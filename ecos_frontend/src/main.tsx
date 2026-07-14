@@ -49,7 +49,7 @@ import AsyncTaskCenterView from './pages/AsyncTaskCenterView';
 import EngineMonitor from './pages/EngineMonitor';
 import CognitiveEngineView from './pages/CognitiveEngineView';
 import KnowledgeView from './pages/KnowledgeView.tsx';
-import AIPKnowledgeView from './pages/AIPKnowledgeView.tsx';
+import GraphExplorerView from './pages/GraphExplorerView.tsx';
 import GuardrailsView from './pages/GuardrailsView.tsx';
 import AIWorkbench from './pages/aiworkbench/index.tsx';
 import WorkshopView from './pages/WorkshopView.tsx';
@@ -97,7 +97,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="domain_designer" element={<Navigate to="/ontology_workbench" replace />} />
               <Route path="ontology" element={<Navigate to="/ontology_workbench" replace />} />
               <Route path="ontology_designer" element={<Navigate to="/ontology_workbench" replace />} />
-              <Route path="knowledge_graph" element={<AIPKnowledgeView />} />
+              <Route path="knowledge_graph" element={<GraphExplorerView />} />
               <Route path="glossary" element={<Navigate to="/ontology_workbench" replace />} />
               <Route path="dict" element={<DictManager />} />
               <Route path="system-config" element={<SystemConfigManager />} />

@@ -2,6 +2,8 @@
 import React from 'react';
 import type { DataPipeline, DataConnection } from '../types';
 import PipelineFlowEditor from '../PipelineFlowEditor';
+import { useTheme } from "../../../components/ThemeContext";
+
 
 interface PipelinesTabProps {
   pipelines: DataPipeline[];
@@ -53,11 +55,11 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
         />
       </div>
     ) : (
-      <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        <div className="px-6 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+      <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
+        <div className={`px-6 py-3 border-b ${styles.cardBorder} flex items-center justify-between shrink-0`}>
           <div>
-            <h3 className="text-sm font-bold text-slate-800">{t("dw.txt.fdcb6f")}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h3 className={`text-sm font-bold ${styles.cardText}`}>{t("dw.txt.fdcb6f")}</h3>
+            <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>
               共 {pipelines.length} 条定义 · 后端实时数据
             </p>
           </div>
@@ -85,10 +87,10 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs`}>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-200">
+                <tr className={`${styles.appBg} ${styles.cardTextMuted} text-[10px] font-extrabold uppercase tracking-wider border-b ${styles.cardBorder}`}>
                   <th className="p-3">{t("dw.txt.5aab17")}</th>
                   <th className="p-3">{t("dw.txt.6f3f00")}</th>
                   <th className="p-3">{t("dw.txt.d21ba8")}</th>
@@ -98,19 +100,19 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
               </thead>
               <tbody className="divide-y divide-slate-150">
                 {pipelines.map((p, idx) => (
-                  <tr key={p.id || idx} className="hover:bg-slate-50/50 transition-colors text-xs">
-                    <td className="p-3 font-bold text-slate-800">{p.name}</td>
-                    <td className="p-3 text-slate-500">{p.description || '-'}</td>
+                  <tr key={p.id || idx} className={`hover:${styles.appBg}/50 transition-colors text-xs`}>
+                    <td className={`p-3 font-bold ${styles.cardText}`}>{p.name}</td>
+                    <td className={`p-3 ${styles.cardTextMuted}`}>{p.description || '-'}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                         p.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                         p.status === 'draft' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                        'bg-slate-100 text-slate-600'
+                        '${styles.sidebarBg} ${styles.cardTextMuted}'
                       }`}>
                         {p.status === 'active' ? '运行中' : p.status === 'draft' ? '草稿' : p.status}
                       </span>
                     </td>
-                    <td className="p-3 text-slate-500 font-mono text-[10px]">{p.lastExecuted || '-'}</td>
+                    <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{p.lastExecuted || '-'}</td>
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <button

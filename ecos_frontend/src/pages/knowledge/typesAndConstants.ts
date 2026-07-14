@@ -107,41 +107,24 @@ export const KNOWLEDGE_TAB_GROUPS = [
     tabs: [{ id: 'closed_loop' as const, labelZh: '闭环设计', label: 'Closed Loop', icon: 'FileText' as const }],
   },
   {
-    id: 'preparation',
-    labelZh: '知识准备（轨道A：平台自用）',
-    label: 'Preparation (Track A)',
+    id: 'data',
+    labelZh: '数据准备',
+    label: 'Data Preparation',
     tabs: [
       { id: 'sync' as const, labelZh: '元数据同步', label: 'Sync', icon: 'Combine' as const },
       { id: 'lineage' as const, labelZh: '血缘解析', label: 'Lineage', icon: 'Network' as const },
       { id: 'ontology' as const, labelZh: '本体对齐', label: 'Ontology', icon: 'Workflow' as const },
-    ],
-  },
-  {
-    id: 'construction',
-    labelZh: '知识构建（轨道B：智能体知识）',
-    label: 'Construction (Track B)',
-    tabs: [
       { id: 'graph_sync' as const, labelZh: '图谱同步', label: 'Graph Sync', icon: 'Database' as const },
-      { id: 'graph_explore' as const, labelZh: '图谱探索', label: 'Graph Explore', icon: 'Share2' as const },
-      { id: 'glossary' as const, labelZh: '术语库', label: 'Glossary', icon: 'BookOpen' as const },
       { id: 'classification' as const, labelZh: '分类体系', label: 'Classification', icon: 'Tag' as const },
     ],
   },
   {
     id: 'retrieval',
-    labelZh: '知识检索',
-    label: 'Retrieval',
+    labelZh: '检索与配置',
+    label: 'Retrieval & Config',
     tabs: [
-      { id: 'index' as const, labelZh: '向量索引', label: 'Index', icon: 'Cpu' as const },
+      { id: 'index' as const, labelZh: '向量索引', label: 'Index & Settings', icon: 'Cpu' as const },
       { id: 'rag' as const, labelZh: 'RAG模拟', label: 'RAG', icon: 'SearchCheck' as const },
-    ],
-  },
-  {
-    id: 'config',
-    labelZh: '配置',
-    label: 'Config',
-    tabs: [
-      { id: 'settings' as const, labelZh: '工作台配置', label: 'Settings', icon: 'Settings' as const },
       { id: 'cognitive_config' as const, labelZh: '认知引擎配置', label: 'Cognitive Config', icon: 'Brain' as const },
     ],
   },

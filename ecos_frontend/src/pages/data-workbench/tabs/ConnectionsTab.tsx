@@ -3,6 +3,8 @@ import React from 'react';
 import LucideIcon from '../LucideIcon';
 import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
+import { useTheme } from "../../../components/ThemeContext";
+
 
 interface ConnectionsTabProps {
   connections: DataConnection[];
@@ -32,9 +34,9 @@ interface ConnectionsTabProps {
 const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, t }) => (
 <div className="flex-1 flex overflow-hidden">
   {/* Connections list panel */}
-  <div className="w-72 bg-white border-r border-slate-200 flex flex-col overflow-hidden shrink-0">
-    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/40">
-      <h3 className="text-xs font-bold text-slate-800">{t("dw.txt.64d3b2")}</h3>
+  <div className={`w-72 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col overflow-hidden shrink-0`}>
+    <div className={`p-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/40`}>
+      <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.txt.64d3b2")}</h3>
       <button
         onClick={() => setShowAddConn(true)}
         className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs flex items-center gap-1 cursor-pointer font-medium"
@@ -54,17 +56,17 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             className={`w-full text-left p-3 rounded-lg border transition-all text-xs flex flex-col gap-1.5 ${
               isSelected
                 ? 'bg-blue-50/80 border-blue-200 shadow-2xs'
-                : 'border-slate-100 hover:bg-slate-50'
+                : '${styles.cardBorder} hover:${styles.appBg}'
             }`}
           >
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-slate-800 truncate pr-2">{conn.name}</span>
+              <span className={`font-semibold ${styles.cardText} truncate pr-2`}>{conn.name}</span>
               <span className={`h-2 w-2 rounded-full ${
                 conn.status === 'connected' ? 'bg-emerald-500' :
                 conn.status === 'error' ? 'bg-red-500' : 'bg-amber-500'
               }`} title={conn.status} />
             </div>
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+            <div className={`flex justify-between text-[10px] ${styles.cardTextMuted} font-mono`}>
               <span>类型: {conn.type.toUpperCase()}</span>
               <span>{conn.tablesAvailable.length} 表/目录</span>
             </div>
@@ -77,23 +79,23 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   {/* Connection Detail View */}
   {(() => {
     const conn = connections.find(c => c.id === selectedConnId);
-    if (!conn) return <div className="flex-1 p-6 text-slate-400">{t("dw.txt.282170")}</div>;
+    if (!conn) return <div className={`flex-1 p-6 ${styles.cardTextMuted}`}>{t("dw.txt.282170")}</div>;
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+      <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
         {/* Detail banner */}
-        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+        <div className={`p-6 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/50`}>
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-full border border-blue-300 bg-blue-50 text-blue-700 flex items-center justify-center">
               <LucideIcon name={getSourceIcon(conn.type)} size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-800">{conn.name}</span>
-                <span className="text-[10px] bg-slate-100 text-slate-500 font-mono px-2 py-0.5 rounded-full uppercase">
+                <span className={`text-sm font-bold ${styles.cardText}`}>{conn.name}</span>
+                <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} font-mono px-2 py-0.5 rounded-full uppercase`}>
                   {conn.type}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">{getSourceTypeLabel(conn.type)}</p>
+              <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{getSourceTypeLabel(conn.type)}</p>
             </div>
           </div>
 
@@ -112,60 +114,60 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Technical specifications */}
           <div className="grid grid-cols-3 gap-6">
-            <div className="col-span-1 bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-slate-700 border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
-                <LucideIcon name="Settings" size={12} className="text-slate-500" />
+            <div className={`col-span-1 ${styles.appBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
+              <h4 className={`text-xs font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-1.5 flex items-center gap-1.5`}>
+                <LucideIcon name="Settings" size={12} className={`${styles.cardTextMuted}`} />
                 物理连接配置参数
               </h4>
 
               <div className="text-xs space-y-2.5">
                 {conn.config.host && (
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase block font-mono">{t("dw.txt.16e578")}</span>
-                    <span className="font-mono font-medium text-slate-800">{conn.config.host}</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.16e578")}</span>
+                    <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.host}</span>
                   </div>
                 )}
                 {conn.config.port && (
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase block font-mono">{t("dw.txt.4016cf")}</span>
-                    <span className="font-mono font-medium text-slate-800">{conn.config.port}</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.4016cf")}</span>
+                    <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.port}</span>
                   </div>
                 )}
                 {conn.config.username && (
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase block font-mono">{t("dw.txt.1169ed")}</span>
-                    <span className="font-mono font-medium text-slate-800">{conn.config.username}</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.1169ed")}</span>
+                    <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.username}</span>
                   </div>
                 )}
                 {conn.config.bucket && (
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase block font-mono">{t("dw.txt.eb9003")}</span>
-                    <span className="font-mono font-medium text-slate-800 truncate block">{conn.config.bucket}</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.eb9003")}</span>
+                    <span className={`font-mono font-medium ${styles.cardText} truncate block`}>{conn.config.bucket}</span>
                   </div>
                 )}
                 {conn.config.endpointUrl && (
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase block font-mono">{t("dw.txt.3cd968")}</span>
-                    <span className="font-mono font-medium text-slate-800 truncate block">{conn.config.endpointUrl}</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.3cd968")}</span>
+                    <span className={`font-mono font-medium ${styles.cardText} truncate block`}>{conn.config.endpointUrl}</span>
                   </div>
                 )}
-                <hr className="border-slate-200" />
+                <hr className={`${styles.cardBorder}`} />
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase block font-mono">{t("dw.txt.165c7b")}</span>
-                  <span className="text-slate-600 text-[11px] font-medium">{conn.config.lastTested || '从未测试'}</span>
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.165c7b")}</span>
+                  <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || '从未测试'}</span>
                 </div>
               </div>
             </div>
 
             {/* Database physical table browser */}
             <div className="col-span-2 space-y-4">
-              <h4 className="text-xs font-bold text-slate-800 flex items-center justify-between">
+              <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
                 <span>{t("dw.txt.42bc1b")}</span>
-                <span className="text-[10px] text-slate-500 font-normal"> Ontology 映射只读元数据清单 ({conn.tablesAvailable.length} 表)</span>
+                <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> Ontology 映射只读元数据清单 ({conn.tablesAvailable.length} 表)</span>
               </h4>
 
               {conn.tablesAvailable.length === 0 ? (
-                <div className="p-8 border border-dashed border-slate-300 rounded-xl text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+                <div className={`p-8 border border-dashed border-slate-300 rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
                   <LucideIcon name="AlertTriangle" size={24} className="text-amber-500" />
                   <span>{t("dw.txt.2ce9e0")}</span>
                   <span>{t("dw.txt.44e8b3")}</span>
@@ -173,23 +175,23 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               ) : (
                 <div className="space-y-4">
                   {conn.tablesAvailable.map(tbl => (
-                    <div key={tbl.name} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
-                      <div className="bg-slate-100/70 px-4 py-2 flex justify-between items-center border-b border-slate-200">
+                    <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50`}>
+                      <div className={`${styles.sidebarBg}/70 px-4 py-2 flex justify-between items-center border-b ${styles.cardBorder}`}>
                         <div className="flex items-center gap-2 text-xs">
                           <LucideIcon name="Table" size={13} className="text-blue-500" />
-                          <span className="font-bold font-mono text-slate-800">{tbl.name}</span>
+                          <span className={`font-bold font-mono ${styles.cardText}`}>{tbl.name}</span>
                         </div>
-                        <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full font-mono">
+                        <span className={`text-[10px] ${styles.cardTextMuted} ${styles.cardBg} border ${styles.cardBorder} px-2 py-0.5 rounded-full font-mono`}>
                           物理总行数: {tbl.rowCount.toLocaleString()} 行
                         </span>
                       </div>
 
-                      <div className="p-3 bg-white">
+                      <div className={`p-3 ${styles.cardBg}`}>
                         <div className="grid grid-cols-4 gap-2 text-[11px]">
                           {tbl.columns.map(col => (
-                            <div key={col.name} className="p-1.5 bg-slate-50 rounded border border-slate-100 flex flex-col font-mono">
-                              <span className="text-slate-800 truncate font-semibold" title={col.name}>{col.name}</span>
-                              <span className="text-[9px] text-slate-400 mt-0.5">{col.type}</span>
+                            <div key={col.name} className={`p-1.5 ${styles.appBg} rounded border ${styles.cardBorder} flex flex-col font-mono`}>
+                              <span className={`${styles.cardText} truncate font-semibold`} title={col.name}>{col.name}</span>
+                              <span className={`text-[9px] ${styles.cardTextMuted} mt-0.5`}>{col.type}</span>
                             </div>
                           ))}
                         </div>
@@ -204,7 +206,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
           {/* Diagnostic Log Terminal */}
           {testingLogs.length > 0 && (
             <div className="bg-slate-950 p-4 rounded-xl text-xs font-mono text-slate-200 space-y-1.5 border border-slate-800 select-text leading-relaxed">
-              <div className="text-[10px] text-slate-500 tracking-wider uppercase font-semibold mb-2 border-b border-slate-900 pb-1 flex justify-between items-center select-none">
+              <div className={`text-[10px] ${styles.cardTextMuted} tracking-wider uppercase font-semibold mb-2 border-b border-slate-900 pb-1 flex justify-between items-center select-none`}>
                 <span>{t("dw.txt.26079a")}</span>
                 <span className="text-blue-400">JDBC API Log v1.4</span>
               </div>
@@ -257,21 +259,21 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
   };
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
-      <div className="bg-slate-100 px-4 py-2 flex items-center justify-between cursor-pointer select-none"
+    <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden`}>
+      <div className={`${styles.sidebarBg} px-4 py-2 flex items-center justify-between cursor-pointer select-none`}
            onClick={() => setCollapsed(!collapsed)}>
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+        <div className={`flex items-center gap-2 text-xs font-bold ${styles.cardText}`}>
           <LucideIcon name="Terminal" size={14} className="text-blue-600" />
           <span>SQL 查询控制台</span>
         </div>
-        <LucideIcon name={collapsed ? 'ChevronDown' : 'ChevronUp'} size={14} className="text-slate-400" />
+        <LucideIcon name={collapsed ? 'ChevronDown' : 'ChevronUp'} size={14} className={`${styles.cardTextMuted}`} />
       </div>
       {!collapsed && (
-        <div className="bg-white p-3 space-y-3">
+        <div className={`${styles.cardBg} p-3 space-y-3`}>
           {/* SQL 编辑器 + 执行按钮 */}
           <div className="flex gap-2">
             <textarea value={sql} onChange={e => setSql(e.target.value)}
-              className="flex-1 p-2 border border-slate-200 rounded text-xs font-mono resize-none outline-none focus:border-blue-400 h-16"
+              className={`flex-1 p-2 border ${styles.cardBorder} rounded text-xs font-mono resize-none outline-none focus:border-blue-400 h-16`}
               placeholder="SELECT * FROM ..." spellCheck={false} />
             <button onClick={execute} disabled={loading}
               className="px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0">
@@ -282,24 +284,24 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
           {error && <div className="text-rose-500 text-xs bg-rose-50 p-2 rounded">⚠ {error}</div>}
           {result && !error && (
             <div>
-              <div className="flex items-center gap-3 text-[10px] text-slate-500 mb-2">
+              <div className={`flex items-center gap-3 text-[10px] ${styles.cardTextMuted} mb-2`}>
                 <span className="text-emerald-600 font-bold">{result.rowCount} 行</span>
                 <span>{result.elapsedMs}ms</span>
                 <span>{result.columns.length} 列</span>
               </div>
-              <div className="max-h-64 overflow-auto border border-slate-200 rounded">
+              <div className={`max-h-64 overflow-auto border ${styles.cardBorder} rounded`}>
                 <table className="w-full text-[11px]">
-                  <thead><tr className="bg-slate-50">
+                  <thead><tr className={`${styles.appBg}`}>
                     {result.columns.map((c: string) => (
-                      <th key={c} className="px-2 py-1 text-left font-bold text-slate-700 whitespace-nowrap border-b">{c}</th>
+                      <th key={c} className={`px-2 py-1 text-left font-bold ${styles.cardText} whitespace-nowrap border-b`}>{c}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {result.rows.slice(0, 50).map((row: any, i: number) => (
                       <tr key={i} className={i % 2 ? 'bg-slate-50/50' : ''}>
                         {result.columns.map((c: string) => (
-                          <td key={c} className="px-2 py-0.5 text-slate-600 border-b border-slate-100 max-w-[200px] truncate">
-                            {row[c] === null ? <span className="text-slate-400 italic">NULL</span> : String(row[c])}
+                          <td key={c} className={`px-2 py-0.5 ${styles.cardTextMuted} border-b ${styles.cardBorder} max-w-[200px] truncate`}>
+                            {row[c] === null ? <span className={`${styles.cardTextMuted} italic`}>NULL</span> : String(row[c])}
                           </td>
                         ))}
                       </tr>

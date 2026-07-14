@@ -582,7 +582,7 @@ export default function LineageMapView({
             style={{ left: layout.x }}
           >
             <span
-              className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border ${stageColors[key] || 'text-slate-400 border-slate-600 bg-slate-800/50'}`}
+              className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border ${stageColors[key] || '${styles.cardTextMuted} border-slate-600 bg-slate-800/50'}`}
             >
               {layout.label}
             </span>
@@ -597,27 +597,27 @@ export default function LineageMapView({
           <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.appBorder} ${styles.sidebarBg}`}>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${styles.sidebarBg}`}>
-                <Database size={16} className="text-slate-600" />
+                <Database size={16} className={`${styles.cardTextMuted}`} />
               </div>
               <div className="min-w-0">
                 <h3 className={`text-sm font-semibold truncate ${styles.cardText}`}>
                   {String(selectedNode.data?.label || '未命名')}
                 </h3>
-                <p className="text-[10px] text-slate-500 truncate">
+                <p className={`text-[10px] ${styles.cardTextMuted} truncate`}>
                   {selectedNode.type?.replace('lineage', '').replace('Node', '') || ''}
                 </p>
               </div>
             </div>
             <button
               onClick={closePanel}
-              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition"
+              className={`p-1.5 rounded-lg ${styles.sidebarHoverBg} ${styles.cardTextMuted} hover:${styles.cardText} transition`}
             >
               <X size={16} />
             </button>
           </div>
 
           {/* Tab 导航 */}
-          <div className="flex border-b border-slate-200 bg-slate-50">
+          <div className={`flex border-b ${styles.cardBorder} ${styles.appBg}`}>
             {TABS.map(tab => {
               const Icon = tab.icon;
               return (
@@ -628,8 +628,8 @@ export default function LineageMapView({
                     flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5
                     text-[11px] font-medium transition-colors
                     ${activeTab === tab.id
-                      ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                      ? 'text-blue-600 border-b-2 border-blue-600 ${styles.cardBg}'
+                      : '${styles.cardTextMuted} hover:${styles.cardText} hover:${styles.sidebarBg}'
                     }
                   `}
                 >
@@ -775,7 +775,7 @@ function DatasetInfoPanel({ nodeData, nodeType, healthChecks, rawData }: PanelPr
           <span className={`px-2 py-0.5 rounded text-xs font-medium ${slaStatus.color}`}>
             {slaStatus.label}
           </span>
-          <span className="text-xs text-slate-500">
+          <span className={`text-xs ${styles.cardTextMuted}`}>
             {healthChecks?.length || 0} 个检查规则
           </span>
         </div>
@@ -784,8 +784,8 @@ function DatasetInfoPanel({ nodeData, nodeType, healthChecks, rawData }: PanelPr
             {healthChecks.map(hc => (
               <div key={hc.id} className="flex items-center gap-2 text-xs">
                 <StatusBadge status={hc.status} />
-                <span className="text-slate-700 truncate">{hc.name}</span>
-                <span className="text-slate-400 text-[10px]">{hc.checkType}</span>
+                <span className={`${styles.cardText} truncate`}>{hc.name}</span>
+                <span className={`${styles.cardTextMuted} text-[10px]`}>{hc.checkType}</span>
               </div>
             ))}
           </div>
@@ -801,11 +801,11 @@ function DatasetInfoPanel({ nodeData, nodeType, healthChecks, rawData }: PanelPr
               return (
                 <div
                   key={`${field.name}-${i}`}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-slate-50 text-xs"
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md ${styles.appBg} text-xs`}
                 >
-                  <TypeIcon size={12} className="text-slate-400 shrink-0" />
-                  <span className="font-mono text-slate-700 truncate flex-1">{field.name}</span>
-                  <span className="text-[10px] text-slate-500 uppercase">{field.type}</span>
+                  <TypeIcon size={12} className={`${styles.cardTextMuted} shrink-0`} />
+                  <span className={`font-mono ${styles.cardText} truncate flex-1`}>{field.name}</span>
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase`}>{field.type}</span>
                 </div>
               );
             })}
@@ -829,10 +829,10 @@ function DatasetInfoPanel({ nodeData, nodeType, healthChecks, rawData }: PanelPr
           <Section title="可用表">
             <div className="space-y-1 max-h-[150px] overflow-y-auto">
               {(rawData.data as DataConnection).tablesAvailable?.map((t: any) => (
-                <div key={t.name} className="flex items-center gap-2 px-2 py-1 text-xs text-slate-700">
-                  <Table2 size={11} className="text-slate-400 shrink-0" />
+                <div key={t.name} className={`flex items-center gap-2 px-2 py-1 text-xs ${styles.cardText}`}>
+                  <Table2 size={11} className={`${styles.cardTextMuted} shrink-0`} />
                   <span className="truncate flex-1">{t.name}</span>
-                  <span className="text-[10px] text-slate-500">{t.rowCount?.toLocaleString()} 行</span>
+                  <span className={`text-[10px] ${styles.cardTextMuted}`}>{t.rowCount?.toLocaleString()} 行</span>
                 </div>
               ))}
             </div>
@@ -856,7 +856,7 @@ function RelationsPanel({ upstream, downstream }: RelationsPanelProps) {
       {/* 上游数据源 */}
       <Section title={`上游数据源 (${upstream.length})`}>
         {upstream.length === 0 ? (
-          <p className="text-xs text-slate-400 italic">无上游依赖</p>
+          <p className={`text-xs ${styles.cardTextMuted} italic`}>无上游依赖</p>
         ) : (
           <div className="space-y-2">
             {upstream.map((item, i) => (
@@ -866,9 +866,9 @@ function RelationsPanel({ upstream, downstream }: RelationsPanelProps) {
               >
                 <ArrowRightLeft size={14} className="text-blue-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{item.name}</p>
+                  <p className={`text-xs font-medium ${styles.cardText} truncate`}>{item.name}</p>
                   {item.detail && (
-                    <p className="text-[10px] text-slate-500 truncate">{item.detail}</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted} truncate`}>{item.detail}</p>
                   )}
                 </div>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 font-medium">
@@ -883,7 +883,7 @@ function RelationsPanel({ upstream, downstream }: RelationsPanelProps) {
       {/* 下游消费者 */}
       <Section title={`下游消费者 (${downstream.length})`}>
         {downstream.length === 0 ? (
-          <p className="text-xs text-slate-400 italic">无下游消费</p>
+          <p className={`text-xs ${styles.cardTextMuted} italic`}>无下游消费</p>
         ) : (
           <div className="space-y-2">
             {downstream.map((item, i) => (
@@ -893,9 +893,9 @@ function RelationsPanel({ upstream, downstream }: RelationsPanelProps) {
               >
                 <ArrowRightLeft size={14} className="text-emerald-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{item.name}</p>
+                  <p className={`text-xs font-medium ${styles.cardText} truncate`}>{item.name}</p>
                   {item.detail && (
-                    <p className="text-[10px] text-slate-500 truncate">{item.detail}</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted} truncate`}>{item.detail}</p>
                   )}
                 </div>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-600 font-medium">
@@ -919,15 +919,15 @@ function RelationsPanel({ upstream, downstream }: RelationsPanelProps) {
               >
                 <Box size={14} className="text-rose-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{item.name}</p>
+                  <p className={`text-xs font-medium ${styles.cardText} truncate`}>{item.name}</p>
                   {item.detail && (
-                    <p className="text-[10px] text-slate-500 truncate">域: {item.detail}</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted} truncate`}>域: {item.detail}</p>
                   )}
                 </div>
               </div>
             ))}
           {downstream.filter(item => item.type === 'Ontology实体').length === 0 && (
-            <p className="text-xs text-slate-400 italic">无关联 Ontology 实体</p>
+            <p className={`text-xs ${styles.cardTextMuted} italic`}>无关联 Ontology 实体</p>
           )}
         </div>
       </Section>
@@ -986,7 +986,7 @@ function TransformPanel({ selectedNode, rawData }: TransformPanelProps) {
 
   if (transforms.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+      <div className={`flex flex-col items-center justify-center h-40 ${styles.cardTextMuted}`}>
         <FileCode size={32} className="mb-2 opacity-30" />
         <p className="text-xs">该节点无转换规格</p>
       </div>
@@ -998,18 +998,18 @@ function TransformPanel({ selectedNode, rawData }: TransformPanelProps) {
       {transforms.map((t, i) => (
         <div
           key={i}
-          className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2"
+          className={`rounded-lg border ${styles.cardBorder} ${styles.appBg} p-3 space-y-2`}
         >
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-amber-100 flex items-center justify-center">
               <GitBranch size={11} className="text-amber-600" />
             </div>
-            <span className="text-xs font-semibold text-slate-700">{t.name}</span>
+            <span className={`text-xs font-semibold ${styles.cardText}`}>{t.name}</span>
           </div>
 
           {t.expression && (
             <div>
-              <span className="text-[10px] font-medium text-slate-500 uppercase">表达式</span>
+              <span className={`text-[10px] font-medium ${styles.cardTextMuted} uppercase`}>表达式</span>
               <pre className="mt-0.5 p-2 rounded bg-slate-800 text-[10px] text-emerald-300 font-mono overflow-x-auto">
                 {t.expression}
               </pre>
@@ -1147,18 +1147,18 @@ function ExecutionPanel({ rawData, healthChecks }: ExecutionPanelProps) {
             {healthChecks.map(hc => (
               <div
                 key={hc.id}
-                className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-100"
+                className={`flex items-center justify-between px-3 py-2 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Shield size={12} className="text-slate-400 shrink-0" />
+                  <Shield size={12} className={`${styles.cardTextMuted} shrink-0`} />
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-slate-700 truncate">{hc.name}</p>
-                    <p className="text-[10px] text-slate-500">{hc.checkType}</p>
+                    <p className={`text-xs font-medium ${styles.cardText} truncate`}>{hc.name}</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted}`}>{hc.checkType}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {hc.lastChecked && (
-                    <span className="text-[10px] text-slate-400">
+                    <span className={`text-[10px] ${styles.cardTextMuted}`}>
                       {new Date(hc.lastChecked).toLocaleDateString('zh-CN')}
                     </span>
                   )}
@@ -1172,7 +1172,7 @@ function ExecutionPanel({ rawData, healthChecks }: ExecutionPanelProps) {
 
       {/* 无执行记录 */}
       {!execInfo.lastExecuted && !execInfo.errorMessage && (!healthChecks || healthChecks.length === 0) && (
-        <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+        <div className={`flex flex-col items-center justify-center h-32 ${styles.cardTextMuted}`}>
           <RefreshCw size={28} className="mb-2 opacity-30" />
           <p className="text-xs">暂无执行记录</p>
         </div>
@@ -1186,7 +1186,7 @@ function ExecutionPanel({ rawData, healthChecks }: ExecutionPanelProps) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+      <h4 className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider mb-2`}>
         {title}
       </h4>
       {children}
@@ -1196,9 +1196,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-slate-50">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-xs font-medium text-slate-700 truncate max-w-[200px] text-right">
+    <div className={`flex items-center justify-between py-1.5 px-2 rounded-md hover:${styles.appBg}`}>
+      <span className={`text-xs ${styles.cardTextMuted}`}>{label}</span>
+      <span className={`text-xs font-medium ${styles.cardText} truncate max-w-[200px] text-right`}>
         {value || '-'}
       </span>
     </div>
@@ -1224,10 +1224,10 @@ function StatCard({
         : 'text-slate-600';
 
   return (
-    <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-      <div className="text-slate-400 mb-1">{icon}</div>
+    <div className={`flex flex-col items-center justify-center p-3 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>
+      <div className={`${styles.cardTextMuted} mb-1`}>{icon}</div>
       <span className={`text-lg font-bold ${statusColor}`}>{value}</span>
-      <span className="text-[10px] text-slate-500">{label}</span>
+      <span className={`text-[10px] ${styles.cardTextMuted}`}>{label}</span>
     </div>
   );
 }

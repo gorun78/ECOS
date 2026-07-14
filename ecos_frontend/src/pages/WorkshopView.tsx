@@ -6,6 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Check, Inbox, LayoutGrid, MousePointerClick, Palette, Play, Plus, PlusCircle, Send, Settings, Trash2, Zap, LayoutDashboard, Plane, Activity, HeartPulse } from 'lucide-react';
 import * as Icons from 'lucide-react';
+import { useTheme } from "../components/ThemeContext";
+
 
 // ── Local types (self-contained workshop) ──
 interface ObjectType { id: string; name: string; }
@@ -289,6 +291,7 @@ const initialApps: WorkshopApp[] = [
 ];
 
 export default function WorkshopView({ showToast: propShowToast }: { showToast?: (type: 'success' | 'info' | 'error', message: string) => void }) {
+  const { styles } = useTheme();
   const showToast = propShowToast || ((type: string, msg: string) => console.log(`[workshop:${type}]`, msg));
   // Workshop states
   const [apps, setApps] = useState<WorkshopApp[]>(() => {
@@ -900,20 +903,20 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 select-none text-xs font-sans">
+    <div className={`flex-1 flex flex-col h-full overflow-hidden ${styles.appBg} select-none text-xs font-sans`}>
       
       {/* 1. APP LIST SCREEN */}
       {activeAppId === null ? (
         <div className="flex-1 overflow-y-auto p-8 max-w-5xl mx-auto w-full space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-4`}>
             <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <h1 className={`text-xl font-bold ${styles.cardText} tracking-tight flex items-center gap-2`}>
                 <span className="p-2 rounded-lg bg-blue-600 text-white">
                   <LayoutGrid size={18} />
                 </span>
                 <span>Workshop 应用构建中心</span>
               </h1>
-              <p className="text-slate-500 mt-1 text-xs">
+              <p className={`${styles.cardTextMuted} mt-1 text-xs`}>
                 通过直接绑定企业本体数据、关联链条及操作实体，进行可视化拼装交互式前端应用程序。
               </p>
             </div>
@@ -936,7 +939,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                   setSelectedWidgetId(null);
                   setEditorMode('design');
                 }}
-                className="bg-white rounded-xl border border-slate-200 p-5 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between h-44 relative group"
+                className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between h-44 relative group`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -955,20 +958,20 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                       )}
                     </div>
                   </div>
-                  <h3 className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">
+                  <h3 className={`font-bold ${styles.cardText} text-sm group-hover:text-blue-600 transition-colors`}>
                     {app.name}
                   </h3>
-                  <p className="text-slate-500 mt-1.5 text-xs line-clamp-2 leading-relaxed">
+                  <p className={`${styles.cardTextMuted} mt-1.5 text-xs line-clamp-2 leading-relaxed`}>
                     {app.description}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-[10px] text-slate-400 font-mono">
+                <div className={`flex items-center justify-between border-t ${styles.cardBorder} pt-3 text-[10px] ${styles.cardTextMuted} font-mono`}>
                   <span>更新于 {app.lastModified}</span>
                   <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => handleDeleteApp(app.id, app.name)}
-                      className="p-1.5 hover:bg-red-50 hover:text-red-600 rounded-md text-slate-400 transition-colors"
+                      className={`p-1.5 hover:bg-red-50 hover:text-red-600 rounded-md ${styles.cardTextMuted} transition-colors`}
                       title="删除应用"
                     >
                       <Trash2 size={13} />
@@ -982,14 +985,14 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
       ) : (
         
         // 2. WORKSHOP EDITOR WORKSPACE (Three-column layout)
-        <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
           
           {/* Top Control Header bar */}
-          <div className="h-11 bg-slate-100 border-b border-slate-200 px-3 flex items-center justify-between shrink-0 select-none">
+          <div className={`h-11 ${styles.sidebarBg} border-b ${styles.cardBorder} px-3 flex items-center justify-between shrink-0 select-none`}>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setActiveAppId(null)}
-                className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                className={`p-1.5 hover:bg-slate-200 rounded-lg ${styles.cardTextMuted} transition-colors cursor-pointer`}
                 title="返回应用清单"
               >
                 <ArrowLeft size={15} />
@@ -1000,10 +1003,10 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                   type="text"
                   value={activeApp.name}
                   onChange={e => handleUpdateAppTheme({}, e.target.value)}
-                  className="font-bold text-xs text-slate-800 bg-transparent hover:bg-slate-200/50 focus:bg-white focus:outline-hidden px-1.5 py-0.5 rounded-md transition-all font-sans w-64 border border-transparent focus:border-slate-300"
+                  className={`font-bold text-xs ${styles.cardText} bg-transparent hover:bg-slate-200/50 focus:${styles.cardBg} focus:outline-hidden px-1.5 py-0.5 rounded-md transition-all font-sans w-64 border border-transparent focus:border-slate-300`}
                 />
               </div>
-              <span className="text-[10px] text-slate-400 bg-slate-200/60 px-1.5 py-0.5 rounded font-mono uppercase">
+              <span className={`text-[10px] ${styles.cardTextMuted} bg-slate-200/60 px-1.5 py-0.5 rounded font-mono uppercase`}>
                 {activeApp.id}
               </span>
             </div>
@@ -1016,7 +1019,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                   setSelectedWidgetId(null);
                 }}
                 className={`px-3 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                  editorMode === 'design' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  editorMode === 'design' ? '${styles.cardBg} ${styles.cardText} shadow-xs' : '${styles.cardTextMuted} hover:${styles.cardText}'
                 }`}
               >
                 <Palette size={11} />
@@ -1028,7 +1031,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                   setSelectedWidgetId(null);
                 }}
                 className={`px-3 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                  editorMode === 'preview' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  editorMode === 'preview' ? '${styles.cardBg} ${styles.cardText} shadow-xs' : '${styles.cardTextMuted} hover:${styles.cardText}'
                 }`}
               >
                 <Play size={11} />
@@ -1040,7 +1043,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[10px] text-slate-500 mr-2">草稿已自动保存</span>
+                <span className={`text-[10px] ${styles.cardTextMuted} mr-2`}>草稿已自动保存</span>
               </div>
               <button
                 onClick={handlePublishApp}
@@ -1056,17 +1059,17 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
           <div className="flex-1 flex overflow-hidden">
             
             {/* COLUMN 1: LEFT CONFIG SIDEBAR (Widget list, Pages, Variables, Styles) */}
-            <div className="w-60 bg-slate-50 border-r border-slate-200 flex flex-col h-full shrink-0">
+            <div className={`w-60 ${styles.appBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
               {/* Tab Selector */}
-              <div className="flex border-b border-slate-200 divide-x divide-slate-200/55 text-center shrink-0">
+              <div className={`flex border-b ${styles.cardBorder} divide-x divide-slate-200/55 text-center shrink-0`}>
                 {(['pages', 'variables', 'widgets', 'theme'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setLeftTab(tab)}
                     className={`flex-1 py-2 font-semibold text-[10px] uppercase transition-colors cursor-pointer ${
                       leftTab === tab
-                        ? 'bg-white text-slate-900 border-b-2 border-slate-800'
-                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                        ? '${styles.cardBg} ${styles.cardText} border-b-2 border-slate-800'
+                        : '${styles.cardTextMuted} hover:${styles.sidebarBg} hover:${styles.cardText}'
                     }`}
                   >
                     {tab === 'pages' ? '页面' : tab === 'variables' ? '数据变量' : tab === 'widgets' ? '组件树' : '属性'}
@@ -1081,7 +1084,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 {leftTab === 'pages' && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-[10px] text-slate-400 uppercase">应用页面 ({activeApp.pages.length})</span>
+                      <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase`}>应用页面 ({activeApp.pages.length})</span>
                       <button onClick={handleAddPage} className="p-1 hover:bg-slate-200 rounded text-blue-600" title="添加新视图">
                         <Plus size={13} />
                       </button>
@@ -1097,7 +1100,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                               setSelectedWidgetId(null);
                             }}
                             className={`w-full p-2 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
-                              isActive ? 'bg-white shadow-xs border border-slate-200 font-bold text-slate-900' : 'text-slate-600 hover:bg-slate-200/50'
+                              isActive ? '${styles.cardBg} shadow-xs border ${styles.cardBorder} font-bold ${styles.cardText}' : '${styles.cardTextMuted} hover:bg-slate-200/50'
                             }`}
                           >
                             <div className="flex items-center gap-2 truncate">
@@ -1153,7 +1156,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 {leftTab === 'variables' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-[10px] text-slate-400 uppercase">状态与变量</span>
+                      <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase`}>状态与变量</span>
                       <button
                         onClick={() => setShowAddVarModal(true)}
                         className="p-1 hover:bg-slate-200 rounded text-blue-600 flex items-center gap-0.5"
@@ -1165,17 +1168,17 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
 
                     <div className="space-y-2">
                       {activeApp.variables.map(v => (
-                        <div key={v.id} className="p-2 bg-white rounded-lg border border-slate-200 space-y-1 hover:border-slate-300">
+                        <div key={v.id} className={`p-2 ${styles.cardBg} rounded-lg border ${styles.cardBorder} space-y-1 hover:border-slate-300`}>
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-800 text-xs truncate" title={v.name}>{v.name}</span>
+                            <span className={`font-bold ${styles.cardText} text-xs truncate`} title={v.name}>{v.name}</span>
                             <span className={`px-1.5 py-0.2 rounded border text-[8px] font-mono uppercase shrink-0 ${getVarTypeBadge(v.type)}`}>
                               {v.type === 'object_set' ? `集合:${v.objectTypeId}` : v.type === 'object' ? `实体:${v.objectTypeId}` : v.type}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 leading-tight">{v.description}</p>
-                          <div className="bg-slate-50 p-1 rounded font-mono text-[9px] text-slate-600 truncate border border-slate-200/50 flex justify-between items-center">
-                            <span className="text-slate-400">运行值:</span>
-                            <span className="truncate max-w-32 font-bold text-slate-700">
+                          <p className={`text-[10px] ${styles.cardTextMuted} leading-tight`}>{v.description}</p>
+                          <div className={`${styles.appBg} p-1 rounded font-mono text-[9px] ${styles.cardTextMuted} truncate border ${styles.cardBorder}/50 flex justify-between items-center`}>
+                            <span className={`${styles.cardTextMuted}`}>运行值:</span>
+                            <span className={`truncate max-w-32 font-bold ${styles.cardText}`}>
                               {v.type === 'object_set' ? 'Dynamic Set' : v.value ? (typeof v.value === 'object' ? v.value.flightNumber || v.value.tailNumber : String(v.value)) : 'null'}
                             </span>
                           </div>
@@ -1188,7 +1191,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 {/* 3. WIDGETS TREE VIEW */}
                 {leftTab === 'widgets' && (
                   <div className="space-y-3">
-                    <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1">页面组件层级 Tree</span>
+                    <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>页面组件层级 Tree</span>
                     <div className="space-y-1">
                       {activePage?.widgets.map(w => {
                         const isSelected = w.id === selectedWidgetId;
@@ -1197,11 +1200,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                             key={w.id}
                             onClick={() => setSelectedWidgetId(w.id)}
                             className={`p-1.5 rounded-md flex items-center justify-between cursor-pointer transition-all ${
-                              isSelected ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600' : 'text-slate-600 hover:bg-slate-100'
+                              isSelected ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600' : '${styles.cardTextMuted} hover:${styles.sidebarBg}'
                             }`}
                           >
                             <div className="flex items-center gap-1.5 truncate">
-                              <span className="text-slate-400">
+                              <span className={`${styles.cardTextMuted}`}>
                                 <DynamicIcon
                                   name={
                                     w.type === 'table' ? 'TableProperties' :
@@ -1214,12 +1217,12 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                               </span>
                               <span className="truncate text-[11px]">{w.title}</span>
                             </div>
-                            <span className="text-[8px] font-mono text-slate-400 lowercase">{w.slot}</span>
+                            <span className={`text-[8px] font-mono ${styles.cardTextMuted} lowercase`}>{w.slot}</span>
                           </div>
                         );
                       })}
                       {(!activePage || activePage.widgets.length === 0) && (
-                        <div className="p-4 text-center text-slate-400 text-xs">画布空空如也，请从预览区添加组件</div>
+                        <div className={`p-4 text-center ${styles.cardTextMuted} text-xs`}>画布空空如也，请从预览区添加组件</div>
                       )}
                     </div>
                   </div>
@@ -1228,31 +1231,31 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 {/* 4. APP THEME VIEW */}
                 {leftTab === 'theme' && (
                   <div className="space-y-4">
-                    <span className="font-bold text-[10px] text-slate-400 uppercase block">应用主题与外观设置</span>
+                    <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase block`}>应用主题与外观设置</span>
                     
                     <div className="space-y-2">
                       <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[10px]">应用品牌名</label>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>应用品牌名</label>
                         <input
                           type="text"
                           value={activeApp.theme.title}
                           onChange={e => handleUpdateAppTheme({ title: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-hidden"
+                          className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md focus:outline-hidden`}
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[10px]">应用描述</label>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>应用描述</label>
                         <textarea
                           value={activeApp.description}
                           onChange={e => handleUpdateAppTheme({}, undefined, e.target.value)}
                           rows={2}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-hidden resize-none"
+                          className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md focus:outline-hidden resize-none`}
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-slate-600 font-semibold text-[10px]">主色调 (Accent Color)</label>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>主色调 (Accent Color)</label>
                         <div className="flex gap-2">
                           {['blue', 'indigo', 'violet', 'emerald', 'rose'].map(color => {
                             const selected = activeApp.theme.primaryColor === color;
@@ -1274,14 +1277,14 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         </div>
                       </div>
 
-                      <div className="space-y-1.5 pt-2 border-t border-slate-200/50">
-                        <label className="text-slate-600 font-semibold text-[10px] flex items-center justify-between">
+                      <div className={`space-y-1.5 pt-2 border-t ${styles.cardBorder}/50`}>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px] flex items-center justify-between`}>
                           <span>深色主题 (Dark Mode)</span>
                           <input
                             type="checkbox"
                             checked={activeApp.theme.isDark}
                             onChange={e => handleUpdateAppTheme({ isDark: e.target.checked })}
-                            className="rounded text-slate-900 border-slate-300 h-3 w-3"
+                            className={`rounded ${styles.cardText} border-slate-300 h-3 w-3`}
                           />
                         </label>
                       </div>
@@ -1293,11 +1296,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
             </div>
 
             {/* COLUMN 2: CENTER STAGE (Canvas Designer or Live interact) */}
-            <div className={`flex-1 flex flex-col overflow-hidden ${activeApp.theme.isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden ${activeApp.theme.isDark ? 'bg-slate-950 text-slate-100' : '${styles.sidebarBg} ${styles.cardText}'}`}>
               
               {/* Application's Own Inner Header Bar */}
               <div className={`h-11 px-4 flex items-center justify-between shadow-xs border-b shrink-0 ${
-                activeApp.theme.isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
+                activeApp.theme.isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : '${styles.cardBg} ${styles.cardBorder} ${styles.cardText}'
               }`}>
                 <div className="flex items-center gap-2">
                   <span className={`p-1 rounded bg-${activeApp.theme.primaryColor}-100 text-${activeApp.theme.primaryColor}-700`}>
@@ -1356,18 +1359,18 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                       <div
                         key={w.id}
                         onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                        className={`relative rounded-xl border p-4 bg-white shadow-xs select-none transition-all ${
+                        className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs select-none transition-all ${
                           editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                        } ${isSelected ? 'ring-2 ring-blue-500 border-transparent scale-102' : 'border-slate-200'}`}
+                        } ${isSelected ? 'ring-2 ring-blue-500 border-transparent scale-102' : '${styles.cardBorder}'}`}
                       >
                         {editorMode === 'design' && (
-                          <div className="absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 bg-slate-100 rounded px-1.5 py-0.5 text-[8px] font-mono">
+                          <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                             <span>Hash</span>
                             <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                           </div>
                         )}
-                        <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{w.title}</p>
-                        <h2 className="text-2xl font-black text-slate-900 mt-1">{metricValue} <span className="text-xs font-semibold text-slate-500">条记录</span></h2>
+                        <p className={`text-[10px] uppercase font-bold ${styles.cardTextMuted} tracking-wider`}>{w.title}</p>
+                        <h2 className={`text-2xl font-black ${styles.cardText} mt-1`}>{metricValue} <span className={`text-xs font-semibold ${styles.cardTextMuted}`}>条记录</span></h2>
                       </div>
                     );
                   })}
@@ -1375,7 +1378,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                   {editorMode === 'design' && (
                     <button
                       onClick={() => { setAddWidgetSlot('main_top'); setShowAddWidgetModal(true); }}
-                      className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer min-h-[80px]"
+                      className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[80px]`}
                     >
                       <Plus size={15} />
                       <span className="text-[10px] mt-1 font-semibold">添加指标卡</span>
@@ -1397,25 +1400,25 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         <div
                           key={w.id}
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                          className={`relative rounded-xl border p-4 bg-white shadow-xs transition-all ${
+                          className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-slate-200'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
                         >
                           {editorMode === 'design' && (
-                            <div className="absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 bg-slate-100 rounded px-1.5 py-0.5 text-[8px] font-mono">
+                            <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Filter</span>
                               <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
-                          <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3 text-[11px]">{w.title}</h3>
+                          <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-3 text-[11px]`}>{w.title}</h3>
                           
                           {/* Simulated Filters */}
                           <div className="space-y-3">
                             <div className="space-y-1">
-                              <label className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">航班状态：</label>
+                              <label className={`${styles.cardTextMuted} text-[10px] uppercase font-bold tracking-wider`}>航班状态：</label>
                               <div className="space-y-1.5">
                                 {['ALL', 'ON_TIME', 'DELAYED', 'BOARDING', 'CANCELLED'].map(st => (
-                                  <label key={st} className="flex items-center gap-2 cursor-pointer text-slate-700">
+                                  <label key={st} className={`flex items-center gap-2 cursor-pointer ${styles.cardText}`}>
                                     <input
                                       type="radio"
                                       name="status_filter"
@@ -1432,13 +1435,13 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                               </div>
                             </div>
 
-                            <div className="space-y-1 pt-2 border-t border-slate-100">
-                              <label className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">枢纽港口：</label>
+                            <div className={`space-y-1 pt-2 border-t ${styles.cardBorder}`}>
+                              <label className={`${styles.cardTextMuted} text-[10px] uppercase font-bold tracking-wider`}>枢纽港口：</label>
                               <select
                                 disabled={editorMode === 'design'}
                                 value={activeAirport}
                                 onChange={e => handleVariableChange('v_filter_airport', e.target.value)}
-                                className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold"
+                                className={`w-full px-2 py-1 ${styles.cardBg} border ${styles.cardBorder} rounded-md text-xs font-semibold`}
                               >
                                 <option value="ALL">全部关联机场</option>
                                 <option value="ORD">ORD (芝加哥)</option>
@@ -1456,7 +1459,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {editorMode === 'design' && (
                       <button
                         onClick={() => { setAddWidgetSlot('sidebar'); setShowAddWidgetModal(true); }}
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer min-h-[100px] w-full"
+                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[100px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">添加页面筛选栏</span>
@@ -1500,17 +1503,17 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         <div
                           key={w.id}
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                          className={`relative rounded-xl border p-4 bg-white shadow-xs transition-all ${
+                          className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-slate-200'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
                         >
                           {editorMode === 'design' && (
-                            <div className="absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 bg-slate-100 rounded px-1.5 py-0.5 text-[8px] font-mono">
+                            <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Chart</span>
                               <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
-                          <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4 text-[11px]">{w.title}</h3>
+                          <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-4 text-[11px]`}>{w.title}</h3>
                           
                           <div className="h-44 w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -1557,7 +1560,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {editorMode === 'design' && activePage?.widgets.filter(w => w.slot === 'main_middle').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('main_middle'); setShowAddWidgetModal(true); }}
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer min-h-[120px] w-full"
+                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[120px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">添加分析图表</span>
@@ -1579,22 +1582,22 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         <div
                           key={w.id}
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                          className={`relative rounded-xl border p-4 bg-white shadow-xs transition-all ${
+                          className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-slate-200'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
                         >
                           {editorMode === 'design' && (
-                            <div className="absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 bg-slate-100 rounded px-1.5 py-0.5 text-[8px] font-mono">
+                            <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Table</span>
                               <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
-                          <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3 text-[11px]">{w.title}</h3>
+                          <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-3 text-[11px]`}>{w.title}</h3>
                           
-                          <div className="overflow-x-auto rounded-lg border border-slate-100">
+                          <div className={`overflow-x-auto rounded-lg border ${styles.cardBorder}`}>
                             <table className="w-full text-left border-collapse">
                               <thead>
-                                <tr className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                <tr className={`${styles.appBg}/50 text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider border-b ${styles.cardBorder}`}>
                                   {isAircraftTable ? (
                                     <>
                                       <th className="py-2 px-3">机尾号</th>
@@ -1628,9 +1631,9 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                                           showToast('info', `选中本体实体: ${key}`);
                                         }
                                       }}
-                                      className={`hover:bg-slate-50 transition-colors ${
+                                      className={`hover:${styles.appBg} transition-colors ${
                                         editorMode === 'preview' ? 'cursor-pointer' : ''
-                                      } ${isRowSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'}`}
+                                      } ${isRowSelected ? 'bg-blue-50 text-blue-700 font-bold' : '${styles.cardTextMuted}'}`}
                                     >
                                       {isAircraftTable ? (
                                         <>
@@ -1649,14 +1652,14 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                                         </>
                                       ) : (
                                         <>
-                                          <td className="py-2 px-3 font-bold font-mono text-slate-800">{row.flightNumber}</td>
+                                          <td className={`py-2 px-3 font-bold font-mono ${styles.cardText}`}>{row.flightNumber}</td>
                                           <td className="py-2 px-3 font-mono">{row.tailNumber}</td>
                                           <td className="py-2 px-3 font-mono">{row.depAirport}</td>
                                           <td className="py-2 px-3 font-mono">{row.arrAirport}</td>
                                           <td className="py-2 px-3">
                                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
                                               row.status === 'ON_TIME' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                              row.status === 'DELAYED' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-slate-100 text-slate-700'
+                                              row.status === 'DELAYED' ? 'bg-red-50 text-red-700 border border-red-100' : '${styles.sidebarBg} ${styles.cardText}'
                                             }`}>
                                               {row.status === 'ON_TIME' ? '准点' : row.status === 'DELAYED' ? '延误' : row.status}
                                             </span>
@@ -1668,7 +1671,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                                 })}
                                 {rowData.length === 0 && (
                                   <tr>
-                                    <td colSpan={5} className="py-6 text-center text-slate-400">暂无符合过滤器条件的数据实例</td>
+                                    <td colSpan={5} className={`py-6 text-center ${styles.cardTextMuted}`}>暂无符合过滤器条件的数据实例</td>
                                   </tr>
                                 )}
                               </tbody>
@@ -1681,7 +1684,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {editorMode === 'design' && activePage?.widgets.filter(w => w.slot === 'main_bottom').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('main_bottom'); setShowAddWidgetModal(true); }}
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer min-h-[140px] w-full"
+                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[140px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">添加本体表格明细</span>
@@ -1701,72 +1704,72 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         <div
                           key={w.id}
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                          className={`relative rounded-xl border p-4 bg-white shadow-xs transition-all ${
+                          className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-slate-200'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
                         >
                           {editorMode === 'design' && (
-                            <div className="absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 bg-slate-100 rounded px-1.5 py-0.5 text-[8px] font-mono">
+                            <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>ObjectView</span>
                               <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
-                          <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3 text-[11px]">{w.title}</h3>
+                          <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-3 text-[11px]`}>{w.title}</h3>
                           
                           {currentSelection ? (
                             <div className="space-y-2.5">
                               {currentSelection.flightNumber ? (
                                 <>
                                   <div className="flex items-center justify-between">
-                                    <span className="text-lg font-black text-slate-900">{currentSelection.flightNumber}</span>
+                                    <span className={`text-lg font-black ${styles.cardText}`}>{currentSelection.flightNumber}</span>
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                       currentSelection.status === 'ON_TIME' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
                                     }`}>
                                       {currentSelection.status}
                                     </span>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-100 font-mono">
+                                  <div className={`grid grid-cols-2 gap-2 text-[11px] ${styles.appBg} p-2.5 rounded-lg border ${styles.cardBorder} font-mono`}>
                                     <div>
-                                      <p className="text-[9px] text-slate-400">执飞机尾号</p>
-                                      <p className="font-bold text-slate-700">{currentSelection.tailNumber}</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>执飞机尾号</p>
+                                      <p className={`font-bold ${styles.cardText}`}>{currentSelection.tailNumber}</p>
                                     </div>
                                     <div>
-                                      <p className="text-[9px] text-slate-400">飞行员编号</p>
-                                      <p className="font-bold text-slate-700">{currentSelection.assignedPilotId}</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>飞行员编号</p>
+                                      <p className={`font-bold ${styles.cardText}`}>{currentSelection.assignedPilotId}</p>
                                     </div>
-                                    <div className="col-span-2 border-t border-slate-200/50 pt-1.5">
-                                      <p className="text-[9px] text-slate-400">起降枢纽港</p>
-                                      <p className="font-bold text-slate-700">{currentSelection.depAirport} ✈ {currentSelection.arrAirport}</p>
+                                    <div className={`col-span-2 border-t ${styles.cardBorder}/50 pt-1.5`}>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>起降枢纽港</p>
+                                      <p className={`font-bold ${styles.cardText}`}>{currentSelection.depAirport} ✈ {currentSelection.arrAirport}</p>
                                     </div>
                                   </div>
                                 </>
                               ) : (
                                 <>
                                   <div className="flex items-center justify-between">
-                                    <span className="text-lg font-black text-slate-900">{currentSelection.tailNumber}</span>
+                                    <span className={`text-lg font-black ${styles.cardText}`}>{currentSelection.tailNumber}</span>
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700`}>
                                       {currentSelection.status}
                                     </span>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-100 font-mono">
+                                  <div className={`grid grid-cols-2 gap-2 text-[11px] ${styles.appBg} p-2.5 rounded-lg border ${styles.cardBorder} font-mono`}>
                                     <div>
-                                      <p className="text-[9px] text-slate-400">客机型号</p>
-                                      <p className="font-bold text-slate-700">{currentSelection.model}</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>客机型号</p>
+                                      <p className={`font-bold ${styles.cardText}`}>{currentSelection.model}</p>
                                     </div>
                                     <div>
-                                      <p className="text-[9px] text-slate-400">制造厂商</p>
-                                      <p className="font-bold text-slate-700">{currentSelection.manufacturer}</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>制造厂商</p>
+                                      <p className={`font-bold ${styles.cardText}`}>{currentSelection.manufacturer}</p>
                                     </div>
-                                    <div className="col-span-2 border-t border-slate-200/50 pt-1.5">
-                                      <p className="text-[9px] text-slate-400">最近检修</p>
-                                      <p className="font-bold text-slate-700">{currentSelection.lastMaintenance}</p>
+                                    <div className={`col-span-2 border-t ${styles.cardBorder}/50 pt-1.5`}>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>最近检修</p>
+                                      <p className={`font-bold ${styles.cardText}`}>{currentSelection.lastMaintenance}</p>
                                     </div>
                                   </div>
                                 </>
                               )}
                             </div>
                           ) : (
-                            <div className="py-8 text-center text-slate-400 flex flex-col items-center justify-center">
+                            <div className={`py-8 text-center ${styles.cardTextMuted} flex flex-col items-center justify-center`}>
                               <Inbox size={20} className="stroke-1 text-slate-300 mb-1" />
                               <span>请从表格中选中任意实体查看本体卡片详情</span>
                             </div>
@@ -1786,12 +1789,12 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         <div
                           key={w.id}
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                          className={`relative rounded-xl border p-4 bg-white shadow-xs transition-all ${
+                          className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-slate-200'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
                         >
                           {editorMode === 'design' && (
-                            <div className="absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 bg-slate-100 rounded px-1.5 py-0.5 text-[8px] font-mono">
+                            <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Action</span>
                               <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
@@ -1803,15 +1806,15 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                               if (act) setShowActionModal(act);
                             }}
                             className={`w-full py-2.5 rounded-lg font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 ${
-                              editorMode === 'design' ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' :
-                              boundObject ? getPrimaryColorClass(activeApp.theme.primaryColor) : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                              editorMode === 'design' ? '${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}' :
+                              boundObject ? getPrimaryColorClass(activeApp.theme.primaryColor) : '${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}'
                             }`}
                           >
                             <Zap size={12} className={boundObject ? "fill-white/25" : ""} />
                             <span>{w.title}</span>
                           </button>
                           {!boundObject && editorMode === 'preview' && (
-                            <p className="text-[9px] text-slate-400 text-center mt-1.5 leading-tight">需要选中一个本体实例后方能触发本项操作</p>
+                            <p className={`text-[9px] ${styles.cardTextMuted} text-center mt-1.5 leading-tight`}>需要选中一个本体实例后方能触发本项操作</p>
                           )}
                         </div>
                       );
@@ -1820,7 +1823,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {editorMode === 'design' && activePage?.widgets.filter(w => w.slot === 'aside').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('aside'); setShowAddWidgetModal(true); }}
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer min-h-[140px] w-full"
+                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[140px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">放置侧边面板栏</span>
@@ -1834,43 +1837,43 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
             </div>
 
             {/* COLUMN 3: RIGHT PROPERTIES SELECTION CONFIG PANEL */}
-            <div className="w-64 bg-slate-50 border-l border-slate-200 flex flex-col h-full shrink-0 overflow-y-auto p-4 space-y-4 text-xs select-none">
-              <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">组件属性配置面板 (Properties)</span>
+            <div className={`w-64 ${styles.appBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0 overflow-y-auto p-4 space-y-4 text-xs select-none`}>
+              <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase tracking-wider`}>组件属性配置面板 (Properties)</span>
 
               {selectedWidgetId ? (() => {
                 const w = activePage?.widgets.find(wg => wg.id === selectedWidgetId);
-                if (!w) return <div className="text-slate-400 py-6 text-center">请选中任意组件进行设置</div>;
+                if (!w) return <div className={`${styles.cardTextMuted} py-6 text-center`}>请选中任意组件进行设置</div>;
 
                 return (
                   <div className="space-y-4">
                     {/* Common Widget header */}
-                    <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 space-y-1">
+                    <div className={`${styles.sidebarBg} p-2.5 rounded-lg border ${styles.cardBorder} space-y-1`}>
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-700 text-xs font-mono lowercase">type: {w.type}</span>
-                        <span className="text-[9px] text-slate-400 font-mono">{w.id}</span>
+                        <span className={`font-bold ${styles.cardText} text-xs font-mono lowercase`}>type: {w.type}</span>
+                        <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>{w.id}</span>
                       </div>
-                      <p className="text-[9px] text-slate-400">布局插槽: {w.slot}</p>
+                      <p className={`text-[9px] ${styles.cardTextMuted}`}>布局插槽: {w.slot}</p>
                     </div>
 
                     {/* Widget Display Title */}
                     <div className="space-y-1">
-                      <label className="text-slate-600 font-semibold text-[10px]">组件显示标题</label>
+                      <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>组件显示标题</label>
                       <input
                         type="text"
                         value={w.title}
                         onChange={e => handleUpdateWidgetConfig({}, e.target.value)}
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-hidden text-xs bg-white"
+                        className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md focus:outline-hidden text-xs ${styles.cardBg}`}
                       />
                     </div>
 
                     {/* Data Source selection */}
                     {['table', 'chart', 'metric', 'filter_bar'].includes(w.type) && (
                       <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[10px]">绑定数据源 (Object Set)</label>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>绑定数据源 (Object Set)</label>
                         <select
                           value={w.config.dataSourceVarId || ''}
                           onChange={e => handleUpdateWidgetConfig({ dataSourceVarId: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                          className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                         >
                           {activeApp.variables.filter(v => v.type === 'object_set').map(v => (
                             <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
@@ -1882,11 +1885,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {/* Widget Specific options */}
                     {w.type === 'table' && (
                       <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[10px]">选中项输出至变量 (Object Selection)</label>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>选中项输出至变量 (Object Selection)</label>
                         <select
                           value={w.config.targetVarId || ''}
                           onChange={e => handleUpdateWidgetConfig({ targetVarId: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                          className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                         >
                           <option value="">-- 请指派变量 --</option>
                           {activeApp.variables.filter(v => v.type === 'object').map(v => (
@@ -1899,11 +1902,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {w.type === 'chart' && (
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          <label className="text-slate-600 font-semibold text-[10px]">图表呈现样式 (Chart Type)</label>
+                          <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>图表呈现样式 (Chart Type)</label>
                           <select
                             value={w.config.chartType || 'bar'}
                             onChange={e => handleUpdateWidgetConfig({ chartType: e.target.value as any })}
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white text-slate-700"
+                            className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg} ${styles.cardText}`}
                           >
                             <option value="bar">📊 柱状堆叠图 (Bar Chart)</option>
                             <option value="line">📈 趋势折线图 (Line Chart)</option>
@@ -1911,11 +1914,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-600 font-semibold text-[10px]">聚合维度属性 (Group By)</label>
+                          <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>聚合维度属性 (Group By)</label>
                           <select
                             value={w.config.groupByProperty || 'status'}
                             onChange={e => handleUpdateWidgetConfig({ groupByProperty: e.target.value })}
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white text-slate-700"
+                            className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg} ${styles.cardText}`}
                           >
                             <option value="status">运行状态 (Status)</option>
                             <option value="depAirport">起飞机场 (Departure Airport)</option>
@@ -1927,11 +1930,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
 
                     {w.type === 'object_view' && (
                       <div className="space-y-1">
-                        <label className="text-slate-600 font-semibold text-[10px]">绑定目标变量 (Selected Object)</label>
+                        <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>绑定目标变量 (Selected Object)</label>
                         <select
                           value={w.config.targetVarId || ''}
                           onChange={e => handleUpdateWidgetConfig({ targetVarId: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                          className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                         >
                           {activeApp.variables.filter(v => v.type === 'object').map(v => (
                             <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
@@ -1943,11 +1946,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                     {w.type === 'action_button' && (
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          <label className="text-slate-600 font-semibold text-[10px]">触发的 Ontology 操作</label>
+                          <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>触发的 Ontology 操作</label>
                           <select
                             value={w.config.actionTypeId || ''}
                             onChange={e => handleUpdateWidgetConfig({ actionTypeId: e.target.value })}
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                            className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                           >
                             <option value="">-- 请选择 Action --</option>
                             {mockActionTypes.map(act => (
@@ -1957,11 +1960,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-slate-600 font-semibold text-[10px]">传入参数来源变量</label>
+                          <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>传入参数来源变量</label>
                           <select
                             value={w.config.targetVarId || ''}
                             onChange={e => handleUpdateWidgetConfig({ targetVarId: e.target.value })}
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                            className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                           >
                             <option value="">-- 请指派选定实体 --</option>
                             {activeApp.variables.filter(v => v.type === 'object').map(v => (
@@ -1972,7 +1975,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                       </div>
                     )}
 
-                    <div className="pt-3 border-t border-slate-200 flex justify-end">
+                    <div className={`pt-3 border-t ${styles.cardBorder} flex justify-end`}>
                       <button
                         onClick={() => handleDeleteWidget(w.id)}
                         className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md font-bold transition-colors flex items-center gap-1 cursor-pointer"
@@ -1985,10 +1988,10 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                   </div>
                 );
               })() : (
-                <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center">
+                <div className={`py-12 text-center ${styles.cardTextMuted} flex flex-col items-center justify-center`}>
                   <MousePointerClick size={24} className="stroke-1 text-slate-300 mb-2" />
                   <p className="font-semibold text-xs leading-normal">未选中任何元素</p>
-                  <p className="text-[10px] text-slate-400 mt-1 max-w-[150px] leading-relaxed mx-auto">请点击左侧组件树或中央设计画布上的任意组件查看属性进行定制。</p>
+                  <p className={`text-[10px] ${styles.cardTextMuted} mt-1 max-w-[150px] leading-relaxed mx-auto`}>请点击左侧组件树或中央设计画布上的任意组件查看属性进行定制。</p>
                 </div>
               )}
 
@@ -2006,13 +2009,13 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
       {/* 4. MODAL: ADD WIDGET */}
       {showAddWidgetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col">
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-lg overflow-hidden flex flex-col`}>
+            <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
+              <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
                 <PlusCircle size={14} className="text-blue-500" />
                 <span>向布局插槽「{addWidgetSlot}」添加组件</span>
               </h3>
-              <button onClick={() => setShowAddWidgetModal(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">×</button>
+              <button onClick={() => setShowAddWidgetModal(false)} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} text-sm font-bold`}>×</button>
             </div>
             
             <div className="p-4 grid grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
@@ -2027,15 +2030,15 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 <div
                   key={item.type}
                   onClick={() => handleAddWidget(item.type as any)}
-                  className="border border-slate-200 rounded-xl p-3 hover:border-blue-500 hover:bg-blue-50/50 cursor-pointer transition-all space-y-1.5 flex flex-col justify-between"
+                  className={`border ${styles.cardBorder} rounded-xl p-3 hover:border-blue-500 hover:bg-blue-50/50 cursor-pointer transition-all space-y-1.5 flex flex-col justify-between`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
                       <DynamicIcon name={item.icon} size={13} />
                     </span>
-                    <span className="font-bold text-slate-800 text-[11px]">{item.title}</span>
+                    <span className={`font-bold ${styles.cardText} text-[11px]`}>{item.title}</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 leading-normal">{item.desc}</p>
+                  <p className={`text-[10px] ${styles.cardTextMuted} leading-normal`}>{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -2046,35 +2049,35 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
       {/* 5. MODAL: ADD VARIABLE */}
       {showAddVarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
+          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-sm overflow-hidden`}>
             <form onSubmit={handleAddVariable}>
-              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
+                <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
                   <Settings size={14} className="text-blue-500" />
                   <span>添加应用运行时变量</span>
                 </h3>
-                <button type="button" onClick={() => setShowAddVarModal(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">×</button>
+                <button type="button" onClick={() => setShowAddVarModal(false)} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} text-sm font-bold`}>×</button>
               </div>
 
               <div className="p-4 space-y-3">
                 <div className="space-y-1">
-                  <label className="text-slate-600 font-semibold text-[10px]">变量名称</label>
+                  <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>变量名称</label>
                   <input
                     type="text"
                     value={newVarName}
                     onChange={e => setNewVarName(e.target.value)}
                     placeholder="例如: v_filter_status"
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs focus:outline-hidden"
+                    className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs focus:outline-hidden`}
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-slate-600 font-semibold text-[10px]">变量类型</label>
+                  <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>变量类型</label>
                   <select
                     value={newVarType}
                     onChange={e => setNewVarType(e.target.value as any)}
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                    className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                   >
                     <option value="string">文本 (String)</option>
                     <option value="number">数值 (Number)</option>
@@ -2085,11 +2088,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
 
                 {['object_set', 'object'].includes(newVarType) && (
                   <div className="space-y-1">
-                    <label className="text-slate-600 font-semibold text-[10px]">绑定本体对象类型 (Ontology Link)</label>
+                    <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>绑定本体对象类型 (Ontology Link)</label>
                     <select
                       value={newVarObjType}
                       onChange={e => setNewVarObjType(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white"
+                      className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                     >
                       <option value="flight">航班 (Flight)</option>
                       <option value="aircraft">飞机 (Aircraft)</option>
@@ -2099,22 +2102,22 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 )}
 
                 <div className="space-y-1">
-                  <label className="text-slate-600 font-semibold text-[10px]">简短说明</label>
+                  <label className={`${styles.cardTextMuted} font-semibold text-[10px]`}>简短说明</label>
                   <input
                     type="text"
                     value={newVarDesc}
                     onChange={e => setNewVarDesc(e.target.value)}
                     placeholder="存储及控制大盘交互..."
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs focus:outline-hidden"
+                    className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs focus:outline-hidden`}
                   />
                 </div>
               </div>
 
-              <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className={`px-4 py-3 ${styles.appBg} border-t ${styles.cardBorder} flex items-center justify-end gap-2`}>
                 <button
                   type="button"
                   onClick={() => setShowAddVarModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-md hover:bg-slate-100 font-semibold"
+                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-md hover:${styles.sidebarBg} font-semibold`}
                 >
                   取消
                 </button>
@@ -2133,38 +2136,38 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-sm overflow-hidden`}>
+              <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
+                <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
                   <span className="p-1 rounded bg-amber-500 text-white">
                     <Zap size={12} className="fill-white/20" />
                   </span>
                   <span>执行本体修改：{showActionModal.displayName}</span>
                 </h3>
-                <button onClick={() => setShowActionModal(null)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">×</button>
+                <button onClick={() => setShowActionModal(null)} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} text-sm font-bold`}>×</button>
               </div>
 
               <div className="p-4 space-y-3">
-                <p className="text-[10px] text-slate-400 italic leading-relaxed border-b border-slate-100 pb-2">{showActionModal.description}</p>
+                <p className={`text-[10px] ${styles.cardTextMuted} italic leading-relaxed border-b ${styles.cardBorder} pb-2`}>{showActionModal.description}</p>
                 
                 {/* Dynamically prompt parameter form based on bound action type */}
                 {showActionModal.id === 'update_flight_status' && (
                   <>
                     <div className="space-y-1">
-                      <label className="text-slate-600 font-semibold text-[10px] block">目标航班号 (Target Key)</label>
+                      <label className={`${styles.cardTextMuted} font-semibold text-[10px] block`}>目标航班号 (Target Key)</label>
                       <input
                         type="text"
                         disabled
                         value={boundObject?.flightNumber || ''}
-                        className="w-full px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-bold font-mono text-xs text-slate-500"
+                        className={`w-full px-2 py-1.5 ${styles.sidebarBg} border ${styles.cardBorder} rounded-md font-bold font-mono text-xs ${styles.cardTextMuted}`}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-slate-600 font-semibold text-[10px] block">选择更新的最新航班状态</label>
+                      <label className={`${styles.cardTextMuted} font-semibold text-[10px] block`}>选择更新的最新航班状态</label>
                       <select
                         id="form_action_status"
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white font-semibold"
+                        className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg} font-semibold`}
                       >
                         <option value="ON_TIME">准点运行 (ON_TIME)</option>
                         <option value="DELAYED">登记发生延误 (DELAYED)</option>
@@ -2178,33 +2181,33 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
                 {showActionModal.id === 'schedule_maintenance_check' && (
                   <>
                     <div className="space-y-1">
-                      <label className="text-slate-600 font-semibold text-[10px] block">目标飞机 (Aircraft Key)</label>
+                      <label className={`${styles.cardTextMuted} font-semibold text-[10px] block`}>目标飞机 (Aircraft Key)</label>
                       <input
                         type="text"
                         disabled
                         value={boundObject?.tailNumber || ''}
-                        className="w-full px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-bold font-mono text-xs text-slate-500"
+                        className={`w-full px-2 py-1.5 ${styles.sidebarBg} border ${styles.cardBorder} rounded-md font-bold font-mono text-xs ${styles.cardTextMuted}`}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-slate-600 font-semibold text-[10px] block">开始维护登记日期</label>
+                      <label className={`${styles.cardTextMuted} font-semibold text-[10px] block`}>开始维护登记日期</label>
                       <input
                         type="date"
                         id="form_action_mdate"
                         defaultValue={new Date().toISOString().slice(0, 10)}
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs bg-white font-mono"
+                        className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg} font-mono`}
                       />
                     </div>
                   </>
                 )}
               </div>
 
-              <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className={`px-4 py-3 ${styles.appBg} border-t ${styles.cardBorder} flex items-center justify-end gap-2`}>
                 <button
                   type="button"
                   onClick={() => setShowActionModal(null)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-md hover:bg-slate-100 font-semibold"
+                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-md hover:${styles.sidebarBg} font-semibold`}
                 >
                   取消
                 </button>

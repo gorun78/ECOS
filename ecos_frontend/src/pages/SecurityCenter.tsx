@@ -19,6 +19,8 @@ import {
   Bar
 } from 'recharts';
 import { Activity, ArrowRight, BookOpen, CheckSquare, ChevronRight, ClipboardList, Cpu, Database, Download, EyeOff, Filter, Flame, FolderGit, Globe, Info, Lock, PieChart as PieChartIcon, Play, Plus, RefreshCw, Settings, Shield, ShieldAlert, ShieldCheck, Tag, TrendingUp, UserPlus, Users, Workflow, X, Zap, HelpCircle } from 'lucide-react';
+import { useTheme } from "../components/ThemeContext";
+
 
 /** Dynamic icon renderer — replaces ceos_new LucideIcon wrapper */
 function LucideIcon({ name, className = '', size = 16 }: { name: string; className?: string; size?: number }) {
@@ -449,6 +451,7 @@ export default function SecurityCenter({
 }: SecurityCenterViewProps = {}) {
   // Navigation Tabs
   const [localActiveTab, setLocalActiveTab] = useState<'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit' | 'guide'>('overview');
+  const { styles } = useTheme();
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = (tab: any) => {
     if (onActiveTabChange) onActiveTabChange(tab);
@@ -1272,14 +1275,14 @@ export default function SecurityCenter({
           <div className="h-px bg-slate-800" />
 
           <nav className="space-y-1">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 mb-2">安全域导航</div>
+            <div className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider px-2 mb-2`}>安全域导航</div>
             
             <button
               onClick={() => setActiveTab('overview')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'overview'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <Shield size={13} className={activeTab === 'overview' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1291,7 +1294,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'orgs'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <Globe size={13} className={activeTab === 'orgs' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1303,7 +1306,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'dac'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <FolderGit size={13} className={activeTab === 'dac' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1315,7 +1318,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'mac'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <Tag size={13} className={activeTab === 'mac' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1327,7 +1330,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'pbac'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <ClipboardList size={13} className={activeTab === 'pbac' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1339,7 +1342,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'row_col'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <EyeOff size={13} className={activeTab === 'row_col' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1351,7 +1354,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'audit'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <Activity size={13} className={activeTab === 'audit' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1363,7 +1366,7 @@ export default function SecurityCenter({
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold ${
                 activeTab === 'guide'
                   ? 'bg-slate-800 text-white border-l-2 border-indigo-500'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  : '${styles.cardTextMuted} hover:bg-slate-900 hover:text-slate-200'
               }`}
             >
               <BookOpen size={13} className={activeTab === 'guide' ? 'text-indigo-400' : 'text-slate-500'} />
@@ -1377,7 +1380,7 @@ export default function SecurityCenter({
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span>ECOS 零信任网关已激活</span>
           </div>
-          <div className="text-[9px] text-slate-500 leading-normal text-center font-mono">
+          <div className={`text-[9px] ${styles.cardTextMuted} leading-normal text-center font-mono`}>
             V.2026.07.SEC_SHIELD
           </div>
         </div>
@@ -1391,12 +1394,12 @@ export default function SecurityCenter({
           <div className="flex items-center gap-3">
             <div className="text-sm font-black text-slate-100 flex items-center gap-2">
               <span>Palantir Security Guardian</span>
-              <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono uppercase">
+              <span className={`text-[10px] bg-slate-800 ${styles.cardTextMuted} px-2 py-0.5 rounded font-mono uppercase`}>
                 Enterprise Shield
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className={`flex items-center gap-2 text-xs ${styles.cardTextMuted}`}>
             <span>安全上下文: </span>
             <span className="text-indigo-400 font-mono font-bold">Aviation_Domain_Root</span>
           </div>
@@ -1415,7 +1418,7 @@ export default function SecurityCenter({
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
                   <div className="space-y-1">
-                    <div className="text-[11px] text-slate-400 font-semibold uppercase">安全隔离域 (Orgs)</div>
+                    <div className={`text-[11px] ${styles.cardTextMuted} font-semibold uppercase`}>安全隔离域 (Orgs)</div>
                     <div className="text-xl font-mono font-black text-white">{orgs.length}</div>
                   </div>
                   <span className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
@@ -1424,7 +1427,7 @@ export default function SecurityCenter({
                 </div>
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
                   <div className="space-y-1">
-                    <div className="text-[11px] text-slate-400 font-semibold uppercase">受控工程项目 (DAC)</div>
+                    <div className={`text-[11px] ${styles.cardTextMuted} font-semibold uppercase`}>受控工程项目 (DAC)</div>
                     <div className="text-xl font-mono font-black text-white">{projects.length}</div>
                   </div>
                   <span className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
@@ -1433,7 +1436,7 @@ export default function SecurityCenter({
                 </div>
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
                   <div className="space-y-1">
-                    <div className="text-[11px] text-slate-400 font-semibold uppercase">强制密级标记 (MAC)</div>
+                    <div className={`text-[11px] ${styles.cardTextMuted} font-semibold uppercase`}>强制密级标记 (MAC)</div>
                     <div className="text-xl font-mono font-black text-white">{markings.length}</div>
                   </div>
                   <span className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
@@ -1442,9 +1445,9 @@ export default function SecurityCenter({
                 </div>
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
                   <div className="space-y-1">
-                    <div className="text-[11px] text-slate-400 font-semibold uppercase">合规目的管控 (PBAC)</div>
+                    <div className={`text-[11px] ${styles.cardTextMuted} font-semibold uppercase`}>合规目的管控 (PBAC)</div>
                     <div className="text-xl font-mono font-black text-white">
-                      {purposes.filter(p => p.status === 'ACTIVE').length} <span className="text-xs text-slate-500">/ {purposes.length}</span>
+                      {purposes.filter(p => p.status === 'ACTIVE').length} <span className={`text-xs ${styles.cardTextMuted}`}>/ {purposes.length}</span>
                     </div>
                   </div>
                   <span className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
@@ -1463,7 +1466,7 @@ export default function SecurityCenter({
                       <TrendingUp size={13} className="text-indigo-400" />
                       安全策略鉴权评估趋势 (Policy Evaluation Trend)
                     </span>
-                    <span className="text-[10px] text-slate-500">过去7天动态安全阻断详情</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted}`}>过去7天动态安全阻断详情</span>
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1487,7 +1490,7 @@ export default function SecurityCenter({
                       <PieChartIcon size={13} className="text-indigo-400" />
                       安全标记保护下的高敏数据分布 (MAC Tag Distribution)
                     </div>
-                    <p className="text-[10px] text-slate-500">按保密分类所涵盖的核心数源占比</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted}`}>按保密分类所涵盖的核心数源占比</p>
                   </div>
                   <div className="h-44 flex items-center justify-center relative">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1507,11 +1510,11 @@ export default function SecurityCenter({
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute flex flex-col items-center">
-                      <span className="text-xs font-bold font-mono text-slate-400">受护项</span>
+                      <span className={`text-xs font-bold font-mono ${styles.cardTextMuted}`}>受护项</span>
                       <span className="text-lg font-black font-mono text-white">100%</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400">
+                  <div className={`grid grid-cols-2 gap-2 text-[10px] ${styles.cardTextMuted}`}>
                     {markings.map((m, idx) => (
                       <div key={m.id} className="flex items-center gap-1">
                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
@@ -1530,7 +1533,7 @@ export default function SecurityCenter({
                       <Zap size={14} className="text-indigo-400 animate-pulse" />
                       零信任策略仿真演算器 (Zero-Trust Security Policy Simulator)
                     </span>
-                    <p className="text-[10px] text-slate-500">模拟不同用户、敏感资产和具体分析目的在 ECOS 级联策略链条中的真实决策判定结果</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted}`}>模拟不同用户、敏感资产和具体分析目的在 ECOS 级联策略链条中的真实决策判定结果</p>
                   </div>
                   <button
                     onClick={handleRunSimulation}
@@ -1546,7 +1549,7 @@ export default function SecurityCenter({
                   {/* Inputs */}
                   <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
                     <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1">模拟主体 (Subject User)</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted} font-bold block mb-1`}>模拟主体 (Subject User)</label>
                       <select
                         value={simUser}
                         onChange={(e) => setSimUser(e.target.value)}
@@ -1561,7 +1564,7 @@ export default function SecurityCenter({
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1">敏感资源 (Sensitive Dataset)</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted} font-bold block mb-1`}>敏感资源 (Sensitive Dataset)</label>
                       <select
                         value={simDataset}
                         onChange={(e) => setSimDataset(e.target.value)}
@@ -1574,7 +1577,7 @@ export default function SecurityCenter({
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1">使用目的环境 (Purpose Context)</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted} font-bold block mb-1`}>使用目的环境 (Purpose Context)</label>
                       <select
                         value={simPurpose}
                         onChange={(e) => setSimPurpose(e.target.value)}
@@ -1587,7 +1590,7 @@ export default function SecurityCenter({
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1">物理客户端 IP (Client IP - Whitelist CIDR)</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted} font-bold block mb-1`}>物理客户端 IP (Client IP - Whitelist CIDR)</label>
                       <input
                         type="text"
                         value={simIp}
@@ -1595,7 +1598,7 @@ export default function SecurityCenter({
                         placeholder="例: 10.120.5.23"
                         className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono outline-none focus:border-indigo-500"
                       />
-                      <span className="text-[8px] text-slate-500 mt-1 block">
+                      <span className={`text-[8px] ${styles.cardTextMuted} mt-1 block`}>
                         HQ段: 10.120.0.0/16 | 合作段: 172.16.45.0/24 | 承包段: 202.96.128.0/24
                       </span>
                     </div>
@@ -1606,7 +1609,7 @@ export default function SecurityCenter({
                     {simResult ? (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400 font-bold">校验结果反馈 (Decision Result)</span>
+                          <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>校验结果反馈 (Decision Result)</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black font-mono tracking-wider ${
                             simResult.verdict === 'GRANTED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'
                           }`}>
@@ -1628,13 +1631,13 @@ export default function SecurityCenter({
                         </div>
                       </div>
                     ) : (
-                      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 space-y-2 py-6">
-                        <ShieldAlert size={24} className="text-slate-600" />
+                      <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2 py-6`}>
+                        <ShieldAlert size={24} className={`${styles.cardTextMuted}`} />
                         <span className="text-xs">等待仿真触发，请点击右上角「一键仿真演算」按钮</span>
                       </div>
                     )}
 
-                    <div className="text-[9px] text-slate-500 border-t border-slate-800/60 pt-2 flex items-center gap-1.5">
+                    <div className={`text-[9px] ${styles.cardTextMuted} border-t border-slate-800/60 pt-2 flex items-center gap-1.5`}>
                       <Info size={10} />
                       <span>本仿真完全模拟 Palantir ECOS 零信任架构下的 <strong>组织隔离 ➔ DAC ➔ MAC ➔ 目的链(PBAC)</strong> 四重复合门禁。</span>
                     </div>
@@ -1653,7 +1656,7 @@ export default function SecurityCenter({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-black text-slate-100">ECOS 组织边界配置 (Organizations Setup)</h3>
-                  <p className="text-[10px] text-slate-400">ECOS 最高级别安全隔离机制。即使授予了文件权限，非共享协议白名单下的跨组织访问也将被绝对硬隔离阻断。</p>
+                  <p className={`text-[10px] ${styles.cardTextMuted}`}>ECOS 最高级别安全隔离机制。即使授予了文件权限，非共享协议白名单下的跨组织访问也将被绝对硬隔离阻断。</p>
                 </div>
                 <button
                   onClick={() => setShowAddOrgModal(true)}
@@ -1674,7 +1677,7 @@ export default function SecurityCenter({
                           <Globe size={13} className="text-indigo-400" />
                           <span>{org.name}</span>
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono">ID: {org.id}</div>
+                        <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>ID: {org.id}</div>
                       </div>
                       <span className={`px-2 py-0.5 rounded text-[8px] font-black ${
                         org.isolationMode ? 'bg-red-950 text-red-400 border border-red-900/40' : 'bg-blue-950 text-blue-400 border border-blue-900/40'
@@ -1687,17 +1690,17 @@ export default function SecurityCenter({
 
                     <div className="space-y-2 text-xs text-slate-300">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500">组织活跃成员:</span>
+                        <span className={`${styles.cardTextMuted}`}>组织活跃成员:</span>
                         <span className="font-mono font-bold text-slate-200">{org.memberCount} 人</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500">已授权跨组织共享:</span>
+                        <span className={`${styles.cardTextMuted}`}>已授权跨组织共享:</span>
                         <span className="font-mono text-[10px] text-indigo-400">
                           {org.crossOrgSharing.length > 0 ? org.crossOrgSharing.join(', ') : '无共享'}
                         </span>
                       </div>
                       <div className="space-y-1">
-                        <div className="text-slate-500">活跃白名单IP段 (CIDR):</div>
+                        <div className={`${styles.cardTextMuted}`}>活跃白名单IP段 (CIDR):</div>
                         <div className="flex flex-wrap gap-1">
                           {org.ipRanges.map(ip => (
                             <span key={ip} className="bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-indigo-300">
@@ -1745,7 +1748,7 @@ export default function SecurityCenter({
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <span className="text-xs font-bold text-slate-200">受控安全工程项目</span>
-                  <span className="text-[9px] font-mono text-slate-500">DAC CONTROLS</span>
+                  <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>DAC CONTROLS</span>
                 </div>
                 <div className="space-y-2">
                   {projects.map(proj => (
@@ -1759,8 +1762,8 @@ export default function SecurityCenter({
                       }`}
                     >
                       <div className="text-xs font-extrabold text-slate-100 truncate">{proj.name}</div>
-                      <p className="text-[10px] text-slate-400 line-clamp-1">{proj.description}</p>
-                      <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-500">
+                      <p className={`text-[10px] ${styles.cardTextMuted} line-clamp-1`}>{proj.description}</p>
+                      <div className={`flex items-center gap-1.5 mt-1 text-[9px] ${styles.cardTextMuted}`}>
                         <Users size={10} />
                         <span>授权成员: {proj.members.length}</span>
                         <span>•</span>
@@ -1777,14 +1780,14 @@ export default function SecurityCenter({
               <div className="lg:col-span-2 bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-6">
                 {(() => {
                   const currentProj = projects.find(p => p.id === selectedProjectId);
-                  if (!currentProj) return <div className="text-slate-500 text-xs">请在左侧选择项目</div>;
+                  if (!currentProj) return <div className={`${styles.cardTextMuted} text-xs`}>请在左侧选择项目</div>;
 
                   return (
                     <div className="space-y-6">
                       <div className="flex items-start justify-between border-b border-slate-800 pb-4">
                         <div className="space-y-1">
                           <h3 className="text-sm font-black text-slate-100">{currentProj.name}</h3>
-                          <p className="text-xs text-slate-400 leading-relaxed">{currentProj.description}</p>
+                          <p className={`text-xs ${styles.cardTextMuted} leading-relaxed`}>{currentProj.description}</p>
                         </div>
                         <button
                           onClick={() => setShowAddMemberModal(true)}
@@ -1799,7 +1802,7 @@ export default function SecurityCenter({
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-lg flex items-center justify-between">
                           <div className="space-y-1">
-                            <div className="text-[10px] text-slate-400 font-bold">跨组织可见性 (Discoverability)</div>
+                            <div className={`text-[10px] ${styles.cardTextMuted} font-bold`}>跨组织可见性 (Discoverability)</div>
                             <div className="text-xs text-slate-200">
                               {currentProj.discoverableAllOrgs ? '允许其他组织在全局索引中检索' : '仅限本组织可见与索引'}
                             </div>
@@ -1809,7 +1812,7 @@ export default function SecurityCenter({
                               setProjects(projects.map(p => p.id === currentProj.id ? { ...p, discoverableAllOrgs: !p.discoverableAllOrgs } : p));
                             }}
                             className={`p-1 px-2.5 rounded text-[10px] font-black cursor-pointer ${
-                              currentProj.discoverableAllOrgs ? 'bg-indigo-950 text-indigo-400' : 'bg-slate-800 text-slate-400'
+                              currentProj.discoverableAllOrgs ? 'bg-indigo-950 text-indigo-400' : 'bg-slate-800 ${styles.cardTextMuted}'
                             }`}
                           >
                             切换可见性
@@ -1818,7 +1821,7 @@ export default function SecurityCenter({
 
                         <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-lg flex items-center justify-between">
                           <div className="space-y-1">
-                            <div className="text-[10px] text-slate-400 font-bold">继承传播锁 (Auto-Inheritance)</div>
+                            <div className={`text-[10px] ${styles.cardTextMuted} font-bold`}>继承传播锁 (Auto-Inheritance)</div>
                             <div className="text-xs text-slate-200">
                               {currentProj.autoPropagation ? '下游派生项目强制自动继承此权限' : '当下游产生新工程时重置鉴权'}
                             </div>
@@ -1828,7 +1831,7 @@ export default function SecurityCenter({
                               setProjects(projects.map(p => p.id === currentProj.id ? { ...p, autoPropagation: !p.autoPropagation } : p));
                             }}
                             className={`p-1 px-2.5 rounded text-[10px] font-black cursor-pointer ${
-                              currentProj.autoPropagation ? 'bg-indigo-950 text-indigo-400' : 'bg-slate-800 text-slate-400'
+                              currentProj.autoPropagation ? 'bg-indigo-950 text-indigo-400' : 'bg-slate-800 ${styles.cardTextMuted}'
                             }`}
                           >
                             切换沿袭
@@ -1844,7 +1847,7 @@ export default function SecurityCenter({
                         </div>
                         <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/30">
                           <table className="w-full text-left text-xs text-slate-300">
-                            <thead className="bg-slate-950 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                            <thead className={`bg-slate-950 ${styles.cardTextMuted} text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800`}>
                               <tr>
                                 <th className="p-3">用户名称 (Subject)</th>
                                 <th className="p-3">分配角色 (Role)</th>
@@ -1862,13 +1865,13 @@ export default function SecurityCenter({
                                       member.role === 'Owner' ? 'bg-red-950 text-red-400 border border-red-900/30' :
                                       member.role === 'Editor' ? 'bg-blue-950 text-blue-400 border border-blue-900/30' :
                                       member.role === 'Viewer' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/30' :
-                                      'bg-slate-800 text-slate-400'
+                                      'bg-slate-800 ${styles.cardTextMuted}'
                                     }`}>
                                       {member.role}
                                     </span>
                                   </td>
-                                  <td className="p-3 text-slate-400">{member.grantedBy}</td>
-                                  <td className="p-3 text-slate-500">{member.grantedAt}</td>
+                                  <td className={`p-3 ${styles.cardTextMuted}`}>{member.grantedBy}</td>
+                                  <td className={`p-3 ${styles.cardTextMuted}`}>{member.grantedAt}</td>
                                   <td className="p-3 text-right">
                                     <button
                                       onClick={() => {
@@ -1936,8 +1939,8 @@ export default function SecurityCenter({
                         <span className="h-1.5 w-1.5 rounded-full bg-pink-500" />
                         <span>{m.id}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 line-clamp-1">{m.description}</p>
-                      <div className="flex items-center gap-2 mt-1.5 text-[9px] text-slate-500">
+                      <p className={`text-[10px] ${styles.cardTextMuted} line-clamp-1`}>{m.description}</p>
+                      <div className={`flex items-center gap-2 mt-1.5 text-[9px] ${styles.cardTextMuted}`}>
                         <span className="bg-slate-800 px-1 py-0.2 rounded font-mono text-slate-300">{m.classificationLevel}</span>
                         <span>锁定数据集: {m.appliedDatasets.length}</span>
                       </div>
@@ -1950,7 +1953,7 @@ export default function SecurityCenter({
               <div className="lg:col-span-2 bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-6">
                 {(() => {
                   const currentMark = markings.find(m => m.id === selectedMarkingId);
-                  if (!currentMark) return <div className="text-slate-500 text-xs">请选择一个安全标记</div>;
+                  if (!currentMark) return <div className={`${styles.cardTextMuted} text-xs`}>请选择一个安全标记</div>;
 
                   return (
                     <div className="space-y-6">
@@ -1960,16 +1963,16 @@ export default function SecurityCenter({
                           <span className="text-[10px] bg-pink-950/60 text-pink-400 border border-pink-900/40 px-2 py-0.5 rounded font-mono font-bold uppercase">
                             {currentMark.classificationLevel} 级密文安全标记
                           </span>
-                          <span className="text-[10px] text-slate-500">API Key: {currentMark.apiName}</span>
+                          <span className={`text-[10px] ${styles.cardTextMuted}`}>API Key: {currentMark.apiName}</span>
                         </div>
                         <h3 className="text-sm font-black text-slate-100">{currentMark.displayName}</h3>
-                        <p className="text-xs text-slate-400 leading-relaxed">{currentMark.description}</p>
+                        <p className={`text-xs ${styles.cardTextMuted} leading-relaxed`}>{currentMark.description}</p>
                       </div>
 
                       {/* Detail attributes */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-lg space-y-2">
-                          <span className="text-[10px] text-slate-400 font-bold block">获授此标记的用户组 (Authorized Recipient Groups)</span>
+                          <span className={`text-[10px] ${styles.cardTextMuted} font-bold block`}>获授此标记的用户组 (Authorized Recipient Groups)</span>
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {currentMark.grantedGroups.map(grp => (
                               <span key={grp} className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono text-pink-300">
@@ -1991,7 +1994,7 @@ export default function SecurityCenter({
                         </div>
 
                         <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-lg space-y-2">
-                          <span className="text-[10px] text-slate-400 font-bold block">当前锚定的根源数据集 (Anchored Root Datasets)</span>
+                          <span className={`text-[10px] ${styles.cardTextMuted} font-bold block`}>当前锚定的根源数据集 (Anchored Root Datasets)</span>
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {currentMark.appliedDatasets.map(ds => (
                               <span key={ds} className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono text-slate-300">
@@ -2009,16 +2012,16 @@ export default function SecurityCenter({
                             <Workflow size={13} className="text-pink-400" />
                             Palantir 沿袭安全级联传递图 (Marking Propagation & Lineage Tracker)
                           </span>
-                          <p className="text-[10px] text-slate-500">展现标记由于向下衍生转换，从而在底层管道中对下游节点产生的自动化锁定传染效果</p>
+                          <p className={`text-[10px] ${styles.cardTextMuted}`}>展现标记由于向下衍生转换，从而在底层管道中对下游节点产生的自动化锁定传染效果</p>
                         </div>
 
                         <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-slate-950/80 rounded border border-slate-800 relative">
                           
                           {/* Node 1 */}
                           <div className="flex-1 text-center p-3 rounded bg-slate-900 border-2 border-slate-800 relative z-10 flex flex-col items-center gap-1">
-                            <Database size={16} className="text-slate-400" />
+                            <Database size={16} className={`${styles.cardTextMuted}`} />
                             <span className="text-[10px] font-bold text-slate-300">根源数据集</span>
-                            <span className="text-[8px] font-mono text-slate-500">ds_aviation_raw</span>
+                            <span className={`text-[8px] font-mono ${styles.cardTextMuted}`}>ds_aviation_raw</span>
                             <div className="mt-1.5 flex items-center gap-1 text-[8px] bg-pink-950/60 text-pink-400 border border-pink-900/30 px-1 rounded">
                               <Tag size={8} />
                               <span>已打标锁</span>
@@ -2026,7 +2029,7 @@ export default function SecurityCenter({
                           </div>
 
                           {/* Arrow */}
-                          <div className="text-slate-700 font-bold flex items-center justify-center">
+                          <div className={`${styles.cardText} font-bold flex items-center justify-center`}>
                             <ArrowRight size={14} className="rotate-90 md:rotate-0" />
                           </div>
 
@@ -2034,7 +2037,7 @@ export default function SecurityCenter({
                           <div className="flex-1 text-center p-3 rounded bg-slate-900 border-2 border-pink-800/40 relative z-10 flex flex-col items-center gap-1 shadow-md shadow-pink-950/10">
                             <Cpu size={16} className="text-pink-400" />
                             <span className="text-[10px] font-bold text-slate-300">清洗同步管道</span>
-                            <span className="text-[8px] font-mono text-slate-500">sync_aviation_cleansed</span>
+                            <span className={`text-[8px] font-mono ${styles.cardTextMuted}`}>sync_aviation_cleansed</span>
                             <div className="mt-1.5 text-[8px] text-pink-400 font-extrabold flex items-center gap-0.5">
                               <span className="h-1 w-1 rounded-full bg-pink-500 animate-ping" />
                               <span>安全自动穿透 (Inherited)</span>
@@ -2042,7 +2045,7 @@ export default function SecurityCenter({
                           </div>
 
                           {/* Arrow */}
-                          <div className="text-slate-700 font-bold flex items-center justify-center">
+                          <div className={`${styles.cardText} font-bold flex items-center justify-center`}>
                             <ArrowRight size={14} className="rotate-90 md:rotate-0" />
                           </div>
 
@@ -2050,7 +2053,7 @@ export default function SecurityCenter({
                           <div className="flex-1 text-center p-3 rounded bg-slate-900 border-2 border-pink-700/60 relative z-10 flex flex-col items-center gap-1 shadow-lg shadow-pink-950/20">
                             <Workflow size={16} className="text-pink-400 animate-pulse" />
                             <span className="text-[10px] font-bold text-slate-200">派生本体对象</span>
-                            <span className="text-[8px] font-mono text-slate-500">Aviation_Object_Derived</span>
+                            <span className={`text-[8px] font-mono ${styles.cardTextMuted}`}>Aviation_Object_Derived</span>
                             <div className="mt-1.5 flex items-center gap-1 text-[8px] bg-red-950 text-red-400 border border-red-900/30 px-1 rounded font-black">
                               <ShieldAlert size={8} />
                               <span>终点级联锁定</span>
@@ -2058,7 +2061,7 @@ export default function SecurityCenter({
                           </div>
                         </div>
 
-                        <p className="text-[9px] text-slate-500 text-center italic">
+                        <p className={`text-[9px] ${styles.cardTextMuted} text-center italic`}>
                           * ECOS 安全标准：任何衍生、转化、联结该根源数源的数据项都将自动继承 {currentMark.id}，无法通过普通视图清洗逻辑逃逸。
                         </p>
                       </div>
@@ -2078,7 +2081,7 @@ export default function SecurityCenter({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-black text-slate-100">基于分析用途授权控制 (Purpose-Based Access Control - PBAC)</h3>
-                  <p className="text-[10px] text-slate-400">只有定义合法、合规的数据分析「目的」(Purpose)，才能获得临时的密文解密密钥。任何违背目的的导出或越权行为将被严厉记录。</p>
+                  <p className={`text-[10px] ${styles.cardTextMuted}`}>只有定义合法、合规的数据分析「目的」(Purpose)，才能获得临时的密文解密密钥。任何违背目的的导出或越权行为将被严厉记录。</p>
                 </div>
                 <button
                   onClick={() => setShowAddPurposeModal(true)}
@@ -2097,23 +2100,23 @@ export default function SecurityCenter({
                       <span className={`px-2 py-0.5 rounded text-[8px] font-black ${
                         p.status === 'ACTIVE' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/30' :
                         p.status === 'EXPIRED' ? 'bg-red-950 text-red-400 border border-red-900/30' :
-                        'bg-slate-800 text-slate-400'
+                        'bg-slate-800 ${styles.cardTextMuted}'
                       }`}>
                         {p.status}
                       </span>
-                      <span className="text-[9px] text-slate-500 font-mono">ID: {p.id}</span>
+                      <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>ID: {p.id}</span>
                     </div>
 
                     <div className="space-y-1">
                       <div className="text-xs font-extrabold text-slate-100">{p.name}</div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed line-clamp-2">{p.description}</p>
+                      <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed line-clamp-2`}>{p.description}</p>
                     </div>
 
                     <div className="h-px bg-slate-900" />
 
                     <div className="space-y-2 text-[10px] text-slate-300">
                       <div>
-                        <span className="text-slate-500">特许执行人员:</span>
+                        <span className={`${styles.cardTextMuted}`}>特许执行人员:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {p.authorizedUsers.map(u => (
                             <span key={u} className="bg-slate-900 px-1.5 py-0.2 rounded font-mono text-indigo-300">
@@ -2124,7 +2127,7 @@ export default function SecurityCenter({
                       </div>
 
                       <div>
-                        <span className="text-slate-500">锚定输入数据集:</span>
+                        <span className={`${styles.cardTextMuted}`}>锚定输入数据集:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {p.inputDatasets.map(ds => (
                             <span key={ds} className="bg-slate-900 px-1.5 py-0.2 rounded font-mono text-slate-300">
@@ -2135,7 +2138,7 @@ export default function SecurityCenter({
                       </div>
 
                       <div>
-                        <span className="text-slate-500">强制动态脱敏要求:</span>
+                        <span className={`${styles.cardTextMuted}`}>强制动态脱敏要求:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {p.redactionRules.map(rule => (
                             <span key={rule} className="bg-pink-950/30 text-pink-400 border border-pink-900/20 px-1.5 py-0.2 rounded font-mono">
@@ -2145,9 +2148,9 @@ export default function SecurityCenter({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-[9px] border-t border-slate-900 pt-2 text-slate-500">
+                      <div className={`flex items-center justify-between text-[9px] border-t border-slate-900 pt-2 ${styles.cardTextMuted}`}>
                         <span>届期截至日期:</span>
-                        <span className="font-mono text-slate-400 font-semibold">{p.expiresAt}</span>
+                        <span className={`font-mono ${styles.cardTextMuted} font-semibold`}>{p.expiresAt}</span>
                       </div>
                     </div>
 
@@ -2188,7 +2191,7 @@ export default function SecurityCenter({
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <span className="text-xs font-bold text-slate-200">受动态策略约束的数据表</span>
-                  <span className="text-[9px] font-mono text-slate-500">ROW/COL CONFIGS</span>
+                  <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>ROW/COL CONFIGS</span>
                 </div>
                 <div className="space-y-2">
                   {rowColPolicies.map(item => (
@@ -2202,7 +2205,7 @@ export default function SecurityCenter({
                       }`}
                     >
                       <div className="text-xs font-extrabold text-slate-100 truncate">{item.datasetName}</div>
-                      <div className="flex items-center gap-2 mt-1.5 text-[9px] text-slate-500">
+                      <div className={`flex items-center gap-2 mt-1.5 text-[9px] ${styles.cardTextMuted}`}>
                         <span>列脱敏: {item.columnMasks.filter(c => c.active && c.maskType !== 'NONE').length}项</span>
                         <span>•</span>
                         <span>行过滤: {item.rowFilters.filter(r => r.active).length}条</span>
@@ -2216,14 +2219,14 @@ export default function SecurityCenter({
               <div className="lg:col-span-2 bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-6">
                 {(() => {
                   const currentPolicy = rowColPolicies.find(p => p.datasetId === selectedRowColDs);
-                  if (!currentPolicy) return <div className="text-slate-500 text-xs">请选择数据集</div>;
+                  if (!currentPolicy) return <div className={`${styles.cardTextMuted} text-xs`}>请选择数据集</div>;
 
                   return (
                     <div className="space-y-6">
                       
                       <div className="border-b border-slate-800 pb-4">
                         <h3 className="text-sm font-black text-slate-100">{currentPolicy.datasetName}</h3>
-                        <p className="text-[10px] text-slate-400">在此处针对特定的列项设置动态遮蔽(SHA256哈希、全部抹除或部分脱敏)，或添加SQL风格的行级隔离条件。</p>
+                        <p className={`text-[10px] ${styles.cardTextMuted}`}>在此处针对特定的列项设置动态遮蔽(SHA256哈希、全部抹除或部分脱敏)，或添加SQL风格的行级隔离条件。</p>
                       </div>
 
                       {/* Column Masking section */}
@@ -2234,7 +2237,7 @@ export default function SecurityCenter({
                         </div>
                         <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/40">
                           <table className="w-full text-left text-xs text-slate-300">
-                            <thead className="bg-slate-950 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                            <thead className={`bg-slate-950 ${styles.cardTextMuted} text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800`}>
                               <tr>
                                 <th className="p-3">列字段名</th>
                                 <th className="p-3">脱敏手段</th>
@@ -2251,7 +2254,7 @@ export default function SecurityCenter({
                                       col.maskType === 'REDACT' ? 'bg-red-950 text-red-400 border border-red-900/30' :
                                       col.maskType === 'SHA256' ? 'bg-orange-950 text-orange-400 border border-orange-900/30' :
                                       col.maskType === 'PARTIAL' ? 'bg-blue-950 text-blue-400 border border-blue-900/30' :
-                                      'bg-slate-800 text-slate-400'
+                                      'bg-slate-800 ${styles.cardTextMuted}'
                                     }`}>
                                       {col.maskType === 'NONE' ? '不遮蔽 (NONE)' : col.maskType}
                                     </span>
@@ -2266,7 +2269,7 @@ export default function SecurityCenter({
                                       onClick={() => handleToggleColumnMask(currentPolicy.datasetId, col.column)}
                                       className={`p-1 px-2 text-[10px] font-bold rounded cursor-pointer ${
                                         col.maskType === 'NONE' ? 'opacity-30 cursor-not-allowed' :
-                                        col.active ? 'bg-emerald-950 text-emerald-400 hover:bg-emerald-900' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                        col.active ? 'bg-emerald-950 text-emerald-400 hover:bg-emerald-900' : 'bg-slate-800 ${styles.cardTextMuted} hover:bg-slate-700'
                                       }`}
                                     >
                                       {col.active ? '激活生效' : '已关闭'}
@@ -2286,7 +2289,7 @@ export default function SecurityCenter({
                           <span>行级动态物理隔离策略 (Row-Level Security Policies)</span>
                         </div>
                         {currentPolicy.rowFilters.length === 0 ? (
-                          <div className="text-center p-6 bg-slate-900/30 border border-slate-800 rounded-lg text-slate-500 text-xs">
+                          <div className={`text-center p-6 bg-slate-900/30 border border-slate-800 rounded-lg ${styles.cardTextMuted} text-xs`}>
                             当前数据集没有添加任何行过滤策略。
                           </div>
                         ) : (
@@ -2295,12 +2298,12 @@ export default function SecurityCenter({
                               <div key={idx} className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-lg flex items-center justify-between">
                                 <div className="space-y-1">
                                   <div className="text-[10px] text-indigo-400 font-mono font-bold">SQL FILTER: {filter.filterSql}</div>
-                                  <p className="text-[10px] text-slate-400">{filter.description}</p>
+                                  <p className={`text-[10px] ${styles.cardTextMuted}`}>{filter.description}</p>
                                 </div>
                                 <button
                                   onClick={() => handleToggleRowFilter(currentPolicy.datasetId, idx)}
                                   className={`p-1.5 rounded text-[10px] font-black cursor-pointer ${
-                                    filter.active ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/40' : 'bg-slate-800 text-slate-400'
+                                    filter.active ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/40' : 'bg-slate-800 ${styles.cardTextMuted}'
                                   }`}
                                 >
                                   {filter.active ? '过滤激活中' : '未开启'}
@@ -2314,10 +2317,10 @@ export default function SecurityCenter({
                       {/* Dynamic Preview Simulation */}
                       <div className="bg-slate-900/30 border border-slate-800 rounded-lg p-4 space-y-3.5">
                         <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
                             当前脱敏输出预览 (Dynamic Masking Simulation Preview)
                           </span>
-                          <span className="text-[8px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-mono">
+                          <span className={`text-[8px] bg-slate-800 px-1.5 py-0.5 rounded ${styles.cardTextMuted} font-mono`}>
                             Based on Active Policies
                           </span>
                         </div>
@@ -2325,7 +2328,7 @@ export default function SecurityCenter({
                         {/* Interactive columns view */}
                         {currentPolicy.datasetId === 'ds_flight_schedules' ? (
                           <div className="font-mono text-[10px] text-slate-300 space-y-2">
-                            <div className="grid grid-cols-3 gap-2 bg-slate-950 p-2 rounded text-slate-400 font-bold border-b border-slate-800">
+                            <div className={`grid grid-cols-3 gap-2 bg-slate-950 p-2 rounded ${styles.cardTextMuted} font-bold border-b border-slate-800`}>
                               <span>航班号 (flight_num)</span>
                               <span>机长ID (captain_id)</span>
                               <span>延误时长 (delay_minutes)</span>
@@ -2347,7 +2350,7 @@ export default function SecurityCenter({
                           </div>
                         ) : currentPolicy.datasetId === 'ds_pilots_biography' ? (
                           <div className="font-mono text-[10px] text-slate-300 space-y-2">
-                            <div className="grid grid-cols-3 gap-2 bg-slate-950 p-2 rounded text-slate-400 font-bold border-b border-slate-800">
+                            <div className={`grid grid-cols-3 gap-2 bg-slate-950 p-2 rounded ${styles.cardTextMuted} font-bold border-b border-slate-800`}>
                               <span>身份证号 (ssn_number)</span>
                               <span>邮箱地址 (email_address)</span>
                               <span>基本月薪 (base_salary)</span>
@@ -2365,7 +2368,7 @@ export default function SecurityCenter({
                             </div>
                           </div>
                         ) : (
-                          <div className="text-center py-4 text-slate-500 text-xs">暂无可用预览行数据</div>
+                          <div className={`text-center py-4 ${styles.cardTextMuted} text-xs`}>暂无可用预览行数据</div>
                         )}
                       </div>
                     </div>
@@ -2387,7 +2390,7 @@ export default function SecurityCenter({
                     <Activity size={15} className="text-indigo-400" />
                     安全防护实时审计日志 (Real-Time Dynamic Security Audit Trails)
                   </h3>
-                  <p className="text-[10px] text-slate-400">
+                  <p className={`text-[10px] ${styles.cardTextMuted}`}>
                     捕获并永久存证所有针对敏感数据集、操作行为和安全标记的判定行为，每隔 6 秒自动同步评估引擎记录。
                   </p>
                 </div>
@@ -2414,7 +2417,7 @@ export default function SecurityCenter({
               {/* Logs Table */}
               <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
                 <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-950 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                  <thead className={`bg-slate-950 ${styles.cardTextMuted} text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800`}>
                     <tr>
                       <th className="p-3">事件时间</th>
                       <th className="p-3">访问主体</th>
@@ -2430,9 +2433,9 @@ export default function SecurityCenter({
                       <tr key={log.id} className="hover:bg-slate-900/30 transition-colors">
                         <td className="p-3 text-indigo-400/80 font-bold">{log.timestamp}</td>
                         <td className="p-3 text-slate-200">{log.username}</td>
-                        <td className="p-3 text-slate-400">{log.orgId.split('_')[1] || log.orgId}</td>
+                        <td className={`p-3 ${styles.cardTextMuted}`}>{log.orgId.split('_')[1] || log.orgId}</td>
                         <td className="p-3 text-slate-300 font-semibold">{log.action}</td>
-                        <td className="p-3 text-slate-400">
+                        <td className={`p-3 ${styles.cardTextMuted}`}>
                           <span className="text-[10px] text-indigo-300 font-bold bg-indigo-950/20 px-1 py-0.2 rounded border border-indigo-900/10 mr-1.5">
                             {log.resourceType}
                           </span>
@@ -2447,7 +2450,7 @@ export default function SecurityCenter({
                             {log.status}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-400 max-w-sm truncate" title={log.details}>
+                        <td className={`p-3 ${styles.cardTextMuted} max-w-sm truncate`} title={log.details}>
                           {log.details}
                         </td>
                       </tr>
@@ -2469,7 +2472,7 @@ export default function SecurityCenter({
                     <BookOpen size={15} className="text-indigo-400" />
                     ECOS 零信任防御架构 - 安全中心系统管理员操作手册 (Security Operations Manual)
                   </h3>
-                  <p className="text-[10px] text-slate-400">
+                  <p className={`text-[10px] ${styles.cardTextMuted}`}>
                     本手册专为初级系统管理员设计，帮助其在极短时间内掌握组织初始化、项目授权、数据打标、行列脱敏与自适应审计的闭环防御能力。
                   </p>
                 </div>
@@ -2484,7 +2487,7 @@ export default function SecurityCenter({
                 <button
                   onClick={() => setGuideSection('arch')}
                   className={`px-3 py-1.5 text-[11px] rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    guideSection === 'arch' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    guideSection === 'arch' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 ${styles.cardTextMuted} hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   <Shield size={12} />
@@ -2493,7 +2496,7 @@ export default function SecurityCenter({
                 <button
                   onClick={() => setGuideSection('org')}
                   className={`px-3 py-1.5 text-[11px] rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    guideSection === 'org' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    guideSection === 'org' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 ${styles.cardTextMuted} hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   <Globe size={12} />
@@ -2502,7 +2505,7 @@ export default function SecurityCenter({
                 <button
                   onClick={() => setGuideSection('dac')}
                   className={`px-3 py-1.5 text-[11px] rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    guideSection === 'dac' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    guideSection === 'dac' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 ${styles.cardTextMuted} hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   <FolderGit size={12} />
@@ -2511,7 +2514,7 @@ export default function SecurityCenter({
                 <button
                   onClick={() => setGuideSection('mac')}
                   className={`px-3 py-1.5 text-[11px] rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    guideSection === 'mac' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    guideSection === 'mac' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 ${styles.cardTextMuted} hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   <Tag size={12} />
@@ -2520,7 +2523,7 @@ export default function SecurityCenter({
                 <button
                   onClick={() => setGuideSection('pbac')}
                   className={`px-3 py-1.5 text-[11px] rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    guideSection === 'pbac' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    guideSection === 'pbac' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 ${styles.cardTextMuted} hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   <EyeOff size={12} />
@@ -2529,7 +2532,7 @@ export default function SecurityCenter({
                 <button
                   onClick={() => setGuideSection('audit')}
                   className={`px-3 py-1.5 text-[11px] rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    guideSection === 'audit' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    guideSection === 'audit' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-950 ${styles.cardTextMuted} hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   <Activity size={12} />
@@ -2550,7 +2553,7 @@ export default function SecurityCenter({
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">ECOS 四层深度防御物理/逻辑校验链路</h4>
                     </div>
                     
-                    <p className="text-xs text-slate-400 leading-relaxed">
+                    <p className={`text-xs ${styles.cardTextMuted} leading-relaxed`}>
                       Palantir ECOS 的安全底座不是靠单一防火墙或密保，而是依靠一套**零信任动态研判解密管道 (Zero-Trust Decryption Pipeline)**。
                       当任何用户尝试读取或查询核心数据集时，零信任网关会顺次执行以下 **四个安全关卡** 校验，全部通过才能实现实时无损流式解密：
                     </p>
@@ -2561,7 +2564,7 @@ export default function SecurityCenter({
                           <span className="h-4 w-4 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-mono flex items-center justify-center text-indigo-400">1</span>
                           <span>组织网关 (Org Ingress)</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-normal">
+                        <p className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
                           检查用户所处物理终端 IP 是否符合其所属组织绑定的 CIDR 信任网段。阻断跨组织物理泄露。
                         </p>
                       </div>
@@ -2571,7 +2574,7 @@ export default function SecurityCenter({
                           <span className="h-4 w-4 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-mono flex items-center justify-center text-indigo-400">2</span>
                           <span>项目容器 (DAC ACL)</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-normal">
+                        <p className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
                           确认用户在项目目录上拥有相应角色（Owner/Editor/Viewer/Discoverer）。控制粗粒度读取资产。
                         </p>
                       </div>
@@ -2581,7 +2584,7 @@ export default function SecurityCenter({
                           <span className="h-4 w-4 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-mono flex items-center justify-center text-indigo-400">3</span>
                           <span>强制打标 (MAC Locks)</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-normal">
+                        <p className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
                           识别目标资产是否被打上安全标记。即使在项目内，如未拥有特定特许安全组标签（MAC），亦将被无情拦截。
                         </p>
                       </div>
@@ -2591,7 +2594,7 @@ export default function SecurityCenter({
                           <span className="h-4 w-4 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-mono flex items-center justify-center text-indigo-400">4</span>
                           <span>合规用途 (PBAC Rule)</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-normal">
+                        <p className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
                           校验当前操作是否关联了处于有效期内的“合规分析目的用途”。并在最终流式输出层应用行级过滤与列遮蔽。
                         </p>
                       </div>
@@ -2603,7 +2606,7 @@ export default function SecurityCenter({
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;&amp;&amp; evaluateDac(user, project)</div>
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;&amp;&amp; evaluateMac(user.securityGroups, dataset.markings)</div>
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;&amp;&amp; evaluatePbac(user, purpose, dataset);</div>
-                      <div className="text-slate-500 pt-1">if (verdict === GRANTED) {"{"} return decryptStream(cipherText, rowFilters, columnMasks); {"}"}</div>
+                      <div className={`${styles.cardTextMuted} pt-1`}>if (verdict === GRANTED) {"{"} return decryptStream(cipherText, rowFilters, columnMasks); {"}"}</div>
                     </div>
                   </div>
                 )}
@@ -2618,7 +2621,7 @@ export default function SecurityCenter({
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">第 1 关：组织隔离架构初始化 & 信任域注册</h4>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-slate-400">
+                    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs ${styles.cardTextMuted}`}>
                       <div className="lg:col-span-2 space-y-3 leading-relaxed">
                         <p className="font-normal">
                           组织（Security Organization）是 ECOS 里的最高安全边界。一个用户只能属于一个主权组织，而数据可以打上组织物理隔离标签。
@@ -2643,7 +2646,7 @@ export default function SecurityCenter({
                           <CheckSquare size={12} className="text-emerald-400" />
                           <span>初级管理员配置清单</span>
                         </div>
-                        <ol className="space-y-2 list-decimal list-inside pl-1 text-slate-400 font-normal">
+                        <ol className={`space-y-2 list-decimal list-inside pl-1 ${styles.cardTextMuted} font-normal`}>
                           <li>进入左侧「<span className="text-slate-200">组织隔离架构</span>」面板。</li>
                           <li>点击“新增安全隔离域”，注册新组织，分配一个不冲突的 ID（如 <code className="text-emerald-400 font-mono text-[10px]">Org_Aviation_EU</code>）。</li>
                           <li>设定可信 IP 地址块，例：<code className="text-indigo-400 font-mono text-[10px]">10.120.0.0/16</code>。</li>
@@ -2664,7 +2667,7 @@ export default function SecurityCenter({
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">第 2 关：项目级自主授权机制 (Discretionary Access Control)</h4>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-slate-400">
+                    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs ${styles.cardTextMuted}`}>
                       <div className="lg:col-span-2 space-y-3 leading-relaxed">
                         <p className="font-normal">
                           ECOS 采用类似于操作系统的“项目文件夹目录”进行粗粒度控制，我们称之为 **项目 ACL 授权 (DAC)**。
@@ -2696,7 +2699,7 @@ export default function SecurityCenter({
                           <Settings size={12} className="text-blue-400" />
                           <span>如何为受控项目授权成员？</span>
                         </div>
-                        <ol className="space-y-2 list-decimal list-inside pl-1 text-slate-400 font-normal leading-normal">
+                        <ol className={`space-y-2 list-decimal list-inside pl-1 ${styles.cardTextMuted} font-normal leading-normal`}>
                           <li>进入左侧「<span className="text-slate-200">项目授权治理 (DAC)</span>」页面。</li>
                           <li>在项目列表里选择相应的分析项目（如 <code className="text-blue-400 font-mono">proj_passenger_eu</code>）。</li>
                           <li>找到右侧的 “项目 ACL 控制授权白名单” 栏目。</li>
@@ -2718,7 +2721,7 @@ export default function SecurityCenter({
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">第 3 关：保密等级强制标定与安全标记级联派生 (Mandatory Access Control)</h4>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-slate-400">
+                    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs ${styles.cardTextMuted}`}>
                       <div className="lg:col-span-2 space-y-3 leading-relaxed">
                         <p className="font-normal">
                           普通的自主访问控制（DAC）很容易因分析人员意外将文件拷贝到另一个未受控文件夹而造成泄露。为了彻底封死此类漏洞，ECOS 推出了 **强制访问标记管理 (MAC - Security Markings)**。
@@ -2741,7 +2744,7 @@ export default function SecurityCenter({
                           <Lock size={12} className="text-pink-400" />
                           <span>如何绑定与创建标记锁？</span>
                         </div>
-                        <ol className="space-y-2 list-decimal list-inside pl-1 text-slate-400 font-normal">
+                        <ol className={`space-y-2 list-decimal list-inside pl-1 ${styles.cardTextMuted} font-normal`}>
                           <li>打开左侧「<span className="text-pink-400 font-bold">安全标记管理</span>」面板。</li>
                           <li>可以点击 “创建密级安全标记” 来建立新的保密标识，如 <code className="text-pink-400 font-mono text-[10px]">M_VIP_PASSPORT</code>，选择相应的保密评级：`SECRET` / `RESTRICTED`。</li>
                           <li>在右下侧数据源列表上，选择敏感数据集。</li>
@@ -2762,7 +2765,7 @@ export default function SecurityCenter({
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">第 4 关：合规分析用途 (PBAC) 与行列级流式脱敏网关策略</h4>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-slate-400">
+                    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs ${styles.cardTextMuted}`}>
                       <div className="lg:col-span-2 space-y-3 leading-relaxed">
                         <p className="font-normal">
                           这是保护用户 PII（个人敏感信息）和财务核心安全的最后、也是最细粒度的过滤底盘：**基于商业正当分析用途的安全检查 (PBAC & Row/Column Level Policies)**。
@@ -2793,7 +2796,7 @@ export default function SecurityCenter({
                           <Settings size={12} className="text-emerald-400" />
                           <span>如何快速配置行列策略？</span>
                         </div>
-                        <ol className="space-y-2 list-decimal list-inside pl-1 text-slate-400 font-normal leading-normal">
+                        <ol className={`space-y-2 list-decimal list-inside pl-1 ${styles.cardTextMuted} font-normal leading-normal`}>
                           <li>点击左侧导航「<span className="text-slate-200">行列级安全策略</span>」面板。</li>
                           <li>从顶部下拉选项卡中选择你需要重点关切的数据集（如 <code className="text-emerald-400 font-mono">ds_passenger_manifest</code>）。</li>
                           <li>下方的 “列遮蔽脱敏设置 (Column Masking)” 区域中，可直接开关对应的某一列（例如 <code className="text-slate-200 font-mono text-[10px]">passport_no</code> 的 `REDACT`，或 <code className="text-slate-200 font-mono text-[10px]">email_address</code> 的 `PARTIAL`）。</li>
@@ -2814,7 +2817,7 @@ export default function SecurityCenter({
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">第 5 关：动态安全合规审计与自适应重新扫描诊断</h4>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-slate-400">
+                    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs ${styles.cardTextMuted}`}>
                       <div className="lg:col-span-2 space-y-3 leading-relaxed font-normal">
                         <p>
                           任何防御都可能在策略更替中引入死角。因此，管理员必须周期性地查看安全审计，并结合 AIP 自适应安全扫描，做到**“动态威胁捕获”**。
@@ -2843,7 +2846,7 @@ export default function SecurityCenter({
                           <ShieldAlert size={12} className="text-amber-400" />
                           <span>态势感知与阻断核验</span>
                         </div>
-                        <ul className="space-y-2 list-none pl-0 text-slate-400 leading-normal font-normal">
+                        <ul className={`space-y-2 list-none pl-0 ${styles.cardTextMuted} leading-normal font-normal`}>
                           <li className="flex items-start gap-1">
                             <span className="text-amber-500">⚠️</span>
                             <span><strong>定期导出合规证明</strong>: 点击“导出安全合规报告”可自动生成并加密打包PDF合规文件存证。</span>
@@ -2868,7 +2871,7 @@ export default function SecurityCenter({
                   </span>
                   <div>
                     <h5 className="font-black text-slate-200">准备好了？现在就开启一场合规攻防实战演练！</h5>
-                    <p className="text-[10px] text-slate-500 font-normal">可以通过左侧的“安全合规概览”选择 GDPR 欧盟隐私合规或高密财务退票核销，跟随向导执行每一步动作并观看解密网关计算出的实时判定链路。</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted} font-normal`}>可以通过左侧的“安全合规概览”选择 GDPR 欧盟隐私合规或高密财务退票核销，跟随向导执行每一步动作并观看解密网关计算出的实时判定链路。</p>
                   </div>
                 </div>
                 <button
@@ -2899,13 +2902,13 @@ export default function SecurityCenter({
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">添加全新安全隔离域</h4>
-              <button onClick={() => setShowAddOrgModal(false)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
+              <button onClick={() => setShowAddOrgModal(false)} className={`${styles.cardTextMuted} hover:text-slate-300 cursor-pointer`}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddOrg} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-400 font-bold block mb-1">组织名称</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>组织名称</label>
                 <input
                   type="text"
                   required
@@ -2916,7 +2919,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">唯一标识 (ID)</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>唯一标识 (ID)</label>
                 <input
                   type="text"
                   required
@@ -2927,7 +2930,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">默认 IP 段限制 CIDR</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>默认 IP 段限制 CIDR</label>
                 <input
                   type="text"
                   placeholder="例: 10.220.0.0/16"
@@ -2952,7 +2955,7 @@ export default function SecurityCenter({
                 <button
                   type="button"
                   onClick={() => setShowAddOrgModal(false)}
-                  className="px-3 py-1.5 bg-slate-900 text-slate-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+                  className={`px-3 py-1.5 bg-slate-900 ${styles.cardTextMuted} rounded-lg hover:bg-slate-800 cursor-pointer`}
                 >
                   取消
                 </button>
@@ -2974,13 +2977,13 @@ export default function SecurityCenter({
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">授予受控工程成员角色</h4>
-              <button onClick={() => setShowAddMemberModal(false)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
+              <button onClick={() => setShowAddMemberModal(false)} className={`${styles.cardTextMuted} hover:text-slate-300 cursor-pointer`}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddMember} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-400 font-bold block mb-1">用户或工作组 LDAP 账号</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>用户或工作组 LDAP 账号</label>
                 <input
                   type="text"
                   required
@@ -2991,7 +2994,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">受控角色类别 (Role)</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>受控角色类别 (Role)</label>
                 <select
                   value={newMemberRole}
                   onChange={(e) => setNewMemberRole(e.target.value as any)}
@@ -3007,7 +3010,7 @@ export default function SecurityCenter({
                 <button
                   type="button"
                   onClick={() => setShowAddMemberModal(false)}
-                  className="px-3 py-1.5 bg-slate-900 text-slate-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+                  className={`px-3 py-1.5 bg-slate-900 ${styles.cardTextMuted} rounded-lg hover:bg-slate-800 cursor-pointer`}
                 >
                   取消
                 </button>
@@ -3029,13 +3032,13 @@ export default function SecurityCenter({
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">创建密级安全标记</h4>
-              <button onClick={() => setShowAddMarkingModal(false)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
+              <button onClick={() => setShowAddMarkingModal(false)} className={`${styles.cardTextMuted} hover:text-slate-300 cursor-pointer`}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddMarking} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-400 font-bold block mb-1">安全标记代码 (ID)</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>安全标记代码 (ID)</label>
                 <input
                   type="text"
                   required
@@ -3046,7 +3049,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">标记中文显示名称</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>标记中文显示名称</label>
                 <input
                   type="text"
                   required
@@ -3057,7 +3060,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">保密评级 (Classification Level)</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>保密评级 (Classification Level)</label>
                 <select
                   value={newMarkLevel}
                   onChange={(e) => setNewMarkLevel(e.target.value as any)}
@@ -3070,7 +3073,7 @@ export default function SecurityCenter({
                 </select>
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">安全标记背景描述</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>安全标记背景描述</label>
                 <textarea
                   placeholder="详细解释打标依据和继承限制规则..."
                   value={newMarkDesc}
@@ -3082,7 +3085,7 @@ export default function SecurityCenter({
                 <button
                   type="button"
                   onClick={() => setShowAddMarkingModal(false)}
-                  className="px-3 py-1.5 bg-slate-900 text-slate-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+                  className={`px-3 py-1.5 bg-slate-900 ${styles.cardTextMuted} rounded-lg hover:bg-slate-800 cursor-pointer`}
                 >
                   取消
                 </button>
@@ -3104,13 +3107,13 @@ export default function SecurityCenter({
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">新增合规分析目的项目</h4>
-              <button onClick={() => setShowAddPurposeModal(false)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
+              <button onClick={() => setShowAddPurposeModal(false)} className={`${styles.cardTextMuted} hover:text-slate-300 cursor-pointer`}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddPurpose} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-400 font-bold block mb-1">合规目的编号 (ID)</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>合规目的编号 (ID)</label>
                 <input
                   type="text"
                   required
@@ -3121,7 +3124,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">合规目的中文标题</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>合规目的中文标题</label>
                 <input
                   type="text"
                   required
@@ -3132,7 +3135,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">拟引入的数据集</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>拟引入的数据集</label>
                 <input
                   type="text"
                   placeholder="例: ds_flight_schedules"
@@ -3142,7 +3145,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">脱敏遮蔽条款</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>脱敏遮蔽条款</label>
                 <input
                   type="text"
                   placeholder="例: MASK(ssn_number)"
@@ -3152,7 +3155,7 @@ export default function SecurityCenter({
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-bold block mb-1">目的用途背景详情说明</label>
+                <label className={`${styles.cardTextMuted} font-bold block mb-1`}>目的用途背景详情说明</label>
                 <textarea
                   placeholder="在此写入符合GDPR或审计要求的正当商业分析用途陈述..."
                   value={newPurpDesc}
@@ -3164,7 +3167,7 @@ export default function SecurityCenter({
                 <button
                   type="button"
                   onClick={() => setShowAddPurposeModal(false)}
-                  className="px-3 py-1.5 bg-slate-900 text-slate-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+                  className={`px-3 py-1.5 bg-slate-900 ${styles.cardTextMuted} rounded-lg hover:bg-slate-800 cursor-pointer`}
                 >
                   取消
                 </button>
@@ -3193,7 +3196,7 @@ export default function SecurityCenter({
                 <RefreshCw size={13} />
                 <span>实时重新扫描</span>
               </button>
-              <button onClick={() => setShowDiagnosticModal(false)} className="text-slate-400 hover:text-slate-200 cursor-pointer p-1 bg-slate-900 hover:bg-slate-800 rounded">
+              <button onClick={() => setShowDiagnosticModal(false)} className={`${styles.cardTextMuted} hover:text-slate-200 cursor-pointer p-1 bg-slate-900 hover:bg-slate-800 rounded`}>
                 <X size={16} />
               </button>
             </div>
@@ -3206,7 +3209,7 @@ export default function SecurityCenter({
                 <h4 className="text-sm font-black text-slate-100">
                   🧬 AIP 自适应零信任安全扫描诊断书
                 </h4>
-                <p className="text-[10px] text-slate-400">
+                <p className={`text-[10px] ${styles.cardTextMuted}`}>
                   System Security Scan Diagnostic & Threats Hunter (Auto-learned in Vector Knowledge Base)
                 </p>
               </div>
@@ -3267,18 +3270,18 @@ export default function SecurityCenter({
                   }
                   if (line.trim().startsWith('*判定依据*') || line.trim().startsWith('- *判定依据*')) {
                     return (
-                      <div key={idx} className="ml-10 text-[10px] text-slate-400 italic bg-slate-950/40 p-1.5 rounded border border-slate-900">
+                      <div key={idx} className={`ml-10 text-[10px] ${styles.cardTextMuted} italic bg-slate-950/40 p-1.5 rounded border border-slate-900`}>
                         {line}
                       </div>
                     );
                   }
                   if (line.trim() === '') return <div key={idx} className="h-1" />;
-                  return <p key={idx} className="text-slate-400 pl-4">{line}</p>;
+                  return <p key={idx} className={`${styles.cardTextMuted} pl-4`}>{line}</p>;
                 })}
               </div>
             </div>
 
-            <div className="border-t border-slate-850 pt-3 flex justify-between items-center text-[10px] text-slate-500 font-mono">
+            <div className={`border-t border-slate-850 pt-3 flex justify-between items-center text-[10px] ${styles.cardTextMuted} font-mono`}>
               <span>状态: 零信任自适应闭环机制已激活</span>
               <button
                 type="button"

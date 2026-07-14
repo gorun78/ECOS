@@ -9,7 +9,7 @@ import {
   Shield, Eye, EyeOff, Cpu, Database, HardDrive, Workflow,
   ShieldCheck, GitBranch, Wrench,
 } from 'lucide-react';
-import { apiFetch, apiFetchData } from '../../api';
+import { apiFetchData } from '../../api';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -194,8 +194,8 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
     setLoadError(null);
     try {
       const [configResp, defaultsResp] = await Promise.all([
-        apiFetch<{ code: number; data: any }>('/api/v1/engine/data/settings'),
-        apiFetch<{ code: number; data: any }>('/api/v1/engine/data/settings/defaults'),
+        apiFetchData<{ code: number; data: any }>('/api/v1/engine/data/settings'),
+        apiFetchData<{ code: number; data: any }>('/api/v1/engine/data/settings/defaults'),
       ]);
 
       const configData = configResp?.data ?? configResp;
@@ -293,7 +293,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
         return;
       }
 
-      await apiFetch('/api/v1/engine/data/settings', {
+      await apiFetchData('/api/v1/engine/data/settings', {
         method: 'PUT',
         body: JSON.stringify(changedItems),
       });
@@ -313,7 +313,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
   const handleRefreshCache = useCallback(async () => {
     setRefreshing(true);
     try {
-      await apiFetch('/api/v1/engine/data/settings/refresh', { method: 'POST' });
+      await apiFetchData('/api/v1/engine/data/settings/refresh', { method: 'POST' });
       showToast?.('success', '缓存已刷新');
     } catch (e: any) {
       showToast?.('error', `刷新缓存失败: ${e?.message || '未知错误'}`);

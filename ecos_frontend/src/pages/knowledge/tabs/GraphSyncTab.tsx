@@ -131,7 +131,7 @@ export default function GraphSyncTab() {
 
         {/* Overall progress bar */}
         <div className="space-y-1.5">
-          <div className="flex justify-between text-[11px] text-slate-400">
+          <div className={`flex justify-between text-[11px] ${styles.cardTextMuted}`}>
             <span>总同步进度</span>
             <span className="font-bold text-slate-300">{syncedAll} / {totalAll} ({progressPct}%)</span>
           </div>
@@ -147,14 +147,14 @@ export default function GraphSyncTab() {
       {/* Object Type List Table */}
       <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden flex-1">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-          <Database size={13} className="text-slate-400" />
+          <Database size={13} className={`${styles.cardTextMuted}`} />
           <span className="text-xs font-bold text-slate-300">Object类型同步列表</span>
         </div>
 
         <div className="overflow-auto">
           <table className="w-full text-[11px]">
             <thead>
-              <tr className="bg-slate-800 text-slate-400 uppercase tracking-wider">
+              <tr className={`bg-slate-800 ${styles.cardTextMuted} uppercase tracking-wider`}>
                 <th className="text-left px-4 py-2.5 font-bold">Object类型</th>
                 <th className="text-center px-3 py-2.5 font-bold">已同步数</th>
                 <th className="text-center px-3 py-2.5 font-bold">未同步数</th>
@@ -166,7 +166,7 @@ export default function GraphSyncTab() {
             <tbody>
               {syncStatuses.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-slate-500">
+                  <td colSpan={6} className={`text-center py-8 ${styles.cardTextMuted}`}>
                     {isLoadingStatus
                       ? <span className="flex items-center justify-center gap-2"><Loader2 size={12} className="animate-spin" /> 加载中...</span>
                       : '暂无同步数据，点击"刷新状态"获取'}
@@ -187,7 +187,7 @@ export default function GraphSyncTab() {
                     <td className="px-3 py-2.5 text-center">
                       <span className="text-amber-400 font-mono">{item.unsynced}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-400">
+                    <td className={`px-3 py-2.5 ${styles.cardTextMuted}`}>
                       {item.lastSyncTime || '—'}
                     </td>
                     <td className="px-3 py-2.5 text-center">
@@ -198,7 +198,7 @@ export default function GraphSyncTab() {
                       >
                         {item.enabled
                           ? <ToggleRight size={16} className="text-emerald-500" />
-                          : <ToggleLeft size={16} className="text-slate-600" />
+                          : <ToggleLeft size={16} className={`${styles.cardTextMuted}`} />
                         }
                       </button>
                     </td>
@@ -226,12 +226,12 @@ export default function GraphSyncTab() {
       {/* Sync History Logs */}
       <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-          <Clock size={13} className="text-slate-400" />
+          <Clock size={13} className={`${styles.cardTextMuted}`} />
           <span className="text-xs font-bold text-slate-300">同步历史日志 (最近10条)</span>
         </div>
         <div className="overflow-auto max-h-48">
           {syncLogs.length === 0 ? (
-            <div className="text-center py-6 text-slate-500 text-[11px]">
+            <div className={`text-center py-6 ${styles.cardTextMuted} text-[11px]`}>
               暂无同步日志
             </div>
           ) : (
@@ -240,10 +240,10 @@ export default function GraphSyncTab() {
                 key={log.id}
                 className="flex items-center gap-3 px-4 py-2 border-t border-slate-800/50 text-[11px] hover:bg-slate-800/30 transition"
               >
-                <span className="text-slate-500 font-mono w-36 shrink-0">
+                <span className={`${styles.cardTextMuted} font-mono w-36 shrink-0`}>
                   {log.timestamp}
                 </span>
-                <span className="text-slate-400 font-bold w-28 shrink-0">
+                <span className={`${styles.cardTextMuted} font-bold w-28 shrink-0`}>
                   {log.objectType}
                 </span>
                 <span className="text-slate-300 w-20 shrink-0">
@@ -259,7 +259,7 @@ export default function GraphSyncTab() {
                   {log.status === 'success' ? '成功' : '失败'}
                 </span>
                 {log.message && (
-                  <span className="text-slate-500 truncate flex-1">
+                  <span className={`${styles.cardTextMuted} truncate flex-1`}>
                     {log.message}
                   </span>
                 )}

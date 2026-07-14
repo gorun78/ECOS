@@ -3174,6 +3174,9 @@ Palantir ECOS 的零信任一体化集成架构强调：“物理拉取轻量化
         {activeTab === 'pipeline-builder' && (
           <PipelineBuilderTab
             connections={connections}
+            pipelines={pipelines}
+            computeEngine={computeEngine}
+            setComputeEngine={setComputeEngine}
             showToast={showToast}
             pipelineBuilderOutput={pipelineBuilderOutput}
             setPipelineBuilderOutput={setPipelineBuilderOutput}

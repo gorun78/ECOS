@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Tag, Trash2, X, Zap } from 'lucide-react';
+import { AlertCircle, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Tag, Trash2, X, Zap } from 'lucide-react';
 // Dynamic icon resolver for runtime icon names (from ceos_new)
 import * as LucideIcons from 'lucide-react';
 function DynamicIcon({ name, size = 14, className }: { name: string; size?: number; className?: string }) {
@@ -29,7 +29,7 @@ interface SidebarProps {
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objects: ObjectType[]) => void;
   
-  selectedCategory: 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
+  selectedCategory: 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
   selectedId: string | null;
 
   onSelectCategory: (category: any, id: string | null) => void;
@@ -883,6 +883,21 @@ export default function Sidebar({
           </div>
         </div>
       )}
+
+      {/* 📖 术语库快速入口 */}
+      <div className="border-t border-slate-200 px-3 py-3">
+        <button
+          onClick={() => onSelectCategory('glossary', null)}
+          className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
+            selectedCategory === 'glossary'
+              ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <BookOpen size={14} />
+          <span>术语库</span>
+        </button>
+      </div>
 
     </aside>
   );

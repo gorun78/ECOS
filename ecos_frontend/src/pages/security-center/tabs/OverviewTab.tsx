@@ -242,7 +242,7 @@ export default function OverviewTab(props: TabProps) {
               </span>
             </div>
             <div className="space-y-1.5 font-mono text-[10px] text-slate-300 overflow-y-auto max-h-32 pr-2">
-              {simResult.traces.map((trace, idx) => (
+              {Array.isArray(simResult.traces) && simResult.traces.map((trace, idx) => (
                 <div key={idx} className={`p-1 rounded ${
                   trace.includes('SUCCESS') || trace.includes('GRANTED') || trace.includes('通过')
                     ? 'bg-emerald-950/25 text-emerald-300' 

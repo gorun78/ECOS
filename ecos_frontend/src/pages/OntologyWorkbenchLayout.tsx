@@ -32,6 +32,7 @@ import LinkTypeDetail from './ontology/LinkTypeDetail';
 import ActionTypeDetail from './ontology/ActionTypeDetail';
 import FunctionTypeDetail from './ontology/FunctionTypeDetail';
 import { InterfaceView, SharedPropertyView, DatasetView } from './ontology/OtherViews';
+import GlossaryTab from './knowledge/tabs/GlossaryTab';
 import ObjectExplorerView from './ObjectExplorerView';
 
 import {
@@ -46,7 +47,7 @@ import {
 import { useOntologyData } from '../hooks/useOntologyData';
 import type { Entity } from '../types/workbench';
 
-type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
+type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
 type CreatableType = 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function';
 
 export default function OntologyWorkbenchLayout() {
@@ -465,6 +466,13 @@ export default function OntologyWorkbenchLayout() {
             />
           );
         })()}
+
+        {/* 术语库 */}
+        {selectedCategory === 'glossary' && (
+          <div className="p-4">
+            <GlossaryTab />
+          </div>
+        )}
       </main>
 
       {/* Toast Notification */}

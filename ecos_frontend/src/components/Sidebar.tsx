@@ -97,7 +97,7 @@ export default function Sidebar({
     groupZh: "资源概览",
     items: [
       { id: "marketplace", label: "Marketplace", labelZh: "数据市场", icon: Store, desc: "Browse data assets", descZh: "浏览数据资产，申请访问权限" },
-      { id: "knowledge_graph", label: "Knowledge Graph", labelZh: "知识图谱", icon: BookOpen, desc: "Vector index & RAG search", descZh: "知识向量索引与RAG检索" },
+      { id: "knowledge_graph", label: "Knowledge Graph", labelZh: "知识图谱", icon: BookOpen, desc: "Interactive ontology graph exploration", descZh: "交互式本体图谱探索" },
       { id: "ops_apps", label: "Operational Apps", labelZh: "运营应用", icon: Play, desc: "Operational apps", descZh: "运营应用快速入口" },
     ],
   };

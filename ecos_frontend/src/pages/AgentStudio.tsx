@@ -331,16 +331,16 @@ export default function AgentStudio() {
   const g = (en: string, zh: string) => locale === "zh" ? zh : en;
 
   return (
-    <div className="flex-1 bg-slate-50 text-slate-800 flex flex-col h-full font-sans overflow-hidden animate-fade-in w-full">
+    <div className={`flex-1 ${styles.appBg} ${styles.cardText} flex flex-col h-full font-sans overflow-hidden animate-fade-in w-full`}>
 
       {/* Page header */}
-      <div className="bg-white border-b border-slate-200 p-3 sm:p-5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+      <div className={`${styles.cardBg} border-b ${styles.cardBorder} p-3 sm:p-5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4`}>
         <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2 font-sans">
+          <h1 className={`text-xl font-bold ${styles.cardText} flex items-center gap-2 font-sans`}>
             <Cpu className="text-indigo-650 w-5 h-5 shrink-0" />
             {t("agent.title")}
           </h1>
-          <p className="text-xs text-slate-550 mt-1 max-w-2xl leading-relaxed">
+          <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-2xl leading-relaxed`}>
             {t("agent.desc")}
           </p>
         </div>
@@ -357,7 +357,7 @@ export default function AgentStudio() {
           </button>
           <input
             type="text"
-            className="bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-700 placeholder-slate-400 outline-hidden focus:border-indigo-400 flex-1 sm:w-56 sm:flex-none font-sans"
+            className={`${styles.appBg} border ${styles.cardBorder} rounded-lg px-3.5 py-2 text-xs ${styles.cardText} placeholder-slate-400 outline-hidden focus:border-indigo-400 flex-1 sm:w-56 sm:flex-none font-sans`}
             placeholder={selectedAgent ? g(`Ask ${selectedAgent.name}...`, `向 ${selectedAgent.name} 提问...`) : g("Ask agent...", "向 Agent 提问...")}
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}
@@ -393,19 +393,19 @@ export default function AgentStudio() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-5 p-4 sm:p-6 min-h-0 overflow-hidden">
 
         {/* COL 1: AGENT CARD SELECTOR + TOOLS DIRECTORY */}
-        <div className="lg:col-span-1 bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-4 overflow-hidden shadow-xs">
+        <div className={`lg:col-span-1 ${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 flex flex-col gap-4 overflow-hidden shadow-xs`}>
 
           {/* Agent card selector */}
           <div className="flex-1 flex flex-col overflow-hidden min-h-[150px]">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-405 leading-none">
+              <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${styles.cardTextMuted} leading-none`}>
                 {t("agent.list.title")}
               </span>
-              <span className="text-[9px] text-slate-400">{agents.length} agents</span>
+              <span className={`text-[9px] ${styles.cardTextMuted}`}>{agents.length} agents</span>
             </div>
             <div className="space-y-2 overflow-y-auto flex-1 scrollbar-none pr-1">
               {agents.length === 0 ? (
-                <div className="text-[10px] text-slate-400 italic py-4 text-center">
+                <div className={`text-[10px] ${styles.cardTextMuted} italic py-4 text-center`}>
                   {t("agent.list.empty")}
                 </div>
               ) : (
@@ -421,38 +421,38 @@ export default function AgentStudio() {
                       className={`w-full text-left p-3 rounded-xl transition-all border-2 outline-hidden ${
                         isSelected
                           ? "bg-indigo-50 border-indigo-400 shadow-md shadow-indigo-100/50"
-                          : "bg-slate-50 border-slate-100 hover:border-slate-200 hover:bg-white hover:shadow-sm"
+                          : "${styles.appBg} ${styles.cardBorder} hover:${styles.cardBorder} hover:${styles.cardBg} hover:shadow-sm"
                       }`}
                     >
                       {/* Agent name + icon */}
                       <div className="flex items-center gap-2 mb-1.5">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
+                          isSelected ? "bg-indigo-600 text-white" : "bg-slate-200 ${styles.cardTextMuted}"
                         }`}>
                           <Bot className="w-3.5 h-3.5" />
                         </div>
                         <span className={`text-xs font-bold leading-tight ${
-                          isSelected ? "text-indigo-900" : "text-slate-700"
+                          isSelected ? "text-indigo-900" : "${styles.cardText}"
                         }`}>
                           {agent.name}
                         </span>
                       </div>
 
                       {/* Role */}
-                      <p className="text-[10px] text-slate-450 leading-relaxed mb-2 line-clamp-2">
+                      <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed mb-2 line-clamp-2`}>
                         {agent.role}
                       </p>
 
                       {/* Meta badges: model + tools */}
                       <div className="flex items-center gap-2 flex-wrap">
                         {modelLabel && modelLabel !== "unknown" && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-500 bg-white/70 border border-slate-200 rounded px-1.5 py-0.5">
-                            <Cpu className="w-2.5 h-2.5 text-slate-400" />
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-mono ${styles.cardTextMuted} ${styles.cardBg}/70 border ${styles.cardBorder} rounded px-1.5 py-0.5`}>
+                            <Cpu className={`w-2.5 h-2.5 ${styles.cardTextMuted}`} />
                             {modelLabel}
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-500 bg-white/70 border border-slate-200 rounded px-1.5 py-0.5">
-                          <Wrench className="w-2.5 h-2.5 text-slate-400" />
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-mono ${styles.cardTextMuted} ${styles.cardBg}/70 border ${styles.cardBorder} rounded px-1.5 py-0.5`}>
+                          <Wrench className={`w-2.5 h-2.5 ${styles.cardTextMuted}`} />
                           {toolCount} {g("tools", "工具")}
                         </span>
                       </div>
@@ -464,23 +464,23 @@ export default function AgentStudio() {
           </div>
 
           {/* Tools registry */}
-          <div className="flex-1 flex flex-col overflow-hidden border-t border-slate-100 pt-4">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-405 block mb-2 leading-none">
+          <div className={`flex-1 flex flex-col overflow-hidden border-t ${styles.cardBorder} pt-4`}>
+            <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${styles.cardTextMuted} block mb-2 leading-none`}>
               {t("agent.tools.title")}
             </span>
             <div className="space-y-2 overflow-y-auto flex-1 scrollbar-thin pr-1">
               {tools.length === 0 ? (
-                <div className="text-[10px] text-slate-400 italic py-2 text-center">
+                <div className={`text-[10px] ${styles.cardTextMuted} italic py-2 text-center`}>
                   {t("agent.tools.empty")}
                 </div>
               ) : (
                 tools.map((tool) => (
-                  <div key={tool.id} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                  <div key={tool.id} className={`p-2.5 ${styles.appBg} border ${styles.cardBorder} rounded-lg`}>
                     <div className="flex items-center gap-1.5">
-                      <Code className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-705 font-mono leading-none">{tool.name}</span>
+                      <Code className={`w-3.5 h-3.5 ${styles.cardTextMuted}`} />
+                      <span className={`text-[10px] font-bold ${styles.cardText} font-mono leading-none`}>{tool.name}</span>
                     </div>
-                    <p className="text-[10px] text-slate-450 leading-relaxed mt-1.5">{tool.description}</p>
+                    <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed mt-1.5`}>{tool.description}</p>
                   </div>
                 ))
               )}
@@ -499,12 +499,12 @@ export default function AgentStudio() {
                 <Terminal className="w-3.5 h-3.5 text-green-500 shrink-0" />
                 {t("agent.chat.title")}
               </span>
-              <span className="text-slate-500 text-[9px]">{chatHistory.length} {g("messages", "条消息")}</span>
+              <span className={`${styles.cardTextMuted} text-[9px]`}>{chatHistory.length} {g("messages", "条消息")}</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-thin space-y-3 pr-1 text-[11px] leading-relaxed">
               {chatHistory.length === 0 ? (
-                <div className="py-12 text-center text-slate-500 italic select-none">
+                <div className={`py-12 text-center ${styles.cardTextMuted} italic select-none`}>
                   {t("agent.chat.placeholder")}
                 </div>
               ) : (
@@ -520,7 +520,7 @@ export default function AgentStudio() {
                         ? "bg-emerald-900/20 border-emerald-500/40 border-l-2 border-l-emerald-400 mr-4"
                         : "bg-slate-800/40 border-slate-700 border-l-2 border-l-green-500 mr-4"
                     }`}>
-                      <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                      <span className={`text-[10px] font-bold uppercase ${styles.cardTextMuted} block mb-1`}>
                         {entry.role === "user"
                           ? g("You", "你")
                           : entry.role === "error"
@@ -537,7 +537,7 @@ export default function AgentStudio() {
                       <div className="mt-1.5 ml-2 mr-6">
                         <button
                           onClick={() => toggleTrace(i)}
-                          className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer select-none"
+                          className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} hover:${styles.cardText} transition-colors cursor-pointer select-none`}
                         >
                           {entry.collapsed ? (
                             <ChevronDown className="w-3 h-3" />
@@ -548,7 +548,7 @@ export default function AgentStudio() {
                           <span className="font-bold uppercase tracking-wider">
                             {g("Thought Trace", "思考过程")}
                           </span>
-                          <span className="text-slate-600">({entry.thoughtTrace.length} {g("steps", "步")})</span>
+                          <span className={`${styles.cardTextMuted}`}>({entry.thoughtTrace.length} {g("steps", "步")})</span>
                         </button>
 
                         {!entry.collapsed && (
@@ -564,13 +564,13 @@ export default function AgentStudio() {
                                   className={`p-2 rounded-lg border ${style.bg} ${style.border} text-[10px]`}
                                 >
                                   <div
-                                    className={`flex items-center gap-1.5 mb-0.5 ${hasDetail ? "cursor-pointer select-none hover:bg-white/5 rounded" : ""}`}
+                                    className={`flex items-center gap-1.5 mb-0.5 ${hasDetail ? "cursor-pointer select-none hover:${styles.cardBg}/5 rounded" : ""}`}
                                     onClick={hasDetail ? () => toggleStepExpand(stepKey) : undefined}
                                   >
                                     {hasDetail && (
                                       isStepExpanded
-                                        ? <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-                                        : <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />
+                                        ? <ChevronDown className={`w-3 h-3 ${styles.cardTextMuted} shrink-0`} />
+                                        : <ChevronRight className={`w-3 h-3 ${styles.cardTextMuted} shrink-0`} />
                                     )}
                                     <span className={`font-bold uppercase tracking-wider ${style.icon}`}>
                                       [{style.label}]
@@ -584,7 +584,7 @@ export default function AgentStudio() {
                                   </div>
                                   <p className="text-slate-300 font-sans leading-relaxed">{step.summary}</p>
                                   {hasDetail && isStepExpanded && (
-                                    <p className="text-slate-500 font-sans leading-relaxed mt-0.5 text-[9px]">{step.detail}</p>
+                                    <p className={`${styles.cardTextMuted} font-sans leading-relaxed mt-0.5 text-[9px]`}>{step.detail}</p>
                                   )}
                                 </div>
                               );
@@ -664,12 +664,12 @@ export default function AgentStudio() {
                 <Terminal className="w-3.5 h-3.5 text-green-500 shrink-0" />
                 {t("agent.trace.title")}
               </span>
-              <span className="text-slate-500 text-[9px]">{traceLogs.length} {g("steps", "步")}</span>
+              <span className={`${styles.cardTextMuted} text-[9px]`}>{traceLogs.length} {g("steps", "步")}</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-thin space-y-1 pr-1 text-[10px]">
               {traceLogs.length === 0 ? (
-                <div className="py-8 text-center text-slate-500 italic select-none">
+                <div className={`py-8 text-center ${styles.cardTextMuted} italic select-none`}>
                   {t("agent.trace.placeholder")}
                 </div>
               ) : (

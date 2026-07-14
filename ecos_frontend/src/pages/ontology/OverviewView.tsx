@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import { useLanguage } from '../../components/LanguageContext';
+import { useTheme } from '../../components/ThemeContext';
 import { Box, ChevronRight, Compass, GitMerge, History, Layers, Network, ShieldCheck, Tag, Workflow } from 'lucide-react';
 import DynamicIcon from '../../components/ontology/DynamicIcon';
 import { getDomainColorClasses, auditLogs } from './helpers';
@@ -39,6 +40,7 @@ export default function OverviewView({
   onSelectNode, onSelectEdge, onQuickNavigate, onUpdateDomains, onUpdateObjectTypes,
 }: OverviewViewProps) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
 
   const handleDeleteDomain = (domainId: string) => {
     if (!window.confirm(t('ontology.confirm_delete_domain').replace('{name}', domains.find(d => d.id === domainId)?.displayName || ''))) return;
@@ -55,9 +57,9 @@ export default function OverviewView({
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-y-auto p-6 space-y-6 select-none">
+    <div className={`flex flex-col h-full ${styles.appBg} overflow-y-auto p-6 space-y-6 select-none`}>
       {/* Title Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex items-center justify-between">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs flex items-center justify-between`}>
         <div className="space-y-1 flex-1">
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5"><Workflow className="text-blue-600" size={16} />航空资产与运行智能本体 (Aviation Core Ontology)</h2>
           <p className="text-xs text-slate-500 max-w-3xl leading-relaxed">物理世界实体网络庞大异构。为便于大型航司进行数字治理，我们支持将本体对象归属到不同的「业务域 (Domains)」分级中。</p>
@@ -67,14 +69,14 @@ export default function OverviewView({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow"><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">业务对象实体</span><div className="text-xl font-bold text-slate-900 font-mono">{objectTypes.length}</div><div className="text-[10px] text-slate-500 flex items-center gap-1"><span>{objectTypes.filter(ot => ot.domainId).length} 个已归域</span><span className="text-slate-300">|</span><span className="text-amber-600 font-medium">{objectTypes.filter(ot => !ot.domainId).length} 个未归类</span></div></div><span className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100"><Box size={18} /></span></div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow"><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">关系链接数量</span><div className="text-xl font-bold text-slate-900 font-mono">{linkTypes.length}</div><div className="text-[10px] text-slate-500">包含域内关联与跨域多维关联</div></div><span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100"><GitMerge size={18} /></span></div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow"><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">系统业务域</span><div className="text-xl font-bold text-slate-900 font-mono">{domains.length}</div><div className="text-[10px] text-slate-500">支持按域进行对象隔离与维护</div></div><span className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100"><Layers size={18} /></span></div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow"><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">接口与属性指标</span><div className="text-xl font-bold text-slate-900 font-mono">{interfaces.length + sharedProperties.length}</div><div className="text-[10px] text-slate-500">{interfaces.length} 契约规范 · {sharedProperties.length} 共享属性</div></div><span className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100"><Tag size={18} /></span></div>
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">业务对象实体</span><div className={`text-xl font-bold ${styles.cardText} font-mono`}>{objectTypes.length}</div><div className="text-[10px] text-slate-500 flex items-center gap-1"><span>{objectTypes.filter(ot => ot.domainId).length} 个已归域</span><span className="text-slate-300">|</span><span className="text-amber-600 font-medium">{objectTypes.filter(ot => !ot.domainId).length} 个未归类</span></div></div><span className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100"><Box size={18} /></span></div>
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">关系链接数量</span><div className={`text-xl font-bold ${styles.cardText} font-mono`}>{linkTypes.length}</div><div className="text-[10px] text-slate-500">包含域内关联与跨域多维关联</div></div><span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100"><GitMerge size={18} /></span></div>
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">系统业务域</span><div className={`text-xl font-bold ${styles.cardText} font-mono`}>{domains.length}</div><div className="text-[10px] text-slate-500">支持按域进行对象隔离与维护</div></div><span className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100"><Layers size={18} /></span></div>
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}><div className="space-y-1"><span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">接口与属性指标</span><div className={`text-xl font-bold ${styles.cardText} font-mono`}>{interfaces.length + sharedProperties.length}</div><div className="text-[10px] text-slate-500">{interfaces.length} 契约规范 · {sharedProperties.length} 共享属性</div></div><span className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100"><Tag size={18} /></span></div>
       </div>
 
       {/* Graph Panel */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-4`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="space-y-0.5"><h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><Network size={15} className="text-blue-600" />关系拓扑图谱 (Ontology ER Diagram)</h3><p className="text-[11px] text-slate-500">显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。</p></div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -84,7 +86,7 @@ export default function OverviewView({
             {objectTypes.some(ot => !ot.domainId) && (<button onClick={() => onSelectDomainFilter('unassigned')} className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer text-[11px] ${selectedDomainFilter === 'unassigned' ? 'bg-slate-500 text-white border-slate-500 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>未归域 ({objectTypes.filter(ot => !ot.domainId).length})</button>)}
           </div>
         </div>
-        <div className="relative border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50"><OntologyGraph objectTypes={displayedObjects} linkTypes={displayedLinks} onSelectNode={onSelectNode} onSelectEdge={onSelectEdge} /></div>
+        <div className={`relative border ${styles.cardBorder} rounded-lg overflow-hidden`}><OntologyGraph objectTypes={displayedObjects} linkTypes={displayedLinks} onSelectNode={onSelectNode} onSelectEdge={onSelectEdge} /></div>
       </div>
 
       {/* Domain Manager */}
@@ -97,14 +99,14 @@ export default function OverviewView({
 
       {/* Bottom: Quick Nav + Audit Logs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-3`}>
           <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><Compass size={14} className="text-slate-500" />实体清单快速分级导航</h3>
           <div className="space-y-4 max-h-[260px] overflow-y-auto pr-1">
             {domains.map(d => { const domObjs = objectTypes.filter(ot => ot.domainId === d.id); if (domObjs.length === 0) return null; const classes = getDomainColorClasses(d.color); return (<div key={d.id} className="space-y-1.5"><div className="flex items-center gap-1.5 text-[10px] font-extrabold text-slate-500 tracking-wider uppercase border-b border-slate-100 pb-1"><span className={`w-2 h-2 rounded-full ${classes.dot}`} /><span>{d.displayName}</span></div><div className="space-y-1 pl-1">{domObjs.map(ot => (<div key={ot.id} onClick={() => onQuickNavigate('object', ot.id)} className="flex items-center justify-between p-1.5 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group"><div className="flex items-center gap-2 truncate"><span className={`p-0.5 rounded border ${ot.color}`}><DynamicIcon name={ot.icon} size={11} /></span><span className="text-xs font-medium text-slate-700">{ot.displayName}</span></div><ChevronRight size={11} className="text-slate-300 group-hover:translate-x-0.5" /></div>))}</div></div>); })}
             {objectTypes.some(ot => !ot.domainId) && (<div className="space-y-1.5"><div className="flex items-center gap-1.5 text-[10px] font-extrabold text-slate-400 tracking-wider uppercase border-b border-slate-100 pb-1"><span className="w-2 h-2 rounded-full bg-slate-300" /><span>未归类业务对象 (Pool)</span></div><div className="space-y-1 pl-1">{objectTypes.filter(ot => !ot.domainId).map(ot => (<div key={ot.id} onClick={() => onQuickNavigate('object', ot.id)} className="flex items-center justify-between p-1.5 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group"><div className="flex items-center gap-2 truncate"><span className={`p-0.5 rounded border ${ot.color}`}><DynamicIcon name={ot.icon} size={11} /></span><span className="text-xs font-medium text-slate-700">{ot.displayName}</span></div><ChevronRight size={11} className="text-slate-300 group-hover:translate-x-0.5" /></div>))}</div></div>)}
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs lg:col-span-2 space-y-3">
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs lg:col-span-2 space-y-3`}>
           <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><History size={14} className="text-slate-500" />生命周期与审计日志 (ECOS Activity Stream)</h3>
           <div className="divide-y divide-slate-100 max-h-[260px] overflow-y-auto pr-1">
             {auditLogs.map(log => (<div key={log.id} className="py-2.5 first:pt-0 last:pb-0 text-[11px] flex items-start gap-3"><div className="mt-0.5"><span className={`w-2 h-2 rounded-full inline-block ${log.type === 'publish' ? 'bg-blue-500' : log.type === 'create' ? 'bg-emerald-500' : 'bg-slate-400'}`} /></div><div className="flex-1 space-y-0.5"><div className="flex justify-between items-center text-xs"><span className="font-semibold text-slate-800">{log.action}</span><span className="text-[10px] text-slate-400 font-mono">{log.time}</span></div><p className="text-slate-500 text-[11px] leading-relaxed">{log.detail}</p><div className="text-[10px] text-slate-400 font-mono">操作员: {log.user}</div></div></div>))}

@@ -653,8 +653,8 @@ export default function SecurityCenter({
       const data = await response.json();
       
       setSimResult({
-        verdict: data.verdict,
-        traces: data.traces
+        verdict: data.verdict || 'DENIED',
+        traces: Array.isArray(data.traces) ? data.traces : ['⚠️ 后端返回数据格式异常，请检查 API 链路。']
       });
 
       if (data.success) {

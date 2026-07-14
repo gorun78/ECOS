@@ -61,7 +61,7 @@ export default function MonitoringCenter() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab Bar */}
-      <div className={`flex shrink-0 border-b ${styles.appBorder} bg-white/50 dark:bg-slate-900/30 px-2`}>
+      <div className={`flex shrink-0 border-b ${styles.appBorder} ${styles.cardBg}/50 dark:bg-slate-900/30 px-2`}>
         {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -72,7 +72,7 @@ export default function MonitoringCenter() {
               className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap ${
                 isActive
                   ? "border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20"
-                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/30"
+                  : "border-transparent ${styles.cardTextMuted} dark:${styles.cardTextMuted} hover:${styles.cardText} dark:hover:${styles.cardText} hover:${styles.sidebarBg}/50 dark:hover:bg-slate-800/30"
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -87,7 +87,7 @@ export default function MonitoringCenter() {
         {activeTab === "metrics" && <BasicMonitoringTab />}
         {activeTab === "engines" && (
           <div className="p-4 space-y-3">
-            <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">
+            <div className={`text-sm font-semibold ${styles.cardTextMuted} dark:${styles.cardTextMuted} mb-2`}>
               {tl("四引擎健康状态监控 — 点击展开查看详情", "Four-engine health monitoring — click to expand details")}
             </div>
             {ENGINE_DRAWERS.map(drawer => {
@@ -96,24 +96,24 @@ export default function MonitoringCenter() {
               return (
                 <div
                   key={drawer.id}
-                  className={`rounded-lg border ${styles.appBorder} bg-white dark:bg-slate-800 overflow-hidden`}
+                  className={`rounded-lg border ${styles.appBorder} ${styles.cardBg} dark:bg-slate-800 overflow-hidden`}
                 >
                   <button
                     onClick={() => toggleEngine(drawer.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                    className={`w-full flex items-center gap-3 px-4 py-3 hover:${styles.appBg} dark:hover:bg-slate-700/50 transition-colors`}
                   >
                     <Icon className="w-5 h-5 text-indigo-500" />
                     <span className="flex-1 text-left font-medium text-sm">
                       {tl(drawer.labelZh, drawer.label)}
                     </span>
                     <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                      className={`w-4 h-4 ${styles.cardTextMuted} transition-transform duration-200 ${
                         isExpanded ? "rotate-180" : ""
                       }`}
                     />
                   </button>
                   {isExpanded && (
-                    <div className="border-t border-slate-200 dark:border-slate-700">
+                    <div className={`border-t ${styles.cardBorder} dark:border-slate-700`}>
                       <EngineMonitor engine={drawer.engine} />
                     </div>
                   )}

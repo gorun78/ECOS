@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   FileText, Combine, Network, Workflow, Cpu, SearchCheck,
-  Database, Share2, BookOpen, Tag, Settings, Brain,
+  Database, Tag, Brain,
 } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
@@ -13,15 +13,12 @@ import OntologyTab from './knowledge/tabs/OntologyTab';
 import IndexTab from './knowledge/tabs/IndexTab';
 import RagTab from './knowledge/tabs/RagTab';
 import GraphSyncTab from './knowledge/tabs/GraphSyncTab';
-import GraphExplorerTab from './knowledge/tabs/GraphExplorerTab';
-import GlossaryTab from './knowledge/tabs/GlossaryTab';
 import ClassificationTab from './knowledge/tabs/ClassificationTab';
-import SettingsTab from './knowledge/tabs/SettingsTab';
 import CognitiveConfigTab from './knowledge/tabs/CognitiveConfigTab';
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   FileText, Combine, Network, Workflow, Cpu, SearchCheck,
-  Database, Share2, BookOpen, Tag, Settings, Brain,
+  Database, Tag, Brain,
 };
 
 const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
@@ -30,12 +27,9 @@ const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
   lineage: LineageTab,
   ontology: OntologyTab,
   graph_sync: GraphSyncTab,
-  graph_explore: GraphExplorerTab,
-  glossary: GlossaryTab,
   classification: ClassificationTab,
   index: IndexTab,
   rag: RagTab,
-  settings: SettingsTab,
   cognitive_config: CognitiveConfigTab,
 };
 
@@ -91,7 +85,7 @@ export default function KnowledgeView() {
             <span>{locale === 'zh' ? '知识底座就绪' : 'Knowledge Ready'}</span>
           </p>
           <p className="text-[9px] text-slate-400 leading-relaxed font-sans">
-            {locale === 'zh' ? '双轨知识体系：平台自用 + 智能体知识' : 'Dual-track: Platform + Agent Knowledge'}
+            {locale === 'zh' ? '统一知识体系：数据 → 图谱 → 检索' : 'Unified: Data → Graph → Retrieval'}
           </p>
         </div>
       </div>

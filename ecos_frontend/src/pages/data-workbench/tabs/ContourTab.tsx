@@ -1,9 +1,13 @@
 /* Extracted from DataWorkbenchLayout.tsx */
 import React from 'react';
 import ContourPrototype from '../ContourPrototype';
+import { useTheme } from "../../../components/ThemeContext";
 
-const ContourTab: React.FC = () => (
-<div className="flex-1 flex flex-col min-h-0 bg-slate-50 overflow-hidden">
+
+const ContourTab: React.FC = () => {
+  const { styles } = useTheme();
+  return (
+<div className={`flex-1 flex flex-col min-h-0 ${styles.appBg} overflow-hidden`}>
   <div className="bg-slate-950 text-white px-5 py-3 border-b border-slate-800 flex justify-between items-center shrink-0 select-none">
     <div className="flex items-center gap-2">
       <span className="h-2 w-2 rounded-full bg-rose-400 animate-pulse" />
@@ -11,14 +15,15 @@ const ContourTab: React.FC = () => (
         ECOS 核心开发工具 · Contour (百亿级全交互式漏斗分析路径)
       </span>
     </div>
-    <div className="bg-white/10 text-white text-[9px] font-bold px-2 py-0.5 rounded border border-white/10 font-mono">
+    <div className={`${styles.cardBg}/10 text-white text-[9px] font-bold px-2 py-0.5 rounded border border-white/10 font-mono`}>
       PROTOTYPE WORKSTATION ACTIVE
     </div>
   </div>
-  <div className="flex-1 overflow-hidden min-h-0 bg-slate-50">
+  <div className={`flex-1 overflow-hidden min-h-0 ${styles.appBg}`}>
     <ContourPrototype />
   </div>
 </div>
-);
+  );
+};
 
 export default ContourTab;

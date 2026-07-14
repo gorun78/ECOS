@@ -2,6 +2,8 @@
 import React from 'react';
 import LucideIcon from '../LucideIcon';
 import type { DataHealthCheck } from '../types';
+import { useTheme } from "../../../components/ThemeContext";
+
 
 interface HealthTabProps {
   healthChecks: DataHealthCheck[];
@@ -51,12 +53,12 @@ const HealthTab: React.FC<HealthTabProps> = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-white">
+    <div className={`flex-1 overflow-y-auto p-6 ${styles.cardBg}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-sm font-bold text-slate-800">{t("dw.txt.693c4f")}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h3 className={`text-sm font-bold ${styles.cardText}`}>{t("dw.txt.693c4f")}</h3>
+          <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>
             共 {healthChecks.length} 条质量检查规则
           </p>
         </div>
@@ -71,7 +73,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
 
       {/* Add form */}
       {showAddCheck && (
-        <div className="mb-6 p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+        <div className={`mb-6 p-4 border ${styles.cardBorder} rounded-xl ${styles.appBg} space-y-3`}>
           <input value={newCheckName} onChange={e => setNewCheckName(e.target.value)} placeholder="规则名称" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" />
           <input value={newCheckDs} onChange={e => setNewCheckDs(e.target.value)} placeholder="数据集/表名" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" />
           <select value={checkType} onChange={e => setCheckType(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
@@ -85,7 +87,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
           </select>
           <div className="flex gap-2">
             <button onClick={handleAddCheck} className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold cursor-pointer">添加</button>
-            <button onClick={() => setShowAddCheck(false)} className="px-4 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-xs cursor-pointer">取消</button>
+            <button onClick={() => setShowAddCheck(false)} className={`px-4 py-1.5 bg-slate-200 ${styles.cardTextMuted} rounded-lg text-xs cursor-pointer`}>取消</button>
           </div>
         </div>
       )}
@@ -93,13 +95,13 @@ const HealthTab: React.FC<HealthTabProps> = ({
       {/* Rules list */}
       <div className="space-y-4">
         {healthChecks.map((check) => (
-          <div key={check.id} className="border border-slate-200 rounded-xl p-4 bg-white hover:shadow-sm transition-shadow">
+          <div key={check.id} className={`border ${styles.cardBorder} rounded-xl p-4 ${styles.cardBg} hover:shadow-sm transition-shadow`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <LucideIcon name={check.checkType === 'null_check' ? 'shield-off' : check.checkType === 'uniqueness' ? 'fingerprint' : check.checkType === 'freshness' ? 'clock' : 'activity'} className="w-4 h-4 text-emerald-600" />
                 <div>
-                  <span className="text-sm font-bold text-slate-800">{check.name}</span>
-                  <span className="ml-2 text-[10px] text-slate-400">{t("dw.txt.185a12")}: {check.targetTable}</span>
+                  <span className={`text-sm font-bold ${styles.cardText}`}>{check.name}</span>
+                  <span className={`ml-2 text-[10px] ${styles.cardTextMuted}`}>{t("dw.txt.185a12")}: {check.targetTable}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -123,7 +125,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
             <div className="space-y-3 pl-7">
               {check.checkType === 'range_check' && (
                 <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-slate-600 block">{t("dw.txt.e21195")}</label>
+                  <label className={`text-[11px] font-semibold ${styles.cardTextMuted} block`}>{t("dw.txt.e21195")}</label>
                   <div className="flex gap-4 items-center">
                     <input
                       type="range" min="100" max="50000" step="100"
@@ -135,7 +137,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
                       }}
                       className="flex-1"
                     />
-                    <span className="font-mono text-slate-700 font-semibold text-xs border bg-white px-2 py-0.5 rounded">
+                    <span className={`font-mono ${styles.cardText} font-semibold text-xs border ${styles.cardBg} px-2 py-0.5 rounded`}>
                       {check.config.minRows || 1000} {t("dw.txt.3960a8")}
                     </span>
                   </div>
@@ -144,7 +146,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
 
               {check.checkType === 'null_check' && (
                 <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-slate-600 block">{t("dw.txt.d086dc")}</label>
+                  <label className={`text-[11px] font-semibold ${styles.cardTextMuted} block`}>{t("dw.txt.d086dc")}</label>
                   <div className="flex gap-4 items-center">
                     <input
                       type="range" min="0" max="10" step="0.1"
@@ -156,7 +158,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
                       }}
                       className="flex-1"
                     />
-                    <span className="font-mono text-slate-700 font-semibold text-xs border bg-white px-2 py-0.5 rounded">
+                    <span className={`font-mono ${styles.cardText} font-semibold text-xs border ${styles.cardBg} px-2 py-0.5 rounded`}>
                       {check.config.maxNullPercentage || 2.0}%
                     </span>
                   </div>
@@ -165,7 +167,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
 
               {check.checkType === 'freshness' && (
                 <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-slate-600 block">{t("dw.txt.e442a8")}</label>
+                  <label className={`text-[11px] font-semibold ${styles.cardTextMuted} block`}>{t("dw.txt.e442a8")}</label>
                   <div className="flex gap-4 items-center">
                     <input
                       type="range" min="15" max="720" step="15"
@@ -177,7 +179,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
                       }}
                       className="flex-1"
                     />
-                    <span className="font-mono text-slate-700 font-semibold text-xs border bg-white px-2 py-0.5 rounded">
+                    <span className={`font-mono ${styles.cardText} font-semibold text-xs border ${styles.cardBg} px-2 py-0.5 rounded`}>
                       {check.config.maxDelayMinutes || 120} {t("dw.txt.951352")}
                     </span>
                   </div>
@@ -189,7 +191,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
       </div>
 
       {healthChecks.length === 0 && (
-        <div className="text-center py-16 text-slate-400">
+        <div className={`text-center py-16 ${styles.cardTextMuted}`}>
           <LucideIcon name="shield-check" className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm font-semibold">{t("dw.txt.d8c7cb")}</p>
           <p className="text-xs mt-1">{t("dw.txt.6f933b")}</p>
