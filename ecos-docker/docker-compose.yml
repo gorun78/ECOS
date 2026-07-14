@@ -1,0 +1,93 @@
+# ECOS 基础设施 Docker Compose
+# 所有组件统一管理，WSL 通过 localhost 访问
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: [REDACTED]
+      POSTGRES_DB: sys_man
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    mem_limit: 512m
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: ecos-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/[REDACTED]
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 128m
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4jdata:/data
+      - neo4jlogs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    mem_limit: 768m
+
+  minio:
+    image: minio/minio:latest
+    container_name: ecos-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: [REDACTED]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  opa:
+    image: openpolicyagent/opa:0.63.0
+    container_name: ecos-opa
+    restart: unless-stopped
+    command: run --server --log-level=info --addr=:8181
+    ports:
+      - "8181:8181"
+    volumes:
+      - /home/guorongxiao/opa-policies:/policies:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8181/v1/data || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    mem_limit: 64m
+
+volumes:
+  pgdata:
+    name: ecos_pgdata
+  neo4jdata:
+    name: ecos_neo4jdata
+  neo4jlogs:
+    name: ecos_neo4jlogs
+  miniodata:
+    name: ecos_miniodata

@@ -1,0 +1,1177 @@
+# 第10章 Query & Semantic Layer（统一查询与语义层）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 10.1 模块概述
+
+## 模块名称
+
+```text
+Query & Semantic Layer
+```
+
+---
+
+## 模块定位
+
+ECOS统一查询与语义访问平台。
+
+对应：
+
+```text
+Palantir Foundry Ontology Query
+
+Operational Search
+
+Semantic Search
+
+Knowledge Search
+```
+
+---
+
+## 核心目标
+
+屏蔽底层：
+
+```text
+数据库
+
+数据湖
+
+图数据库
+
+向量库
+
+对象运行时
+
+知识库
+```
+
+向上提供统一查询能力。
+
+---
+
+## 总体架构
+
+```text
+Query & Semantic Layer
+
+├── Unified Query Engine
+├── Semantic Query Engine
+├── Object Query Engine
+├── Graph Query Engine
+├── Knowledge Query Engine
+├── Federated Query Engine
+├── Natural Language Query
+├── Search Engine
+├── Query Optimization Engine
+├── Query Security Engine
+├── Query API Gateway
+└── Agent Query Assistant
+```
+
+---
+
+# 10.2 查询体系架构
+
+```text
+User
+
+↓
+
+Natural Language
+
+↓
+
+Semantic Parser
+
+↓
+
+Ontology Query Plan
+
+↓
+
+Query Engine
+
+↓
+
+─────────────────
+
+Object Runtime
+
+Lakehouse
+
+GraphDB
+
+VectorDB
+
+Knowledge Base
+
+─────────────────
+
+↓
+
+Unified Result
+```
+
+---
+
+# 10.3 Unified Query Engine
+
+---
+
+## 功能目标
+
+统一所有查询入口。
+
+---
+
+用户无需关心：
+
+```text
+数据在哪
+
+存在哪个系统
+
+是否是图谱
+
+是否是向量
+```
+
+---
+
+统一接口：
+
+```text
+Search Once
+
+Query Everywhere
+```
+
+---
+
+# 10.4 Query Request模型
+
+```json
+{
+  "query":"查询华东区域VIP客户",
+  "type":"semantic"
+}
+```
+
+---
+
+系统自动解析：
+
+```text
+Region=华东
+
+CustomerLevel=VIP
+```
+
+---
+
+# 10.5 Object Query Engine
+
+---
+
+## 功能目标
+
+查询Ontology对象。
+
+---
+
+查询对象：
+
+```text
+Customer
+
+Supplier
+
+Product
+
+Order
+
+Asset
+
+Risk
+```
+
+---
+
+示例：
+
+```text
+查询VIP客户
+```
+
+转换：
+
+```sql
+SELECT *
+
+FROM customer_object
+
+WHERE level='VIP'
+```
+
+---
+
+# 10.6 Object Search
+
+---
+
+支持：
+
+### 精确搜索
+
+```text
+客户编码
+```
+
+---
+
+### 模糊搜索
+
+```text
+客户名称
+```
+
+---
+
+### 条件搜索
+
+```text
+区域
+
+行业
+
+等级
+```
+
+---
+
+### 关系搜索
+
+```text
+客户关联订单
+```
+
+---
+
+# 10.7 Semantic Query Engine
+
+---
+
+## 功能目标
+
+支持业务语义查询。
+
+---
+
+示例：
+
+```text
+华东地区高价值客户
+```
+
+---
+
+解析：
+
+```text
+华东
+
+=
+
+Region=EastChina
+
+高价值
+
+=
+
+Score>80
+```
+
+---
+
+生成：
+
+```sql
+SELECT *
+
+FROM customer
+
+WHERE region='EastChina'
+
+AND score>80
+```
+
+---
+
+# 10.8 Semantic Dictionary
+
+---
+
+## 功能目标
+
+建立企业语义词典。
+
+---
+
+示例：
+
+```text
+高价值客户
+
+↓
+
+CustomerScore > 80
+```
+
+---
+
+```text
+重点供应商
+
+↓
+
+SupplierLevel=A
+```
+
+---
+
+支持：
+
+```text
+同义词
+
+别名
+
+行业术语
+```
+
+---
+
+# 10.9 Natural Language Query
+
+---
+
+## 功能目标
+
+自然语言查询企业数据。
+
+---
+
+示例：
+
+用户输入：
+
+```text
+本月销售额最高的10个客户
+```
+
+---
+
+Agent解析：
+
+```text
+Sales Amount
+
+Current Month
+
+Top10
+```
+
+---
+
+生成：
+
+```sql
+SELECT *
+
+ORDER BY sales DESC
+
+LIMIT 10
+```
+
+---
+
+# 10.10 NLQ执行流程
+
+```text
+Question
+
+↓
+
+Semantic Parsing
+
+↓
+
+Ontology Mapping
+
+↓
+
+Query Planning
+
+↓
+
+Execution
+
+↓
+
+Answer Generation
+```
+
+---
+
+# 10.11 Federated Query Engine
+
+---
+
+## 功能目标
+
+跨系统联合查询。
+
+---
+
+支持：
+
+```text
+ERP
+
+CRM
+
+MES
+
+SCM
+
+Lakehouse
+
+Knowledge Base
+```
+
+---
+
+示例：
+
+```text
+客户订单
+
++
+
+CRM信息
+
++
+
+风险评分
+```
+
+---
+
+统一返回。
+
+---
+
+# 10.12 Federated Query Planner
+
+---
+
+自动：
+
+```text
+拆分查询
+
+路由查询
+
+结果合并
+```
+
+---
+
+例如：
+
+```text
+Customer
+
+↓
+
+CRM
+
+Order
+
+↓
+
+ERP
+
+Risk
+
+↓
+
+Knowledge Graph
+```
+
+---
+
+# 10.13 Graph Query Engine
+
+---
+
+## 功能目标
+
+图关系查询。
+
+---
+
+支持：
+
+```text
+Neo4j
+
+NebulaGraph
+
+JanusGraph
+```
+
+---
+
+查询：
+
+```text
+客户关联供应商
+```
+
+---
+
+Cypher：
+
+```cypher
+MATCH (c:Customer)-[:BUY]->(s:Supplier)
+
+RETURN c,s
+```
+
+---
+
+# 10.14 图路径分析
+
+---
+
+功能：
+
+```text
+最短路径
+
+影响路径
+
+供应链路径
+
+风险传播路径
+```
+
+---
+
+示例：
+
+```text
+Supplier
+
+↓
+
+Material
+
+↓
+
+Factory
+
+↓
+
+Customer
+```
+
+---
+
+# 10.15 Knowledge Query Engine
+
+---
+
+## 功能目标
+
+查询知识库。
+
+---
+
+支持：
+
+```text
+Document
+
+Knowledge
+
+Report
+
+Case
+```
+
+---
+
+模式：
+
+```text
+Keyword Search
+
+Semantic Search
+
+Hybrid Search
+```
+
+---
+
+# 10.16 RAG Query
+
+---
+
+查询流程：
+
+```text
+Question
+
+↓
+
+Embedding
+
+↓
+
+Vector Search
+
+↓
+
+Knowledge Retrieval
+
+↓
+
+LLM Answer
+```
+
+---
+
+示例：
+
+```text
+过去三年供应商风险情况
+```
+
+---
+
+返回：
+
+```text
+风险分析报告
+```
+
+---
+
+# 10.17 Search Engine
+
+---
+
+## 功能目标
+
+统一搜索平台。
+
+---
+
+搜索范围：
+
+```text
+Object
+
+Workflow
+
+Document
+
+Knowledge
+
+Case
+
+Agent
+```
+
+---
+
+# 页面
+
+```text
+Global Search
+```
+
+---
+
+支持：
+
+```text
+全文检索
+
+语义检索
+
+图谱检索
+```
+
+---
+
+# 10.18 Search Ranking
+
+---
+
+排序因素：
+
+```text
+相关度
+
+更新时间
+
+访问频率
+
+权限等级
+```
+
+---
+
+# 10.19 Query Optimization Engine
+
+---
+
+## 功能目标
+
+提升查询性能。
+
+---
+
+支持：
+
+```text
+缓存
+
+索引
+
+预计算
+
+物化视图
+```
+
+---
+
+# 查询缓存
+
+---
+
+缓存：
+
+```text
+热点对象
+
+热点查询
+
+热点图谱
+```
+
+---
+
+# 10.20 Query Security Engine
+
+---
+
+## 功能目标
+
+保证查询安全。
+
+---
+
+校验：
+
+```text
+身份
+
+权限
+
+策略
+
+数据分类
+```
+
+---
+
+# 字段级权限
+
+---
+
+示例：
+
+```text
+客户经理
+
+可查看客户信息
+
+不可查看信用评级
+```
+
+---
+
+# 10.21 Query Result Governance
+
+---
+
+支持：
+
+```text
+脱敏
+
+加密
+
+审计
+```
+
+---
+
+示例：
+
+```text
+13812345678
+
+↓
+
+138****5678
+```
+
+---
+
+# 10.22 Query API Gateway
+
+---
+
+统一入口：
+
+```http
+POST /api/v1/query
+```
+
+---
+
+请求：
+
+```json
+{
+ "query":"华东VIP客户"
+}
+```
+
+---
+
+返回：
+
+```json
+{
+ "count":120,
+ "data":[]
+}
+```
+
+---
+
+# 10.23 Agent Query Assistant
+
+---
+
+Agent能力：
+
+### 自动生成查询
+
+---
+
+输入：
+
+```text
+查找高风险供应商
+```
+
+---
+
+生成：
+
+```sql
+risk_score > 80
+```
+
+---
+
+### 查询解释
+
+---
+
+### 查询优化
+
+---
+
+### 查询推荐
+
+---
+
+### 自动构建Dashboard
+
+---
+
+# 10.24 Query History
+
+---
+
+记录：
+
+```text
+查询人
+
+查询条件
+
+执行时间
+
+结果数量
+```
+
+---
+
+支持：
+
+```text
+收藏查询
+
+共享查询
+
+查询模板
+```
+
+---
+
+# 10.25 Query Analytics
+
+---
+
+统计：
+
+```text
+查询次数
+
+热门查询
+
+慢查询
+
+失败查询
+```
+
+---
+
+页面：
+
+```text
+Query Analytics Dashboard
+```
+
+---
+
+# 10.26 Query API
+
+---
+
+对象查询：
+
+```http
+POST /api/v1/query/object
+```
+
+---
+
+语义查询：
+
+```http
+POST /api/v1/query/semantic
+```
+
+---
+
+图查询：
+
+```http
+POST /api/v1/query/graph
+```
+
+---
+
+知识查询：
+
+```http
+POST /api/v1/query/knowledge
+```
+
+---
+
+联邦查询：
+
+```http
+POST /api/v1/query/federated
+```
+
+---
+
+# 10.27 数据模型
+
+核心表：
+
+```sql
+query_history
+
+query_template
+
+query_cache
+
+semantic_dictionary
+
+search_index
+
+search_log
+
+federated_source
+
+query_policy
+```
+
+---
+
+# 10.28 KPI指标
+
+```text
+查询总量
+
+查询成功率
+
+平均响应时间
+
+搜索命中率
+
+RAG命中率
+
+联邦查询成功率
+
+热点查询占比
+```
+
+---
+
+# 10.29 权限模型
+
+| 角色            | 权限    |
+| ------------- | ----- |
+| Query Admin   | 全部    |
+| Business User | 查询    |
+| Analyst       | 高级查询  |
+| Developer     | API访问 |
+| Auditor       | 审计    |
+
+---
+
+# 10.30 审计要求
+
+记录：
+
+```text
+查询行为
+
+导出行为
+
+敏感查询
+
+失败查询
+
+权限拒绝
+```
+
+---
+
+# 10.31 异常码
+
+| 错误码     | 说明     |
+| ------- | ------ |
+| QRY-001 | 查询失败   |
+| QRY-002 | 语义解析失败 |
+| QRY-003 | 权限不足   |
+| QRY-004 | 联邦源不可达 |
+| QRY-005 | 图查询失败  |
+| QRY-006 | 知识检索失败 |
+| QRY-007 | 查询超时   |
+| QRY-008 | 结果集过大  |
+
+---
+
+# 第10章完成
+
+完成ECOS语义访问层：
+
+```text
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Query & Semantic Layer
+```
+
+对应Foundry：
+
+```text
+Ontology Query
+
+Operational Search
+
+Semantic Search
+
+Knowledge Search
+```
+
+---
+
+已完成 Volume 2：
+
+```text
+第6章 Ontology Platform
+第7章 Object Runtime
+第8章 Action & Rule Engine
+第9章 Workflow Platform
+第10章 Query & Semantic Layer
+```
+
+---
+
+下一章进入 Volume 3（AI Native Layer）：
+
+# 第11章 Agent Runtime（智能体运行时）
+
+对应：
+
+```text
+Agent Runtime
+
+Agent Execution
+
+Agent Memory
+
+Agent Planning
+
+Tool Calling
+
+Multi-Agent Collaboration
+```
+
+这是整个 ECOS 与 Foundry AIP 最接近的核心模块，也是未来 Agent OS 的执行引擎。

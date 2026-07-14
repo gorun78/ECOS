@@ -1,0 +1,1192 @@
+# 06-数据库设计说明书
+
+(Database Design Specification)
+
+**文档编号**
+
+```text
+ECOS-DBD-001
+```
+
+**版本**
+
+```text
+V1.0
+```
+
+---
+
+# 1. 数据库总体设计
+
+ECOS采用 Polyglot Persistence：
+
+```text
+PostgreSQL      事务数据库
+ClickHouse      分析数据库
+Neo4j           图数据库
+Redis           缓存数据库
+MinIO           对象存储
+Elasticsearch   搜索引擎
+Vector DB       向量存储
+```
+
+---
+
+# 2. 数据库逻辑架构
+
+```text
+                 ┌──────────────────┐
+                 │    PostgreSQL    │
+                 │   Metadata DB    │
+                 └────────┬─────────┘
+                          │
+     ┌────────────────────┼─────────────────────┐
+     │                    │                     │
+     ▼                    ▼                     ▼
+
+ Neo4j             ClickHouse             Elasticsearch
+
+ Knowledge         Analytics              Search
+ Graph             Metrics                FullText
+
+     │
+     ▼
+
+ Vector Store
+
+ Memory
+ RAG
+ Agent
+```
+
+---
+
+# 3. PostgreSQL Schema规划
+
+```text
+ecos_identity
+
+ecos_catalog
+
+ecos_ontology
+
+ecos_object
+
+ecos_workflow
+
+ecos_rule
+
+ecos_agent
+
+ecos_knowledge
+
+ecos_mission
+
+ecos_audit
+```
+
+---
+
+# 4. 命名规范
+
+---
+
+## 表
+
+格式：
+
+```text
+{domain}_{entity}
+```
+
+例如：
+
+```text
+identity_user
+
+ontology_entity
+
+workflow_task
+```
+
+---
+
+## 主键
+
+统一：
+
+```sql
+id UUID PRIMARY KEY
+```
+
+---
+
+示例：
+
+```sql
+CREATE TABLE identity_user (
+
+ id UUID PRIMARY KEY,
+
+ username VARCHAR(100),
+
+ created_at TIMESTAMP
+
+);
+```
+
+---
+
+## 外键
+
+格式：
+
+```text
+{entity}_id
+```
+
+例如：
+
+```text
+user_id
+
+role_id
+
+workflow_id
+```
+
+---
+
+# 5. Identity数据库设计
+
+Schema：
+
+```text
+ecos_identity
+```
+
+---
+
+# identity_tenant
+
+```sql
+CREATE TABLE identity_tenant (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100) UNIQUE,
+
+ name VARCHAR(200),
+
+ status VARCHAR(50),
+
+ created_at TIMESTAMP,
+
+ updated_at TIMESTAMP
+
+);
+```
+
+---
+
+索引：
+
+```sql
+CREATE INDEX idx_tenant_code
+ON identity_tenant(code);
+```
+
+---
+
+# identity_organization
+
+```sql
+CREATE TABLE identity_organization (
+
+ id UUID PRIMARY KEY,
+
+ tenant_id UUID,
+
+ parent_id UUID,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200)
+
+);
+```
+
+---
+
+# identity_user
+
+```sql
+CREATE TABLE identity_user (
+
+ id UUID PRIMARY KEY,
+
+ tenant_id UUID,
+
+ organization_id UUID,
+
+ username VARCHAR(100),
+
+ email VARCHAR(200),
+
+ mobile VARCHAR(50),
+
+ status VARCHAR(50),
+
+ created_at TIMESTAMP
+
+);
+```
+
+---
+
+索引：
+
+```sql
+CREATE UNIQUE INDEX idx_user_name
+ON identity_user(username);
+
+CREATE INDEX idx_user_org
+ON identity_user(organization_id);
+```
+
+---
+
+# identity_role
+
+```sql
+CREATE TABLE identity_role (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200)
+
+);
+```
+
+---
+
+# identity_permission
+
+```sql
+CREATE TABLE identity_permission (
+
+ id UUID PRIMARY KEY,
+
+ resource VARCHAR(200),
+
+ action VARCHAR(100)
+
+);
+```
+
+---
+
+# identity_user_role
+
+```sql
+CREATE TABLE identity_user_role (
+
+ user_id UUID,
+
+ role_id UUID,
+
+ PRIMARY KEY(user_id, role_id)
+
+);
+```
+
+---
+
+# 6. Catalog数据库设计
+
+Schema：
+
+```text
+ecos_catalog
+```
+
+---
+
+# catalog_dataset
+
+```sql
+CREATE TABLE catalog_dataset (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ dataset_type VARCHAR(50),
+
+ owner_id UUID,
+
+ created_at TIMESTAMP
+
+);
+```
+
+---
+
+# catalog_dataset_field
+
+```sql
+CREATE TABLE catalog_dataset_field (
+
+ id UUID PRIMARY KEY,
+
+ dataset_id UUID,
+
+ field_name VARCHAR(100),
+
+ field_type VARCHAR(50),
+
+ nullable BOOLEAN
+
+);
+```
+
+---
+
+# catalog_tag
+
+```sql
+CREATE TABLE catalog_tag (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(100)
+
+);
+```
+
+---
+
+# catalog_dataset_tag
+
+```sql
+CREATE TABLE catalog_dataset_tag (
+
+ dataset_id UUID,
+
+ tag_id UUID,
+
+ PRIMARY KEY(dataset_id, tag_id)
+
+);
+```
+
+---
+
+# 7. Ontology数据库设计
+
+Schema：
+
+```text
+ecos_ontology
+```
+
+---
+
+# ontology
+
+```sql
+CREATE TABLE ontology (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ version VARCHAR(20),
+
+ status VARCHAR(50)
+
+);
+```
+
+---
+
+# ontology_entity
+
+```sql
+CREATE TABLE ontology_entity (
+
+ id UUID PRIMARY KEY,
+
+ ontology_id UUID,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ description TEXT
+
+);
+```
+
+---
+
+# ontology_property
+
+```sql
+CREATE TABLE ontology_property (
+
+ id UUID PRIMARY KEY,
+
+ entity_id UUID,
+
+ code VARCHAR(100),
+
+ property_type VARCHAR(50),
+
+ required BOOLEAN
+
+);
+```
+
+---
+
+# ontology_relationship
+
+```sql
+CREATE TABLE ontology_relationship (
+
+ id UUID PRIMARY KEY,
+
+ source_entity_id UUID,
+
+ target_entity_id UUID,
+
+ relationship_type VARCHAR(50)
+
+);
+```
+
+---
+
+# ontology_metric
+
+```sql
+CREATE TABLE ontology_metric (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ formula TEXT
+
+);
+```
+
+---
+
+# 8. Object Runtime数据库设计
+
+Schema：
+
+```text
+ecos_object
+```
+
+---
+
+# object_instance
+
+核心表
+
+```sql
+CREATE TABLE object_instance (
+
+ id UUID PRIMARY KEY,
+
+ entity_type VARCHAR(100),
+
+ external_id VARCHAR(200),
+
+ created_at TIMESTAMP,
+
+ updated_at TIMESTAMP
+
+);
+```
+
+---
+
+# object_property
+
+EAV模型
+
+```sql
+CREATE TABLE object_property (
+
+ id UUID PRIMARY KEY,
+
+ object_id UUID,
+
+ property_code VARCHAR(100),
+
+ property_value TEXT
+
+);
+```
+
+---
+
+索引：
+
+```sql
+CREATE INDEX idx_object_property
+ON object_property(object_id);
+```
+
+---
+
+# object_relationship
+
+```sql
+CREATE TABLE object_relationship (
+
+ id UUID PRIMARY KEY,
+
+ source_object_id UUID,
+
+ target_object_id UUID,
+
+ relation_type VARCHAR(100)
+
+);
+```
+
+---
+
+# object_version
+
+```sql
+CREATE TABLE object_version (
+
+ id UUID PRIMARY KEY,
+
+ object_id UUID,
+
+ version_no INTEGER,
+
+ payload JSONB,
+
+ created_at TIMESTAMP
+
+);
+```
+
+---
+
+# 9. Workflow数据库设计
+
+Schema：
+
+```text
+ecos_workflow
+```
+
+---
+
+# workflow_definition
+
+```sql
+CREATE TABLE workflow_definition (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ version INTEGER
+
+);
+```
+
+---
+
+# workflow_node
+
+```sql
+CREATE TABLE workflow_node (
+
+ id UUID PRIMARY KEY,
+
+ workflow_id UUID,
+
+ node_type VARCHAR(100),
+
+ config JSONB
+
+);
+```
+
+---
+
+# workflow_instance
+
+```sql
+CREATE TABLE workflow_instance (
+
+ id UUID PRIMARY KEY,
+
+ workflow_id UUID,
+
+ status VARCHAR(50),
+
+ started_at TIMESTAMP,
+
+ ended_at TIMESTAMP
+
+);
+```
+
+---
+
+# workflow_task
+
+```sql
+CREATE TABLE workflow_task (
+
+ id UUID PRIMARY KEY,
+
+ instance_id UUID,
+
+ assignee VARCHAR(100),
+
+ status VARCHAR(50)
+
+);
+```
+
+---
+
+# workflow_comment
+
+```sql
+CREATE TABLE workflow_comment (
+
+ id UUID PRIMARY KEY,
+
+ task_id UUID,
+
+ comment_text TEXT,
+
+ created_by UUID
+
+);
+```
+
+---
+
+# 10. Agent数据库设计
+
+Schema：
+
+```text
+ecos_agent
+```
+
+---
+
+# agent_definition
+
+```sql
+CREATE TABLE agent_definition (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ description TEXT
+
+);
+```
+
+---
+
+# agent_version
+
+```sql
+CREATE TABLE agent_version (
+
+ id UUID PRIMARY KEY,
+
+ agent_id UUID,
+
+ version_no INTEGER,
+
+ prompt TEXT
+
+);
+```
+
+---
+
+# tool_definition
+
+```sql
+CREATE TABLE tool_definition (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ endpoint VARCHAR(500),
+
+ schema_json JSONB
+
+);
+```
+
+---
+
+# agent_execution
+
+```sql
+CREATE TABLE agent_execution (
+
+ id UUID PRIMARY KEY,
+
+ agent_id UUID,
+
+ status VARCHAR(50),
+
+ started_at TIMESTAMP,
+
+ completed_at TIMESTAMP
+
+);
+```
+
+---
+
+# agent_execution_step
+
+```sql
+CREATE TABLE agent_execution_step (
+
+ id UUID PRIMARY KEY,
+
+ execution_id UUID,
+
+ step_no INTEGER,
+
+ action_type VARCHAR(100),
+
+ payload JSONB
+
+);
+```
+
+---
+
+# 11. Knowledge数据库设计
+
+Schema：
+
+```text
+ecos_knowledge
+```
+
+---
+
+# knowledge_article
+
+```sql
+CREATE TABLE knowledge_article (
+
+ id UUID PRIMARY KEY,
+
+ title VARCHAR(500),
+
+ content TEXT,
+
+ author_id UUID
+
+);
+```
+
+---
+
+# knowledge_tag
+
+```sql
+CREATE TABLE knowledge_tag (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(100)
+
+);
+```
+
+---
+
+# knowledge_feedback
+
+```sql
+CREATE TABLE knowledge_feedback (
+
+ id UUID PRIMARY KEY,
+
+ article_id UUID,
+
+ rating INTEGER,
+
+ comment TEXT
+
+);
+```
+
+---
+
+# 12. Mission数据库设计
+
+Schema：
+
+```text
+ecos_mission
+```
+
+---
+
+# goal
+
+```sql
+CREATE TABLE goal (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(300),
+
+ status VARCHAR(50)
+
+);
+```
+
+---
+
+# initiative
+
+```sql
+CREATE TABLE initiative (
+
+ id UUID PRIMARY KEY,
+
+ goal_id UUID,
+
+ name VARCHAR(300)
+
+);
+```
+
+---
+
+# kpi
+
+```sql
+CREATE TABLE kpi (
+
+ id UUID PRIMARY KEY,
+
+ code VARCHAR(100),
+
+ name VARCHAR(200),
+
+ target_value NUMERIC
+
+);
+```
+
+---
+
+# kpi_snapshot
+
+```sql
+CREATE TABLE kpi_snapshot (
+
+ id UUID PRIMARY KEY,
+
+ kpi_id UUID,
+
+ actual_value NUMERIC,
+
+ snapshot_time TIMESTAMP
+
+);
+```
+
+---
+
+# 13. 审计数据库设计
+
+Schema：
+
+```text
+ecos_audit
+```
+
+---
+
+# audit_log
+
+```sql
+CREATE TABLE audit_log (
+
+ id UUID PRIMARY KEY,
+
+ user_id UUID,
+
+ action VARCHAR(200),
+
+ resource VARCHAR(200),
+
+ payload JSONB,
+
+ created_at TIMESTAMP
+
+);
+```
+
+---
+
+# security_log
+
+```sql
+CREATE TABLE security_log (
+
+ id UUID PRIMARY KEY,
+
+ event_type VARCHAR(100),
+
+ source_ip VARCHAR(100),
+
+ details JSONB,
+
+ created_at TIMESTAMP
+
+);
+```
+
+---
+
+# 14. ClickHouse模型
+
+---
+
+# fact_event
+
+```sql
+CREATE TABLE fact_event (
+
+ event_time DateTime,
+
+ event_type String,
+
+ source String,
+
+ payload String
+
+)
+ENGINE = MergeTree
+ORDER BY (event_time,event_type);
+```
+
+---
+
+# fact_agent_execution
+
+```sql
+CREATE TABLE fact_agent_execution (
+
+ execution_id String,
+
+ agent_code String,
+
+ duration_ms UInt64,
+
+ success UInt8
+
+)
+ENGINE = MergeTree
+ORDER BY execution_id;
+```
+
+---
+
+# fact_kpi
+
+```sql
+CREATE TABLE fact_kpi (
+
+ snapshot_time DateTime,
+
+ kpi_code String,
+
+ value Float64
+
+)
+ENGINE = MergeTree
+ORDER BY (snapshot_time,kpi_code);
+```
+
+---
+
+# 15. Neo4j图谱模型
+
+---
+
+Node Labels
+
+```text
+Customer
+
+Facility
+
+Asset
+
+Employee
+
+Goal
+
+Case
+
+Policy
+```
+
+---
+
+Relationships
+
+```text
+OWNS
+
+USES
+
+SUPPORTS
+
+REPORTS_TO
+
+IMPACTS
+
+RELATED_TO
+```
+
+---
+
+示例：
+
+```cypher
+CREATE
+
+(c:Customer {id:'cust001'})
+
+-[:OWNS]->
+
+(f:Facility {id:'fac001'})
+```
+
+---
+
+# 16. Redis设计
+
+---
+
+Session
+
+```text
+session:{userId}
+```
+
+TTL：
+
+```text
+8h
+```
+
+---
+
+Cache
+
+```text
+object:{id}
+
+ontology:{id}
+
+workflow:{id}
+```
+
+TTL：
+
+```text
+30m
+```
+
+---
+
+# 17. 数据库规模预估
+
+V1：
+
+```text
+表数量
+≈ 220张
+
+索引
+≈ 1200个
+
+视图
+≈ 80个
+
+物化视图
+≈ 40个
+```
+
+---
+
+# 下一卷
+
+## 07-Ontology元模型设计说明书
+
+将定义：
+
+```text
+Entity Meta Model
+Property Meta Model
+Relationship Meta Model
+Metric Meta Model
+Action Meta Model
+
+Ontology DSL
+
+Ontology Compiler
+
+Object Runtime Mapping
+
+Semantic Query Engine
+```
+
+这是 Foundry 最核心的部分，也是整个 ECOS 的灵魂层。

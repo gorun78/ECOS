@@ -1,0 +1,1296 @@
+# 第4章 数据存储与湖仓（Storage & Lakehouse Platform）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 4.1 模块概述
+
+## 模块名称
+
+```text
+Storage & Lakehouse Platform
+```
+
+---
+
+## 模块定位
+
+ECOS统一数据底座。
+
+负责：
+
+```text
+数据存储
+
+数据管理
+
+数据访问
+
+数据生命周期
+
+统一计算访问
+```
+
+对应Foundry：
+
+```text
+Foundry Data Lake
+
+Ontology Storage
+
+Object Storage
+
+Data Warehouse
+```
+
+---
+
+## 核心目标
+
+构建企业统一数据空间：
+
+```text
+Structured Data
+
++
+
+Semi Structured Data
+
++
+
+Unstructured Data
+
++
+
+Graph Data
+
++
+
+Vector Data
+```
+
+---
+
+## 功能架构
+
+```text
+Storage Platform
+
+├── Object Storage
+├── Lakehouse Storage
+├── Data Warehouse
+├── Vector Storage
+├── Graph Storage
+├── Cache Layer
+├── Metadata Storage
+├── File Storage
+├── Lifecycle Management
+├── Storage Security
+├── Storage Monitoring
+└── Storage Governance
+```
+
+---
+
+# 4.2 数据存储总体架构
+
+```text
+Application
+
+↓
+
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Unified Data Access Layer
+
+↓
+
+Lakehouse Engine
+
+↓
+
+──────────────────────
+
+Object Storage
+
+Iceberg
+
+Vector Store
+
+Graph Store
+
+Metadata Store
+
+Cache
+
+──────────────────────
+
+Infrastructure
+```
+
+---
+
+# 4.3 对象存储（Object Storage）
+
+---
+
+## 功能目标
+
+存储：
+
+```text
+文档
+
+图片
+
+视频
+
+音频
+
+附件
+
+模型文件
+
+Agent记忆文件
+```
+
+---
+
+## 支持平台
+
+```text
+S3
+
+MinIO
+
+OSS
+
+COS
+
+OBS
+```
+
+---
+
+## 页面
+
+```text
+Object Storage Explorer
+```
+
+---
+
+功能：
+
+```text
+上传
+
+下载
+
+预览
+
+移动
+
+删除
+
+权限管理
+```
+
+---
+
+## 文件上传
+
+支持：
+
+```text
+单文件
+
+批量上传
+
+目录上传
+
+断点续传
+```
+
+---
+
+## 文件限制
+
+默认：
+
+```text
+单文件 ≤ 10GB
+```
+
+---
+
+可配置：
+
+```text
+100GB+
+```
+
+---
+
+# 4.4 文件元数据管理
+
+---
+
+记录：
+
+```text
+文件名
+
+路径
+
+Owner
+
+大小
+
+Hash
+
+类型
+
+创建时间
+```
+
+---
+
+数据库：
+
+```sql
+file_object
+```
+
+---
+
+示例：
+
+```json
+{
+  "id":"file001",
+  "name":"contract.pdf",
+  "size":120394,
+  "owner":"user01"
+}
+```
+
+---
+
+# 4.5 Lakehouse存储引擎
+
+---
+
+## 功能目标
+
+统一：
+
+```text
+Data Lake
+
++
+
+Data Warehouse
+```
+
+---
+
+采用：
+
+```text
+Apache Iceberg
+```
+
+推荐默认方案：
+
+```text
+MinIO + Iceberg + Spark
+```
+
+---
+
+## 存储层次
+
+```text
+Raw Zone
+
+↓
+
+Standard Zone
+
+↓
+
+Business Zone
+
+↓
+
+Knowledge Zone
+
+↓
+
+Ontology Zone
+```
+
+---
+
+# 4.6 数据分层模型
+
+---
+
+## Raw Layer
+
+原始数据层。
+
+特点：
+
+```text
+不修改
+
+全量保留
+```
+
+---
+
+## Standard Layer
+
+标准化层。
+
+完成：
+
+```text
+清洗
+
+格式统一
+
+编码统一
+```
+
+---
+
+## Business Layer
+
+业务层。
+
+形成：
+
+```text
+Customer360
+
+Sales Fact
+
+Asset Fact
+```
+
+---
+
+## Knowledge Layer
+
+知识层。
+
+形成：
+
+```text
+Knowledge Chunk
+
+Embedding
+
+Entity
+```
+
+---
+
+## Ontology Layer
+
+对象层。
+
+形成：
+
+```text
+Customer Object
+
+Supplier Object
+
+Asset Object
+```
+
+---
+
+# 4.7 Iceberg表管理
+
+---
+
+## 功能目标
+
+管理湖仓表。
+
+---
+
+页面：
+
+```text
+Table Management
+```
+
+---
+
+功能：
+
+```text
+创建表
+
+修改Schema
+
+快照管理
+
+版本回滚
+
+数据预览
+```
+
+---
+
+## 表结构示例
+
+```sql
+CREATE TABLE customer (
+ id STRING,
+ name STRING,
+ level STRING
+)
+```
+
+---
+
+# 4.8 数据快照管理
+
+---
+
+## 功能目标
+
+支持时间旅行。
+
+---
+
+操作：
+
+```text
+查看快照
+
+比较快照
+
+回滚快照
+```
+
+---
+
+示例：
+
+```sql
+SELECT *
+
+FROM customer
+
+VERSION AS OF 20250101
+```
+
+---
+
+# 4.9 数据仓库（Warehouse）
+
+---
+
+## 功能目标
+
+支持分析查询。
+
+---
+
+存储：
+
+```text
+事实表
+
+维度表
+
+指标表
+```
+
+---
+
+模型：
+
+```text
+Star Schema
+
+Snowflake Schema
+
+Data Vault
+```
+
+---
+
+# 4.10 指标仓库
+
+---
+
+## 功能目标
+
+统一指标管理。
+
+---
+
+示例：
+
+```text
+销售额
+
+库存周转率
+
+设备利用率
+
+客户满意度
+```
+
+---
+
+字段：
+
+```text
+指标编码
+
+指标名称
+
+计算公式
+
+负责人
+```
+
+---
+
+# 4.11 向量存储（Vector Storage）
+
+---
+
+## 功能目标
+
+支持RAG与Agent。
+
+---
+
+支持：
+
+```text
+Milvus
+
+PGVector
+
+Weaviate
+
+Qdrant
+```
+
+---
+
+存储内容：
+
+```text
+Embedding
+
+Knowledge Chunk
+
+Memory
+```
+
+---
+
+## 页面
+
+```text
+Vector Dataset Explorer
+```
+
+---
+
+功能：
+
+```text
+创建向量集
+
+查询
+
+删除
+
+重建索引
+```
+
+---
+
+# 4.12 向量索引管理
+
+---
+
+支持：
+
+```text
+HNSW
+
+IVF
+
+Flat
+```
+
+---
+
+配置：
+
+```text
+维度
+
+距离算法
+
+召回率
+```
+
+---
+
+距离算法：
+
+```text
+Cosine
+
+L2
+
+Inner Product
+```
+
+---
+
+# 4.13 图存储（Graph Storage）
+
+---
+
+## 功能目标
+
+支撑知识图谱。
+
+---
+
+支持：
+
+```text
+Neo4j
+
+JanusGraph
+
+NebulaGraph
+```
+
+---
+
+存储：
+
+```text
+Entity
+
+Relationship
+
+Triple
+```
+
+---
+
+## 图模型
+
+```text
+Customer
+
+BOUGHT
+
+Product
+```
+
+---
+
+# 4.14 图数据管理
+
+---
+
+功能：
+
+```text
+节点管理
+
+关系管理
+
+图查询
+
+图分析
+```
+
+---
+
+查询语言：
+
+```text
+Cypher
+
+Gremlin
+
+GraphQL
+```
+
+---
+
+# 4.15 Metadata Store
+
+---
+
+## 功能目标
+
+管理平台元数据。
+
+---
+
+存储：
+
+```text
+Catalog
+
+Ontology
+
+Workflow
+
+Pipeline
+
+Agent
+```
+
+---
+
+推荐：
+
+```text
+PostgreSQL
+```
+
+---
+
+# 4.16 Cache Layer
+
+---
+
+## 功能目标
+
+提升访问性能。
+
+---
+
+支持：
+
+```text
+Redis
+
+Hazelcast
+```
+
+---
+
+缓存内容：
+
+```text
+热点对象
+
+查询结果
+
+Agent上下文
+```
+
+---
+
+# 4.17 Unified Data Access Layer
+
+---
+
+## 功能目标
+
+统一访问所有存储。
+
+---
+
+接口统一：
+
+```text
+Object API
+
+SQL API
+
+Graph API
+
+Vector API
+```
+
+---
+
+屏蔽底层差异。
+
+---
+
+# 4.18 数据生命周期管理
+
+---
+
+## 功能目标
+
+控制数据生命周期。
+
+---
+
+状态：
+
+```text
+Active
+
+Warm
+
+Cold
+
+Archive
+
+Deleted
+```
+
+---
+
+## 自动归档
+
+规则：
+
+```text
+180天未访问
+
+↓
+
+Cold Storage
+```
+
+---
+
+# 4.19 数据保留策略
+
+---
+
+支持：
+
+```text
+1年
+
+3年
+
+5年
+
+永久
+```
+
+---
+
+按法规：
+
+```text
+GDPR
+
+网络安全法
+
+数据安全法
+```
+
+---
+
+# 4.20 数据压缩策略
+
+---
+
+支持：
+
+```text
+Snappy
+
+ZSTD
+
+GZIP
+```
+
+---
+
+自动优化：
+
+```text
+小文件合并
+
+碎片整理
+```
+
+---
+
+# 4.21 数据加密
+
+---
+
+静态加密：
+
+```text
+AES256
+```
+
+---
+
+传输加密：
+
+```text
+TLS1.3
+```
+
+---
+
+密钥管理：
+
+```text
+KMS
+```
+
+---
+
+# 4.22 数据脱敏
+
+---
+
+支持：
+
+```text
+手机号
+
+身份证
+
+银行卡
+
+邮箱
+```
+
+---
+
+规则：
+
+```text
+138****8888
+```
+
+---
+
+# 4.23 存储权限模型
+
+---
+
+权限：
+
+```text
+Read
+
+Write
+
+Delete
+
+Share
+
+Admin
+```
+
+---
+
+粒度：
+
+```text
+Database
+
+Table
+
+Column
+
+Object
+```
+
+---
+
+# 4.24 Storage Monitoring
+
+---
+
+监控：
+
+```text
+容量
+
+TPS
+
+QPS
+
+延迟
+
+错误率
+```
+
+---
+
+Dashboard：
+
+```text
+Storage Health
+
+Capacity Trend
+
+Hot Data
+
+Cold Data
+```
+
+---
+
+# 4.25 存储成本分析
+
+---
+
+统计：
+
+```text
+存储成本
+
+计算成本
+
+向量成本
+
+图谱成本
+```
+
+---
+
+输出：
+
+```text
+成本趋势
+
+成本预测
+
+优化建议
+```
+
+---
+
+# 4.26 Storage与Ontology集成
+
+---
+
+自动映射：
+
+```text
+Iceberg Table
+
+↓
+
+Ontology Entity
+```
+
+---
+
+示例：
+
+```text
+customer_table
+
+↓
+
+Customer
+```
+
+---
+
+# 4.27 Storage与Object Runtime集成
+
+---
+
+支持：
+
+```text
+Object Persistence
+
+Object Query
+
+Object History
+```
+
+---
+
+# 4.28 Storage与Knowledge集成
+
+---
+
+知识对象存储：
+
+```text
+Chunk
+
+Embedding
+
+Summary
+
+Knowledge Object
+```
+
+---
+
+# 4.29 Storage与Agent Runtime集成
+
+---
+
+Agent存储：
+
+```text
+Short Memory
+
+Long Memory
+
+Semantic Memory
+
+Episodic Memory
+```
+
+---
+
+# 4.30 Storage API
+
+---
+
+创建数据集：
+
+```http
+POST /api/v1/storage/datasets
+```
+
+---
+
+查询数据集：
+
+```http
+GET /api/v1/storage/datasets
+```
+
+---
+
+查询快照：
+
+```http
+GET /api/v1/storage/snapshots
+```
+
+---
+
+向量检索：
+
+```http
+POST /api/v1/vector/search
+```
+
+---
+
+图查询：
+
+```http
+POST /api/v1/graph/query
+```
+
+---
+
+# 4.31 数据模型
+
+核心表：
+
+```sql
+storage_dataset
+storage_snapshot
+storage_file
+storage_policy
+vector_dataset
+vector_embedding
+graph_node
+graph_edge
+storage_metric
+```
+
+---
+
+# 4.32 KPI指标
+
+```text
+总容量
+
+活跃数据量
+
+冷热比例
+
+查询响应时间
+
+向量召回率
+
+图查询性能
+
+存储成本
+```
+
+---
+
+# 4.33 异常码
+
+| 错误码    | 说明       |
+| ------ | -------- |
+| ST-001 | 存储空间不足   |
+| ST-002 | 数据集不存在   |
+| ST-003 | 快照不存在    |
+| ST-004 | 向量索引失败   |
+| ST-005 | 图查询失败    |
+| ST-006 | 权限不足     |
+| ST-007 | 加密失败     |
+| ST-008 | 生命周期策略错误 |
+
+---
+
+# Volume 1 第四模块完成
+
+已完成：
+
+```text
+第1章 数据接入与集成
+第2章 数据目录（Catalog）
+第3章 数据处理与管道（Pipeline）
+第4章 数据存储与湖仓（Storage & Lakehouse）
+```
+
+下一章进入数据平台层最后一个核心模块：
+
+# 第5章 数据治理与质量（Data Governance & Quality）
+
+对应蓝图：
+
+```text
+数据血缘
+数据质量
+元数据管理
+主数据管理
+数据标准
+数据安全治理
+```
+
+这一章将正式进入 Foundry Governance、Data Lineage、Data Health、Master Data Management 以及后续 Ontology 治理体系的基础设计。

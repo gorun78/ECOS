@@ -1,0 +1,1263 @@
+# 12-前端设计系统规范（Design System Specification）
+
+(ECOS Design System / Foundry-style UX Specification)
+
+**文档编号**
+
+```text
+ECOS-DS-001
+```
+
+**版本**
+
+```text
+V1.0
+```
+
+---
+
+# 1. 设计目标
+
+ECOS 前端不是普通后台管理系统。
+
+定位：
+
+```text
+Palantir Foundry
++
+Databricks
++
+Linear
++
+Vercel
++
+Bloomberg Terminal
+```
+
+设计原则：
+
+```text
+Data First
+
+Ontology First
+
+Operator First
+
+Mission First
+
+AI Native
+```
+
+---
+
+# 2. 整体视觉风格
+
+关键词：
+
+```text
+Professional
+
+Dense
+
+Operational
+
+Industrial
+
+Command Center
+
+Mission Control
+```
+
+---
+
+避免：
+
+```text
+Ant Design官网风格
+
+传统ERP风格
+
+表单中心风格
+
+低信息密度风格
+```
+
+---
+
+强调：
+
+```text
+信息密度
+
+状态感知
+
+实时反馈
+
+图谱关系
+
+操作链路
+```
+
+---
+
+# 3. Design Token
+
+## Color System
+
+### Primary
+
+```css
+--color-primary-50: #eef4ff;
+--color-primary-100: #dbe7ff;
+--color-primary-200: #b7d0ff;
+--color-primary-300: #85aeff;
+--color-primary-400: #5d8eff;
+--color-primary-500: #336dff;
+--color-primary-600: #2457e6;
+--color-primary-700: #1c46ba;
+```
+
+---
+
+### Neutral
+
+```css
+--gray-0:#ffffff;
+--gray-50:#f8fafc;
+--gray-100:#f1f5f9;
+--gray-200:#e2e8f0;
+--gray-300:#cbd5e1;
+--gray-400:#94a3b8;
+--gray-500:#64748b;
+--gray-600:#475569;
+--gray-700:#334155;
+--gray-800:#1e293b;
+--gray-900:#0f172a;
+```
+
+---
+
+### Semantic
+
+```css
+--success:#10b981;
+--warning:#f59e0b;
+--danger:#ef4444;
+--info:#3b82f6;
+```
+
+---
+
+# 4. Dark Mode（默认）
+
+ECOS 默认采用：
+
+```text
+Dark First
+```
+
+类似：
+
+```text
+Foundry
+
+Databricks
+
+GitHub Dark
+
+VSCode Dark
+```
+
+---
+
+主题：
+
+```css
+--bg:#0b1220;
+--panel:#111827;
+--panel-2:#1f2937;
+
+--border:#273244;
+
+--text:#f9fafb;
+--text-secondary:#94a3b8;
+```
+
+---
+
+# 5. Typography
+
+字体：
+
+```css
+Inter
+SF Pro
+Roboto
+PingFang SC
+```
+
+---
+
+字号：
+
+```css
+12
+13
+14
+16
+20
+24
+32
+40
+```
+
+---
+
+规范：
+
+```text
+Body = 14
+
+Table = 13
+
+Title = 20
+
+Page Title = 24
+```
+
+---
+
+# 6. Spacing System
+
+```css
+4px
+8px
+12px
+16px
+24px
+32px
+48px
+64px
+```
+
+---
+
+原则：
+
+```text
+紧凑
+
+高密度
+
+少留白
+```
+
+---
+
+# 7. Layout Architecture
+
+采用：
+
+```text
+Shell Layout
+```
+
+---
+
+结构：
+
+```text
+┌─────────────────────────────┐
+│ Top Navigation              │
+├─────────┬───────────────────┤
+│ Sidebar │ Workspace         │
+│         │                   │
+│         │                   │
+└─────────┴───────────────────┘
+```
+
+---
+
+# 8. Shell结构
+
+组件：
+
+```text
+AppShell
+
+TopBar
+
+SideNav
+
+Workspace
+
+StatusBar
+```
+
+---
+
+React：
+
+```tsx
+<AppShell>
+
+ <TopBar/>
+
+ <SideNav/>
+
+ <Workspace/>
+
+</AppShell>
+```
+
+---
+
+# 9. Top Navigation
+
+高度：
+
+```css
+48px
+```
+
+---
+
+包含：
+
+```text
+Logo
+
+Search
+
+Command Palette
+
+Notifications
+
+Agent Center
+
+Profile
+```
+
+---
+
+布局：
+
+```text
+Logo | Search | Workspace | AI | User
+```
+
+---
+
+# 10. Sidebar Navigation
+
+宽度：
+
+```css
+260px
+```
+
+折叠：
+
+```css
+72px
+```
+
+---
+
+菜单：
+
+```text
+Mission Control
+
+Ontology
+
+Object Explorer
+
+Pipeline
+
+Workflow
+
+Knowledge
+
+Agent Studio
+
+Marketplace
+
+Governance
+
+Admin
+```
+
+---
+
+# 11. Workspace模式
+
+类似Foundry。
+
+---
+
+Workspace：
+
+```text
+Tab Based
+```
+
+---
+
+支持：
+
+```text
+多Tab
+
+保存状态
+
+恢复会话
+```
+
+---
+
+结构：
+
+```text
+┌───────────────────┐
+
+Tab1
+
+Tab2
+
+Tab3
+
+───────────────────
+
+Workspace
+
+└───────────────────┘
+```
+
+---
+
+# 12. 页面类型
+
+统一六类：
+
+```text
+Dashboard
+
+List
+
+Detail
+
+Builder
+
+Studio
+
+Command Center
+```
+
+---
+
+# 13. Dashboard规范
+
+布局：
+
+```text
+KPI
+
+Trend
+
+Alert
+
+Task
+
+Agent
+```
+
+---
+
+结构：
+
+```text
+┌─────────────┐
+
+ KPI KPI KPI
+
+─────────────
+
+ Chart
+
+─────────────
+
+ Feed
+
+└─────────────┘
+```
+
+---
+
+# 14. List Page规范
+
+Foundry最常见页面。
+
+---
+
+布局：
+
+```text
+Filter Bar
+
+Table
+
+Action Bar
+```
+
+---
+
+结构：
+
+```text
+┌─────────────────────┐
+
+Filters
+
+─────────────────────
+
+Table
+
+─────────────────────
+
+Pagination
+
+└─────────────────────┘
+```
+
+---
+
+# 15. Data Table规范
+
+核心组件。
+
+---
+
+支持：
+
+```text
+Virtual Scroll
+
+Column Freeze
+
+Grouping
+
+Aggregation
+
+Export
+
+Inline Edit
+```
+
+---
+
+列数：
+
+```text
+10~80列
+```
+
+---
+
+数据量：
+
+```text
+100万+
+```
+
+---
+
+# 16. Object Detail规范
+
+Foundry核心页面。
+
+---
+
+结构：
+
+```text
+Object Header
+
+Properties
+
+Relationships
+
+Metrics
+
+Timeline
+
+Activity
+```
+
+---
+
+布局：
+
+```text
+┌─────────────────────┐
+
+Object Header
+
+─────────────────────
+
+Properties
+
+─────────────────────
+
+Relationships
+
+─────────────────────
+
+Timeline
+
+└─────────────────────┘
+```
+
+---
+
+# 17. Relationship Explorer
+
+图谱浏览器。
+
+---
+
+能力：
+
+```text
+Expand
+
+Collapse
+
+Path Analysis
+
+Neighborhood
+```
+
+---
+
+布局：
+
+```text
+Graph
+
+|
+
+Inspector
+```
+
+---
+
+# 18. Ontology Studio
+
+Foundry最重要页面。
+
+---
+
+模块：
+
+```text
+Entity
+
+Property
+
+Relationship
+
+Metric
+
+Action
+```
+
+---
+
+布局：
+
+```text
+Tree
+
+|
+
+Editor
+
+|
+
+Preview
+```
+
+---
+
+# 19. Workflow Builder
+
+采用：
+
+```text
+Node Editor
+```
+
+---
+
+结构：
+
+```text
+Palette
+
+↓
+
+Canvas
+
+↓
+
+Properties
+```
+
+---
+
+节点：
+
+```text
+Start
+
+Task
+
+Agent
+
+Approval
+
+Condition
+
+End
+```
+
+---
+
+# 20. Pipeline Builder
+
+类似：
+
+```text
+Foundry Pipeline Builder
+```
+
+---
+
+布局：
+
+```text
+Dataset
+
+↓
+
+Transform
+
+↓
+
+Dataset
+```
+
+---
+
+节点：
+
+```text
+SQL
+
+Python
+
+Spark
+
+API
+
+Agent
+```
+
+---
+
+# 21. Agent Studio
+
+Agent开发中心。
+
+---
+
+模块：
+
+```text
+Prompt
+
+Tools
+
+Memory
+
+Evaluation
+
+Logs
+```
+
+---
+
+布局：
+
+```text
+Editor
+
+|
+
+Preview
+
+|
+
+Execution
+```
+
+---
+
+# 22. Mission Control
+
+企业驾驶舱。
+
+---
+
+布局：
+
+```text
+Goals
+
+KPIs
+
+Alerts
+
+Agents
+
+Recommendations
+```
+
+---
+
+结构：
+
+```text
+┌─────────────────────┐
+
+Mission Status
+
+─────────────────────
+
+KPI Wall
+
+─────────────────────
+
+Agent Feed
+
+─────────────────────
+
+Recommendations
+
+└─────────────────────┘
+```
+
+---
+
+# 23. Global Search
+
+类似Foundry Search。
+
+快捷键：
+
+```text
+⌘K
+
+Ctrl+K
+```
+
+---
+
+搜索范围：
+
+```text
+Object
+
+Knowledge
+
+Workflow
+
+Dataset
+
+Agent
+```
+
+---
+
+# 24. Command Palette
+
+统一操作入口。
+
+---
+
+支持：
+
+```text
+Create Object
+
+Run Workflow
+
+Create Agent
+
+Open Dataset
+
+Search Anything
+```
+
+---
+
+# 25. Notification Center
+
+通知分类：
+
+```text
+Task
+
+Workflow
+
+Approval
+
+Agent
+
+System
+```
+
+---
+
+# 26. AI Copilot Panel
+
+右侧固定AI助手。
+
+---
+
+能力：
+
+```text
+Ask
+
+Analyze
+
+Summarize
+
+Execute
+
+Create
+```
+
+---
+
+布局：
+
+```text
+Workspace
+
+|
+
+Copilot
+```
+
+---
+
+# 27. Component Library
+
+V1组件数量：
+
+```text
+220+
+```
+
+---
+
+基础组件：
+
+```text
+Button
+
+Input
+
+Select
+
+Dialog
+
+Drawer
+
+Tabs
+
+Tooltip
+
+Popover
+```
+
+---
+
+数据组件：
+
+```text
+DataTable
+
+Tree
+
+Graph
+
+Timeline
+
+MetricCard
+
+KPIBoard
+```
+
+---
+
+AI组件：
+
+```text
+PromptEditor
+
+AgentRunner
+
+ToolSelector
+
+ReasoningViewer
+
+ExecutionTimeline
+```
+
+---
+
+# 28. 前端工程结构
+
+```text
+src
+
+├── app
+├── pages
+├── modules
+
+│   ├── ontology
+│   ├── object
+│   ├── workflow
+│   ├── knowledge
+│   ├── mission
+│   └── agent
+
+├── components
+├── hooks
+├── services
+├── stores
+├── layouts
+├── themes
+├── providers
+└── utils
+```
+
+---
+
+# 29. 技术栈
+
+推荐：
+
+```text
+Next.js 15
+
+React 19
+
+TypeScript
+
+TailwindCSS
+
+TanStack Query
+
+Zustand
+
+React Flow
+
+AG Grid Enterprise
+
+ECharts
+
+Monaco Editor
+```
+
+---
+
+# 30. 状态管理
+
+```text
+Server State
+  ↓
+TanStack Query
+
+Client State
+  ↓
+Zustand
+
+Form
+  ↓
+React Hook Form
+```
+
+---
+
+# 31. Foundry风格关键页面清单
+
+必须实现：
+
+```text
+Login
+
+Home
+
+Mission Dashboard
+
+Object Explorer
+
+Object Detail
+
+Ontology Studio
+
+Pipeline Builder
+
+Workflow Builder
+
+Knowledge Center
+
+Graph Explorer
+
+Agent Studio
+
+Agent Marketplace
+
+Governance Center
+
+Admin Center
+```
+
+---
+
+# 32. 页面数量规划
+
+MVP：
+
+```text
+页面
+≈ 80
+```
+
+V1：
+
+```text
+页面
+≈ 220
+```
+
+Enterprise：
+
+```text
+页面
+≈ 500+
+```
+
+---
+
+# 33. Design System交付物
+
+开发团队最终应产出：
+
+```text
+Figma Design System
+
+Token库
+
+React组件库
+
+Storybook
+
+页面模板库
+
+图标库
+
+主题系统
+```
+
+---
+
+# 34. 与Palantir Foundry差异
+
+Foundry：
+
+```text
+Ontology
+Pipeline
+Operational App
+AIP
+```
+
+---
+
+ECOS：
+
+```text
+Ontology Studio
+
+Knowledge Graph
+
+Agent Studio
+
+World Model
+
+Mission Control
+```
+
+新增：
+
+```text
+企业认知层
+
+数字孪生
+
+Agent Mesh
+
+战略推演
+```
+
+---
+
+# 下一卷
+
+## 13-API设计规范（API Design Specification）
+
+将输出：
+
+```text
+REST规范
+
+GraphQL规范
+
+Object API
+
+Ontology API
+
+Workflow API
+
+Knowledge API
+
+Agent API
+
+Mission API
+
+认证规范
+
+错误码规范
+
+SDK规范
+
+OpenAPI规范
+```
+
+这一卷开始进入开发团队可以直接编码的接口层设计。

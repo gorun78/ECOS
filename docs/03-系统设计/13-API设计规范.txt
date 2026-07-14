@@ -1,0 +1,1097 @@
+# 13-API设计规范
+
+(API Design Specification)
+
+**文档编号**
+
+```text
+ECOS-API-001
+```
+
+**版本**
+
+```text
+V1.0
+```
+
+---
+
+# 1. 设计目标
+
+ECOS API不仅是传统CRUD接口。
+
+需要支撑：
+
+```text
+Ontology
+
+Object Runtime
+
+Knowledge Graph
+
+Workflow
+
+Agent Runtime
+
+Agent Mesh
+
+World Model
+
+Mission Control
+```
+
+统一访问。
+
+---
+
+设计原则：
+
+```text
+Resource Oriented
+
+Domain Driven
+
+Ontology First
+
+AI Native
+
+Event Driven
+
+Versioned
+```
+
+---
+
+# 2. API架构体系
+
+```text
+                 API Gateway
+
+                       │
+
+      ┌────────────────┼────────────────┐
+
+      ▼                ▼                ▼
+
+  REST API        GraphQL API      Event API
+
+      │                │                │
+
+      └────────────────┼────────────────┘
+
+                       ▼
+
+                 Domain Services
+```
+
+---
+
+# 3. API分层
+
+```text
+L1 Gateway API
+
+L2 Domain API
+
+L3 Internal API
+
+L4 Event API
+```
+
+---
+
+# 4. API命名规范
+
+统一：
+
+```http
+/api/v1/{resource}
+```
+
+例如：
+
+```http
+/api/v1/customers
+
+/api/v1/orders
+
+/api/v1/workflows
+
+/api/v1/agents
+```
+
+---
+
+禁止：
+
+```http
+/getCustomer
+
+/queryOrder
+
+/createWorkflow
+```
+
+---
+
+# 5. HTTP Method规范
+
+查询：
+
+```http
+GET
+```
+
+创建：
+
+```http
+POST
+```
+
+更新：
+
+```http
+PUT
+PATCH
+```
+
+删除：
+
+```http
+DELETE
+```
+
+---
+
+# 6. URL规范
+
+正确：
+
+```http
+GET /api/v1/customers/123
+
+GET /api/v1/customers/123/orders
+```
+
+---
+
+错误：
+
+```http
+GET /api/v1/getCustomer?id=123
+```
+
+---
+
+# 7. 返回结构统一
+
+统一格式：
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "message": "",
+
+  "data": {}
+}
+```
+
+---
+
+分页：
+
+```json
+{
+  "success": true,
+
+  "data": [],
+
+  "page": {
+      "pageNo":1,
+      "pageSize":20,
+      "total":500
+  }
+}
+```
+
+---
+
+# 8. 错误响应规范
+
+```json
+{
+  "success": false,
+
+  "code": "OBJECT_NOT_FOUND",
+
+  "message": "Customer not found"
+}
+```
+
+---
+
+# 9. 错误码体系
+
+格式：
+
+```text
+DOMAIN_ERRORCODE
+```
+
+---
+
+示例：
+
+```text
+AUTH_UNAUTHORIZED
+
+AUTH_FORBIDDEN
+
+OBJECT_NOT_FOUND
+
+WORKFLOW_FAILED
+
+AGENT_TIMEOUT
+
+MISSION_CANCELLED
+```
+
+---
+
+# 10. API版本管理
+
+URI版本：
+
+```http
+/api/v1
+
+/api/v2
+```
+
+---
+
+Header版本：
+
+```http
+Accept-Version: v1
+```
+
+---
+
+推荐：
+
+```text
+URI Version
+```
+
+---
+
+# 11. GraphQL规范
+
+统一入口：
+
+```http
+POST /graphql
+```
+
+---
+
+Schema：
+
+```graphql
+type Customer {
+
+  id: ID
+
+  name: String
+
+  revenue: Float
+
+}
+```
+
+---
+
+查询：
+
+```graphql
+query {
+
+  customers {
+
+     id
+
+     name
+
+  }
+
+}
+```
+
+---
+
+# 12. Object Runtime API
+
+核心对象访问层。
+
+---
+
+查询对象：
+
+```http
+GET /api/v1/objects/{id}
+```
+
+---
+
+返回：
+
+```json
+{
+  "id":"cust001",
+
+  "type":"Customer",
+
+  "properties":{}
+}
+```
+
+---
+
+创建对象：
+
+```http
+POST /api/v1/objects
+```
+
+---
+
+请求：
+
+```json
+{
+  "type":"Customer",
+
+  "properties":{
+      "name":"ACME"
+  }
+}
+```
+
+---
+
+# 13. Ontology API
+
+获取实体：
+
+```http
+GET /api/v1/ontology/entities
+```
+
+---
+
+获取属性：
+
+```http
+GET /api/v1/ontology/entities/{id}
+```
+
+---
+
+发布模型：
+
+```http
+POST /api/v1/ontology/publish
+```
+
+---
+
+DSL导入：
+
+```http
+POST /api/v1/ontology/import
+```
+
+---
+
+# 14. Workflow API
+
+创建流程：
+
+```http
+POST /api/v1/workflows
+```
+
+---
+
+启动流程：
+
+```http
+POST /api/v1/workflows/{id}/start
+```
+
+---
+
+暂停流程：
+
+```http
+POST /api/v1/workflows/{id}/pause
+```
+
+---
+
+终止流程：
+
+```http
+POST /api/v1/workflows/{id}/terminate
+```
+
+---
+
+# 15. Knowledge API
+
+搜索知识：
+
+```http
+POST /api/v1/knowledge/search
+```
+
+---
+
+请求：
+
+```json
+{
+  "query":"客户续费下降原因"
+}
+```
+
+---
+
+获取文档：
+
+```http
+GET /api/v1/knowledge/documents/{id}
+```
+
+---
+
+# 16. Graph API
+
+查询节点：
+
+```http
+GET /api/v1/graph/nodes/{id}
+```
+
+---
+
+查询路径：
+
+```http
+POST /api/v1/graph/path
+```
+
+---
+
+请求：
+
+```json
+{
+  "source":"customer001",
+
+  "target":"risk001"
+}
+```
+
+---
+
+# 17. Agent API
+
+创建Agent：
+
+```http
+POST /api/v1/agents
+```
+
+---
+
+执行Agent：
+
+```http
+POST /api/v1/agents/{id}/execute
+```
+
+---
+
+查看执行：
+
+```http
+GET /api/v1/executions/{id}
+```
+
+---
+
+取消执行：
+
+```http
+POST /api/v1/executions/{id}/cancel
+```
+
+---
+
+# 18. Agent Mesh API
+
+注册Agent：
+
+```http
+POST /api/v1/mesh/agents
+```
+
+---
+
+发现Agent：
+
+```http
+GET /api/v1/mesh/discovery
+```
+
+---
+
+创建Mission：
+
+```http
+POST /api/v1/missions
+```
+
+---
+
+查询Mission：
+
+```http
+GET /api/v1/missions/{id}
+```
+
+---
+
+# 19. World Model API
+
+创建场景：
+
+```http
+POST /api/v1/scenarios
+```
+
+---
+
+运行仿真：
+
+```http
+POST /api/v1/simulations/run
+```
+
+---
+
+预测：
+
+```http
+POST /api/v1/predictions
+```
+
+---
+
+优化：
+
+```http
+POST /api/v1/optimizations
+```
+
+---
+
+# 20. Mission API
+
+获取目标：
+
+```http
+GET /api/v1/goals
+```
+
+---
+
+创建目标：
+
+```http
+POST /api/v1/goals
+```
+
+---
+
+获取战略建议：
+
+```http
+POST /api/v1/goals/{id}/recommendation
+```
+
+---
+
+# 21. Search API
+
+统一搜索。
+
+---
+
+接口：
+
+```http
+POST /api/v1/search
+```
+
+---
+
+请求：
+
+```json
+{
+  "keyword":"ACME"
+}
+```
+
+---
+
+返回：
+
+```json
+{
+  "objects":[],
+  "documents":[],
+  "workflows":[]
+}
+```
+
+---
+
+# 22. Event API
+
+采用：
+
+```text
+Kafka
++
+WebSocket
++
+SSE
+```
+
+---
+
+Topic：
+
+```text
+object.created
+
+object.updated
+
+workflow.completed
+
+agent.finished
+
+mission.completed
+```
+
+---
+
+# 23. WebSocket API
+
+连接：
+
+```http
+/ws
+```
+
+---
+
+消息：
+
+```json
+{
+  "event":"workflow.completed",
+
+  "payload":{}
+}
+```
+
+---
+
+# 24. OpenAPI规范
+
+所有REST接口必须生成：
+
+```text
+OpenAPI 3.1
+```
+
+---
+
+目录：
+
+```text
+/openapi
+
+├── ontology.yaml
+├── object.yaml
+├── workflow.yaml
+├── knowledge.yaml
+├── graph.yaml
+├── agent.yaml
+├── mission.yaml
+└── worldmodel.yaml
+```
+
+---
+
+# 25. SDK规范
+
+自动生成：
+
+```text
+Java SDK
+
+TypeScript SDK
+
+Python SDK
+
+Go SDK
+```
+
+---
+
+示例：
+
+```typescript
+const customer =
+ await ecos.object.get(id)
+```
+
+---
+
+# 26. API Gateway
+
+推荐：
+
+```text
+Kong
+
+APISIX
+
+Spring Gateway
+```
+
+---
+
+能力：
+
+```text
+认证
+
+限流
+
+审计
+
+路由
+
+熔断
+```
+
+---
+
+# 27. API安全规范
+
+强制：
+
+```text
+HTTPS
+
+JWT
+
+OAuth2
+
+OIDC
+```
+
+---
+
+签名：
+
+```text
+HMAC-SHA256
+```
+
+---
+
+# 28. API限流
+
+默认：
+
+```text
+1000 req/min/user
+```
+
+---
+
+Agent：
+
+```text
+10000 req/min
+```
+
+---
+
+# 29. API审计
+
+记录：
+
+```text
+User
+
+Time
+
+IP
+
+Request
+
+Response
+
+Result
+```
+
+---
+
+审计表：
+
+```sql
+api_audit_log
+```
+
+---
+
+# 30. API成熟度等级
+
+L1：
+
+```text
+REST
+```
+
+L2：
+
+```text
+REST + GraphQL
+```
+
+L3：
+
+```text
+REST + GraphQL + Events
+```
+
+L4：
+
+```text
+REST + GraphQL + Events + Agent APIs
+```
+
+---
+
+# 31. API规模规划
+
+V1：
+
+```text
+REST API
+≈ 800
+```
+
+```text
+GraphQL
+≈ 300
+```
+
+```text
+Event
+≈ 500
+```
+
+---
+
+Enterprise：
+
+```text
+REST API
+≈ 3000+
+```
+
+```text
+Event
+≈ 5000+
+```
+
+---
+
+# 32. API域划分
+
+```text
+identity
+
+organization
+
+ontology
+
+object
+
+workflow
+
+pipeline
+
+knowledge
+
+graph
+
+agent
+
+mission
+
+worldmodel
+
+governance
+
+audit
+
+platform
+```
+
+---
+
+# 33. API开发规范
+
+统一要求：
+
+```text
+OpenAPI First
+
+Contract First
+
+Consumer Driven
+
+Backward Compatible
+```
+
+---
+
+代码生成：
+
+```text
+OpenAPI
+
+↓
+
+SDK
+
+↓
+
+Controller
+
+↓
+
+Client
+```
+
+---
+
+# 34. API架构全景
+
+```text
+Client
+
+↓
+
+Gateway
+
+↓
+
+REST
+
+↓
+
+GraphQL
+
+↓
+
+Event Bus
+
+↓
+
+Domain Services
+
+↓
+
+Object Runtime
+
+↓
+
+Knowledge Graph
+
+↓
+
+Agent Mesh
+
+↓
+
+World Model
+```
+
+---
+
+# 下一卷
+
+# 14-安全架构设计说明书
+
+(Security Architecture Specification)
+
+将覆盖：
+
+```text
+IAM身份体系
+
+RBAC
+
+ABAC
+
+Ontology权限模型
+
+Object权限模型
+
+Data Security
+
+Field Security
+
+Row Level Security
+
+Agent Security
+
+Zero Trust
+
+Audit
+
+Compliance
+
+SOC2
+
+ISO27001
+
+GDPR
+
+等保三级
+```
+
+这一卷开始进入企业级生产环境落地设计。

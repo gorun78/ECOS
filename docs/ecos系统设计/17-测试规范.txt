@@ -1,0 +1,1379 @@
+# 17-测试规范
+
+(Testing Specification)
+
+**文档编号**
+
+```text
+ECOS-TEST-001
+```
+
+**版本**
+
+```text
+V1.0
+```
+
+---
+
+# 1. 测试目标
+
+ECOS属于：
+
+```text
+Mission Critical Platform
+```
+
+质量目标：
+
+```text
+高可靠
+
+高稳定
+
+高安全
+
+高可维护
+
+高可观测
+```
+
+---
+
+质量指标：
+
+```text
+P0缺陷 = 0
+
+P1缺陷 ≤ 2
+
+核心流程成功率 ≥ 99.9%
+
+Agent成功率 ≥ 98%
+
+API可用性 ≥ 99.95%
+```
+
+---
+
+# 2. 测试体系架构
+
+```text
+                   Testing
+
+                       │
+
+    ┌──────────┬──────────┬──────────┐
+
+    ▼          ▼          ▼          ▼
+
+ Functional  NonFunc   Security   UAT
+
+    │          │          │          │
+
+    ▼          ▼          ▼          ▼
+
+ Unit      Perf      PenTest    Business
+
+ Integration Load      Audit     Acceptance
+
+ E2E        Stress
+```
+
+---
+
+# 3. 测试分层模型
+
+采用测试金字塔：
+
+```text
+               E2E
+
+          Integration
+
+          Unit Test
+```
+
+---
+
+覆盖比例：
+
+```text
+Unit Test
+70%
+
+Integration
+20%
+
+E2E
+10%
+```
+
+---
+
+# 4. 测试环境规划
+
+```text
+DEV
+
+TEST
+
+SIT
+
+UAT
+
+PERF
+
+PROD
+```
+
+---
+
+职责：
+
+| 环境   | 用途   |
+| ---- | ---- |
+| DEV  | 开发验证 |
+| TEST | 功能测试 |
+| SIT  | 集成测试 |
+| UAT  | 用户验收 |
+| PERF | 性能测试 |
+| PROD | 生产验证 |
+
+---
+
+# 5. 测试数据管理
+
+原则：
+
+```text
+可重复
+
+可追溯
+
+可恢复
+```
+
+---
+
+分类：
+
+```text
+Mock Data
+
+Synthetic Data
+
+Production Masked Data
+```
+
+---
+
+# 6. 缺陷等级
+
+P0：
+
+```text
+系统不可用
+```
+
+---
+
+P1：
+
+```text
+核心功能失效
+```
+
+---
+
+P2：
+
+```text
+业务功能异常
+```
+
+---
+
+P3：
+
+```text
+体验问题
+```
+
+---
+
+# 7. 单元测试规范
+
+目标：
+
+```text
+覆盖率 ≥ 80%
+```
+
+---
+
+核心模块：
+
+```text
+≥ 90%
+```
+
+---
+
+模块：
+
+```text
+Ontology
+
+Workflow
+
+Graph
+
+Agent
+
+World Model
+```
+
+---
+
+工具：
+
+```text
+JUnit5
+
+Mockito
+
+AssertJ
+```
+
+---
+
+# 8. 单元测试示例
+
+```java
+@Test
+void shouldCreateCustomer(){
+
+    Customer customer =
+        service.create(req);
+
+    assertNotNull(customer);
+
+}
+```
+
+---
+
+# 9. 集成测试
+
+验证：
+
+```text
+Service
+
+Database
+
+Message Queue
+
+Cache
+```
+
+---
+
+示例：
+
+```text
+Workflow
+
+↓
+
+Kafka
+
+↓
+
+Agent
+
+↓
+
+Graph
+```
+
+---
+
+# 10. API测试
+
+范围：
+
+```text
+REST
+
+GraphQL
+
+WebSocket
+```
+
+---
+
+工具：
+
+```text
+Postman
+
+Newman
+
+RestAssured
+```
+
+---
+
+测试内容：
+
+```text
+状态码
+
+返回值
+
+权限
+
+限流
+
+异常
+```
+
+---
+
+# 11. API验收标准
+
+成功：
+
+```http
+200
+
+201
+
+204
+```
+
+---
+
+失败：
+
+```http
+400
+
+401
+
+403
+
+404
+
+500
+```
+
+---
+
+必须验证：
+
+```text
+错误码规范
+```
+
+---
+
+# 12. Contract Test
+
+采用：
+
+```text
+Consumer Driven Contract
+```
+
+---
+
+工具：
+
+```text
+Pact
+```
+
+---
+
+目的：
+
+```text
+避免接口变更破坏下游
+```
+
+---
+
+# 13. 前端测试
+
+覆盖：
+
+```text
+Component
+
+Page
+
+Workflow
+```
+
+---
+
+工具：
+
+```text
+Vitest
+
+RTL
+```
+
+---
+
+示例：
+
+```typescript
+render(<Button/>)
+
+expect(
+ screen.getByText("Save")
+).toBeVisible()
+```
+
+---
+
+# 14. E2E测试
+
+工具：
+
+```text
+Playwright
+```
+
+---
+
+必须覆盖：
+
+```text
+登录
+
+审批
+
+流程
+
+Agent执行
+
+Mission执行
+```
+
+---
+
+# 15. 登录测试
+
+场景：
+
+```text
+正确密码
+
+错误密码
+
+锁定用户
+
+MFA
+
+SSO
+```
+
+---
+
+通过率：
+
+```text
+100%
+```
+
+---
+
+# 16. Ontology测试
+
+验证：
+
+```text
+Entity
+
+Property
+
+Relationship
+
+Action
+```
+
+---
+
+检查：
+
+```text
+模型合法性
+
+引用完整性
+
+循环依赖
+```
+
+---
+
+# 17. Object Runtime测试
+
+覆盖：
+
+```text
+CRUD
+
+Relationship
+
+Permission
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+↓
+
+Facility
+
+↓
+
+Asset
+```
+
+关系是否正确。
+
+---
+
+# 18. Workflow测试
+
+覆盖：
+
+```text
+Start
+
+Task
+
+Approval
+
+Agent
+
+Condition
+
+End
+```
+
+---
+
+验证：
+
+```text
+流程状态
+
+重试
+
+补偿
+
+超时
+```
+
+---
+
+# 19. Pipeline测试
+
+覆盖：
+
+```text
+SQL
+
+Spark
+
+Python
+
+API
+```
+
+---
+
+验证：
+
+```text
+输入
+
+输出
+
+Schema
+```
+
+---
+
+# 20. Knowledge Graph测试
+
+覆盖：
+
+```text
+Node
+
+Edge
+
+Path
+
+Subgraph
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+↓
+
+Facility
+
+↓
+
+Risk
+```
+
+路径是否正确。
+
+---
+
+# 21. Graph Query测试
+
+验证：
+
+```text
+Cypher
+
+GraphQL
+
+ObjectQL
+```
+
+---
+
+检查：
+
+```text
+性能
+
+正确性
+
+权限
+```
+
+---
+
+# 22. RAG测试
+
+验证：
+
+```text
+Recall
+
+Precision
+
+Grounding
+```
+
+---
+
+指标：
+
+```text
+Recall ≥ 85%
+
+Precision ≥ 80%
+```
+
+---
+
+# 23. Agent测试
+
+分类：
+
+```text
+Tool Test
+
+Memory Test
+
+Planning Test
+
+Execution Test
+```
+
+---
+
+# 24. Tool测试
+
+验证：
+
+```text
+权限
+
+参数
+
+结果
+```
+
+---
+
+示例：
+
+```text
+CreateCustomer
+```
+
+Agent是否正确调用。
+
+---
+
+# 25. Agent Planning测试
+
+输入：
+
+```text
+提高利润10%
+```
+
+---
+
+验证：
+
+```text
+Goal
+
+Task
+
+Plan
+```
+
+是否合理。
+
+---
+
+# 26. Multi-Agent测试
+
+验证：
+
+```text
+Coordinator
+
+Worker
+
+Reviewer
+```
+
+---
+
+场景：
+
+```text
+Mission执行
+```
+
+---
+
+# 27. Agent安全测试
+
+验证：
+
+```text
+越权
+
+Prompt Injection
+
+Data Leakage
+```
+
+---
+
+必须：
+
+```text
+0高危漏洞
+```
+
+---
+
+# 28. World Model测试
+
+验证：
+
+```text
+Simulation
+
+Prediction
+
+Optimization
+```
+
+---
+
+示例：
+
+```text
+销售增长20%
+```
+
+是否得到合理结果。
+
+---
+
+# 29. 仿真测试
+
+覆盖：
+
+```text
+Monte Carlo
+
+Forecast
+
+Strategy
+```
+
+---
+
+验证：
+
+```text
+稳定性
+
+准确性
+```
+
+---
+
+# 30. 性能测试
+
+分类：
+
+```text
+Load
+
+Stress
+
+Spike
+
+Endurance
+```
+
+---
+
+工具：
+
+```text
+JMeter
+
+K6
+
+Gatling
+```
+
+---
+
+# 31. API性能指标
+
+目标：
+
+```text
+P95 ≤ 300ms
+
+P99 ≤ 1000ms
+```
+
+---
+
+TPS：
+
+```text
+5000+
+```
+
+---
+
+# 32. Workflow性能测试
+
+目标：
+
+```text
+100万流程/天
+```
+
+---
+
+验证：
+
+```text
+吞吐量
+
+延迟
+
+失败率
+```
+
+---
+
+# 33. Graph性能测试
+
+目标：
+
+```text
+10亿关系
+```
+
+---
+
+验证：
+
+```text
+Path Query
+
+Subgraph Query
+```
+
+---
+
+指标：
+
+```text
+P95 ≤ 2秒
+```
+
+---
+
+# 34. Agent性能测试
+
+指标：
+
+```text
+Agent启动时间
+
+Tool调用时间
+
+Mission完成时间
+```
+
+---
+
+目标：
+
+```text
+Agent启动 < 3秒
+```
+
+---
+
+# 35. 并发测试
+
+模拟：
+
+```text
+1000
+
+5000
+
+10000
+```
+
+用户同时在线。
+
+---
+
+# 36. 压力测试
+
+目标：
+
+```text
+150%
+
+200%
+
+300%
+```
+
+系统容量。
+
+---
+
+# 37. 稳定性测试
+
+持续：
+
+```text
+72小时
+
+168小时
+```
+
+---
+
+检查：
+
+```text
+内存泄漏
+
+线程泄漏
+
+连接泄漏
+```
+
+---
+
+# 38. 安全测试
+
+覆盖：
+
+```text
+OWASP Top10
+```
+
+---
+
+检查：
+
+```text
+SQL Injection
+
+XSS
+
+CSRF
+
+SSRF
+
+RCE
+```
+
+---
+
+# 39. 渗透测试
+
+频率：
+
+```text
+每季度
+```
+
+---
+
+输出：
+
+```text
+Pentest Report
+```
+
+---
+
+# 40. 漏洞扫描
+
+工具：
+
+```text
+Nessus
+
+OpenVAS
+
+Trivy
+```
+
+---
+
+要求：
+
+```text
+Critical = 0
+```
+
+---
+
+# 41. Chaos测试
+
+工具：
+
+```text
+Chaos Mesh
+```
+
+---
+
+模拟：
+
+```text
+Pod故障
+
+网络中断
+
+数据库故障
+```
+
+---
+
+# 42. 容灾测试
+
+验证：
+
+```text
+主机房故障
+
+数据库切换
+
+对象存储故障
+```
+
+---
+
+指标：
+
+```text
+RPO ≤ 15分钟
+
+RTO ≤ 1小时
+```
+
+---
+
+# 43. UAT测试
+
+参与：
+
+```text
+业务用户
+
+产品经理
+
+架构师
+```
+
+---
+
+验收：
+
+```text
+需求覆盖率100%
+```
+
+---
+
+# 44. 验收标准
+
+必须满足：
+
+```text
+功能通过
+
+性能达标
+
+安全通过
+
+文档齐全
+```
+
+---
+
+# 45. 测试报告模板
+
+内容：
+
+```text
+测试范围
+
+执行情况
+
+缺陷统计
+
+风险分析
+
+结论
+```
+
+---
+
+# 46. 自动化测试体系
+
+CI触发：
+
+```text
+Commit
+
+↓
+
+Unit Test
+
+↓
+
+Integration
+
+↓
+
+Security Scan
+
+↓
+
+Deploy
+```
+
+---
+
+# 47. 测试度量指标
+
+统计：
+
+```text
+通过率
+
+覆盖率
+
+缺陷密度
+
+缺陷逃逸率
+```
+
+---
+
+目标：
+
+```text
+缺陷逃逸率 < 3%
+```
+
+---
+
+# 48. 测试成熟度
+
+Level 1：
+
+```text
+手工测试
+```
+
+---
+
+Level 2：
+
+```text
+自动化测试
+```
+
+---
+
+Level 3：
+
+```text
+持续测试
+```
+
+---
+
+Level 4：
+
+```text
+AI辅助测试
+```
+
+---
+
+# 49. 测试组织结构
+
+```text
+QA Lead
+
+Automation QA
+
+Performance QA
+
+Security QA
+
+Business QA
+```
+
+---
+
+# 50. 测试全景架构
+
+```text
+Requirement
+
+↓
+
+Development
+
+↓
+
+Unit Test
+
+↓
+
+Integration Test
+
+↓
+
+API Test
+
+↓
+
+E2E Test
+
+↓
+
+Performance Test
+
+↓
+
+Security Test
+
+↓
+
+UAT
+
+↓
+
+Release
+```
+
+---
+
+# 下一卷（最终卷）
+
+## 18-MVP实施路线图（Implementation Roadmap）
+
+将输出：
+
+```text
+MVP范围定义
+
+团队规模
+
+阶段规划
+
+12个月实施路线图
+
+人员配置
+
+预算估算
+
+优先级矩阵
+
+Foundry替代路径
+
+Agent优先路线
+
+World Model演进路线
+
+商业化版本规划
+
+V1/V2/V3演进蓝图
+```
+
+这一卷完成后，18份核心设计文档将形成完整的 **ECOS（Enterprise Cognitive Operating System）总体架构设计包**，可直接作为研发立项、招标、技术方案和实施蓝图使用。

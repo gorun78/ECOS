@@ -1,0 +1,1437 @@
+# 第13章 Knowledge Graph（知识图谱平台）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 13.1 模块概述
+
+## 模块名称
+
+```text
+Knowledge Graph Platform
+```
+
+---
+
+## 模块定位
+
+ECOS企业知识网络核心平台。
+
+负责：
+
+```text
+实体关联
+
+关系建模
+
+知识发现
+
+图谱分析
+
+图推理
+
+Graph RAG
+
+Graph AI
+```
+
+---
+
+对应：
+
+```text
+Palantir Foundry Ontology Graph
+
+Knowledge Graph
+
+Operational Graph
+```
+
+---
+
+## 核心目标
+
+构建企业数字世界。
+
+实现：
+
+```text
+Data
+
+↓
+
+Ontology
+
+↓
+
+Object
+
+↓
+
+Knowledge Graph
+
+↓
+
+World Model
+
+↓
+
+Agent Reasoning
+```
+
+---
+
+# 13.2 总体架构
+
+```text
+Knowledge Graph Platform
+
+├── Graph Modeling
+├── Graph Engine
+├── Graph Storage
+├── Knowledge Graph
+├── Operational Graph
+├── Graph Query Engine
+├── Graph Analytics
+├── Graph Reasoning
+├── Graph RAG
+├── Graph AI
+├── Graph Visualization
+├── Graph Governance
+└── Graph API
+```
+
+---
+
+# 13.3 图谱核心理念
+
+传统系统：
+
+```text
+Customer Table
+
+Order Table
+
+Supplier Table
+```
+
+彼此孤立。
+
+---
+
+知识图谱：
+
+```text
+Customer
+
+↓
+
+Order
+
+↓
+
+Supplier
+
+↓
+
+Material
+
+↓
+
+Factory
+
+↓
+
+Risk Event
+```
+
+形成企业知识网络。
+
+---
+
+# 13.4 Graph Meta Model
+
+---
+
+## 核心对象
+
+```text
+Node
+```
+
+节点
+
+---
+
+```text
+Edge
+```
+
+关系
+
+---
+
+```text
+Property
+```
+
+属性
+
+---
+
+```text
+Path
+```
+
+路径
+
+---
+
+```text
+Subgraph
+```
+
+子图
+
+---
+
+# 13.5 Node模型
+
+---
+
+来源：
+
+```text
+Ontology Entity
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+Supplier
+
+Order
+
+Product
+
+Facility
+
+Employee
+
+Risk
+```
+
+---
+
+结构：
+
+```json
+{
+  "id":"CUST001",
+  "type":"Customer"
+}
+```
+
+---
+
+# 13.6 Edge模型
+
+---
+
+来源：
+
+```text
+Ontology Relationship
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+PLACED
+
+Order
+```
+
+---
+
+```text
+Supplier
+
+SUPPLY
+
+Material
+```
+
+---
+
+结构：
+
+```json
+{
+  "source":"Customer",
+  "target":"Order",
+  "relation":"PLACED"
+}
+```
+
+---
+
+# 13.7 Knowledge Graph
+
+---
+
+## 功能目标
+
+构建企业知识网络。
+
+---
+
+示例：
+
+```text
+Customer
+
+↓
+
+Order
+
+↓
+
+Invoice
+
+↓
+
+Payment
+```
+
+---
+
+形成：
+
+```text
+Business Knowledge Graph
+```
+
+---
+
+# 13.8 Operational Graph
+
+---
+
+## 功能目标
+
+构建业务运行图谱。
+
+---
+
+包含：
+
+```text
+Object
+
+Workflow
+
+Agent
+
+Mission
+
+Event
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+↓
+
+Workflow
+
+↓
+
+Approval
+
+↓
+
+Agent
+
+↓
+
+Decision
+```
+
+---
+
+# 13.9 Digital Twin Graph
+
+---
+
+## 功能目标
+
+构建企业数字孪生图谱。
+
+---
+
+表示：
+
+```text
+Organization
+
+People
+
+Asset
+
+Facility
+
+System
+
+Process
+```
+
+---
+
+形成：
+
+```text
+Enterprise Digital Twin
+```
+
+---
+
+# 13.10 Graph Engine
+
+---
+
+## 功能目标
+
+图计算核心引擎。
+
+---
+
+支持：
+
+```text
+Neo4j
+
+NebulaGraph
+
+JanusGraph
+
+TigerGraph
+```
+
+---
+
+能力：
+
+```text
+存储
+
+查询
+
+分析
+
+推理
+```
+
+---
+
+# 13.11 Graph Query Engine
+
+---
+
+## 功能目标
+
+统一图查询能力。
+
+---
+
+支持：
+
+### Cypher
+
+```cypher
+MATCH (c:Customer)
+
+RETURN c
+```
+
+---
+
+### Gremlin
+
+---
+
+### GraphQL
+
+---
+
+### Semantic Query
+
+---
+
+# 13.12 Graph Search
+
+---
+
+支持：
+
+```text
+节点搜索
+
+关系搜索
+
+路径搜索
+
+影响搜索
+```
+
+---
+
+示例：
+
+```text
+查找客户关联的全部供应商
+```
+
+---
+
+# 13.13 Path Analysis
+
+---
+
+## 功能目标
+
+路径分析。
+
+---
+
+支持：
+
+### Shortest Path
+
+最短路径
+
+---
+
+### Dependency Path
+
+依赖路径
+
+---
+
+### Influence Path
+
+影响路径
+
+---
+
+### Risk Path
+
+风险传播路径
+
+---
+
+# 示例
+
+```text
+Supplier
+
+↓
+
+Material
+
+↓
+
+Factory
+
+↓
+
+Product
+
+↓
+
+Customer
+```
+
+---
+
+# 13.14 Graph Analytics
+
+---
+
+## 功能目标
+
+图分析平台。
+
+---
+
+支持：
+
+### Degree Analysis
+
+度分析
+
+---
+
+### Centrality
+
+中心性分析
+
+---
+
+### Community Detection
+
+社区发现
+
+---
+
+### Similarity
+
+相似性分析
+
+---
+
+### Influence Analysis
+
+影响分析
+
+---
+
+# 13.15 Graph Algorithms
+
+---
+
+支持：
+
+```text
+PageRank
+
+Louvain
+
+KNN
+
+Connected Components
+
+Shortest Path
+```
+
+---
+
+# 13.16 Risk Propagation Analysis
+
+---
+
+## 功能目标
+
+风险传播分析。
+
+---
+
+示例：
+
+```text
+Supplier Risk
+
+↓
+
+Factory
+
+↓
+
+Production
+
+↓
+
+Customer
+```
+
+---
+
+自动计算：
+
+```text
+Impact Score
+```
+
+---
+
+# 13.17 Root Cause Analysis
+
+---
+
+## 功能目标
+
+根因分析。
+
+---
+
+输入：
+
+```text
+订单延迟
+```
+
+---
+
+分析：
+
+```text
+Order
+
+↓
+
+Factory
+
+↓
+
+Equipment
+
+↓
+
+Failure Event
+```
+
+---
+
+输出：
+
+```text
+根因设备故障
+```
+
+---
+
+# 13.18 Knowledge Discovery
+
+---
+
+## 功能目标
+
+发现隐藏关系。
+
+---
+
+示例：
+
+```text
+Customer A
+
+Supplier B
+
+Project C
+```
+
+---
+
+系统发现：
+
+```text
+潜在合作关系
+```
+
+---
+
+# 13.19 Graph Reasoning Engine
+
+---
+
+## 功能目标
+
+图谱推理。
+
+---
+
+推理方式：
+
+### Rule Based
+
+规则推理
+
+---
+
+### Ontology Based
+
+本体推理
+
+---
+
+### Graph Based
+
+图推理
+
+---
+
+### Agent Based
+
+Agent推理
+
+---
+
+# 示例
+
+```text
+Supplier
+
+属于高风险
+```
+
+---
+
+推理：
+
+```text
+相关订单
+
+存在潜在风险
+```
+
+---
+
+# 13.20 Knowledge Inference
+
+---
+
+自动推导：
+
+```text
+Entity
+
+↓
+
+Relationship
+
+↓
+
+Knowledge
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+购买
+
+Product
+```
+
+---
+
+推导：
+
+```text
+客户兴趣偏好
+```
+
+---
+
+# 13.21 Graph RAG
+
+---
+
+## 功能目标
+
+图谱增强检索。
+
+---
+
+传统RAG：
+
+```text
+Question
+
+↓
+
+Vector Search
+
+↓
+
+Answer
+```
+
+---
+
+Graph RAG：
+
+```text
+Question
+
+↓
+
+Graph Search
+
+↓
+
+Subgraph
+
+↓
+
+Knowledge Retrieval
+
+↓
+
+LLM
+```
+
+---
+
+# 13.22 Graph Context Builder
+
+---
+
+自动构建：
+
+```text
+Entity Context
+
+Relationship Context
+
+Path Context
+
+Knowledge Context
+```
+
+---
+
+供Agent使用。
+
+---
+
+# 13.23 Graph AI
+
+---
+
+## 功能目标
+
+图谱驱动AI。
+
+---
+
+支持：
+
+```text
+Graph Embedding
+
+Graph Neural Network
+
+Graph Prediction
+
+Graph Recommendation
+```
+
+---
+
+应用：
+
+```text
+客户推荐
+
+供应商推荐
+
+风险预测
+
+欺诈检测
+```
+
+---
+
+# 13.24 Graph Visualization
+
+---
+
+## 功能目标
+
+可视化图谱展示。
+
+---
+
+页面：
+
+```text
+Graph Explorer
+```
+
+---
+
+布局：
+
+```text
+Graph Canvas
+
++
+
+Node Panel
+
++
+
+Relationship Panel
+```
+
+---
+
+支持：
+
+```text
+缩放
+
+拖拽
+
+展开
+
+折叠
+```
+
+---
+
+# 13.25 Knowledge Explorer
+
+---
+
+## 功能目标
+
+浏览企业知识网络。
+
+---
+
+支持：
+
+```text
+搜索
+
+过滤
+
+关系导航
+
+路径分析
+```
+
+---
+
+# 13.26 Graph Governance
+
+---
+
+## 功能目标
+
+治理图谱质量。
+
+---
+
+检查：
+
+```text
+孤立节点
+
+重复节点
+
+错误关系
+
+无效关系
+```
+
+---
+
+评分：
+
+```text
+Graph Health Score
+```
+
+---
+
+# 13.27 Graph Security
+
+---
+
+权限模型：
+
+### Node Level
+
+节点级
+
+---
+
+### Edge Level
+
+关系级
+
+---
+
+### Property Level
+
+属性级
+
+---
+
+### Path Level
+
+路径级
+
+---
+
+# 示例
+
+```text
+用户可查看客户
+
+不可查看客户关联审计记录
+```
+
+---
+
+# 13.28 Graph与Ontology集成
+
+---
+
+映射：
+
+```text
+Ontology Entity
+
+↓
+
+Graph Node
+```
+
+---
+
+```text
+Ontology Relation
+
+↓
+
+Graph Edge
+```
+
+---
+
+# 13.29 Graph与Agent Runtime集成
+
+---
+
+Agent能力：
+
+```text
+Graph Query
+
+Graph Analysis
+
+Graph Reasoning
+
+Graph RAG
+```
+
+---
+
+示例：
+
+```text
+Risk Agent
+
+↓
+
+Knowledge Graph
+
+↓
+
+Risk Prediction
+```
+
+---
+
+# 13.30 Graph与Workflow集成
+
+---
+
+Workflow生成：
+
+```text
+Workflow Graph
+```
+
+---
+
+分析：
+
+```text
+流程依赖
+
+瓶颈分析
+
+影响分析
+```
+
+---
+
+# 13.31 Graph API
+
+---
+
+创建节点：
+
+```http
+POST /api/v1/graph/nodes
+```
+
+---
+
+创建关系：
+
+```http
+POST /api/v1/graph/edges
+```
+
+---
+
+图查询：
+
+```http
+POST /api/v1/graph/query
+```
+
+---
+
+路径分析：
+
+```http
+POST /api/v1/graph/path
+```
+
+---
+
+图推理：
+
+```http
+POST /api/v1/graph/reasoning
+```
+
+---
+
+# 13.32 数据模型
+
+核心表：
+
+```sql
+graph_node
+graph_edge
+graph_property
+graph_subgraph
+graph_embedding
+graph_reasoning
+graph_analysis
+graph_audit
+```
+
+---
+
+# 13.33 KPI指标
+
+```text
+节点数量
+
+关系数量
+
+图谱规模
+
+查询次数
+
+推理次数
+
+Graph RAG命中率
+
+知识发现数量
+```
+
+---
+
+# 13.34 审计要求
+
+记录：
+
+```text
+节点创建
+
+关系创建
+
+图推理
+
+路径分析
+
+知识发现
+
+权限访问
+```
+
+---
+
+# 13.35 异常码
+
+| 错误码     | 说明          |
+| ------- | ----------- |
+| GRF-001 | 节点不存在       |
+| GRF-002 | 关系不存在       |
+| GRF-003 | 路径不存在       |
+| GRF-004 | 推理失败        |
+| GRF-005 | 图查询失败       |
+| GRF-006 | 权限不足        |
+| GRF-007 | 图谱损坏        |
+| GRF-008 | Graph RAG失败 |
+
+---
+
+# 13.36 企业知识网络模型
+
+ECOS最终构建：
+
+```text
+Customer
+
+↔
+
+Order
+
+↔
+
+Supplier
+
+↔
+
+Material
+
+↔
+
+Factory
+
+↔
+
+Equipment
+
+↔
+
+Employee
+
+↔
+
+Risk Event
+
+↔
+
+Workflow
+
+↔
+
+Agent
+
+↔
+
+Mission
+```
+
+形成：
+
+```text
+Enterprise Knowledge Network
+```
+
+---
+
+# 13.37 与Palantir Foundry映射
+
+| ECOS              | Foundry               |
+| ----------------- | --------------------- |
+| Knowledge Graph   | Ontology Graph        |
+| Operational Graph | Operational Graph     |
+| Graph Reasoning   | Ontology Reasoning    |
+| Graph RAG         | AIP Graph Context     |
+| Graph Explorer    | Ontology Explorer     |
+| Graph Analytics   | Operational Analytics |
+
+---
+
+# 第13章完成
+
+完成ECOS认知层基础：
+
+```text
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Knowledge Graph
+```
+
+实现：
+
+```text
+企业对象
+
+↓
+
+企业关系
+
+↓
+
+企业知识网络
+```
+
+---
+
+下一章进入：
+
+# 第14章 World Model（世界模型平台）
+
+这是整个ECOS区别于传统Foundry的关键升级。
+
+对应未来形态：
+
+```text
+Ontology
+
+↓
+
+Knowledge Graph
+
+↓
+
+World Model
+
+↓
+
+Agent Society
+
+↓
+
+Autonomous Enterprise
+```
+
+将定义：
+
+```text
+World Model
+Digital Twin
+Simulation Engine
+Scenario Planning
+Prediction Engine
+Causal Reasoning
+Enterprise Operating Simulation
+```
+
+这一章将把ECOS从“知识系统”升级为“企业数字世界操作系统（Enterprise World Operating System）”。

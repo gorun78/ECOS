@@ -1,0 +1,1255 @@
+# 第8章 Action & Rule Engine（动作与规则引擎）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 8.1 模块概述
+
+## 模块名称
+
+```text
+Action & Rule Engine Platform
+```
+
+---
+
+## 模块定位
+
+ECOS业务执行核心。
+
+位于：
+
+```text
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Action & Rule Engine
+
+↓
+
+Workflow
+
+↓
+
+Agent
+
+↓
+
+Mission Control
+```
+
+---
+
+对应Foundry：
+
+```text
+Ontology Actions
+
+Automation
+
+Workflow Logic
+
+Business Rules
+```
+
+---
+
+## 核心目标
+
+实现：
+
+```text
+业务对象
+
+↓
+
+动作(Action)
+
+↓
+
+规则(Rule)
+
+↓
+
+决策(Decision)
+
+↓
+
+事件(Event)
+
+↓
+
+流程(Workflow)
+```
+
+驱动企业业务自动运行。
+
+---
+
+## 功能架构
+
+```text
+Action & Rule Engine
+
+├── Action Runtime
+├── Rule Engine
+├── Decision Engine
+├── Policy Engine
+├── Event Engine
+├── State Machine Engine
+├── Business Validation Engine
+├── Action Scheduler
+├── Action Marketplace
+├── Automation Engine
+├── Audit Engine
+└── Agent Rule Assistant
+```
+
+---
+
+# 8.2 Action Runtime
+
+---
+
+## 功能目标
+
+执行Ontology中定义的Action。
+
+---
+
+示例：
+
+Customer对象
+
+支持：
+
+```text
+Approve
+
+Reject
+
+Suspend
+
+Activate
+```
+
+---
+
+Order对象
+
+支持：
+
+```text
+Submit
+
+Pay
+
+Ship
+
+Complete
+
+Cancel
+```
+
+---
+
+## Action执行架构
+
+```text
+User
+
+↓
+
+Action Runtime
+
+↓
+
+Rule Engine
+
+↓
+
+Policy Engine
+
+↓
+
+State Machine
+
+↓
+
+Object Update
+
+↓
+
+Event Publish
+
+↓
+
+Workflow Trigger
+```
+
+---
+
+# 8.3 Action定义模型
+
+---
+
+## Action结构
+
+```json
+{
+  "code":"ApproveCustomer",
+  "name":"审批客户",
+  "target":"Customer",
+  "type":"StateTransition"
+}
+```
+
+---
+
+字段：
+
+| 字段     | 说明   |
+| ------ | ---- |
+| Code   | 动作编码 |
+| Name   | 动作名称 |
+| Target | 目标对象 |
+| Type   | 动作类型 |
+| Rule   | 规则   |
+| Policy | 权限策略 |
+
+---
+
+# 8.4 Action分类
+
+---
+
+## State Action
+
+状态变更。
+
+示例：
+
+```text
+Approve
+
+Reject
+
+Suspend
+```
+
+---
+
+## Data Action
+
+数据修改。
+
+示例：
+
+```text
+UpdateLevel
+
+UpdateOwner
+```
+
+---
+
+## Workflow Action
+
+启动流程。
+
+示例：
+
+```text
+StartApprovalFlow
+```
+
+---
+
+## Agent Action
+
+调用Agent。
+
+示例：
+
+```text
+RiskAssessment
+```
+
+---
+
+## Integration Action
+
+调用外部系统。
+
+示例：
+
+```text
+CreateERPOrder
+```
+
+---
+
+# 8.5 Rule Engine
+
+---
+
+## 功能目标
+
+统一规则执行平台。
+
+---
+
+支持：
+
+```text
+业务规则
+
+校验规则
+
+决策规则
+
+安全规则
+
+Agent规则
+```
+
+---
+
+## Rule结构
+
+```json
+{
+  "code":"CustomerLevelRule",
+  "expression":"sales_amount > 10000000"
+}
+```
+
+---
+
+# 8.6 Rule分类
+
+---
+
+## Validation Rule
+
+校验规则
+
+---
+
+示例：
+
+```text
+手机号不能为空
+```
+
+---
+
+表达式：
+
+```sql
+phone IS NOT NULL
+```
+
+---
+
+## Calculation Rule
+
+计算规则
+
+---
+
+示例：
+
+```text
+客户评分
+```
+
+---
+
+公式：
+
+```text
+销售额 × 0.6
+
++
+
+利润 × 0.4
+```
+
+---
+
+## Decision Rule
+
+决策规则
+
+---
+
+示例：
+
+```text
+信用等级判断
+```
+
+---
+
+## Event Rule
+
+事件触发规则
+
+---
+
+示例：
+
+```text
+订单金额 > 100万
+
+↓
+
+通知财务总监
+```
+
+---
+
+# 8.7 Rule表达式引擎
+
+---
+
+支持：
+
+### SQL模式
+
+```sql
+amount > 10000
+```
+
+---
+
+### DSL模式
+
+```text
+IF sales > 10000000
+THEN VIP
+```
+
+---
+
+### JSON规则
+
+```json
+{
+ "field":"amount",
+ "operator":">",
+ "value":10000
+}
+```
+
+---
+
+### Agent规则
+
+```text
+LLM判断客户风险等级
+```
+
+---
+
+# 8.8 Decision Engine
+
+---
+
+## 功能目标
+
+实现复杂业务决策。
+
+---
+
+输入：
+
+```text
+客户
+
+订单
+
+供应商
+
+设备
+```
+
+---
+
+输出：
+
+```text
+审批
+
+拒绝
+
+升级审批
+
+人工介入
+```
+
+---
+
+# 决策流
+
+```text
+Input
+
+↓
+
+Rules
+
+↓
+
+Scoring
+
+↓
+
+Decision
+
+↓
+
+Action
+```
+
+---
+
+# 8.9 决策表示例
+
+---
+
+采购审批：
+
+```text
+金额 ≤ 10万
+
+↓
+
+部门经理审批
+```
+
+---
+
+```text
+金额 > 10万
+
+↓
+
+总监审批
+```
+
+---
+
+```text
+金额 > 100万
+
+↓
+
+董事会审批
+```
+
+---
+
+# 8.10 Policy Engine
+
+---
+
+## 功能目标
+
+控制Action执行权限。
+
+---
+
+策略：
+
+```text
+RBAC
+
+ABAC
+
+PBAC
+```
+
+---
+
+# RBAC
+
+```text
+Role
+
+↓
+
+Permission
+```
+
+---
+
+示例：
+
+```text
+SalesManager
+
+↓
+
+ApproveCustomer
+```
+
+---
+
+# ABAC
+
+---
+
+条件：
+
+```text
+部门
+
+地区
+
+职级
+
+对象属性
+```
+
+---
+
+示例：
+
+```text
+仅华东区经理
+
+可审批华东客户
+```
+
+---
+
+# 8.11 State Machine Engine
+
+---
+
+## 功能目标
+
+管理对象状态流转。
+
+---
+
+Customer：
+
+```text
+Draft
+
+↓
+
+Submitted
+
+↓
+
+Approved
+
+↓
+
+Active
+
+↓
+
+Suspended
+
+↓
+
+Archived
+```
+
+---
+
+Order：
+
+```text
+Created
+
+↓
+
+Paid
+
+↓
+
+Shipped
+
+↓
+
+Completed
+```
+
+---
+
+# 状态规则
+
+---
+
+示例：
+
+```text
+Draft
+
+不可直接进入
+
+Active
+```
+
+---
+
+必须：
+
+```text
+Draft
+
+↓
+
+Submitted
+
+↓
+
+Approved
+```
+
+---
+
+# 8.12 Event Engine
+
+---
+
+## 功能目标
+
+事件驱动业务运行。
+
+---
+
+事件：
+
+```text
+ObjectCreated
+
+ObjectUpdated
+
+ActionExecuted
+
+WorkflowCompleted
+
+AgentFinished
+```
+
+---
+
+# 事件流
+
+```text
+Action
+
+↓
+
+Event
+
+↓
+
+Workflow
+
+↓
+
+Agent
+
+↓
+
+Notification
+```
+
+---
+
+# 8.13 Event订阅
+
+---
+
+支持：
+
+```text
+系统订阅
+
+用户订阅
+
+Agent订阅
+
+Webhook订阅
+```
+
+---
+
+示例：
+
+```text
+CustomerApproved
+
+↓
+
+Webhook
+```
+
+通知CRM。
+
+---
+
+# 8.14 Automation Engine
+
+---
+
+## 功能目标
+
+自动执行业务逻辑。
+
+---
+
+示例：
+
+```text
+客户审批通过
+
+↓
+
+自动创建账户
+
+↓
+
+自动分配客户经理
+
+↓
+
+自动发送欢迎邮件
+```
+
+---
+
+# 自动化模式
+
+---
+
+### Event Driven
+
+事件驱动
+
+---
+
+### Time Driven
+
+定时驱动
+
+---
+
+### Rule Driven
+
+规则驱动
+
+---
+
+# 8.15 Action Scheduler
+
+---
+
+## 功能目标
+
+计划执行Action。
+
+---
+
+示例：
+
+```text
+每天00:00
+
+自动刷新评分
+```
+
+---
+
+```text
+每月1日
+
+自动计算KPI
+```
+
+---
+
+# 8.16 Action Marketplace
+
+---
+
+## 功能目标
+
+沉淀企业标准动作。
+
+---
+
+示例：
+
+```text
+审批动作
+
+风险评估动作
+
+客户评级动作
+
+供应商审核动作
+```
+
+---
+
+支持：
+
+```text
+发布
+
+复用
+
+共享
+```
+
+---
+
+# 8.17 Audit Engine
+
+---
+
+## 功能目标
+
+记录所有动作执行过程。
+
+---
+
+记录：
+
+```text
+执行人
+
+执行时间
+
+对象
+
+规则
+
+结果
+```
+
+---
+
+示例：
+
+```json
+{
+ "action":"ApproveCustomer",
+ "operator":"admin",
+ "result":"success"
+}
+```
+
+---
+
+# 8.18 Agent Rule Assistant
+
+---
+
+Agent自动：
+
+### 生成规则
+
+---
+
+输入：
+
+```text
+客户超过1000万销售额自动升级VIP
+```
+
+---
+
+输出：
+
+```sql
+sales_amount > 10000000
+```
+
+---
+
+### 推荐Action
+
+---
+
+### 推荐审批路径
+
+---
+
+### 发现规则冲突
+
+---
+
+### 优化规则
+
+---
+
+# 8.19 Rule冲突检测
+
+---
+
+检测：
+
+```text
+重复规则
+
+循环规则
+
+冲突规则
+
+无效规则
+```
+
+---
+
+示例：
+
+```text
+VIP
+
+销售额 > 1000万
+```
+
+同时：
+
+```text
+VIP
+
+销售额 < 100万
+```
+
+系统告警。
+
+---
+
+# 8.20 Action API
+
+---
+
+执行Action：
+
+```http
+POST /api/v1/actions/execute
+```
+
+---
+
+查询Action：
+
+```http
+GET /api/v1/actions/{id}
+```
+
+---
+
+暂停Action：
+
+```http
+POST /api/v1/actions/{id}/pause
+```
+
+---
+
+取消Action：
+
+```http
+POST /api/v1/actions/{id}/cancel
+```
+
+---
+
+# 8.21 Rule API
+
+---
+
+创建规则：
+
+```http
+POST /api/v1/rules
+```
+
+---
+
+测试规则：
+
+```http
+POST /api/v1/rules/test
+```
+
+---
+
+发布规则：
+
+```http
+POST /api/v1/rules/publish
+```
+
+---
+
+查询规则：
+
+```http
+GET /api/v1/rules
+```
+
+---
+
+# 8.22 数据模型
+
+核心表：
+
+```sql
+action_definition
+action_execution
+rule_definition
+rule_version
+rule_execution
+policy_definition
+event_definition
+event_subscription
+state_machine
+state_transition
+```
+
+---
+
+# 8.23 权限模型
+
+| 角色                 | 权限   |
+| ------------------ | ---- |
+| Rule Admin         | 全部   |
+| Business Architect | 规则设计 |
+| Developer          | 开发   |
+| Operator           | 执行   |
+| Auditor            | 审计   |
+
+---
+
+# 8.24 KPI指标
+
+```text
+Action执行量
+
+Action成功率
+
+规则执行次数
+
+规则命中率
+
+自动化率
+
+审批自动化率
+
+事件处理延迟
+```
+
+---
+
+# 8.25 审计要求
+
+记录：
+
+```text
+Action创建
+
+Action执行
+
+规则修改
+
+规则发布
+
+策略变更
+
+状态流转
+```
+
+---
+
+# 8.26 异常码
+
+| 错误码     | 说明         |
+| ------- | ---------- |
+| ACT-001 | Action不存在  |
+| ACT-002 | Action不可执行 |
+| ACT-003 | 状态转换非法     |
+| ACT-004 | 规则校验失败     |
+| ACT-005 | 权限不足       |
+| ACT-006 | 策略冲突       |
+| ACT-007 | 事件发布失败     |
+| ACT-008 | 自动化执行失败    |
+
+---
+
+# 第8章完成
+
+完成ECOS业务执行引擎：
+
+```text
+Object Runtime
+
+↓
+
+Action Runtime
+
+↓
+
+Rule Engine
+
+↓
+
+Decision Engine
+
+↓
+
+Event Engine
+```
+
+对应Foundry：
+
+```text
+Ontology Actions
+Operational Workflow Logic
+Automation Framework
+```
+
+---
+
+下一章进入：
+
+# 第9章 Workflow & Process Automation（工作流与流程自动化）
+
+对应：
+
+```text
+Foundry Workflow Builder
+Operational Workflow
+Case Management
+Human-in-the-loop
+```
+
+这一章将构建真正的企业流程操作系统，包括：
+
+```text
+Workflow Designer
+BPMN Engine
+Case Management
+Task Center
+Approval Center
+Human-AI Collaboration
+Mission Workflow
+```

@@ -1,0 +1,4413 @@
+{
+  "totalTables": 85,
+  "totalColumns": 759,
+  "totalRelationships": 2,
+  "tables": [
+    {
+      "table": "ecos_agent_registry",
+      "source": "V1.4__agent_mesh.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL PRIMARY KEY COMMENT 'Agent唯一ID'"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL COMMENT 'Agent名称'"
+        },
+        {
+          "name": "role",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL COMMENT '角色类型: compliance/data/knowledge/supervisor'"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "COMMENT 'Agent能力描述'"
+        },
+        {
+          "name": "system_prompt",
+          "type": "TEXT",
+          "extra": "COMMENT '系统提示词'"
+        },
+        {
+          "name": "toolset",
+          "type": "JSON",
+          "extra": "COMMENT '可用工具列表 JSON数组'"
+        },
+        {
+          "name": "model",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'deepseek-chat' COMMENT '绑定模型'"
+        },
+        {
+          "name": "max_iterations",
+          "type": "INT",
+          "extra": "DEFAULT 10 COMMENT 'ReAct最大迭代次数'"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'ACTIVE' COMMENT 'ACTIVE/DISABLED'"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "extra": "DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "extra": "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        }
+      ],
+      "columnCount": 11
+    },
+    {
+      "table": "ecos_mission",
+      "source": "V1.4__agent_mesh.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL PRIMARY KEY COMMENT 'Mission唯一ID'"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL COMMENT '任务标题'"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "COMMENT '任务描述'"
+        },
+        {
+          "name": "mode",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'SUPERVISOR' COMMENT '执行模式: SUPERVISOR/PIPELINE'"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/COMPLETED/FAILED/CANCELLED'"
+        },
+        {
+          "name": "input_params",
+          "type": "JSON",
+          "extra": "COMMENT '输入参数 JSON'"
+        },
+        {
+          "name": "output_result",
+          "type": "JSON",
+          "extra": "COMMENT '输出结果 JSON'"
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "extra": "COMMENT '失败原因'"
+        },
+        {
+          "name": "started_at",
+          "type": "DATETIME",
+          "extra": "COMMENT '开始时间'"
+        },
+        {
+          "name": "completed_at",
+          "type": "DATETIME",
+          "extra": "COMMENT '完成时间'"
+        },
+        {
+          "name": "duration_ms",
+          "type": "BIGINT",
+          "extra": "COMMENT '总耗时毫秒'"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "extra": "DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "extra": "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        }
+      ],
+      "columnCount": 13
+    },
+    {
+      "table": "ecos_mission_task",
+      "source": "V1.4__agent_mesh.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL PRIMARY KEY COMMENT '子任务唯一ID'"
+        },
+        {
+          "name": "mission_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL COMMENT '所属Mission ID'"
+        },
+        {
+          "name": "seq",
+          "type": "INT",
+          "extra": "NOT NULL DEFAULT 0 COMMENT '执行顺序(PIPELINE模式)'"
+        },
+        {
+          "name": "agent_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL COMMENT '分配的Agent ID'"
+        },
+        {
+          "name": "agent_name",
+          "type": "VARCHAR(128)",
+          "extra": "COMMENT 'Agent名称快照'"
+        },
+        {
+          "name": "instruction",
+          "type": "TEXT",
+          "extra": "NOT NULL COMMENT '子任务指令'"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/COMPLETED/FAILED'"
+        },
+        {
+          "name": "result_summary",
+          "type": "TEXT",
+          "extra": "COMMENT '结果摘要'"
+        },
+        {
+          "name": "result_detail",
+          "type": "JSON",
+          "extra": "COMMENT '结果详情 JSON'"
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "extra": "COMMENT '失败原因'"
+        },
+        {
+          "name": "duration_ms",
+          "type": "BIGINT",
+          "extra": "COMMENT '耗时毫秒'"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "extra": "DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "extra": "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        }
+      ],
+      "columnCount": 13
+    },
+    {
+      "table": "ecos_workflow_instance",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "workflow_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "workflow_name",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "version_no",
+          "type": "VARCHAR(20)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL,          -- Created/Running/Waiting/Completed/Failed/Suspended/Terminated trigger_type        VARCHAR(50)"
+        },
+        {
+          "name": "triggered_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "triggered_object_id",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "trigger_event",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "variables",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "context",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "current_node_ids",
+          "type": "JSONB,",
+          "extra": "-- JSON array of active node IDs started_at          TIMESTAMP"
+        },
+        {
+          "name": "completed_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "retry_count",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 16
+    },
+    {
+      "table": "ecos_workflow_task",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "instance_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "task_type",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL,              -- APPROVAL/EXECUTION/AGENT/INVESTIGATION title           VARCHAR(500)"
+        },
+        {
+          "name": "assignee",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "candidate_users",
+          "type": "JSONB,",
+          "extra": "-- JSON array candidate_roles JSONB,                               -- JSON array status          VARCHAR(50) DEFAULT 'New',          -- New/Assigned/InProgress/Completed/Rejected/Transferred priority        VARCHAR(20) DEFAULT 'NORMAL'"
+        },
+        {
+          "name": "form_schema",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "form_data",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "result",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "agent_result",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "due_date",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "completed_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "completed_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 15
+    },
+    {
+      "table": "ecos_workflow_approval",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "task_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "instance_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "approver",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "decision",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL,              -- Approved/Rejected/Transferred opinion         TEXT"
+        },
+        {
+          "name": "form_data",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_workflow_log",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "instance_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "node_type",
+          "type": "VARCHAR(50)",
+          "extra": ""
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL,             -- NodeStarted/NodeCompleted/TaskCreated/TaskAssigned/AgentInvoked/AgentCompleted/InstanceStarted/InstanceCompleted message         TEXT"
+        },
+        {
+          "name": "details",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "duration_ms",
+          "type": "BIGINT",
+          "extra": ""
+        },
+        {
+          "name": "trace_id",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_world_scenarios",
+      "source": "V10__ecos_world_scenarios.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "goal_ids",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]',        -- JSON array: [\"goal-id-1\", \"goal-id-2\"] status          VARCHAR(32) DEFAULT 'draft'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "sys_dict",
+      "source": "V12__ecos_sys_dict.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "dict_type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "dict_code",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "dict_label",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "dict_label_en",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "parent_code",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "ext_value",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 11
+    },
+    {
+      "table": "sys_config",
+      "source": "V13__ecos_sys_config.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "config_group",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "config_key",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "config_value",
+          "type": "TEXT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "config_type",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'string'"
+        },
+        {
+          "name": "config_label",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "config_label_en",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 12
+    },
+    {
+      "table": "ecos_wm_goal_log",
+      "source": "V17__ecos_goal_hierarchy.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "goal_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_wm_goal(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "change_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "old_value",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "new_value",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "changed_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "changed_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "td_datasource",
+      "source": "V19__datanet_physical_tables.sql",
+      "columns": [
+        {
+          "name": "datasource_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "datasource_name",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "datasource_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'JDBC'"
+        },
+        {
+          "name": "org_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "connection_config",
+          "type": "TEXT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "extra": "NOT NULL DEFAULT 'ACTIVE'"
+        },
+        {
+          "name": "tags",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "last_test_time",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "last_test_result",
+          "type": "BOOLEAN",
+          "extra": ""
+        },
+        {
+          "name": "last_test_message",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "create_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "create_time",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        },
+        {
+          "name": "update_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "update_time",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 16
+    },
+    {
+      "table": "td_data_resource",
+      "source": "V19__datanet_physical_tables.sql",
+      "columns": [
+        {
+          "name": "resource_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "resource_name",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "resource_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'TABLE'"
+        },
+        {
+          "name": "org_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "org_name",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "datasource_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "source_path",
+          "type": "VARCHAR(512)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "tags",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "extra": "NOT NULL DEFAULT 'ACTIVE'"
+        },
+        {
+          "name": "field_count",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "record_count",
+          "type": "BIGINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "last_sync_time",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "create_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "create_time",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        },
+        {
+          "name": "update_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "update_time",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 17
+    },
+    {
+      "table": "td_data_field",
+      "source": "V19__datanet_physical_tables.sql",
+      "columns": [
+        {
+          "name": "field_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "resource_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "field_name",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "field_alias",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "field_type",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "field_length",
+          "type": "INTEGER",
+          "extra": ""
+        },
+        {
+          "name": "data_precision",
+          "type": "INTEGER",
+          "extra": ""
+        },
+        {
+          "name": "nullable",
+          "type": "SMALLINT",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "is_primary_key",
+          "type": "SMALLINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "default_value",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "field_order",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        }
+      ],
+      "columnCount": 12
+    },
+    {
+      "table": "td_catalog_item",
+      "source": "V19__datanet_physical_tables.sql",
+      "columns": [
+        {
+          "name": "catalog_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "resource_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "resource_name",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "resource_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'TABLE'"
+        },
+        {
+          "name": "org_name",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "tags",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "category_path",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "access_type",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'READ'"
+        },
+        {
+          "name": "data_format",
+          "type": "VARCHAR(32)",
+          "extra": ""
+        },
+        {
+          "name": "field_count",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "record_count",
+          "type": "BIGINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "last_updated",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "extra": "NOT NULL DEFAULT 'ACTIVE'"
+        }
+      ],
+      "columnCount": 14
+    },
+    {
+      "table": "demo_customer",
+      "source": "V1__init.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "industry",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "region",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "level",
+          "type": "VARCHAR(16)",
+          "extra": ""
+        },
+        {
+          "name": "credit_score",
+          "type": "INTEGER",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "demo_supplier",
+      "source": "V1__init.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "industry",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "region",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "level",
+          "type": "VARCHAR(16)",
+          "extra": ""
+        },
+        {
+          "name": "supply_capacity",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "demo_invoice",
+      "source": "V1__init.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(12,2)",
+          "extra": ""
+        },
+        {
+          "name": "customer_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "supplier_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'pending'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_spans",
+      "source": "V20__ecos_telemetry.sql",
+      "columns": [
+        {
+          "name": "span_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "trace_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "parent_span_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "operation_name",
+          "type": "VARCHAR(512)",
+          "extra": ""
+        },
+        {
+          "name": "service_name",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "http_method",
+          "type": "VARCHAR(16)",
+          "extra": ""
+        },
+        {
+          "name": "http_path",
+          "type": "VARCHAR(512)",
+          "extra": ""
+        },
+        {
+          "name": "http_status",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "start_time",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        },
+        {
+          "name": "end_time",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "duration_ms",
+          "type": "BIGINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "extra": "DEFAULT 'OK'"
+        },
+        {
+          "name": "attributes",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 14
+    },
+    {
+      "table": "ecos_token_usage",
+      "source": "V20__ecos_telemetry.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "trace_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "model",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "operation",
+          "type": "VARCHAR(256)",
+          "extra": ""
+        },
+        {
+          "name": "prompt_tokens",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "completion_tokens",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "total_tokens",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "cost_estimate",
+          "type": "DECIMAL(10,6)",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "latency_ms",
+          "type": "BIGINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_tenant_quota",
+      "source": "V21__ecos_tenant_quota.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "tenant_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "quota_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL,   -- API_CALLS, STORAGE_MB, etc. daily_limit     BIGINT          DEFAULT 0"
+        },
+        {
+          "name": "monthly_limit",
+          "type": "BIGINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_tenant_usage",
+      "source": "V21__ecos_tenant_quota.sql",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "usage_date",
+          "type": "DATE",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "quota_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "used_count",
+          "type": "BIGINT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 5
+    },
+    {
+      "table": "ecos_cognitive_rule",
+      "source": "V22__ecos_cognitive_rule.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "rule_name",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "rule_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL,    -- THRESHOLD / CAUSAL / OPTIMIZATION condition_expr  TEXT         NOT NULL,    -- 规则条件表达式 action_config   JSONB,                    -- 动作配置 priority        INT          DEFAULT 0"
+        },
+        {
+          "name": "enabled",
+          "type": "BOOLEAN",
+          "extra": "DEFAULT true"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_task",
+      "source": "V23__ecos_task.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "task_name",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "task_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL,       -- PIPELINE / REALTIME / AGENT / ADMIN status          VARCHAR(32)     DEFAULT 'PENDING', -- PENDING / RUNNING / SUCCESS / FAILED / CANCELLED config          JSONB,                          -- 任务配置: SQL语句、规则ID、参数等 runner          VARCHAR(64),                    -- 执行器: doris / rule / hermes priority        INT             DEFAULT 0"
+        },
+        {
+          "name": "retry_count",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "max_retries",
+          "type": "INT",
+          "extra": "DEFAULT 3"
+        },
+        {
+          "name": "scheduled_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "started_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "completed_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "result",
+          "type": "JSONB,",
+          "extra": "-- 执行结果 error_message   TEXT"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 12
+    },
+    {
+      "table": "td_user_security_profile",
+      "source": "V24__ecos_security_profile.sql",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "clearance_level",
+          "type": "INT",
+          "extra": "DEFAULT 0,        -- 准入等级 0-4 linked_workstation   VARCHAR(256),                     -- 物理工作站绑定 audit_mode           VARCHAR(32)     DEFAULT 'basic',  -- 审计力度: basic/detailed/full sandbox_mandatory    BOOLEAN         DEFAULT FALSE,    -- 沙盒强制 is_default           BOOLEAN         DEFAULT FALSE,    -- 是否作为全局默认 created_at           TIMESTAMP       DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 3
+    },
+    {
+      "table": "td_role_security_profile",
+      "source": "V24__ecos_security_profile.sql",
+      "columns": [
+        {
+          "name": "role_id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "clearance_level",
+          "type": "INT",
+          "extra": "DEFAULT 0,        -- 准入等级 0-4 linked_workstation   VARCHAR(256),                     -- 物理工作站绑定 audit_mode           VARCHAR(32)     DEFAULT 'basic',  -- 审计力度: basic/detailed/full sandbox_mandatory    BOOLEAN         DEFAULT FALSE,    -- 沙盒强制 created_at           TIMESTAMP       DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 3
+    },
+    {
+      "table": "ecos_pipeline_node",
+      "source": "V25__ecos_pipeline.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "definition_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL DEFAULT 'TRANSFORM_SQL'"
+        },
+        {
+          "name": "config",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "position_x",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "position_y",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_pipeline_edge",
+      "source": "V25__ecos_pipeline.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "definition_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "from_node_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "to_node_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 5
+    },
+    {
+      "table": "ecos_dq_execution_result",
+      "source": "V26__ecos_dq_execution_result.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "rule_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "passed",
+          "type": "BOOLEAN",
+          "extra": "NOT NULL DEFAULT FALSE"
+        },
+        {
+          "name": "total_rows",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "failed_rows",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "error_details",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "executed_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_workflow",
+      "source": "V2__ecos_workflow.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'draft'"
+        },
+        {
+          "name": "mode",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'sequential'"
+        },
+        {
+          "name": "nodes",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]'"
+        },
+        {
+          "name": "edges",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]'"
+        },
+        {
+          "name": "published_at",
+          "type": "TIMESTAMP",
+          "extra": "NULL"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_goal_tracking",
+      "source": "V31__ecos_goal_tracking_config.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "goal_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_wm_goal(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "progress",
+          "type": "INTEGER",
+          "extra": "NOT NULL CHECK (progress >= 0 AND progress <= 100)"
+        },
+        {
+          "name": "actual_value",
+          "type": "NUMERIC(18,2)",
+          "extra": ""
+        },
+        {
+          "name": "note",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "recorded_at",
+          "type": "DATE",
+          "extra": "NOT NULL DEFAULT CURRENT_DATE"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_ontology_entity",
+      "source": "V3__ecos_ontology.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "ontology_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "entity_type",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'MASTER'"
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_ontology_property",
+      "source": "V3__ecos_ontology.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "property_type",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'STRING'"
+        },
+        {
+          "name": "required_flag",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "searchable_flag",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_ontology_relationship",
+      "source": "V3__ecos_ontology.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "source_entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "target_entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "relationship_type",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'ONE_TO_MANY'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_agent",
+      "source": "V4__ecos_agent.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "model_provider",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'deepseek'"
+        },
+        {
+          "name": "model_name",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT 'deepseek-v4-flash'"
+        },
+        {
+          "name": "system_prompt",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "tools",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]',   -- JSON array: [\"search_knowledge\", \"query_object\"] knowledge       TEXT DEFAULT '[]',   -- JSON array: [\"kb-supplier\"] status          VARCHAR(32) DEFAULT 'draft'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_wm_goal",
+      "source": "V5__ecos_world_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "parent_id",
+          "type": "BIGINT",
+          "extra": "REFERENCES ecos_wm_goal(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "progress",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0 CHECK (progress >= 0 AND progress <= 100)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'PLANNED'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_wm_causal_link",
+      "source": "V5__ecos_world_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "source_goal_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_wm_goal(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "target_goal_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_wm_goal(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "relationship_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'POSITIVE'"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_wm_scenario",
+      "source": "V5__ecos_world_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "extra": "DEFAULT '{}',       -- JSON: 自定义配置(score/cost/risk 等) status          VARCHAR(32) DEFAULT 'DRAFT'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_dq_rule",
+      "source": "V6__ecos_data_quality.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "rule_type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL DEFAULT 'NOT_NULL'"
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "extra": "DEFAULT '{}',   -- JSON: {\"threshold\":95.0, \"passRate\":95.0} severity        VARCHAR(32) NOT NULL DEFAULT 'HIGH'"
+        },
+        {
+          "name": "enabled",
+          "type": "BOOLEAN",
+          "extra": "NOT NULL DEFAULT TRUE"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_dq_issue",
+      "source": "V6__ecos_data_quality.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "rule_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "asset_id",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL DEFAULT '',   -- \"entity:entityId\" e.g. \"Customer:c005\" description     TEXT DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'open'"
+        },
+        {
+          "name": "severity",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'HIGH'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "resolved_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_glossary_term",
+      "source": "V7__ecos_glossary_marketplace.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "definition",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "domain",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "owner",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'DRAFT',   -- DRAFT / REVIEW / PUBLISHED / DEPRECATED created_by  VARCHAR(128) DEFAULT ''"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_marketplace_asset",
+      "source": "V7__ecos_glossary_marketplace.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT '',       -- 数据集 / AI模型 / API / 报表 owner       VARCHAR(128) DEFAULT ''"
+        },
+        {
+          "name": "rating",
+          "type": "NUMERIC(3,2)",
+          "extra": "DEFAULT 0.0,      -- 评分 0.00~5.00 popularity  INTEGER      DEFAULT 0,        -- 综合热度值 status      VARCHAR(32)  DEFAULT 'PUBLISHED', -- DRAFT / PUBLISHED / DEPRECATED created_at  TIMESTAMP    DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 5
+    },
+    {
+      "table": "ecos_marketplace_access_request",
+      "source": "V7__ecos_glossary_marketplace.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "asset_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_marketplace_asset(id)"
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "applicant",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'PENDING',  -- PENDING / APPROVED / REJECTED created_at  TIMESTAMP    DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_ontology_action",
+      "source": "V8__ecos_ontology_action.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "action_type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL DEFAULT 'CUSTOM'"
+        },
+        {
+          "name": "rule_json",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "strategy",
+          "type": "VARCHAR(255)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'ACTIVE'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_object_state_machine",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "from_status",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "to_status",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "transition_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "transition_name",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "require_role",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "guard_rule",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "side_effect",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 11
+    },
+    {
+      "table": "ecos_object_timeline",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "event_summary",
+          "type": "VARCHAR(500)",
+          "extra": ""
+        },
+        {
+          "name": "actor",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "details",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_object_version",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "version_no",
+          "type": "INT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "snapshot",
+          "type": "JSONB",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "change_summary",
+          "type": "VARCHAR(500)",
+          "extra": ""
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_object_relationship",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "source_object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "target_object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "source_entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "target_entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "relationship_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "relationship_type",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "properties",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_object_attachment",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "file_name",
+          "type": "VARCHAR(500)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "file_path",
+          "type": "VARCHAR(1000)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "file_size",
+          "type": "BIGINT",
+          "extra": ""
+        },
+        {
+          "name": "mime_type",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "version_no",
+          "type": "INT",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "uploaded_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_agent_registry",
+      "source": "V1.4__agent_mesh_pg.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "role",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "capability",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'ACTIVE'"
+        },
+        {
+          "name": "endpoint",
+          "type": "VARCHAR(512)",
+          "extra": ""
+        },
+        {
+          "name": "metadata",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_mission",
+      "source": "V1.4__agent_mesh_pg.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "goal",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "mode",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'SUPERVISOR'"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'PENDING'"
+        },
+        {
+          "name": "plan",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "result",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "finished_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_mission_task",
+      "source": "V1.4__agent_mesh_pg.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "mission_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL REFERENCES ecos_mission(id)"
+        },
+        {
+          "name": "agent_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "instruction",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'PENDING'"
+        },
+        {
+          "name": "result",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "depends_on",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "started_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "finished_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_decision_case",
+      "source": "V1.5__decision_case.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(256)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "scenario",
+          "type": "TEXT,",
+          "extra": "-- 情景描述 tags        TEXT[],                  -- 标签数组 decision    JSONB        DEFAULT '{}', -- 决策内容 result      JSONB        DEFAULT '{}', -- 执行结果 feedback    VARCHAR(32)  DEFAULT 'pending', -- pending/positive/negative source      VARCHAR(64),             -- 来源: causal/agent/manual created_by  VARCHAR(128)"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "NOT NULL DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 5
+    },
+    {
+      "table": "ecos_workflow_instance",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "workflow_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "workflow_name",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "version_no",
+          "type": "VARCHAR(20)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL,          -- Created/Running/Waiting/Completed/Failed/Suspended/Terminated trigger_type        VARCHAR(50)"
+        },
+        {
+          "name": "triggered_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "triggered_object_id",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "trigger_event",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "variables",
+          "type": "JSONB",
+          "extra": "DEFAULT '{}'"
+        },
+        {
+          "name": "context",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "current_node_ids",
+          "type": "JSONB,",
+          "extra": "-- JSON array of active node IDs started_at          TIMESTAMP"
+        },
+        {
+          "name": "completed_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "error_message",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "retry_count",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 16
+    },
+    {
+      "table": "ecos_workflow_task",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "instance_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "task_type",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL,              -- APPROVAL/EXECUTION/AGENT/INVESTIGATION title           VARCHAR(500)"
+        },
+        {
+          "name": "assignee",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "candidate_users",
+          "type": "JSONB,",
+          "extra": "-- JSON array candidate_roles JSONB,                               -- JSON array status          VARCHAR(50) DEFAULT 'New',          -- New/Assigned/InProgress/Completed/Rejected/Transferred priority        VARCHAR(20) DEFAULT 'NORMAL'"
+        },
+        {
+          "name": "form_schema",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "form_data",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "result",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "agent_result",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "due_date",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "completed_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "completed_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 15
+    },
+    {
+      "table": "ecos_workflow_approval",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "task_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "instance_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "approver",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "decision",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL,              -- Approved/Rejected/Transferred opinion         TEXT"
+        },
+        {
+          "name": "form_data",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_workflow_log",
+      "source": "V1.1__S1_CORE03_workflow_tables.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "instance_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "node_type",
+          "type": "VARCHAR(50)",
+          "extra": ""
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL,             -- NodeStarted/NodeCompleted/TaskCreated/TaskAssigned/AgentInvoked/AgentCompleted/InstanceStarted/InstanceCompleted message         TEXT"
+        },
+        {
+          "name": "details",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "duration_ms",
+          "type": "BIGINT",
+          "extra": ""
+        },
+        {
+          "name": "trace_id",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_world_scenarios",
+      "source": "V10__ecos_world_scenarios.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "goal_ids",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]',        -- JSON array: [\"goal-id-1\", \"goal-id-2\"] status          VARCHAR(32) DEFAULT 'draft'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "sys_dict",
+      "source": "V12__ecos_sys_dict.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "dict_type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "dict_code",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "dict_label",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "dict_label_en",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "parent_code",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "ext_value",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 11
+    },
+    {
+      "table": "sys_config",
+      "source": "V13__ecos_sys_config.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "config_group",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "config_key",
+          "type": "VARCHAR(128)",
+          "extra": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "config_value",
+          "type": "TEXT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "config_type",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'string'"
+        },
+        {
+          "name": "config_label",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "config_label_en",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 12
+    },
+    {
+      "table": "demo_customer",
+      "source": "V1__init.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "industry",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "region",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "level",
+          "type": "VARCHAR(16)",
+          "extra": ""
+        },
+        {
+          "name": "credit_score",
+          "type": "INTEGER",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "demo_supplier",
+      "source": "V1__init.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": ""
+        },
+        {
+          "name": "industry",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "region",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "level",
+          "type": "VARCHAR(16)",
+          "extra": ""
+        },
+        {
+          "name": "supply_capacity",
+          "type": "VARCHAR(128)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'active'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "demo_invoice",
+      "source": "V1__init.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(12,2)",
+          "extra": ""
+        },
+        {
+          "name": "customer_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "supplier_id",
+          "type": "VARCHAR(64)",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'pending'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_workflow",
+      "source": "V2__ecos_workflow.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'draft'"
+        },
+        {
+          "name": "mode",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'sequential'"
+        },
+        {
+          "name": "nodes",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]'"
+        },
+        {
+          "name": "edges",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]'"
+        },
+        {
+          "name": "published_at",
+          "type": "TIMESTAMP",
+          "extra": "NULL"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_ontology_entity",
+      "source": "V3__ecos_ontology.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "ontology_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "entity_type",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'MASTER'"
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_ontology_property",
+      "source": "V3__ecos_ontology.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "property_type",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'STRING'"
+        },
+        {
+          "name": "required_flag",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "searchable_flag",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_ontology_relationship",
+      "source": "V3__ecos_ontology.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "source_entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "target_entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "relationship_type",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'ONE_TO_MANY'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_agent",
+      "source": "V4__ecos_agent.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "model_provider",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT 'deepseek'"
+        },
+        {
+          "name": "model_name",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT 'deepseek-v4-flash'"
+        },
+        {
+          "name": "system_prompt",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "tools",
+          "type": "TEXT",
+          "extra": "DEFAULT '[]',   -- JSON array: [\"search_knowledge\", \"query_object\"] knowledge       TEXT DEFAULT '[]',   -- JSON array: [\"kb-supplier\"] status          VARCHAR(32) DEFAULT 'draft'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_wm_goal",
+      "source": "V5__ecos_world_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "parent_id",
+          "type": "BIGINT",
+          "extra": "REFERENCES ecos_wm_goal(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "progress",
+          "type": "INTEGER",
+          "extra": "DEFAULT 0 CHECK (progress >= 0 AND progress <= 100)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'PLANNED'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_wm_causal_link",
+      "source": "V5__ecos_world_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "source_goal_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_wm_goal(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "target_goal_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_wm_goal(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "relationship_type",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'POSITIVE'"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_wm_scenario",
+      "source": "V5__ecos_world_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "extra": "DEFAULT '{}',       -- JSON: 自定义配置(score/cost/risk 等) status          VARCHAR(32) DEFAULT 'DRAFT'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_dq_rule",
+      "source": "V6__ecos_data_quality.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "rule_type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL DEFAULT 'NOT_NULL'"
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "extra": "DEFAULT '{}',   -- JSON: {\"threshold\":95.0, \"passRate\":95.0} severity        VARCHAR(32) NOT NULL DEFAULT 'HIGH'"
+        },
+        {
+          "name": "enabled",
+          "type": "BOOLEAN",
+          "extra": "NOT NULL DEFAULT TRUE"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_dq_issue",
+      "source": "V6__ecos_data_quality.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "rule_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "asset_id",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL DEFAULT '',   -- \"entity:entityId\" e.g. \"Customer:c005\" description     TEXT DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'open'"
+        },
+        {
+          "name": "severity",
+          "type": "VARCHAR(32)",
+          "extra": "NOT NULL DEFAULT 'HIGH'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "resolved_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        }
+      ],
+      "columnCount": 7
+    },
+    {
+      "table": "ecos_glossary_term",
+      "source": "V7__ecos_glossary_marketplace.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "definition",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "domain",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "owner",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'DRAFT',   -- DRAFT / REVIEW / PUBLISHED / DEPRECATED created_by  VARCHAR(128) DEFAULT ''"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_marketplace_asset",
+      "source": "V7__ecos_glossary_marketplace.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR(64)",
+          "extra": "DEFAULT '',       -- 数据集 / AI模型 / API / 报表 owner       VARCHAR(128) DEFAULT ''"
+        },
+        {
+          "name": "rating",
+          "type": "NUMERIC(3,2)",
+          "extra": "DEFAULT 0.0,      -- 评分 0.00~5.00 popularity  INTEGER      DEFAULT 0,        -- 综合热度值 status      VARCHAR(32)  DEFAULT 'PUBLISHED', -- DRAFT / PUBLISHED / DEPRECATED created_at  TIMESTAMP    DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 5
+    },
+    {
+      "table": "ecos_marketplace_access_request",
+      "source": "V7__ecos_glossary_marketplace.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "asset_id",
+          "type": "BIGINT",
+          "extra": "NOT NULL REFERENCES ecos_marketplace_asset(id)"
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "applicant",
+          "type": "VARCHAR(128)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'PENDING',  -- PENDING / APPROVED / REJECTED created_at  TIMESTAMP    DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 6
+    },
+    {
+      "table": "ecos_ontology_action",
+      "source": "V8__ecos_ontology_action.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "action_type",
+          "type": "VARCHAR(64)",
+          "extra": "NOT NULL DEFAULT 'CUSTOM'"
+        },
+        {
+          "name": "rule_json",
+          "type": "TEXT",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "strategy",
+          "type": "VARCHAR(255)",
+          "extra": "DEFAULT ''"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(32)",
+          "extra": "DEFAULT 'ACTIVE'"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_object_state_machine",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "from_status",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "to_status",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "transition_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "transition_name",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "require_role",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "guard_rule",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "side_effect",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 11
+    },
+    {
+      "table": "ecos_object_timeline",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "event_summary",
+          "type": "VARCHAR(500)",
+          "extra": ""
+        },
+        {
+          "name": "actor",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "details",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_object_version",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "version_no",
+          "type": "INT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "snapshot",
+          "type": "JSONB",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "change_summary",
+          "type": "VARCHAR(500)",
+          "extra": ""
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 8
+    },
+    {
+      "table": "ecos_object_relationship",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "source_object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "target_object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "source_entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "target_entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "relationship_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "relationship_type",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "properties",
+          "type": "JSONB",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_object_attachment",
+      "source": "V9__ecos_object_runtime.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "object_id",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "entity_code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "file_name",
+          "type": "VARCHAR(500)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "file_path",
+          "type": "VARCHAR(1000)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "file_size",
+          "type": "BIGINT",
+          "extra": ""
+        },
+        {
+          "name": "mime_type",
+          "type": "VARCHAR(200)",
+          "extra": ""
+        },
+        {
+          "name": "version_no",
+          "type": "INT",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "uploaded_by",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 10
+    },
+    {
+      "table": "ecos_domain",
+      "source": "V1.1__ontology_designer_core02.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(200)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "owner",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "extra": "DEFAULT 'Draft'"
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    },
+    {
+      "table": "ecos_ontology_rule",
+      "source": "V1.1__ontology_designer_core02.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(100)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(200)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "rule_type",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "expression",
+          "type": "TEXT",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "priority",
+          "type": "INT",
+          "extra": "DEFAULT 0"
+        },
+        {
+          "name": "enabled",
+          "type": "INT",
+          "extra": "DEFAULT 1"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 12
+    },
+    {
+      "table": "ecos_ontology_version",
+      "source": "V1.1__ontology_designer_core02.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(50)",
+          "extra": "PRIMARY KEY"
+        },
+        {
+          "name": "ontology_id",
+          "type": "VARCHAR(50)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "version_no",
+          "type": "VARCHAR(20)",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "extra": "DEFAULT 'Draft'"
+        },
+        {
+          "name": "snapshot",
+          "type": "JSONB",
+          "extra": "NOT NULL"
+        },
+        {
+          "name": "change_log",
+          "type": "TEXT",
+          "extra": ""
+        },
+        {
+          "name": "publisher",
+          "type": "VARCHAR(100)",
+          "extra": ""
+        },
+        {
+          "name": "published_at",
+          "type": "TIMESTAMP",
+          "extra": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "extra": "DEFAULT NOW()"
+        }
+      ],
+      "columnCount": 9
+    }
+  ],
+  "relationships": [
+    {
+      "fromTable": "ecos_dq_issue",
+      "fromColumn": "rule_id",
+      "toTable": "ecos_dq_rule",
+      "toColumn": "id",
+      "source": "V6__ecos_data_quality.sql"
+    },
+    {
+      "fromTable": "ecos_dq_issue",
+      "fromColumn": "rule_id",
+      "toTable": "ecos_dq_rule",
+      "toColumn": "id",
+      "source": "V6__ecos_data_quality.sql"
+    }
+  ]
+}

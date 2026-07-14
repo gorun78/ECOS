@@ -1,0 +1,1122 @@
+# 10-Knowledge Graph设计说明书
+
+(Knowledge Graph Design Specification)
+
+**文档编号**
+
+```text
+ECOS-KG-001
+```
+
+**版本**
+
+```text
+V1.0
+```
+
+---
+
+# 1. 设计目标
+
+Knowledge Graph 是 ECOS 的企业认知中枢。
+
+定位：
+
+```text
+Foundry Ontology Graph
++
+Google Knowledge Graph
++
+Enterprise Memory System
++
+Agent Native Knowledge Layer
+```
+
+---
+
+核心能力：
+
+```text
+统一企业知识
+
+知识关联
+
+知识推理
+
+Graph RAG
+
+Agent共享记忆
+
+企业认知网络
+```
+
+---
+
+# 2. 总体架构
+
+```text
+                Enterprise Data
+
+                       │
+
+                       ▼
+
+                 Ontology Layer
+
+                       │
+
+                       ▼
+
+                Object Runtime
+
+                       │
+
+                       ▼
+
+                Knowledge Graph
+
+             ┌─────────┼──────────┐
+
+             ▼         ▼          ▼
+
+       Semantic    Graph RAG   Reasoning
+
+             │         │          │
+
+             └─────────┼──────────┘
+
+                       ▼
+
+                  Agent Mesh
+```
+
+---
+
+# 3. 图谱核心模型
+
+ECOS图谱分四层：
+
+```text
+L1 Business Object
+
+L2 Relationship
+
+L3 Knowledge
+
+L4 Cognition
+```
+
+---
+
+# L1 Object Layer
+
+来自Ontology。
+
+---
+
+节点：
+
+```text
+Customer
+
+Supplier
+
+Employee
+
+Asset
+
+Facility
+
+Product
+
+Contract
+
+Case
+
+Workflow
+
+Goal
+```
+
+---
+
+# L2 Relationship Layer
+
+对象之间关系。
+
+---
+
+关系：
+
+```text
+OWNS
+
+USES
+
+BELONGS_TO
+
+SUPPORTS
+
+IMPACTS
+
+REPORTS_TO
+
+LOCATED_IN
+```
+
+---
+
+# L3 Knowledge Layer
+
+企业知识。
+
+---
+
+节点：
+
+```text
+Document
+
+Policy
+
+Decision
+
+LessonLearned
+
+Risk
+
+BestPractice
+```
+
+---
+
+# L4 Cognition Layer
+
+Agent认知层。
+
+---
+
+节点：
+
+```text
+Goal
+
+Intent
+
+Hypothesis
+
+Evidence
+
+Insight
+
+Conclusion
+```
+
+---
+
+# 4. Graph Meta Model
+
+---
+
+## Node
+
+```java
+public class GraphNode {
+
+   UUID id;
+
+   String label;
+
+   Map<String,Object> properties;
+
+}
+```
+
+---
+
+## Edge
+
+```java
+public class GraphEdge {
+
+   UUID id;
+
+   UUID source;
+
+   UUID target;
+
+   String relation;
+
+}
+```
+
+---
+
+# 5. 标准节点模型
+
+---
+
+## Customer
+
+```json
+{
+  "label":"Customer",
+
+  "properties":{
+    "name":"ACME",
+    "industry":"Manufacturing"
+  }
+}
+```
+
+---
+
+## Facility
+
+```json
+{
+  "label":"Facility",
+
+  "properties":{
+    "name":"Shanghai Plant"
+  }
+}
+```
+
+---
+
+## Goal
+
+```json
+{
+  "label":"Goal",
+
+  "properties":{
+    "name":"Increase Revenue"
+  }
+}
+```
+
+---
+
+# 6. 标准关系模型
+
+---
+
+Customer拥有工厂：
+
+```cypher
+(Customer)-[:OWNS]->(Facility)
+```
+
+---
+
+员工汇报：
+
+```cypher
+(Employee)-[:REPORTS_TO]->(Manager)
+```
+
+---
+
+目标影响KPI：
+
+```cypher
+(Goal)-[:IMPACTS]->(KPI)
+```
+
+---
+
+# 7. Graph Schema
+
+---
+
+核心Schema：
+
+```text
+Customer
+
+Supplier
+
+Partner
+
+Employee
+
+Organization
+
+Product
+
+Asset
+
+Facility
+
+Case
+
+Workflow
+
+Agent
+
+Goal
+
+KPI
+
+Knowledge
+
+Risk
+
+Decision
+```
+
+---
+
+关系总量：
+
+```text
+≈ 1500+
+```
+
+---
+
+# 8. Entity Linking
+
+知识融合核心能力。
+
+---
+
+输入：
+
+```text
+ACME Corp
+
+ACME Corporation
+
+ACME Inc.
+```
+
+---
+
+输出：
+
+```text
+Customer#001
+```
+
+---
+
+算法：
+
+```text
+String Similarity
+
++
+
+Embedding Similarity
+
++
+
+Ontology Constraint
+```
+
+---
+
+# 9. Knowledge Fusion
+
+多源数据融合。
+
+---
+
+来源：
+
+```text
+ERP
+
+CRM
+
+MES
+
+Email
+
+Document
+
+Workflow
+
+Agent
+```
+
+---
+
+流程：
+
+```text
+Extract
+
+↓
+
+Normalize
+
+↓
+
+Link
+
+↓
+
+Merge
+
+↓
+
+Knowledge Graph
+```
+
+---
+
+# 10. Knowledge Extraction
+
+从文档提取知识。
+
+---
+
+输入：
+
+```text
+PDF
+
+DOCX
+
+Email
+
+Wiki
+```
+
+---
+
+输出：
+
+```text
+Entity
+
+Relationship
+
+Event
+
+Decision
+```
+
+---
+
+示例：
+
+```text
+客户ACME在2025年采购1000万设备
+```
+
+提取：
+
+```text
+Customer: ACME
+
+Order: 1000万
+
+Relationship:
+
+ACME -> PURCHASED -> Equipment
+```
+
+---
+
+# 11. Graph RAG架构
+
+---
+
+传统RAG：
+
+```text
+Question
+
+↓
+
+Vector Search
+
+↓
+
+Answer
+```
+
+---
+
+Graph RAG：
+
+```text
+Question
+
+↓
+
+Ontology
+
+↓
+
+Knowledge Graph
+
+↓
+
+Subgraph Retrieval
+
+↓
+
+Vector Retrieval
+
+↓
+
+Answer
+```
+
+---
+
+# 12. Subgraph Retrieval
+
+问题：
+
+```text
+为什么客户ACME续费下降？
+```
+
+---
+
+获取：
+
+```text
+Customer
+
+↓
+
+Contracts
+
+↓
+
+Support Tickets
+
+↓
+
+Satisfaction
+
+↓
+
+Revenue
+```
+
+---
+
+形成：
+
+```text
+Evidence Graph
+```
+
+---
+
+# 13. Semantic Search
+
+---
+
+统一搜索：
+
+```text
+Customer
+
+Asset
+
+Document
+
+Case
+
+Knowledge
+```
+
+---
+
+查询：
+
+```text
+上海工厂相关风险
+```
+
+---
+
+执行：
+
+```text
+Ontology Match
+
+↓
+
+Graph Search
+
+↓
+
+Vector Search
+
+↓
+
+Rank
+```
+
+---
+
+# 14. Reasoning Engine
+
+图推理引擎。
+
+---
+
+规则：
+
+```yaml
+IF
+
+Customer
+
+OWNS
+
+Facility
+
+AND
+
+Facility
+
+HAS_RISK
+
+Risk
+
+THEN
+
+Customer
+
+HAS_RISK
+
+Risk
+```
+
+---
+
+推理：
+
+```text
+显式关系
+
+↓
+
+隐式关系
+```
+
+---
+
+# 15. Knowledge Memory
+
+企业长期记忆。
+
+---
+
+来源：
+
+```text
+Workflow
+
+Case
+
+Decision
+
+Agent Execution
+
+Meeting
+```
+
+---
+
+存储：
+
+```text
+Knowledge Graph
+```
+
+---
+
+# 16. Enterprise Memory Graph
+
+---
+
+结构：
+
+```text
+Decision
+
+↓
+
+Evidence
+
+↓
+
+Outcome
+
+↓
+
+Lesson Learned
+```
+
+---
+
+示例：
+
+```text
+提高库存
+
+↓
+
+库存增加20%
+
+↓
+
+资金占用增加
+
+↓
+
+形成经验
+```
+
+---
+
+# 17. Agent Knowledge Integration
+
+Agent执行：
+
+```text
+Goal
+
+↓
+
+Graph Query
+
+↓
+
+Knowledge Retrieval
+
+↓
+
+Reasoning
+
+↓
+
+Answer
+```
+
+---
+
+Agent读取：
+
+```text
+Knowledge Graph
+
+Ontology
+
+Enterprise Memory
+```
+
+---
+
+# 18. Graph Analytics
+
+支持：
+
+```text
+Centrality
+
+Community
+
+Shortest Path
+
+PageRank
+
+Influence Analysis
+```
+
+---
+
+案例：
+
+```text
+关键客户识别
+
+供应链影响分析
+
+组织网络分析
+```
+
+---
+
+# 19. Neo4j物理模型
+
+---
+
+Label：
+
+```text
+Customer
+
+Employee
+
+Asset
+
+Facility
+
+Goal
+
+Risk
+
+Decision
+```
+
+---
+
+Relationship：
+
+```text
+OWNS
+
+REPORTS_TO
+
+AFFECTS
+
+SUPPORTS
+
+RELATED_TO
+```
+
+---
+
+索引：
+
+```cypher
+CREATE INDEX customer_id
+FOR (n:Customer)
+ON (n.id)
+```
+
+---
+
+# 20. Graph API
+
+查询节点：
+
+```http
+GET /api/graph/node/{id}
+```
+
+---
+
+查询关系：
+
+```http
+GET /api/graph/relations
+```
+
+---
+
+子图查询：
+
+```http
+POST /api/graph/subgraph
+```
+
+---
+
+路径分析：
+
+```http
+POST /api/graph/path
+```
+
+---
+
+# 21. Graph Query Language
+
+ECOS支持：
+
+```text
+Cypher
+
+Gremlin
+
+GraphQL
+
+ObjectQL
+```
+
+---
+
+示例：
+
+```cypher
+MATCH
+
+(c:Customer)
+
+-[:OWNS]->
+
+(f:Facility)
+
+RETURN c,f
+```
+
+---
+
+# 22. Knowledge Graph数据库
+
+核心表：
+
+```text
+graph_node
+
+graph_edge
+
+knowledge_article
+
+knowledge_tag
+
+knowledge_relation
+
+knowledge_embedding
+```
+
+---
+
+# 23. 企业知识规模
+
+V1：
+
+```text
+Node
+≈ 1亿
+
+Relationship
+≈ 10亿
+
+Document
+≈ 1000万
+
+Embedding
+≈ 5亿
+```
+
+---
+
+V2：
+
+```text
+Node
+≈ 10亿
+
+Relationship
+≈ 100亿
+```
+
+---
+
+# 24. 企业认知模型
+
+```text
+Data
+
+↓
+
+Information
+
+↓
+
+Knowledge
+
+↓
+
+Insight
+
+↓
+
+Decision
+
+↓
+
+Action
+
+↓
+
+Learning
+```
+
+---
+
+Knowledge Graph负责：
+
+```text
+Information
+
+Knowledge
+
+Insight
+```
+
+三层能力。
+
+---
+
+# 25. Knowledge Graph与Agent Mesh
+
+```text
+Knowledge Graph
+
+↓
+
+Shared Memory
+
+↓
+
+Agent Mesh
+
+↓
+
+Mission Runtime
+```
+
+---
+
+Knowledge Graph成为：
+
+```text
+企业长期记忆
+
+Agent共享记忆
+
+认知推理基础设施
+```
+
+---
+
+# 下一卷
+
+## 11-World Model设计说明书
+
+进入 ECOS 最高级能力层：
+
+```text
+Digital Twin
+
+Enterprise Simulation
+
+Scenario Planning
+
+Strategy Engine
+
+Prediction Engine
+
+Optimization Engine
+
+Cognitive Planning
+```
+
+这是整个系统区别于 Foundry 的核心创新层，也是企业级 Cognitive Operating System 的真正大脑。

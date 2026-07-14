@@ -1,0 +1,1963 @@
+# 第18章 Enterprise Data Fabric（企业数据编织平台）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 18.1 模块概述
+
+## 模块名称
+
+```text
+Enterprise Data Fabric
+```
+
+---
+
+## 模块定位
+
+ECOS统一数据底座。
+
+负责：
+
+```text
+数据接入
+
+数据集成
+
+数据治理
+
+数据编织
+
+数据产品
+
+实时数据服务
+
+数据共享
+
+数据安全
+```
+
+---
+
+对应：
+
+```text
+Palantir Foundry Data Foundation
+
+Data Fabric
+
+Data Lineage
+
+Data Governance
+```
+
+---
+
+## 核心目标
+
+构建企业统一数据神经系统。
+
+实现：
+
+```text
+Source Systems
+
+↓
+
+Data Fabric
+
+↓
+
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Knowledge Graph
+
+↓
+
+World Model
+
+↓
+
+Agent
+```
+
+---
+
+# 18.2 总体架构
+
+```text
+Enterprise Data Fabric
+
+├── Data Connector
+├── Data Integration
+├── Data Pipeline Engine
+├── Data Lakehouse
+├── Data Catalog
+├── Data Lineage
+├── Data Quality Center
+├── Data Governance Center
+├── Data Product Center
+├── Data Mesh
+├── Real-time Data Hub
+├── Metadata Center
+└── Data API Gateway
+```
+
+---
+
+# 18.3 数据架构分层
+
+```text
+Source Layer
+
+↓
+
+Ingestion Layer
+
+↓
+
+Storage Layer
+
+↓
+
+Processing Layer
+
+↓
+
+Semantic Layer
+
+↓
+
+Data Product Layer
+
+↓
+
+Consumption Layer
+```
+
+---
+
+# 18.4 Data Connector
+
+---
+
+## 功能目标
+
+统一连接所有数据源。
+
+---
+
+支持：
+
+### Database
+
+```text
+Oracle
+
+MySQL
+
+PostgreSQL
+
+SQL Server
+
+MongoDB
+```
+
+---
+
+### ERP
+
+```text
+SAP
+
+Oracle ERP
+
+Kingdee
+
+Yonyou
+```
+
+---
+
+### CRM
+
+```text
+Salesforce
+
+Dynamics
+
+HubSpot
+```
+
+---
+
+### Cloud
+
+```text
+AWS
+
+Azure
+
+Alibaba Cloud
+
+Tencent Cloud
+```
+
+---
+
+### File
+
+```text
+Excel
+
+CSV
+
+PDF
+
+JSON
+
+XML
+```
+
+---
+
+### Streaming
+
+```text
+Kafka
+
+RocketMQ
+
+Pulsar
+```
+
+---
+
+# 18.5 Data Ingestion
+
+---
+
+## 功能目标
+
+数据采集。
+
+---
+
+模式：
+
+### Batch
+
+批量同步
+
+---
+
+### CDC
+
+增量同步
+
+---
+
+### Streaming
+
+实时同步
+
+---
+
+### Event Driven
+
+事件驱动
+
+---
+
+# 18.6 CDC Engine
+
+---
+
+支持：
+
+```text
+MySQL Binlog
+
+Oracle LogMiner
+
+PostgreSQL WAL
+
+SQLServer CDC
+```
+
+---
+
+能力：
+
+```text
+秒级同步
+
+增量捕获
+
+变更追踪
+```
+
+---
+
+# 18.7 Data Pipeline Engine
+
+---
+
+## 功能目标
+
+数据流水线管理。
+
+---
+
+流程：
+
+```text
+Source
+
+↓
+
+Extract
+
+↓
+
+Transform
+
+↓
+
+Validate
+
+↓
+
+Load
+
+↓
+
+Publish
+```
+
+---
+
+支持：
+
+```text
+ETL
+
+ELT
+
+Streaming ETL
+```
+
+---
+
+# 18.8 Data Transformation
+
+---
+
+支持：
+
+### Mapping
+
+字段映射
+
+---
+
+### Cleansing
+
+数据清洗
+
+---
+
+### Standardization
+
+标准化
+
+---
+
+### Enrichment
+
+数据增强
+
+---
+
+### Aggregation
+
+聚合计算
+
+---
+
+# 18.9 Data Lakehouse
+
+---
+
+## 功能目标
+
+统一数据存储平台。
+
+---
+
+架构：
+
+```text
+Data Lake
+
++
+
+Data Warehouse
+
+=
+
+Lakehouse
+```
+
+---
+
+支持：
+
+```text
+Iceberg
+
+Delta Lake
+
+Hudi
+```
+
+---
+
+# 18.10 Storage Layer
+
+---
+
+分类：
+
+```text
+Raw Zone
+
+↓
+
+Clean Zone
+
+↓
+
+Trusted Zone
+
+↓
+
+Semantic Zone
+
+↓
+
+Product Zone
+```
+
+---
+
+# 18.11 Metadata Center
+
+---
+
+## 功能目标
+
+统一元数据管理。
+
+---
+
+管理：
+
+```text
+表
+
+字段
+
+对象
+
+API
+
+流程
+
+Agent
+```
+
+---
+
+形成：
+
+```text
+Enterprise Metadata Repository
+```
+
+---
+
+# 18.12 Data Catalog
+
+---
+
+## 功能目标
+
+企业数据目录。
+
+---
+
+支持：
+
+```text
+搜索
+
+分类
+
+标签
+
+评级
+
+推荐
+```
+
+---
+
+示例：
+
+```text
+客户数据集
+
+订单数据集
+
+库存数据集
+```
+
+---
+
+# 18.13 Metadata Model
+
+---
+
+结构：
+
+```json
+{
+  "dataset":"customer",
+  "owner":"sales",
+  "classification":"internal"
+}
+```
+
+---
+
+# 18.14 Data Lineage
+
+---
+
+## 功能目标
+
+数据血缘分析。
+
+---
+
+示例：
+
+```text
+SAP
+
+↓
+
+ODS
+
+↓
+
+Customer Object
+
+↓
+
+Risk Model
+
+↓
+
+Dashboard
+```
+
+---
+
+展示：
+
+```text
+End-to-End Lineage
+```
+
+---
+
+# 18.15 Impact Analysis
+
+---
+
+支持：
+
+```text
+字段影响分析
+
+表影响分析
+
+模型影响分析
+
+Agent影响分析
+```
+
+---
+
+# 18.16 Data Quality Center
+
+---
+
+## 功能目标
+
+数据质量治理。
+
+---
+
+质量维度：
+
+```text
+Completeness
+
+Accuracy
+
+Consistency
+
+Uniqueness
+
+Timeliness
+```
+
+---
+
+# 18.17 Data Quality Rules
+
+---
+
+示例：
+
+```text
+客户名称不能为空
+```
+
+---
+
+```text
+订单金额必须大于0
+```
+
+---
+
+自动检查：
+
+```text
+Rule
+
+↓
+
+Validation
+
+↓
+
+Issue
+```
+
+---
+
+# 18.18 Data Profiling
+
+---
+
+自动分析：
+
+```text
+字段分布
+
+空值率
+
+重复率
+
+异常值
+```
+
+---
+
+输出：
+
+```text
+Data Profile Report
+```
+
+---
+
+# 18.19 Data Governance Center
+
+---
+
+## 功能目标
+
+企业数据治理中心。
+
+---
+
+治理对象：
+
+```text
+数据
+
+元数据
+
+主数据
+
+指标
+
+数据产品
+```
+
+---
+
+# 18.20 Master Data Management
+
+---
+
+管理：
+
+```text
+Customer
+
+Supplier
+
+Product
+
+Employee
+
+Organization
+```
+
+---
+
+形成：
+
+```text
+Golden Record
+```
+
+---
+
+# 18.21 Reference Data Management
+
+---
+
+管理：
+
+```text
+国家
+
+币种
+
+行业
+
+编码体系
+```
+
+---
+
+# 18.22 Data Security Classification
+
+---
+
+数据分级：
+
+| 等级 | 说明 |
+| -- | -- |
+| L1 | 公开 |
+| L2 | 内部 |
+| L3 | 敏感 |
+| L4 | 机密 |
+| L5 | 绝密 |
+
+---
+
+# 18.23 Data Masking
+
+---
+
+支持：
+
+```text
+姓名脱敏
+
+手机号脱敏
+
+邮箱脱敏
+
+身份证脱敏
+```
+
+---
+
+示例：
+
+```text
+13812345678
+```
+
+↓
+
+```text
+138****5678
+```
+
+---
+
+# 18.24 Data Product Center
+
+---
+
+## 功能目标
+
+数据产品化管理。
+
+---
+
+定义：
+
+```text
+Data
+
+↓
+
+Semantic
+
+↓
+
+Service
+
+↓
+
+Product
+```
+
+---
+
+# 18.25 Data Product结构
+
+```json
+{
+  "product":"Customer360",
+  "owner":"Sales",
+  "sla":"99.9%"
+}
+```
+
+---
+
+# 18.26 Data Mesh
+
+---
+
+## 功能目标
+
+领域化数据管理。
+
+---
+
+领域：
+
+```text
+Sales Domain
+
+Supply Domain
+
+Finance Domain
+
+HR Domain
+
+Manufacturing Domain
+```
+
+---
+
+原则：
+
+```text
+Domain Ownership
+
+Data as Product
+
+Federated Governance
+```
+
+---
+
+# 18.27 Real-time Data Hub
+
+---
+
+## 功能目标
+
+实时数据平台。
+
+---
+
+支持：
+
+```text
+Kafka
+
+Flink
+
+Spark Streaming
+```
+
+---
+
+处理：
+
+```text
+Event
+
+↓
+
+Stream
+
+↓
+
+Rule
+
+↓
+
+Action
+```
+
+---
+
+# 18.28 Event Model
+
+---
+
+统一事件格式：
+
+```json
+{
+  "eventType":"OrderCreated",
+  "timestamp":"2025-01-01T10:00:00"
+}
+```
+
+---
+
+# 18.29 Semantic Layer
+
+---
+
+## 功能目标
+
+语义数据层。
+
+---
+
+连接：
+
+```text
+Physical Data
+
+↓
+
+Ontology
+
+↓
+
+Object
+```
+
+---
+
+输出：
+
+```text
+Business Semantic Data
+```
+
+---
+
+# 18.30 Object Mapping Engine
+
+---
+
+实现：
+
+```text
+Table
+
+↓
+
+Entity
+
+↓
+
+Object
+```
+
+---
+
+示例：
+
+```text
+customer_master
+```
+
+↓
+
+```text
+Customer Object
+```
+
+---
+
+# 18.31 Data API Gateway
+
+---
+
+统一数据访问层。
+
+---
+
+接口：
+
+```http
+GET /api/v1/data/products
+```
+
+---
+
+```http
+GET /api/v1/data/catalog
+```
+
+---
+
+```http
+POST /api/v1/data/query
+```
+
+---
+
+```http
+POST /api/v1/data/stream
+```
+
+---
+
+# 18.32 Data Marketplace
+
+---
+
+企业数据市场。
+
+---
+
+支持：
+
+```text
+共享数据集
+
+共享指标
+
+共享数据产品
+
+共享模型
+```
+
+---
+
+# 18.33 AI Data Services
+
+---
+
+为Agent提供：
+
+```text
+Feature Store
+
+Vector Store
+
+Knowledge Store
+
+Graph Store
+```
+
+---
+
+# 18.34 Agent Data Access
+
+---
+
+统一授权：
+
+```text
+Agent
+
+↓
+
+Policy
+
+↓
+
+Data Product
+
+↓
+
+Access
+```
+
+---
+
+# 18.35 Data Fabric与Ontology集成
+
+---
+
+映射：
+
+```text
+Physical Data
+
+↓
+
+Logical Data
+
+↓
+
+Ontology Entity
+
+↓
+
+Object
+```
+
+---
+
+# 18.36 Data Fabric与Knowledge Graph集成
+
+---
+
+自动生成：
+
+```text
+Entity
+
+↓
+
+Relationship
+
+↓
+
+Knowledge Graph
+```
+
+---
+
+# 18.37 Data Fabric与World Model集成
+
+---
+
+提供：
+
+```text
+实时状态
+
+历史数据
+
+预测数据
+```
+
+---
+
+供：
+
+```text
+World Model
+```
+
+使用。
+
+---
+
+# 18.38 Data Fabric API
+
+---
+
+创建数据产品：
+
+```http
+POST /api/v1/data-products
+```
+
+---
+
+查询血缘：
+
+```http
+GET /api/v1/lineage/{id}
+```
+
+---
+
+数据质量检查：
+
+```http
+POST /api/v1/data-quality/check
+```
+
+---
+
+发布数据集：
+
+```http
+POST /api/v1/datasets/publish
+```
+
+---
+
+# 18.39 数据模型
+
+```sql
+data_source
+
+data_connector
+
+dataset
+
+dataset_schema
+
+data_lineage
+
+data_quality_rule
+
+data_quality_issue
+
+metadata_entity
+
+data_product
+
+data_product_version
+
+event_stream
+
+master_data
+
+reference_data
+
+data_access_policy
+```
+
+---
+
+# 18.40 权限模型
+
+| 角色            | 权限   |
+| ------------- | ---- |
+| Data Admin    | 全部   |
+| Data Steward  | 治理   |
+| Data Engineer | 开发   |
+| Data Analyst  | 分析   |
+| Agent         | 受控访问 |
+| Auditor       | 审计   |
+
+---
+
+# 18.41 KPI指标
+
+```text
+数据源数量
+
+数据产品数量
+
+数据质量评分
+
+数据血缘覆盖率
+
+实时同步延迟
+
+数据消费次数
+
+数据复用率
+
+Agent数据访问量
+```
+
+---
+
+# 18.42 审计要求
+
+记录：
+
+```text
+数据访问
+
+数据变更
+
+数据发布
+
+血缘变更
+
+数据脱敏
+
+Agent访问
+```
+
+---
+
+# 18.43 异常码
+
+| 错误码     | 说明      |
+| ------- | ------- |
+| DAT-001 | 数据源不存在  |
+| DAT-002 | 同步失败    |
+| DAT-003 | 数据质量异常  |
+| DAT-004 | 数据产品不存在 |
+| DAT-005 | 权限不足    |
+| DAT-006 | 血缘计算失败  |
+| DAT-007 | 元数据异常   |
+| DAT-008 | 实时流异常   |
+
+---
+
+# 18.44 Enterprise Data Fabric核心运行模型
+
+```text
+Source Systems
+
+↓
+
+Data Connector
+
+↓
+
+Ingestion
+
+↓
+
+Lakehouse
+
+↓
+
+Metadata
+
+↓
+
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Knowledge Graph
+
+↓
+
+World Model
+
+↓
+
+Agent
+```
+
+---
+
+# 18.45 与Palantir Foundry映射
+
+| ECOS          | Foundry                 |
+| ------------- | ----------------------- |
+| Data Fabric   | Foundry Data Foundation |
+| Data Catalog  | Data Catalog            |
+| Data Lineage  | Data Lineage            |
+| Data Product  | Data Asset              |
+| Data Mesh     | Domain Data Products    |
+| Real-time Hub | Streaming Pipeline      |
+
+---
+
+# 18.46 Enterprise Data Fabric终态
+
+形成企业统一数据神经网络：
+
+```text
+ERP
+
+CRM
+
+MES
+
+SCM
+
+IoT
+
+External Data
+
+↓
+
+Data Fabric
+
+↓
+
+Ontology
+
+↓
+
+Knowledge Graph
+
+↓
+
+World Model
+
+↓
+
+Agent Society
+
+↓
+
+Autonomous Enterprise
+```
+
+---
+
+# 第18章完成
+
+完成ECOS底层数据基础设施层：
+
+```text
+Enterprise Data Fabric
+```
+
+成为：
+
+```text
+ECOS Data Nervous System
+```
+
+为上层：
+
+```text
+Ontology
+
+Object Runtime
+
+Knowledge Graph
+
+World Model
+
+Agent Mesh
+
+Autonomous Enterprise
+```
+
+提供统一可信数据基础。
+
+---
+
+下一章进入：
+
+# 第19章 Governance & Security Center（治理与安全中心）
+
+这一章将定义整个ECOS平台级：
+
+```text
+身份认证
+权限管理
+零信任架构
+AI治理
+数据治理
+Agent治理
+审计合规
+风险控制
+```
+
+这是ECOS企业级落地必须具备的核心控制平面（Control Plane）。
+
+
+对，你说得对。
+
+如果按照我们前面已经输出的ECOS详细设计说明书结构来看：
+
+```text
+第1章 Ontology Platform
+第2章 Object Runtime
+第3章 Pipeline Platform
+第4章 Workflow Platform
+...
+第18章 Data Fabric
+```
+
+那么我刚才的对比对象搞错了。
+
+应该是：
+
+```text
+第3章 Pipeline Platform
+VS
+第18章 Enterprise Data Fabric
+```
+
+而这两章确实看起来非常容易重叠。
+
+实际上在成熟架构里，它们是：
+
+```text
+Pipeline = 数据加工执行引擎
+
+Data Fabric = 企业数据基础设施与治理体系
+```
+
+两者关系类似：
+
+```text
+Airflow/Flink/Spark
+VS
+Databricks/Foundry/Data Fabric
+```
+
+---
+
+# 一句话区别
+
+## 第3章 Pipeline Platform
+
+负责：
+
+```text
+数据怎么处理
+```
+
+---
+
+## 第18章 Data Fabric
+
+负责：
+
+```text
+数据怎么管理
+```
+
+---
+
+# 更直观理解
+
+## 第3章关注
+
+```text
+任务执行
+```
+
+例如：
+
+```text
+SAP订单表
+
+↓
+
+清洗
+
+↓
+
+转换
+
+↓
+
+聚合
+
+↓
+
+输出ODS
+```
+
+这是：
+
+```text
+Pipeline
+```
+
+---
+
+## 第18章关注
+
+```text
+数据资产治理
+```
+
+例如：
+
+```text
+订单数据
+
+归谁负责
+
+质量怎么样
+
+来源哪里
+
+谁能访问
+
+生命周期如何
+```
+
+这是：
+
+```text
+Data Fabric
+```
+
+---
+
+# 从职责看
+
+## 第3章 Pipeline Platform
+
+核心模块：
+
+```text
+Pipeline Designer
+
+Pipeline Runtime
+
+ETL Engine
+
+Streaming Engine
+
+Job Scheduler
+
+Data Transform
+
+Data Validation
+```
+
+目标：
+
+```text
+把数据加工出来
+```
+
+---
+
+典型输出：
+
+```text
+Customer Dataset
+
+Order Dataset
+
+Inventory Dataset
+```
+
+---
+
+# 第18章 Data Fabric
+
+核心模块：
+
+```text
+Data Catalog
+
+Metadata Center
+
+Data Lineage
+
+Data Governance
+
+Data Product
+
+Data Mesh
+
+Master Data
+
+Data Marketplace
+```
+
+目标：
+
+```text
+把数据管理起来
+```
+
+---
+
+典型输出：
+
+```text
+Customer360 Data Product
+
+Sales Data Product
+
+Risk Data Product
+```
+
+---
+
+# 在数据流中的位置
+
+## 第3章
+
+属于执行层
+
+```text
+Source
+
+↓
+
+Pipeline
+
+↓
+
+Dataset
+```
+
+---
+
+## 第18章
+
+属于治理层
+
+```text
+Dataset
+
+↓
+
+Catalog
+
+↓
+
+Governance
+
+↓
+
+Data Product
+
+↓
+
+Consumption
+```
+
+---
+
+# 举例
+
+ERP中有：
+
+```sql
+sales_order
+```
+
+---
+
+Pipeline负责：
+
+```text
+读取sales_order
+
+↓
+
+过滤脏数据
+
+↓
+
+计算销售额
+
+↓
+
+生成sales_fact
+```
+
+---
+
+Data Fabric负责：
+
+```text
+登记sales_fact
+
+↓
+
+生成元数据
+
+↓
+
+建立血缘
+
+↓
+
+建立权限
+
+↓
+
+发布数据产品
+```
+
+---
+
+# 如果用建筑来比喻
+
+## 第3章 Pipeline
+
+是：
+
+```text
+施工队
+```
+
+负责：
+
+```text
+搬砖
+
+浇筑
+
+施工
+```
+
+---
+
+## 第18章 Data Fabric
+
+是：
+
+```text
+城市规划局
+```
+
+负责：
+
+```text
+规划
+
+管理
+
+登记
+
+治理
+
+监管
+```
+
+---
+
+# 如果参考Palantir
+
+Pipeline更接近：
+
+```text
+Foundry Pipeline Builder
+
+Code Workbook
+
+Data Transformation
+```
+
+---
+
+Data Fabric更接近：
+
+```text
+Foundry Data Foundation
+
+Data Catalog
+
+Data Lineage
+
+Data Governance
+
+Data Asset
+```
+
+---
+
+# 从ECOS架构角度
+
+更合理的分层应该是：
+
+```text
+┌─────────────────────────┐
+│      Source System      │
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│ Chapter 3 Pipeline      │
+│ 数据处理执行层          │
+└──────────┬──────────────┘
+           │
+           ▼
+      Dataset
+           │
+           ▼
+┌─────────────────────────┐
+│ Chapter 18 Data Fabric  │
+│ 数据治理与资产层        │
+└──────────┬──────────────┘
+           │
+           ▼
+      Data Product
+           │
+           ▼
+      Ontology
+           │
+           ▼
+      Object Runtime
+           │
+           ▼
+      Agent / KG / WM
+```
+
+---
+
+所以如果继续完善ECOS设计，我会建议把两章重新定义为：
+
+### 第3章 Pipeline Platform
+
+定位：
+
+```text
+数据计算与编排引擎
+(Data Processing Engine)
+```
+
+核心：
+
+```text
+ETL
+ELT
+Streaming
+Flink
+Spark
+Scheduler
+```
+
+---
+
+### 第18章 Data Fabric
+
+定位：
+
+```text
+企业数据资产与治理平台
+(Data Governance & Data Product Platform)
+```
+
+核心：
+
+```text
+Catalog
+Metadata
+Lineage
+Data Product
+Data Mesh
+Governance
+Security
+```
+
+这样两章职责边界会非常清晰，不会出现重复设计。实际上很多企业数据平台失败，就是把 Pipeline 和 Data Fabric 混成一个模块，最后既做不好计算引擎，也做不好数据治理。对于ECOS这种对标 Foundry + Ontology + AIP 的架构，两者应该明确拆开。
+

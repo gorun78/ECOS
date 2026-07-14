@@ -1,0 +1,90 @@
+/* ECOS Kanban 全局样式 */
+:root {
+  --sidebar-width: 240px;
+  --header-height: 56px;
+  --board-bg: #f1f5f9;
+  --column-bg: #f8fafc;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --card-shadow-hover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 看板页面滚动 */
+.board-scroll-x {
+  overflow-x: auto;
+  white-space: nowrap;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 拖拽相关 */
+.dragging {
+  opacity: 0.5;
+  transform: rotate(3deg);
+}
+
+.drag-over {
+  background-color: #e0f2fe !important;
+  border: 2px dashed #3b82f6 !important;
+}
+
+/* 卡片列动画过渡 */
+.card-enter-active,
+.card-leave-active {
+  transition: all 0.3s ease;
+}
+.card-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.card-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+/* 优先级标记 */
+.priority-urgent {
+  border-left: 3px solid #f56c6c;
+}
+.priority-high {
+  border-left: 3px solid #e6a23c;
+}
+.priority-medium {
+  border-left: 3px solid #409eff;
+}
+.priority-low {
+  border-left: 3px solid #909399;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+}

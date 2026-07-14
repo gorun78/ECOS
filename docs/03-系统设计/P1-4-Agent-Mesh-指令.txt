@@ -1,0 +1,195 @@
+## P1-4：Agent Mesh MVP —— 多 Agent 协作平台
+
+### 目标
+现在 Agent Runtime 是单 Agent 模式。做完后：多个 Agent 可以同时干活、互相通信、协同决策。支持 Supervisor（主管分派）和 Pipeline（流水线接力）两种协作模式。
+
+### 核心概念
+
+                   ┌──────────────────┐
+                   │  Coordinator     │  ← Supervisor Agent（拆任务、分派、汇总）
+                   └──┬───────┬───────┘
+                      │       │
+             ┌────────▼──┐ ┌──▼──────────┐
+             │ 数据查询   │ │ 知识检索     │  ← Specialist Agents
+             │ Agent     │ │ Agent       │
+             └───────────┘ └─────────────┘
+                      │       │
+             ┌────────▼──┐ ┌──▼──────────┐
+             │ 合规审查   │ │ 风险评估     │
+             │ Agent     │ │ Agent       │
+             └───────────┘ └─────────────┘
+
+
+### 第一步：Agent 注册中心（1天）
+
+#### 1.1 Agent Registry 表
+```sql
+CREATE TABLE IF NOT EXISTS ecos_agent_registry (
+  id VARCHAR(64) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(128) NOT NULL,          -- 'supervisor' / 'specialist'
+  capability JSONB NOT NULL,           -- {"tools":["object_query"],"domains":["Procurement"]}
+  status VARCHAR(32) DEFAULT 'ACTIVE', -- ACTIVE/IDLE/BUSY/ERROR
+  endpoint VARCHAR(512),               -- A2A 通信端点（P1-6 用）
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### 1.2 预注册 4 个 Agent
+
+| ID | 角色 | 能力 |
+|----|------|------|
+| ag-coordinator | supervisor | 任务拆解 + 分派 + 汇总 |
+| ag-data | specialist | object_query + ontology_explore |
+| ag-knowledge | specialist | knowledge_search |
+| ag-compliance | specialist | object_query + knowledge_search + ML 评级 |
+
+#### 1.3 Registry API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/ecos/agent-mesh/agents | Agent 列表 |
+| POST | /api/ecos/agent-mesh/agents | 注册 Agent |
+| GET | /api/ecos/agent-mesh/agents/{id} | Agent 详情 |
+| PUT | /api/ecos/agent-mesh/agents/{id} | 更新 Agent |
+
+
+### 第二步：Mission Runtime（2天）
+
+#### 2.1 任务模型
+```sql
+CREATE TABLE IF NOT EXISTS ecos_mission (
+  id VARCHAR(64) PRIMARY KEY,
+  title VARCHAR(500) NOT NULL,
+  goal TEXT NOT NULL,
+  mode VARCHAR(32) NOT NULL,              -- 'supervisor' / 'pipeline'
+  status VARCHAR(32) DEFAULT 'PENDING',   -- PENDING→PLANNING→EXECUTING→COMPLETED/FAILED
+  plan JSONB,
+  result JSONB,
+  created_by VARCHAR(64),
+  created_at TIMESTAMP DEFAULT NOW(),
+  finished_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ecos_mission_task (
+  id VARCHAR(64) PRIMARY KEY,
+  mission_id VARCHAR(64) NOT NULL REFERENCES ecos_mission(id),
+  agent_id VARCHAR(64) NOT NULL,
+  instruction TEXT NOT NULL,
+  status VARCHAR(32) DEFAULT 'PENDING',   -- PENDING→ASSIGNED→RUNNING→COMPLETED/FAILED
+  result JSONB,
+  depends_on TEXT,                        -- 依赖的其他 task ID（逗号分隔）
+  started_at TIMESTAMP,
+  finished_at TIMESTAMP
+);
+```
+
+#### 2.2 Supervisor 模式
+
+Coordinator Agent 接到 Mission 后：
+1. Planner：读取 goal → 拆解为子任务列表
+2. Agent Selector：根据 capability 匹配 Agent → 生成分派方案
+3. Dispatcher：按依赖顺序分派任务 → 等待结果
+4. Aggregator：收集所有子任务结果 → 汇总最终答案
+5. Reflector：检查一致性（各 Agent 结论冲突？）→ 必要时重新分派
+
+关键实现：不是真做多进程——同一 JVM 内，Coordinator Agent 调用各 Specialist Agent 的 Runtime。每个 Specialist 独立一条 session、独立 ReAct 循环。Coordinator 把分派指令作为 Specialist 的 user prompt 注入。
+
+#### 2.3 Pipeline 模式
+
+任务按顺序流经不同 Agent：
+用户输入 → ag-data(object_query) → ag-knowledge(knowledge_search) → ag-compliance(综合判断) → 返回
+
+每个 Agent 的输出是下一个 Agent 的输入。
+
+#### 2.4 Mission API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/ecos/agent-mesh/missions | 创建 Mission |
+| POST | /api/ecos/agent-mesh/missions/{id}/execute | 执行 |
+| GET | /api/ecos/agent-mesh/missions/{id} | 状态 + 子任务进度 |
+| GET | /api/ecos/agent-mesh/missions | Mission 列表 |
+
+
+### 第三步：A2A 通信协议（1天）
+
+MVP 不实现真正的 Agent-to-Agent 网络通信——同一进程内用消息通道模拟：
+
+```java
+public class AgentMessage {
+    String fromAgentId;
+    String toAgentId;
+    String type;        // REQUEST / RESPONSE / EVENT / BROADCAST
+    String payload;     // JSON
+    String conversationId; // 同一 Mission 的会话 ID
+}
+```
+
+每个 Agent 执行时，可以从消息通道读取其他 Agent 发给它的消息。Coordinator 和 Specialist 之间通过消息通道协商任务分配。
+
+
+### 第四步：前端 AgentMesh 页面（1.5天）
+
+新建 AgentMesh.tsx：
+
+┌─────────────────────────────────────────────────┐
+│ 🤖 Agent Mesh                          [+ New Mission] │
+├─────────────────────────┬───────────────────────┤
+│ Agent 状态面板           │ Mission 工作台          │
+│                         │                       │
+│ 🟢 ag-coordinator      │ 📋 供应商准入批量审查   │
+│    Supervisor · 空闲    │    COMPLETED · 3/3 tasks│
+│                         │                        │
+│ 🟢 ag-data             │ ┌─────────────────────┐ │
+│    Specialist · 空闲    │ │ ✅ 数据查询          │ │
+│    🔧 object_query     │ │    ag-data · 2.3s   │ │
+│       ontology_explore │ │    查到5家供应商     │ │
+│                         │ ├─────────────────────┤ │
+│ 🟡 ag-knowledge        │ │ ✅ 知识检索          │ │
+│    Specialist · 执行中  │ │    ag-knowledge·3.1s│ │
+│    🔧 knowledge_search │ │    准入标准+评级规则 │ │
+│                         │ ├─────────────────────┤ │
+│ 🟢 ag-compliance       │ │ ✅ 合规判断          │ │
+│    Specialist · 空闲    │ │    ag-compliance·4.8s│ │
+│    🔧 object_query     │ │    4家通过/1家待补充 │ │
+│       knowledge_search │ └─────────────────────┘ │
+│       ml_inference     │                        │
+└─────────────────────────┴───────────────────────┘
+
+Agent 面板（左侧）：已注册 Agent 列表 + 状态指示灯 + 工具列表
+Mission 面板（右侧）：创建 Mission 表单（选模式 + 写目标）+ Mission 执行进度（子任务逐个亮起）
+
+侧边栏加「Agent Mesh」入口。
+
+
+### 第五步：端到端验证（半天）
+
+场景：供应商批量准入审查（Supervisor 模式）
+
+创建 Mission：
+目标：对系统内所有 Supplier 进行准入审查，每家的结论包含：通过/有条件通过/不通过，及理由
+
+期望：
+1. Coordinator 拆解：查 Supplier 列表 → 逐家查详细信息 → 查准入标准 → 综合判断
+2. ag-data 执行 object_query → 返回所有 Supplier
+3. ag-knowledge 执行 knowledge_search → 返回准入标准
+4. ag-compliance 综合数据+知识 → 逐家给出判断
+5. Coordinator 汇总 → 返回最终报告
+
+
+### 验收标准
+1. 4 个 Agent 成功注册并显示在面板
+2. Supervisor 模式：Coordinator 分派 → 3 个 Specialist 执行 → 汇总成功
+3. Pipeline 模式也能走通（至少试一个简单 Pipeline：data→knowledge→compliance）
+4. Mission 面板实时显示子任务进度
+5. 每个 Specialist 独立 ReAct 循环（非 Coordinator 代劳）
+
+### 完成后给我
+1. Agent Mesh 页面全貌截图（Mission 完成状态 + Agent 面板）
+2. Supervisor 模式 Mission 的完整执行日志
+3. SELECT * FROM ecos_mission_task WHERE mission_id='<id>' ORDER BY started_at
+4. 每个 Specialist Agent 的 ReAct trace（AgentStudio 能看到各自的 trace 吗？如果看不到——那是下一个任务：Agent Observability）
+5. 遇到的任何坑

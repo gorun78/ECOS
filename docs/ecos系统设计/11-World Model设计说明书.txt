@@ -1,0 +1,1101 @@
+# 11-World Model设计说明书
+
+(World Model Design Specification)
+
+**文档编号**
+
+```text
+ECOS-WM-001
+```
+
+**版本**
+
+```text
+V1.0
+```
+
+---
+
+# 1. World Model定位
+
+World Model 是 ECOS 的最高认知层。
+
+如果说：
+
+```text
+Ontology
+=
+企业事实层
+
+Knowledge Graph
+=
+企业知识层
+
+Agent Mesh
+=
+企业执行层
+```
+
+那么：
+
+```text
+World Model
+=
+企业认知层
+```
+
+---
+
+核心职责：
+
+```text
+理解企业
+
+预测企业
+
+模拟企业
+
+优化企业
+
+规划企业
+```
+
+---
+
+# 2. World Model总体架构
+
+```text
+                      Mission
+
+                         │
+
+                         ▼
+
+                   Goal Engine
+
+                         │
+
+                         ▼
+
+                  World Model
+
+      ┌────────────┬────────────┬────────────┐
+
+      ▼            ▼            ▼
+
+ Simulation   Prediction   Optimization
+
+      │            │            │
+
+      └────────────┼────────────┘
+
+                   ▼
+
+            Strategy Engine
+
+                   ▼
+
+              Agent Mesh
+
+                   ▼
+
+              Execution
+```
+
+---
+
+# 3. World Model分层
+
+```text
+L1 Enterprise State
+
+L2 Causal Model
+
+L3 Scenario Model
+
+L4 Simulation Model
+
+L5 Strategy Model
+
+L6 Cognitive Planning
+```
+
+---
+
+# 4. Enterprise State Model
+
+企业实时状态快照。
+
+---
+
+状态来源：
+
+```text
+ERP
+
+CRM
+
+MES
+
+SCM
+
+IoT
+
+Workflow
+
+Agent
+```
+
+---
+
+统一映射：
+
+```text
+Ontology Object
+```
+
+---
+
+示例：
+
+```yaml
+Customer:
+  100000
+
+Facility:
+  500
+
+Employee:
+  50000
+
+Orders:
+  10000000
+```
+
+---
+
+# 5. State Graph
+
+企业状态图。
+
+---
+
+结构：
+
+```text
+Enterprise
+
+├── Customer
+
+├── Product
+
+├── Facility
+
+├── Supplier
+
+├── Asset
+
+├── Employee
+
+├── Goal
+```
+
+---
+
+数学表达：
+
+```text
+State(t)
+```
+
+表示：
+
+```text
+企业在时间t的状态
+```
+
+---
+
+# 6. Causal Model
+
+世界模型核心。
+
+---
+
+定义：
+
+```text
+Cause
+
+↓
+
+Effect
+```
+
+---
+
+示例：
+
+```text
+库存增加
+
+↓
+
+库存成本增加
+```
+
+---
+
+```text
+客户满意度下降
+
+↓
+
+续费率下降
+```
+
+---
+
+数据结构：
+
+```java
+public class CausalEdge {
+
+   Node source;
+
+   Node target;
+
+   Double weight;
+
+}
+```
+
+---
+
+# 7. Causal Graph
+
+```text
+Customer Satisfaction
+
+↓
+
+Renewal Rate
+
+↓
+
+Revenue
+
+↓
+
+Profit
+```
+
+---
+
+图表示：
+
+```cypher
+(CustomerSatisfaction)
+
+-[:CAUSES]->
+
+(RenewalRate)
+```
+
+---
+
+# 8. Scenario Model
+
+场景建模。
+
+---
+
+场景：
+
+```text
+What If
+```
+
+---
+
+示例：
+
+```text
+如果销售增长20%
+
+会发生什么？
+```
+
+---
+
+系统构建：
+
+```yaml
+Scenario:
+
+  Revenue:
+
+      +20%
+```
+
+---
+
+输出：
+
+```text
+利润变化
+
+库存变化
+
+现金流变化
+```
+
+---
+
+# 9. Scenario Library
+
+预置场景：
+
+```text
+Demand Growth
+
+Demand Decline
+
+Supply Shortage
+
+Cost Increase
+
+Market Expansion
+
+Economic Recession
+```
+
+---
+
+# 10. Digital Twin
+
+数字孪生。
+
+---
+
+映射：
+
+```text
+Physical Enterprise
+
+↓
+
+Digital Enterprise
+```
+
+---
+
+对象：
+
+```text
+Facility
+
+Equipment
+
+Employee
+
+Workflow
+
+Supply Chain
+```
+
+---
+
+实时同步：
+
+```text
+IoT
+
+ERP
+
+MES
+
+CRM
+```
+
+---
+
+# 11. Simulation Engine
+
+仿真引擎。
+
+---
+
+输入：
+
+```text
+Current State
+```
+
+---
+
+执行：
+
+```text
+Simulation
+```
+
+---
+
+输出：
+
+```text
+Future State
+```
+
+---
+
+公式：
+
+```text
+State(t)
+
+↓
+
+Action
+
+↓
+
+State(t+1)
+```
+
+---
+
+# 12. Monte Carlo Engine
+
+不确定性分析。
+
+---
+
+模拟：
+
+```text
+10000次
+
+随机场景
+```
+
+---
+
+输出：
+
+```text
+风险分布
+
+收益分布
+
+失败概率
+```
+
+---
+
+示例：
+
+```text
+项目成功率
+
+78%
+```
+
+---
+
+# 13. Prediction Engine
+
+预测引擎。
+
+---
+
+能力：
+
+```text
+Revenue Forecast
+
+Demand Forecast
+
+Risk Forecast
+
+Inventory Forecast
+```
+
+---
+
+模型：
+
+```text
+XGBoost
+
+Prophet
+
+LSTM
+
+Transformer
+```
+
+---
+
+# 14. Optimization Engine
+
+优化引擎。
+
+---
+
+目标：
+
+```text
+最大利润
+
+最低库存
+
+最佳资源配置
+```
+
+---
+
+数学模型：
+
+```text
+Objective
+
++
+
+Constraint
+```
+
+---
+
+示例：
+
+```text
+Max Profit
+
+Subject To
+
+Inventory < 10000
+```
+
+---
+
+# 15. Strategy Engine
+
+战略引擎。
+
+---
+
+输入：
+
+```text
+Goal
+```
+
+---
+
+输出：
+
+```text
+Recommended Strategy
+```
+
+---
+
+案例：
+
+```text
+Goal:
+
+利润提升10%
+```
+
+---
+
+输出：
+
+```text
+提高价格2%
+
+降低库存15%
+
+优化供应商
+```
+
+---
+
+# 16. Goal Planning Engine
+
+目标驱动规划。
+
+---
+
+结构：
+
+```text
+Goal
+
+↓
+
+Objective
+
+↓
+
+Initiative
+
+↓
+
+Task
+
+↓
+
+Action
+```
+
+---
+
+示例：
+
+```text
+Increase Revenue
+
+↓
+
+Expand Market
+
+↓
+
+Launch Product
+
+↓
+
+Campaign
+```
+
+---
+
+# 17. Cognitive Planning
+
+认知规划能力。
+
+---
+
+能力：
+
+```text
+长期规划
+
+战略规划
+
+资源规划
+
+风险规划
+```
+
+---
+
+过程：
+
+```text
+Goal
+
+↓
+
+World Model
+
+↓
+
+Simulation
+
+↓
+
+Optimization
+
+↓
+
+Plan
+```
+
+---
+
+# 18. Decision Engine
+
+决策引擎。
+
+---
+
+输入：
+
+```text
+Evidence
+
+Knowledge
+
+Forecast
+```
+
+---
+
+输出：
+
+```text
+Decision
+```
+
+---
+
+示例：
+
+```text
+是否扩建工厂？
+```
+
+---
+
+输出：
+
+```text
+推荐扩建
+
+ROI: 18%
+
+Risk: Low
+```
+
+---
+
+# 19. Enterprise Policy Model
+
+约束条件。
+
+---
+
+类型：
+
+```text
+Budget
+
+Compliance
+
+Security
+
+Capacity
+```
+
+---
+
+示例：
+
+```yaml
+Budget:
+
+  MaxInvestment:
+    10000000
+```
+
+---
+
+# 20. World Model API
+
+创建场景：
+
+```http
+POST /api/scenarios
+```
+
+---
+
+运行仿真：
+
+```http
+POST /api/simulation/run
+```
+
+---
+
+预测：
+
+```http
+POST /api/prediction
+```
+
+---
+
+优化：
+
+```http
+POST /api/optimization
+```
+
+---
+
+获取战略建议：
+
+```http
+POST /api/strategy/recommend
+```
+
+---
+
+# 21. 数据模型
+
+核心表：
+
+```text
+world_state
+
+world_snapshot
+
+scenario
+
+simulation
+
+simulation_result
+
+forecast
+
+optimization_job
+
+strategy_recommendation
+```
+
+---
+
+# 22. Agent与World Model协同
+
+```text
+Agent Mesh
+
+↓
+
+World Model
+
+↓
+
+Simulation
+
+↓
+
+Prediction
+
+↓
+
+Recommendation
+
+↓
+
+Execution
+```
+
+---
+
+示例：
+
+```text
+Agent:
+
+如何提高利润？
+```
+
+---
+
+World Model：
+
+```text
+运行5000个场景
+
+↓
+
+发现最佳方案
+
+↓
+
+返回建议
+```
+
+---
+
+# 23. Mission Control集成
+
+驾驶舱读取：
+
+```text
+Current State
+
+Future State
+
+Risk
+
+Opportunity
+```
+
+---
+
+形成：
+
+```text
+企业数字驾驶舱
+```
+
+---
+
+# 24. 企业数字大脑
+
+最终结构：
+
+```text
+Data Platform
+
+↓
+
+Ontology
+
+↓
+
+Knowledge Graph
+
+↓
+
+Agent Mesh
+
+↓
+
+World Model
+
+↓
+
+Mission Control
+```
+
+---
+
+能力层次：
+
+```text
+数据
+
+↓
+
+知识
+
+↓
+
+认知
+
+↓
+
+决策
+
+↓
+
+执行
+```
+
+---
+
+# 25. V1规模规划
+
+```text
+State Objects
+≈ 1亿
+
+Knowledge Nodes
+≈ 10亿
+
+Scenario
+≈ 10000
+
+Simulation/day
+≈ 100万
+
+Forecast/day
+≈ 1000万
+```
+
+---
+
+# 26. 与Palantir Foundry对标
+
+Foundry：
+
+```text
+Ontology
+
+Pipeline
+
+Operational Application
+
+AIP
+```
+
+---
+
+ECOS：
+
+```text
+Ontology
+
+Knowledge Graph
+
+Agent Mesh
+
+World Model
+
+Mission Control
+```
+
+---
+
+新增能力：
+
+```text
+企业长期记忆
+
+企业认知网络
+
+企业数字孪生
+
+企业战略推演
+
+企业自动决策
+```
+
+---
+
+# 下一卷
+
+## 12-前端设计系统规范（Design System Specification）
+
+将输出完整内容：
+
+```text
+Foundry风格设计语言
+
+Design Token
+
+布局系统
+
+导航系统
+
+数据表格规范
+
+Object Explorer
+
+Ontology Studio
+
+Workflow Builder
+
+Agent Studio
+
+Mission Control
+
+组件库（200+组件）
+
+前端工程目录
+
+Next.js实现规范
+```
+
+这一卷将直接对应你最初要求的：
+
+**“完整 Foundry 风格前端工程设计规范与界面体系”**。

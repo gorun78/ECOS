@@ -1,0 +1,1266 @@
+# 第7章 Object Runtime（对象运行时平台）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 7.1 模块概述
+
+## 模块名称
+
+```text
+Object Runtime Platform
+```
+
+---
+
+## 模块定位
+
+ECOS业务运行核心。
+
+对应：
+
+```text
+Palantir Foundry Object Runtime
+```
+
+在ECOS中的位置：
+
+```text
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Workflow
+
+↓
+
+Agent
+
+↓
+
+Mission Control
+```
+
+---
+
+## 核心目标
+
+将Ontology定义的业务语义实例化为可运行对象。
+
+即：
+
+```text
+Entity
+
+↓
+
+Object
+
+↓
+
+Action
+
+↓
+
+Workflow
+
+↓
+
+Business Process
+```
+
+---
+
+例如：
+
+Ontology定义：
+
+```text
+Customer
+```
+
+运行时对象：
+
+```json
+{
+  "id":"CUST001",
+  "name":"华为技术有限公司",
+  "level":"VIP",
+  "status":"Active"
+}
+```
+
+---
+
+## 核心价值
+
+解决：
+
+```text
+业务对象散落在多个系统
+
+对象关系不可见
+
+对象生命周期不可追踪
+
+业务操作无法统一
+```
+
+问题。
+
+---
+
+# 7.2 Object Runtime总体架构
+
+```text
+Object Runtime
+
+├── Object Explorer
+├── Object Detail
+├── Object Creation
+├── Object Query Engine
+├── Object Relationship Engine
+├── Object Timeline
+├── Object Action Runtime
+├── Object Search
+├── Object Versioning
+├── Object Permission
+├── Object Event Bus
+└── Agent Object Assistant
+```
+
+---
+
+# 7.3 Object Explorer
+
+---
+
+## 功能目标
+
+统一浏览企业对象。
+
+类似：
+
+```text
+Foundry Object Explorer
+```
+
+---
+
+## 页面
+
+```text
+Object Explorer
+```
+
+---
+
+布局：
+
+```text
+┌─────────────────────┐
+│ Object Type Tree    │
+├─────────────────────┤
+│ Object List         │
+├─────────────────────┤
+│ Filter/Search       │
+└─────────────────────┘
+```
+
+---
+
+## 支持对象
+
+```text
+Customer
+
+Supplier
+
+Product
+
+Asset
+
+Facility
+
+Risk
+
+Employee
+
+Mission
+```
+
+---
+
+## 功能
+
+### 浏览对象
+
+---
+
+### 搜索对象
+
+---
+
+### 高级过滤
+
+---
+
+### 批量操作
+
+---
+
+### 收藏对象
+
+---
+
+# 7.4 Object List页面
+
+---
+
+字段：
+
+| 字段           | 说明   |
+| ------------ | ---- |
+| Object ID    | 对象ID |
+| Name         | 名称   |
+| Type         | 对象类型 |
+| Status       | 状态   |
+| Owner        | 负责人  |
+| Updated Time | 更新时间 |
+
+---
+
+支持：
+
+```text
+分页
+
+排序
+
+筛选
+
+导出
+```
+
+---
+
+# 7.5 Object Detail
+
+---
+
+## 功能目标
+
+查看对象全景信息。
+
+---
+
+页面结构：
+
+```text
+Object Detail
+
+├── Summary
+├── Properties
+├── Relationships
+├── Actions
+├── Timeline
+├── Files
+├── Workflow
+├── Knowledge
+└── Audit
+```
+
+---
+
+# Summary区域
+
+显示：
+
+```text
+名称
+
+状态
+
+Owner
+
+标签
+
+评分
+```
+
+---
+
+# Properties区域
+
+展示：
+
+```text
+Ontology Property
+```
+
+示例：
+
+```text
+CustomerCode
+
+Name
+
+Phone
+
+Email
+
+Level
+```
+
+---
+
+# 7.6 Object创建
+
+---
+
+## 功能目标
+
+创建对象实例。
+
+---
+
+示例：
+
+```text
+Create Customer
+```
+
+---
+
+输入：
+
+| 字段           | 必填 |
+| ------------ | -- |
+| Name         | Y  |
+| CustomerCode | Y  |
+| Level        | N  |
+
+---
+
+流程：
+
+```text
+提交
+
+↓
+
+规则校验
+
+↓
+
+生成ObjectID
+
+↓
+
+创建成功
+
+↓
+
+触发事件
+```
+
+---
+
+# 7.7 Object状态机
+
+---
+
+每个对象拥有生命周期。
+
+---
+
+示例：
+
+Customer
+
+```text
+Draft
+
+↓
+
+Submitted
+
+↓
+
+Approved
+
+↓
+
+Active
+
+↓
+
+Suspended
+
+↓
+
+Archived
+```
+
+---
+
+支持：
+
+```text
+自定义状态机
+```
+
+---
+
+# 7.8 Object Query Engine
+
+---
+
+## 功能目标
+
+统一对象查询引擎。
+
+---
+
+查询模式：
+
+### Attribute Query
+
+属性查询
+
+---
+
+示例：
+
+```sql
+Customer
+
+WHERE level='VIP'
+```
+
+---
+
+### Relationship Query
+
+关系查询
+
+---
+
+示例：
+
+```text
+查询某客户所有订单
+```
+
+---
+
+### Semantic Query
+
+语义查询
+
+---
+
+示例：
+
+```text
+华东地区高价值客户
+```
+
+---
+
+# 查询优化
+
+支持：
+
+```text
+索引
+
+缓存
+
+预计算
+```
+
+---
+
+# 7.9 Object Relationship Engine
+
+---
+
+## 功能目标
+
+管理对象关系。
+
+---
+
+示例：
+
+```text
+Customer
+
+PLACED
+
+Order
+```
+
+---
+
+关系存储：
+
+```text
+Graph-Based
+```
+
+---
+
+支持：
+
+```text
+创建关系
+
+删除关系
+
+查询关系
+
+关系分析
+```
+
+---
+
+# 7.10 Relationship View
+
+---
+
+页面：
+
+```text
+Object Relationship Graph
+```
+
+---
+
+显示：
+
+```text
+Customer
+
+↓
+
+Order
+
+↓
+
+Invoice
+
+↓
+
+Payment
+```
+
+---
+
+功能：
+
+```text
+缩放
+
+路径分析
+
+依赖分析
+```
+
+---
+
+# 7.11 Object Timeline
+
+---
+
+## 功能目标
+
+记录对象生命周期。
+
+---
+
+记录：
+
+```text
+创建
+
+修改
+
+审批
+
+Workflow
+
+Agent操作
+```
+
+---
+
+示例：
+
+```text
+2025-01-01 创建
+
+2025-01-03 修改
+
+2025-01-05 审批通过
+
+2025-01-06 Agent评分
+```
+
+---
+
+# 7.12 Object Versioning
+
+---
+
+## 功能目标
+
+追踪对象历史版本。
+
+---
+
+支持：
+
+```text
+Version 1
+
+Version 2
+
+Version 3
+```
+
+---
+
+功能：
+
+```text
+查看版本
+
+比较版本
+
+回滚版本
+```
+
+---
+
+# 7.13 Object Action Runtime
+
+---
+
+## 功能目标
+
+执行Ontology定义的Action。
+
+---
+
+示例：
+
+Customer
+
+支持：
+
+```text
+Approve
+
+Reject
+
+Suspend
+
+AssignOwner
+```
+
+---
+
+执行流程：
+
+```text
+点击Action
+
+↓
+
+权限校验
+
+↓
+
+规则校验
+
+↓
+
+状态变更
+
+↓
+
+事件发布
+
+↓
+
+Workflow触发
+```
+
+---
+
+# 7.14 Action权限控制
+
+---
+
+规则：
+
+```text
+Action
+
+=
+
+Role
+
++
+
+Policy
+```
+
+---
+
+示例：
+
+```text
+Approve Customer
+
+仅SalesManager
+```
+
+---
+
+允许执行。
+
+---
+
+# 7.15 Object Workflow集成
+
+---
+
+对象可以绑定：
+
+```text
+Workflow
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+↓
+
+Customer Approval Workflow
+```
+
+---
+
+支持：
+
+```text
+启动流程
+
+查看流程
+
+终止流程
+```
+
+---
+
+# 7.16 Object Event Bus
+
+---
+
+## 功能目标
+
+对象驱动事件架构。
+
+---
+
+事件：
+
+```text
+ObjectCreated
+
+ObjectUpdated
+
+ObjectDeleted
+
+ActionExecuted
+
+WorkflowCompleted
+```
+
+---
+
+事件流：
+
+```text
+Object
+
+↓
+
+Event
+
+↓
+
+Workflow
+
+↓
+
+Agent
+
+↓
+
+Mission
+```
+
+---
+
+# 7.17 Object权限模型
+
+---
+
+支持：
+
+### Object Level
+
+对象级
+
+---
+
+### Property Level
+
+字段级
+
+---
+
+### Action Level
+
+动作级
+
+---
+
+### Relationship Level
+
+关系级
+
+---
+
+# 示例
+
+```text
+客户经理
+
+可查看客户
+
+不可查看信用评分
+```
+
+---
+
+# 7.18 Object Search
+
+---
+
+## 功能目标
+
+统一搜索企业对象。
+
+---
+
+支持：
+
+### Keyword Search
+
+关键词搜索
+
+---
+
+### Semantic Search
+
+语义搜索
+
+---
+
+### Graph Search
+
+图搜索
+
+---
+
+### Agent Search
+
+Agent辅助搜索
+
+---
+
+示例：
+
+```text
+华东VIP客户
+```
+
+---
+
+返回：
+
+```text
+Customer List
+```
+
+---
+
+# 7.19 Object Attachments
+
+---
+
+支持：
+
+```text
+合同
+
+发票
+
+图片
+
+报告
+```
+
+---
+
+功能：
+
+```text
+上传
+
+预览
+
+版本管理
+```
+
+---
+
+# 7.20 Object Knowledge关联
+
+---
+
+对象可关联：
+
+```text
+Document
+
+Knowledge
+
+Insight
+
+Agent Result
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+↓
+
+Risk Assessment Report
+```
+
+---
+
+# 7.21 Object评分系统
+
+---
+
+## 功能目标
+
+支持对象评分。
+
+---
+
+示例：
+
+Customer
+
+```text
+信用评分
+
+风险评分
+
+价值评分
+```
+
+---
+
+范围：
+
+```text
+0-100
+```
+
+---
+
+# 7.22 Object治理规则
+
+---
+
+检查：
+
+```text
+缺失属性
+
+非法状态
+
+孤立关系
+
+重复对象
+```
+
+---
+
+自动修复：
+
+```text
+Agent Suggestion
+```
+
+---
+
+# 7.23 Agent Object Assistant
+
+---
+
+Agent自动：
+
+### 创建对象
+
+---
+
+### 更新对象
+
+---
+
+### 推荐关系
+
+---
+
+### 推荐Action
+
+---
+
+### 发现异常
+
+---
+
+### 自动补全属性
+
+---
+
+示例：
+
+```text
+上传合同
+
+↓
+
+Agent识别
+
+↓
+
+创建Supplier对象
+```
+
+---
+
+# 7.24 Object API
+
+---
+
+创建对象：
+
+```http
+POST /api/v1/objects
+```
+
+---
+
+查询对象：
+
+```http
+GET /api/v1/objects/{id}
+```
+
+---
+
+执行Action：
+
+```http
+POST /api/v1/objects/{id}/actions
+```
+
+---
+
+查询关系：
+
+```http
+GET /api/v1/objects/{id}/relations
+```
+
+---
+
+查询时间线：
+
+```http
+GET /api/v1/objects/{id}/timeline
+```
+
+---
+
+# 7.25 数据模型
+
+核心表：
+
+```sql
+object_instance
+
+object_property
+
+object_relation
+
+object_action_log
+
+object_timeline
+
+object_attachment
+
+object_version
+
+object_permission
+```
+
+---
+
+# 7.26 KPI指标
+
+---
+
+运行指标：
+
+```text
+对象总量
+
+活跃对象数
+
+关系总量
+
+Action执行次数
+
+Workflow关联率
+
+对象完整率
+
+搜索成功率
+```
+
+---
+
+# 7.27 审计要求
+
+记录：
+
+```text
+对象创建
+
+对象修改
+
+对象删除
+
+Action执行
+
+权限变更
+
+关系变更
+```
+
+---
+
+# 7.28 异常码
+
+| 错误码     | 说明           |
+| ------- | ------------ |
+| OBJ-001 | 对象不存在        |
+| OBJ-002 | 状态非法         |
+| OBJ-003 | Action不可执行   |
+| OBJ-004 | 关系不存在        |
+| OBJ-005 | 权限不足         |
+| OBJ-006 | 对象重复         |
+| OBJ-007 | 版本冲突         |
+| OBJ-008 | Workflow启动失败 |
+
+---
+
+# 第7章完成
+
+至此完成 Foundry 最核心的：
+
+```text
+Ontology
+
+↓
+
+Object Runtime
+```
+
+能力体系。
+
+---
+
+下一章进入：
+
+# 第8章 Action & Rule Engine（动作与规则引擎）
+
+这是 Foundry 相比传统主数据平台最大的区别之一：
+
+```text
+Object
+
+↓
+
+Action
+
+↓
+
+Rule
+
+↓
+
+Workflow
+
+↓
+
+Mission
+```
+
+将详细定义：
+
+```text
+Action Runtime
+Rule Engine
+Decision Engine
+Policy Engine
+Event Engine
+Business Automation
+```
+
+并开始形成真正的企业业务操作系统（Business Operating System）。

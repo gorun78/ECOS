@@ -1,0 +1,1225 @@
+# 第2章 数据目录（Data Catalog）
+
+（ECOS Detailed Functional Design Specification）
+
+---
+
+# 2.1 模块概述
+
+## 模块名称
+
+```text
+Enterprise Data Catalog
+```
+
+---
+
+## 模块定位
+
+企业级数据资产管理中心。
+
+对应 Foundry：
+
+```text
+Data Catalog
+
+Data Lineage
+
+Data Discovery
+
+Metadata Management
+```
+
+---
+
+## 模块目标
+
+实现：
+
+```text
+知道有哪些数据
+
+知道数据在哪里
+
+知道谁在使用
+
+知道数据质量如何
+
+知道数据从哪里来
+
+知道会影响谁
+```
+
+---
+
+## 业务价值
+
+解决：
+
+```text
+找不到数据
+
+重复建设
+
+指标口径不统一
+
+数据责任不清
+
+血缘不可追溯
+```
+
+---
+
+## 功能架构
+
+```text
+Data Catalog
+
+├── Data Asset Center
+├── Metadata Management
+├── Business Glossary
+├── Data Classification
+├── Data Lineage
+├── Impact Analysis
+├── Data Discovery
+├── Data Marketplace
+├── Data Rating
+├── Data Ownership
+├── Data Subscription
+└── Data Governance Integration
+```
+
+---
+
+# 2.2 数据资产中心（Data Asset Center）
+
+---
+
+## 功能目标
+
+统一管理所有数据资产。
+
+---
+
+## 资产类型
+
+```text
+Database
+
+Table
+
+View
+
+File
+
+Dataset
+
+API
+
+Stream
+
+Feature
+
+Vector Dataset
+
+Ontology Object
+
+Knowledge Graph
+```
+
+---
+
+## 页面
+
+```text
+Asset Explorer
+```
+
+---
+
+页面布局：
+
+```text
+资产树
+
+资产列表
+
+搜索栏
+
+筛选器
+
+详情面板
+```
+
+---
+
+## 功能
+
+### 浏览资产
+
+支持：
+
+```text
+目录浏览
+
+树形浏览
+
+标签浏览
+```
+
+---
+
+### 搜索资产
+
+支持：
+
+```text
+名称搜索
+
+描述搜索
+
+标签搜索
+
+Owner搜索
+
+业务域搜索
+```
+
+---
+
+### 收藏资产
+
+用户可：
+
+```text
+关注
+
+收藏
+
+加入工作空间
+```
+
+---
+
+## 资产详情页
+
+展示：
+
+### 基本信息
+
+```text
+名称
+
+描述
+
+Owner
+
+创建时间
+
+更新时间
+```
+
+---
+
+### 技术信息
+
+```text
+Schema
+
+字段
+
+存储位置
+
+更新频率
+```
+
+---
+
+### 业务信息
+
+```text
+业务域
+
+标签
+
+分类
+
+术语
+```
+
+---
+
+### 使用信息
+
+```text
+访问次数
+
+订阅人数
+
+下游系统
+```
+
+---
+
+# 2.3 元数据管理（Metadata Management）
+
+---
+
+## 功能目标
+
+管理所有技术元数据和业务元数据。
+
+---
+
+## 元数据分类
+
+### Technical Metadata
+
+技术元数据
+
+```text
+数据库
+
+表
+
+字段
+
+数据类型
+```
+
+---
+
+### Business Metadata
+
+业务元数据
+
+```text
+业务名称
+
+业务定义
+
+业务负责人
+```
+
+---
+
+### Operational Metadata
+
+运行元数据
+
+```text
+任务执行时间
+
+数据量
+
+失败率
+```
+
+---
+
+## 自动采集
+
+来源：
+
+```text
+数据库扫描
+
+API扫描
+
+Pipeline扫描
+
+Ontology扫描
+```
+
+---
+
+## 元数据编辑
+
+支持：
+
+```text
+在线编辑
+
+批量导入
+
+版本管理
+```
+
+---
+
+## 元数据版本
+
+状态：
+
+```text
+Draft
+
+Published
+
+Archived
+```
+
+---
+
+# 2.4 业务术语库（Business Glossary）
+
+---
+
+## 功能目标
+
+统一企业业务语言。
+
+---
+
+解决：
+
+```text
+客户定义不一致
+
+收入定义不一致
+
+风险定义不一致
+```
+
+问题。
+
+---
+
+## 页面
+
+```text
+Glossary Center
+```
+
+---
+
+## 术语结构
+
+示例：
+
+```text
+客户(Customer)
+
+定义：
+购买公司产品或服务的组织或个人
+```
+
+---
+
+字段：
+
+| 字段         | 说明  |
+| ---------- | --- |
+| Code       | 编码  |
+| Name       | 名称  |
+| Definition | 定义  |
+| Owner      | 负责人 |
+| Domain     | 业务域 |
+
+---
+
+## 功能
+
+### 创建术语
+
+### 审核术语
+
+### 发布术语
+
+### 关联资产
+
+---
+
+## 状态机
+
+```text
+Draft
+
+↓
+
+Review
+
+↓
+
+Approved
+
+↓
+
+Published
+
+↓
+
+Deprecated
+```
+
+---
+
+# 2.5 数据分类分级
+
+---
+
+## 功能目标
+
+识别数据敏感等级。
+
+---
+
+## 分类
+
+```text
+公开
+
+内部
+
+敏感
+
+机密
+
+绝密
+```
+
+---
+
+## 示例
+
+客户姓名：
+
+```text
+敏感
+```
+
+---
+
+身份证：
+
+```text
+机密
+```
+
+---
+
+银行卡：
+
+```text
+绝密
+```
+
+---
+
+## 自动识别
+
+Agent识别：
+
+```text
+身份证
+
+手机号
+
+邮箱
+
+银行卡
+```
+
+---
+
+自动打标签。
+
+---
+
+# 2.6 数据发现（Data Discovery）
+
+---
+
+## 功能目标
+
+帮助用户快速发现数据。
+
+---
+
+## 搜索方式
+
+### Keyword Search
+
+关键词搜索
+
+---
+
+### Semantic Search
+
+语义搜索
+
+---
+
+### Graph Search
+
+图谱搜索
+
+---
+
+### Ontology Search
+
+对象搜索
+
+---
+
+## 示例
+
+输入：
+
+```text
+华东地区客户订单
+```
+
+返回：
+
+```text
+Customer
+
+Order
+
+Region
+
+Sales
+```
+
+相关资产。
+
+---
+
+## AI搜索增强
+
+Agent能力：
+
+```text
+自动扩展关键词
+
+自动推荐资产
+
+自动生成查询
+```
+
+---
+
+# 2.7 数据血缘（Data Lineage）
+
+---
+
+## 功能目标
+
+追踪数据来源和流向。
+
+---
+
+## 展示层级
+
+### Table Lineage
+
+表级血缘
+
+---
+
+### Column Lineage
+
+字段级血缘
+
+---
+
+### Object Lineage
+
+对象级血缘
+
+---
+
+### Knowledge Lineage
+
+知识级血缘
+
+---
+
+## 示例
+
+```text
+CRM.Customer
+
+↓
+
+ODS.Customer
+
+↓
+
+DW.Customer
+
+↓
+
+Customer Object
+
+↓
+
+Risk Score
+```
+
+---
+
+## 血缘图页面
+
+支持：
+
+```text
+放大
+
+缩小
+
+筛选
+
+路径分析
+```
+
+---
+
+# 2.8 影响分析（Impact Analysis）
+
+---
+
+## 功能目标
+
+评估变更影响。
+
+---
+
+示例：
+
+删除字段：
+
+```text
+Customer.phone
+```
+
+系统自动分析：
+
+```text
+影响：
+
+12个报表
+
+5个流程
+
+3个Agent
+
+2个应用
+```
+
+---
+
+## 分析维度
+
+```text
+数据集
+
+报表
+
+Agent
+
+Workflow
+
+API
+```
+
+---
+
+## 风险评分
+
+等级：
+
+```text
+Low
+
+Medium
+
+High
+
+Critical
+```
+
+---
+
+# 2.9 数据所有权（Data Ownership）
+
+---
+
+## 功能目标
+
+明确责任归属。
+
+---
+
+角色：
+
+### Data Owner
+
+负责数据定义。
+
+---
+
+### Data Steward
+
+负责质量治理。
+
+---
+
+### Custodian
+
+负责技术运维。
+
+---
+
+## 页面
+
+```text
+Ownership Center
+```
+
+---
+
+## 规则
+
+每个资产必须：
+
+```text
+至少1个Owner
+```
+
+---
+
+# 2.10 数据评分系统
+
+---
+
+## 功能目标
+
+量化数据资产价值。
+
+---
+
+评分维度
+
+### Quality
+
+数据质量
+
+---
+
+### Popularity
+
+使用频率
+
+---
+
+### Freshness
+
+新鲜度
+
+---
+
+### Completeness
+
+完整度
+
+---
+
+### Governance
+
+治理程度
+
+---
+
+## 评分公式
+
+```text
+Score
+
+=
+
+Quality*30%
+
++
+
+Popularity*20%
+
++
+
+Freshness*20%
+
++
+
+Completeness*15%
+
++
+
+Governance*15%
+```
+
+---
+
+评分范围：
+
+```text
+0~100
+```
+
+---
+
+# 2.11 数据订阅中心
+
+---
+
+## 功能目标
+
+用户订阅数据变化。
+
+---
+
+支持：
+
+```text
+Dataset
+
+API
+
+Ontology Object
+
+Knowledge Asset
+```
+
+---
+
+通知方式：
+
+```text
+邮件
+
+短信
+
+钉钉
+
+企业微信
+```
+
+---
+
+触发条件：
+
+```text
+数据更新
+
+Schema变更
+
+质量异常
+
+权限变更
+```
+
+---
+
+# 2.12 数据市场（Data Marketplace）
+
+---
+
+## 功能目标
+
+实现企业内部数据共享。
+
+---
+
+页面：
+
+```text
+Marketplace
+```
+
+---
+
+展示：
+
+```text
+热门资产
+
+推荐资产
+
+最新资产
+
+高价值资产
+```
+
+---
+
+申请流程：
+
+```text
+发现资产
+
+↓
+
+申请访问
+
+↓
+
+审批
+
+↓
+
+授权
+
+↓
+
+使用
+```
+
+---
+
+# 2.13 Catalog与Ontology集成
+
+---
+
+功能：
+
+```text
+资产映射实体
+
+自动生成Ontology
+
+自动发现关系
+
+字段映射属性
+```
+
+---
+
+示例：
+
+```text
+customer_tbl
+
+↓
+
+Customer Entity
+```
+
+---
+
+# 2.14 Catalog与Knowledge Graph集成
+
+---
+
+自动构建：
+
+```text
+资产节点
+
+Owner节点
+
+业务节点
+
+系统节点
+```
+
+---
+
+形成：
+
+```text
+Enterprise Metadata Graph
+```
+
+---
+
+# 2.15 Catalog与Agent集成
+
+---
+
+Agent自动：
+
+### 元数据发现
+
+```text
+扫描数据源
+```
+
+---
+
+### 标签推荐
+
+```text
+自动打标签
+```
+
+---
+
+### 资产分类
+
+```text
+自动归类
+```
+
+---
+
+### 质量分析
+
+```text
+发现异常
+```
+
+---
+
+### 血缘推断
+
+```text
+自动构建血缘图
+```
+
+---
+
+# 2.16 审计要求
+
+记录：
+
+```text
+资产创建
+
+资产修改
+
+资产删除
+
+标签变更
+
+Owner变更
+
+权限变更
+```
+
+---
+
+# 2.17 API设计
+
+查询资产：
+
+```http
+GET /api/v1/catalog/assets
+```
+
+---
+
+资产详情：
+
+```http
+GET /api/v1/catalog/assets/{id}
+```
+
+---
+
+创建术语：
+
+```http
+POST /api/v1/catalog/glossary
+```
+
+---
+
+查询血缘：
+
+```http
+GET /api/v1/catalog/lineage/{id}
+```
+
+---
+
+影响分析：
+
+```http
+GET /api/v1/catalog/impact/{id}
+```
+
+---
+
+# 2.18 数据模型
+
+核心表：
+
+```sql
+catalog_asset
+catalog_metadata
+catalog_glossary
+catalog_lineage
+catalog_owner
+catalog_tag
+catalog_subscription
+catalog_rating
+```
+
+---
+
+# 2.19 异常码
+
+| 错误码     | 说明      |
+| ------- | ------- |
+| CAT-001 | 资产不存在   |
+| CAT-002 | 术语重复    |
+| CAT-003 | 无权限访问   |
+| CAT-004 | 血缘构建失败  |
+| CAT-005 | 元数据同步失败 |
+| CAT-006 | Owner缺失 |
+
+---
+
+# 2.20 KPI指标
+
+数据目录运营指标：
+
+```text
+资产总数
+
+覆盖率
+
+血缘完整率
+
+Owner覆盖率
+
+质量评分
+
+订阅人数
+
+搜索成功率
+```
+
+---
+
+# Volume 1 第二模块完成
+
+累计完成：
+
+```text
+第1章 数据接入与集成
+
+第2章 数据目录（Catalog）
+```
+
+下一章进入 ECOS 数据平台最核心能力之一：
+
+# 第3章 数据处理与管道（Pipeline）
+
+对应 Foundry Pipeline Builder：
+
+```text
+Pipeline Designer
+
+Data Transformation
+
+Data Lineage
+
+Data Quality
+
+Scheduling
+
+Data Products
+```
+
+这一章将开始进入 Foundry 风格最强的数据工程能力设计。

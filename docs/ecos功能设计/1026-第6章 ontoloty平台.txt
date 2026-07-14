@@ -1,0 +1,1175 @@
+# ECOS详细功能设计说明书
+
+# Volume 2
+
+# 语义与业务层（Semantic & Business Layer）
+
+---
+
+# 第6章 Ontology平台（Ontology Platform）
+
+（ECOS Core Semantic Layer）
+
+---
+
+# 6.1 模块概述
+
+## 模块名称
+
+```text
+Ontology Platform
+```
+
+---
+
+## 模块定位
+
+ECOS核心能力。
+
+对应：
+
+```text
+Palantir Foundry Ontology
+```
+
+在整个ECOS中的位置：
+
+```text
+Data
+
+↓
+
+Knowledge
+
+↓
+
+Ontology
+
+↓
+
+Object Runtime
+
+↓
+
+Workflow
+
+↓
+
+Agent
+
+↓
+
+Mission
+```
+
+---
+
+## 核心目标
+
+把数据转换为业务对象。
+
+实现：
+
+```text
+数据(Data)
+
+↓
+
+实体(Entity)
+
+↓
+
+对象(Object)
+
+↓
+
+业务语义(Semantic)
+
+↓
+
+业务操作(Action)
+```
+
+---
+
+## 业务价值
+
+解决：
+
+```text
+技术数据难理解
+
+业务与IT脱节
+
+系统间语义不统一
+
+Agent无法理解业务
+```
+
+---
+
+## Ontology核心思想
+
+传统系统：
+
+```text
+ERP
+
+↓
+
+Table
+
+↓
+
+Field
+```
+
+---
+
+ECOS：
+
+```text
+Customer
+
+Supplier
+
+Facility
+
+Equipment
+
+Risk
+
+Employee
+```
+
+统一表达企业世界。
+
+---
+
+# 6.2 Ontology总体架构
+
+```text
+Ontology Platform
+
+├── Domain Management
+├── Entity Designer
+├── Property Designer
+├── Relationship Designer
+├── Action Designer
+├── Rule Designer
+├── Ontology Versioning
+├── Ontology Publishing
+├── Ontology Governance
+├── Ontology Explorer
+├── Ontology API
+└── Agent Ontology Assistant
+```
+
+---
+
+# 6.3 Domain管理（Domain Management）
+
+---
+
+## 功能目标
+
+建立业务域。
+
+---
+
+示例：
+
+```text
+Sales
+
+SupplyChain
+
+Manufacturing
+
+Finance
+
+HR
+
+Risk
+```
+
+---
+
+## 页面
+
+```text
+Domain Center
+```
+
+---
+
+字段：
+
+| 字段          | 说明  |
+| ----------- | --- |
+| Code        | 编码  |
+| Name        | 名称  |
+| Owner       | 负责人 |
+| Description | 描述  |
+
+---
+
+## 生命周期
+
+```text
+Draft
+
+↓
+
+Published
+
+↓
+
+Deprecated
+```
+
+---
+
+# 6.4 Entity Designer
+
+---
+
+## 功能目标
+
+定义企业实体。
+
+---
+
+页面：
+
+```text
+Entity Designer
+```
+
+---
+
+## 实体定义
+
+示例：
+
+```text
+Customer
+```
+
+---
+
+字段：
+
+| 字段          | 说明   |
+| ----------- | ---- |
+| Code        | 唯一编码 |
+| Name        | 名称   |
+| Domain      | 所属域  |
+| Description | 描述   |
+
+---
+
+示例：
+
+```json
+{
+  "code":"Customer",
+  "name":"客户"
+}
+```
+
+---
+
+## 实体分类
+
+### Master Entity
+
+```text
+Customer
+
+Supplier
+
+Product
+```
+
+---
+
+### Transaction Entity
+
+```text
+Order
+
+Invoice
+```
+
+---
+
+### Event Entity
+
+```text
+InspectionEvent
+
+RiskEvent
+```
+
+---
+
+### Reference Entity
+
+```text
+Country
+
+Region
+```
+
+---
+
+# 6.5 Property Designer
+
+---
+
+## 功能目标
+
+定义实体属性。
+
+---
+
+示例：
+
+Customer
+
+```text
+CustomerCode
+
+Name
+
+Phone
+
+Email
+
+Level
+```
+
+---
+
+属性类型：
+
+| 类型        | 说明    |
+| --------- | ----- |
+| String    | 字符串   |
+| Number    | 数值    |
+| Boolean   | 布尔    |
+| Date      | 日期    |
+| Enum      | 枚举    |
+| Reference | 引用    |
+| JSON      | 结构化对象 |
+
+---
+
+## 属性配置
+
+字段：
+
+| 字段       | 说明   |
+| -------- | ---- |
+| Code     | 编码   |
+| Name     | 名称   |
+| Type     | 类型   |
+| Required | 是否必填 |
+| Unique   | 是否唯一 |
+
+---
+
+## 规则
+
+```text
+Code唯一
+
+长度限制
+
+默认值
+
+校验表达式
+```
+
+---
+
+# 6.6 Relationship Designer
+
+---
+
+## 功能目标
+
+定义实体关系。
+
+---
+
+示例：
+
+```text
+Customer
+
+PLACED
+
+Order
+```
+
+---
+
+## 关系类型
+
+### OneToOne
+
+```text
+Person
+
+HAS
+
+Passport
+```
+
+---
+
+### OneToMany
+
+```text
+Customer
+
+HAS
+
+Order
+```
+
+---
+
+### ManyToMany
+
+```text
+Supplier
+
+SUPPLY
+
+Material
+```
+
+---
+
+## 页面
+
+```text
+Relationship Designer
+```
+
+---
+
+字段：
+
+| 字段          | 说明   |
+| ----------- | ---- |
+| Source      | 源实体  |
+| Target      | 目标实体 |
+| Relation    | 关系名称 |
+| Cardinality | 基数   |
+
+---
+
+# 6.7 Action Designer
+
+---
+
+## 功能目标
+
+定义业务动作。
+
+---
+
+这是Ontology区别于传统MDM的重要能力。
+
+---
+
+示例：
+
+Customer
+
+支持：
+
+```text
+Approve
+
+Reject
+
+Suspend
+
+Activate
+
+AssignOwner
+```
+
+---
+
+## Action定义
+
+字段：
+
+| 字段          | 说明 |
+| ----------- | -- |
+| Code        | 编码 |
+| Name        | 名称 |
+| Object      | 对象 |
+| Description | 描述 |
+
+---
+
+## Action结构
+
+```json
+{
+  "action":"Approve",
+  "target":"Customer"
+}
+```
+
+---
+
+# 6.8 Action执行流程
+
+---
+
+```text
+用户点击动作
+
+↓
+
+权限校验
+
+↓
+
+业务规则校验
+
+↓
+
+执行Action
+
+↓
+
+更新对象状态
+
+↓
+
+写审计日志
+
+↓
+
+触发Workflow
+```
+
+---
+
+# 6.9 Rule Designer
+
+---
+
+## 功能目标
+
+定义业务规则。
+
+---
+
+规则类型：
+
+### Validation Rule
+
+校验规则
+
+---
+
+### Calculation Rule
+
+计算规则
+
+---
+
+### Decision Rule
+
+决策规则
+
+---
+
+### Agent Rule
+
+Agent规则
+
+---
+
+# 示例
+
+客户等级：
+
+```text
+销售额 > 1000万
+
+↓
+
+VIP
+```
+
+---
+
+规则表达式：
+
+```sql
+sales_amount > 10000000
+```
+
+---
+
+# 6.10 Rule Engine
+
+---
+
+功能：
+
+```text
+规则解析
+
+规则执行
+
+规则缓存
+
+规则审计
+```
+
+---
+
+执行模式：
+
+```text
+同步
+
+异步
+
+事件驱动
+```
+
+---
+
+# 6.11 Ontology版本管理
+
+---
+
+## 功能目标
+
+管理语义模型生命周期。
+
+---
+
+状态：
+
+```text
+Draft
+
+↓
+
+Review
+
+↓
+
+Published
+
+↓
+
+Deprecated
+
+↓
+
+Archived
+```
+
+---
+
+## 版本策略
+
+```text
+Major.Minor.Patch
+```
+
+---
+
+示例：
+
+```text
+Customer
+
+1.0.0
+
+1.1.0
+
+2.0.0
+```
+
+---
+
+# 6.12 Ontology发布中心
+
+---
+
+## 功能目标
+
+发布到运行时。
+
+---
+
+发布内容：
+
+```text
+Entity
+
+Property
+
+Relationship
+
+Action
+
+Rule
+```
+
+---
+
+发布流程：
+
+```text
+设计
+
+↓
+
+校验
+
+↓
+
+审批
+
+↓
+
+发布
+
+↓
+
+Object Runtime同步
+```
+
+---
+
+# 6.13 Ontology治理
+
+---
+
+## 功能目标
+
+保证语义一致性。
+
+---
+
+检查：
+
+```text
+命名规范
+
+重复实体
+
+循环关系
+
+废弃属性
+```
+
+---
+
+自动生成：
+
+```text
+治理评分
+```
+
+---
+
+# 6.14 Ontology Explorer
+
+---
+
+## 功能目标
+
+浏览企业语义模型。
+
+---
+
+页面：
+
+```text
+Ontology Explorer
+```
+
+---
+
+展示：
+
+```text
+Domain
+
+Entity
+
+Property
+
+Relationship
+
+Action
+```
+
+---
+
+支持：
+
+```text
+搜索
+
+过滤
+
+关系图
+```
+
+---
+
+# 6.15 Ontology Graph
+
+---
+
+可视化展示：
+
+```text
+Customer
+
+↓
+
+Order
+
+↓
+
+Invoice
+
+↓
+
+Payment
+```
+
+---
+
+功能：
+
+```text
+缩放
+
+展开
+
+路径分析
+
+影响分析
+```
+
+---
+
+# 6.16 Ontology与Data Catalog集成
+
+---
+
+自动映射：
+
+```text
+Table
+
+↓
+
+Entity
+```
+
+---
+
+字段：
+
+```text
+Column
+
+↓
+
+Property
+```
+
+---
+
+# 6.17 Ontology与Knowledge Graph集成
+
+---
+
+自动生成：
+
+```text
+Ontology Entity
+
+↓
+
+Graph Node
+```
+
+---
+
+关系：
+
+```text
+Ontology Relation
+
+↓
+
+Graph Edge
+```
+
+---
+
+# 6.18 Ontology与Workflow集成
+
+---
+
+Action触发：
+
+```text
+Approve Customer
+
+↓
+
+Workflow
+```
+
+---
+
+示例：
+
+```text
+Customer Approval Workflow
+```
+
+---
+
+# 6.19 Ontology与Agent集成
+
+---
+
+Agent能力：
+
+### 自动生成实体
+
+---
+
+输入：
+
+```text
+客户管理系统
+```
+
+---
+
+输出：
+
+```text
+Customer
+
+Contact
+
+Opportunity
+```
+
+---
+
+### 自动推荐关系
+
+---
+
+### 自动生成规则
+
+---
+
+### 自动生成Action
+
+---
+
+# 6.20 Ontology API
+
+---
+
+创建实体：
+
+```http
+POST /api/v1/ontology/entities
+```
+
+---
+
+创建关系：
+
+```http
+POST /api/v1/ontology/relations
+```
+
+---
+
+发布Ontology：
+
+```http
+POST /api/v1/ontology/publish
+```
+
+---
+
+查询实体：
+
+```http
+GET /api/v1/ontology/entities/{id}
+```
+
+---
+
+# 6.21 数据模型
+
+核心表：
+
+```sql
+ontology_domain
+ontology_entity
+ontology_property
+ontology_relation
+ontology_action
+ontology_rule
+ontology_version
+ontology_publish
+```
+
+---
+
+# 6.22 权限模型
+
+| 角色                 | 权限   |
+| ------------------ | ---- |
+| Ontology Admin     | 全部   |
+| Ontology Architect | 设计   |
+| Business Architect | 业务建模 |
+| Developer          | 查看   |
+| Auditor            | 审计   |
+
+---
+
+# 6.23 审计要求
+
+记录：
+
+```text
+实体创建
+
+实体修改
+
+关系创建
+
+规则修改
+
+发布
+
+回滚
+```
+
+---
+
+# 6.24 KPI指标
+
+```text
+Domain数量
+
+Entity数量
+
+Property数量
+
+Relationship数量
+
+Action数量
+
+规则覆盖率
+
+发布成功率
+```
+
+---
+
+# 6.25 异常码
+
+| 错误码     | 说明    |
+| ------- | ----- |
+| ONT-001 | 实体不存在 |
+| ONT-002 | 属性重复  |
+| ONT-003 | 关系循环  |
+| ONT-004 | 规则错误  |
+| ONT-005 | 发布失败  |
+| ONT-006 | 版本冲突  |
+| ONT-007 | 权限不足  |
+
+---
+
+# 第6章完成
+
+完成ECOS最核心能力：
+
+```text
+Ontology Platform
+```
+
+对应Foundry：
+
+```text
+Ontology Manager
+Ontology Editor
+Ontology Graph
+Ontology Governance
+```
+
+---
+
+下一章进入：
+
+# 第7章 Object Runtime（对象运行时）
+
+这是Foundry真正的运行核心：
+
+```text
+Ontology
+
+↓
+
+Object
+
+↓
+
+Action
+
+↓
+
+Workflow
+
+↓
+
+Mission
+```
+
+这一章会定义：
+
+```text
+Object Explorer
+Object Detail
+Object Relationship
+Object Timeline
+Object Query
+Object Action Runtime
+```
+
+即企业数字世界的运行引擎。

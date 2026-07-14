@@ -1,0 +1,46 @@
+# ECOS API 契约基线 — 2026-06-29
+# 格式: METHOD|PATH|EXPECTED_CODE
+# 不带 request body 的基线契约测试
+# POST endpoints with body requirements are noted but not in GET-only suite
+
+# Auth (tested by script login)
+POST|/api/v1/auth/login|200
+
+# Dashboard
+GET|/api/v1/ecos/biz/dashboard|200
+
+# WorldModel
+GET|/api/v1/worldmodel/goals|200
+GET|/api/v1/worldmodel/causal-links|200
+
+# DQ
+GET|/api/v1/dq/rules|200
+POST|/api/v1/dq/execute-all|200
+
+# Pipeline
+GET|/api/v1/pipeline/definitions|200
+
+# Tenant
+GET|/api/v1/system/tenants|200
+GET|/api/v1/system/tenants/default|200
+DELETE|/api/v1/system/tenants/default|200
+
+# Cognitive
+GET|/api/v1/cognitive/health|200
+
+# Task
+GET|/api/v1/task/list|200
+GET|/api/v1/task/stats|200
+
+# Agent
+GET|/api/v1/agents|200
+
+# Health
+GET|/api/health|200
+
+# Organization
+GET|/api/v1/system/organizations/tree|200
+
+# IAM
+GET|/api/v1/system/users|200
+GET|/api/v1/system/roles|200
