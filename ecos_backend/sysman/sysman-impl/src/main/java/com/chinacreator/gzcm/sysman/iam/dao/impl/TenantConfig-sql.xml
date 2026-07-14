@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertTenantConfig">
+        <![CDATA[
+        INSERT INTO td_tenant_config (
+            config_id, tenant_id, config_key, config_value
+        ) VALUES (
+            #[configId], #[tenantId], #[configKey], #[configValue]
+        )
+        ]]>
+    </property>
+
+    <property name="updateTenantConfig">
+        <![CDATA[
+        UPDATE td_tenant_config
+        SET config_value = #[configValue]
+        WHERE config_id = #[configId]
+        ]]>
+    </property>
+
+    <property name="deleteTenantConfig">
+        <![CDATA[
+        DELETE FROM td_tenant_config WHERE config_id = #[configId]
+        ]]>
+    </property>
+
+    <property name="listByTenantId">
+        <![CDATA[
+        SELECT * FROM td_tenant_config WHERE tenant_id = #[tenantId]
+        ]]>
+    </property>
+
+    <property name="findByTenantAndKey">
+        <![CDATA[
+        SELECT * FROM td_tenant_config
+        WHERE tenant_id = ? AND config_key = ?
+        ]]>
+    </property>
+</properties>
+
+

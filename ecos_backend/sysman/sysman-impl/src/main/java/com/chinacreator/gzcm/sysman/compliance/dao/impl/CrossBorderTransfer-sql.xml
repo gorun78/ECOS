@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertCrossBorderTransfer">
+        <![CDATA[
+        INSERT INTO td_cross_border_transfer (
+            transfer_id, source_region, target_region, resource_id, transfer_type,
+            status, reason, operator_id, transfer_time
+        ) VALUES (
+            #[transferId], #[sourceRegion], #[targetRegion], #[resourceId], #[transferType],
+            #[status], #[reason], #[operatorId], #[transferTime]
+        )
+        ]]>
+    </property>
+</properties>
+

@@ -1,0 +1,1653 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
+import { AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
+import * as Icons from 'lucide-react';
+
+const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
+  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  return <Comp size={size} className={className} />;
+};
+
+interface ChatbotStudioViewProps {
+  agents: AIPAgent[];
+  models: AIPModel[];
+  guardrails: AIPGuardrail[];
+  onUpdateAgents: (updated: AIPAgent[]) => void;
+  onAddAuditLog: (log: AIPAuditLog) => void;
+  showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
+}
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'agent' | 'system';
+  content: string;
+  timestamp: string;
+  thinkingTrace?: string[];
+  actionProposal?: {
+    id?: string;
+    actionId: string;
+    actionName: string;
+    payload: Record<string, string>;
+    status: 'pending' | 'approved' | 'rejected';
+  };
+}
+
+interface RAGDocument {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  chunksCount: number;
+  status: 'synced' | 'pending';
+  lastModified: string;
+}
+
+export default function ChatbotStudioView({
+  agents,
+  models,
+  guardrails,
+  onUpdateAgents,
+  onAddAuditLog,
+  showToast
+}: ChatbotStudioViewProps) {
+  // Master Chatbot Selected
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id || '');
+  const activeChatbot = agents.find(a => a.id === selectedAgentId);
+
+  // Configuration Workspace Tabs
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'prompt' | 'ontology' | 'knowledge' | 'guardrails' | 'publish'>('prompt');
+
+  // Sandbox Testing States
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+  const [activeUserRole, setActiveUserRole] = useState<'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR'>('AOC_DIRECTOR');
+  const [activeContextDataset, setActiveContextDataset] = useState<string>('all_ontology');
+
+  // Local editable draft state for active Chatbot
+  const [tempName, setTempName] = useState('');
+  const [tempRole, setTempRole] = useState('');
+  const [tempDesc, setTempDesc] = useState('');
+  const [tempModel, setTempModel] = useState('');
+  const [tempPrompt, setTempPrompt] = useState('');
+  const [tempTemperature, setTempTemperature] = useState(0.4);
+  const [tempTopP, setTempTopP] = useState(0.9);
+  const [tempMaxTokens, setTempMaxTokens] = useState(2048);
+
+  // Bindings
+  const [selectedObjects, setSelectedObjects] = useState<string[]>(['AviationFlight', 'AviationPilot']);
+  const [selectedActions, setSelectedActions] = useState<string[]>(['act_reschedule_flight']);
+  const [selectedFunctions, setSelectedFunctions] = useState<string[]>(['func_get_flight_weather']);
+  const [selectedGuardrails, setSelectedGuardrails] = useState<string[]>(['gr-pii', 'gr-approval', 'gr-hallucination']);
+
+  // RAG / Documents list
+  const [ragDocs, setRagDocs] = useState<RAGDocument[]>([
+    { id: 'doc-1', name: 'CAAC_AOC_Safety_Rules_v4.pdf', type: 'PDF 文档', size: '2.4 MB', chunksCount: 142, status: 'synced', lastModified: '2026-07-02 11:20' },
+    { id: 'doc-2', name: 'SOP_Emergency_Reschedule_Guide.md', type: 'Markdown', size: '124 KB', chunksCount: 45, status: 'synced', lastModified: '2026-07-01 10:45' },
+    { id: 'doc-3', name: 'Airline_Crew_FAQ_List.txt', type: 'TEXT 纯文本', size: '48 KB', chunksCount: 18, status: 'synced', lastModified: '2026-06-28 14:15' }
+  ]);
+  const [dragOver, setDragOver] = useState(false);
+  const [isSyncingRAG, setIsSyncingRAG] = useState(false);
+  const [ragLogs, setRagLogs] = useState<string[]>([]);
+
+  // Publishing Panel States
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishingLogs, setPublishingLogs] = useState<string[]>([]);
+  const [chatbotVersion, setChatbotVersion] = useState<string>('v1.0.4');
+  const [embedTab, setEmbedTab] = useState<'iframe' | 'web-component' | 'widget-json'>('iframe');
+  const [apiLang, setApiLang] = useState<'typescript' | 'curl'>('curl');
+
+  // Modals
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Sync state when active chatbot switches
+  useEffect(() => {
+    if (activeChatbot) {
+      setTempName(activeChatbot.name);
+      setTempRole(activeChatbot.role);
+      setTempDesc(activeChatbot.description);
+      setTempModel(activeChatbot.modelId);
+      setTempPrompt(activeChatbot.systemPrompt);
+      setSelectedObjects(['AviationFlight', 'AviationPilot']);
+      setSelectedActions([...activeChatbot.assignedTools.actionIds]);
+      setSelectedFunctions([...activeChatbot.assignedTools.functionIds]);
+      setSelectedGuardrails([...activeChatbot.guardrailIds]);
+
+      // Reload welcome chat messages
+      setChatMessages([
+        {
+          id: 'welcome',
+          sender: 'agent',
+          content: `### 🤖 ${activeChatbot.name} (AIP Chatbot Studio Sandbox)\n\n您好！我是工作于航空运行控制中心(AOC)的 **${activeChatbot.name}**。  \n我已经基于您配置的 **本体关系** 与 **RAG安全规章知识库** 动态就绪。  \n\n**我的数据访问授权**：\n- 📂 绑定实体：\`AviationFlight (航班对象)\`, \`AviationPilot (飞行员对象)\`\n- ⚙️ 绑定动作：\`act_reschedule_flight (重新指派航班与状态修改)\`\n- 🛡️ 安全合规：已装配 \`${activeChatbot.guardrailIds.length} 个防护规则\`, 包括 PII 数据动态脱敏与 Action 强人工对账核对。\n\n您可以用以下方式在沙箱中对我进行对话干涉测试：\n1. **多模态实体关联查询**："查询 UA102 航班当前运行状态及机长是谁？"\n2. **敏感个人隐私脱敏**："查询张建国机长的社会保障号 (SSN) 执勤底线记录"\n3. **意图触发写回提案**："帮我将 UA102 航班延误状态改派为2小时"`,
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    }
+  }, [selectedAgentId]);
+
+  // Scroll to bottom of chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, isReplying]);
+
+  // Handle Drag and Drop for Files
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer.files) as File[];
+    if (files.length > 0) {
+      handleFilesAdded(files);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = (e.target.files ? Array.from(e.target.files) : []) as File[];
+    if (files.length > 0) {
+      handleFilesAdded(files);
+    }
+  };
+
+  const handleFilesAdded = (files: File[]) => {
+    const newDocs: RAGDocument[] = files.map((file, idx) => ({
+      id: `doc-add-${Date.now()}-${idx}`,
+      name: file.name,
+      type: file.name.split('.').pop()?.toUpperCase() || 'DOCUMENT',
+      size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      chunksCount: 0,
+      status: 'pending',
+      lastModified: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    }));
+
+    setRagDocs(prev => [...prev, ...newDocs]);
+    showToast('info', `已添加 ${files.length} 个知识文档到待切块索引列表`);
+  };
+
+  // RAG / Chunking Vectorization Simulation
+  const handleSyncRAG = () => {
+    setIsSyncingRAG(true);
+    setRagLogs(['🔄 [0.0s] 启动 AIP Chatbot RAG 向量增量切片管道...']);
+
+    const progressLogs = [
+      '⚡ [0.5s] 读取未同步文档：寻找状态为 [pending] 的知识源...',
+      '🔍 [1.0s] 提取文档文字、消除特殊标记并清洗格式 (TEXT/PDF Parser)...',
+      '✂️ [1.8s] 按照块大小: 512, 重叠度: 50 运行滑动窗口递归分块(Recursive Character Splitting)...',
+      '🤖 [2.5s] 调用 LLM 嵌入式模型 `text-embedding-004` 计算向量特征值...',
+      '💾 [3.2s] 将切片成果注入私有 pgvector 特征元数据表，双向对齐底层本体索引...',
+      '✅ [4.0s] RAG 知识检索网格重构完成！所有新挂载文档均已标记为已对齐状态。'
+    ];
+
+    let logIdx = 0;
+    const interval = setInterval(() => {
+      if (logIdx < progressLogs.length) {
+        setRagLogs(prev => [...prev, progressLogs[logIdx]]);
+        logIdx++;
+      } else {
+        clearInterval(interval);
+        setRagDocs(prev => prev.map(d => ({ ...d, status: 'synced', chunksCount: d.chunksCount === 0 ? Math.floor(Math.random() * 80) + 15 : d.chunksCount })));
+        setIsSyncingRAG(false);
+        showToast('success', 'RAG 文档向量化对齐成功！智能体已习得最新专业领域知识。');
+      }
+    }, 700);
+  };
+
+  // Publishing / Testing Compile Simulation
+  const handlePublishChatbot = () => {
+    setIsPublishing(true);
+    setPublishingLogs(['🚀 [0.0s] 启动 Chatbot Studio 构建流，检查模型及本体连接...']);
+
+    const steps = [
+      '🔍 [0.4s] 验证逻辑绑定契约... Objects: Ok, Actions: 1 Ok, Functions: 1 Ok',
+      '🛡️ [0.9s] 编译安全护栏网格，注入列级 Redaction 规则与 row-filter...',
+      '🧪 [1.5s] 触发集成测试用例: 对话幻觉防御 HAG 自检测试 (置信度阀值: 92%)... ✅ PASSED',
+      '📦 [2.1s] 生成独立 Web UI 视图容器，构建 Workshop 桥接接口与元数据 API 终端...',
+      '💾 [2.8s] 注册服务版本, 升级编译版本至 v1.0.5 并提交全站对账元数据记录...',
+      '🎉 [3.5s] 部署完成！Chatbot 节点在 Sovereign 边界内正常运行，已在控制台中激活上线。'
+    ];
+
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      if (stepIdx < steps.length) {
+        setPublishingLogs(prev => [...prev, steps[stepIdx]]);
+        stepIdx++;
+      } else {
+        clearInterval(interval);
+        setIsPublishing(false);
+        setChatbotVersion('v1.0.5');
+        
+        // Update master agents state
+        if (activeChatbot) {
+          const updated = agents.map(a => {
+            if (a.id === activeChatbot.id) {
+              return {
+                ...a,
+                name: tempName,
+                role: tempRole,
+                description: tempDesc,
+                modelId: tempModel,
+                systemPrompt: tempPrompt,
+                guardrailIds: selectedGuardrails,
+                assignedTools: {
+                  actionIds: selectedActions,
+                  functionIds: selectedFunctions
+                }
+              };
+            }
+            return a;
+          });
+          onUpdateAgents(updated);
+        }
+
+        // Add Audit Log
+        onAddAuditLog({
+          id: `log-pub-${Date.now()}`,
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          source: 'Chatbot Studio',
+          assetName: tempName,
+          user: '王凯 (AOC签派总监)',
+          inputTokens: 0,
+          outputTokens: 0,
+          status: 'allowed',
+          actionTaken: '编译发布成功',
+          details: `发布了智能对话工坊的新版本 v1.0.5。绑定关系：Objects=${selectedObjects.join(',')}, Actions=${selectedActions.join(',')}`
+        });
+
+        showToast('success', `智能体「${tempName}」发布成功！最新版本 v1.0.5 已于企业网内下发运行。`);
+      }
+    }, 600);
+  };
+
+  // Chat Submission & Sandbox Dynamic Inference Logic
+  const handleSendChat = (textToSend?: string) => {
+    const text = textToSend || chatInput;
+    if (!text.trim() || isReplying || !activeChatbot) return;
+
+    // Add user message to chat state
+    const userMsgId = `user-${Date.now()}`;
+    const timestampStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const userMsg: ChatMessage = {
+      id: userMsgId,
+      sender: 'user',
+      content: text,
+      timestamp: timestampStr
+    };
+
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setIsReplying(true);
+
+    // Dynamic Server-Side Simulation Trigger
+    setTimeout(() => {
+      const replyMsgId = `agent-${Date.now()}`;
+      let replyContent = '';
+      let thinkingTrace: string[] = [];
+      let proposal: ChatMessage['actionProposal'] = undefined;
+
+      const queryLower = text.toLowerCase();
+
+      // CASE 1: External Contractor - STRICT RBAC Block
+      if (activeUserRole === 'EXTERNAL_CONTRACTOR') {
+        thinkingTrace = [
+          '⚡ 正在解析用户请求，检查 activeUserRole 鉴权身份...',
+          '🛡️ 安全拦截：检测到用户角色 [EXTERNAL_CONTRACTOR] 隶属于外部承包方，未被授权读取核心航空实体或执行指令。',
+          '⛔ 触发安全防御规则：拒绝执行操作，隐藏物理数据结构。'
+        ];
+        replyContent = `⚠️ **安全网安全拦截通知 (Sovereign Safety Block)**：\n\n对不起，系统检测到您当前身份为 **[外部承包商 (External Contractor)]**。  \n由于您未持有民航 AOC 核心签派员鉴权角色，受安全中心 **AIP Row-Level & RBAC 隔离护栏** 强制阻断约束：\n- 🔒 禁止读取 \`AviationPilot\` 与 \`AviationFlight\` 核心物理实体数据。\n- 🔒 无法使用任何写回指令（Ontology Actions）。\n\n如有排班调配需求，请联系 AOC 签派总监王凯进行授权处理。`;
+      } 
+      // CASE 2: General Query about Flight UA102 / Object lookup (Grounded retrieval)
+      else if (queryLower.includes('ua102') || queryLower.includes('查询')) {
+        thinkingTrace = [
+          '⚡ 正在提取查询本体目标: Flight (ID: UA102)',
+          '🔍 运行 RAG 向量检索，召回相关业务上下文: CAAC AOC 运行调度 SOP、延误改派规定...',
+          '🔗 查询底层物理表：从 Doris `ds_flights_clean` 宽表读取物理记录...',
+          '🧬 装配知识卡：关联 Pilot 实体的社会保障号码 (SSN)、保底工资与 CAAC 资质...',
+          '🛡️ 安全审查：Guardrail [gr-pii] 已激活，检测 Pilot PII 数据，执行动态遮蔽...'
+        ];
+
+        // check if PII masking is selected
+        const isPiiMasked = selectedGuardrails.includes('gr-pii');
+        const ssnValue = isPiiMasked ? '`[REDACTED_BY_PII_GUARDRAIL_MASK_SSN]`' : '`32010619841203XXXX (真实值: S-2289410)`';
+        const payrollValue = isPiiMasked ? '`[REDACTED_BY_PII_GUARDRAIL_MASK_SALARY]`' : '`¥38,400 / 月 (Base)`';
+
+        replyContent = `已为您在航空核心本体(Aviation Core)中成功拉取 **UA102** 航班的最新高精度数据：\n\n### ✈️ 航班运行档案 (ObjectType: Flight)\n- **航班号**: UA102 (芝加哥 ORD → 旧金山 SFO)\n- **计划起飞**: 今日 08:00 (ON_TIME 准点)\n- **执飞机型**: Boeing 737-800 (尾号: **N101UA**)\n- **适航状态**: 【极佳 (Excellent)】（最后一次 C 检维保于 2026-05-12）\n\n### 👨‍✈️ 签派飞行员资质与安全审计 (ObjectType: Pilot)\n- **责任机长**: **张建国** (资质: D-121部机长, 累积安全飞行 8200 小时)\n- **CAAC 资质状态**: ✅ 资质在有效期内\n- **机长社保保障号 (SSN)**: ${ssnValue}\n- **机长保底薪资标准**: ${payrollValue}\n\n**AIP 决策引擎建议**：\n当前执飞方案完全符合 CAAC 121 部执勤时间规章。芝加哥与旧金山航路上目前无明显对流云团，气象评估结果为适航，推荐维持当前编排方案。`;
+      } 
+      // CASE 3: Trigger Action Intent / Write-back (Reschedule flight)
+      else if (queryLower.includes('延误') || queryLower.includes('改期') || queryLower.includes('小时') || queryLower.includes('reschedule')) {
+        thinkingTrace = [
+          '⚡ 用户发起对本体数据修改之事务请求。操作目标: 航班重调度与状态变更',
+          '🔍 识别待调用动作算子: `act_reschedule_flight`',
+          '⚙️ 验证参数白名单契约... delay_minutes: "120", new_status: "DELAYED"',
+          '🛡️ 安全拦截：发现操作涉及逻辑写回，触发安全护栏 `gr-approval` 人工确认机制。',
+          '💾 暂挂物理事务，注册暂挂写回提案 (Pending Proposal)，向前端生成操作授权 Consent 卡片...'
+        ];
+
+        replyContent = `我已理解您的操作意图：**因突发天气变化或签派调度要求，需将 UA102 航班更改为延误 2 小时**。\n\n根据系统预设的 **AIP Guardrails 安全审查规范**，由于该操作会物理影响底层 Doris 表 ` + "`flights_raw`" + `，系统必须暂挂物理写入，转为**对账写回提案 (Ontology Action Proposal)**。\n\n请您作为 **AOC 签派总监**，在下方授权卡片中核对物理映射并手动确认授权，方可物理落库生效。`;
+        
+        proposal = {
+          actionId: 'act_reschedule_flight',
+          actionName: '重新指派航班与状态修改 (act_reschedule_flight)',
+          payload: {
+            flight_number: 'UA102',
+            new_status: 'DELAYED',
+            delay_minutes: '120',
+            auth_required_by: 'AOC_DIRECTOR'
+          },
+          status: 'pending'
+        };
+      } 
+      // CASE 4: PII Masking direct test
+      else if (queryLower.includes('ssn') || queryLower.includes('工资') || queryLower.includes('薪') || queryLower.includes('身份证')) {
+        const isPiiMasked = selectedGuardrails.includes('gr-pii');
+        thinkingTrace = [
+          '⚡ 检测到显式寻求敏感隐私要素 (SSN/Salary) 指令...',
+          `🛡️ 触发 PII 护栏匹配... 规则启用状态: [${isPiiMasked}]`
+        ];
+
+        if (isPiiMasked) {
+          replyContent = `⚠️ **敏感数据安全遮蔽阻断警告**：\n\n系统检测到您的指令正在尝试以明文拉取飞行员的核心个人隐私信息（SSN / 保底工资）。\n根据 **AIP Guardrails 隐私合规条例 (gr-pii)**，所有输出中的关键敏感信息已被强制转换为脱敏标记，明文日志已被阻断：\n- 🔒 **机长社会保障号 (SSN)**: \`[REDACTED_SSN_NUMBER_BY_GUARDRAIL]\`\n- 🔒 **保底工资标准**: \`[REDACTED_PAYROLL_DATA_BY_GDPR]\`\n\n审计详情已自动生成并发送给安全中心审计总揽大盘。`;
+        } else {
+          replyContent = `⚠️ **安全免责警告 (PII 护栏未启用)**：\n\n系统检测到您的指令正在尝试拉取敏感隐私信息（SSN / 薪资）。由于您在当前 Chatbot 中**未勾选启用 [gr-pii] 安全护栏**，数据将以明文导出，请妥善保管机密！\n\n- 👨‍✈️ 机长张建国身份证 SSN: \`32010619841203XXXX\`\n- 💰 责任保底薪酬标准: \`¥38,400 / 月\`\n\n*提示：为了生产环境合规，建议立即在左侧「安全护栏」设置中启用 PII 脱敏机制！*`;
+        }
+      } 
+      // CASE 5: Default Generic Conversation
+      else {
+        thinkingTrace = [
+          '⚡ 提取通用交互会话意图...',
+          '🧠 解析 RAG 知识库大纲，提供操作指导路线...'
+        ];
+        replyContent = `我是您的 **${activeChatbot.name}**。我可以基于您的本地航空本体与 RAG 规章知识库，为您提供无缝、可信的多维航空签派问答：\n\n您可以尝试对我输入以下交互问题测试：\n1. 🔍 **实体查询**："UA102 航班今天准点吗？机组配置如何？"\n2. 🛡️ **脱敏测试**："显示张建国机长的社会保障和薪水标准"\n3. ⚙️ **调配写回**："UA102 航班因暴雨改派，延误2小时，通知调度大厅"`;
+      }
+
+      // If action proposal was generated, register in backend
+      if (proposal) {
+        fetch('/api/ontology/proposals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            actionId: proposal.actionId,
+            actionName: proposal.actionName,
+            agentId: activeChatbot.id,
+            agentName: activeChatbot.name,
+            payload: proposal.payload,
+            proposedBy: `Chatbot Sandbox (${activeChatbot.name})`
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.proposal) {
+            proposal!.id = data.proposal.id;
+          }
+        })
+        .catch(err => console.error('Failed to create proposal', err));
+      }
+
+      // Append chatbot message to chat state
+      setChatMessages(prev => [...prev, {
+        id: replyMsgId,
+        sender: 'agent',
+        content: replyContent,
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        thinkingTrace,
+        actionProposal: proposal
+      }]);
+
+      setIsReplying(false);
+    }, 1500);
+  };
+
+  // Human Approval Card Execution
+  const handleProposalConsent = (msgId: string, approved: boolean) => {
+    const targetMsg = chatMessages.find(m => m.id === msgId);
+    if (!targetMsg || !targetMsg.actionProposal) return;
+
+    const propId = targetMsg.actionProposal.id || 'prop-1';
+
+    if (approved) {
+      // call the execute backend
+      fetch(`/api/ontology/proposals/${propId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userRole: '签派总监',
+          userName: '王凯'
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showToast('success', 'Ontology Action 物理写回成功并通过双向核对对账！');
+
+          // update chat proposal status
+          setChatMessages(prev => prev.map(msg => {
+            if (msg.id === msgId && msg.actionProposal) {
+              return {
+                ...msg,
+                actionProposal: {
+                  ...msg.actionProposal,
+                  status: 'approved' as const
+                }
+              };
+            }
+            return msg;
+          }));
+
+          // add audit log
+          onAddAuditLog({
+            id: `log-exec-${Date.now()}`,
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+            source: 'Ontology Engine',
+            assetName: activeChatbot?.name || 'AIP Chatbot',
+            user: '王凯 (AOC签派总监)',
+            inputTokens: 0,
+            outputTokens: 250,
+            status: 'allowed',
+            actionTaken: '双向核对成功',
+            details: `人工授权执行动作 act_reschedule_flight: 航班 UA102 成功延误 120 分钟并完成 Doris 双向字段值核算对账。`
+          });
+
+          // Generate verification details
+          const checkItems = data.verificationMatrix?.map((m: any) => 
+            `• **[逻辑字段对齐]** \`${m.logicalField}\` ➔ \`${m.physicalCol}\`: 预估 [${m.expectedValue}] ↔ 物理读回 [${m.readbackValue}] ✅ 强一致对齐`
+          ).join('\n') || '';
+
+          // Add verification report system message
+          setChatMessages(prev => [...prev, {
+            id: `sys-report-${Date.now()}`,
+            sender: 'system',
+            content: `### 📊 完美对账写回双向审计报告 (Bi-directional Physical Validation Report)\n\n**物理更新动作**: ${data.executionDetail}  \n**安全事务标识**: \`${data.transactionHash || 'TX_AOC_823901'}\`  \n\n**物理-逻辑字段强一致性对账核对 (Read-back Verification Check)**:\n${checkItems}\n\n🎉 底层 Doris 物理 Bronze/Gold 级宽表已成功写回刷新，血缘级联对齐。`,
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+          }]);
+        } else {
+          showToast('error', `授权执行失败: ${data.message || data.error}`);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        showToast('error', '物理对账执行出错，请重试');
+      });
+    } else {
+      showToast('info', '已拒绝该动作授权申请，操作已被安全拦截。');
+      
+      setChatMessages(prev => prev.map(msg => {
+        if (msg.id === msgId && msg.actionProposal) {
+          return {
+            ...msg,
+            actionProposal: {
+              ...msg.actionProposal,
+              status: 'rejected' as const
+            }
+          };
+        }
+        return msg;
+      }));
+    }
+  };
+
+  // Create or update Chatbot Metadata
+  const handleSaveMetadata = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempName.trim() || !tempRole.trim()) return;
+
+    if (isCreatingNew) {
+      const newId = `agent-${Date.now().toString().slice(-4)}`;
+      const newAgent: AIPAgent = {
+        id: newId,
+        name: tempName.trim(),
+        role: tempRole.trim(),
+        description: tempDesc.trim(),
+        avatar: 'Bot',
+        modelId: tempModel,
+        systemPrompt: tempPrompt.trim(),
+        assignedTools: {
+          actionIds: selectedActions,
+          functionIds: selectedFunctions
+        },
+        guardrailIds: selectedGuardrails,
+        status: 'active',
+        lastModified: new Date().toISOString().replace('T', ' ').substring(0, 16)
+      };
+
+      onUpdateAgents([...agents, newAgent]);
+      setSelectedAgentId(newId);
+      showToast('success', '成功创建全新 AIP Chatbot');
+    } else if (activeChatbot) {
+      const updated = agents.map(a => {
+        if (a.id === activeChatbot.id) {
+          return {
+            ...a,
+            name: tempName.trim(),
+            role: tempRole.trim(),
+            description: tempDesc.trim(),
+            modelId: tempModel,
+            systemPrompt: tempPrompt.trim(),
+            guardrailIds: selectedGuardrails,
+            assignedTools: {
+              actionIds: selectedActions,
+              functionIds: selectedFunctions
+            },
+            lastModified: new Date().toISOString().replace('T', ' ').substring(0, 16)
+          };
+        }
+        return a;
+      });
+      onUpdateAgents(updated);
+      showToast('success', '已更新 Chatbot 架构参数');
+    }
+    setShowMetadataModal(false);
+  };
+
+  const handleStartCreate = () => {
+    setIsCreatingNew(true);
+    setTempName('');
+    setTempRole('AOC 调度大厅专属 AI 助理');
+    setTempDesc('服务于运行大厅。结合本地本体与 RAG 知识回答各类签派问题。');
+    setTempModel('gemini-1.5-pro');
+    setTempPrompt('你是一个工作在运行控制中心 (AOC) 的 AI 协同助理...');
+    setSelectedObjects(['AviationFlight', 'AviationPilot']);
+    setSelectedActions(['act_reschedule_flight']);
+    setSelectedFunctions(['func_get_flight_weather']);
+    setSelectedGuardrails(['gr-pii', 'gr-approval']);
+    setShowMetadataModal(true);
+  };
+
+  const handleDeleteChatbot = (id: string) => {
+    if (!window.confirm('您确定要注销这个 Chatbot 实例吗？此操作不可逆。')) return;
+    const updated = agents.filter(a => a.id !== id);
+    onUpdateAgents(updated);
+    if (selectedAgentId === id && updated.length > 0) {
+      setSelectedAgentId(updated[0].id);
+    }
+    showToast('success', '已注销 Chatbot 实例');
+  };
+
+  return (
+    <div className="h-full w-full flex flex-col md:flex-row overflow-hidden bg-slate-100 text-xs select-none">
+      
+      {/* 1. Left Side: Chatbot Workspace Selector */}
+      <div className="w-full md:w-60 bg-white border-r border-slate-200 flex flex-col h-full shrink-0">
+        
+        <div className="p-3 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Icon name="Bot" size={14} className="text-blue-600" />
+            <span className="font-bold text-slate-800">对齐工坊实例 ({agents.length})</span>
+          </div>
+          <button
+            onClick={handleStartCreate}
+            className="p-1 text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 hover:border-blue-600 rounded-md transition-all cursor-pointer flex items-center justify-center"
+            title="新建 Chatbot"
+          >
+            <Icon name="Plus" size={11} />
+          </button>
+        </div>
+
+        {/* Chatbots list */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {agents.map(a => {
+            const isSelected = selectedAgentId === a.id;
+            return (
+              <div
+                key={a.id}
+                onClick={() => setSelectedAgentId(a.id)}
+                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 border ${
+                  isSelected
+                    ? 'bg-slate-900 border-slate-950 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center justify-between min-w-0">
+                  <div className="flex items-center gap-1.5 font-bold min-w-0">
+                    <span className={`p-1 rounded shrink-0 ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      <Icon name={a.avatar} size={11} />
+                    </span>
+                    <span className="truncate text-[11px]">{a.name}</span>
+                  </div>
+                </div>
+                <p className={`text-[10px] line-clamp-1 leading-normal ${isSelected ? 'text-slate-300' : 'text-slate-400 font-medium'}`}>
+                  {a.role}
+                </p>
+                <div className="flex items-center justify-between text-[8px] pt-1 mt-1 border-t border-slate-100/10 font-mono">
+                  <span className={isSelected ? 'text-slate-400' : 'text-slate-400'}>{a.modelId.replace('-1.5-pro', '')}</span>
+                  <span className={`px-1 rounded-sm font-extrabold ${isSelected ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-50 text-emerald-600'}`}>ACTIVE</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Workspace Footer Info */}
+        <div className="p-3 border-t border-slate-200 bg-slate-50 text-[9px] text-slate-400 leading-normal font-sans">
+          <div className="flex items-center gap-1.5 font-bold text-slate-600 mb-1">
+            <Icon name="ShieldCheck" size={11} className="text-emerald-500" />
+            <span>Sovereign Chatbot Agent</span>
+          </div>
+          符合 Palantir AIP 安全隔离要求，所有 Ontology Actions 执行均通过强双向对账机制。
+        </div>
+
+      </div>
+
+      {/* 2. Middle & Right: Active Chatbot Builder Workspace */}
+      {activeChatbot ? (
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-50">
+          
+          {/* Middle Left: Configuration Column */}
+          <div className="flex-1 flex flex-col border-r border-slate-200 h-full overflow-hidden bg-white">
+            
+            {/* Header of Active Workspace */}
+            <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col gap-2 shrink-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex gap-2.5 items-center min-w-0">
+                  <span className="p-2 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                    <Icon name={activeChatbot.avatar} size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-sm font-black text-slate-800 truncate">{activeChatbot.name}</h1>
+                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-mono font-bold rounded">
+                        {chatbotVersion}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{activeChatbot.role}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => {
+                      setIsCreatingNew(false);
+                      setTempName(activeChatbot.name);
+                      setTempRole(activeChatbot.role);
+                      setTempDesc(activeChatbot.description);
+                      setTempModel(activeChatbot.modelId);
+                      setTempPrompt(activeChatbot.systemPrompt);
+                      setShowMetadataModal(true);
+                    }}
+                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center"
+                    title="配置元数据"
+                  >
+                    <Icon name="Settings2" size={12} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteChatbot(activeChatbot.id)}
+                    className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center"
+                    title="注销此智能体"
+                  >
+                    <Icon name="Trash2" size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabs list inside active workspace configuration */}
+              <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px] font-bold mt-2">
+                {[
+                  { id: 'prompt', label: '角色指令 (Prompt)', icon: 'Sliders' },
+                  { id: 'ontology', label: '本体与逻辑绑定', icon: 'Workflow' },
+                  { id: 'knowledge', label: 'RAG 专属知识库', icon: 'FileText' },
+                  { id: 'guardrails', label: '安全拦截护栏', icon: 'ShieldAlert' },
+                  { id: 'publish', label: '发布与嵌入 (Embed)', icon: 'Send' }
+                ].map(tab => {
+                  const isActive = activeWorkspaceTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveWorkspaceTab(tab.id as any)}
+                      className={`flex-1 py-1 px-2 rounded-md font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        isActive ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <Icon name={tab.icon} size={11} />
+                      <span className="hidden lg:inline">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Workspace Column Dynamic Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              
+              {/* TAB 1: System prompt config */}
+              {activeWorkspaceTab === 'prompt' && (
+                <div className="space-y-4 font-sans">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">
+                      System Instructions (系统提示词角色约束)
+                    </label>
+                    <textarea
+                      value={tempPrompt}
+                      onChange={(e) => setTempPrompt(e.target.value)}
+                      className="w-full h-64 p-3 border border-slate-200 rounded-xl text-[11px] font-mono leading-relaxed bg-slate-50/50 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="指定智能体的系统设定、专业知识限制、执行指令契约..."
+                    />
+                    <p className="text-[9px] text-slate-400 leading-normal">
+                      提示词可引导模型在限定本体领域内提供专业解答，并强制规定动作提案生成语法规则。
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+                    <h3 className="font-bold text-slate-700 text-[11px] flex items-center gap-1">
+                      <Icon name="Settings" size={12} className="text-blue-500" />
+                      <span>大模型超参数精细微调 (Hyperparameters)</span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Temperature Slider */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="text-slate-500 font-bold">Temperature (温度值)</span>
+                          <span className="font-mono text-blue-600 font-extrabold">{tempTemperature}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={tempTemperature}
+                          onChange={(e) => setTempTemperature(parseFloat(e.target.value))}
+                          className="w-full accent-blue-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
+                        />
+                        <span className="text-[8px] text-slate-400 block">较低值使回复稳定，较高值激发创意</span>
+                      </div>
+
+                      {/* Top P Slider */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="text-slate-500 font-bold">Top P (核采样)</span>
+                          <span className="font-mono text-blue-600 font-extrabold">{tempTopP}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={tempTopP}
+                          onChange={(e) => setTempTopP(parseFloat(e.target.value))}
+                          className="w-full accent-blue-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
+                        />
+                        <span className="text-[8px] text-slate-400 block">多核概率截断阈值</span>
+                      </div>
+
+                      {/* Max Tokens */}
+                      <div className="space-y-1.5 md:col-span-2">
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="text-slate-500 font-bold">Max Output Tokens (最大输出字数限制)</span>
+                          <span className="font-mono text-blue-600 font-extrabold">{tempMaxTokens}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="256"
+                          max="8192"
+                          step="256"
+                          value={tempMaxTokens}
+                          onChange={(e) => setTempMaxTokens(parseInt(e.target.value))}
+                          className="w-full accent-blue-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Ontology bindings */}
+              {activeWorkspaceTab === 'ontology' && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-200/50 flex items-start gap-2">
+                    <Icon name="Info" size={14} className="shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      <strong>本体对齐映射协议：</strong> 在此配置 Chatbot 允许调取的 **ObjectType（本体实体）**、**Ontology Actions（写回动作）** 及 **Functions（执行算子）**。AIP 引擎会自动将实体数据转化为上下文，供模型执行工具调用。
+                    </p>
+                  </div>
+
+                  {/* 1. Object Types */}
+                  <div className="space-y-2">
+                    <h3 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-1">
+                      <Icon name="Layers" size={11} className="text-slate-400" />
+                      <span>授权读取的对象主体 (ObjectType Bindings)</span>
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {[
+                        { id: 'AviationFlight', label: 'AviationFlight (航班运行对象)', desc: '计划起飞、客座率、延误情况物理表：ds_flights_clean' },
+                        { id: 'AviationPilot', label: 'AviationPilot (机组飞行员档案)', desc: '执飞限制、CAAC执照物理表：ds_pilots_biography' },
+                        { id: 'AviationAirport', label: 'AviationAirport (机场物理档案)', desc: '机场跑道、流量监控物理表：ds_airports_metadata' },
+                        { id: 'AviationEquipment', label: 'AviationEquipment (飞机MEL物料)', desc: '飞机故障MEL清单、QAR飞安状态' }
+                      ].map(obj => {
+                        const isBound = selectedObjects.includes(obj.id);
+                        return (
+                          <div
+                            key={obj.id}
+                            onClick={() => {
+                              setSelectedObjects(prev => 
+                                prev.includes(obj.id) ? prev.filter(x => x !== obj.id) : [...prev, obj.id]
+                              );
+                            }}
+                            className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
+                              isBound ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isBound}
+                              onChange={() => {}}
+                              className="mt-0.5 accent-blue-600 rounded"
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 text-[11px]">{obj.label}</span>
+                              <span className="text-[9px] text-slate-400 leading-tight mt-0.5">{obj.desc}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. Action Types */}
+                  <div className="space-y-2">
+                    <h3 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-1">
+                      <Icon name="Settings" size={11} className="text-slate-400" />
+                      <span>授权执行的写回算子 (ActionType Bindings)</span>
+                    </h3>
+                    <div className="space-y-2">
+                      {[
+                        { id: 'act_reschedule_flight', name: '重新指派航班与状态修改 (act_reschedule_flight)', desc: '修改物理 Doris 宽表的航班状态、延误时长参数，由 AOC 签派总监提权。', target: ' DDL: ds_flights_clean.status' },
+                        { id: 'act_assign_pilot', name: '强制接替指派飞行员 (act_assign_pilot)', desc: '修改航班责任机长工号，自动校验 CAAC 121 部执勤超时规定。', target: ' DDL: ds_flights_clean.captain_id' }
+                      ].map(act => {
+                        const isBound = selectedActions.includes(act.id);
+                        return (
+                          <div
+                            key={act.id}
+                            onClick={() => {
+                              setSelectedActions(prev => 
+                                prev.includes(act.id) ? prev.filter(x => x !== act.id) : [...prev, act.id]
+                              );
+                            }}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
+                              isBound ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isBound}
+                              onChange={() => {}}
+                              className="mt-0.5 accent-indigo-600 rounded"
+                            />
+                            <div className="flex-1 flex flex-col">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-800 text-[11px]">{act.name}</span>
+                                <span className="text-[9px] bg-slate-100 text-slate-500 font-mono px-1 rounded">{act.target}</span>
+                              </div>
+                              <p className="text-[9px] text-slate-400 mt-1 leading-normal">{act.desc}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TAB 3: RAG / Document Source upload */}
+              {activeWorkspaceTab === 'knowledge' && (
+                <div className="space-y-4 font-sans">
+                  
+                  {/* Upload Drop Zone */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all cursor-pointer ${
+                      dragOver 
+                        ? 'border-blue-500 bg-blue-50/40' 
+                        : 'border-slate-300 bg-slate-50/40 hover:bg-slate-50 hover:border-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      id="file-upload"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                    <label htmlFor="file-upload" className="flex flex-col items-center cursor-pointer space-y-2">
+                      <Icon name="UploadCloud" size={32} className="text-slate-400" />
+                      <span className="font-bold text-slate-700 text-xs text-center">拖拽规章、SOP、PDF至此上传</span>
+                      <span className="text-[10px] text-slate-400 text-center">支持 PDF, Markdown, TXT, Excel 等 RAG 知识源 (单个最大 100MB)</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h4 className="font-extrabold text-slate-700 text-[11px] uppercase tracking-wider font-mono">
+                      已挂载的专有知识文件 ({ragDocs.length})
+                    </h4>
+
+                    <button
+                      onClick={handleSyncRAG}
+                      disabled={isSyncingRAG || !ragDocs.some(d => d.status === 'pending')}
+                      className={`px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition-all text-[10px] flex items-center gap-1 cursor-pointer ${
+                        isSyncingRAG || !ragDocs.some(d => d.status === 'pending') ? 'opacity-40 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isSyncingRAG ? (
+                        <>
+                          <span className="w-3 h-3 border border-slate-100 border-t-transparent rounded-full animate-spin" />
+                          <span>向量化对齐中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="RefreshCcw" size={10} />
+                          <span>一键开始增量切片对齐</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Document List */}
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                    {ragDocs.map(doc => (
+                      <div key={doc.id} className="p-2 bg-white border border-slate-200/80 hover:bg-slate-50 rounded-lg flex items-center justify-between gap-4 transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={`p-1.5 rounded ${doc.type === 'PDF' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>
+                            <Icon name="FileText" size={12} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 truncate text-[11px]">{doc.name}</p>
+                            <p className="text-[9px] text-slate-400 flex items-center gap-2 mt-0.5">
+                              <span>大小: {doc.size}</span>
+                              <span>•</span>
+                              <span>分块数: {doc.chunksCount > 0 ? `${doc.chunksCount} chunks` : '待提取'}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {doc.status === 'synced' ? (
+                            <span className="text-emerald-600 font-extrabold text-[9px] flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                              <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                              <span>对齐成功</span>
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 font-extrabold text-[9px] flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 animate-pulse">
+                              <span className="w-1 h-1 rounded-full bg-amber-500" />
+                              <span>等待向量化</span>
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => setRagDocs(prev => prev.filter(x => x.id !== doc.id))}
+                            className="p-1 text-slate-400 hover:text-red-500 rounded-md transition-colors cursor-pointer"
+                            title="卸载文件"
+                          >
+                            <Icon name="X" size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Log Console */}
+                  {ragLogs.length > 0 && (
+                    <div className="bg-slate-950 p-3 rounded-xl shadow-xs border border-slate-800 flex flex-col space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                        <span className="font-mono text-white text-[9px] font-bold">RAG Pipeline Vectorization Stream</span>
+                        <span className="text-[8px] text-slate-500 font-mono">text-embedding-004</span>
+                      </div>
+                      <div className="space-y-1 font-mono text-[8.5px] text-slate-300 leading-normal max-h-24 overflow-y-auto">
+                        {ragLogs.map((log, idx) => (
+                          <p key={idx} className={log.includes('✅') ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
+                            {log}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* TAB 4: Safety guardrails */}
+              {activeWorkspaceTab === 'guardrails' && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200/50 flex items-start gap-2">
+                    <Icon name="ShieldAlert" size={14} className="shrink-0 mt-0.5" />
+                    <p className="leading-relaxed text-[11px]">
+                      <strong>安全拦截围网 (AIP Guardrails Protection)：</strong> 强制对输入和输出流量执行即时过滤、隐私（PII）脱敏、幻觉阻断及动作对账阻拦，拦截任何违反 GDPR、CAAC 规章或超出特权的操作指令。
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {guardrails.map(gr => {
+                      const isEnabled = selectedGuardrails.includes(gr.id);
+                      return (
+                        <div
+                          key={gr.id}
+                          onClick={() => {
+                            setSelectedGuardrails(prev => 
+                              prev.includes(gr.id) ? prev.filter(x => x !== gr.id) : [...prev, gr.id]
+                            );
+                          }}
+                          className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-4 ${
+                            isEnabled ? 'bg-indigo-50/40 border-indigo-200/80 shadow-xs' : 'bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${isEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                              <Icon name={gr.type === 'pii_redaction' ? 'EyeOff' : gr.type === 'human_approval' ? 'KeyRound' : 'FileCheck'} size={14} />
+                            </span>
+                            <div className="space-y-1">
+                              <h4 className="font-extrabold text-slate-800 text-[11px]">{gr.name}</h4>
+                              <p className="text-[10px] text-slate-400 leading-normal font-sans">{gr.description}</p>
+                              
+                              {/* Guardrail Params Detail tag */}
+                              {gr.type === 'pii_redaction' && (
+                                <div className="flex flex-wrap gap-1 pt-1.5">
+                                  {gr.parameters.piiTypes?.map(t => (
+                                    <span key={t} className="px-1.5 py-0.2 bg-slate-100 border border-slate-200 rounded text-[8px] font-mono font-bold text-slate-500">
+                                      PII: {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {gr.type === 'human_approval' && (
+                                <div className="flex flex-wrap gap-1 pt-1.5">
+                                  {gr.parameters.requiredActionIds?.map(a => (
+                                    <span key={a} className="px-1.5 py-0.2 bg-indigo-50 border border-indigo-150 rounded text-[8px] font-mono font-bold text-indigo-500">
+                                      ACTION: {a}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase ${
+                              gr.severity === 'block' ? 'bg-rose-50 border border-rose-200 text-rose-600' :
+                              gr.severity === 'warn' ? 'bg-amber-50 border border-amber-200 text-amber-600' :
+                              'bg-slate-50 border border-slate-200 text-slate-500'
+                            }`}>
+                              {gr.severity === 'block' ? '🛡️ 拦截拦截' : gr.severity === 'warn' ? '⚠️ 弹窗告警' : '📝 仅审计存底'}
+                            </span>
+
+                            {/* Toggle Switch */}
+                            <div className={`w-8 h-4.5 rounded-full p-0.5 transition-all ${isEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                              <div className={`w-3.5 h-3.5 rounded-full bg-white transition-all transform ${isEnabled ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                </div>
+              )}
+
+              {/* TAB 5: Publishing & Deployment options */}
+              {activeWorkspaceTab === 'publish' && (
+                <div className="space-y-4 font-sans">
+                  
+                  {/* Compile & Publish zone */}
+                  <div className="p-4 bg-slate-900 rounded-2xl text-white space-y-4 relative overflow-hidden shadow-md">
+                    <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-4 scale-150">
+                      <Icon name="Send" size={120} />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="px-1.5 py-0.5 bg-blue-500 text-white rounded text-[8px] font-extrabold uppercase">
+                        Sovereign Compiler v2.4
+                      </span>
+                      <h3 className="font-extrabold text-sm">编译部署发布 (Compile & Publish)</h3>
+                      <p className="text-[10px] text-slate-300">
+                        检查本体映射规则约束、RAG 向量特征、幻觉护栏对账单并一键生成编译包。
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handlePublishChatbot}
+                      disabled={isPublishing}
+                      className={`px-4 py-2 bg-white hover:bg-slate-100 text-slate-900 font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                        isPublishing ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isPublishing ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                          <span>编译验证中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="Cpu" size={13} />
+                          <span>验证并重新发布上线</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Publishing Console logs */}
+                  {publishingLogs.length > 0 && (
+                    <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-slate-300 font-mono text-[9px] space-y-1.5">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                        <span className="text-white font-bold">AIP Copilot Compiler Logs</span>
+                        <span className="text-[8px] text-slate-500">v1.0.5</span>
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto leading-relaxed">
+                        {publishingLogs.map((log, i) => (
+                          <p key={i} className={log.includes('🎉') || log.includes('✅') ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
+                            {log}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Integration Snippets */}
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <h4 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                        <Icon name="Code" size={13} className="text-blue-500" />
+                        <span>多终端应用与集成发布方式 (Integration Channels)</span>
+                      </h4>
+                    </div>
+
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[9px] font-bold">
+                      <button
+                        onClick={() => setEmbedTab('iframe')}
+                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'iframe' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500'}`}
+                      >
+                        Workshop 网页嵌入 (iFrame)
+                      </button>
+                      <button
+                        onClick={() => setEmbedTab('web-component')}
+                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'web-component' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500'}`}
+                      >
+                        Web Component (自定义标签)
+                      </button>
+                      <button
+                        onClick={() => setEmbedTab('widget-json')}
+                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'widget-json' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500'}`}
+                      >
+                        AIP Widget JSON
+                      </button>
+                    </div>
+
+                    {embedTab === 'iframe' && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          您可以直接复制如下代码，在 Palantir Workshop 网页中通过 iframe 嵌入本智能交互界面：
+                        </p>
+                        <pre className="bg-slate-50 p-2.5 border border-slate-150 rounded-lg text-[9px] font-mono leading-relaxed text-slate-700 overflow-x-auto select-all">
+                          {`<iframe 
+  src="https://ECOS_AIP_GATEWAY/chatbot/embed/${activeChatbot.id}?auth=sso_jwt"
+  width="100%" 
+  height="600px" 
+  style="border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);"
+  allow="clipboard-write"
+/>`}
+                        </pre>
+                      </div>
+                    )}
+
+                    {embedTab === 'web-component' && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          采用原生 Shadow DOM 挂载，不破坏外层宿主微应用 CSS 样式，并完美兼容 ECOS AIP 沙箱：
+                        </p>
+                        <pre className="bg-slate-50 p-2.5 border border-slate-150 rounded-lg text-[9px] font-mono leading-relaxed text-slate-700 overflow-x-auto select-all">
+                          {`<!-- 引入 AIP 统一 SDK Web-Components 库 -->
+<script src="https://ECOS_AIP_GATEWAY/cdn/aip-widgets-v2.js" async></script>
+
+<!-- 在 HTML 任意处悬挂智能对话悬浮按钮 -->
+<aip-chatbot-button 
+  chatbot-id="${activeChatbot.id}" 
+  theme="cosmic-slate"
+  user-role="签派总监"
+  data-context="all_ontology"
+  placeholder="UA102 航班今天能准时飞吗？"
+/>`}
+                        </pre>
+                      </div>
+                    )}
+
+                    {embedTab === 'widget-json' && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          用于在 Web IDE 或定制前后端进行底层配置同步的 AIP 组件描述元文件：
+                        </p>
+                        <pre className="bg-slate-50 p-2.5 border border-slate-150 rounded-lg text-[9px] font-mono leading-relaxed text-slate-700 overflow-x-auto select-all">
+                          {`{
+  "widgetType": "AIP_CHATBOT_STUDIO",
+  "widgetId": "${activeChatbot.id}",
+  "chatbotName": "${activeChatbot.name}",
+  "engineModel": "${activeChatbot.modelId}",
+  "temperature": ${tempTemperature},
+  "bindings": {
+    "objects": ${JSON.stringify(selectedObjects)},
+    "actions": ${JSON.stringify(selectedActions)},
+    "functions": ${JSON.stringify(selectedFunctions)}
+  },
+  "security": {
+    "guardrails": ${JSON.stringify(selectedGuardrails)},
+    "roleLock": "AOC_DIRECTOR"
+  }
+}`}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* API Code snippets */}
+                    <div className="border-t border-slate-150 pt-3 mt-1.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700">API 外部查询网关 SDK 接口 (API Integration)</span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setApiLang('curl')}
+                            className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'curl' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}
+                          >
+                            cURL
+                          </button>
+                          <button
+                            onClick={() => setApiLang('typescript')}
+                            className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'typescript' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}
+                          >
+                            TypeScript
+                          </button>
+                        </div>
+                      </div>
+
+                      {apiLang === 'curl' ? (
+                        <pre className="bg-slate-50 p-2.5 border border-slate-150 rounded-lg text-[9px] font-mono leading-relaxed text-slate-700 overflow-x-auto select-all">
+                          {`curl -X POST "https://ECOS_AIP_GATEWAY/api/chatbot/${activeChatbot.id}/query" \\
+  -H "Authorization: Bearer \$ECOS_AIP_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "query": "查询 UA102 航班运行状态",
+    "userRole": "AOC_DIRECTOR",
+    "stream": false
+  }'`}
+                        </pre>
+                      ) : (
+                        <pre className="bg-slate-50 p-2.5 border border-slate-150 rounded-lg text-[9px] font-mono leading-relaxed text-slate-700 overflow-x-auto select-all">
+                          {`import { AIPChatbotClient } from '@ecos/aip-sdk';
+
+const client = new AIPChatbotClient({
+  apiKey: process.env.ECOS_AIP_API_KEY,
+  gatewayUrl: 'https://ECOS_AIP_GATEWAY'
+});
+
+async function runInference() {
+  const response = await client.chatbot.query({
+    chatbotId: '${activeChatbot.id}',
+    query: '查询 UA102 航班运行状态并对齐机组',
+    userRole: 'AOC_DIRECTOR'
+  });
+  
+  console.log('Chatbot Reply:', response.content);
+  console.log('Thinking CoT:', response.thinkingTrace);
+}`}
+                        </pre>
+                      )}
+                    </div>
+
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+          </div>
+
+          {/* Right Side: Interactive Sandbox Playground */}
+          <div className="w-full md:w-110 flex flex-col h-full bg-slate-50 border-l border-slate-200">
+            
+            {/* Sandbox Setup Panel Header */}
+            <div className="p-3 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="font-extrabold text-slate-800">Chatbot 交互调试沙箱 (Sandbox)</span>
+              </div>
+              
+              {/* Reset state */}
+              <button
+                onClick={() => {
+                  setChatMessages([
+                    {
+                      id: 'welcome-reset',
+                      sender: 'agent',
+                      content: `### 🤖 ${activeChatbot.name} (沙箱调试已重置)\n\n请输入问题开始交互测试。你可以对我说："查询 UA102 航班运行情况"`,
+                      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                    }
+                  ]);
+                  showToast('info', '沙箱交互历史已清空');
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer transition-colors"
+                title="清空历史"
+              >
+                <Icon name="RotateCw" size={11} />
+              </button>
+            </div>
+
+            {/* Sandbox context modifier */}
+            <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2 shrink-0">
+              <div className="grid grid-cols-2 gap-2 text-[9px] font-sans">
+                
+                {/* Simulated User Role selector */}
+                <div className="space-y-1">
+                  <label className="text-slate-500 font-extrabold flex items-center gap-1">
+                    <Icon name="User" size={10} className="text-indigo-500" />
+                    <span>沙箱模拟用户角色 (RBAC Role)</span>
+                  </label>
+                  <select
+                    value={activeUserRole}
+                    onChange={(e) => {
+                      setActiveUserRole(e.target.value as any);
+                      showToast('info', `已将沙箱测试身份切换为: ${e.target.value === 'AOC_DIRECTOR' ? 'AOC签派总监' : '外部承包商'}`);
+                    }}
+                    className="w-full p-1 bg-white border border-slate-200 rounded font-bold text-[10px] outline-none"
+                  >
+                    <option value="AOC_DIRECTOR">王凯 (AOC签派总监 - 满权限)</option>
+                    <option value="EXTERNAL_CONTRACTOR">张杰 (外部承包商 - 安全隔离限权)</option>
+                  </select>
+                </div>
+
+                {/* Simulated database selector */}
+                <div className="space-y-1">
+                  <label className="text-slate-500 font-extrabold flex items-center gap-1">
+                    <Icon name="Database" size={10} className="text-blue-500" />
+                    <span>数据上下文 (Grounded Scope)</span>
+                  </label>
+                  <select
+                    value={activeContextDataset}
+                    onChange={(e) => setActiveContextDataset(e.target.value)}
+                    className="w-full p-1 bg-white border border-slate-200 rounded font-bold text-[10px] outline-none"
+                  >
+                    <option value="all_ontology">整个 Aviation Core 本体库</option>
+                    <option value="only_flights">限制仅可读取 Flight 数据</option>
+                  </select>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Chat Sandbox Message History */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-100/50">
+              {chatMessages.map((msg) => {
+                const isUser = msg.sender === 'user';
+                const isSystem = msg.sender === 'system';
+                
+                if (isSystem) {
+                  return (
+                    <div key={msg.id} className="p-3 bg-white border border-emerald-100 rounded-xl space-y-2 shadow-2xs font-mono text-[10px]">
+                      <div className="flex items-center gap-1.5 text-emerald-600 font-extrabold border-b border-emerald-50 pb-1.5">
+                        <Icon name="ShieldCheck" size={13} />
+                        <span>{msg.content.split('\n\n')[0].replace('###', '').trim()}</span>
+                      </div>
+                      <div className="text-slate-600 leading-relaxed whitespace-pre-line font-sans text-[10px]">
+                        {msg.content.substring(msg.content.indexOf('\n\n') + 2)}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={msg.id} className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                    
+                    {/* Avatar */}
+                    <span className={`p-1.5 rounded-lg shrink-0 h-7 w-7 flex items-center justify-center font-bold text-white shadow-3xs ${
+                      isUser ? 'bg-indigo-600' : 'bg-slate-800'
+                    }`}>
+                      <Icon name={isUser ? 'User' : activeChatbot.avatar} size={12} />
+                    </span>
+
+                    {/* Bubble body */}
+                    <div className="space-y-1.5 max-w-[85%]">
+                      
+                      <div className={`p-3 rounded-2xl leading-normal text-[11px] whitespace-pre-line shadow-3xs ${
+                        isUser 
+                          ? 'bg-indigo-600 text-white font-medium rounded-tr-none' 
+                          : 'bg-white text-slate-800 border border-slate-200/60 rounded-tl-none font-sans'
+                      }`}>
+                        {/* Elegant rendering for chatbot markdown paragraphs */}
+                        {msg.content}
+                      </div>
+
+                      {/* Thinking Trace (Chain of Thought logs) */}
+                      {!isUser && msg.thinkingTrace && msg.thinkingTrace.length > 0 && (
+                        <details className="group bg-white/60 border border-slate-200/50 rounded-lg p-1.5 transition-all">
+                          <summary className="flex items-center gap-1 font-mono text-[9px] text-slate-400 font-bold cursor-pointer select-none outline-none hover:text-slate-600">
+                            <span className="transition-transform group-open:rotate-90">▶</span>
+                            <Icon name="Cpu" size={9} />
+                            <span>推理决策链路追踪 (CoT Thinking Trace)</span>
+                          </summary>
+                          <div className="mt-1.5 pl-3 border-l border-slate-200 font-mono text-[8.5px] text-slate-500 space-y-1 leading-normal">
+                            {msg.thinkingTrace.map((trace, tIdx) => (
+                              <p key={tIdx} className={trace.includes('🛡️') || trace.includes('⛔') ? 'text-rose-600 font-bold' : trace.includes('🔍') ? 'text-blue-500 font-medium' : 'text-slate-500'}>
+                                {trace}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+
+                      {/* Interactive Ontology Action Proposal Consent Card */}
+                      {!isUser && msg.actionProposal && (
+                        <div className="p-3.5 bg-white border border-indigo-200/80 rounded-xl space-y-2.5 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-indigo-50 pb-2">
+                            <span className="font-extrabold text-[11px] text-indigo-700 flex items-center gap-1.5">
+                              <Icon name="Settings" size={12} />
+                              <span>对账写回申请卡片 (Ontology Action Request)</span>
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded font-extrabold text-[8px] uppercase ${
+                              msg.actionProposal.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                              msg.actionProposal.status === 'rejected' ? 'bg-rose-100 text-rose-700' :
+                              'bg-amber-100 text-amber-700 animate-pulse'
+                            }`}>
+                              {msg.actionProposal.status === 'approved' ? '已授权写回' :
+                               msg.actionProposal.status === 'rejected' ? '已安全拒绝' : '等待签派授权'}
+                            </span>
+                          </div>
+
+                          <div className="font-mono text-[9px] space-y-1 text-slate-600 leading-normal bg-slate-50 p-2.5 rounded-lg border border-slate-150">
+                            <p><span className="text-slate-400 font-bold">算子标识</span>: <span className="text-slate-800 font-extrabold">{msg.actionProposal.actionId}</span></p>
+                            <p><span className="text-slate-400 font-bold">目标物理表</span>: <span className="text-indigo-600 font-extrabold">ds_flights_clean / flights_raw</span></p>
+                            <div className="border-t border-slate-100 my-1.5 pt-1.5 space-y-0.5">
+                              <p><span className="text-slate-400 font-bold">变动字段/参数 mappings</span>:</p>
+                              {Object.entries(msg.actionProposal.payload).map(([k, v]) => (
+                                <p key={k} className="pl-2">
+                                  <span className="text-slate-500">• {k}</span>: <span className="text-slate-800 font-bold">"{v}"</span>
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+
+                          {msg.actionProposal.status === 'pending' && (
+                            <div className="flex gap-2 text-[10px] font-bold">
+                              <button
+                                onClick={() => handleProposalConsent(msg.id, true)}
+                                className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
+                              >
+                                <Icon name="Check" size={11} />
+                                <span>同意物理写入并双向对账</span>
+                              </button>
+                              <button
+                                onClick={() => handleProposalConsent(msg.id, false)}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <span>安全拒绝</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                    </div>
+
+                  </div>
+                );
+              })}
+
+              {/* Chatbot typing loading spinner */}
+              {isReplying && (
+                <div className="flex gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-slate-800 shrink-0 h-7 w-7 flex items-center justify-center text-white">
+                    <Icon name={activeChatbot.avatar} size={12} className="animate-spin" />
+                  </span>
+                  <div className="p-3 rounded-2xl bg-white text-slate-500 border border-slate-200 rounded-tl-none font-sans text-[11px] flex items-center gap-1.5 shadow-3xs">
+                    <span className="h-1.5 w-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="h-1.5 w-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="h-1.5 w-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="text-[10px] text-slate-400 ml-1">本体语义对齐及 RAG 召回中...</span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Sandbox Input Zone */}
+            <div className="p-3 bg-white border-t border-slate-200 shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendChat();
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  disabled={isReplying}
+                  className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-[11px] focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="测试输入问题...（如：'查询 UA102' 或 '改派 UA102 航班延误2小时'）"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isReplying}
+                  className={`px-3 py-2 bg-slate-900 text-white rounded-xl font-bold transition-all flex items-center justify-center cursor-pointer shrink-0 ${
+                    !chatInput.trim() || isReplying ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon name="Send" size={12} />
+                </button>
+              </form>
+            </div>
+
+          </div>
+
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 text-center space-y-2">
+          <Icon name="Bot" size={48} className="text-slate-300" />
+          <h2 className="font-extrabold text-slate-700">没有就绪的 Chatbot</h2>
+          <p>请在左上角点击 + 按钮，创建部署您的首个 Chatbot 对齐工坊实例。</p>
+        </div>
+      )}
+
+      {/* 3. Metadata Manager Modal (Create/Edit Chatbot) */}
+      {showMetadataModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                <Icon name="Bot" size={13} className="text-blue-500" />
+                <span>{isCreatingNew ? '部署全新 AIP Chatbot 实例' : '修改 Chatbot 架构元参数'}</span>
+              </div>
+              <button
+                onClick={() => setShowMetadataModal(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <Icon name="X" size={14} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMetadata} className="p-4 space-y-3.5 flex-1 overflow-y-auto">
+              {/* Chatbot Name */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">Chatbot 名称</label>
+                <input
+                  type="text"
+                  required
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  className="w-full p-2 border border-slate-200 rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500"
+                  placeholder="如: AOC 运行协同助手"
+                />
+              </div>
+
+              {/* Chatbot Role */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">担当岗位角色</label>
+                <input
+                  type="text"
+                  required
+                  value={tempRole}
+                  onChange={(e) => setTempRole(e.target.value)}
+                  className="w-full p-2 border border-slate-200 rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500"
+                  placeholder="如: 航空运行控制中心智能协调助理"
+                />
+              </div>
+
+              {/* Chatbot Desc */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">简述简介</label>
+                <textarea
+                  value={tempDesc}
+                  onChange={(e) => setTempDesc(e.target.value)}
+                  className="w-full h-16 p-2 border border-slate-200 rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500"
+                  placeholder="说明此 Chatbot 的业务目标和限制范围..."
+                />
+              </div>
+
+              {/* LLM Model selector */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">关联的模型后端 (Model Catalog)</label>
+                <select
+                  value={tempModel}
+                  onChange={(e) => setTempModel(e.target.value)}
+                  className="w-full p-2 border border-slate-200 bg-white rounded-lg outline-none text-[11px]"
+                >
+                  {models.map(m => (
+                    <option key={m.id} value={m.id}>{m.displayName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3.5 flex gap-2 justify-end text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setShowMetadataModal(false)}
+                  className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg cursor-pointer shadow-sm"
+                >
+                  保存部署
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

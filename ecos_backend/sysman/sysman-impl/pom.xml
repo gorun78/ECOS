@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>sysman</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>sysman-impl</artifactId>
+    <name>Sys-Man Impl</name>
+    <description>系统管理实现层 — Service/Dao 实现</description>
+
+    <dependencies>
+        <!-- Sys-Man API -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Hermes Engine -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>hermes-engine</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Runtime 子模块 (crypto/monitor/task 从 runtime-core 拆出) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-crypto</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-monitor</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-task</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Spring Boot Web (for @RestController etc.) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- MyBatis -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- JPA — disabled for now (use MyBatis only) -->
+
+        <!-- Spring AOP (for audit interceptor) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- Spring JDBC (for JdbcTemplate repository) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!-- Jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- JWT -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- JetBrains Annotations -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>24.1.0</version>
+        </dependency>
+
+        <!-- Jakarta -->
+        <dependency>
+            <groupId>jakarta.transaction</groupId>
+            <artifactId>jakarta.transaction-api</artifactId>
+        </dependency>
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Dc-Cheng (数据资源中心) — 术语/本体/知识图谱 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>dccheng-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Bus-Zhi (数据处理) — DQ/Workflow/StateMachine -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- AIMod (智能模块) — Agent Mesh/Studio/LLM -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>aimod-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Portal (门户) — FrontendBridge/Menu -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>portal-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Market (市场) — Marketplace -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>market-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- WorldModel (世界模型) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>worldmodel-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Workspace (工作区) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>workspace-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>src/main/java</directory>
+                <includes>
+                    <include>**/*.xml</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
+
+</project>

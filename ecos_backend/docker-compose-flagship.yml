@@ -1,0 +1,68 @@
+version: '3.8'
+# ECOS 旗舰版 — PG+Neo4j+Doris+MinIO, 全功能, >500GB
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sys_man
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sys_man"]
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/neo4j123
+    ports: ["7474:7474", "7687:7687"]
+    volumes:
+      - ./data/neo4j:/data
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000", "9001:9001"]
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    volumes:
+      - ./data/minio:/data
+
+  doris-fe:
+    image: apache/doris:2.1-fe
+    ports: ["8030:8030", "9030:9030"]
+    environment:
+      FE_SERVERS: doris-fe:9010
+    volumes:
+      - ./data/doris/fe:/opt/apache-doris/fe/doris-meta
+
+  doris-be:
+    image: apache/doris:2.1-be
+    ports: ["8040:8040"]
+    environment:
+      FE_SERVERS: doris-fe:9010
+      BE_ADDR: doris-be:9050
+    volumes:
+      - ./data/doris/be:/opt/apache-doris/be/storage
+    depends_on:
+      - doris-fe
+
+  gateway:
+    image: ecos-gateway:latest
+    ports: ["8080:8080"]
+    environment:
+      SPRING_PROFILES_ACTIVE: flagship
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DORIS_USER: root
+      DORIS_PASSWORD: ""
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: admin123
+    depends_on:
+      postgres:
+        condition: service_healthy
+      doris-fe:
+        condition: service_started

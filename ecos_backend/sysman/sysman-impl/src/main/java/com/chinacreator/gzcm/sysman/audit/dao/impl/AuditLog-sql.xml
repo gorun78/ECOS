@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="AuditLog">
+    <insert id="insertAuditLog">
+        <![CDATA[
+        INSERT INTO td_audit_log (
+            log_id, event_type, timestamp, user_id, tenant_id, resource, action, 
+            result, ip_address, user_agent, request_id, duration, details
+        ) VALUES (
+            #[logId], #[eventType], #[timestamp], #[userId], #[tenantId], #[resource], 
+            #[action], #[result], #[ipAddress], #[userAgent], #[requestId], #[duration], #[details]
+        )
+        ]]>
+    </insert>
+
+    <select id="findById">
+        <![CDATA[
+        SELECT * FROM td_audit_log WHERE log_id = ?
+        ]]>
+    </select>
+
+    <select id="queryAuditLog">
+        <![CDATA[
+        SELECT * FROM td_audit_log WHERE 1 = 1
+        #if($userId) AND user_id = #[userId] #end
+        #if($tenantId) AND tenant_id = #[tenantId] #end
+        #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
+        #if($eventType) AND event_type = #[eventType] #end
+        #if($result) AND result = #[result] #end
+        ORDER BY timestamp DESC
+        ]]>
+    </select>
+
+    <select id="queryAuditLogWithTimeRange">
+        <![CDATA[
+        SELECT * FROM td_audit_log WHERE 1 = 1
+        #if($userId) AND user_id = #[userId] #end
+        #if($tenantId) AND tenant_id = #[tenantId] #end
+        #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
+        #if($eventType) AND event_type = #[eventType] #end
+        #if($result) AND result = #[result] #end
+        #if($startTime) AND timestamp >= #[startTime] #end
+        #if($endTime) AND timestamp <= #[endTime] #end
+        ORDER BY timestamp DESC
+        ]]>
+    </select>
+
+    <select id="countAuditLog">
+        <![CDATA[
+        SELECT COUNT(*) FROM td_audit_log WHERE 1 = 1
+        #if($userId) AND user_id = #[userId] #end
+        #if($tenantId) AND tenant_id = #[tenantId] #end
+        #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
+        #if($eventType) AND event_type = #[eventType] #end
+        #if($result) AND result = #[result] #end
+        ]]>
+    </select>
+
+    <select id="countAuditLogWithTimeRange">
+        <![CDATA[
+        SELECT COUNT(*) FROM td_audit_log WHERE 1 = 1
+        #if($userId) AND user_id = #[userId] #end
+        #if($tenantId) AND tenant_id = #[tenantId] #end
+        #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
+        #if($eventType) AND event_type = #[eventType] #end
+        #if($result) AND result = #[result] #end
+        #if($startTime) AND timestamp >= #[startTime] #end
+        #if($endTime) AND timestamp <= #[endTime] #end
+        ]]>
+    </select>
+</sqlMap>

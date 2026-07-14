@@ -1,0 +1,32 @@
+# ── ECOS 旗舰版 (Flagship Edition) ──
+# 适用: 大型集团、>500GB数据、PG+Neo4j+Doris+MinIO
+# 启动: SPRING_PROFILES_ACTIVE=flagship
+
+ecos:
+  edition: flagship
+  graph:
+    provider: neo4j
+    neo4j-uri: bolt://neo4j-cluster:7687
+  analytics:
+    provider: doris
+    doris-fe: jdbc:mysql://localhost:9030/ecos_olap
+    doris-user: ${DORIS_USER:root}
+    doris-password: ${DORIS_PASSWORD:}
+  storage:
+    provider: minio
+    minio-endpoint: http://minio-cluster:9000
+    minio-access-key: ${MINIO_ACCESS_KEY:admin}
+    minio-secret-key: ${MINIO_SECRET_KEY:admin123}
+  features:
+    knowledge-graph: true
+    causal-analysis: true
+    workbook-sandbox: true
+    nsga-ii-optimizer: true
+    multi-tenant: true
+    opentelemetry: true
+  module:
+    aimod: true
+    cognitive: true
+    worldmodel: true
+    market: true
+    portal: true

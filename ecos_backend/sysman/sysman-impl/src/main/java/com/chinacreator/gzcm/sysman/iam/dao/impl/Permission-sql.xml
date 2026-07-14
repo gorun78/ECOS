@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="Permission">
+    <insert id="insertPermission">
+        INSERT INTO TD_PERMISSION (
+            "PERMISSION_ID", "PERMISSION_NAME", "PERMISSION_CODE", "RESOURCE_ID", "ACTION", "DESCRIPTION"
+        ) VALUES (
+            #[permissionId], 
+            concat(#[resource], ':', #[action]), 
+            concat(#[resource], ':', #[action]), 
+            #[resource], 
+            #[action], 
+            concat(#[description], ' Condition:', ifnull(#[conditionExpr],''))
+        )
+    </insert>
+
+    <update id="updatePermission">
+        UPDATE TD_PERMISSION
+        SET "RESOURCE_ID" = #[resource],
+            "ACTION" = #[action],
+            "DESCRIPTION" = concat(#[description], ' Condition:', ifnull(#[conditionExpr],''))
+        WHERE "PERMISSION_ID" = #[permissionId]
+    </update>
+
+    <delete id="deletePermission">
+        DELETE FROM TD_PERMISSION WHERE "PERMISSION_ID" = #[permissionId]
+    </delete>
+
+    <select id="findById">
+        SELECT "PERMISSION_ID", "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr 
+        FROM TD_PERMISSION WHERE "PERMISSION_ID" = #[permissionId]
+    </select>
+
+    <select id="findByResourceAction">
+        SELECT "PERMISSION_ID", "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr
+        FROM TD_PERMISSION
+        WHERE "RESOURCE_ID" = ? AND "ACTION" = ?
+    </select>
+
+    <select id="listPermissions">
+        SELECT "PERMISSION_ID", "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr
+        FROM TD_PERMISSION ORDER BY "RESOURCE_ID", "ACTION"
+    </select>
+</sqlMap>

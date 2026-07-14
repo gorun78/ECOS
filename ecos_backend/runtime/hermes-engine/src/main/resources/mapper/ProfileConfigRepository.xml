@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  sys_agent_profile 表 — Profile 配置
+  CREATE TABLE IF NOT EXISTS sys_agent_profile (
+      id              VARCHAR(64)  NOT NULL PRIMARY KEY,
+      profile_name    VARCHAR(128) NOT NULL,
+      subsystem       VARCHAR(64)  NOT NULL,
+      enabled         TINYINT(1)   NOT NULL DEFAULT 1,
+      description     VARCHAR(512)          DEFAULT NULL,
+
+      - LLM 配置
+      provider        VARCHAR(64)           DEFAULT NULL,
+      model           VARCHAR(128)          DEFAULT NULL,
+      base_url        VARCHAR(512)          DEFAULT NULL,
+      api_key_ref     VARCHAR(256)          DEFAULT NULL,
+      temperature     DOUBLE                DEFAULT NULL,
+      max_tokens      INT                   DEFAULT NULL,
+
+      - Agent 行为
+      system_prompt   TEXT                  DEFAULT NULL,
+      max_iterations  INT                   DEFAULT 10,
+      session_timeout_sec INT               DEFAULT 300,
+      tools_enabled   TINYINT(1)            DEFAULT 1,
+      auto_approve    TINYINT(1)            DEFAULT 0,
+
+      - 工具权限 (JSON)
+      allowed_tools   TEXT                  DEFAULT NULL,
+
+      - 控制
+      concurrency     INT                   DEFAULT 5,
+      priority        INT                   DEFAULT 0,
+
+      - 审计
+      created_by      VARCHAR(64)           DEFAULT NULL,
+      created_time    DATETIME              DEFAULT CURRENT_TIMESTAMP,
+      updated_by      VARCHAR(64)           DEFAULT NULL,
+      updated_time    DATETIME              DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+  );
+-->
+
+<mapper namespace="com.chinacreator.gzcm.runtime.hermes.repository.ProfileConfigRepository">
+
+    <resultMap id="profileConfigMap" type="com.chinacreator.gzcm.runtime.hermes.model.ProfileConfig">
+        <id property="id" column="id"/>
+        <result property="profileName" column="profile_name"/>
+        <result property="subsystem" column="subsystem"/>
+        <result property="enabled" column="enabled"/>
+        <result property="description" column="description"/>
+        <result property="provider" column="provider"/>
+        <result property="model" column="model"/>
+        <result property="baseUrl" column="base_url"/>
+        <result property="apiKeyRef" column="api_key_ref"/>
+        <result property="temperature" column="temperature"/>
+        <result property="maxTokens" column="max_tokens"/>
+        <result property="systemPrompt" column="system_prompt"/>
+        <result property="maxIterations" column="max_iterations"/>
+        <result property="sessionTimeoutSec" column="session_timeout_sec"/>
+        <result property="toolsEnabled" column="tools_enabled"/>
+        <result property="autoApprove" column="auto_approve"/>
+        <result property="allowedTools" column="allowed_tools"/>
+        <result property="concurrency" column="concurrency"/>
+        <result property="priority" column="priority"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdTime" column="created_time"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedTime" column="updated_time"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, profile_name, subsystem, enabled, description,
+        provider, model, base_url, api_key_ref, temperature, max_tokens,
+        system_prompt, max_iterations, session_timeout_sec,
+        tools_enabled, auto_approve, allowed_tools,
+        concurrency, priority,
+        created_by, created_time, updated_by, updated_time
+    </sql>
+
+    <select id="findAll" resultMap="profileConfigMap">
+        SELECT <include refid="baseColumns"/>
+        FROM sys_agent_profile
+        ORDER BY priority DESC, created_time DESC
+    </select>
+
+    <select id="findBySubsystem" resultMap="profileConfigMap">
+        SELECT <include refid="baseColumns"/>
+        FROM sys_agent_profile
+        WHERE subsystem = #{subsystem}
+        ORDER BY priority DESC, created_time DESC
+    </select>
+
+    <select id="findById" resultMap="profileConfigMap">
+        SELECT <include refid="baseColumns"/>
+        FROM sys_agent_profile
+        WHERE id = #{id}
+    </select>
+
+    <select id="findBySubsystemAndProfileName" resultMap="profileConfigMap">
+        SELECT <include refid="baseColumns"/>
+        FROM sys_agent_profile
+        WHERE subsystem = #{subsystem} AND profile_name = #{profileName}
+        LIMIT 1
+    </select>
+
+    <select id="findEnabledBySubsystem" resultMap="profileConfigMap">
+        SELECT <include refid="baseColumns"/>
+        FROM sys_agent_profile
+        WHERE subsystem = #{subsystem} AND enabled = 1
+        ORDER BY priority DESC, created_time DESC
+    </select>
+
+    <insert id="insert" parameterType="com.chinacreator.gzcm.runtime.hermes.model.ProfileConfig">
+        INSERT INTO sys_agent_profile (
+            id, profile_name, subsystem, enabled, description,
+            provider, model, base_url, api_key_ref, temperature, max_tokens,
+            system_prompt, max_iterations, session_timeout_sec,
+            tools_enabled, auto_approve, allowed_tools,
+            concurrency, priority,
+            created_by, created_time, updated_by, updated_time
+        ) VALUES (
+            #{id}, #{profileName}, #{subsystem}, #{enabled}, #{description},
+            #{provider}, #{model}, #{baseUrl}, #{apiKeyRef}, #{temperature}, #{maxTokens},
+            #{systemPrompt}, #{maxIterations}, #{sessionTimeoutSec},
+            #{toolsEnabled}, #{autoApprove}, #{allowedTools},
+            #{concurrency}, #{priority},
+            #{createdBy}, #{createdTime}, #{updatedBy}, #{updatedTime}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.chinacreator.gzcm.runtime.hermes.model.ProfileConfig">
+        UPDATE sys_agent_profile
+        SET
+            profile_name       = #{profileName},
+            subsystem          = #{subsystem},
+            enabled            = #{enabled},
+            description        = #{description},
+            provider           = #{provider},
+            model              = #{model},
+            base_url           = #{baseUrl},
+            api_key_ref        = #{apiKeyRef},
+            temperature        = #{temperature},
+            max_tokens         = #{maxTokens},
+            system_prompt      = #{systemPrompt},
+            max_iterations     = #{maxIterations},
+            session_timeout_sec = #{sessionTimeoutSec},
+            tools_enabled      = #{toolsEnabled},
+            auto_approve       = #{autoApprove},
+            allowed_tools      = #{allowedTools},
+            concurrency        = #{concurrency},
+            priority           = #{priority},
+            updated_by         = #{updatedBy},
+            updated_time       = #{updatedTime}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_agent_profile
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

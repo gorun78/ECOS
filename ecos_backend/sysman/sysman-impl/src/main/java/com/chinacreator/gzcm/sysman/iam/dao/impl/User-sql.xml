@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="User">
+    <insert id="insertUser">
+        INSERT INTO TD_USER (
+            "USER_ID", "USERNAME", "PASSWORD", "EMAIL", "MOBILE_TEL1", "STATUS", "LOCKED", "LOCK_TIME",
+            "LAST_LOGIN_TIME", "CREATED_TIME", "CREATED_BY", "UPDATED_TIME", "UPDATED_BY"
+        ) VALUES (
+            #[userId], #[username], #[password], #[email], #[phone], #[status], #[locked], #[lockTime],
+            #[lastLoginTime], #[createdTime], #[createdBy], #[updatedTime], #[updatedBy]
+        )
+    </insert>
+
+    <update id="updateUser">
+        UPDATE TD_USER SET
+            USERNAME = #[username],
+            EMAIL = #[email],
+            MOBILE_TEL1 = #[phone],
+            STATUS = #[status],
+            LOCKED = #[locked],
+            LOCK_TIME = #[lockTime],
+            LAST_LOGIN_TIME = #[lastLoginTime],
+            UPDATED_TIME = #[updatedTime],
+            UPDATED_BY = #[updatedBy]
+        WHERE "USER_ID" = #[userId]
+    </update>
+
+    <delete id="deleteUser">
+        UPDATE TD_USER SET STATUS = 'DELETED', UPDATED_TIME = now()
+        WHERE "USER_ID" = #[userId]
+    </delete>
+
+    <select id="findById">
+        SELECT * FROM TD_USER WHERE "USER_ID" = #[userId]
+    </select>
+
+    <select id="findByUsername">
+        SELECT * FROM TD_USER WHERE "USERNAME" = #[username]
+    </select>
+
+    <select id="findByEmail">
+        SELECT * FROM TD_USER WHERE "EMAIL" = #[email]
+    </select>
+
+    <select id="queryUsers">
+        SELECT 
+            "USER_ID" as user_id, "USERNAME" as username, "PASSWORD" as password,
+            "EMAIL" as email, "MOBILE_TEL1" as phone,
+            "STATUS" as status, "LOCKED" as locked, "LOCK_TIME" as lock_time,
+            "LAST_LOGIN_TIME" as last_login_time, "LOGIN_IP" as login_ip,
+            "LOGIN_COUNT" as login_count,
+            "REAL_NAME" as real_name,
+            "CREATED_TIME" as created_time, "CREATED_BY" as created_by,
+            "UPDATED_TIME" as updated_time, "UPDATED_BY" as updated_by
+        FROM TD_USER WHERE 1=1
+        #if($keyword)
+          AND ("USERNAME" LIKE concat('%', #[keyword], '%') OR "EMAIL" LIKE concat('%', #[keyword], '%'))
+        #end
+        #if($status)
+          AND "STATUS" = #[status]
+        #end
+        ORDER BY "CREATED_TIME" DESC
+    </select>
+</sqlMap>

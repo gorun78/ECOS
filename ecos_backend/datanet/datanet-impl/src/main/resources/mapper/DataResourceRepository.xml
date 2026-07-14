@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.datanet.repository.DataResourceRepository">
+
+    <resultMap id="resMap" type="com.chinacreator.gzcm.datanet.model.DataResource">
+        <id property="resourceId" column="resource_id"/>
+        <result property="resourceName" column="resource_name"/>
+        <result property="resourceType" column="resource_type"/>
+        <result property="orgId" column="org_id"/>
+        <result property="orgName" column="org_name"/>
+        <result property="datasourceId" column="datasource_id"/>
+        <result property="sourcePath" column="source_path"/>
+        <result property="description" column="description"/>
+        <result property="tags" column="tags"/>
+        <result property="status" column="status"/>
+        <result property="fieldCount" column="field_count"/>
+        <result property="recordCount" column="record_count"/>
+        <result property="lastSyncTime" column="last_sync_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="baseCols">
+        resource_id, resource_name, resource_type, org_id, org_name,
+        datasource_id, source_path, description, tags, status,
+        field_count, record_count, last_sync_time,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO td_data_resource (<include refid="baseCols"/>)
+        VALUES (#{resourceId}, #{resourceName}, #{resourceType}, #{orgId}, #{orgName},
+                #{datasourceId}, #{sourcePath}, #{description}, #{tags}, #{status},
+                #{fieldCount}, #{recordCount}, #{lastSyncTime},
+                #{createBy}, #{createTime}, #{updateBy}, #{updateTime})
+    </insert>
+
+    <update id="update">
+        UPDATE td_data_resource
+        SET resource_name = #{resourceName},
+            resource_type = #{resourceType},
+            org_id = #{orgId}, org_name = #{orgName},
+            datasource_id = #{datasourceId},
+            source_path = #{sourcePath},
+            description = #{description}, tags = #{tags}, status = #{status},
+            field_count = #{fieldCount}, record_count = #{recordCount},
+            last_sync_time = #{lastSyncTime},
+            update_by = #{updateBy}, update_time = NOW()
+        WHERE resource_id = #{resourceId}
+    </update>
+
+    <select id="findById" resultMap="resMap">
+        SELECT <include refid="baseCols"/> FROM td_data_resource WHERE resource_id = #{id}
+    </select>
+
+    <select id="findByDatasource" resultMap="resMap">
+        SELECT <include refid="baseCols"/> FROM td_data_resource WHERE datasource_id = #{datasourceId}
+    </select>
+
+    <select id="findAll" resultMap="resMap">
+        SELECT <include refid="baseCols"/> FROM td_data_resource ORDER BY create_time DESC
+    </select>
+
+    <select id="search" resultMap="resMap">
+        SELECT <include refid="baseCols"/> FROM td_data_resource
+        WHERE resource_name LIKE CONCAT('%', #{keyword}, '%')
+           OR description LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY create_time DESC
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM td_data_resource WHERE resource_id = #{id}
+    </delete>
+</mapper>

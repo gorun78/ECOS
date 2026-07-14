@@ -1,0 +1,29 @@
+# ── ECOS 企业版 (Enterprise Edition) ──
+# 适用: 多组织、50GB-500GB数据、PG+Neo4j+MinIO
+# 启动: SPRING_PROFILES_ACTIVE=enterprise
+
+ecos:
+  edition: enterprise
+  graph:
+    provider: neo4j
+    neo4j-uri: bolt://localhost:7687
+  analytics:
+    provider: pg
+  storage:
+    provider: minio
+    minio-endpoint: http://localhost:9000
+    minio-access-key: ${MINIO_ACCESS_KEY:admin}
+    minio-secret-key: ${MINIO_SECRET_KEY:admin123}
+  features:
+    knowledge-graph: true
+    causal-analysis: true
+    workbook-sandbox: true
+    nsga-ii-optimizer: true
+    multi-tenant: true
+    opentelemetry: true
+  module:
+    aimod: true
+    cognitive: true
+    worldmodel: true
+    market: true
+    portal: true

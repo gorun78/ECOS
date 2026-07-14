@@ -1,0 +1,34 @@
+server:
+  port: 18082
+
+spring:
+  application:
+    name: ecos-data-engine-boot
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sys_man
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  type-aliases-package: com.chinacreator.gzcm.datanet.model
+
+logging:
+  level:
+    com.chinacreator.gzcm: DEBUG
+    org.springframework: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

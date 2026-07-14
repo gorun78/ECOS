@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertTenant">
+        <![CDATA[
+        INSERT INTO td_tenant (
+            tenant_id, tenant_name, tenant_code, status, max_users, max_storage,
+            created_time, created_by, updated_time, updated_by
+        ) VALUES (
+            #[tenantId], #[tenantName], #[tenantCode], #[status], #[maxUsers], #[maxStorage],
+            #[createdTime], #[createdBy], #[updatedTime], #[updatedBy]
+        )
+        ]]>
+    </property>
+
+    <property name="updateTenant">
+        <![CDATA[
+        UPDATE td_tenant
+        SET tenant_name = #[tenantName],
+            tenant_code = #[tenantCode],
+            status = #[status],
+            max_users = #[maxUsers],
+            max_storage = #[maxStorage],
+            updated_time = #[updatedTime],
+            updated_by = #[updatedBy]
+        WHERE tenant_id = #[tenantId]
+        ]]>
+    </property>
+
+    <property name="softDeleteTenant">
+        <![CDATA[
+        UPDATE td_tenant
+        SET status = 'DELETED', updated_time = now()
+        WHERE tenant_id = #[tenantId]
+        ]]>
+    </property>
+
+    <property name="findById">
+        <![CDATA[
+        SELECT * FROM td_tenant WHERE tenant_id = #[tenantId]
+        ]]>
+    </property>
+
+    <property name="findByCode">
+        <![CDATA[
+        SELECT * FROM td_tenant WHERE tenant_code = #[tenantCode]
+        ]]>
+    </property>
+
+    <property name="queryTenants">
+        <![CDATA[
+        SELECT * FROM td_tenant
+        WHERE 1=1
+        #[if(keyword != null && keyword != '')]
+          AND (tenant_name LIKE concat('%', #[keyword], '%')
+            OR tenant_code LIKE concat('%', #[keyword], '%'))
+        [/#if]
+        #[if(status != null && status != '')]
+          AND status = #[status]
+        [/#if]
+        ORDER BY created_time DESC
+        ]]>
+    </property>
+</properties>
+
+

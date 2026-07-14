@@ -1,0 +1,50 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+*target*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# Node
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# pnpm
+.pnpm-store/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Hermes
+.hermes/
+
+# Temp
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Test output
+jacoco.exec
+reports/

@@ -1,0 +1,126 @@
+server:
+  port: 8081
+  servlet:
+    context-path: /sys-man
+
+spring:
+  application:
+    name: sys-man-service
+  main:
+    allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+# ECOS 版本标识: standard / enterprise / ultimate
+ecos:
+  edition: ${ECOS_EDITION:all}
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=public
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: SysManHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+
+# Authentication Configuration
+auth:
+  enabled: true
+  whitelist:
+    paths:
+      - "/api/health"
+      - "/auth/**"
+      - "/api/v1/auth/**"
+      - "/error"
+      - "/api/agent/**"
+      - "/api/v1/ecos/**"
+      - "/api/v1/gsxk/**"
+      - "/api/audit-logs"
+
+# LLM Configuration
+llm:
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY:}
+    base-url: https://api.deepseek.com
+    model: deepseek-chat
+
+logging:
+  level:
+    root: INFO
+    com.chinacreator.gzcm: DEBUG
+    org.springframework: INFO
+
+# JWT RS256 Test Keys (auto-generated, PEM format)
+jwt:
+  private-key: |
+
+    -----BEGIN PRIVATE KEY-----
+    MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCjBlznp15VNag/
+    f8nRyynAhPrQYzSpBu3X9J4SJ9xsiZivwH4ia9Qx87maVtr+H1kJYkl2WyBfqour
+    1M0owKhzw/csNnuMOKRU5gcPjSeN1cdi76cznLdccsMPeo2Xz6qvsZ+8KfpqxfHq
+    s6Y7rpVQneHXMLM+cZvJ8p86ZqGcwDaXtZwKvODUfBtI+imdpCsw+M8Yup7MAJI6
+    /Tbz2YqJEDBLB+17T5J/dhlx3gduo2fia5Ifldjz4kpgDHCNn6W7DjBkVqTnTZbu
+    iZU2J7fkQ+G5jjNowMbWfr6TPkGIH7vNsi4QJSCwN0DlXsv+cAnA7XSnC4cgNvjm
+    Na7juGcFAgMBAAECggEAJz11F9pwqZx2gMBS1RFsnZc0ovu6FXRiRBCwiqi3FRYC
+    n007XzAqvZJPis+cuz3S6eATVC6HipdrsqLQdh53fZP+FxGPJ/eLUJckvHDKxEhg
+    i5cpXRI8DX/fJUbntZKqIEumKf3FtbUrL4Xp/aQecy7piSlC/8ULTW79tio1fNvh
+    6sjCTYniR4MJak+GPyo4XWVxoGUi1CyPlCFdHGypaK5fRw2BX1cHqj7moHsoquj8
+    o423TcJgf0NLBDYOvRtOMR5bDngZqciXgkLVa3L9Aj95zKPRCwO67teZsFLaORZe
+    aMZ1mDOgelC/3LbGA2/9bG0slA6+bgXe1rM73A5UYQKBgQDUuSH1Umq6YnahCUG1
+    2DNoGX8CAJGHpe5jNG/vRrqHoTdEiQmFFvRNC7xWhIrQUeGAKW0p8W9gA/0zP92U
+    LwDmQ+6WQLtQRCR0jGgGI8xv+YxrU8Xe/Uxaxt56AsFStHEY9cs0AYfcto1YD7Kp
+    yDr2LU28Gb6s6I2S9L++wujsIQKBgQDEMOJ6x9k39i9ZIQuu3C5f/7En9MQZ4do3
+    OdnaqTGH3jcafzq1vUk6rhP8VDy/pTZFRV5JfAo4/I52Wai1ggSKSS8W3q+cKHgm
+    aAQ3AeTvfgKxXaukmnCa74/moqF6ieoIR/dL72lX/GLrVJOpVrV2TcuYMEolglYQ
+    L9FBLjt+ZQKBgDWp4pQ1z3DnqA+l+yq5uPY5AF5r8EqtJH9oWhid2i6fEAc9Huax
+    TL4nCMM2uqIlFeM0EDL1kmhBeV21bduVI//zATxsZhSwrBWu2gs6ereA19i3kIJZ
+    miqIYtWa3lRT6vgmAbZD8JdQgkXF6AeG2MED2slqIT0TiauaDMk9+G6hAoGBAIKW
+    H0mmWDldjip/Sm17dQrFAMAdtaGcqUj1IsLet28+Q+NJKGTrtyBt2jOsRjsx1qvI
+    /ndfLta7lH/GMfuOrUL2b3eDhdQlQ8QcnCGZCy816sjwFl2bxrP6HQhg26bawYH9
+    lOdgVfgQsC7/vsGKS4KRSaDlE5Vf6bUgfuIpycPZAoGBALevafodBmb1a5tcmgQf
+    ehcG08+V4Bsp43HnZJJSIeNMUqsfTgDwN4Lu+3HrTcA5jNvJMu/O+lNXNXs7dDkb
+    VZugNKHhlpibKDd9/S3DLdL+gbFw0iMkd+QyZ1kuc/6C4PzqNzrYxaFvR8PjC1i/
+    iNHO3XqUc546lq6+UzSomip/
+    -----END PRIVATE KEY-----
+  public-key: |
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowZc56deVTWoP3/J0csp
+    wIT60GM0qQbt1/SeEifcbImYr8B+ImvUMfO5mlba/h9ZCWJJdlsgX6qLq9TNKMCo
+    c8P3LDZ7jDikVOYHD40njdXHYu+nM5y3XHLDD3qNl8+qr7GfvCn6asXx6rOmO66V
+    UJ3h1zCzPnGbyfKfOmahnMA2l7WcCrzg1HwbSPopnaQrMPjPGLqezACSOv0289mK
+    iRAwSwfte0+Sf3YZcd4HbqNn4muSH5XY8+JKYAxwjZ+luw4wZFak502W7omVNie3
+    5EPhuY4zaMDG1n6+kz5BiB+7zbIuECUgsDdA5V7L/nAJwO10pwuHIDb45jWu47hn
+    BQIDAQAB
+    -----END PUBLIC KEY-----
+
+# Hermes Agent Engine Configuration
+hermes:
+  engine:
+    running: false
+    default-provider: openrouter
+    default-model: deepseek/deepseek-chat
+    max-concurrency: 5
+    default-timeout: 600
+  gateway:
+    retry-max-attempts: 3
+    request-timeout: 60s
+  profile:
+    cache-enabled: false
+    cache-ttl-minutes: 30

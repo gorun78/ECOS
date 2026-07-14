@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  sys_agent_call_log 表 — Agent 调用日志
+  CREATE TABLE IF NOT EXISTS sys_agent_call_log (
+      id              VARCHAR(64)   NOT NULL PRIMARY KEY,
+      subsystem       VARCHAR(64)   NOT NULL,
+      profile_name    VARCHAR(128)  NOT NULL,
+      session_id      VARCHAR(64)   NOT NULL,
+      user_message    TEXT                    DEFAULT NULL,
+      tokens_input    INT           NOT NULL DEFAULT 0,
+      tokens_output   INT           NOT NULL DEFAULT 0,
+      duration_ms     INT           NOT NULL DEFAULT 0,
+      status          VARCHAR(16)   NOT NULL DEFAULT 'success',  /* success / failed / timeout */
+      error_msg       TEXT                    DEFAULT NULL,
+      created_time    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+      INDEX idx_subsystem (subsystem),
+      INDEX idx_subsystem_status (subsystem, status),
+      INDEX idx_created_time (created_time)
+  );
+-->
+
+<mapper namespace="com.chinacreator.gzcm.runtime.hermes.repository.AgentCallLogRepository">
+
+    <resultMap id="agentCallLogMap" type="com.chinacreator.gzcm.runtime.hermes.model.AgentCallLog">
+        <id property="id" column="id"/>
+        <result property="subsystem" column="subsystem"/>
+        <result property="profileName" column="profile_name"/>
+        <result property="sessionId" column="session_id"/>
+        <result property="userMessage" column="user_message"/>
+        <result property="tokensInput" column="tokens_input"/>
+        <result property="tokensOutput" column="tokens_output"/>
+        <result property="durationMs" column="duration_ms"/>
+        <result property="status" column="status"/>
+        <result property="errorMsg" column="error_msg"/>
+        <result property="createdTime" column="created_time"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, subsystem, profile_name, session_id, user_message,
+        tokens_input, tokens_output, duration_ms, status, error_msg, created_time
+    </sql>
+
+    <insert id="insert" parameterType="com.chinacreator.gzcm.runtime.hermes.model.AgentCallLog">
+        INSERT INTO sys_agent_call_log (
+            id, subsystem, profile_name, session_id, user_message,
+            tokens_input, tokens_output, duration_ms, status, error_msg, created_time
+        ) VALUES (
+            #{id}, #{subsystem}, #{profileName}, #{sessionId}, #{userMessage},
+            #{tokensInput}, #{tokensOutput}, #{durationMs}, #{status}, #{errorMsg}, #{createdTime}
+        )
+    </insert>
+
+    <select id="findBySubsystem" resultMap="agentCallLogMap">
+        SELECT <include refid="baseColumns"/>
+        FROM sys_agent_call_log
+        WHERE subsystem = #{subsystem}
+        ORDER BY created_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countBySubsystemAndStatus" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_agent_call_log
+        WHERE subsystem = #{subsystem} AND status = #{status}
+    </select>
+
+    <select id="countTokensBySubsystem" resultType="long">
+        SELECT COALESCE(SUM(tokens_input + tokens_output), 0)
+        FROM sys_agent_call_log
+        WHERE subsystem = #{subsystem}
+    </select>
+
+</mapper>

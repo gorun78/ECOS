@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+
+    <property name="insertPolicy">
+        <![CDATA[
+        INSERT INTO td_data_permission_policy (
+            policy_id, policy_name, policy_type, resource,
+            policy_condition, created_time, created_by
+        ) VALUES (
+            #[policyId], #[policyName], #[policyType], #[resource],
+            #[policyCondition], #[createdTime], #[createdBy]
+        )
+        ]]>
+    </property>
+
+    <property name="updatePolicy">
+        <![CDATA[
+        UPDATE td_data_permission_policy
+        SET policy_name = #[policyName],
+            policy_type = #[policyType],
+            resource = #[resource],
+            policy_condition = #[policyCondition]
+        WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="deletePolicy">
+        <![CDATA[
+        DELETE FROM td_data_permission_policy WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="findById">
+        <![CDATA[
+        SELECT * FROM td_data_permission_policy WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="queryPolicies">
+        <![CDATA[
+        SELECT * FROM td_data_permission_policy
+        WHERE 1 = 1
+        @if(!isEmpty(policyType)){
+          AND policy_type = #[policyType]
+        @}
+        @if(!isEmpty(resource)){
+          AND resource = #[resource]
+        @}
+        ORDER BY created_time DESC
+        ]]>
+    </property>
+
+</properties>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+
+    <property name="insertPolicy">
+        <![CDATA[
+        INSERT INTO td_data_permission_policy(
+            policy_id, policy_name, policy_type, resource,
+            policy_condition, created_time, created_by
+        ) VALUES (
+            #[policyId], #[policyName], #[policyType], #[resource],
+            #[policyCondition], #[createdTime], #[createdBy]
+        )
+        ]]>
+    </property>
+
+    <property name="updatePolicy">
+        <![CDATA[
+        UPDATE td_data_permission_policy
+        SET policy_name = #[policyName],
+            policy_type = #[policyType],
+            resource = #[resource],
+            policy_condition = #[policyCondition]
+        WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="deletePolicy">
+        <![CDATA[
+        DELETE FROM td_data_permission_policy WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="findById">
+        <![CDATA[
+        SELECT * FROM td_data_permission_policy WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="queryPolicies">
+        <![CDATA[
+        SELECT *
+        FROM td_data_permission_policy
+        WHERE 1=1
+        #if($policyType != null && $policyType != '')
+          AND policy_type = #[policyType]
+        #end
+        #if($resource != null && $resource != '')
+          AND resource = #[resource]
+        #end
+        ORDER BY created_time DESC
+        ]]>
+    </property>
+
+</properties>
+
+

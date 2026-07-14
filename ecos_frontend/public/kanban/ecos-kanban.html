@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECOS 项目看板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+body{background:#f1f5f9;color:#1e293b;padding:24px}
+.container{max-width:1400px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin-bottom:4px}
+.subtitle{color:#94a3b8;font-size:14px;margin-bottom:24px}
+.status-bar{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.status-item{background:#fff;border-radius:8px;padding:12px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;font-size:14px}
+.status-item .num{font-size:20px;font-weight:700}
+.status-todo .num{color:#64748b}
+.status-doing .num{color:#e6a23c}
+.status-review .num{color:#409eff}
+.status-done .num{color:#67c23a}
+.status-blocked .num{color:#f56c6c}
+.board{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px;min-height:300px}
+.column{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);min-width:240px;max-width:280px;flex:1;display:flex;flex-direction:column}
+.col-header{padding:14px 16px;font-weight:600;font-size:14px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:center}
+.col-header .count{background:rgba(0,0,0,.08);padding:2px 8px;border-radius:10px;font-size:12px}
+.col-body{padding:8px;flex:1;min-height:60px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s}
+.card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.card-title{font-size:13px;font-weight:500;margin-bottom:4px;line-height:1.4}
+.card-desc{font-size:12px;color:#94a3b8;margin-bottom:6px}
+.card-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.tag{padding:1px 6px;border-radius:4px;font-size:11px;color:#fff}
+.tag-p0{background:#f56c6c}
+.tag-p1{background:#409eff}
+.tag-risk{background:#e6a23c}
+.card-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#94a3b8}
+.card-meta .pri{font-weight:600}
+.pri-high{color:#e6a23c}
+.pri-urgent{color:#f56c6c}
+.pri-medium{color:#67c23a}
+.pri-low{color:#94a3b8}
+.empty{color:#94a3b8;font-size:12px;text-align:center;padding:20px}
+.milestones{background:#fff;border-radius:10px;padding:16px;margin-top:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.milestones h3{font-size:14px;margin-bottom:12px;color:#64748b}
+.milestones-grid{display:flex;gap:12px;flex-wrap:wrap}
+.milestone{display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 12px;background:#f8fafc;border-radius:6px}
+.milestone .date{color:#94a3b8;font-size:11px}
+.error{padding:40px;text-align:center;color:#f56c6c}
+.loading{padding:40px;text-align:center;color:#94a3b8}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <div class="loading">加载看板数据...</div>
+</div>
+<script>
+async function loadKanban() {
+  const app = document.getElementById('app');
+  
+  try {
+    // Fetch the kanban markdown file
+    // Since we can't fetch local files from browser, we need the data embedded
+    // Let's embed the kanban data directly
+    const response = await fetch('./kanban-data.json?' + Date.now());
+    if (!response.ok) {
+      // Fallback: show error with link
+      app.innerHTML = '<div class="error">看板数据加载失败。请查看 <a href="../ECOS-总看板.md" style="color:#409eff">ECOS-总看板.md</a></div>';
+      return;
+    }
+    const data = await response.json();
+    renderKanban(data);
+  } catch(e) {
+    // Try direct data
+    app.innerHTML = `<div class="error">加载失败: ${e.message}. 请查看原始看板文件。</div>`;
+  }
+}
+
+function renderKanban(data) {
+  const cols = data.columns;
+  const totalCards = cols.reduce((s, c) => s + c.cards.length, 0);
+  
+  const statusColors = {
+    'TODO': '#E2E8F0',
+    'DOING': '#FEF3C7',
+    'REVIEW': '#DBEAFE',
+    'DONE': '#D1FAE5',
+    'BLOCKED': '#FCE4EC'
+  };
+
+  let html = `
+    <h1>📋 ECOS 项目总看板</h1>
+    <div class="subtitle">${data.updateTime} | ${data.phase} | PMO: ECOS-PMO</div>
+    <div class="status-bar">
+      ${cols.map(c => `
+        <div class="status-item status-${c.id.toLowerCase()}">
+          <span class="num">${c.cards.length}</span>
+          <span>${c.name}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="board">
+      ${cols.map(c => `
+        <div class="column">
+          <div class="col-header" style="background:${statusColors[c.id] || '#E2E8F0'}">
+            <span>${c.name}</span>
+            <span class="count">${c.cards.length}</span>
+          </div>
+          <div class="col-body">
+            ${c.cards.length === 0 ? '<div class="empty">暂无卡片</div>' : 
+              c.cards.map(card => `
+                <div class="card">
+                  <div class="card-tags">
+                    ${(card.tags || []).map(t => `<span class="tag tag-${t}">${t}</span>`).join('')}
+                  </div>
+                  <div class="card-title">${card.title}</div>
+                  ${card.desc ? `<div class="card-desc">${card.desc}</div>` : ''}
+                  <div class="card-meta">
+                    <span class="pri pri-${card.priority || 'medium'}">${card.priority || ''}</span>
+                    <span>${card.assignee || ''}</span>
+                  </div>
+                </div>
+              `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    ${data.milestones ? `
+    <div class="milestones">
+      <h3>🏁 里程碑</h3>
+      <div class="milestones-grid">
+        ${data.milestones.map(m => `
+          <div class="milestone">
+            <span>${m.status === '✅' ? '✅' : m.status === '🟡' ? '🟡' : '⚪'}</span>
+            <span><strong>${m.name}</strong></span>
+            <span class="date">${m.date}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+  `;
+  
+  app.innerHTML = html;
+}
+
+// Check if there's a JSON endpoint
+// For now, embed the data directly
+const EMBEDDED_DATA = {
+  updateTime: '最后更新: 2026-06-17',
+  phase: '✅ Sprint 0 完成 — 17/17 ✅',
+  columns: [
+    { id: 'TODO', name: '📋 TODO', cards: [
+      { title: 'S0-INF01: Dockerfile for sysman-boot', tags: ['p1'], priority: 'low', assignee: 'ECOS-BE' },
+      { title: 'S0-INF02: GitHub Actions CI', tags: ['p1'], priority: 'low', assignee: 'ECOS-BE' },
+      { title: 'S0-INF03: 前端路由守卫', tags: ['p1'], priority: 'low', assignee: 'ECOS-FE' },
+    ]},
+    { id: 'DOING', name: '🔧 DOING', cards: [
+      { title: 'S0-FC02: 条件表达式编辑器 (Workflow)', tags: ['p1'], priority: 'medium', assignee: 'ECOS-FE' },
+    ]},
+    { id: 'REVIEW', name: '👁️ REVIEW', cards: [] },
+    { id: 'DONE', name: '✅ DONE', cards: [
+      { title: 'DB持久化: V5 WorldModel 表+JdbcTemplate', tags: ['p0'], assignee: 'ECOS-BE' },
+      { title: 'DB持久化: V6 DataQuality 表+JdbcTemplate', tags: ['p0'], assignee: 'ECOS-BE' },
+      { title: 'DB持久化: V7 Glossary+Marketplace 表+JdbcTemplate', tags: ['p0'], assignee: 'ECOS-BE' },
+      { title: 'S0-FC01: Action Designer 后端 CRUD (V8)', tags: ['p1'], assignee: 'ECOS-BE' },
+      { title: 'S0-FC03: Agent 真实测试执行 (HermesEngine)', tags: ['p1'], assignee: 'ECOS-BE' },
+      { title: 'S0-FC04: Workflow 真实执行引擎 (DAG)', tags: ['p0'], assignee: 'ECOS-BE' },
+      { title: 'S0-FC05: Object 关系/时间线真实数据', tags: ['p1'], assignee: 'ECOS-BE' },
+      { title: 'S0-FC06: 审计AOP切面全CUD拦截', tags: ['p1'], assignee: 'ECOS-BE' },
+      { title: 'S0-FC07: NLQ Agent Runtime 回退', tags: ['p1'], assignee: 'ECOS-BE' },
+      { title: 'TASK-NP04: BUG-005 后端部署修复', tags: ['p0'], assignee: 'ECOS-BE' },
+      { title: 'TASK-RISK01: 差距分析报告', tags: ['risk'], assignee: 'ECOS-ARCH' },
+      { title: 'P0-1~P0-6 + P1-1~P1-5: MVP核心模块', tags: ['p0'], assignee: '团队' },
+    ]},
+    { id: 'BLOCKED', name: '🚫 BLOCKED', cards: [] },
+  ],
+  milestones: [
+    { name: 'M1: 基础框架', date: '已完成', status: '✅' },
+    { name: 'M2: MVP P0-P1', date: '已完成', status: '✅' },
+    { name: 'M3: Sprint 0', date: '2026-07-07', status: '🟡' },
+  ]
+};
+
+renderKanban(EMBEDDED_DATA);
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="Organization">
+    <insert id="createOrganization">
+        INSERT INTO TD_ORGANIZATION (
+            "ORG_ID", "ORG_NAME", "ORG_CODE", "PARENT_ORG_ID", "ORG_TYPE",
+            "DESCRIPTION", "CREATED_TIME", "CREATED_BY", "UPDATED_TIME",
+            "UPDATED_BY", "STATUS", "REMARK"
+        ) VALUES (
+            #[orgId], #[orgName], #[orgCode], #[parentOrgId], #[orgType],
+            #[description], #[createdTime], #[createdBy], #[updatedTime],
+            #[updatedBy], #[status], #[remark]
+        )
+    </insert>
+
+    <select id="getOrganization">
+        SELECT "ORG_ID", "ORG_NAME", "ORG_CODE", "PARENT_ORG_ID", "ORG_TYPE",
+            "DESCRIPTION", "CREATED_TIME", "CREATED_BY", "UPDATED_TIME",
+            "UPDATED_BY", "STATUS", "REMARK"
+        FROM TD_ORGANIZATION
+        WHERE "ORG_ID" = ? AND "STATUS" != 'DELETED'
+    </select>
+
+    <update id="updateOrganization">
+        UPDATE TD_ORGANIZATION SET
+            "ORG_NAME" = #[orgName],
+            "ORG_CODE" = #[orgCode],
+            "PARENT_ORG_ID" = #[parentOrgId],
+            "ORG_TYPE" = #[orgType],
+            "DESCRIPTION" = #[description],
+            "UPDATED_TIME" = #[updatedTime],
+            "UPDATED_BY" = #[updatedBy],
+            "STATUS" = #[status],
+            "REMARK" = #[remark]
+        WHERE "ORG_ID" = #[orgId]
+    </update>
+
+    <delete id="deleteOrganization">
+        UPDATE TD_ORGANIZATION SET "STATUS" = 'DELETED', "UPDATED_TIME" = NOW()
+        WHERE "ORG_ID" = ?
+    </delete>
+
+    <select id="getChildren">
+        SELECT "ORG_ID", "ORG_NAME", "ORG_CODE", "PARENT_ORG_ID", "ORG_TYPE",
+            "DESCRIPTION", "CREATED_TIME", "CREATED_BY", "UPDATED_TIME",
+            "UPDATED_BY", "STATUS", "REMARK"
+        FROM TD_ORGANIZATION
+        WHERE "PARENT_ORG_ID" = ? AND "STATUS" != 'DELETED'
+        ORDER BY "CREATED_TIME" ASC
+    </select>
+
+    <select id="listOrganizations">
+        SELECT "ORG_ID", "ORG_NAME", "ORG_CODE", "PARENT_ORG_ID", "ORG_TYPE",
+            "DESCRIPTION", "CREATED_TIME", "CREATED_BY", "UPDATED_TIME",
+            "UPDATED_BY", "STATUS", "REMARK"
+        FROM TD_ORGANIZATION
+        WHERE "STATUS" != 'DELETED'
+        #if($orgType)
+        AND "ORG_TYPE" = #[orgType]
+        #end
+        ORDER BY "CREATED_TIME" ASC
+    </select>
+
+    <select id="hasChildren">
+        SELECT COUNT(*) FROM TD_ORGANIZATION
+        WHERE "PARENT_ORG_ID" = ? AND "STATUS" != 'DELETED'
+    </select>
+
+    <insert id="assignUserToOrg">
+        INSERT INTO TD_USER_ORGANIZATION (
+            "USER_ID", "ORG_ID", "IS_PRIMARY", "CREATED_TIME", "CREATED_BY"
+        ) VALUES (
+            #[userId], #[orgId], #[isPrimary], #[createdTime], #[createdBy]
+        )
+    </insert>
+
+    <delete id="removeUserFromOrg">
+        DELETE FROM TD_USER_ORGANIZATION WHERE "USER_ID" = ? AND "ORG_ID" = ?
+    </delete>
+
+    <select id="getUserOrganizations">
+        SELECT o."ORG_ID", o."ORG_NAME", o."ORG_CODE", o."PARENT_ORG_ID", o."ORG_TYPE",
+            o."DESCRIPTION", o."CREATED_TIME", o."CREATED_BY", o."UPDATED_TIME",
+            o."UPDATED_BY", o."STATUS", o."REMARK"
+        FROM TD_ORGANIZATION o
+        INNER JOIN TD_USER_ORGANIZATION uo ON o."ORG_ID" = uo."ORG_ID"
+        WHERE uo."USER_ID" = ? AND o."STATUS" != 'DELETED'
+        ORDER BY uo."IS_PRIMARY" DESC, o."CREATED_TIME" ASC
+    </select>
+
+    <update id="setPrimaryOrg">
+        UPDATE TD_USER_ORGANIZATION SET
+            "IS_PRIMARY" = CASE WHEN "ORG_ID" = ? THEN '1' ELSE '0' END
+        WHERE "USER_ID" = ?
+    </update>
+
+    <insert id="createOrgPermission">
+        INSERT INTO TD_ORG_PERMISSION (
+            "PERMISSION_ID", "ORG_ID", "RESOURCE_ID", "ACTION",
+            "INHERIT_FROM_PARENT", "CREATED_TIME", "CREATED_BY"
+        ) VALUES (
+            #[permissionId], #[orgId], #[resourceId], #[action],
+            #[inheritFromParent], #[createdTime], #[createdBy]
+        )
+    </insert>
+
+    <select id="getOrgPermissions">
+        SELECT "PERMISSION_ID", "ORG_ID", "RESOURCE_ID", "ACTION",
+            "INHERIT_FROM_PARENT", "CREATED_TIME", "CREATED_BY"
+        FROM TD_ORG_PERMISSION WHERE "ORG_ID" = ?
+        ORDER BY "CREATED_TIME" ASC
+    </select>
+
+    <delete id="deleteOrgPermission">
+        DELETE FROM TD_ORG_PERMISSION WHERE "PERMISSION_ID" = ?
+    </delete>
+</sqlMap>

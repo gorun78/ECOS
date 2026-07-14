@@ -1,0 +1,26 @@
+# Hermes 引擎默认配置
+# 前缀: hermes
+hermes:
+  engine:
+    # 引擎总开关
+    enabled: true
+    # 默认 provider
+    default-provider: openrouter
+    # 默认模型 (openrouter 格式: provider/model)
+    default-model: deepseek/deepseek-chat
+    # 全局最大并发
+    max-concurrency: 5
+    # 默认超时 (秒)
+    default-timeout: 600
+
+  gateway:
+    # 重试最大次数（不含首次）
+    retry-max-attempts: 3
+    # 请求超时
+    request-timeout: 60s
+
+  profile:
+    # 是否启用 Profile 缓存
+    cache-enabled: true
+    # 缓存 TTL（分钟）
+    cache-ttl-minutes: 30

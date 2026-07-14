@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="ConfigVersion">
+    <insert id="insert">
+        INSERT INTO td_config_version (version_id, config_id, version, config_content, changelog, created_time, created_by)
+        VALUES (#[versionId], #[configId], #[version], #[configContent], #[changelog], #[createdTime], #[createdBy])
+    </insert>
+
+    <select id="findById">
+        SELECT * FROM td_config_version WHERE version_id = #[versionId]
+    </select>
+
+    <select id="findByConfigIdAndVersion">
+        SELECT * FROM td_config_version WHERE config_id = #[configId] AND version = #[version]
+    </select>
+
+    <select id="listByConfigId">
+        SELECT * FROM td_config_version WHERE config_id = #[configId] ORDER BY created_time DESC
+    </select>
+</sqlMap>

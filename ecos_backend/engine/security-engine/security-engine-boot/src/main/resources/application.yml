@@ -1,0 +1,38 @@
+server:
+  port: 18081
+
+spring:
+  application:
+    name: ecos-security-engine-boot
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sys_man
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  type-aliases-package: com.chinacreator.gzcm.sysman.controller.model
+
+opa:
+  url: http://localhost:8181
+  policy-dir: /home/guorongxiao/opa-policies
+
+logging:
+  level:
+    com.chinacreator.gzcm: DEBUG
+    org.springframework: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

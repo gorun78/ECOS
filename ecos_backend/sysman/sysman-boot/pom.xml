@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>sysman</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>sysman-boot</artifactId>
+    <name>Sys-Man Boot</name>
+    <description>系统管理启动模块 — Spring Boot 应用入口</description>
+
+    <dependencies>
+        <!-- Sys-Man Impl (包含所有业务逻辑) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Runtime Security (KMS/策略引擎/ABAC/合规/数据权限) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-security</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Runtime 子模块 (monitor/crypto/task 从 runtime-core 拆出) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-monitor</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Workspace (Object Runtime / Ontology / Workflow — P3迁移) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>workspace-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-crypto</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-task</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Domain Modules (P3 migration — were missing!) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>dccheng-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>datanet-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>aimod-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>portal-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>market-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>worldmodel-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Spring Boot Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- PostgreSQL Driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- JetBrains Annotations -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>24.1.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.sysman.boot.SysManApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

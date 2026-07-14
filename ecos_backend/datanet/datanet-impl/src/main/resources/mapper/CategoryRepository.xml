@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.datanet.repository.CategoryRepository">
+
+    <resultMap id="catMap" type="com.chinacreator.gzcm.datanet.model.DataCategory">
+        <id property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="path" column="path"/>
+        <result property="level" column="level"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="description" column="description"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="baseCols">
+        category_id, category_name, parent_id, path, level,
+        sort_order, description, status,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO td_data_category (<include refid="baseCols"/>)
+        VALUES (#{categoryId}, #{categoryName}, #{parentId}, #{path}, #{level},
+                #{sortOrder}, #{description}, #{status},
+                #{createBy}, #{createTime}, #{updateBy}, #{updateTime})
+    </insert>
+
+    <update id="update">
+        UPDATE td_data_category
+        SET category_name = #{categoryName},
+            parent_id = #{parentId},
+            path = #{path},
+            level = #{level},
+            sort_order = #{sortOrder},
+            description = #{description},
+            status = #{status},
+            update_by = #{updateBy},
+            update_time = NOW()
+        WHERE category_id = #{categoryId}
+    </update>
+
+    <select id="findById" resultMap="catMap">
+        SELECT <include refid="baseCols"/> FROM td_data_category WHERE category_id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="catMap">
+        SELECT <include refid="baseCols"/> FROM td_data_category ORDER BY path ASC, sort_order ASC
+    </select>
+
+    <select id="findByParentId" resultMap="catMap">
+        SELECT <include refid="baseCols"/> FROM td_data_category
+        WHERE parent_id = #{parentId} ORDER BY sort_order ASC
+    </select>
+
+    <select id="maxSortOrder" resultType="int">
+        SELECT COALESCE(MAX(sort_order), 0) FROM td_data_category WHERE parent_id = #{parentId}
+    </select>
+
+    <select id="countResources" resultType="int">
+        SELECT COUNT(*) FROM td_catalog_item WHERE category_path LIKE CONCAT(#{categoryPath}, '%')
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM td_data_category WHERE category_id = #{id}
+    </delete>
+
+</mapper>

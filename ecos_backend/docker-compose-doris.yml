@@ -1,0 +1,69 @@
+# ============================================================
+# Apache Doris — OLAP 分析引擎
+# 固定 IP 桥接: 172.28.0.10 (FE) / 172.28.0.20 (BE)
+# MySQL: localhost:9030  |  FE HTTP: 8030  |  BE HTTP: 8040
+# ============================================================
+
+services:
+  ecos-doris-fe:
+    image: apache/doris:fe-2.1.8
+    container_name: ecos-doris-fe
+    ports:
+      - "9030:9030"
+      - "8030:8030"
+    environment:
+      - FE_MASTER_IP=172.28.0.10
+      - FE_MASTER_PORT=9010
+      - FE_CURRENT_IP=172.28.0.10
+      - FE_CURRENT_PORT=9010
+    volumes:
+      - doris-fe-data:/opt/apache-doris/fe/doris-meta
+      - doris-fe-log:/opt/apache-doris/fe/log
+    networks:
+      doris-net:
+        ipv4_address: 172.28.0.10
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8030/api/bootstrap || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  ecos-doris-be:
+    image: apache/doris:be-2.1.8
+    container_name: ecos-doris-be
+    ports:
+      - "8040:8040"
+      - "9050:9050"
+    environment:
+      - FE_MASTER_IP=172.28.0.10
+      - FE_MASTER_PORT=9010
+      - BE_IP=172.28.0.20
+      - BE_PORT=9050
+    depends_on:
+      ecos-doris-fe:
+        condition: service_healthy
+    volumes:
+      - doris-be-data:/opt/apache-doris/be/storage
+      - doris-be-log:/opt/apache-doris/be/log
+    networks:
+      doris-net:
+        ipv4_address: 172.28.0.20
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8040/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  doris-fe-data:
+  doris-fe-log:
+  doris-be-data:
+  doris-be-log:
+
+networks:
+  doris-net:
+    external: true

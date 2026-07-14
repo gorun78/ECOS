@@ -1,0 +1,23 @@
+ontology:
+  graph:
+    backend: pg
+    neo4j:
+      uri: bolt://localhost:7687
+      user: neo4j
+      password: neo4j123
+  cache:
+    ttl_seconds: 300
+  version:
+    max_versions: 10
+    auto_version: true
+    require_approval: true
+  import:
+    batch_size: 1000
+  export:
+    format: jsonld
+  proposal:
+    auto_publish: false
+  workflow:
+    engine: buszhi
+  general:
+    default_domain: default

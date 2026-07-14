@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertCompliancePolicy">
+        <![CDATA[
+        INSERT INTO td_compliance_policy (
+            policy_id, policy_name, policy_type, regulation, rules, status, 
+            created_time, created_by, updated_time, updated_by
+        ) VALUES (
+            #[policyId], #[policyName], #[policyType], #[regulation], #[rules], #[status],
+            #[createdTime], #[createdBy], #[updatedTime], #[updatedBy]
+        )
+        ]]>
+    </property>
+
+    <property name="updateCompliancePolicy">
+        <![CDATA[
+        UPDATE td_compliance_policy SET
+            policy_name = #[policyName],
+            policy_type = #[policyType],
+            regulation = #[regulation],
+            rules = #[rules],
+            status = #[status],
+            updated_time = #[updatedTime],
+            updated_by = #[updatedBy]
+        WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="deleteCompliancePolicy">
+        <![CDATA[
+        DELETE FROM td_compliance_policy WHERE policy_id = ?
+        ]]>
+    </property>
+
+    <property name="findById">
+        <![CDATA[
+        SELECT * FROM td_compliance_policy WHERE policy_id = ?
+        ]]>
+    </property>
+
+    <property name="queryCompliancePolicy">
+        <![CDATA[
+        SELECT * FROM td_compliance_policy WHERE 1 = 1
+        #if($policyType && $policyType != '')
+            AND policy_type = #[policyType]
+        #end
+        #if($regulation && $regulation != '')
+            AND regulation = #[regulation]
+        #end
+        #if($status && $status != '')
+            AND status = #[status]
+        #end
+        ORDER BY created_time DESC
+        ]]>
+    </property>
+</properties>
+

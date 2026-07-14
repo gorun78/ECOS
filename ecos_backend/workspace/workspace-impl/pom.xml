@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>workspace</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>workspace-impl</artifactId>
+    <name>工作区 Impl</name>
+    <description>工作区实现 — Controller/Service/Repository</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- ★ ABAC 查询过滤依赖 Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <!-- 对象运行时依赖 buszhi 的 ObjectRuntimeService + StateMachineEngine -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- ★ 计算属性引擎依赖 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>dccheng-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- ★ KG 同步依赖 Neo4j -->
+        <dependency>
+            <groupId>org.neo4j.driver</groupId>
+            <artifactId>neo4j-java-driver</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        </dependency>
+
+        <!-- A3 MinIO SDK (MinioObjectStorageService) -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+        </dependency>
+        <!-- 阶段5.1: market→workspace 已吸收，源码已复制，无需外部依赖 -->
+    </dependencies>
+</project>

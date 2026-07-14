@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <relativePath>../pom.xml</relativePath>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>runtime</artifactId>
+    <packaging>pom</packaging>
+    <name>DataBridge Runtime</name>
+    <description>运行时子系统 — 任务调度、监控、加解密、元数据</description>
+
+    <modules>
+        <module>runtime-core</module>
+        <module>runtime-security</module>
+        <module>runtime-monitor</module>
+        <module>runtime-crypto</module>
+        <module>runtime-task</module>
+        <module>hermes-engine</module>
+    </modules>
+
+</project>

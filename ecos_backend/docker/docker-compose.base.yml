@@ -1,0 +1,57 @@
+version: '3.8'
+
+# =============================================================================
+# ECOS Base Compose — 所有版本共用
+#   - PostgreSQL 16 (sys_man, root/root)
+#   - ECOS Gateway (port 8080, build from project root)
+#
+# 使用方式:
+#   标准版: docker compose -f docker-compose.base.yml -f docker-compose.standard.yml up -d
+#   企业版: docker compose -f docker-compose.base.yml -f docker-compose.enterprise.yml up -d
+#   旗舰版: docker compose -f docker-compose.base.yml -f docker-compose.ultimate.yml up -d
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ecos-postgres
+    environment:
+      POSTGRES_DB: sys_man
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-pg:/docker-entrypoint-initdb.d
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d sys_man"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  ecos-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        EDITION: ${ECOS_EDITION:-standard}
+    container_name: ecos-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ECOS_EDITION:-standard}
+      ECOS_EDITION: ${ECOS_EDITION:-standard}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+    driver: local

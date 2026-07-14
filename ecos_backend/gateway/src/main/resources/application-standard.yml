@@ -1,0 +1,25 @@
+# ── ECOS 标准版 (Standard Edition) ──
+# 适用: 单一组织、<50GB数据、PG Only
+# 启动: SPRING_PROFILES_ACTIVE=standard
+
+ecos:
+  edition: standard
+  graph:
+    provider: pg
+  analytics:
+    provider: pg
+  storage:
+    provider: pg
+  features:
+    knowledge-graph: false
+    causal-analysis: false
+    workbook-sandbox: false
+    nsga-ii-optimizer: false
+    multi-tenant: false
+    opentelemetry: false
+  module:
+    aimod: false
+    cognitive: false
+    worldmodel: false
+    market: false
+    portal: false

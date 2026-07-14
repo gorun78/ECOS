@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <relativePath>../pom.xml</relativePath>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>datanet</artifactId>
+    <packaging>pom</packaging>
+    <name>DataBridge DataNet</name>
+    <description>数据网络 — 跨部门数据资源连接/编目/发现</description>
+
+    <modules>
+        <module>datanet-api</module>
+        <module>datanet-impl</module>
+        <module>datanet-boot</module>
+    </modules>
+
+</project>

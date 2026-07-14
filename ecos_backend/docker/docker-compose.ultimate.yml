@@ -1,0 +1,86 @@
+version: '3.8'
+
+# =============================================================================
+# ECOS 旗舰版 — PG + Neo4j + Doris + Gateway (extend base + Neo4j + Doris)
+# 使用: docker compose -f docker-compose.base.yml -f docker-compose.ultimate.yml up -d
+# =============================================================================
+
+services:
+  postgres:
+    extends:
+      file: docker-compose.base.yml
+      service: postgres
+
+  neo4j:
+    image: neo4j:5
+    container_name: ecos-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/password
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./neo4j-data:/data
+      - ./neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  doris-fe:
+    image: apache/doris:2.1.8-fe-x86_64
+    container_name: ecos-doris-fe
+    environment:
+      FE_SERVERS: fe1:172.20.0.2:9010
+      FE_ID: 1
+    ports:
+      - "8030:8030"
+      - "9030:9030"
+    volumes:
+      - ./doris-fe-data:/opt/apache-doris/fe/doris-meta
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8030/api/bootstrap || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  doris-be:
+    image: apache/doris:2.1.8-be-x86_64
+    container_name: ecos-doris-be
+    environment:
+      FE_SERVERS: fe1:doris-fe:9010
+      BE_ADDR: 0.0.0.0:9050
+    ports:
+      - "9050:9050"
+    volumes:
+      - ./doris-be-data:/opt/apache-doris/be/storage
+    depends_on:
+      doris-fe:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ecos-gateway:
+    extends:
+      file: docker-compose.base.yml
+      service: ecos-gateway
+    environment:
+      ECOS_EDITION: ultimate
+      SPRING_PROFILES_ACTIVE: ultimate
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: password
+      DORIS_FE_HOST: doris-fe
+      DORIS_FE_QUERY_PORT: 9030
+      DORIS_FE_HTTP_PORT: 8030
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      doris-fe:
+        condition: service_healthy

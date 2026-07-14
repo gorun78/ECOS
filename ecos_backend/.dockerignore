@@ -1,0 +1,66 @@
+# =============================================================================
+# .dockerignore — DataBridge v2
+# Exclude unnecessary files from Docker build context for faster builds
+# =============================================================================
+
+# --- Build artifacts ---
+target/
+**/target/
+*.jar
+*.war
+
+# --- Maven wrapper ---
+.mvn/
+mvnw
+mvnw.cmd
+
+# --- Version control ---
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# --- IDE and editor files ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+*.swo
+*~
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# --- Logs and temp ---
+logs/
+*.log
+tmp/
+temp/
+
+# --- Documentation and misc ---
+*.md
+*.pdf
+*.drawio
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+docs/
+assets/
+
+# --- Docker files (don't need to ship in context) ---
+Dockerfile*
+.dockerignore
+
+# --- Node / frontend (if any) ---
+node_modules/
+dist/

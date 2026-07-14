@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.datanet.repository.DataFieldRepository">
+
+    <resultMap id="fieldMap" type="com.chinacreator.gzcm.datanet.model.DataField">
+        <id property="fieldId" column="field_id"/>
+        <result property="resourceId" column="resource_id"/>
+        <result property="fieldName" column="field_name"/>
+        <result property="fieldAlias" column="field_alias"/>
+        <result property="dataType" column="field_type"/>
+        <result property="dataLength" column="field_length"/>
+        <result property="dataPrecision" column="data_precision"/>
+        <result property="nullable" column="nullable"/>
+        <result property="primaryKey" column="is_primary_key"/>
+        <result property="defaultValue" column="default_value"/>
+        <result property="description" column="description"/>
+        <result property="sortOrder" column="field_order"/>
+    </resultMap>
+
+    <sql id="baseCols">
+        field_id, resource_id, field_name, field_alias, field_type,
+        field_length, data_precision, nullable, is_primary_key,
+        default_value, description, field_order
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO td_data_field (<include refid="baseCols"/>)
+        VALUES (#{fieldId}, #{resourceId}, #{fieldName}, #{fieldAlias}, #{dataType},
+                #{dataLength}, #{dataPrecision}, #{nullable}, #{primaryKey},
+                #{defaultValue}, #{description}, #{sortOrder})
+    </insert>
+
+    <insert id="batchInsert" parameterType="list">
+        INSERT INTO td_data_field (<include refid="baseCols"/>) VALUES
+        <foreach collection="fields" item="f" separator=",">
+            (#{f.fieldId}, #{f.resourceId}, #{f.fieldName}, #{f.fieldAlias}, #{f.dataType},
+             #{f.dataLength}, #{f.dataPrecision}, #{f.nullable}, #{f.primaryKey},
+             #{f.defaultValue}, #{f.description}, #{f.sortOrder})
+        </foreach>
+    </insert>
+
+    <select id="findByResourceId" resultMap="fieldMap">
+        SELECT <include refid="baseCols"/> FROM td_data_field
+        WHERE resource_id = #{resourceId} ORDER BY field_order ASC
+    </select>
+
+    <delete id="deleteByResourceId">
+        DELETE FROM td_data_field WHERE resource_id = #{resourceId}
+    </delete>
+</mapper>

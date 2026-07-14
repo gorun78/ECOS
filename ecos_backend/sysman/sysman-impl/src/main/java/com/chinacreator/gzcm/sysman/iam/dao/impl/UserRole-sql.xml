@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertUserRole">
+        <![CDATA[
+        INSERT INTO TD_USER_ROLE (user_id, role_id, org_id, created_time, created_by)
+        VALUES (#[userId], #[roleId], '-1', now(), 'system')
+        ]]>
+    </property>
+
+    <property name="deleteUserRole">
+        <![CDATA[
+        DELETE FROM TD_USER_ROLE WHERE user_id = ? AND role_id = ?
+        ]]>
+    </property>
+
+    <property name="listByUserId">
+        <![CDATA[
+        SELECT * FROM TD_USER_ROLE WHERE user_id = #[userId]
+        ]]>
+    </property>
+</properties>
+
+

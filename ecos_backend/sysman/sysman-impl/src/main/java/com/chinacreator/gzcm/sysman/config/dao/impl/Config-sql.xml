@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="Config">
+    <insert id="insert">
+        INSERT INTO td_config (config_id, config_key, config_value, config_type, environment, description, created_time, created_by, updated_time, updated_by)
+        VALUES (#[configId], #[configKey], #[configValue], #[configType], #[environment], #[description], #[createdTime], #[createdBy], #[updatedTime], #[updatedBy])
+    </insert>
+
+    <update id="update">
+        UPDATE td_config SET
+            config_key = #[configKey],
+            config_value = #[configValue],
+            config_type = #[configType],
+            environment = #[environment],
+            description = #[description],
+            updated_time = #[updatedTime],
+            updated_by = #[updatedBy]
+        WHERE config_id = #[configId]
+    </update>
+
+    <delete id="delete">
+        DELETE FROM td_config WHERE config_id = #[configId]
+    </delete>
+
+    <select id="findById">
+        SELECT * FROM td_config WHERE config_id = #[configId]
+    </select>
+
+    <select id="findByTypeNameEnv">
+        SELECT * FROM td_config WHERE config_type = #[configType] AND config_key = #[configName] AND environment = #[environment]
+    </select>
+
+    <select id="query">
+        SELECT * FROM td_config WHERE 1=1
+        #if($configType)
+          AND config_type = #[configType]
+        #end
+        #if($environment)
+          AND environment = #[environment]
+        #end
+        #if($keyword)
+          AND (config_key LIKE concat('%', #[keyword], '%') OR description LIKE concat('%', #[keyword], '%'))
+        #end
+        ORDER BY updated_time DESC
+    </select>
+
+    <select id="listAll">
+        SELECT * FROM td_config WHERE 1=1 ORDER BY updated_time DESC
+    </select>
+</sqlMap>

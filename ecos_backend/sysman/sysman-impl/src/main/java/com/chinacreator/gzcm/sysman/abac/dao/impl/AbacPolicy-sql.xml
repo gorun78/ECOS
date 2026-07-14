@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertPolicy">
+        <![CDATA[
+        INSERT INTO td_abac_policy (
+            policy_id, policy_name, subject_condition, resource_condition,
+            action_condition, environment_condition, effect, priority, created_time
+        ) VALUES (
+            #[policyId], #[policyName], #[subjectCondition], #[resourceCondition],
+            #[actionCondition], #[environmentCondition], #[effect], #[priority], #[createdTime]
+        )
+        ]]>
+    </property>
+
+    <property name="updatePolicy">
+        <![CDATA[
+        UPDATE td_abac_policy
+        SET policy_name = #[policyName],
+            subject_condition = #[subjectCondition],
+            resource_condition = #[resourceCondition],
+            action_condition = #[actionCondition],
+            environment_condition = #[environmentCondition],
+            effect = #[effect],
+            priority = #[priority]
+        WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="deletePolicy">
+        <![CDATA[
+        DELETE FROM td_abac_policy WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="findById">
+        <![CDATA[
+        SELECT * FROM td_abac_policy WHERE policy_id = #[policyId]
+        ]]>
+    </property>
+
+    <property name="findAll">
+        <![CDATA[
+        SELECT * FROM td_abac_policy ORDER BY priority DESC, created_time DESC
+        ]]>
+    </property>
+</properties>
+
+

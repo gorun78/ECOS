@@ -1,0 +1,51 @@
+{
+  "updateTime": "2026-06-17",
+  "phase": "Sprint 0 — DB持久化 + 功能补全",
+  "todo": [
+    "S0-DB01: DDL World Model 持久化表 (ecos_wm_goal/causal/scenario)",
+    "S0-DB02: DDL Data Quality 持久化表 (ecos_dq_rule/issue)",
+    "S0-DB03: DDL Glossary + Marketplace 表",
+    "S0-DB04: WorldModelController: ConcurrentHashMap → JdbcTemplate",
+    "S0-DB05: DqController: ConcurrentHashMap → JdbcTemplate",
+    "S0-DB06: GlossaryController: ConcurrentHashMap → JdbcTemplate",
+    "S0-DB07: MarketplaceController: Mock → DB驱动",
+    "S0-FC01: Action Designer 后端 CRUD",
+    "S0-FC02: 条件表达式编辑器 (Workflow)",
+    "S0-FC03: Agent 真实测试执行 (对接HermesEngine)",
+    "S0-FC04: Workflow 真实执行引擎",
+    "S0-FC05: Object 关系/时间线真实数据",
+    "S0-FC06: 审计AOP切面全CUD拦截",
+    "S0-FC07: NLQ Agent Runtime 回退",
+    "S0-INF01: Dockerfile for sysman-boot",
+    "S0-INF02: GitHub Actions CI (编译+测试)",
+    "S0-INF03: 前端路由守卫"
+  ],
+  "doing": [],
+  "review": [],
+  "done": [
+    "TASK-001: P0-安全修复方案设计",
+    "TASK-NP01: 修复SQL注入",
+    "TASK-P103: 统一响应格式+全局异常处理",
+    "TASK-P108: Flyway Schema管理",
+    "TASK-P105: 前端API层合并",
+    "TASK-NP04: P0-04: 后端部署修复(修复BUG-005)",
+    "TASK-RISK01: 差距分析 — 设计与实现差异梳理",
+    "P0-1: Object Runtime 全链路",
+    "P0-2: Ontology Designer",
+    "P0-3: Workflow Designer",
+    "P0-4: World Model 后端",
+    "P0-5: Data Quality Dashboard",
+    "P0-6: IAM 完善",
+    "P1-1: Agent Builder",
+    "P1-2: Knowledge Graph (Neo4j)",
+    "P1-3: Pipeline 节点库",
+    "P1-4: Agent Mesh MVP",
+    "P1-5: Data Catalog 完善"
+  ],
+  "blocked": [],
+  "milestones": [
+    {"name": "M1: 基础框架", "date": "已完成", "status": "✅"},
+    {"name": "M2: MVP P0-P1", "date": "已完成", "status": "✅"},
+    {"name": "M3: Sprint 0", "date": "2026-07-07", "status": "🟡"}
+  ]
+}

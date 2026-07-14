@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertRolePermission">
+        <![CDATA[
+        INSERT INTO TD_ROLE_PERMISSION (role_id, permission_id, created_time, created_by)
+        VALUES (#[roleId], #[permissionId], now(), 'system')
+        ]]>
+    </property>
+
+    <property name="deleteRolePermission">
+        <![CDATA[
+        DELETE FROM TD_ROLE_PERMISSION WHERE role_id = ? AND permission_id = ?
+        ]]>
+    </property>
+
+    <property name="listRolePermissions">
+        <![CDATA[
+        SELECT role_id, permission_id FROM TD_ROLE_PERMISSION WHERE role_id = #[roleId]
+        ]]>
+    </property>
+</properties>
+
+

@@ -1,0 +1,20 @@
+version: '3.8'
+
+# =============================================================================
+# ECOS 标准版 — 仅 PG + Gateway (extend base)
+# 使用: docker compose -f docker-compose.base.yml -f docker-compose.standard.yml up -d
+# =============================================================================
+
+services:
+  postgres:
+    extends:
+      file: docker-compose.base.yml
+      service: postgres
+
+  ecos-gateway:
+    extends:
+      file: docker-compose.base.yml
+      service: ecos-gateway
+    environment:
+      ECOS_EDITION: standard
+      SPRING_PROFILES_ACTIVE: standard

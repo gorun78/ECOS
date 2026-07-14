@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<properties>
+    <property name="insertDataResidency">
+        <![CDATA[
+        INSERT INTO td_data_residency (
+            residency_id, resource_id, resource_type, region, tenant_id, created_time, created_by
+        ) VALUES (
+            #[residencyId], #[resourceId], #[resourceType], #[region], #[tenantId], #[createdTime], #[createdBy]
+        )
+        ]]>
+    </property>
+
+    <property name="findByResource">
+        <![CDATA[
+        SELECT * FROM td_data_residency WHERE resource_id = ? AND resource_type = ?
+        ]]>
+    </property>
+
+    <property name="updateDataResidency">
+        <![CDATA[
+        UPDATE td_data_residency SET
+            region = #[region],
+            tenant_id = #[tenantId]
+        WHERE residency_id = #[residencyId]
+        ]]>
+    </property>
+</properties>
+

@@ -1,0 +1,4 @@
+total 12
+drwxr-xr-x 3 guorongxiao guorongxiao 4096 Jun  3 18:48 .
+drwxr-xr-x 3 guorongxiao guorongxiao 4096 Jun  3 18:48 ..
+drwxr-xr-x 3 guorongxiao guorongxiao 4096 Jun  3 18:48 com

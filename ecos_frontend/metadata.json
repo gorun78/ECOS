@@ -1,0 +1,6 @@
+{
+  "name": "C2EOS",
+  "description": "Cognitive Enterprise Operating System (C2EOS) - A metadata-driven data, ontology, and multi-agent operations platform inspired by Palantir Foundry and AIP.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,53 @@
+version: '3.8'
+# ECOS 企业版 — PG+Neo4j+MinIO, 多租户, 50-500GB
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sys_man
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sys_man"]
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/neo4j123
+    ports: ["7474:7474", "7687:7687"]
+    volumes:
+      - ./data/neo4j:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "neo4j123", "RETURN 1"]
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000", "9001:9001"]
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+
+  gateway:
+    image: ecos-gateway:latest
+    ports: ["8080:8080"]
+    environment:
+      SPRING_PROFILES_ACTIVE: enterprise
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: admin123
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      minio:
+        condition: service_healthy

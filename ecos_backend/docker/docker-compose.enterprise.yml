@@ -1,0 +1,47 @@
+version: '3.8'
+
+# =============================================================================
+# ECOS 企业版 — PG + Neo4j + Gateway (extend base + Neo4j)
+# 使用: docker compose -f docker-compose.base.yml -f docker-compose.enterprise.yml up -d
+# =============================================================================
+
+services:
+  postgres:
+    extends:
+      file: docker-compose.base.yml
+      service: postgres
+
+  neo4j:
+    image: neo4j:5
+    container_name: ecos-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/password
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./neo4j-data:/data
+      - ./neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  ecos-gateway:
+    extends:
+      file: docker-compose.base.yml
+      service: ecos-gateway
+    environment:
+      ECOS_EDITION: enterprise
+      SPRING_PROFILES_ACTIVE: enterprise
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy

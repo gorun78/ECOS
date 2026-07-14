@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="Role">
+    <insert id="insertRole">
+        INSERT INTO TD_ROLE (
+            "ROLE_ID", "ROLE_NAME", "ROLE_CODE", "DESCRIPTION", "PARENT_ROLE_ID",
+            "CREATED_TIME", "CREATED_BY", "UPDATED_TIME", "UPDATED_BY"
+        ) VALUES (
+            #roleId#, #roleName#, #roleCode#, #description#, #parentRoleId#,
+            #createdTime#, #createdBy#, #updatedTime#, #updatedBy#
+        )
+    </insert>
+
+    <update id="updateRole">
+        UPDATE TD_ROLE
+        SET "ROLE_NAME" = #roleName#,
+            "DESCRIPTION" = #description#,
+            "PARENT_ROLE_ID" = #parentRoleId#,
+            "UPDATED_TIME" = #updatedTime#,
+            "UPDATED_BY" = #updatedBy#
+        WHERE "ROLE_ID" = #roleId#
+    </update>
+
+    <delete id="deleteRole">
+        DELETE FROM TD_ROLE WHERE "ROLE_ID" = #roleId#
+    </delete>
+
+    <select id="findById">
+        SELECT * FROM TD_ROLE WHERE "ROLE_ID" = #roleId#
+    </select>
+
+    <select id="findByCode">
+        SELECT * FROM TD_ROLE WHERE "ROLE_CODE" = #roleCode#
+    </select>
+
+    <select id="queryRoles">
+        SELECT * FROM TD_ROLE
+        WHERE 1=1
+        #if($keyword)
+          AND ("ROLE_NAME" LIKE concat('%', #keyword#, '%') OR "ROLE_CODE" LIKE concat('%', #keyword#, '%'))
+        #end
+        ORDER BY "CREATED_TIME" DESC
+    </select>
+</sqlMap>
