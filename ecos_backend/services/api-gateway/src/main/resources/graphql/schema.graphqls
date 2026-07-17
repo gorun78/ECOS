@@ -1,0 +1,297 @@
+# ECOS GraphQL Schema — Sprint 2
+# Aligned with design doc 07-Ontology and 13-API
+
+scalar DateTime
+scalar JSON
+
+type Query {
+    # Object Runtime queries
+    object(id: ID!): Object
+    objects(entityType: String, page: Int = 0, size: Int = 20): ObjectPage!
+    objectRelationships(objectId: ID!, relationType: String): [Relationship!]!
+
+    # Ontology queries
+    ontology(id: ID!): Ontology
+    ontologies(domain: String, page: Int = 0, size: Int = 20): OntologyPage!
+    entityDefinition(ontologyId: ID!, code: String!): EntityDefinition
+    propertyDefinitions(entityCode: String!): [PropertyDefinition!]!
+
+    # Agent queries
+    agent(id: ID!): Agent
+    agents(page: Int = 0, size: Int = 20): AgentPage!
+    agentExecution(id: ID!): AgentExecution
+
+    # Knowledge Graph queries
+    graphNode(id: ID!): GraphNode
+    graphNeighbors(id: ID!, depth: Int = 1): GraphSubgraph!
+    graphShortestPath(fromId: ID!, toId: ID!): GraphPath!
+
+    # Mission queries
+    goal(id: ID!): Goal
+    goals(status: String, page: Int = 0, size: Int = 20): GoalPage!
+
+    # Catalog queries
+    dataset(id: ID!): Dataset
+    datasets(source: String, page: Int = 0, size: Int = 20): DatasetPage!
+
+    # Search
+    search(query: String!, type: String, page: Int = 0, size: Int = 20): SearchPage!
+
+    # Workflow queries
+    workflow(id: ID!): Workflow
+    workflows(status: String, page: Int = 0, size: Int = 20): WorkflowPage!
+}
+
+type Mutation {
+    # Object mutations
+    createObject(input: CreateObjectInput!): Object!
+    updateObject(id: ID!, input: UpdateObjectInput!): Object!
+    deleteObject(id: ID!): Boolean!
+
+    # Relationship mutations
+    createRelationship(input: CreateRelationshipInput!): Relationship!
+
+    # Agent mutations
+    executeAgent(id: ID!, input: AgentExecutionInput!): AgentExecution!
+    cancelAgentExecution(id: ID!): Boolean!
+
+    # Workflow mutations
+    startWorkflow(id: ID!, input: JSON): WorkflowInstance!
+    completeTask(taskId: ID!, input: JSON): Task!
+}
+
+# Object types
+type Object {
+    id: ID!
+    entityType: String!
+    properties: JSON!
+    state: String
+    relationships: [Relationship!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+type ObjectPage {
+    content: [Object!]!
+    totalElements: Int!
+    totalPages: Int!
+    number: Int!
+    size: Int!
+}
+
+type Relationship {
+    id: ID!
+    sourceId: ID!
+    targetId: ID!
+    relationType: String!
+    properties: JSON
+}
+
+# Ontology types
+type Ontology {
+    id: ID!
+    code: String!
+    name: String!
+    status: String!
+    version: String
+    entities: [EntityDefinition!]!
+    domain: String
+    createdAt: DateTime!
+}
+
+type OntologyPage {
+    content: [Ontology!]!
+    totalElements: Int!
+    totalPages: Int!
+}
+
+type EntityDefinition {
+    code: String!
+    name: String!
+    category: String!
+    properties: [PropertyDefinition!]!
+    relationships: [RelationshipDefinition!]!
+}
+
+type PropertyDefinition {
+    code: String!
+    name: String!
+    dataType: String!
+    required: Boolean!
+    indexed: Boolean!
+}
+
+type RelationshipDefinition {
+    code: String!
+    name: String!
+    sourceEntity: String!
+    targetEntity: String!
+    cardinality: String!
+}
+
+# Agent types
+type Agent {
+    id: ID!
+    code: String!
+    name: String!
+    goal: String!
+    status: String!
+    tools: [String!]!
+}
+
+type AgentPage {
+    content: [Agent!]!
+    totalElements: Int!
+    totalPages: Int!
+}
+
+type AgentExecution {
+    id: ID!
+    agentId: ID!
+    status: String!
+    plan: JSON
+    result: JSON
+    startedAt: DateTime!
+    completedAt: DateTime
+}
+
+# Knowledge Graph types
+type GraphNode {
+    id: ID!
+    label: String!
+    properties: JSON!
+}
+
+type GraphSubgraph {
+    nodes: [GraphNode!]!
+    edges: [GraphEdge!]!
+}
+
+type GraphEdge {
+    id: ID!
+    source: String!
+    target: String!
+    type: String!
+    properties: JSON
+}
+
+type GraphPath {
+    nodes: [GraphNode!]!
+    edges: [GraphEdge!]!
+    totalWeight: Float
+}
+
+# Mission types
+type Goal {
+    id: ID!
+    code: String!
+    name: String!
+    status: String!
+    targetValue: Float
+    currentValue: Float
+    kpis: [KPI!]!
+}
+
+type GoalPage {
+    content: [Goal!]!
+    totalElements: Int!
+    totalPages: Int!
+}
+
+type KPI {
+    id: ID!
+    code: String!
+    name: String!
+    targetValue: Float!
+    actualValue: Float
+    unit: String
+}
+
+# Catalog types
+type Dataset {
+    id: ID!
+    name: String!
+    type: String!
+    description: String
+    fields: [DataField!]!
+    source: String
+    createdAt: DateTime!
+}
+
+type DatasetPage {
+    content: [Dataset!]!
+    totalElements: Int!
+    totalPages: Int!
+}
+
+type DataField {
+    name: String!
+    dataType: String!
+    nullable: Boolean!
+    description: String
+}
+
+# Search types
+type SearchPage {
+    content: [SearchHit!]!
+    totalElements: Int!
+}
+
+type SearchHit {
+    id: ID!
+    type: String!
+    name: String!
+    description: String
+    score: Float!
+}
+
+# Workflow types
+type Workflow {
+    id: ID!
+    name: String!
+    status: String!
+    definition: JSON
+}
+
+type WorkflowPage {
+    content: [Workflow!]!
+    totalElements: Int!
+    totalPages: Int!
+}
+
+type WorkflowInstance {
+    id: ID!
+    workflowId: ID!
+    status: String!
+    tasks: [Task!]!
+}
+
+type Task {
+    id: ID!
+    name: String!
+    status: String!
+    assignee: String
+}
+
+# Input types
+input CreateObjectInput {
+    entityType: String!
+    properties: JSON!
+}
+
+input UpdateObjectInput {
+    properties: JSON!
+    state: String
+}
+
+input CreateRelationshipInput {
+    sourceId: ID!
+    targetId: ID!
+    relationType: String!
+    properties: JSON
+}
+
+input AgentExecutionInput {
+    goal: String!
+    parameters: JSON
+}

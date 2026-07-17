@@ -1,0 +1,77 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      mvc:
+        routes:
+          - id: identity-service
+            uri: http://localhost:18081
+            predicates:
+              - Path=/api/v1/auth/**, /api/v1/users/**, /api/v1/roles/**, /api/v1/permissions/**, /api/v1/organizations/**, /api/v1/tenants/**
+          - id: catalog-service
+            uri: http://localhost:18082
+            predicates:
+              - Path=/api/v1/catalog/**, /api/v1/datasources/**, /api/v1/metadata/**, /api/v1/categories/**, /api/v1/lineage/**, /api/v1/pipeline/**, /api/v1/engine/data/**
+          - id: ontology-service
+            uri: http://localhost:18083
+            predicates:
+              - Path=/api/v1/ecos/ontologies/**, /api/v1/ontology/**, /api/v1/domains/**, /api/v1/engine/ontology/**
+          - id: object-service
+            uri: http://18084
+            predicates:
+              - Path=/api/v1/objects/**, /api/v1/objectql/**, /api/v1/scenarios/**
+          - id: workflow-service
+            uri: http://localhost:18085
+            predicates:
+              - Path=/api/v1/workflows/**, /api/v1/tasks/**, /api/v1/approvals/**, /api/v1/dq/**, /api/v1/engine/workflow/**
+          - id: agent-service
+            uri: http://localhost:18086
+            predicates:
+              - Path=/api/v1/agents/**, /api/v1/agent-profiles/**, /api/v1/missions/**, /api/v1/tools/**, /api/v1/hermes/**, /api/v1/engine/agent/**
+          - id: knowledge-service
+            uri: http://localhost:18087
+            predicates:
+              - Path=/api/v1/knowledge/**, /api/v1/graph/**, /api/v1/glossary/**, /api/v1/classification/**, /api/v1/engine/knowledge/**
+          - id: ai-service
+            uri: http://localhost:18088
+            predicates:
+              - Path=/api/v1/aip/**, /api/v1/nlq/**, /api/v1/guardrails/**, /api/v1/prompt/**, /api/v1/diagnostic/**, /api/v1/engine/cognitive/**
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: api-gateway
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+
+auth:
+  jwt:
+    public-key-pem: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2d3F5f8K3x7L9vA1
+      Bq4Z6h2J8kN5rT3wP0mX7vC4y8bD2eF1gH9kL6sA3jK8nW5vB7xC4mP2qR
+      8tY3uE9wF5gL2vN7kM4bH6sJ1pR8cT3wA9mX2vB4yK7nL5qP8rT6wE3jF
+      9vC2mK4bH7sN1pR8cT5wA9mX3vB6yK8nL4qP7rT2wE5jF8vC1mK3bH6s
+      N0pR+ct5wa9mx3vb6yk8nl4qp7rt2we5jf8vc0mk3bh6sn0pr+ct6wa9mx
+      4vb7yk9ol4qp8rt3we6jf9vd1mk4ci7sn2QR8ct8wa+ny5vb8yq=placeholder
+      -----END PUBLIC KEY-----
+  whitelist:
+    paths:
+      - /api/v1/auth/login
+      - /api/v1/auth/refresh
+      - /api/health
+      - /actuator/**

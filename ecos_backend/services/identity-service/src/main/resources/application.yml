@@ -1,0 +1,32 @@
+server:
+  port: 18081
+
+spring:
+  application:
+    name: identity-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=ecos_identity
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: identity-service
+      auto-offset-reset: earliest
+  flyway:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

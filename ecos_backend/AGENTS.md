@@ -63,13 +63,13 @@ D/I (datanet, dccheng) ← K (buszhi, aimod) ← W (worldmodel, cognitive)
 
 | 被吸收 | → 目标 | 状态 |
 |--------|--------|------|
-| portal | workspace | 源码已复制，旧JAR从~/.m2取 |
-| market | workspace | 同上 |
-| worldmodel | buszhi | 同上 |
-| cognitive | dccheng | 同上 |
-| ecos-kanban | runtime | 同上 |
+| portal | workspace | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
+| market | workspace | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
+| worldmodel | buszhi | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
+| cognitive | dccheng | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
+| ecos-kanban | runtime | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
 
-物理目录仍存在但已从 root POM `<modules>` 注释掉。
+sysman-impl/sysman-boot仍Maven依赖旧模块JAR(portal-impl/market-impl/worldmodel-impl)。未来需更新为依赖目标模块。
 
 ## Key Files
 
@@ -145,8 +145,10 @@ DataBridgeException (RuntimeException)
 
 | 组件 | 版本/路径 |
 |------|----------|
-| JDK | Temurin 17.0.19 (`~/.local/jdk/jdk-17.0.19+10`) |
+| JDK (Linux native) | MS OpenJDK 17.0.14 (`~/.local/jdk17-linux/bin/java`) — **必须用此版本**，不能用~/jdk17(指向Windows java.exe) |
+| JDK (Windows, via WSL interop) | MS JDK 17.0.17 (`/mnt/c/Program Files/Microsoft/jdk-17.0.17.10-hotspot`) — WSL bash自动转Windows路径导致classworlds错误 |
 | Maven | 3.9.11 (`~/.local/apache-maven-3.9.11/bin/mvn`) |
+| 构建快捷方式 | `source ecos_backend/env.sh && cd ecos_backend && mvn clean install -DskipTests -Dmaven.test.skip=true` |
 | Maven仓库 | `~/.m2/repository` (WSL原生路径) |
 | PostgreSQL | localhost:5432 (Windows侧，WSL可达) |
 | Neo4j | localhost:7687 (Docker, enterprise/flagship) |
@@ -161,18 +163,23 @@ DataBridgeException (RuntimeException)
 
 ## Engine Layer Reality Check
 
-四引擎骨架已建，Controller已迁入，但存在以下实际问题：
+四引擎全部已升级为REAL V1，Controller已迁入，均实现IEngine接口(生命周期+healthCheck+config)。
 
-| 引擎 | api | impl | boot | 实际情况 |
+| 引擎 | api | impl | boot | V1-V10静态验证 |
 |------|:---:|:----:|:----:|------|
-| security-engine | 5接口 | 12Java(7Controller+4Service+EngineImpl) | ✅ port:18081 | **已重构V1**: Controller→Service分层完成，Iron Law 5已修复，EngineImpl有真实生命周期(STOPPED/RUNNING+DB healthCheck)，Boot DB配置已修正(sys_man/postgres) |
-| data-engine | 5接口(重导出datanet-api) | 11Java(5Controller+4Service+EngineImpl) | ✅ port:18082 | **已重构V1**: Controller→Service分层完成，Caffeine缓存移入Service，CatalogDashboard用SQL替代N+1分页，EngineImpl有真实生命周期(STOPPED/RUNNING+DB healthCheck)，Boot DB配置已修正(sys_man/postgres) |
-| ontology-engine | **0** (空壳) | 22Java(18Controller+3Service+EngineImpl) | ✅ port:18083 | 最大的引擎。含Neo4jGraphService(@Profile enterprise/flagship) + PgGraphService |
-| cognitive-engine | **0** (空壳) | 17Java(16Controller+EngineImpl) | ✅ port:18084 | CognitiveController 744行(最重)，集成RuleEngine+CausalReasoner+NsgaIIOptimizer |
+| security-engine | 5接口 | 13Java(7Controller+4Service+EngineImpl) | port:18081 | V1-V5✅ V6❌ V7✅ V8✅ V9✅ V10✅ |
+| data-engine | 11接口(重导出datanet-api) | 11Java(5Controller+4Service+EngineImpl) | port:18082 | V1-V5✅ V6❌ V7✅ V8✅(已修) V9✅ V10✅ |
+| ontology-engine | 5接口 | 23Java(18Controller+3Service+EngineImpl+CopilotController) | port:18083 | V1-V5✅ V6❌ V7✅ V8✅ V9✅ V10✅(已修) |
+| cognitive-engine | 4接口 | 17Java(16Controller+EngineImpl) | port:18084 | V1-V5✅ V6❌ V7✅ V8✅ V9✅ V10✅(已修) |
 
-**2个EngineImpl仍为骨架**：ontology/cognitive 硬编码RUNNING状态、静态config Map、空start()/stop()。均未实现ITaskAwareEngine。**Security-engine和Data-engine已完成V1重构**：真实生命周期+DB healthCheck。
-**2个api模块为空**：ontology-engine-api和cognitive-engine-api零Java文件，仅作Maven依赖占位。
-**Boot模块数据库配置错误**：指向 `ecos` 库(ecos/ecos123)，实际数据库是 `sys_man`。独立启动会失败。security-engine-boot已修正。
+**V6(任务提交)四引擎均FAIL**：无引擎实现ITaskAwareEngine接口。Gateway EngineTaskController提供统一端点但绕过引擎契约。W2任务。
+**V8 Data Engine /stop 已修复**：DataEngineStatusController增加POST /stop端点(2026-07-14)。
+**V10 编译隔离已修复**：
+- CopilotService从data-engine-api提升至common-api为ICopilotService，data-engine-api的CopilotService改为extends ICopilotService
+- OntologyCopilotController改注入ICopilotService(来自common-api)，删除ontology-engine-impl对data-engine-api的依赖
+- 删除cognitive-engine-impl对data-engine-api和ontology-engine-api的依赖(IGraphService已在common-api)
+**四引擎Boot数据库配置全部正确**：均指向sys_man/postgres(2026-07-14验证)。
+**Ontology/Cognitive引擎均为REAL V1**：有DB healthCheck(pingDb+countOntologies/countAgents)、AtomicReference<EngineStatus>生命周期、动态config Map。非骨架。
 
 ## Runtime-Core 瘦身现状
 
@@ -199,39 +206,44 @@ runtime-core 当前388个Java文件，PMO目标~100。需移出的包：
 
 ## Old Directories Cleanup
 
-| 目录 | Java文件数 | 内容 |
+| 目录 | 原文件数 | 状态 |
 |------|:----------:|------|
-| portal/ | 5 | 5个Controller(Biz/Contract/Menu/Portal/Project) |
-| worldmodel/ | 16 | 4Controller + 4帕累托类 + 3实体 + 3Service + 1Repo |
-| market/ | 6 | 1Controller + 1Service + 1Repo + 3实体 |
-| cognitive/ | 30 | cognitive-api:26(DTO) + cognitive-impl:4(Controller+3推理器) |
-| ecos-kanban/ | 0 | 仅空POM骨架 |
-| **合计** | **57** | |
+| portal/ | 5 | ✅ 已删除 (2026-07-14) |
+| worldmodel/ | 16 | ✅ 已删除 (2026-07-14) |
+| market/ | 6 | ✅ 已删除 (2026-07-14) |
+| cognitive/ | 30 | ✅ 已删除 (2026-07-14) |
+| ecos-kanban/ | 多文件 | ✅ 已删除 (2026-07-14) |
 
-这些目录已从root POM `<modules>`注释掉，源码已复制到目标模块，但物理目录+文件仍在。
+旧JAR仍在~/.m2/repository/供sysman-impl/sysman-boot依赖引用。未来需更新sysman依赖至目标模块后可清除旧JAR。
 
-## Current Status (2026-07-10)
+## Current Status (2026-07-14)
 
-- **后端编译+启动**: ✅ 正常
-- **Security Engine V1 重构**: ✅ 完成 (Controller→Service分层, Iron Law 5修复, EngineImpl真实生命周期, Boot DB修正)
-- **Data Engine V1 重构**: ✅ 完成 (Controller→Service分层, Caffeine缓存移入Service, CatalogDashboard用SQL替代N+1, EngineImpl真实生命周期, Boot DB修正)
-- **四引擎V1-V10闭环验证**: 待确认
-- **旧目录物理清理**: portal(5)/worldmodel(16)/market(6)/cognitive(30)/ecos-kanban(0) 待删
+- **后端编译+启动**: ✅ 正常 (Linux JDK 17.0.14 @ ~/.local/jdk17-linux)
+- **四引擎V1重构**: ✅ 全部完成 (所有EngineImpl有真实生命周期+DB healthCheck+动态config)
+- **V1-V5 静态验证**: ✅ 四引擎全部PASS
+- **V6 (ITaskAwareEngine)**: ❌ 四引擎均未实现 (W2任务)
+- **V8 Data Engine /stop**: ✅ 已修复
+- **V10 编译隔离**: ✅ 已修复 (CopilotService→ICopilotService→common-api, 跨引擎依赖已删除)
+- **旧目录物理清理**: ✅ portal/worldmodel/market/cognitive/ecos-kanban 已删除
+- **Boot DB配置**: ✅ 四引擎均指向sys_man/postgres
+- **Maven构建环境**: ✅ Linux JDK17 native (解决了WSL UNC路径问题)
+- **verify-engines.sh**: ✅ 已创建于 ~/verify-engines.sh (需Gateway运行后执行)
 
 ## Key Scripts (WSL ~/)
 
 | 脚本 | 用途 |
 |------|------|
 | `~/start-gateway.sh` | Gateway启动，含`unset HOME`绕Hermes UNC bug，默认enterprise profile |
-| `~/verify-engines.sh` | 四引擎V1-V10闭环验证，登录取JWT后curl各端点，输出PASS/FAIL |
+| `~/verify-engines.sh` | 四引擎V1-V10闭环验证(需Gateway运行)，用法: `bash ~/verify-engines.sh [--jwt TOKEN]` |
 | `~/ecos-env.sh` | 环境变量(JAVA_HOME/M2_HOME)，别名ecos-be/fe/build/test/up/check |
 | `~/pre-check.sh` | 提交前5防线：编译→tsc→ArchUnit→Enforcer→API契约测试 |
+| `ecos_backend/env.sh` | Linux JDK17+Maven环境变量(source后即可用mvn) |
 
 ## Roadmap Context
 
-已完成: Sprint 1-19 (全模块API审计+对接修复 ✅)、四引擎骨架+Controller迁移 ✅
-进行中: 后端架构重整 (七域四引擎PMO指令)
-待做: Gateway瘦身、Runtime瘦身(runtime-core 425→~100)、前端引擎管控页、旧模块物理清理、公司场景联调(信科/江粮)
+已完成: Sprint 1-19 (全模块API审计+对接修复 ✅)、四引擎REAL V1+Controller迁移 ✅、V8/V10修复 ✅、旧目录清理 ✅
+进行中: 后端架构重整 (七域四引擎PMO指令) — W1已完成, W2(ITaskAwareEngine+Gateway瘦身)待启动
+待做: ITaskAwareEngine(4引擎)、Gateway瘦身、Runtime瘦身(runtime-core 425→~100)、前端引擎管控页、公司场景联调(信科/江粮)
 
 详细看板: `/home/guorongxiao/ECOS/docs/00-Kanban/ECOS-总看板.md`
 移交文档: `/home/guorongxiao/ECOS/docs/ECOS-项目移交文档-20260709.md`

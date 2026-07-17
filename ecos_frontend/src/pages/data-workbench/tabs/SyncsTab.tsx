@@ -35,7 +35,9 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
   newSyncTable, setNewSyncTable, newSyncMode, setNewSyncMode,
   newSyncSched, setNewSyncSched, handleCreateSyncTask,
   selectedTaskId, setSelectedTaskId, connections, triggerSyncTask, t
-}) => (
+}) => {
+  const { styles } = useTheme();
+  return (
 <div className="flex-1 flex overflow-hidden">
   {/* Sync tasks list panel */}
   <div className={`w-80 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col overflow-hidden shrink-0`}>
@@ -212,6 +214,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
     );
   })()}
 </div>
-);
+  );
+};
 
 export default SyncsTab;

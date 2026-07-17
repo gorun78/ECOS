@@ -42,4 +42,10 @@ public class DataEngineStatusController {
         engine.start();
         return ApiResponse.success(Map.of("name", engine.getName(), "status", engine.getStatus().name()));
     }
+
+    @PostMapping("/stop")
+    public ApiResponse<Map<String, Object>> stop() {
+        engine.stop();
+        return ApiResponse.success(Map.of("name", engine.getName(), "status", engine.getStatus().name()));
+    }
 }

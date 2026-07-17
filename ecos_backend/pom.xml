@@ -20,7 +20,7 @@
         <!-- 项目版本 -->
         <revision>1.0.0-SNAPSHOT</revision>
 
-        <!-- Java -->
+        <!-- Java (Sprint 2: target 21, pending JDK 21 installation; currently 17) -->
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -56,6 +56,12 @@
         <!-- P3-5 OpenTelemetry -->
         <opentelemetry.version>1.40.0</opentelemetry.version>
         <opentelemetry-semconv.version>1.27.0-alpha</opentelemetry-semconv.version>
+
+        <!-- Sprint 1: Kafka + Spring Cloud Gateway for microservice architecture -->
+        <spring-kafka.version>3.1.2</spring-kafka.version>
+
+        <!-- Sprint 2: Redis, GraphQL -->
+        <spring-graphql.version>1.2.2</spring-graphql.version>
 
         <!-- P3-1 MinIO -->
         <minio.version>8.5.10</minio.version>
@@ -332,6 +338,34 @@
                 <version>1.1.3</version>
             </dependency>
 
+            <!-- Sprint 1: Kafka for event bus -->
+            <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka</artifactId>
+                <version>${spring-kafka.version}</version>
+            </dependency>
+
+            <!-- Sprint 2: Redis for distributed cache and session -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-data-redis</artifactId>
+            </dependency>
+
+            <!-- Sprint 2: Spring for GraphQL -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-graphql</artifactId>
+            </dependency>
+
+            <!-- Sprint 2: GraphQL Java -->
+            <dependency>
+                <groupId>com.graphql-java</groupId>
+                <artifactId>graphql-java-extended-scalars</artifactId>
+                <version>21.0</version>
+            </dependency>
+
+
+
             <!-- 测试 -->
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
@@ -378,8 +412,20 @@
         <module>buszhi</module>
         <module>dccheng</module>
         <module>aimod</module>
-        <module>gateway</module>
         <module>workspace</module>
+        <!-- Sprint 1: Microservice boot modules -->
+        <module>services/api-gateway</module>
+        <module>services/identity-service</module>
+        <module>services/catalog-service</module>
+        <module>services/ontology-service</module>
+        <module>services/object-service</module>
+        <module>services/workflow-service</module>
+        <module>services/agent-service</module>
+        <module>services/knowledge-service</module>
+        <module>services/ai-service</module>
+        <module>services/cognitive-service</module>
+        <!-- Legacy gateway (kept for backward compatibility during migration) -->
+        <module>gateway</module>
         <!-- 阶段5模块吸收: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng -->
         <!-- module>portal</module -->
         <!-- module>market</module -->
@@ -407,19 +453,25 @@
                 <module>buszhi</module>
                 <module>dccheng</module>
                 <module>aimod</module>
-                <module>gateway</module>
                 <module>workspace</module>
-                <!-- 阶段5: portal→workspace, market→workspace -->
-                <!-- module>portal</module -->
-                <!-- module>market</module -->
-                <!-- 不含: cognitive, worldmodel (已吸收) -->
+                <!-- Sprint 1: Microservice modules -->
+                <module>services/api-gateway</module>
+                <module>services/identity-service</module>
+                <module>services/catalog-service</module>
+                <module>services/ontology-service</module>
+                <module>services/object-service</module>
+                <module>services/workflow-service</module>
+                <module>services/agent-service</module>
+                <module>services/knowledge-service</module>
+                <module>services/ai-service</module>
+                <module>services/cognitive-service</module>
+                <module>gateway</module>
             </modules>
             <properties>
                 <ecos.edition>standard</ecos.edition>
             </properties>
         </profile>
 
-        <!-- ===== 企业版: PG + Neo4j ===== -->
         <profile>
             <id>enterprise</id>
             <modules>
@@ -430,16 +482,24 @@
                 <module>buszhi</module>
                 <module>dccheng</module>
                 <module>aimod</module>
-                <module>gateway</module>
                 <module>workspace</module>
-                <!-- 阶段5: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng -->
+                <module>services/api-gateway</module>
+                <module>services/identity-service</module>
+                <module>services/catalog-service</module>
+                <module>services/ontology-service</module>
+                <module>services/object-service</module>
+                <module>services/workflow-service</module>
+                <module>services/agent-service</module>
+                <module>services/knowledge-service</module>
+                <module>services/ai-service</module>
+                <module>services/cognitive-service</module>
+                <module>gateway</module>
             </modules>
             <properties>
                 <ecos.edition>enterprise</ecos.edition>
             </properties>
         </profile>
 
-        <!-- ===== 旗舰版: PG + Neo4j + Doris ===== -->
         <profile>
             <id>ultimate</id>
             <modules>
@@ -450,9 +510,18 @@
                 <module>buszhi</module>
                 <module>dccheng</module>
                 <module>aimod</module>
-                <module>gateway</module>
                 <module>workspace</module>
-                <!-- 阶段5: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng -->
+                <module>services/api-gateway</module>
+                <module>services/identity-service</module>
+                <module>services/catalog-service</module>
+                <module>services/ontology-service</module>
+                <module>services/object-service</module>
+                <module>services/workflow-service</module>
+                <module>services/agent-service</module>
+                <module>services/knowledge-service</module>
+                <module>services/ai-service</module>
+                <module>services/cognitive-service</module>
+                <module>gateway</module>
             </modules>
             <properties>
                 <ecos.edition>ultimate</ecos.edition>

@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecos
+  labels:
+    istio-injection: enabled
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: ecos-gateway
+  namespace: ecos
+spec:
+  hosts:
+    - "ecos.example.com"
+  gateways:
+    - ecos-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/agent-runtime
+      route:
+        - destination:
+            host: agent-service
+            port:
+              number: 18086
+    - match:
+        - uri:
+            prefix: /api/v1/knowledge
+      route:
+        - destination:
+            host: knowledge-service
+            port:
+              number: 18087
+    - match:
+        - uri:
+            prefix: /api/v1/world-model
+      route:
+        - destination:
+            host: cognitive-service
+            port:
+              number: 18089
+    - match:
+        - uri:
+            prefix: /api/v1/ontology
+      route:
+        - destination:
+            host: ontology-service
+            port:
+              number: 18083
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: ecos-gateway
+  namespace: ecos
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "ecos.example.com"
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: ecos
+spec:
+  mtls:
+    mode: PERMISSIVE

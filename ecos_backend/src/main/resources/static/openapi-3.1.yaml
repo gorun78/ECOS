@@ -1,0 +1,368 @@
+openapi: 3.1.0
+info:
+  title: ECOS Platform API
+  description: Enterprise Cognitive Operating System - Unified API Specification
+  version: 2.0.0
+  contact:
+    name: ECOS Platform Team
+
+servers:
+  - url: http://localhost:8080
+    description: Development (API Gateway)
+  - url: http://localhost:18086
+    description: Agent Service (direct)
+  - url: http://localhost:18087
+    description: Knowledge Service (direct)
+  - url: http://localhost:18083
+    description: Ontology Service (direct)
+  - url: http://localhost:18089
+    description: Cognitive Service (direct)
+
+tags:
+  - name: Agent Runtime
+    description: Agent execution, planning, memory, evaluation, orchestration
+  - name: Agent Mesh
+    description: Agent registry, mission management, collaboration
+  - name: Knowledge RAG
+    description: RAG pipeline, vector search, graph search
+  - name: Ontology Compiler
+    description: DSL parsing, meta model compilation
+  - name: World Model
+    description: Enterprise cognition, simulation, strategy, causal analysis
+  - name: Security
+    description: MFA, GDPR, privacy
+
+paths:
+  /api/v1/agent-runtime/plans:
+    post:
+      tags: [Agent Runtime]
+      summary: Create execution plan
+      operationId: createPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Goal'
+      responses:
+        '200':
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_ExecutionPlan'
+
+  /api/v1/agent-runtime/telemetry/{agentId}:
+    get:
+      tags: [Agent Runtime]
+      summary: Get agent metrics
+      operationId: getAgentMetrics
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_AgentMetricsSummary'
+
+  /api/v1/agent-runtime/orchestration/plan:
+    post:
+      tags: [Agent Runtime]
+      summary: Plan orchestration
+      operationId: planOrchestration
+      parameters:
+        - name: mode
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [SUPERVISOR, SWARM, PIPELINE, DEBATE]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission'
+      responses:
+        '200':
+          description: Orchestration plan
+
+  /api/v1/knowledge/rag:
+    post:
+      tags: [Knowledge RAG]
+      summary: RAG query
+      operationId: ragQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RagRequest'
+      responses:
+        '200':
+          description: RAG response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_RagResponse'
+
+  /api/v1/ontology/compiler/compile:
+    post:
+      tags: [Ontology Compiler]
+      summary: Compile ontology DSL
+      operationId: compileOntology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompilationRequest'
+      responses:
+        '200':
+          description: Compilation result
+
+  /api/v1/world-model/state:
+    get:
+      tags: [World Model]
+      summary: Get current enterprise state
+      operationId: getWorldState
+      responses:
+        '200':
+          description: World state
+
+  /api/v1/world-model/scenarios:
+    post:
+      tags: [World Model]
+      summary: Run simulation
+      operationId: simulate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Scenario'
+      responses:
+        '200':
+          description: Simulation result
+
+  /api/v1/world-model/strategy/recommend:
+    post:
+      tags: [World Model]
+      summary: Get strategy recommendation
+      operationId: recommendStrategy
+      parameters:
+        - name: goal
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy recommendation
+
+  /api/v1/world-model/causal-graph:
+    get:
+      tags: [World Model]
+      summary: Get causal graph
+      operationId: getCausalGraph
+      responses:
+        '200':
+          description: Causal edges
+
+components:
+  schemas:
+    Goal:
+      type: object
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        priority:
+          type: integer
+        constraints:
+          type: object
+          additionalProperties: true
+
+    ExecutionPlan:
+      type: object
+      properties:
+        id:
+          type: string
+        goalId:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExecutionTask'
+        status:
+          type: string
+          enum: [CREATED, PLANNING, EXECUTING, COMPLETED, FAILED]
+
+    ExecutionTask:
+      type: object
+      properties:
+        id:
+          type: string
+        planId:
+          type: string
+        agentId:
+          type: string
+        instruction:
+          type: string
+        toolType:
+          type: string
+          enum: [OBJECT, WORKFLOW, API, KNOWLEDGE, SQL, AGENT]
+        status:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED, SKIPPED]
+
+    AgentMetricsSummary:
+      type: object
+      properties:
+        agentId:
+          type: string
+        totalPrompts:
+          type: integer
+        totalToolCalls:
+          type: integer
+        avgLatencyMs:
+          type: number
+        totalTokens:
+          type: integer
+        totalCost:
+          type: number
+
+    Mission:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        goal:
+          $ref: '#/components/schemas/Goal'
+        mode:
+          type: string
+          enum: [SUPERVISOR, SWARM, PIPELINE, DEBATE]
+        status:
+          type: string
+        result:
+          type: string
+
+    RagRequest:
+      type: object
+      properties:
+        query:
+          type: string
+        topK:
+          type: integer
+          default: 5
+        threshold:
+          type: number
+          default: 0.7
+        useGraph:
+          type: boolean
+          default: true
+        useVector:
+          type: boolean
+          default: true
+
+    RagResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentChunk'
+        confidence:
+          type: number
+
+    DocumentChunk:
+      type: object
+      properties:
+        id:
+          type: string
+        documentId:
+          type: string
+        content:
+          type: string
+        score:
+          type: number
+
+    CompilationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        entities:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        relationships:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        metrics:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    Scenario:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [DEMAND_GROWTH, DEMAND_DECLINE, SUPPLY_SHORTAGE, COST_INCREASE, MARKET_EXPANSION, ECONOMIC_RECESSION, CUSTOM]
+        assumptions:
+          type: object
+          additionalProperties: true
+        description:
+          type: string
+
+    ApiResponse_ExecutionPlan:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ExecutionPlan'
+
+    ApiResponse_AgentMetricsSummary:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AgentMetricsSummary'
+
+    ApiResponse_RagResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/RagResponse'

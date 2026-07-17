@@ -26,6 +26,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
   setShowAddCheck, newCheckName, setNewCheckName, newCheckDs,
   setNewCheckDs, checkType, setCheckType, newCheck, t
 }) => {
+  const { styles } = useTheme();
   const handleAddCheck = () => {
     if (!newCheckName.trim()) {
       showToast('error', '请输入规则名称');

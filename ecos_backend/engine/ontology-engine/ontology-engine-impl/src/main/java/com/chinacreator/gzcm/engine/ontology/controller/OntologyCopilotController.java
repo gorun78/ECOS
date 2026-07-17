@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.engine.data.CopilotService;
+import com.chinacreator.gzcm.common.service.ICopilotService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -14,9 +14,9 @@ public class OntologyCopilotController {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyCopilotController.class);
 
-    private final CopilotService copilotService;
+    private final ICopilotService copilotService;
 
-    public OntologyCopilotController(CopilotService copilotService) {
+    public OntologyCopilotController(ICopilotService copilotService) {
         this.copilotService = copilotService;
     }
 

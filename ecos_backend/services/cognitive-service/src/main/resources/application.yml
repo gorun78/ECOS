@@ -1,0 +1,25 @@
+server:
+  port: 18089
+
+spring:
+  application:
+    name: cognitive-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=ecos_agent
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: cognitive-service
+      auto-offset-reset: earliest
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

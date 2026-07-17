@@ -31,7 +31,9 @@ interface ConnectionsTabProps {
   t: (key:string)=>string;
 }
 
-const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, t }) => (
+const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, t }) => {
+  const { styles } = useTheme();
+  return (
 <div className="flex-1 flex overflow-hidden">
   {/* Connections list panel */}
   <div className={`w-72 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col overflow-hidden shrink-0`}>
@@ -229,10 +231,12 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     );
   })()}
 </div>
-);
+  );
+};
 
 // ═══ Inline SQL Query Console (嵌入式，复用数据源 ID) ═══
 function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
+  const { styles } = useTheme();
   const [sql, setSql] = React.useState('SELECT * FROM orders LIMIT 10');
   const [result, setResult] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -315,6 +319,6 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
       )}
     </div>
   );
-}
+};
 
 export default ConnectionsTab;

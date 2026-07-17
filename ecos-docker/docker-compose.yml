@@ -1,15 +1,16 @@
-# ECOS 基础设施 Docker Compose
-# 所有组件统一管理，WSL 通过 localhost 访问
+# ECOS Microservices Docker Compose
+# Sprint 1: 9 microservices + Kafka + infrastructure
 version: "3.9"
 
 services:
+  # ===== Infrastructure =====
   postgres:
     image: postgres:16-alpine
     container_name: ecos-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: [REDACTED]
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: sys_man
     ports:
       - "5432:5432"
@@ -23,12 +24,71 @@ services:
       retries: 5
     mem_limit: 512m
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: ecos-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    mem_limit: 256m
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: ecos-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    mem_limit: 512m
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: ecos-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "Creating Kafka topics..."
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.identity --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.catalog --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.ontology --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.object --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.workflow --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.agent --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.knowledge --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.audit --partitions 3 --replication-factor 1
+        echo "Kafka topics created successfully."
+    mem_limit: 128m
+
   neo4j:
     image: neo4j:5.26-community
     container_name: ecos-neo4j
     restart: unless-stopped
     environment:
-      NEO4J_AUTH: neo4j/[REDACTED]
+      NEO4J_AUTH: neo4j/neo4j123
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_server_memory_heap_initial__size: 256m
       NEO4J_server_memory_heap_max__size: 512m
@@ -53,7 +113,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: [REDACTED]
+      MINIO_ROOT_PASSWORD: minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -82,12 +142,235 @@ services:
       retries: 5
     mem_limit: 64m
 
+  # ===== Microservices =====
+  api-gateway:
+    image: ecos/api-gateway:latest
+    container_name: ecos-api-gateway
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_identity
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    mem_limit: 512m
+
+  identity-service:
+    image: ecos/identity-service:latest
+    container_name: ecos-identity-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18081:18081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_identity
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OPA_BASE_URL: http://opa:8181
+    mem_limit: 512m
+
+  catalog-service:
+    image: ecos/catalog-service:latest
+    container_name: ecos-catalog-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18082:18082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_catalog
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    mem_limit: 512m
+
+  ontology-service:
+    image: ecos/ontology-service:latest
+    container_name: ecos-ontology-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18083:18083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_ontology
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    mem_limit: 512m
+
+  object-service:
+    image: ecos/object-service:latest
+    container_name: ecos-object-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "18084:18084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_object
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: neo4j123
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    mem_limit: 512m
+
+  workflow-service:
+    image: ecos/workflow-service:latest
+    container_name: ecos-workflow-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18085:18085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_workflow
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    mem_limit: 512m
+
+  agent-service:
+    image: ecos/agent-service:latest
+    container_name: ecos-agent-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18086:18086"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_agent
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: neo4j123
+    mem_limit: 768m
+
+  knowledge-service:
+    image: ecos/knowledge-service:latest
+    container_name: ecos-knowledge-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "18087:18087"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_knowledge
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: neo4j123
+    mem_limit: 512m
+
+  ai-service:
+    image: ecos/ai-service:latest
+    container_name: ecos-ai-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18088:18088"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_agent
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    mem_limit: 768m
+
+  cognitive-service:
+    image: ecos/cognitive-service:latest
+    container_name: ecos-cognitive-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "18089:18089"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sys_man?currentSchema=ecos_agent
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    mem_limit: 768m
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: ecos-grafana
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ecos2026
+      GF_DATASOURCES_DEFAULT_0_TYPE: postgres
+      GF_DATASOURCES_DEFAULT_0_URL: postgres:5432
+      GF_DATASOURCES_DEFAULT_0_USER: postgres
+      GF_DATASOURCES_DEFAULT_0_PASSWORD: postgres
+      GF_DATASOURCES_DEFAULT_0_DATABASE: sys_man
+    volumes:
+      - grafanadata:/var/lib/grafana
+    mem_limit: 512m
+
 volumes:
   pgdata:
     name: ecos_pgdata
+  kafkadata:
+    name: ecos_kafkadata
   neo4jdata:
     name: ecos_neo4jdata
   neo4jlogs:
     name: ecos_neo4jlogs
   miniodata:
     name: ecos_miniodata
+  grafanadata:
+    name: ecos_grafanadata

@@ -17,7 +17,9 @@ interface PipelinesTabProps {
   t: (key: string) => string;
 }
 
-const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineId, setEditingPipelineId, setPipelines, showToast, connections, computeEngine, setComputeEngine, t }) => (
+const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineId, setEditingPipelineId, setPipelines, showToast, connections, computeEngine, setComputeEngine, t }) => {
+  const { styles } = useTheme();
+  return (
   <>
     {editingPipelineId ? (
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -164,6 +166,7 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
       </div>
     )}
   </>
-);
+  );
+};
 
 export default PipelinesTab;
