@@ -68,6 +68,9 @@ public class DataResource {
     /** 更新时间 */
     private LocalDateTime updateTime;
 
+    /** 数据分层: SOURCE/RAW/CURATED/SEMANTIC/APPLICATION */
+    private String layer;
+
     // ===== Getters/Setters =====
 
     public String getResourceId() { return resourceId; }
@@ -120,4 +123,7 @@ public class DataResource {
 
     public LocalDateTime getUpdateTime() { return updateTime; }
     public void setUpdateTime(LocalDateTime updateTime) { this.updateTime = updateTime; }
+
+    public String getLayer() { return layer; }
+    public void setLayer(String layer) { this.layer = layer; }
 }

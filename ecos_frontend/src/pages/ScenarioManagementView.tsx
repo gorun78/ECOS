@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import LucideIcon from '../components/LucideIcon';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
+import { CopilotPanel } from '../components/CopilotPanel';
 import {
   BarChart,
   Bar,
@@ -65,6 +66,7 @@ export default function ScenarioManagementView({ showToast }: ScenarioManagement
   });
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>('scen_summer_rush');
   const [activeTab, setActiveTab] = useState<'fusion' | 'decision' | 'metrics' | 'git'>('fusion');
+  const [showCopilot, setShowCopilot] = useState(false);
 
   // Git & Configuration Version Control States
   const [gitCommits, setGitCommits] = useState<{[scenarioId: string]: any[]}>(() => {
@@ -680,7 +682,7 @@ export default function ScenarioManagementView({ showToast }: ScenarioManagement
 
 
   return (
-    <div className={`flex-1 flex flex-col ${styles.appBg} ${styles.appText} overflow-hidden font-sans`}>
+    <div className={`flex-1 flex flex-col ${styles.appBg} ${styles.appText} overflow-hidden font-sans relative`}>
       
       {/* 1. Header / KPI Dashboard */}
       <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4`}>
@@ -714,6 +716,19 @@ export default function ScenarioManagementView({ showToast }: ScenarioManagement
           <div className={`${styles.cardBg} border ${styles.cardBorder} p-2 rounded-lg`}>
             <span className={`block text-[10px] ${styles.cardTextMuted} font-bold uppercase`}>平均对账时效</span>
             <span className="text-lg font-extrabold text-amber-400">2.8s <span className="text-xs font-normal text-emerald-400">(-93.7%)</span></span>
+          </div>
+          <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
+            <button
+              onClick={() => setShowCopilot(!showCopilot)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${
+                showCopilot
+                  ? 'bg-blue-600 text-white border-blue-500'
+                  : `${styles.cardBg} ${styles.cardTextMuted} border-[var(--border)] hover:bg-slate-800/50`
+              }`}
+            >
+              <LucideIcon name="MessageSquare" size={12} />
+              {showCopilot ? (locale === 'zh' ? '关闭助手' : 'Close Copilot') : (locale === 'zh' ? '智能助手' : 'Copilot')}
+            </button>
           </div>
         </div>
       </div>
@@ -1507,6 +1522,12 @@ export default function ScenarioManagementView({ showToast }: ScenarioManagement
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {showCopilot && (
+        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">
+          <CopilotPanel agentType="scenario" />
         </div>
       )}
 

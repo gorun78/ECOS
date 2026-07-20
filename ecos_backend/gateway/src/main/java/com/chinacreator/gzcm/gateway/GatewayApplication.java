@@ -117,6 +117,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.worldmodel.service.OntologyKgSyncService.class,
         com.chinacreator.gzcm.worldmodel.service.PgGraphService.class,
         com.chinacreator.gzcm.worldmodel.service.Neo4jGraphService.class,
+        // 知识引擎已接管（阶段7），排除ai-engine侧知识Controller副本
+        com.chinacreator.gzcm.engine.ai.controller.KnowledgeApiController.class,
+        com.chinacreator.gzcm.engine.ai.controller.KnowledgeGraphController.class,
+        com.chinacreator.gzcm.engine.ai.controller.EcosKnowledgeGraphController.class,
+        com.chinacreator.gzcm.engine.ai.controller.KnowledgeSettingsController.class,
+        com.chinacreator.gzcm.engine.ai.controller.GraphSyncController.class,
         // Gateway瘦身: 业务Controller移回引擎 (阶段6)
     })
 })
@@ -126,7 +132,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.runtime.hermes.repository",
     "com.chinacreator.gzcm.runtime.core.agent.mesh.repository",
     "com.chinacreator.gzcm.runtime.core.agent.mesh.knowledge.repository",
-    "com.chinacreator.gzcm.datanet.repository"
+    "com.chinacreator.gzcm.datanet.repository",
+    "com.chinacreator.gzcm.engine.kb.repository"
 })
 public class GatewayApplication {
 

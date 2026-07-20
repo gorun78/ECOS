@@ -1,0 +1,31 @@
+server:
+  port: 18086
+
+spring:
+  application:
+    name: kb-engine
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sys_man
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.chinacreator.gzcm.engine.kb: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.web.client.RestTemplate;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -20,10 +21,12 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
     private static final Logger log = LoggerFactory.getLogger(QualityServiceImpl.class);
     private final JdbcTemplate jdbc;
     private final ConnectorFactory connectorFactory;
+    private final RestTemplate restTemplate;
 
     public QualityServiceImpl(JdbcTemplate jdbc, ConnectorFactory connectorFactory) {
         this.jdbc = jdbc;
         this.connectorFactory = connectorFactory;
+        this.restTemplate = new RestTemplate();
     }
 
     @PostConstruct
@@ -289,6 +292,10 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
             rule.getRuleId(), rule.getTarget(), allPassed, message,
             totalRows, failedRows, sampleFailures));
 
+        if (failedRows > 0 && rule.getSeverity() == QualityRule.Severity.ERROR) {
+            triggerEvolutionOnCriticalFailure(rule.getRuleId(), failedRows);
+        }
+
         return results;
     }
 
@@ -401,6 +408,18 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
             return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(obj);
         } catch (Exception e) {
             return "{}";
+        }
+    }
+
+    private void triggerEvolutionOnCriticalFailure(String ruleId, long failedRows) {
+        try {
+            restTemplate.postForObject("http://localhost:8080/api/v1/evolution/trigger",
+                Map.of("trigger", "DATA_QUALITY_ALERT",
+                       "context", Map.of("ruleId", ruleId, "failedRows", failedRows)),
+                Map.class);
+            log.info("Evolution triggered for critical quality failure: ruleId={}, failedRows={}", ruleId, failedRows);
+        } catch (Exception e) {
+            log.warn("Failed to trigger evolution for quality alert: {}", e.getMessage());
         }
     }
 }

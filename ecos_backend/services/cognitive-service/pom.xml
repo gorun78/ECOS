@@ -22,6 +22,11 @@
             <artifactId>common-api</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>cognitive-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

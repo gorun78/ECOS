@@ -17,6 +17,8 @@
         <module>security-engine</module>
         <module>data-engine</module>
         <module>ontology-engine</module>
+        <module>ai-engine</module>
         <module>cognitive-engine</module>
+        <module>kb-engine</module>
     </modules>
 </project>

@@ -143,4 +143,10 @@ public class AgentRuntimeController {
     public ApiResponse<OrchestrationResult> executeOrchestration(@RequestBody OrchestrationPlan plan) {
         return ApiResponse.success(orchestrationService.execute(plan));
     }
+
+    @PostMapping("/tools/{code}/execute")
+    public ApiResponse<Map<String, Object>> executeTool(@PathVariable String code, @RequestBody Map<String, Object> params) {
+        Object result = toolRouterService.executeTool(code, params);
+        return ApiResponse.success(Map.of("result", result, "toolCode", code));
+    }
 }

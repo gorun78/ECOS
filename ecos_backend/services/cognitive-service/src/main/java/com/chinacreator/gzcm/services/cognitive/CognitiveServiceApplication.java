@@ -6,7 +6,8 @@ import org.springframework.context.annotation.ComponentScan;
 
 @SpringBootApplication
 @ComponentScan(basePackages = {
-    "com.chinacreator.gzcm.services.cognitive"
+    "com.chinacreator.gzcm.services.cognitive",
+    "com.chinacreator.gzcm.engine.cognitive2"
 })
 public class CognitiveServiceApplication {
     public static void main(String[] args) {

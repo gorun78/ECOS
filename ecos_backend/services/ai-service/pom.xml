@@ -14,12 +14,17 @@
     <artifactId>ai-service</artifactId>
     <packaging>jar</packaging>
     <name>ECOS AI Service</name>
-    <description>AI &amp; cognitive engine service - NLQ, guardrails, prompts, diagnostics, model management</description>
+    <description>AI engine service - NLQ, guardrails, prompts, diagnostics, model management, Agent Mesh</description>
 
     <dependencies>
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ai-engine-impl</artifactId>
             <version>${databridge.version}</version>
         </dependency>
         <dependency>

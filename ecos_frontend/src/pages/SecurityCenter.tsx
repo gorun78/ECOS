@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { Activity, ArrowRight, BookOpen, CheckSquare, ChevronRight, ClipboardList, Cpu, Database, Download, EyeOff, Filter, Flame, FolderGit, Globe, Info, Lock, PieChart as PieChartIcon, Play, Plus, RefreshCw, Settings, Shield, ShieldAlert, ShieldCheck, Tag, TrendingUp, UserPlus, Users, Workflow, X, Zap, HelpCircle } from 'lucide-react';
 import { useTheme } from "../components/ThemeContext";
+import { CopilotPanel } from '../components/CopilotPanel';
 
 
 /** Dynamic icon renderer — replaces ceos_new LucideIcon wrapper */
@@ -452,6 +453,7 @@ export default function SecurityCenter({
   // Navigation Tabs
   const [localActiveTab, setLocalActiveTab] = useState<'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit' | 'guide'>('overview');
   const { styles } = useTheme();
+  const [showCopilot, setShowCopilot] = useState(false);
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = (tab: any) => {
     if (onActiveTabChange) onActiveTabChange(tab);
@@ -1257,7 +1259,7 @@ export default function SecurityCenter({
   };
 
   return (
-    <div className="h-full w-full flex bg-slate-900 text-slate-100 overflow-hidden font-sans select-none">
+    <div className="h-full w-full flex bg-slate-900 text-slate-100 overflow-hidden font-sans select-none relative">
       
       {/* LEFT NAVIGATION COLUMN */}
       <div className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between shrink-0">
@@ -1371,6 +1373,19 @@ export default function SecurityCenter({
             >
               <BookOpen size={13} className={activeTab === 'guide' ? 'text-indigo-400' : 'text-slate-500'} />
               <span>管理员操作手册</span>
+            </button>
+
+            <div className="h-px bg-slate-800 my-2" />
+            <button
+              onClick={() => setShowCopilot(!showCopilot)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-all font-semibold cursor-pointer ${
+                showCopilot
+                  ? 'bg-blue-600 text-white border-l-2 border-blue-400'
+                  : 'text-slate-500 hover:bg-slate-900 hover:text-slate-200'
+              }`}
+            >
+              <HelpCircle size={13} className={showCopilot ? 'text-blue-300' : 'text-slate-500'} />
+              <span>智能助手 (Copilot)</span>
             </button>
           </nav>
         </div>
@@ -3292,6 +3307,12 @@ export default function SecurityCenter({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showCopilot && (
+        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">
+          <CopilotPanel agentType="security" />
         </div>
       )}
 

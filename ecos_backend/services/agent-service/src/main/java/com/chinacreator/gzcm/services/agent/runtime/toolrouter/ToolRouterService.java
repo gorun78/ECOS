@@ -7,4 +7,5 @@ import java.util.Map;
 public interface ToolRouterService {
     ToolDefinition resolveTool(String actionType, Map<String, Object> params);
     List<ToolDefinition> getAvailableTools(String agentId);
+    Object executeTool(String toolCode, Map<String, Object> params);
 }

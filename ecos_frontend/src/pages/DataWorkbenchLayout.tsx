@@ -45,6 +45,7 @@ import InteractiveStepGuide from './data-workbench/InteractiveStepGuide';
 
 import SqlQueryConsole from './SqlQueryConsole';
 import DataEngineConfigPanel from './data-workbench/DataEngineConfigPanel';
+import { CopilotPanel } from '../components/CopilotPanel';
 
 
 interface DataWorkbenchLayoutProps {
@@ -1382,6 +1383,8 @@ export default function DataWorkbenchLayout({
 
   const [showExternalInterfaces, setShowExternalInterfaces] = useState(false);
 
+  const [showCopilot, setShowCopilot] = useState(false);
+
 
 
   // --- Enhanced Pipeline Builder (PB) States ---
@@ -2086,15 +2089,33 @@ export default function DataWorkbenchLayout({
 
           </div>
 
+          <button
+
+            onClick={() => setShowCopilot(!showCopilot)}
+
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors cursor-pointer ${
+              showCopilot
+                ? 'bg-blue-600 text-white border-blue-500'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+            }`}
+
+          >
+
+            <LucideIcon name="MessageSquare" size={11} />
+
+            <span>Copilot</span>
+
+          </button>
+
         </div>
 
       </div>
 
 
-
-      {/* Main workspace frame: Sidebar + Body */}
-
+      {/* Main workspace frame: Sidebar + Body + Copilot */}
       <div className="flex-1 flex overflow-hidden">
+
+        
 
         
 
@@ -2521,6 +2542,7 @@ export default function DataWorkbenchLayout({
                               </p>
                             </div>
                           )}
+
                         </div>
 
                         {cellDetail.code && (
@@ -3905,7 +3927,11 @@ Palantir ECOS 的零信任一体化集成架构强调：“物理拉取轻量化
 
       )}
 
-
+      {showCopilot && (
+        <div className="absolute top-12 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">
+          <CopilotPanel agentType="data" />
+        </div>
+      )}
 
     </div>
 

@@ -41,10 +41,23 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- Cognitive Engine (认知引擎 — AIP/知识图谱/认知/诊断) -->
+        <!-- AI Engine (AI引擎 — Agent/Mesh/NLQ/Prompt/诊断) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ai-engine-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Cognitive Engine (认知引擎 — World Model/因果推理/仿真/优化) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>cognitive-engine-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Knowledge Engine (知识引擎 — KG/专家规则/RAG/图谱同步) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>kb-engine-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 

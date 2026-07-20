@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
+import { CopilotPanel } from '../components/CopilotPanel';
 import { KNOWLEDGE_TAB_GROUPS, type KnowledgeTabId } from './knowledge/typesAndConstants';
 import ClosedLoopTab from './knowledge/tabs/ClosedLoopTab';
 import SyncTab from './knowledge/tabs/SyncTab';
@@ -37,6 +38,7 @@ export default function KnowledgeView() {
   const { locale } = useLanguage();
   const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<KnowledgeTabId>('closed_loop');
+  const [showCopilot, setShowCopilot] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
 
   const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
@@ -47,7 +49,7 @@ export default function KnowledgeView() {
   const ActiveComponent = TAB_COMPONENTS[activeTab];
 
   return (
-    <div className="flex h-full select-none text-xs overflow-hidden">
+    <div className="flex h-full select-none text-xs overflow-hidden relative">
       <div className={`w-48 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col shrink-0 h-full p-2.5 space-y-1 overflow-y-auto`}>
         <div className={`px-2 py-1.5 text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider`}>
           {locale === 'zh' ? '知识工作台' : 'Knowledge Workbench'}
@@ -80,6 +82,17 @@ export default function KnowledgeView() {
         ))}
 
         <div className={`mt-auto p-2.5 ${styles.cardBg} rounded-xl border ${styles.cardBorder} space-y-2`}>
+          <button
+            onClick={() => setShowCopilot(!showCopilot)}
+            className={`w-full px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              showCopilot
+                ? `${styles.accentBg} text-white`
+                : `${styles.cardTextMuted} hover:bg-slate-800/30`
+            }`}
+          >
+            <Brain size={13} />
+            <span>{locale === 'zh' ? '智能助手' : 'Copilot'}</span>
+          </button>
           <p className="font-extrabold text-[10px] text-slate-100 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>{locale === 'zh' ? '知识底座就绪' : 'Knowledge Ready'}</span>
@@ -102,6 +115,12 @@ export default function KnowledgeView() {
             ${toast.type === 'info' ? 'bg-slate-700 text-slate-100' : ''}`}>
             {toast.msg}
           </div>
+        </div>
+      )}
+
+      {showCopilot && (
+        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">
+          <CopilotPanel agentType="knowledge" />
         </div>
       )}
     </div>

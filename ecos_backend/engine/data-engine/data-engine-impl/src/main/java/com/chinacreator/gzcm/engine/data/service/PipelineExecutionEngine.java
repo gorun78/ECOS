@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
+import com.chinacreator.gzcm.engine.data.model.DataLayer;
 import com.chinacreator.gzcm.runtime.core.transform.TransformChain;
 import com.chinacreator.gzcm.runtime.core.transform.TransformStep;
 import com.chinacreator.gzcm.runtime.core.transform.impl.TransformChainImpl;
@@ -105,6 +106,8 @@ public class PipelineExecutionEngine {
                 "UPDATE ecos_pipeline_task SET status = 'SUCCEEDED' WHERE id = ?", taskId);
 
             log.info("Pipeline 执行成功: runId={}, totalSteps={}, elapsed={}ms", runId, completed, elapsed);
+
+            updateResourceLayer(runId, steps);
         } catch (Exception e) {
             long elapsed = Instant.now().toEpochMilli() - start.toEpochMilli();
             jdbc.update(
@@ -186,6 +189,57 @@ public class PipelineExecutionEngine {
         }
 
         return new DataFrame();
+    }
+
+    private void updateResourceLayer(String runId, List<Map<String, Object>> steps) {
+        try {
+            String pipelineType = inferPipelineType(steps);
+            String layer;
+            switch (pipelineType) {
+                case "SYNC":
+                    layer = DataLayer.RAW.name();
+                    break;
+                case "TRANSFORM":
+                    layer = DataLayer.CURATED.name();
+                    break;
+                case "AGGREGATE":
+                    layer = DataLayer.APPLICATION.name();
+                    break;
+                default:
+                    return;
+            }
+            List<Map<String, Object>> sinkRows = jdbc.queryForList(
+                "SELECT config_json FROM ecos_pipeline_step WHERE task_id = " +
+                "(SELECT task_id FROM ecos_pipeline_run WHERE id = ?) AND node_type = 'sink'", runId);
+            for (Map<String, Object> sinkRow : sinkRows) {
+                Map<String, Object> sinkConfig = parseConfig((String) sinkRow.get("config_json"));
+                String tableName = (String) sinkConfig.get("table_name");
+                if (tableName != null) {
+                    jdbc.update("UPDATE td_data_resource SET layer = ? WHERE source_path = ?", layer, tableName);
+                }
+            }
+            log.info("Pipeline 资源分层更新: runId={}, pipelineType={}, layer={}", runId, pipelineType, layer);
+        } catch (Exception e) {
+            log.warn("Pipeline 资源分层更新失败: runId={}, error={}", runId, e.getMessage());
+        }
+    }
+
+    private String inferPipelineType(List<Map<String, Object>> steps) {
+        boolean hasSource = false;
+        boolean hasTransform = false;
+        boolean hasAggregate = false;
+        for (Map<String, Object> step : steps) {
+            String nodeType = (String) step.get("node_type");
+            if (nodeType == null) continue;
+            String nt = nodeType.toLowerCase();
+            if (nt.startsWith("source")) hasSource = true;
+            else if (nt.equals("transform")) hasTransform = true;
+            else if (nt.equals("aggregate")) hasAggregate = true;
+        }
+        if (hasAggregate) return "AGGREGATE";
+        if (hasTransform) return "TRANSFORM";
+        if (hasSource) return "SYNC";
+        return "UNKNOWN";
     }
 
     private DataFrame executeTransformStep(Map<String, Object> config, DataFrame input) {

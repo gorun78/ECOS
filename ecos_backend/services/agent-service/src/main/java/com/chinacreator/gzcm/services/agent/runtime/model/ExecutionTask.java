@@ -7,6 +7,7 @@ public class ExecutionTask {
     private String id;
     private String planId;
     private String agentId;
+    private String sessionId;
     private String instruction;
     private ToolType toolType;
     private Map<String, Object> toolParams = new HashMap<>();
@@ -21,6 +22,8 @@ public class ExecutionTask {
     public void setPlanId(String planId) { this.planId = planId; }
     public String getAgentId() { return agentId; }
     public void setAgentId(String agentId) { this.agentId = agentId; }
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
     public String getInstruction() { return instruction; }
     public void setInstruction(String instruction) { this.instruction = instruction; }
     public ToolType getToolType() { return toolType; }

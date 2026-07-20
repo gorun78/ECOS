@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../components/LanguageContext';
 import { apiFetch } from '../../api';
+import { CopilotPanel } from '../../components/CopilotPanel';
 
 // Types
 import {
@@ -74,6 +75,7 @@ export default function BusinessWorkbenchLayout({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [explorerActiveObjectTypeId, setExplorerActiveObjectTypeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCopilot, setShowCopilot] = useState(false);
 
   // --- Security State ---
   const [securityOrgs, setSecurityOrgs] = useState<SecurityOrg[]>(mockSecurityOrgs);
@@ -336,7 +338,7 @@ export default function BusinessWorkbenchLayout({
   ];
 
   return (
-    <div className="h-full flex flex-col bg-slate-900 text-slate-100 font-sans">
+    <div className="h-full flex flex-col bg-slate-900 text-slate-100 font-sans relative">
       {/* Tab Bar */}
       <div className="flex items-center gap-1 px-4 py-2 bg-slate-950 border-b border-slate-800">
         {tabs.map(tab => (
@@ -363,6 +365,16 @@ export default function BusinessWorkbenchLayout({
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-3 py-1 text-xs border border-slate-200 rounded-md w-48 focus:outline-none focus:border-slate-400"
         />
+        <button
+          onClick={() => setShowCopilot(!showCopilot)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors cursor-pointer text-xs ${
+            showCopilot
+              ? 'bg-blue-600 text-white border-blue-500'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+          }`}
+        >
+          Copilot
+        </button>
       </div>
 
       {/* Content */}
@@ -613,6 +625,12 @@ export default function BusinessWorkbenchLayout({
           </>
         )}
       </div>
+
+      {showCopilot && (
+        <div className="absolute top-12 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">
+          <CopilotPanel agentType="ontology" />
+        </div>
+      )}
     </div>
   );
 }

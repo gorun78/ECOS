@@ -3,7 +3,7 @@
 import subprocess, json, sys, time
 
 BASE = "http://localhost:8080"
-CONTRACTS = "/home/guorongxiao/ECOS/05-质量保障/api-contracts.txt"
+CONTRACTS = "/home/guorongxiao/ECOS/docs/05-质量保障/api-contracts.txt"
 
 # Login
 r = subprocess.run([

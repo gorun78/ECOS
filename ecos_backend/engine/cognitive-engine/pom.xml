@@ -2,17 +2,14 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <groupId>com.chinacreator.gzcm</groupId>
         <artifactId>ecos-engine</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-
     <artifactId>cognitive-engine</artifactId>
     <packaging>pom</packaging>
     <name>ECOS Cognitive Engine :: Parent</name>
-
     <modules>
         <module>cognitive-engine-api</module>
         <module>cognitive-engine-impl</module>

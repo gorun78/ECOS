@@ -1,5 +1,7 @@
 server:
-  port: 18084
+  port: 18089
+  servlet:
+    context-path: /
 
 spring:
   application:
@@ -9,23 +11,9 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-  jpa:
-    hibernate:
-      ddl-auto: none
-  flyway:
-    enabled: false
 
 mybatis:
-  mapper-locations: classpath*:mapper/*.xml
-  type-aliases-package: com.chinacreator.gzcm.cognitive.model
-
-logging:
-  level:
-    com.chinacreator.gzcm: DEBUG
-    org.springframework: INFO
+  type-aliases-package: com.chinacreator.gzcm.engine.cognitive2.model
 
 management:
   endpoints:

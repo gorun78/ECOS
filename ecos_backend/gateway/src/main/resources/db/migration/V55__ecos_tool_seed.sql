@@ -1,0 +1,27 @@
+INSERT INTO ecos_agent.ecos_tool_definition (id, code, name, description, tool_type, endpoint_url, http_method, schema_json, status) VALUES
+('tool-001', 'ListDataSources', '列出数据源', '获取所有已注册的数据源列表', 'API', '/api/v1/datanet/datasource', 'GET', '{}', 'ACTIVE'),
+('tool-002', 'GetTableSchema', '获取表结构', '获取指定资源的字段列表', 'API', '/api/v1/datanet/metadata/fields/{resourceId}', 'GET', '{"resourceId":"string"}', 'ACTIVE'),
+('tool-003', 'SearchCatalog', '搜索数据目录', '按关键字搜索数据目录', 'API', '/api/v1/datanet/catalog/search', 'GET', '{"q":"string"}', 'ACTIVE'),
+('tool-004', 'QueryPhysicalTable', '查询物理表', '在指定数据源上执行SQL查询', 'API', '/api/v1/engine/data/query/execute', 'POST', '{"sql":"string","datasourceId":"string"}', 'ACTIVE'),
+('tool-005', 'GetDataLineage', '获取数据血缘', '获取管道定义及数据血缘关系', 'API', '/api/v1/engine/data/lineage/pipeline/{id}', 'GET', '{"id":"string"}', 'ACTIVE'),
+('tool-006', 'RunQualityCheck', '执行质量检查', '对指定表执行质量规则评估', 'API', '/api/v1/engine/data/quality/rules/{id}/evaluate', 'POST', '{"ruleId":"string","datasourceId":"string","tableName":"string"}', 'ACTIVE'),
+('tool-007', 'TriggerPipeline', '触发管道执行', '触发指定管道任务的执行', 'API', '/api/v1/engine/data/pipeline/tasks/{id}/run', 'POST', '{"id":"string"}', 'ACTIVE'),
+('tool-008', 'ListObjectTypes', '列出对象类型', '获取所有本体对象类型列表', 'API', '/api/v1/ecos/ontologies', 'GET', '{}', 'ACTIVE'),
+('tool-009', 'GetObjectProperties', '获取对象属性', '获取指定实体的属性列表', 'API', '/api/v1/ecos/entities/{id}/properties', 'GET', '{"id":"string"}', 'ACTIVE'),
+('tool-010', 'GetObjectRelationships', '获取对象关系', '获取指定实体的关系列表', 'API', '/api/v1/ecos/entities/{id}/relationships', 'GET', '{"id":"string"}', 'ACTIVE'),
+('tool-011', 'ValidateMapping', '校验映射', '校验本体映射配置', 'API', '/api/v1/ecos/ontology-mappings', 'POST', '{}', 'ACTIVE'),
+('tool-012', 'ExecuteAction', '执行动作', '执行指定本体动作', 'API', '/api/v1/ontology/actions/{id}/execute', 'POST', '{"id":"string"}', 'ACTIVE'),
+('tool-013', 'SearchOntologyGraph', '搜索本体图', '获取完整本体图数据', 'API', '/api/v1/engine/ontology/graph/full', 'GET', '{}', 'ACTIVE'),
+('tool-014', 'SearchKnowledgeGraph', '搜索知识图谱', '按关键字搜索知识图谱节点', 'API', '/api/knowledge/search', 'GET', '{"q":"string"}', 'ACTIVE'),
+('tool-015', 'FindGraphPath', '查找图谱路径', '查找两个节点间的最短路径', 'API', '/api/knowledge/path', 'GET', '{"from":"string","to":"string"}', 'ACTIVE'),
+('tool-016', 'ExecuteExpertRule', '执行专家规则', '执行指定专家规则并返回结果', 'API', '/api/v1/kb/rules/{id}/execute', 'POST', '{"ruleId":"string"}', 'ACTIVE'),
+('tool-017', 'RAGQuery', 'RAG向量检索', '基于向量检索的RAG问答', 'API', '/api/v1/knowledge/rag', 'POST', '{"queryText":"string","topK":5}', 'ACTIVE'),
+('tool-018', 'GetSecurityProfile', '获取安全画像', '获取当前用户安全画像信息', 'API', '/api/v1/security/profile', 'GET', '{}', 'ACTIVE'),
+('tool-019', 'CheckPermission', '权限校验', '基于策略引擎评估权限', 'API', '/api/v1/policy-engine/evaluate', 'POST', '{"subject":"string","resource":"string","action":"string"}', 'ACTIVE'),
+('tool-020', 'AuditAccessLog', '审计日志查询', '查询系统审计访问日志', 'API', '/api/v1/audit/logs', 'GET', '{}', 'ACTIVE')
+ON CONFLICT (code) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    endpoint_url = EXCLUDED.endpoint_url,
+    schema_json = EXCLUDED.schema_json,
+    status = 'ACTIVE';
