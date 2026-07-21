@@ -41,7 +41,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.datanet",
     "com.chinacreator.gzcm.cognitive",
     "com.chinacreator.gzcm.engine",
+    "com.chinacreator.gzcm.services.agent.runtime",
+    "com.chinacreator.gzcm.services.agent.model",
 }, excludeFilters = {
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.aimod\\.controller\\..*"),
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
@@ -78,16 +81,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.dccheng.ontology.controller.AutoDiscoverController.class,
         com.chinacreator.gzcm.dccheng.ontology.controller.LineageController.class,
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
-        // 认知引擎已接管（阶段4），排除aimod/dccheng/cognitive/gateway侧副本
-        com.chinacreator.gzcm.aimod.controller.AIPAgentController.class,
-        com.chinacreator.gzcm.aimod.controller.AIPModelController.class,
-        com.chinacreator.gzcm.aimod.controller.AIPPipelineController.class,
-        com.chinacreator.gzcm.aimod.controller.AIPGuardrailController.class,
-        com.chinacreator.gzcm.aimod.controller.AgentCallController.class,
-        com.chinacreator.gzcm.aimod.controller.NLQController.class,
-        com.chinacreator.gzcm.aimod.controller.AgentMeshController.class,
-        com.chinacreator.gzcm.aimod.controller.AgentConfigController.class,
-        com.chinacreator.gzcm.aimod.controller.AgentProfileController.class,
+        // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除
         com.chinacreator.gzcm.dccheng.knowledgegraph.controller.KnowledgeGraphController.class,
         com.chinacreator.gzcm.dccheng.knowledgegraph.controller.GraphSyncController.class,
         com.chinacreator.gzcm.dccheng.knowledge.KnowledgeApiController.class,
@@ -97,6 +91,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.dccheng.classification.controller.ClassificationController.class,
         com.chinacreator.gzcm.cognitive.impl.CognitiveController.class,
         com.chinacreator.gzcm.gateway.controller.DiagnosticAgentController.class,
+        com.chinacreator.gzcm.engine.ai.controller.AgentChatController.class,
+        com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
+        com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
         // DataLakeController 留在gateway (依赖gateway内部service: DuckDB/DataLakeExport/Minio)
         com.chinacreator.gzcm.gateway.controller.EcosKnowledgeGraphController.class,
