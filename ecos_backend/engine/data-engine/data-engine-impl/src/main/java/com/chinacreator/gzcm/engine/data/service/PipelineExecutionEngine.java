@@ -26,10 +26,12 @@ public class PipelineExecutionEngine {
 
     private final JdbcTemplate jdbc;
     private final ConnectorFactory connectorFactory;
+    private final DataLineageService lineageService;
 
-    public PipelineExecutionEngine(JdbcTemplate jdbc, ConnectorFactory connectorFactory) {
+    public PipelineExecutionEngine(JdbcTemplate jdbc, ConnectorFactory connectorFactory, DataLineageService lineageService) {
         this.jdbc = jdbc;
         this.connectorFactory = connectorFactory;
+        this.lineageService = lineageService;
     }
 
     public void execute(String runId) {
@@ -108,6 +110,13 @@ public class PipelineExecutionEngine {
             log.info("Pipeline 执行成功: runId={}, totalSteps={}, elapsed={}ms", runId, completed, elapsed);
 
             updateResourceLayer(runId, steps);
+
+            try {
+                lineageService.buildTopology(List.of(taskId), true, true);
+                log.info("Pipeline lineage topology built: taskId={}", taskId);
+            } catch (Exception le) {
+                log.warn("Pipeline lineage build failed: taskId={}, error={}", taskId, le.getMessage());
+            }
         } catch (Exception e) {
             long elapsed = Instant.now().toEpochMilli() - start.toEpochMilli();
             jdbc.update(

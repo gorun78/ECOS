@@ -5,15 +5,15 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Tag, Trash2, X, Zap } from 'lucide-react';
-// Dynamic icon resolver for runtime icon names (from ceos_new)
 import * as LucideIcons from 'lucide-react';
+import { useLanguage } from '../LanguageContext';
+import { useTheme } from '../ThemeContext';
+import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
+
 function DynamicIcon({ name, size = 14, className }: { name: string; size?: number; className?: string }) {
   const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
   return <IconComponent size={size} className={className} />;
 }
-
-
-import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
 interface SidebarProps {
   objectTypes: ObjectType[];
   allObjectTypes: ObjectType[];
@@ -55,6 +55,9 @@ export default function Sidebar({
   onSelectCategory,
   onCreateNew
 }: SidebarProps) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     object: true,
     link: true,
@@ -135,7 +138,7 @@ export default function Sidebar({
     const targetDomain = domains.find(d => d.id === domainId);
     if (!targetDomain) return;
     
-    if (!window.confirm(`确定要删除业务分级域「${targetDomain.displayName}」吗？关联的实体将变更为未分类。`)) {
+    if (!window.confirm(t('ow.msg.confirmDeleteDomain').replace('{name}', targetDomain.displayName))) {
       return;
     }
     
@@ -160,7 +163,7 @@ export default function Sidebar({
     setFormError('');
 
     if (!formName.trim()) {
-      setFormError('业务域名称不能为空');
+      setFormError(t('ow.msg.domainNameRequired'));
       return;
     }
 
@@ -169,7 +172,7 @@ export default function Sidebar({
       : (formId.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || `domain_${Date.now().toString().slice(-4)}`);
 
     if (!editingDomain && domains.some(d => d.id === domainId)) {
-      setFormError(`业务域ID "${domainId}" 已存在，请使用唯一标识`);
+      setFormError(t('ow.msg.domainIdExists').replace('{id}', domainId));
       return;
     }
 
@@ -215,10 +218,10 @@ export default function Sidebar({
   const selectedDomain = domains.find(d => d.id === selectedDomainId);
 
   return (
-    <aside className="w-64 bg-slate-100 border-r border-slate-200 flex flex-col h-full select-none shrink-0 text-xs">
+    <aside className={`w-64 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col h-full select-none shrink-0 text-xs`}>
       
       {/* Overview Button & Dropdown Selector */}
-      <div className="p-3 border-b border-slate-200 bg-white space-y-2">
+      <div className={`p-3 border-b ${styles.sidebarBorder} ${styles.cardBg} space-y-2`}>
         <div className="flex items-center gap-1.5">
           {/* Custom Dropdown Trigger */}
           <div className="relative flex-1">
@@ -229,20 +232,20 @@ export default function Sidebar({
               }}
               className={`w-full py-2 px-3 rounded-lg flex items-center justify-between font-semibold transition-all text-xs border ${
                 selectedCategory === 'overview'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-50 border-slate-200'
+                  ? `${styles.accentBg} text-white ${styles.accentBorder} shadow-sm`
+                  : `${styles.sidebarText} ${styles.sidebarHoverBg} ${styles.sidebarBorder}`
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
                 <DynamicIcon name={selectedDomain ? "Layers" : "LayoutDashboard"} size={13} className={selectedDomain ? getDomainColorText(selectedDomain.color) : 'text-blue-500'} />
-                <span className="truncate">{selectedDomain ? selectedDomain.displayName.split(' (')[0] : '本体全景与总览'}</span>
+                <span className="truncate">{selectedDomain ? selectedDomain.displayName.split(' (')[0] : t('ow.sidebar.overview')}</span>
               </div>
               <ChevronDown size={12} className="opacity-60" />
             </button>
 
             {/* Dropdown Menu */}
             {showDomainDropdown && (
-              <div className="absolute top-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y divide-slate-100">
+              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y divide-slate-100`}>
                 {/* 1. Global Panorama Option */}
                 <div
                   onClick={() => {
@@ -251,12 +254,12 @@ export default function Sidebar({
                     setShowDomainDropdown(false);
                   }}
                   className={`px-2.5 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                    selectedDomainId === null ? 'bg-slate-50 text-slate-950 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    selectedDomainId === null ? `${styles.sidebarActiveBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
                     <LayoutDashboard size={12} className="text-blue-500" />
-                    <span>全局全景 (All)</span>
+                    <span>{t('ow.sidebar.globalPanorama')}</span>
                   </div>
                   {selectedDomainId === null && <Check size={11} className="text-blue-600" />}
                 </div>
@@ -269,7 +272,7 @@ export default function Sidebar({
                     <div
                       key={d.id}
                       className={`px-2.5 py-1.5 text-xs flex items-center justify-between cursor-pointer group transition-colors ${
-                        isSelected ? 'bg-slate-50 text-slate-950 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        isSelected ? `${styles.sidebarActiveBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                       }`}
                       onClick={() => {
                         onSelectDomainId(d.id);
@@ -280,7 +283,7 @@ export default function Sidebar({
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         <span className={`w-1.5 h-1.5 rounded-full ${getDomainColorDotClass(d.color)}`} />
                         <span className="truncate" title={d.displayName}>{d.displayName}</span>
-                        <span className="text-[9px] text-slate-400 font-mono">({count})</span>
+                        <span className={`text-[9px] ${styles.muted} font-mono`}>({count})</span>
                       </div>
                       
                       {/* Edit/Delete Icons */}
@@ -290,8 +293,8 @@ export default function Sidebar({
                             handleStartEditDomain(d);
                             setShowDomainDropdown(false);
                           }}
-                          className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded transition-colors"
-                          title="修改业务域"
+                          className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:text-slate-800 rounded transition-colors`}
+                          title={t('ow.btn.editDomain')}
                         >
                           <Edit size={11} />
                         </button>
@@ -300,8 +303,8 @@ export default function Sidebar({
                             handleDeleteDomain(d.id);
                             setShowDomainDropdown(false);
                           }}
-                          className="p-1 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded transition-colors"
-                          title="删除业务域"
+                          className={`p-1 hover:bg-red-50 ${styles.muted} hover:text-red-600 rounded transition-colors`}
+                          title={t('ow.btn.deleteDomain')}
                         >
                           <Trash2 size={11} />
                         </button>
@@ -316,23 +319,23 @@ export default function Sidebar({
           {/* Plus button to add domain */}
           <button
             onClick={handleStartAddDomain}
-            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0"
-            title="添加业务分级域"
+            className={`p-2 ${styles.sidebarActiveBg} hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
+            title={t('ow.btn.addDomain')}
           >
             <Plus size={14} />
           </button>
         </div>
 
         {/* Core Sub-view Switcher inside Workbench */}
-        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 mt-2">
+        <div className={`flex ${styles.sidebarBg} p-0.5 rounded-lg border ${styles.sidebarBorder} mt-2`}>
           <button
             onClick={() => {
               onSelectCategory('overview', null);
             }}
-            className="w-full py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-all bg-white text-slate-900 shadow-xs cursor-pointer"
+            className={`w-full py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${styles.cardBg} ${styles.cardText} shadow-xs cursor-pointer`}
           >
             <LayoutDashboard size={11} className="text-blue-600" />
-            <span>配置全景</span>
+            <span>{t('ow.sidebar.configPanorama')}</span>
           </button>
         </div>
       </div>
@@ -344,11 +347,11 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('object')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>对象类型 (Object Types)</span>
+              <span>{t('ow.sidebar.objectTypes')}</span>
             </div>
             <span>{objectTypes.length}</span>
           </button>
@@ -362,17 +365,17 @@ export default function Sidebar({
                     onClick={() => onSelectCategory('object', ot.id)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className={`p-0.5 rounded border ${isActive ? 'bg-blue-100 border-blue-300 text-blue-800' : 'bg-white border-slate-200 text-slate-500'}`}>
+                      <span className={`p-0.5 rounded border ${isActive ? `${styles.sidebarActiveBg} ${styles.accentBorder} ${styles.sidebarActiveText}` : `${styles.cardBg} ${styles.sidebarBorder} ${styles.muted}`}`}>
                         <DynamicIcon name={ot.icon} size={11} />
                       </span>
                       <span className="truncate">{ot.displayName}</span>
                     </div>
-                    <span className="text-[9px] font-mono opacity-65 uppercase">{ot.id}</span>
+                    <span className={`text-[9px] font-mono opacity-65 uppercase ${styles.muted}`}>{ot.id}</span>
                   </button>
                 );
               })}
@@ -384,11 +387,11 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('link')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>链接关系 (Link Types)</span>
+              <span>{t('ow.sidebar.linkTypes')}</span>
             </div>
             <span>{linkTypes.length}</span>
           </button>
@@ -402,17 +405,17 @@ export default function Sidebar({
                     onClick={() => onSelectCategory('link', lt.id)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="text-slate-400">
+                      <span className={styles.muted}>
                         <GitMerge size={11} />
                       </span>
                       <span className="truncate">{lt.displayName}</span>
                     </div>
-                    <span className="text-[9px] font-mono opacity-50 font-bold">{lt.cardinality}</span>
+                    <span className={`text-[9px] font-mono opacity-50 font-bold ${styles.muted}`}>{lt.cardinality}</span>
                   </button>
                 );
               })}
@@ -424,11 +427,11 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('action')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>操作类型 (Action Types)</span>
+              <span>{t('ow.sidebar.actionTypes')}</span>
             </div>
             <span>{actionTypes.length}</span>
           </button>
@@ -442,8 +445,8 @@ export default function Sidebar({
                     onClick={() => onSelectCategory('action', at.id)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -463,11 +466,11 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('function')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>逻辑函数 (Functions)</span>
+              <span>{t('ow.sidebar.functionTypes')}</span>
             </div>
             <span>{functionTypes.length}</span>
           </button>
@@ -481,8 +484,8 @@ export default function Sidebar({
                     onClick={() => onSelectCategory('function', fn.id)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -491,7 +494,7 @@ export default function Sidebar({
                       </span>
                       <span className="truncate">{fn.displayName}</span>
                     </div>
-                    <span className="text-[9px] font-mono opacity-50 uppercase">{fn.returnType}</span>
+                    <span className={`text-[9px] font-mono opacity-50 uppercase ${styles.muted}`}>{fn.returnType}</span>
                   </button>
                 );
               })}
@@ -507,7 +510,7 @@ export default function Sidebar({
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>接口规范 (Interfaces)</span>
+              <span>{t('ow.sidebar.interfaces')}</span>
             </div>
             <span>{interfaces.length}</span>
           </button>
@@ -546,7 +549,7 @@ export default function Sidebar({
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>共享属性 (Shared Properties)</span>
+              <span>{t('ow.sidebar.sharedProperties')}</span>
             </div>
             <span>{sharedProperties.length}</span>
           </button>
@@ -585,7 +588,7 @@ export default function Sidebar({
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>原始数据集 (Datasets)</span>
+              <span>{t('ow.sidebar.datasets')}</span>
             </div>
             <span>{datasets.length}</span>
           </button>
@@ -624,7 +627,7 @@ export default function Sidebar({
           className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs"
         >
           <PlusCircle size={14} />
-          <span>新建本体元素</span>
+          <span>{t('ow.btn.createNewElement')}</span>
           <DynamicIcon name={showCreateDropdown ? "ChevronDown" : "ChevronUp"} size={12} />
         </button>
 
@@ -641,7 +644,7 @@ export default function Sidebar({
               <span className="text-blue-500">
                 <Box size={13} />
               </span>
-              <span>新建对象类型 (Object Type)</span>
+              <span>{t('ow.btn.newObjectType')}</span>
             </button>
             <button
               onClick={() => {
@@ -653,7 +656,7 @@ export default function Sidebar({
               <span className="text-slate-400">
                 <GitMerge size={13} />
               </span>
-              <span>新建链接关系 (Link Type)</span>
+              <span>{t('ow.btn.newLinkType')}</span>
             </button>
             <button
               onClick={() => {
@@ -665,7 +668,7 @@ export default function Sidebar({
               <span className="text-amber-500">
                 <Zap size={13} />
               </span>
-              <span>新建操作类型 (Action Type)</span>
+              <span>{t('ow.btn.newActionType')}</span>
             </button>
             <button
               onClick={() => {
@@ -677,7 +680,7 @@ export default function Sidebar({
               <span className="text-indigo-500">
                 <Layers size={13} />
               </span>
-              <span>新建接口定义 (Interface)</span>
+              <span>{t('ow.btn.newInterface')}</span>
             </button>
             <button
               onClick={() => {
@@ -689,7 +692,7 @@ export default function Sidebar({
               <span className="text-teal-500">
                 <Tag size={13} />
               </span>
-              <span>新建共享属性 (Shared Property)</span>
+              <span>{t('ow.btn.newSharedProperty')}</span>
             </button>
             <button
               onClick={() => {
@@ -701,7 +704,7 @@ export default function Sidebar({
               <span className="text-violet-500">
                 <Code size={13} />
               </span>
-              <span>新建逻辑函数 (Function)</span>
+              <span>{t('ow.btn.newFunction')}</span>
             </button>
           </div>
         )}
@@ -719,7 +722,7 @@ export default function Sidebar({
                   <Layers size={14} />
                 </span>
                 <h3 className="text-sm font-bold text-slate-800">
-                  {editingDomain ? '编辑业务域' : '新建业务域'}
+                  {editingDomain ? t('ow.btn.editDomainTitle') : t('ow.btn.newDomainTitle')}
                 </h3>
               </div>
               <button
@@ -746,14 +749,14 @@ export default function Sidebar({
               {/* ID Input (Only shown on Create) */}
               <div className="space-y-1">
                 <label className="block text-slate-600 font-semibold text-[11px]">
-                  业务域标识 (ID/Key) <span className="text-red-500">*</span>
+                  {t('ow.label.domainId')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   disabled={!!editingDomain}
                   value={formId}
                   onChange={e => setFormId(e.target.value)}
-                  placeholder="例如: customer_domain (英文/数字/下划线)"
+                  placeholder={t('ow.placeholder.domainId')}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs bg-slate-50/50 disabled:bg-slate-100 disabled:text-slate-500"
                   required
                 />
@@ -762,13 +765,13 @@ export default function Sidebar({
               {/* Display Name Input */}
               <div className="space-y-1">
                 <label className="block text-slate-600 font-semibold text-[11px]">
-                  业务域名称 (Display Name) <span className="text-red-500">*</span>
+                  {t('ow.label.domainDisplayName')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
-                  placeholder="例如: 客户域"
+                  placeholder={t('ow.placeholder.domainDisplayName')}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs"
                   required
                 />
@@ -777,12 +780,12 @@ export default function Sidebar({
               {/* Description Input */}
               <div className="space-y-1">
                 <label className="block text-slate-600 font-semibold text-[11px]">
-                  描述 (Description)
+                  {t('ow.label.domainDescription')}
                 </label>
                 <textarea
                   value={formDesc}
                   onChange={e => setFormDesc(e.target.value)}
-                  placeholder="对该业务分级域的业务范围和职责进行说明"
+                  placeholder={t('ow.placeholder.domainDescription')}
                   rows={2}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none"
                 />
@@ -791,7 +794,7 @@ export default function Sidebar({
               {/* Color Theme Selector */}
               <div className="space-y-1.5">
                 <label className="block text-slate-600 font-semibold text-[11px]">
-                  视觉主题色 (Color Accent)
+                  {t('ow.label.domainColor')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {['blue', 'emerald', 'amber', 'purple', 'rose', 'indigo', 'slate'].map(color => {
@@ -823,8 +826,8 @@ export default function Sidebar({
               {/* Assign Object Types Checklist */}
               <div className="space-y-1.5">
                 <label className="block text-slate-600 font-semibold flex justify-between items-center text-[11px]">
-                  <span>包含的对象类型 ({formAssignedObjects.length})</span>
-                  <span className="text-[9px] text-slate-400 font-normal">多选指派</span>
+                  <span>{t('ow.label.domainAssignedObjects').replace('{count}', String(formAssignedObjects.length))}</span>
+                  <span className="text-[9px] text-slate-400 font-normal">{t('ow.label.multiSelect')}</span>
                 </label>
                 <div className="border border-slate-200 rounded-lg max-h-36 overflow-y-auto p-1 bg-slate-50/30 divide-y divide-slate-150">
                   {allObjectTypes.map(ot => {
@@ -853,7 +856,7 @@ export default function Sidebar({
                   })}
                   {allObjectTypes.length === 0 && (
                     <div className="p-4 text-center text-slate-400">
-                      暂无对象类型可供指派
+                      {t('ow.empty.noObjectTypesForAssign')}
                     </div>
                   )}
                 </div>
@@ -869,13 +872,13 @@ export default function Sidebar({
                   }}
                   className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 transition-colors font-semibold cursor-pointer text-xs"
                 >
-                  取消
+                  {t('ow.btn.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs"
                 >
-                  保存
+                  {t('ow.btn.save')}
                 </button>
               </div>
             </form>
@@ -895,7 +898,7 @@ export default function Sidebar({
           }`}
         >
           <BookOpen size={14} />
-          <span>术语库</span>
+          <span>{t('ow.sidebar.glossary')}</span>
         </button>
       </div>
 

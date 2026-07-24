@@ -60,6 +60,9 @@ public class PipelineTaskServiceImpl implements PipelineTaskService {
             try {
                 jdbc.execute("ALTER TABLE ecos_pipeline_task ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true");
             } catch (Exception ignored) {}
+            try {
+                jdbc.execute("ALTER TABLE ecos_pipeline_task ADD COLUMN IF NOT EXISTS task_type VARCHAR(20) DEFAULT 'TRANSFORM'");
+            } catch (Exception ignored) {}
             jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS ecos_pipeline_step (
                     id VARCHAR(36) PRIMARY KEY,
@@ -123,8 +126,8 @@ public class PipelineTaskServiceImpl implements PipelineTaskService {
 
         String yamlContent = (String) body.getOrDefault("yaml_content", "");
         jdbc.update(
-            "INSERT INTO ecos_pipeline_task (id, name, description, yaml_content, git_url, git_branch, status, cron_expression, config_json, created_by) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)",
+            "INSERT INTO ecos_pipeline_task (id, name, description, yaml_content, git_url, git_branch, status, cron_expression, config_json, task_type, created_by) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)",
             id, name,
             body.getOrDefault("description", ""),
             yamlContent,
@@ -133,6 +136,7 @@ public class PipelineTaskServiceImpl implements PipelineTaskService {
             body.getOrDefault("status", "DRAFT"),
             body.getOrDefault("cron_expression", ""),
             safeJson(body.get("config_json")),
+            body.getOrDefault("task_type", "TRANSFORM"),
             body.getOrDefault("created_by", "system"));
 
         // 处理步骤
@@ -166,10 +170,11 @@ public class PipelineTaskServiceImpl implements PipelineTaskService {
             "UPDATE ecos_pipeline_task SET name = COALESCE(?, name), description = COALESCE(?, description), " +
             "yaml_content = COALESCE(?, yaml_content), git_url = COALESCE(?, git_url), " +
             "git_branch = COALESCE(?, git_branch), status = COALESCE(?, status), " +
-            "cron_expression = COALESCE(?, cron_expression), updated_at = NOW() WHERE id = ?",
+            "cron_expression = COALESCE(?, cron_expression), task_type = COALESCE(?, task_type), " +
+            "updated_at = NOW() WHERE id = ?",
             body.get("name"), body.get("description"), body.get("yaml_content"),
             body.get("git_url"), body.get("git_branch"), body.get("status"),
-            body.get("cron_expression"), id);
+            body.get("cron_expression"), body.get("task_type"), id);
 
         // 如果传入了 steps，替换步骤列表
         @SuppressWarnings("unchecked")

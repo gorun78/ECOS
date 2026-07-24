@@ -31,6 +31,30 @@ import type {
   UpdatePropertyDTO,
   CreateRelationshipDTO,
 } from "../types/workbench";
+import type {
+  OntologyMappingRecord,
+  CreateMappingDTO,
+  UpdateMappingDTO,
+  ExportTaskSummary,
+  ExportTask,
+  CreateExportDTO,
+  PaginatedDataResponse,
+  DataRecord,
+  CreateDataDTO,
+  UpdateDataDTO,
+  Proposal,
+  CreateProposalDTO,
+  UpdateProposalDTO,
+  VerifyProposalResult,
+  ReviewProposalDTO,
+  LineageEdge,
+  CreateLineageDTO,
+  UpdateLineageDTO,
+  LineageGraph,
+  LineageTraceResult,
+  LineageImpactResult,
+  ParseLineageResult,
+} from "../types/ontology";
 
 // ── 配置常量 ──────────────────────────────────────────────
 
@@ -389,6 +413,269 @@ export async function loadFromGit(url: string) {
 }
 
 // ================================================================
+// 本体映射 (Ontology Mapping) — T2.1
+// ================================================================
+
+const MAPPING_BASE = "/api/v1/ontology/mappings";
+
+export async function fetchMappings(params?: { objectId?: string; sourceType?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.objectId) qs.set("objectId", params.objectId);
+  if (params?.sourceType) qs.set("sourceType", params.sourceType);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetchData<OntologyMappingRecord[]>(`${MAPPING_BASE}${query}`);
+}
+
+export async function fetchMapping(id: string) {
+  return apiFetchData<OntologyMappingRecord>(`${MAPPING_BASE}/${id}`);
+}
+
+export async function createMapping(data: CreateMappingDTO) {
+  return apiFetchData<OntologyMappingRecord>(MAPPING_BASE, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateMapping(id: string, data: UpdateMappingDTO) {
+  return apiFetchData<OntologyMappingRecord>(`${MAPPING_BASE}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMapping(id: string) {
+  await apiFetchData(`${MAPPING_BASE}/${id}`, { method: "DELETE" });
+}
+
+export async function fetchMappableObjects() {
+  return apiFetchData(`${MAPPING_BASE}/objects`);
+}
+
+// ================================================================
+// 本体导出 (Ontology Export) — T2.2
+// ================================================================
+
+const EXPORT_BASE = "/api/v1/ontology/export";
+
+export async function fetchExportTasks(params?: { ontologyId?: string; format?: string; status?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.ontologyId) qs.set("ontologyId", params.ontologyId);
+  if (params?.format) qs.set("format", params.format);
+  if (params?.status) qs.set("status", params.status);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetchData<ExportTaskSummary[]>(`${EXPORT_BASE}${query}`);
+}
+
+export async function fetchExportTask(id: string) {
+  return apiFetchData<ExportTask>(`${EXPORT_BASE}/${id}`);
+}
+
+export async function createExportTask(data: CreateExportDTO) {
+  return apiFetchData<ExportTask>(EXPORT_BASE, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function downloadExport(id: string): Promise<void> {
+  const token = localStorage.getItem("token") || "";
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${EXPORT_BASE}/${id}/download`, { headers });
+  if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+  const blob = await res.blob();
+  const contentDisposition = res.headers.get("content-disposition") || "";
+  const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  const filename = match ? match[1].replace(/['"]/g, "") : `ontology-export-${id}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function deleteExportTask(id: string) {
+  await apiFetchData(`${EXPORT_BASE}/${id}`, { method: "DELETE" });
+}
+
+// ================================================================
+// 本体数据 (Ontology Data) — T2.3
+// ================================================================
+
+const DATA_BASE = "/api/v1/ontology/data";
+
+export async function fetchOntologyData(params?: { type?: string; objectTypeId?: string; page?: number; size?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.type) qs.set("type", params.type);
+  if (params?.objectTypeId) qs.set("objectTypeId", params.objectTypeId);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.size) qs.set("size", String(params.size));
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetchData<PaginatedDataResponse>(`${DATA_BASE}${query}`);
+}
+
+export async function fetchOntologyDataObjects() {
+  return apiFetchData(`${DATA_BASE}/objects`);
+}
+
+export async function fetchOntologyDataRecord(id: string) {
+  return apiFetchData<DataRecord>(`${DATA_BASE}/${id}`);
+}
+
+export async function createOntologyData(data: CreateDataDTO) {
+  return apiFetchData<DataRecord>(DATA_BASE, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateOntologyData(id: string, data: UpdateDataDTO) {
+  return apiFetchData<DataRecord>(`${DATA_BASE}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteOntologyData(id: string) {
+  await apiFetchData(`${DATA_BASE}/${id}`, { method: "DELETE" });
+}
+
+export async function clearOntologyDataByType(objectTypeId: string) {
+  await apiFetchData(`${DATA_BASE}?objectTypeId=${encodeURIComponent(objectTypeId)}`, { method: "DELETE" });
+}
+
+// ================================================================
+// 本体提案 (Ontology Proposal) — T2.4
+// ================================================================
+
+const PROPOSAL_BASE = "/api/v1/ontology/proposals";
+
+export async function fetchProposals(params?: { status?: string; targetType?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.targetType) qs.set("targetType", params.targetType);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetchData<Proposal[]>(`${PROPOSAL_BASE}${query}`);
+}
+
+export async function fetchProposal(id: string) {
+  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`);
+}
+
+export async function createProposal(data: CreateProposalDTO) {
+  return apiFetchData<Proposal>(PROPOSAL_BASE, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateProposal(id: string, data: UpdateProposalDTO) {
+  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteProposal(id: string) {
+  await apiFetchData(`${PROPOSAL_BASE}/${id}`, { method: "DELETE" });
+}
+
+export async function submitProposal(id: string) {
+  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/submit`, { method: "POST" });
+}
+
+export async function approveProposal(id: string, body: ReviewProposalDTO = {}) {
+  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function rejectProposal(id: string, body: ReviewProposalDTO = {}) {
+  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function verifyProposal(id: string) {
+  return apiFetchData<VerifyProposalResult>(`${PROPOSAL_BASE}/${id}/verify`, { method: "POST" });
+}
+
+export async function executeProposal(id: string) {
+  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/execute`, { method: "POST" });
+}
+
+// ================================================================
+// 数据血缘 (Lineage) — T2.5
+// ================================================================
+
+const LINEAGE_BASE = "/api/v1/lineage";
+
+export async function fetchLineages(params?: { source?: string; target?: string; direction?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.source) qs.set("source", params.source);
+  if (params?.target) qs.set("target", params.target);
+  if (params?.direction) qs.set("direction", params.direction);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetchData<LineageEdge[]>(`${LINEAGE_BASE}${query}`);
+}
+
+export async function fetchLineage(id: string) {
+  return apiFetchData<LineageEdge>(`${LINEAGE_BASE}/${id}`);
+}
+
+export async function createLineage(data: CreateLineageDTO) {
+  return apiFetchData<LineageEdge>(LINEAGE_BASE, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateLineage(id: string, data: UpdateLineageDTO) {
+  return apiFetchData<LineageEdge>(`${LINEAGE_BASE}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteLineage(id: string) {
+  await apiFetchData(`${LINEAGE_BASE}/${id}`, { method: "DELETE" });
+}
+
+export async function fetchLineageGraph() {
+  return apiFetchData<LineageGraph>(`${LINEAGE_BASE}/graph`);
+}
+
+export async function traceLineage(nodeId: string) {
+  return apiFetchData<LineageTraceResult>(`${LINEAGE_BASE}/trace/${nodeId}`);
+}
+
+export async function fetchLineageEntities() {
+  return apiFetchData(`${LINEAGE_BASE}/entities`);
+}
+
+export async function parseLineage(data: { format: string; data: string }) {
+  return apiFetchData<ParseLineageResult>(`${LINEAGE_BASE}/parse`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchLineageImpact(params?: { objectId?: string; rootObject?: string; depth?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.objectId) qs.set("objectId", params.objectId);
+  if (params?.rootObject) qs.set("rootObject", params.rootObject);
+  if (params?.depth) qs.set("depth", String(params.depth));
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetchData<LineageImpactResult>(`${LINEAGE_BASE}/impact${query}`);
+}
+
+// ================================================================
 // 导出 ontologyApi 对象（便捷调用）
 // ================================================================
 
@@ -434,4 +721,42 @@ export const ontologyApi = {
   commitToGit,
   pullFromGit,
   loadFromGit,
+  fetchMappings,
+  fetchMapping,
+  createMapping,
+  updateMapping,
+  deleteMapping,
+  fetchMappableObjects,
+  fetchExportTasks,
+  fetchExportTask,
+  createExportTask,
+  downloadExport,
+  deleteExportTask,
+  fetchOntologyData,
+  fetchOntologyDataObjects,
+  fetchOntologyDataRecord,
+  createOntologyData,
+  updateOntologyData,
+  deleteOntologyData,
+  clearOntologyDataByType,
+  fetchProposals,
+  fetchProposal,
+  createProposal,
+  updateProposal,
+  deleteProposal,
+  submitProposal,
+  approveProposal,
+  rejectProposal,
+  verifyProposal,
+  executeProposal,
+  fetchLineages,
+  fetchLineage,
+  createLineage,
+  updateLineage,
+  deleteLineage,
+  fetchLineageGraph,
+  traceLineage,
+  fetchLineageEntities,
+  parseLineage,
+  fetchLineageImpact,
 };

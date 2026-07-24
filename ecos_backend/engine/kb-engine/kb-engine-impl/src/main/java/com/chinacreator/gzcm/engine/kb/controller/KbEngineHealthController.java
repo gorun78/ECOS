@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.engine.HealthCheck;
 import com.chinacreator.gzcm.common.engine.IEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,11 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/kb")
+@RequestMapping("/api/v1/engine/knowledge")
 public class KbEngineHealthController {
 
     private static final Logger log = LoggerFactory.getLogger(KbEngineHealthController.class);
@@ -21,13 +22,33 @@ public class KbEngineHealthController {
     private IEngine kbEngine;
 
     @GetMapping("/health")
-    public Map<String, Object> health() {
-        Map<String, Object> status = new HashMap<>();
-        status.put("status", "UP");
-        status.put("engine", "KNOWLEDGE");
-        status.put("name", kbEngine.getName());
-        status.put("engineStatus", kbEngine.getStatus().name());
-        status.putAll(kbEngine.healthCheck().getComponents());
-        return status;
+    public ApiResponse<HealthCheck> health() {
+        return ApiResponse.success(kbEngine.healthCheck());
+    }
+
+    @GetMapping("/config")
+    public ApiResponse<Map<String, Object>> config() {
+        return ApiResponse.success(kbEngine.getConfig());
+    }
+
+    @GetMapping("/status")
+    public ApiResponse<Map<String, Object>> status() {
+        Map<String, Object> s = Map.of(
+                "name", kbEngine.getName(),
+                "status", kbEngine.getStatus().name()
+        );
+        return ApiResponse.success(s);
+    }
+
+    @PostMapping("/start")
+    public ApiResponse<Map<String, Object>> start() {
+        kbEngine.start();
+        return ApiResponse.success(Map.of("name", kbEngine.getName(), "status", kbEngine.getStatus().name()));
+    }
+
+    @PostMapping("/stop")
+    public ApiResponse<Map<String, Object>> stop() {
+        kbEngine.stop();
+        return ApiResponse.success(Map.of("name", kbEngine.getName(), "status", kbEngine.getStatus().name()));
     }
 }

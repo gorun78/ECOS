@@ -33,6 +33,8 @@ export interface MappingTabProps extends ObjectDetailTabProps {
   handleDatasetChange: (datasetId: string) => void;
   handleAutoMap: () => void;
   handlePropMappingChange: (propId: string, colName: string) => void;
+  mappingDirty: boolean;
+  onSaveMapping: () => void;
 }
 
 export interface LinksTabProps {

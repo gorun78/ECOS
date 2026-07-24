@@ -34,6 +34,7 @@ import FunctionTypeDetail from './ontology/FunctionTypeDetail';
 import { InterfaceView, SharedPropertyView, DatasetView } from './ontology/OtherViews';
 import GlossaryTab from './knowledge/tabs/GlossaryTab';
 import ObjectExplorerView from './ObjectExplorerView';
+import ProposalPanel from './ontology/ProposalPanel';
 
 import {
   createEntity,
@@ -43,7 +44,9 @@ import {
   deleteRelationship,
   fetchRelationships,
   DEFAULT_ONTOLOGY_ID,
+  createExportTask,
 } from '../services/ontologyApi';
+import type { CreateExportDTO } from '../types/ontology';
 import { useOntologyData } from '../hooks/useOntologyData';
 import type { Entity } from '../types/workbench';
 
@@ -69,6 +72,10 @@ export default function OntologyWorkbenchLayout() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [explorerActiveObjectTypeId, setExplorerActiveObjectTypeId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'JSON' | 'CSV' | 'DDL'>('JSON');
+  const [exportScope, setExportScope] = useState<'FULL' | 'ENTITIES' | 'RELATIONSHIPS'>('FULL');
+  const [exporting, setExporting] = useState(false);
 
   // ── Load Initial Data via custom hook ──
   useOntologyData(({ domains: loadedDomains, objectTypes: loadedObjects, linkTypes: loadedLinks }) => {
@@ -82,6 +89,24 @@ export default function OntologyWorkbenchLayout() {
   const showToast = (type: 'success' | 'info' | 'error', message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleExportOntology = async () => {
+    setExporting(true);
+    try {
+      const dto: CreateExportDTO = {
+        ontologyId: DEFAULT_ONTOLOGY_ID,
+        format: exportFormat,
+        scope: exportScope,
+      };
+      await createExportTask(dto);
+      showToast('success', t('ow.msg.exportStarted'));
+      setShowExportModal(false);
+    } catch (e: any) {
+      showToast('error', t('ow.msg.exportFailed'));
+    } finally {
+      setExporting(false);
+    }
   };
 
   // ── Mutation Helpers ──
@@ -100,12 +125,12 @@ export default function OntologyWorkbenchLayout() {
     if (type === 'object') {
       try {
         const created = await createEntity({
-          name: `未命名对象_${defaultNum}`,
+          name: t('ow.obj.defaultName').replace('{n}', defaultNum),
           code: `custom_obj_${defaultNum}`,
-          description: '新建自定义业务实体',
+          description: t('ow.obj.defaultDescription'),
           entityType: 'MASTER',
         });
-        showToast('success', `创建了对象类型: ${created.name}`);
+        showToast('success', t('ow.msg.objectCreated').replace('{name}', created.name));
         // Reload from backend
         const entities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch(() => []);
         const list: ObjectType[] = (entities || []).map((e: any) => ({
@@ -119,26 +144,27 @@ export default function OntologyWorkbenchLayout() {
           titleProperty: 'id',
           status: 'PUBLISHED',
           properties: [],
-          mapping: e.mapping || null,
+          mapping: e.mapping || { datasetId: '', propertyMappings: {} },
           domainId: e.domainId || null,
         }));
         updateObjectTypes(list);
       } catch (e: any) {
-        showToast('error', `创建失败: ${e.message}`);
+        showToast('error', t('ow.msg.createFailed').replace('{error}', String(e.message)));
       }
     } else if (type === 'link') {
       if (objectTypes.length < 2) {
-        showToast('error', '建立关联至少需要 2 个对象类型！');
+        showToast('error', t('ow.msg.needTwoObjectTypes'));
         return;
       }
       try {
-        await createRelationship(DEFAULT_ONTOLOGY_ID, {
+        await createRelationship({
           sourceEntityId: objectTypes[0].id,
           targetEntityId: objectTypes[1].id,
-          name: `新关联_${defaultNum}`,
+          name: t('ow.link.defaultName').replace('{n}', defaultNum),
+          code: `custom_link_${defaultNum}`,
           relationshipType: 'ONE_TO_MANY',
-        });
-        showToast('success', '关联关系创建成功');
+        }, DEFAULT_ONTOLOGY_ID);
+        showToast('success', t('ow.msg.linkCreated'));
         const rels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch(() => []);
         const list: LinkType[] = (rels || []).map((r: any) => ({
           id: r.id,
@@ -148,19 +174,19 @@ export default function OntologyWorkbenchLayout() {
           sourceObjectType: r.source_entity_id,
           targetObjectType: r.target_entity_id,
           cardinality: (r.relationship_type === 'ONE_TO_ONE' ? '1:1' : r.relationship_type === 'MANY_TO_MANY' ? 'N:N' : '1:N') as any,
-          mapping: { type: 'foreign_key' as const, foreignKeyMapping: {} },
+          mapping: { type: 'foreign_key' as const },
         }));
         updateLinkTypes(list);
       } catch (e: any) {
-        showToast('error', `创建关联失败: ${e.message}`);
+        showToast('error', t('ow.msg.linkCreateFailed').replace('{error}', String(e.message)));
       }
     } else if (type === 'action') {
       const newActionId = `custom_action_${defaultNum}`;
       const newAction: ActionType = {
         id: newActionId,
-        displayName: `新操作行为_${defaultNum}`,
+        displayName: t('ow.action.defaultName').replace('{n}', defaultNum),
         apiName: `customAction${defaultNum}`,
-        description: '配置业务修改端点。通过传入参数，改变指定的本体对象。',
+        description: t('ow.action.defaultDescription'),
         parameters: [],
         rules: [],
         validationRules: []
@@ -168,42 +194,42 @@ export default function OntologyWorkbenchLayout() {
       updateActionTypes([...actionTypes, newAction]);
       setSelectedCategory('action');
       setSelectedId(newActionId);
-      showToast('info', `创建了操作类型: ${newAction.displayName}`);
+      showToast('info', t('ow.msg.actionCreated').replace('{name}', newAction.displayName));
     } else if (type === 'interface') {
       const newIntfId = `custom_interface_${defaultNum}`;
       const newIntf: InterfaceType = {
         id: newIntfId,
-        displayName: `新契约接口_${defaultNum}`,
+        displayName: t('ow.intf.defaultName').replace('{n}', defaultNum),
         apiName: `CustomInterface${defaultNum}`,
-        description: '声明一个公共行为或特征的抽象接口规范。',
+        description: t('ow.intf.defaultDescription'),
         properties: [
-          { id: 'uuid', displayName: '核心编码', apiName: 'uuid', dataType: 'string', isRequired: true, description: '唯一硬件/实体识别符。' }
+          { id: 'uuid', displayName: t('ow.intf.defaultPropertyName'), apiName: 'uuid', dataType: 'string', isRequired: true, description: t('ow.intf.defaultPropertyDescription') }
         ]
       };
       updateInterfaces([...interfaces, newIntf]);
       setSelectedCategory('interface');
       setSelectedId(newIntfId);
-      showToast('info', `创建了接口类型: ${newIntf.displayName}`);
+      showToast('info', t('ow.msg.interfaceCreated').replace('{name}', newIntf.displayName));
     } else if (type === 'shared_property') {
       const newSpId = `custom_sp_${defaultNum}`;
       const newSp: SharedProperty = {
         id: newSpId,
-        displayName: `标准公共属性_${defaultNum}`,
+        displayName: t('ow.prop.defaultName').replace('{n}', defaultNum),
         apiName: `customSharedProp${defaultNum}`,
         dataType: 'string',
-        description: '标准化全局指标，可在各类业务对象中复用。'
+        description: t('ow.prop.defaultDescription')
       };
       updateSharedProperties([...sharedProperties, newSp]);
       setSelectedCategory('shared_property');
       setSelectedId(newSpId);
-      showToast('info', `创建了共享属性: ${newSp.displayName}`);
+      showToast('info', t('ow.msg.sharedPropertyCreated').replace('{name}', newSp.displayName));
     } else if (type === 'function') {
       const newFuncId = `custom_function_${defaultNum}`;
       const newFunc: FunctionType = {
         id: newFuncId,
-        displayName: `新逻辑函数_${defaultNum}`,
+        displayName: t('ow.func.defaultName').replace('{n}', defaultNum),
         apiName: `customFunction${defaultNum}`,
-        description: '配置 TypeScript 逻辑函数。可通过 @Function() 装饰器向本体应用公开计算规则。',
+        description: t('ow.func.defaultDescription'),
         returnType: 'string',
         parameters: [],
         code: `import { Function } from "@ecos/functions-api";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`
@@ -211,7 +237,7 @@ export default function OntologyWorkbenchLayout() {
       updateFunctionTypes([...functionTypes, newFunc]);
       setSelectedCategory('function');
       setSelectedId(newFuncId);
-      showToast('info', `创建了逻辑函数: ${newFunc.displayName}`);
+      showToast('info', t('ow.msg.functionCreated').replace('{name}', newFunc.displayName));
     }
   };
 
@@ -223,19 +249,19 @@ export default function OntologyWorkbenchLayout() {
     if (category === 'object') {
       try {
         await deleteEntity(id, DEFAULT_ONTOLOGY_ID);
-        showToast('success', '实体已删除');
+        showToast('success', t('ow.msg.entityDeleted'));
         updateObjectTypes(objectTypes.filter(ot => ot.id !== id));
         updateLinkTypes(linkTypes.filter(lt => lt.sourceObjectType !== id && lt.targetObjectType !== id));
       } catch (e: any) {
-        showToast('error', `删除失败: ${e.message}`);
+        showToast('error', t('ow.msg.deleteFailed').replace('{error}', String(e.message)));
       }
     } else if (category === 'link') {
       try {
         await deleteRelationship(id, DEFAULT_ONTOLOGY_ID);
-        showToast('success', '关联已删除');
+        showToast('success', t('ow.msg.linkDeleted'));
         updateLinkTypes(linkTypes.filter(lt => lt.id !== id));
       } catch (e: any) {
-        showToast('error', `删除失败: ${e.message}`);
+        showToast('error', t('ow.msg.deleteFailed').replace('{error}', String(e.message)));
       }
     } else if (category === 'action') {
       updateActionTypes(actionTypes.filter(at => at.id !== id));
@@ -249,7 +275,7 @@ export default function OntologyWorkbenchLayout() {
 
     setSelectedCategory('overview');
     setSelectedId(null);
-    showToast('info', '元素已成功从本体草稿中抹除。');
+    showToast('info', t('ow.msg.elementRemoved'));
   };
 
   // ── Domain-aware filtering ──
@@ -290,7 +316,33 @@ export default function OntologyWorkbenchLayout() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden relative">
+      <main className="flex-1 overflow-hidden relative flex flex-col">
+        {/* Top toolbar */}
+        <div className={`flex items-center justify-between px-3 py-1.5 border-b ${styles.cardBorder} ${styles.cardBg}`}>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${styles.muted}`}>
+            {selectedCategory === 'overview' ? t('ow.nav.overview') :
+             selectedCategory === 'explorer' ? t('ow.nav.explorer') :
+             selectedCategory === 'object' ? t('ow.nav.object') :
+             selectedCategory === 'link' ? t('ow.nav.link') :
+             selectedCategory === 'action' ? t('ow.nav.action') :
+             selectedCategory === 'function' ? t('ow.nav.function') :
+             selectedCategory === 'interface' ? t('ow.nav.interface') :
+             selectedCategory === 'shared_property' ? t('ow.nav.shared_property') :
+             selectedCategory === 'dataset' ? t('ow.nav.dataset') :
+             selectedCategory === 'glossary' ? t('ow.nav.glossary') : ''}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-semibold ${styles.accentBg} text-white hover:opacity-90 transition-opacity`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {t('ow.btn.exportOntology')}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto">
         {selectedCategory === 'overview' && (
           <OverviewView
             objectTypes={objectTypes}
@@ -335,7 +387,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'object' && selectedId && (() => {
           const ot = objectTypes.find(o => o.id === selectedId);
-          if (!ot) return <div className="p-6 text-slate-400 text-xs">未找到该对象类型</div>;
+          if (!ot) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.objectTypeNotFound')}</div>;
           return (
             <ObjectTypeDetail
               objectType={ot}
@@ -368,7 +420,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'link' && selectedId && (() => {
           const lt = linkTypes.find(l => l.id === selectedId);
-          if (!lt) return <div className="p-6 text-slate-400 text-xs">未找到该链接关系</div>;
+          if (!lt) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.linkTypeNotFound')}</div>;
           return (
             <LinkTypeDetail
               linkType={lt}
@@ -388,7 +440,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'action' && selectedId && (() => {
           const at = actionTypes.find(a => a.id === selectedId);
-          if (!at) return <div className="p-6 text-slate-400 text-xs">未找到该操作类型</div>;
+          if (!at) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.actionTypeNotFound')}</div>;
           return (
             <ActionTypeDetail
               actionType={at}
@@ -407,7 +459,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'function' && selectedId && (() => {
           const fn = functionTypes.find(f => f.id === selectedId);
-          if (!fn) return <div className="p-6 text-slate-400 text-xs">未找到该逻辑函数</div>;
+          if (!fn) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.functionNotFound')}</div>;
           return (
             <FunctionTypeDetail
               func={fn}
@@ -422,7 +474,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'interface' && selectedId && (() => {
           const it = interfaces.find(i => i.id === selectedId);
-          if (!it) return <div className="p-6 text-slate-400 text-xs">未找到该接口类型</div>;
+          if (!it) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.interfaceNotFound')}</div>;
           return (
             <InterfaceView
               intf={it}
@@ -438,7 +490,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'shared_property' && selectedId && (() => {
           const sp = sharedProperties.find(s => s.id === selectedId);
-          if (!sp) return <div className="p-6 text-slate-400 text-xs">未找到该共享属性</div>;
+          if (!sp) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.sharedPropertyNotFound')}</div>;
           return (
             <SharedPropertyView
               sp={sp}
@@ -454,7 +506,7 @@ export default function OntologyWorkbenchLayout() {
 
         {selectedCategory === 'dataset' && selectedId && (() => {
           const ds = datasets.find(d => d.id === selectedId);
-          if (!ds) return <div className="p-6 text-slate-400 text-xs">未找到该数据集</div>;
+          if (!ds) return <div className={`p-6 ${styles.muted} text-xs`}>{t('ow.empty.datasetNotFound')}</div>;
           return (
             <DatasetView
               dataset={ds}
@@ -473,11 +525,57 @@ export default function OntologyWorkbenchLayout() {
             <GlossaryTab />
           </div>
         )}
+        </div>
+
+        {/* Proposal Panel — collapsible bottom drawer */}
+        {selectedCategory === 'object' && (
+          <ProposalPanel objectTypes={objectTypes} />
+        )}
       </main>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowExportModal(false)}>
+          <div className={`bg-white rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-96`} onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold mb-3">{t('ow.section.exportPanel')}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportFormat')}</label>
+                <div className="flex gap-2">
+                  {(['JSON', 'CSV', 'DDL'] as const).map(f => (
+                    <button key={f} onClick={() => setExportFormat(f)}
+                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportFormat === f ? 'bg-indigo-600 text-white' : `bg-slate-100 text-slate-600 hover:bg-slate-200`}`}>
+                      {t(`ow.export.format.${f}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportScope')}</label>
+                <div className="flex gap-2">
+                  {(['FULL', 'ENTITIES', 'RELATIONSHIPS'] as const).map(s => (
+                    <button key={s} onClick={() => setExportScope(s)}
+                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportScope === s ? 'bg-indigo-600 text-white' : `bg-slate-100 text-slate-600 hover:bg-slate-200`}`}>
+                      {t(`ow.export.scope.${s}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setShowExportModal(false)} className="px-3 py-1.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</button>
+                <button onClick={handleExportOntology} disabled={exporting}
+                  className={`px-3 py-1.5 rounded text-[10px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50`}>
+                  {exporting ? '...' : t('ow.btn.exportOntology')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-lg shadow-xl text-xs font-semibold text-white bg-slate-900 border border-slate-700/80 z-50 animate-bounce">
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-lg shadow-xl text-xs font-semibold text-white ${styles.accentBg} border ${styles.accentBorder} z-50 animate-bounce`}>
           <span className={toast.type === 'success' ? 'text-emerald-400' : toast.type === 'error' ? 'text-red-400' : 'text-blue-400'}>
             {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✗' : 'ℹ'}
           </span>

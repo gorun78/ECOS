@@ -347,3 +347,107 @@ ALTER TABLE ecos_data.ecos_pipeline_node
     ADD CONSTRAINT fk_data_pnode_def FOREIGN KEY (definition_id) REFERENCES ecos_data.ecos_pipeline_definition(id);
 ALTER TABLE ecos_data.ecos_pipeline_edge
     ADD CONSTRAINT fk_data_pedge_def FOREIGN KEY (definition_id) REFERENCES ecos_data.ecos_pipeline_definition(id);
+
+-- ============================================
+-- Table: ecos_data_lineage_node
+-- Description: Data lineage node
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_lineage_node (
+    id VARCHAR(64) PRIMARY KEY,
+    node_type VARCHAR(20) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    schema_name VARCHAR(100),
+    table_name VARCHAR(200),
+    datasource_id VARCHAR(64),
+    layer VARCHAR(20),
+    properties JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ecos_data.ecos_data_lineage_node IS 'Data lineage node';
+COMMENT ON COLUMN ecos_data.ecos_data_lineage_node.node_type IS 'SOURCE / TARGET / TRANSFORM';
+COMMENT ON COLUMN ecos_data.ecos_data_lineage_node.layer IS 'SOURCE / RAW / CURATED / SEMANTIC / APPLICATION';
+CREATE INDEX IF NOT EXISTS idx_lineage_node_type ON ecos_data.ecos_data_lineage_node(node_type);
+CREATE INDEX IF NOT EXISTS idx_lineage_node_ds ON ecos_data.ecos_data_lineage_node(datasource_id);
+
+-- ============================================
+-- Table: ecos_data_lineage_edge
+-- Description: Data lineage edge
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_lineage_edge (
+    id VARCHAR(64) PRIMARY KEY,
+    source_node_id VARCHAR(64) NOT NULL,
+    target_node_id VARCHAR(64) NOT NULL,
+    edge_type VARCHAR(30) NOT NULL,
+    pipeline_task_id VARCHAR(64),
+    transformation VARCHAR(500),
+    properties JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ecos_data.ecos_data_lineage_edge IS 'Data lineage edge';
+COMMENT ON COLUMN ecos_data.ecos_data_lineage_edge.edge_type IS 'DATA_FLOW / DERIVATION / DEPENDENCY';
+COMMENT ON COLUMN ecos_data.ecos_data_lineage_edge.pipeline_task_id IS 'Associated pipeline task';
+CREATE INDEX IF NOT EXISTS idx_lineage_edge_src ON ecos_data.ecos_data_lineage_edge(source_node_id);
+CREATE INDEX IF NOT EXISTS idx_lineage_edge_tgt ON ecos_data.ecos_data_lineage_edge(target_node_id);
+CREATE INDEX IF NOT EXISTS idx_lineage_edge_task ON ecos_data.ecos_data_lineage_edge(pipeline_task_id);
+
+-- ============================================
+-- Table: ecos_query_template
+-- Description: Saved SQL query templates
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_data.ecos_query_template (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    sql_content TEXT NOT NULL,
+    datasource_id VARCHAR(64),
+    is_shared BOOLEAN DEFAULT false,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ecos_data.ecos_query_template IS 'Saved SQL query templates';
+
+-- ============================================
+-- Table: ecos_query_history
+-- Description: SQL query execution history
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_data.ecos_query_history (
+    id VARCHAR(36) PRIMARY KEY,
+    sql_content TEXT NOT NULL,
+    datasource_id VARCHAR(64),
+    status VARCHAR(20) DEFAULT 'RUNNING',
+    rows_affected INT DEFAULT 0,
+    error_msg TEXT,
+    execution_time_ms BIGINT DEFAULT 0,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP,
+    created_by VARCHAR(100)
+);
+
+COMMENT ON TABLE ecos_data.ecos_query_history IS 'SQL query execution history';
+COMMENT ON COLUMN ecos_data.ecos_query_history.status IS 'RUNNING / COMPLETED / FAILED / CANCELLED';
+CREATE INDEX IF NOT EXISTS idx_query_history_ds ON ecos_data.ecos_query_history(datasource_id);
+CREATE INDEX IF NOT EXISTS idx_query_history_started ON ecos_data.ecos_query_history(started_at DESC);
+
+-- ============================================
+-- Table: td_data_category
+-- Description: Data category tree
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_data.td_data_category (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    parent_id VARCHAR(36),
+    description TEXT,
+    icon VARCHAR(50),
+    sort_order INT DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ecos_data.td_data_category IS 'Data category tree';
+CREATE INDEX IF NOT EXISTS idx_category_parent ON ecos_data.td_data_category(parent_id);

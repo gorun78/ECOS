@@ -69,6 +69,7 @@ export interface DataSyncTask {
   errorMessage?: string;
   description?: string;
   syncMode?: 'full' | 'incremental' | 'cdc' | 'snapshot' | 'append';
+  taskType?: 'TRANSFORM' | 'SYNC' | 'LAKE_EXPORT';
   durationMs?: number;
 }
 

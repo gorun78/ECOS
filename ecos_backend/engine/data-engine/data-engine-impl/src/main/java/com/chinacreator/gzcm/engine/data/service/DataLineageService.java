@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,14 +14,50 @@ import java.util.regex.Pattern;
 public class DataLineageService {
 
     private static final Logger log = LoggerFactory.getLogger(DataLineageService.class);
-    private static final Pattern NODE_PATTERN = Pattern.compile(
-        "id:\\s*(\\S+).*?type:\\s*(\\S+).*?table:\\s*\"?(\\S+?)\"?\\s",
-        Pattern.DOTALL);
 
     private final JdbcTemplate jdbc;
 
     public DataLineageService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    @PostConstruct
+    public void init() {
+        ensureSchema();
+    }
+
+    private void ensureSchema() {
+        try {
+            jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_lineage_node (
+                    id VARCHAR(64) PRIMARY KEY,
+                    node_type VARCHAR(20) NOT NULL,
+                    name VARCHAR(200) NOT NULL,
+                    schema_name VARCHAR(100),
+                    table_name VARCHAR(200),
+                    datasource_id VARCHAR(64),
+                    layer VARCHAR(20),
+                    properties JSONB DEFAULT '{}',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+            jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_lineage_edge (
+                    id VARCHAR(64) PRIMARY KEY,
+                    source_node_id VARCHAR(64) NOT NULL,
+                    target_node_id VARCHAR(64) NOT NULL,
+                    edge_type VARCHAR(30) NOT NULL,
+                    pipeline_task_id VARCHAR(64),
+                    transformation VARCHAR(500),
+                    properties JSONB DEFAULT '{}',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+            log.info("Data Lineage tables ready");
+        } catch (Exception e) {
+            log.warn("Data Lineage table init warning: {}", e.getMessage());
+        }
     }
 
     public Map<String, Object> getPipelineLineage(String taskId) {
@@ -33,7 +70,7 @@ public class DataLineageService {
     public List<Map<String, Object>> listNodes() {
         try {
             return jdbc.queryForList(
-                "SELECT id, name, type, datasource_id, table_name, pipeline_id FROM ecos_data_lineage_node ORDER BY name");
+                "SELECT id, name, node_type as type, datasource_id, schema_name, table_name, layer FROM ecos_data.ecos_data_lineage_node ORDER BY name");
         } catch (Exception e) {
             return List.of();
         }
@@ -42,7 +79,7 @@ public class DataLineageService {
     public List<Map<String, Object>> listEdges() {
         try {
             return jdbc.queryForList(
-                "SELECT id, source_id, target_id, edge_type, pipeline_id FROM ecos_data_lineage_edge ORDER BY source_id");
+                "SELECT id, source_node_id as source_id, target_node_id as target_id, edge_type, pipeline_task_id as pipeline_id FROM ecos_data.ecos_data_lineage_edge ORDER BY source_node_id");
         } catch (Exception e) {
             return List.of();
         }
@@ -77,7 +114,7 @@ public class DataLineageService {
         if (includeDb || includeTables) {
             try {
                 List<Map<String, Object>> dbNodes = jdbc.queryForList(
-                    "SELECT DISTINCT datasource_id as id, 'datasource' as type, datasource_id as datasource FROM ecos_data_lineage_node LIMIT 10");
+                    "SELECT DISTINCT datasource_id as id, 'datasource' as type, datasource_id as datasource FROM ecos_data.ecos_data_lineage_node WHERE datasource_id IS NOT NULL LIMIT 10");
                 for (Map<String, Object> n : dbNodes) {
                     if (seenNodeIds.add((String) n.get("id"))) {
                         n.put("label", n.get("id"));

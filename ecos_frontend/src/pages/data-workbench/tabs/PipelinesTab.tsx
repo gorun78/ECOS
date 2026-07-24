@@ -36,20 +36,20 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
               const { createPipeline, updatePipeline } = await import('../api');
               if (pipeline.id) {
                 await updatePipeline(pipeline.id, { name: pipeline.name, description: pipeline.description });
-                showToast('success', `管道 [${pipeline.name}] 已更新`);
+                showToast('success', t("dw.pipelineUpdated").replace('{name}', pipeline.name));
               } else {
                 await createPipeline(pipeline.name, pipeline.description);
-                showToast('success', `管道 [${pipeline.name}] 已创建`);
+                showToast('success', t("dw.pipelineCreated").replace('{name}', pipeline.name));
               }
             } catch (e: any) {
-              showToast('error', `保存失败: ${e.message}`);
+              showToast('error', t("dw.saveFailed").replace('{msg}', e.message));
             }
           }}
           onExecute={async (pipelineId: string) => {
             try {
               const { executePipeline } = await import('../api');
               const result = await executePipeline(pipelineId);
-              showToast('success', result?.status === 'success' ? `管道执行成功` : `管道执行已触发`);
+              showToast('success', result?.status === 'success' ? t("dw.pipelineExecSuccess") : t("dw.pipelineExecTriggered"));
             } catch (e: any) {
               showToast('error', `执行失败: ${e.message}`);
             }
@@ -62,15 +62,15 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
           <div>
             <h3 className={`text-sm font-bold ${styles.cardText}`}>{t("dw.txt.fdcb6f")}</h3>
             <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>
-              共 {pipelines.length} 条定义 · 后端实时数据
+              {t("dw.pipelineCount").replace('{count}', String(pipelines.length))}
             </p>
           </div>
           <button
             onClick={async () => {
               try {
                 const { createPipeline } = await import('../api');
-                const result = await createPipeline('新管道', '');
-                showToast('success', '新管道已创建');
+                const result = await createPipeline(t("dw.newPipeline"), '');
+                showToast('success', t("dw.newPipelineCreated"));
                 if (result?.id) {
                   setEditingPipelineId(result.id);
                   const { fetchDataPipelines } = await import('../api');
@@ -78,13 +78,13 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                   setPipelines(fresh);
                 }
               } catch (e: any) {
-                showToast('error', `创建失败: ${e.message}`);
+                showToast('error', t("dw.createFailed").replace('{msg}', e.message));
               }
             }}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
-            <span>新建管道</span>
+            <span>{t("dw.newPipelineBtn")}</span>
           </button>
         </div>
 
@@ -100,7 +100,7 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                   <th className="p-3">{t("dw.txt.2bbb9a")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-150">
+              <tbody className={`divide-y ${styles.cardBorder}`}>
                 {pipelines.map((p, idx) => (
                   <tr key={p.id || idx} className={`hover:${styles.appBg}/50 transition-colors text-xs`}>
                     <td className={`p-3 font-bold ${styles.cardText}`}>{p.name}</td>
@@ -111,7 +111,7 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                         p.status === 'draft' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                         '${styles.sidebarBg} ${styles.cardTextMuted}'
                       }`}>
-                        {p.status === 'active' ? '运行中' : p.status === 'draft' ? '草稿' : p.status}
+                        {p.status === 'active' ? t("dw.statusActive") : p.status === 'draft' ? t("dw.statusDraft") : p.status}
                       </span>
                     </td>
                     <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{p.lastExecuted || '-'}</td>
@@ -119,41 +119,41 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setEditingPipelineId(p.id)}
-                          className="p-1.5 rounded-md hover:bg-indigo-50 text-indigo-600 font-bold text-[10px] cursor-pointer"
+                          className={`p-1.5 rounded-md hover:${styles.appBg} ${styles.accentText} font-bold text-[10px] cursor-pointer`}
                         >
-                          编辑
+                          {t("dw.editBtn")}
                         </button>
                         <button
                           onClick={async () => {
                             try {
                               const { executePipeline } = await import('../api');
                               await executePipeline(p.id);
-                              showToast('success', `管道 [${p.name}] 已触发执行`);
+                              showToast('success', t("dw.pipelineTriggered").replace('{name}', p.name));
                             } catch (e: any) {
-                              showToast('error', `执行失败: ${e.message}`);
+                              showToast('error', t("dw.execFailedMsg").replace('{msg}', e.message));
                             }
                           }}
-                          className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600 font-bold text-[10px] cursor-pointer"
+                          className={`p-1.5 rounded-md hover:${styles.appBg} font-bold text-[10px] cursor-pointer ${styles.accentText}`}
                         >
-                          执行
+                          {t("dw.runBtn")}
                         </button>
                         <button
                           onClick={async () => {
-                            if (!confirm('确认删除？')) return;
+                            if (!confirm(t("dw.confirmDelete"))) return;
                             try {
                               const { deletePipeline } = await import('../api');
                               await deletePipeline(p.id);
-                              showToast('success', '已删除');
+                              showToast('success', t("dw.deleted"));
                               const { fetchDataPipelines } = await import('../api');
                               const fresh = await fetchDataPipelines();
                               setPipelines(fresh);
                             } catch (e: any) {
-                              showToast('error', `删除失败: ${e.message}`);
+                              showToast('error', t("dw.deleteFailed").replace('{msg}', e.message));
                             }
                           }}
-                          className="p-1.5 rounded-md hover:bg-rose-50 text-rose-500 font-bold text-[10px] cursor-pointer"
+                          className={`p-1.5 rounded-md hover:${styles.appBg} text-rose-500 font-bold text-[10px] cursor-pointer`}
                         >
-                          删除
+                          {t("dw.deleteBtn")}
                         </button>
                       </div>
                     </td>

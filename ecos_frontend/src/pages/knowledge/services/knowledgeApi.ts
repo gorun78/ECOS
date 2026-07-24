@@ -75,7 +75,7 @@ export async function fetchSyncLogs(): Promise<SyncLog[]> {
 
 export async function fetchOntologyMappings() {
   try {
-    return await apiFetchData('/api/ontology/mappings');
+    return await apiFetchData('/api/v1/ontology/mappings');
   } catch {
     return { mappings: [] };
   }
@@ -83,7 +83,7 @@ export async function fetchOntologyMappings() {
 
 export async function saveOntologyMappings(mappings: unknown) {
   try {
-    return await apiFetchData('/api/ontology/mappings', {
+    return await apiFetchData('/api/v1/ontology/mappings', {
       method: 'POST',
       body: JSON.stringify(mappings),
     });
@@ -94,7 +94,7 @@ export async function saveOntologyMappings(mappings: unknown) {
 
 export async function exportOntology() {
   try {
-    return await apiFetchData('/api/ontology/export');
+    return await apiFetchData('/api/v1/ontology/export');
   } catch {
     return '';
   }
@@ -215,7 +215,7 @@ export async function updateCognitiveConfig(updates: Array<{ config_key: string;
 
 export async function fetchLineageImpact(startNode: string) {
   try {
-    return await apiFetchData(`/api/lineage/impact?startNode=${encodeURIComponent(startNode)}`);
+    return await apiFetchData(`/api/v1/lineage/impact?startNode=${encodeURIComponent(startNode)}`);
   } catch {
     return null;
   }
@@ -223,7 +223,7 @@ export async function fetchLineageImpact(startNode: string) {
 
 export async function parseLineage(format: string, payload: string) {
   try {
-    return await apiFetchData('/api/lineage/parse', {
+    return await apiFetchData('/api/v1/lineage/parse', {
       method: 'POST',
       body: JSON.stringify({ format, payload }),
     });

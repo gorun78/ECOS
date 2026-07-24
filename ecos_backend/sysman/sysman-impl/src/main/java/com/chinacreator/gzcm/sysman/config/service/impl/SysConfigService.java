@@ -119,11 +119,12 @@ public class SysConfigService {
         };
         try {
             for (String[] row : defaults) {
+                String label = row[0].contains(".") ? row[0].substring(row[0].lastIndexOf('.') + 1) : row[0];
                 jdbcTemplate.update(
-                    "INSERT INTO sys_config (config_key, config_value, config_group, config_type, description, status) " +
-                    "VALUES (?, ?, ?, ?, ?, 'active') " +
+                    "INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) " +
+                    "VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') " +
                     "ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description",
-                    row[0], row[1], row[2], row[3], row[4]
+                    row[0], row[1], row[2], row[3], label, row[4]
                 );
             }
         } catch (Exception e) {

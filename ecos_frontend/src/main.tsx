@@ -135,6 +135,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="engine-data" element={<EngineMonitor engine="data" />} />
               <Route path="engine-ontology" element={<EngineMonitor engine="ontology" />} />
               <Route path="engine-cognitive" element={<CognitiveEngineView />} />
+              <Route path="engine-knowledge" element={<EngineMonitor engine="knowledge" />} />
+              <Route path="engine-ai" element={<EngineMonitor engine="ai" />} />
               <Route path="engine-tasks" element={<AsyncTaskCenterView showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)} onViewModeChange={(mode) => {}} />} />
               {/* 404 fallback */}
               <Route path="*" element={<WorldModelViewer />} />

@@ -45,7 +45,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
       <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.txt.5da13f")}</h3>
       <button
         onClick={() => setShowAddSync(true)}
-        className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs flex items-center gap-1 cursor-pointer font-medium"
+        className={`p-1 rounded ${styles.accentBg} text-white ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
       >
         <LucideIcon name="Plus" size={12} />
         <span>{t("dw.txt.d85c7b")}</span>
@@ -62,8 +62,8 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
             onClick={() => setSelectedTaskId(task.id)}
             className={`w-full text-left p-3.5 rounded-lg border transition-all text-xs flex flex-col gap-2 ${
               isSelected
-                ? 'bg-blue-50/80 border-blue-200 shadow-2xs'
-                : '${styles.cardBorder} hover:${styles.appBg}'
+                ? `${styles.badgeBg} ${styles.accentBorder} shadow-2xs`
+                : `${styles.cardBorder} hover:${styles.appBg}`
             }`}
           >
             <div className="flex justify-between items-start">
@@ -74,9 +74,9 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
                 task.status === 'running' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' :
                 '${styles.sidebarBg} ${styles.cardTextMuted} border ${styles.cardBorder}'
               }`}>
-                {task.status === 'success' ? '已成功' :
-                 task.status === 'failed' ? '已失败' :
-                 task.status === 'running' ? '同步中' : '暂停'}
+                {task.status === 'success' ? t("dw.statusSuccess") :
+                 task.status === 'failed' ? t("dw.statusFailed") :
+                 task.status === 'running' ? t("dw.statusRunning") : t("dw.statusPaused")}
               </span>
             </div>
             <div className={`text-[10px] ${styles.cardTextMuted} font-mono flex flex-col gap-0.5`}>
@@ -99,7 +99,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
         {/* Detail banner */}
         <div className={`p-6 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/50`}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700 flex items-center justify-center">
+            <div className={`p-2.5 rounded-full border ${styles.accentBorder} ${styles.badgeBg} ${styles.badgeText} flex items-center justify-center`}>
               <LucideIcon name="Import" size={20} />
             </div>
             <div>
@@ -120,7 +120,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
             <button
               onClick={() => triggerSyncTask(task.id)}
               disabled={task.status === 'running'}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs`}
             >
               <LucideIcon name="Play" size={13} />
               <span>{t("dw.txt.a7e407")}</span>
@@ -145,7 +145,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
                 <hr className={`${styles.cardBorder}`} />
                 <div>
                   <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.c6f0b6")}</span>
-                  <span className={`font-mono ${styles.cardText} font-semibold text-blue-600 truncate block`}>
+                  <span className={`font-mono ${styles.cardText} font-semibold ${styles.accentText} truncate block`}>
                     {task.targetDatasetId}
                   </span>
                 </div>
@@ -185,7 +185,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
                   <>
                     <div>
                       <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.ba49ba")}</span>
-                      <span className="font-mono text-emerald-600 font-bold">{task.recordsSynced?.toLocaleString()} {t("dw.txt.b2db8f")}</span>
+                       <span className={`font-mono font-bold ${styles.accentText}`}>{task.recordsSynced?.toLocaleString()} {t("dw.txt.b2db8f")}</span>
                     </div>
                     <div>
                       <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.6974b2")}</span>
@@ -199,12 +199,12 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
 
           {/* Error Log Container if failed */}
           {task.status === 'failed' && task.errorMessage && (
-            <div className="border border-red-200 bg-red-50 text-red-700 rounded-xl p-4 space-y-3 select-text leading-relaxed font-mono text-xs">
-              <h4 className="font-bold font-sans flex items-center gap-1.5 text-red-800">
+            <div className={`border ${styles.cardBorder} ${styles.appBg} ${styles.cardText} rounded-xl p-4 space-y-3 select-text leading-relaxed font-mono text-xs`}>
+              <h4 className={`font-bold font-sans flex items-center gap-1.5 ${styles.cardText}`}>
                 <LucideIcon name="AlertOctagon" size={14} />
                 {t("dw.txt.8bc36c")}
               </h4>
-              <p className={`${styles.cardBg} border border-red-200/50 p-3 rounded-lg ${styles.cardText} leading-relaxed whitespace-pre-line text-[11px]`}>
+              <p className={`${styles.cardBg} border ${styles.cardBorder} p-3 rounded-lg ${styles.cardText} leading-relaxed whitespace-pre-line text-[11px]`}>
                 {task.errorMessage}
               </p>
             </div>

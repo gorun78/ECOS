@@ -29,7 +29,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
   const { styles } = useTheme();
   const handleAddCheck = () => {
     if (!newCheckName.trim()) {
-      showToast('error', '请输入规则名称');
+      showToast('error', t("dw.enterRuleName"));
       return;
     }
     const newId = `check-${Date.now()}`;
@@ -50,7 +50,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
     setNewCheckDs('');
     setCheckType('null_check');
     setShowAddCheck(false);
-    showToast('success', `规则 [${newCheckName}] 已添加`);
+    showToast('success', t("dw.ruleAdded").replace('{name}', newCheckName));
   };
 
   return (
@@ -60,12 +60,12 @@ const HealthTab: React.FC<HealthTabProps> = ({
         <div>
           <h3 className={`text-sm font-bold ${styles.cardText}`}>{t("dw.txt.693c4f")}</h3>
           <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>
-            共 {healthChecks.length} 条质量检查规则
+            {t("dw.healthCheckCount").replace('{count}', String(healthChecks.length))}
           </p>
         </div>
         <button
           onClick={() => setShowAddCheck(!showAddCheck)}
-          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+          className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
           <span>{t("dw.txt.57eece")}</span>
@@ -75,9 +75,9 @@ const HealthTab: React.FC<HealthTabProps> = ({
       {/* Add form */}
       {showAddCheck && (
         <div className={`mb-6 p-4 border ${styles.cardBorder} rounded-xl ${styles.appBg} space-y-3`}>
-          <input value={newCheckName} onChange={e => setNewCheckName(e.target.value)} placeholder="规则名称" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" />
-          <input value={newCheckDs} onChange={e => setNewCheckDs(e.target.value)} placeholder="数据集/表名" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" />
-          <select value={checkType} onChange={e => setCheckType(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+          <input value={newCheckName} onChange={e => setNewCheckName(e.target.value)} placeholder={t("dw.ruleNamePlaceholder")} className={`w-full px-3 py-2 border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg text-xs`} />
+          <input value={newCheckDs} onChange={e => setNewCheckDs(e.target.value)} placeholder={t("dw.datasetTablePlaceholder")} className={`w-full px-3 py-2 border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg text-xs`} />
+          <select value={checkType} onChange={e => setCheckType(e.target.value)} className={`w-full px-3 py-2 border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg text-xs`}>
             <option value="null_check">{t("dw.txt.b0fd45")}</option>
             <option value="range_check">{t("dw.txt.d086dc")}</option>
             <option value="uniqueness">{t("dw.txt.cc9056")}</option>
@@ -87,8 +87,8 @@ const HealthTab: React.FC<HealthTabProps> = ({
             <option value="custom_sql">{t("dw.txt.7b06b8")}</option>
           </select>
           <div className="flex gap-2">
-            <button onClick={handleAddCheck} className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold cursor-pointer">添加</button>
-            <button onClick={() => setShowAddCheck(false)} className={`px-4 py-1.5 bg-slate-200 ${styles.cardTextMuted} rounded-lg text-xs cursor-pointer`}>取消</button>
+            <button onClick={handleAddCheck} className={`px-4 py-1.5 ${styles.accentBg} text-white rounded-lg text-xs font-bold cursor-pointer`}>{t("dw.addBtn")}</button>
+            <button onClick={() => setShowAddCheck(false)} className={`px-4 py-1.5 ${styles.appBg} ${styles.cardTextMuted} rounded-lg text-xs cursor-pointer`}>{t("dw.cancelBtn")}</button>
           </div>
         </div>
       )}
@@ -99,7 +99,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
           <div key={check.id} className={`border ${styles.cardBorder} rounded-xl p-4 ${styles.cardBg} hover:shadow-sm transition-shadow`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <LucideIcon name={check.checkType === 'null_check' ? 'shield-off' : check.checkType === 'uniqueness' ? 'fingerprint' : check.checkType === 'freshness' ? 'clock' : 'activity'} className="w-4 h-4 text-emerald-600" />
+                <LucideIcon name={check.checkType === 'null_check' ? 'shield-off' : check.checkType === 'uniqueness' ? 'fingerprint' : check.checkType === 'freshness' ? 'clock' : 'activity'} className={`w-4 h-4 ${styles.accentText}`} />
                 <div>
                   <span className={`text-sm font-bold ${styles.cardText}`}>{check.name}</span>
                   <span className={`ml-2 text-[10px] ${styles.cardTextMuted}`}>{t("dw.txt.185a12")}: {check.targetTable}</span>
@@ -115,7 +115,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
                 </span>
                 <button
                   onClick={() => setHealthChecks(prev => prev.filter(c => c.id !== check.id))}
-                  className="p-1 rounded hover:bg-rose-50 text-rose-400 cursor-pointer"
+                  className={`p-1 rounded hover:${styles.appBg} text-rose-400 cursor-pointer`}
                 >
                   <LucideIcon name="trash-2" className="w-3.5 h-3.5" />
                 </button>

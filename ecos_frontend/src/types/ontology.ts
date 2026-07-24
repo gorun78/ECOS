@@ -39,7 +39,7 @@ export interface PropertyType {
 // 对象类型 (ObjectType)
 // ================================================================
 
-export type ObjectTypeStatus = "DRAFT" | "ACTIVE" | "DEPRECATED";
+export type ObjectTypeStatus = "DRAFT" | "ACTIVE" | "PUBLISHED" | "DEPRECATED";
 
 /**
  * 对象类型 ↔ 数据集的属性映射
@@ -290,4 +290,224 @@ export interface Dataset {
   path: string;
   columns: DatasetColumn[];
   sampleData: Record<string, any>[];
+}
+
+// ================================================================
+// 本体映射 (Ontology Mapping) — T2.1
+// ================================================================
+
+export interface OntologyMappingRecord {
+  id: string;
+  objectId: string;
+  objectTypeId: string;
+  datasetId: string;
+  objectType: string;
+  sourceType: string;
+  sourceName: string;
+  sourceUri: string;
+  propertyMappings: Record<string, string>;
+  fieldMappings: Array<{ source: string; target: string }>;
+  description: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMappingDTO {
+  objectTypeId: string;
+  datasetId?: string;
+  propertyMappings?: Record<string, string>;
+  sourceType?: string;
+  sourceName?: string;
+  sourceUri?: string;
+  description?: string;
+}
+
+export interface UpdateMappingDTO {
+  objectType?: string;
+  sourceType?: string;
+  sourceName?: string;
+  sourceUri?: string;
+  fieldMappings?: Array<{ source: string; target: string }>;
+  propertyMappings?: Record<string, string>;
+  description?: string;
+  status?: string;
+}
+
+// ================================================================
+// 本体导出 (Ontology Export) — T2.2
+// ================================================================
+
+export interface OntologyExportPayload {
+  objectTypes: ObjectType[];
+  linkTypes: LinkType[];
+  actionTypes: ActionType[];
+  functionTypes: FunctionType[];
+  mappings: OntologyMappingRecord[];
+}
+
+export interface ExportTaskSummary {
+  id: string;
+  ontologyId: string;
+  format: "JSON" | "CSV" | "DDL";
+  scope: "FULL" | "ENTITIES" | "RELATIONSHIPS";
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  objectCount: number;
+  createdAt: string;
+}
+
+export interface ExportTask extends ExportTaskSummary {
+  payload: OntologyExportPayload;
+  error?: string;
+}
+
+export interface CreateExportDTO {
+  ontologyId: string;
+  format?: "JSON" | "CSV" | "DDL";
+  scope?: "FULL" | "ENTITIES" | "RELATIONSHIPS";
+}
+
+// ================================================================
+// 本体数据 (Ontology Data) — T2.3
+// ================================================================
+
+export interface PaginatedDataResponse {
+  data: DataRecord[];
+  total: number;
+  page: number;
+  size: number;
+  totalPages: number;
+}
+
+export interface DataRecord {
+  id: string;
+  objectTypeId: string;
+  objectTypeName: string;
+  properties: Record<string, any>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDataDTO {
+  objectTypeId: string;
+  objectTypeName?: string;
+  properties?: Record<string, any>;
+  createdBy?: string;
+}
+
+export interface UpdateDataDTO {
+  objectTypeName?: string;
+  properties?: Record<string, any>;
+  createdBy?: string;
+}
+
+// ================================================================
+// 本体提案 (Ontology Proposal) — T2.4
+// ================================================================
+
+export type ProposalStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+
+export interface Proposal {
+  id: string;
+  title: string;
+  targetType: string;
+  targetId: string;
+  changeType: "CREATE" | "UPDATE" | "DELETE";
+  description: string;
+  proposedBy: string;
+  payload: Record<string, any>;
+  status: ProposalStatus;
+  reviewer?: string;
+  reviewComment?: string;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+}
+
+export interface CreateProposalDTO {
+  title: string;
+  targetType: string;
+  targetId?: string;
+  changeType?: "CREATE" | "UPDATE" | "DELETE";
+  payload?: Record<string, any>;
+  description?: string;
+  proposedBy?: string;
+}
+
+export interface UpdateProposalDTO {
+  title?: string;
+  targetType?: string;
+  targetId?: string;
+  changeType?: string;
+  description?: string;
+  proposedBy?: string;
+  payload?: Record<string, any>;
+}
+
+export interface VerifyProposalResult {
+  valid: boolean;
+  issues: string[];
+  proposal: Proposal;
+}
+
+export interface ReviewProposalDTO {
+  reviewer?: string;
+  reviewComment?: string;
+}
+
+// ================================================================
+// 数据血缘 (Lineage) — T2.5
+// ================================================================
+
+export interface LineageEdge {
+  id: string;
+  source: string;
+  target: string;
+  lineageType: "DERIVED" | "COPIED" | "TRANSFORMED";
+  transform: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLineageDTO {
+  source: string;
+  target: string;
+  lineageType?: string;
+  transform?: string;
+  description?: string;
+}
+
+export interface UpdateLineageDTO {
+  source?: string;
+  target?: string;
+  lineageType?: string;
+  transform?: string;
+  description?: string;
+}
+
+export interface LineageGraph {
+  nodes: Array<{ id: string }>;
+  edges: Array<{ id: string; source: string; target: string; lineageType: string }>;
+}
+
+export interface LineageTraceResult {
+  nodeId: string;
+  upstream: string[];
+  downstream: string[];
+}
+
+export interface LineageImpactResult {
+  rootObject: string;
+  impactedObjects: Array<{ id: string; type: string; path: string[] }>;
+  depth: number;
+}
+
+export interface ParseLineageResult {
+  format: string;
+  parsed: boolean;
+  nodesCount: number;
+  edgesCount: number;
 }

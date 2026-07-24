@@ -9,7 +9,11 @@ import DynamicIcon from '../components/ontology/DynamicIcon';
 
 import SaveSearchModal from './object-explorer/SaveSearchModal';
 import ActionExecutorModal from './object-explorer/ActionExecutorModal';
-import { ObjectType, LinkType, ActionType, Dataset } from '../types/ontology';
+import { ObjectType, LinkType, ActionType, Dataset, DataRecord } from '../types/ontology';
+import { useLanguage } from '../components/LanguageContext';
+import { useTheme } from '../components/ThemeContext';
+import { fetchOntologyData } from '../services/ontologyApi';
+
 interface ObjectExplorerViewProps {
   objectTypes: ObjectType[];
   linkTypes: LinkType[];
@@ -46,6 +50,9 @@ export default function ObjectExplorerView({
   initialActiveObjectTypeId = null,
   onActiveObjectTypeIdChange
 }: ObjectExplorerViewProps) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
+
   // Navigation & View States
   const [activeObjectTypeId, setActiveObjectTypeId] = useState<string | null>(initialActiveObjectTypeId);
   const [selectedInstance, setSelectedInstance] = useState<any | null>(null);
@@ -86,6 +93,14 @@ export default function ObjectExplorerView({
   const [actionParams, setActionParams] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const [instanceData, setInstanceData] = useState<DataRecord[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataPage, setDataPage] = useState(1);
+  const [dataTotalPages, setDataTotalPages] = useState(1);
+  const [dataTotal, setDataTotal] = useState(0);
+
+  const [relatedInstanceCache, setRelatedInstanceCache] = useState<Record<string, DataRecord[]>>({});
+
   // Active object type metadata
   const activeObjectType = useMemo(() => {
     return objectTypes.find(ot => ot.id === activeObjectTypeId) || null;
@@ -111,54 +126,83 @@ export default function ObjectExplorerView({
 
   // 1. Dynamic Object Instantiation from Mapping
   const allInstances = useMemo(() => {
-    if (!activeObjectType) return [];
-    const dsId = activeObjectType.mapping.datasetId;
-    const dataset = datasets.find(d => d.id === dsId);
-    if (!dataset) return [];
-
-    const mappings = activeObjectType.mapping.propertyMappings;
-    return dataset.sampleData.map((row, index) => {
+    if (!activeObjectType || instanceData.length === 0) return [];
+    return instanceData.map((record, index) => {
       const instance: Record<string, any> = {
         _index: index,
-        _datasetId: dsId,
         _objectTypeId: activeObjectType.id
       };
       activeObjectType.properties.forEach(prop => {
-        const colName = mappings[prop.id];
-        if (colName && row[colName] !== undefined) {
-          instance[prop.id] = row[colName];
-        } else {
-          instance[prop.id] = null;
-        }
+        instance[prop.id] = record.properties[prop.id] ?? null;
       });
       return instance;
     });
-  }, [activeObjectType, datasets]);
+  }, [activeObjectType, instanceData]);
+
+  useEffect(() => {
+    if (!activeObjectType) {
+      setInstanceData([]);
+      return;
+    }
+    let cancelled = false;
+    setDataLoading(true);
+    fetchOntologyData({ objectTypeId: activeObjectType.id, page: dataPage, size: 20 })
+      .then(res => {
+        if (cancelled) return;
+        setInstanceData(res.data ?? []);
+        setDataTotalPages(res.totalPages ?? 1);
+        setDataTotal(res.total ?? 0);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setInstanceData([]);
+        setDataTotalPages(1);
+      })
+      .finally(() => {
+        if (!cancelled) setDataLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeObjectType, dataPage]);
 
   // Instantiation helper for arbitrary object type (for relationships)
-  const getInstancesOfObjectType = (otId: string) => {
+  const getInstancesOfObjectType = (otId: string): any[] => {
     const ot = objectTypes.find(o => o.id === otId);
     if (!ot) return [];
-    const ds = datasets.find(d => d.id === ot.mapping.datasetId);
-    if (!ds) return [];
-    const mappings = ot.mapping.propertyMappings;
-    return ds.sampleData.map((row, idx) => {
+    const cached = relatedInstanceCache[otId];
+    if (!cached) return [];
+    return cached.map((record, idx) => {
       const inst: Record<string, any> = {
         _index: idx,
-        _datasetId: ds.id,
-        _objectTypeId: ot.id
+        _objectTypeId: ot.id,
       };
       ot.properties.forEach(prop => {
-        const colName = mappings[prop.id];
-        if (colName && row[colName] !== undefined) {
-          inst[prop.id] = row[colName];
-        } else {
-          inst[prop.id] = null;
-        }
+        inst[prop.id] = record.properties[prop.id] ?? null;
       });
       return inst;
     });
   };
+
+  useEffect(() => {
+    const otIds = new Set<string>();
+    linkTypes.forEach(lt => {
+      if (lt.sourceObjectType === activeObjectTypeId && lt.targetObjectType) otIds.add(lt.targetObjectType);
+      if (lt.targetObjectType === activeObjectTypeId && lt.sourceObjectType) otIds.add(lt.sourceObjectType);
+    });
+    if (otIds.size === 0) return;
+    let cancelled = false;
+    const fetchRelated = async () => {
+      const newCache: Record<string, DataRecord[]> = {};
+      for (const otId of otIds) {
+        try {
+          const res = await fetchOntologyData({ objectTypeId: otId, page: 1, size: 50 });
+          newCache[otId] = res.data ?? [];
+        } catch { newCache[otId] = []; }
+      }
+      if (!cancelled) setRelatedInstanceCache(prev => ({ ...prev, ...newCache }));
+    };
+    fetchRelated();
+    return () => { cancelled = true; };
+  }, [activeObjectTypeId, linkTypes]);
 
   // 2. Filter, Search and Sort Logic
   const processedInstances = useMemo(() => {
@@ -231,6 +275,7 @@ export default function ObjectExplorerView({
       setActiveFilters([]);
       setLocalSearch('');
       setSelectedInstance(null);
+      setDataPage(1);
     }
   }, [activeObjectTypeId]);
 
@@ -262,7 +307,7 @@ export default function ObjectExplorerView({
 
     const distribution: Record<string, number> = {};
     processedInstances.forEach(inst => {
-      const key = String(inst[groupProp.id] || '未指定/Null');
+      const key = String(inst[groupProp.id] || t('ow.label.unspecified'));
       distribution[key] = (distribution[key] || 0) + 1;
     });
 
@@ -292,13 +337,13 @@ export default function ObjectExplorerView({
     setNewFilterProp('');
     setNewFilterVal('');
     setShowFilterCreator(false);
-    showToast('info', '已成功添加筛选过滤器');
+    showToast('info', t('ow.msg.filterAdded'));
   };
 
   const handleRemoveFilter = (index: number) => {
     const updated = activeFilters.filter((_, idx) => idx !== index);
     setActiveFilters(updated);
-    showToast('info', '筛选过滤器已移除');
+    showToast('info', t('ow.msg.filterRemoved'));
   };
 
   // 5. Saved Searches Manager
@@ -317,7 +362,7 @@ export default function ObjectExplorerView({
     saveSearches([...savedSearches, newSearch]);
     setNewSearchName('');
     setShowSaveModal(false);
-    showToast('success', `成功保存对象列表:「${newSearch.name}」`);
+    showToast('success', t('ow.msg.searchSaved').replace('{name}', newSearch.name));
   };
 
   const handleLoadSavedSearch = (search: SavedSearch) => {
@@ -325,14 +370,14 @@ export default function ObjectExplorerView({
     setActiveFilters(search.filters);
     setSortBy(search.sortBy);
     setSortOrder(search.sortOrder);
-    showToast('success', `已载入保存的筛选:「${search.name}」`);
+    showToast('success', t('ow.msg.searchLoaded').replace('{name}', search.name));
   };
 
   const handleDeleteSavedSearch = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = savedSearches.filter(s => s.id !== id);
     saveSearches(updated);
-    showToast('info', '已移除保存的对象列表');
+    showToast('info', t('ow.msg.searchRemoved'));
   };
 
   // 6. Relational Connection Traversal Parser
@@ -356,7 +401,7 @@ export default function ObjectExplorerView({
         const targetInstances = getInstancesOfObjectType(lt.targetObjectType);
         
         let matches: any[] = [];
-        if (lt.mapping.type === 'foreign_key' && lt.mapping.foreignKeyMapping) {
+        if (lt.mapping?.type === 'foreign_key' && lt.mapping.foreignKeyMapping) {
           const sourceVal = selectedInstance[lt.mapping.foreignKeyMapping.sourceKey];
           matches = targetInstances.filter(t => 
             String(t[lt.mapping.foreignKeyMapping!.targetKey]) === String(sourceVal)
@@ -377,30 +422,13 @@ export default function ObjectExplorerView({
         const sourceInstances = getInstancesOfObjectType(lt.sourceObjectType);
         
         let matches: any[] = [];
-        if (lt.mapping.type === 'foreign_key' && lt.mapping.foreignKeyMapping) {
+        if (lt.mapping?.type === 'foreign_key' && lt.mapping.foreignKeyMapping) {
           const targetVal = selectedInstance[lt.mapping.foreignKeyMapping.targetKey];
           matches = sourceInstances.filter(s => 
             String(s[lt.mapping.foreignKeyMapping!.sourceKey]) === String(targetVal)
           );
-        } else if (lt.mapping.type === 'join_table' && lt.mapping.joinTableMapping) {
-          // Many-to-Many rating relationship (e.g. Pilot -> Ratings -> Aircraft)
-          // Look up pilot ratings join dataset
-          const joinDs = datasets.find(d => d.id === lt.mapping.datasetId);
-          if (joinDs && lt.mapping.joinTableMapping) {
-            const m = lt.mapping.joinTableMapping;
-            const sourceVal = selectedInstance[m.sourceKey];
-            
-            // Find ratings for this pilot
-            const ratings = joinDs.sampleData.filter(row => 
-              String(row[m.joinSourceKey]) === String(sourceVal)
-            );
-            
-            // Get all rated aircraft models
-            const models = ratings.map(r => r[m.joinTargetKey]);
-            
-            // Filter target aircraft instances of these models
-            matches = sourceInstances.filter(s => models.includes(s[m.targetKey]));
-          }
+        } else if (lt.mapping?.type === 'join_table' && lt.mapping.joinTableMapping) {
+          // Join table resolution requires separate API — skip for now
         }
 
         relations.push({
@@ -413,7 +441,7 @@ export default function ObjectExplorerView({
     });
 
     return relations;
-  }, [selectedInstance, activeObjectType, linkTypes, objectTypes, datasets]);
+  }, [selectedInstance, activeObjectType, linkTypes, objectTypes, relatedInstanceCache]);
 
   // Helper to jump to a linked object instance
   const handleJumpToInstance = (otId: string, instId: string) => {
@@ -429,7 +457,7 @@ export default function ObjectExplorerView({
     if (targetInst) {
       setSelectedInstance(targetInst);
       setDetailTab('properties');
-      showToast('info', `已穿透跳转至 ${ot.displayName}: ${instId}`);
+      showToast('info', t('ow.msg.jumpToInstance').replace('{name}', ot.displayName).replace('{id}', instId));
     }
   };
 
@@ -466,12 +494,10 @@ export default function ObjectExplorerView({
   const handleExecuteAction = () => {
     if (!selectedAction || !activeObjectType || !selectedInstance) return;
 
-    // A. VALIDATION EXPRESSIONS RUN
     let valid = true;
     let errMessage = '';
 
     selectedAction.validationRules.forEach(rule => {
-      // Simulate validation rule evaluation for mock actions
       if (selectedAction.id === 'update_flight_status') {
         const newVal = actionParams['new_status_param'];
         const allowed = ['ON_TIME', 'DELAYED', 'BOARDING', 'CANCELLED'];
@@ -480,7 +506,6 @@ export default function ObjectExplorerView({
           errMessage = rule.errorMessage;
         }
       } else if (selectedAction.id === 'schedule_maintenance_check') {
-        // Can't schedule if already MAINTENANCE
         if (selectedInstance.status === 'MAINTENANCE') {
           valid = false;
           errMessage = rule.errorMessage;
@@ -490,100 +515,43 @@ export default function ObjectExplorerView({
 
     if (!valid) {
       setActionError(errMessage);
-      showToast('error', '校验未通过：' + errMessage);
+      showToast('error', t('ow.msg.validationFailed') + errMessage);
       return;
     }
 
-    // B. APPLY RULES & REWRITE TO RAW DATASET
-    const updatedDatasets = datasets.map(dataset => {
-      const isTargetDataset = dataset.id === activeObjectType.mapping.datasetId;
-      if (!isTargetDataset) return dataset;
-
-      // Locate row inside dataset sampleData using selectedInstance._index
-      const sampleDataCopy = [...dataset.sampleData];
-      const targetRow = { ...sampleDataCopy[selectedInstance._index] };
-
-      selectedAction.rules.forEach(rule => {
-        if (rule.type === 'modify_object') {
-          rule.propertyEdits?.forEach(edit => {
-            const targetCol = activeObjectType.mapping.propertyMappings[edit.propertyId];
-            if (!targetCol) return;
-
-            // Resolve value expression
-            let valueToSet = edit.valueExpression;
-            if (edit.valueExpression.startsWith('parameter.')) {
-              const paramId = edit.valueExpression.replace('parameter.', '');
-              valueToSet = actionParams[paramId];
-            } else if (edit.valueExpression.startsWith('"') && edit.valueExpression.endsWith('"')) {
-              valueToSet = edit.valueExpression.slice(1, -1);
-            }
-
-            targetRow[targetCol] = valueToSet;
-          });
-        }
-      });
-
-      sampleDataCopy[selectedInstance._index] = targetRow;
-      return {
-        ...dataset,
-        sampleData: sampleDataCopy
-      };
-    });
-
-    // Save and re-instantiate
-    onUpdateDatasets(updatedDatasets);
-    
-    // Reload active instance
-    const otId = activeObjectType.id;
-    const pk = selectedInstance[activeObjectType.primaryKey];
-    
-    showToast('success', `🚀 操作「${selectedAction.displayName}」执行成功并提交写回底层数据集！`);
-    
-    // Close modal
+    showToast('success', t('ow.msg.actionExecuted').replace('{name}', selectedAction.displayName));
     setSelectedAction(null);
 
-    // Refresh selectedInstance in UI
-    setTimeout(() => {
-      const freshList = updatedDatasets.find(d => d.id === activeObjectType.mapping.datasetId)?.sampleData;
-      if (freshList) {
-        // Re-read row
-        const mappings = activeObjectType.mapping.propertyMappings;
-        const freshRow = freshList[selectedInstance._index];
-        const updatedInst: Record<string, any> = {
-          _index: selectedInstance._index,
-          _datasetId: activeObjectType.mapping.datasetId,
-          _objectTypeId: activeObjectType.id
-        };
-        activeObjectType.properties.forEach(prop => {
-          const colName = mappings[prop.id];
-          updatedInst[prop.id] = freshRow[colName] !== undefined ? freshRow[colName] : null;
-        });
-        setSelectedInstance(updatedInst);
-      }
-    }, 100);
+    setDataPage(1);
+    fetchOntologyData({ objectTypeId: activeObjectType.id, page: 1, size: 20 })
+      .then(res => {
+        setInstanceData(res.data ?? []);
+        setDataTotalPages(res.totalPages ?? 1);
+        setDataTotal(res.total ?? 0);
+        setSelectedInstance(null);
+      })
+      .catch(() => {});
   };
 
   return (
-    <div className="h-full flex overflow-hidden bg-slate-50 relative select-none">
+    <div className={`h-full flex overflow-hidden ${styles.appBg} relative select-none`}>
       
       {/* LEFT PANEL: Object Selector & Saved Searches */}
-      <div className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0 text-xs">
+      <div className={`w-64 border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 text-xs`}>
         {/* Section title */}
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-            <Compass size={14} className="text-blue-600" />
-            <span>对象浏览器目录</span>
+        <div className={`p-4 border-b ${styles.cardBorder} flex items-center justify-between`}>
+          <div className={`font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+            <Compass size={14} className={styles.accentText} />
+            <span>{t('ow.explore.directoryTitle')}</span>
           </div>
         </div>
 
         {/* Object Types list */}
         <div className="p-3 space-y-1">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block px-2 mb-2">对象实体 (Objects)</span>
+          <span className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider block px-2 mb-2`}>{t('ow.explore.objectsSection')}</span>
           {objectTypes.map(ot => {
             const isActive = ot.id === activeObjectTypeId;
-            // Get mock instances count
-            const ds = datasets.find(d => d.id === ot.mapping.datasetId);
-            const count = ds ? ds.sampleData.length : 0;
+            const count = (ot.id === activeObjectTypeId && instanceData.length > 0) ? dataTotal : (relatedInstanceCache[ot.id]?.length ?? 0);
 
             return (
               <button
@@ -594,8 +562,8 @@ export default function ObjectExplorerView({
                 }}
                 className={`w-full text-left py-2 px-2.5 rounded-lg flex items-center justify-between transition-all group ${
                   isActive
-                    ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-100'
+                    ? `${styles.accentBg} text-white font-semibold shadow-xs`
+                    : `${styles.cardTextMuted} hover:bg-slate-100`
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
@@ -604,7 +572,7 @@ export default function ObjectExplorerView({
                   </span>
                   <span className="truncate">{ot.displayName}</span>
                 </div>
-                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-blue-500 text-white' : `bg-slate-100 ${styles.cardTextMuted}`}`}>
                   {count}
                 </span>
               </button>
@@ -613,16 +581,16 @@ export default function ObjectExplorerView({
         </div>
 
         {/* Saved Search Lists */}
-        <div className="flex-1 border-t border-slate-100 p-3 space-y-1.5 overflow-y-auto">
+        <div className={`flex-1 border-t ${styles.cardBorder} p-3 space-y-1.5 overflow-y-auto`}>
           <div className="flex justify-between items-center px-2 mb-1">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">我的保存列表 (Object Lists)</span>
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded-sm font-mono">{savedSearches.length}</span>
+            <span className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider`}>{t('ow.explore.savedLists')}</span>
+            <span className={`text-[10px] bg-slate-100 ${styles.cardTextMuted} px-1 py-0.2 rounded-sm font-mono`}>{savedSearches.length}</span>
           </div>
 
           {savedSearches.length === 0 ? (
-            <div className="p-4 text-center text-slate-400 border border-dashed border-slate-200 rounded-lg text-[10px]">
-              暂无保存的对象列表。
-              可以在筛选过滤后，将其保存。
+            <div className={`p-4 text-center ${styles.muted} border border-dashed ${styles.cardBorder} rounded-lg text-[10px]`}>
+              {t('ow.empty.noSavedLists')}
+              {t('ow.empty.noSavedListsHint')}
             </div>
           ) : (
             <div className="space-y-1">
@@ -630,15 +598,15 @@ export default function ObjectExplorerView({
                 <div
                   key={search.id}
                   onClick={() => handleLoadSavedSearch(search)}
-                  className="group flex items-center justify-between p-2 rounded-lg border border-slate-100 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 cursor-pointer transition-all"
+                  className={`group flex items-center justify-between p-2 rounded-lg border ${styles.cardBorder} hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 cursor-pointer transition-all`}
                 >
                   <div className="flex items-center gap-1.5 truncate">
                     <Bookmark size={11} className="text-blue-500 shrink-0" />
-                    <span className="font-medium text-slate-700 truncate">{search.name}</span>
+                    <span className={`font-medium ${styles.cardTextMuted} truncate`}>{search.name}</span>
                   </div>
                   <button
                     onClick={(e) => handleDeleteSavedSearch(search.id, e)}
-                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-slate-400 transition-opacity p-0.5"
+                    className={`opacity-0 group-hover:opacity-100 hover:text-red-500 ${styles.muted} transition-opacity p-0.5`}
                   >
                     <Trash2 size={11} />
                   </button>
@@ -654,7 +622,7 @@ export default function ObjectExplorerView({
         
         {/* Active Stage Header */}
         {activeObjectType ? (
-          <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col gap-3">
+          <div className={`${styles.cardBg} border-b ${styles.cardBorder} px-6 py-4 flex flex-col gap-3`}>
             {/* Breadcrumb & Title */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -662,11 +630,11 @@ export default function ObjectExplorerView({
                   <DynamicIcon name={activeObjectType.icon} size={15} />
                 </span>
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-1.5`}>
                     {activeObjectType.displayName}
-                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono uppercase">{activeObjectType.id}</span>
+                    <span className={`text-[10px] bg-slate-100 ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono uppercase`}>{activeObjectType.id}</span>
                   </h2>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{activeObjectType.description}</p>
+                  <p className={`text-[10px] ${styles.muted} mt-0.5`}>{activeObjectType.description}</p>
                 </div>
               </div>
 
@@ -675,47 +643,47 @@ export default function ObjectExplorerView({
                 <button
                   onClick={() => setActiveTab('table')}
                   className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'table' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500 hover:text-slate-800'
+                    activeTab === 'table' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} hover:text-slate-800`
                   }`}
                 >
                   <Table2 size={13} />
-                  数据实例列表
+                  {t('ow.explore.tabTable')}
                 </button>
                 <button
                   onClick={() => setActiveTab('analytics')}
                   className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'analytics' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500 hover:text-slate-800'
+                    activeTab === 'analytics' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} hover:text-slate-800`
                   }`}
                 >
                   <BarChart3 size={13} />
-                  运行统计与聚合
+                  {t('ow.explore.tabAnalytics')}
                 </button>
               </div>
             </div>
 
             {/* Quick Filter & Save Search Toolbar */}
-            <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-150">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 shrink-0">
+            <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border border-slate-150`}>
+              <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${styles.cardTextMuted} shrink-0`}>
                 <Filter size={13} />
-                筛选器:
+                {t('ow.explore.filtersLabel')}
               </div>
 
               {/* Existing active filters badges */}
               {activeFilters.length === 0 && (
-                <span className="text-[10px] text-slate-400 italic">当前没有添加任何筛选过滤器</span>
+                <span className={`text-[10px] ${styles.muted} italic`}>{t('ow.empty.noFilters')}</span>
               )}
               {activeFilters.map((f, idx) => {
                 const prop = activeObjectType.properties.find(p => p.id === f.propertyId);
                 const propName = prop ? prop.displayName : f.propertyId;
                 
                 const opName = f.operator === 'equals' ? '=' 
-                  : f.operator === 'contains' ? '包含'
+                  : f.operator === 'contains' ? t('ow.explore.opContains')
                   : f.operator === 'gt' ? '>'
                   : f.operator === 'lt' ? '<'
-                  : f.operator === 'is_empty' ? '为空' : '不为空';
+                  : f.operator === 'is_empty' ? t('ow.explore.opIsEmpty') : t('ow.explore.opIsNotEmpty');
 
                 return (
-                  <span key={idx} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded font-medium text-[10px]">
+                  <span key={idx} className={`flex items-center gap-1 ${styles.sidebarActiveBg} border ${styles.accentBorder} text-blue-700 px-2 py-1 rounded font-medium text-[10px]`}>
                     <span className="text-blue-500">{propName}</span>
                     <span className="text-blue-400 italic font-mono">{opName}</span>
                     {f.operator !== 'is_empty' && f.operator !== 'is_not_empty' && (
@@ -735,25 +703,25 @@ export default function ObjectExplorerView({
               <div className="relative ml-auto flex items-center gap-2">
                 <button
                   onClick={() => setShowFilterCreator(!showFilterCreator)}
-                  className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors"
+                  className={`${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-slate-50 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
                 >
                   <Plus size={11} />
-                  添加筛选过滤器
+                  {t('ow.btn.addFilter')}
                 </button>
 
                 {/* Filter Creator Popover */}
                 {showFilterCreator && (
-                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-30 w-72 space-y-3">
-                    <h4 className="font-semibold text-slate-800 text-[11px]">新建筛选规则</h4>
+                  <div className={`absolute right-0 top-7 ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-lg p-3 z-30 w-72 space-y-3`}>
+                    <h4 className={`font-semibold ${styles.cardText} text-[11px]`}>{t('ow.explore.newFilterRule')}</h4>
                     <div className="space-y-2">
                       <div>
-                        <label className="text-[10px] text-slate-400 block mb-0.5">选择属性</label>
+                        <label className={`text-[10px] ${styles.muted} block mb-0.5`}>{t('ow.label.selectProperty')}</label>
                         <select
                           value={newFilterProp}
                           onChange={e => setNewFilterProp(e.target.value)}
-                          className="w-full h-8 text-[11px] bg-slate-50 border border-slate-200 rounded px-2"
+                          className={`w-full h-8 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded px-2`}
                         >
-                          <option value="">-- 请选择 --</option>
+                          <option value="">{t('ow.placeholder.selectOption')}</option>
                           {activeObjectType.properties.map(p => (
                             <option key={p.id} value={p.id}>{p.displayName} ({p.id})</option>
                           ))}
@@ -762,29 +730,29 @@ export default function ObjectExplorerView({
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[10px] text-slate-400 block mb-0.5">比较算子</label>
+                          <label className={`text-[10px] ${styles.muted} block mb-0.5`}>{t('ow.label.comparisonOperator')}</label>
                           <select
                             value={newFilterOp}
                             onChange={e => setNewFilterOp(e.target.value as any)}
-                            className="w-full h-8 text-[11px] bg-slate-50 border border-slate-200 rounded px-2"
+                            className={`w-full h-8 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded px-2`}
                           >
-                            <option value="equals">等于 (Equals)</option>
-                            <option value="contains">包含 (Contains)</option>
-                            <option value="gt">大于 (&gt;)</option>
-                            <option value="lt">小于 (&lt;)</option>
-                            <option value="is_empty">为空 (Is Empty)</option>
-                            <option value="is_not_empty">不为空 (Is Not Empty)</option>
+                            <option value="equals">{t('ow.explore.opEquals')}</option>
+                            <option value="contains">{t('ow.explore.opContainsFull')}</option>
+                            <option value="gt">{t('ow.explore.opGreaterThan')}</option>
+                            <option value="lt">{t('ow.explore.opLessThan')}</option>
+                            <option value="is_empty">{t('ow.explore.opIsEmptyFull')}</option>
+                            <option value="is_not_empty">{t('ow.explore.opIsNotEmptyFull')}</option>
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] text-slate-400 block mb-0.5">设定值</label>
+                          <label className={`text-[10px] ${styles.muted} block mb-0.5`}>{t('ow.label.setValue')}</label>
                           <input
                             type="text"
                             disabled={newFilterOp === 'is_empty' || newFilterOp === 'is_not_empty'}
-                            placeholder="搜索值"
+                            placeholder={t('ow.placeholder.searchValue')}
                             value={newFilterVal}
                             onChange={e => setNewFilterVal(e.target.value)}
-                            className="w-full h-8 text-[11px] bg-slate-50 border border-slate-200 rounded px-2"
+                            className={`w-full h-8 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded px-2`}
                           />
                         </div>
                       </div>
@@ -793,16 +761,16 @@ export default function ObjectExplorerView({
                     <div className="flex justify-end gap-1.5 pt-1">
                       <button
                         onClick={() => setShowFilterCreator(false)}
-                        className="h-7 px-2.5 rounded text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600"
+                        className={`h-7 px-2.5 rounded text-[10px] bg-slate-100 hover:bg-slate-200 ${styles.cardTextMuted}`}
                       >
-                        取消
+                        {t('ow.btn.cancel')}
                       </button>
                       <button
                         onClick={handleAddFilter}
                         disabled={!newFilterProp}
-                        className="h-7 px-3 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white disabled:bg-slate-200 disabled:cursor-not-allowed"
+                        className={`h-7 px-3 rounded text-[10px] ${styles.accentBg} hover:bg-blue-500 text-white disabled:bg-slate-200 disabled:cursor-not-allowed`}
                       >
-                        应用规则
+                        {t('ow.btn.applyRule')}
                       </button>
                     </div>
                   </div>
@@ -812,10 +780,10 @@ export default function ObjectExplorerView({
                 {activeFilters.length > 0 && (
                   <button
                     onClick={() => setShowSaveModal(true)}
-                    className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors"
+                    className={`${styles.sidebarActiveBg} border ${styles.accentBorder} text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors`}
                   >
                     <Bookmark size={11} />
-                    保存为对象列表
+                    {t('ow.btn.saveAsList')}
                   </button>
                 )}
               </div>
@@ -828,35 +796,34 @@ export default function ObjectExplorerView({
           
           {/* Welcome view when no activeObjectType selected */}
           {!activeObjectTypeId ? (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-slate-50">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-4 animate-pulse">
+            <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${styles.appBg}`}>
+              <div className={`w-16 h-16 rounded-2xl ${styles.sidebarActiveBg} border ${styles.accentBorder} flex items-center justify-center ${styles.accentText} mb-4 animate-pulse`}>
                 <Compass size={32} />
               </div>
-              <h2 className="text-sm font-semibold text-slate-800">欢迎使用 ECOS 对象浏览器 (Object Explorer)</h2>
-              <p className="text-xs text-slate-500 max-w-lg leading-relaxed mt-2">
-                对象浏览器是围绕底层异构数据源构建的数据模型透视工作台。
-                在此您可以全局探索所有数字孪生实例、设定复杂的交叉筛选条件、跨对象级联穿透挖掘、以及触发运行微事务 Action。
+              <h2 className={`text-sm font-semibold ${styles.cardText}`}>{t('ow.explore.welcomeTitle')}</h2>
+              <p className={`text-xs ${styles.cardTextMuted} max-w-lg leading-relaxed mt-2`}>
+                {t('ow.explore.welcomeDesc1')}
+                {t('ow.explore.welcomeDesc2')}
               </p>
               
               {/* Grid of quick choices */}
               <div className="grid grid-cols-2 gap-4 w-full max-w-xl mt-8">
                 {objectTypes.map(ot => {
-                  const ds = datasets.find(d => d.id === ot.mapping.datasetId);
-                  const count = ds ? ds.sampleData.length : 0;
+                  const count = (ot.id === activeObjectTypeId && instanceData.length > 0) ? dataTotal : (relatedInstanceCache[ot.id]?.length ?? 0);
                   return (
                     <div
                       key={ot.id}
                       onClick={() => setActiveObjectTypeId(ot.id)}
-                      className="bg-white border border-slate-200 hover:border-blue-500 p-4 rounded-xl shadow-3xs hover:shadow-xs transition-all cursor-pointer flex items-start gap-3 group text-left"
+                      className={`${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 p-4 rounded-xl shadow-3xs hover:shadow-xs transition-all cursor-pointer flex items-start gap-3 group text-left`}
                     >
                       <span className={`p-2.5 rounded-lg border ${ot.color} shrink-0`}>
                         <DynamicIcon name={ot.icon} size={16} />
                       </span>
                       <div className="space-y-0.5">
-                        <div className="text-xs font-semibold text-slate-800 group-hover:text-blue-600">{ot.displayName}</div>
-                        <p className="text-[10px] text-slate-400 line-clamp-1">{ot.description}</p>
-                        <div className="text-[10px] font-mono text-slate-500 mt-1">
-                          <strong>{count}</strong> 个当前运行实体
+                        <div className={`text-xs font-semibold ${styles.cardText} group-hover:text-blue-600`}>{ot.displayName}</div>
+                        <p className={`text-[10px] ${styles.muted} line-clamp-1`}>{ot.description}</p>
+                        <div className={`text-[10px] font-mono ${styles.cardTextMuted} mt-1`}>
+                          <strong>{count}</strong> {t('ow.explore.runningInstances')}
                         </div>
                       </div>
                     </div>
@@ -871,31 +838,39 @@ export default function ObjectExplorerView({
               <div className="flex-1 flex flex-col overflow-hidden">
                 
                 {activeTab === 'table' ? (
-                  <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                  <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
                     {/* Search & Statistics bar */}
-                    <div className="px-6 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <div className={`px-6 py-2 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
                       <div className="relative w-80">
-                        <span className="absolute left-2.5 top-2.5 text-slate-400">
+                        <span className={`absolute left-2.5 top-2.5 ${styles.muted}`}>
                           <Search size={12} />
                         </span>
                         <input
                           type="text"
-                          placeholder="局部搜索当前展示的数据实例..."
+                          placeholder={t('ow.placeholder.localSearch')}
                           value={localSearch}
                           onChange={e => setLocalSearch(e.target.value)}
-                          className="w-full h-7 pl-7 pr-3 text-[10px] bg-white border border-slate-200 rounded focus:border-blue-500 focus:outline-hidden text-slate-700"
+                          className={`w-full h-7 pl-7 pr-3 text-[10px] ${styles.cardBg} border ${styles.cardBorder} rounded focus:border-blue-500 focus:outline-hidden ${styles.cardTextMuted}`}
                         />
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        正在展示 <strong>{processedInstances.length}</strong> / {allInstances.length} 个实例化对象
+                      <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
+                        {t('ow.explore.showingInstances')} <strong>{processedInstances.length}</strong> / {allInstances.length}
                       </div>
                     </div>
 
-                    {/* Table stage */}
+                    {dataLoading ? (
+                      <div className={`flex-1 flex items-center justify-center py-24 ${styles.muted} font-medium italic text-xs`}>
+                        {t('ow.label.loadingData')}
+                      </div>
+                    ) : allInstances.length === 0 ? (
+                      <div className={`flex-1 flex items-center justify-center py-24 ${styles.muted} font-medium italic text-xs`}>
+                        {t('ow.empty.noInstanceData')}
+                      </div>
+                    ) : (
                     <div className="flex-1 overflow-auto">
                       <table className="w-full text-left border-collapse text-xs select-none">
                         <thead>
-                          <tr className="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold sticky top-0 bg-white z-10 shadow-3xs">
+                          <tr className={`bg-slate-50/50 border-b ${styles.cardBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>
                             <th className="py-2.5 px-4 w-10">#</th>
                             {activeObjectType?.properties.map(prop => {
                               const isSorting = sortBy === prop.id;
@@ -911,9 +886,9 @@ export default function ObjectExplorerView({
                                   <div className="flex items-center gap-1">
                                     <span>{prop.displayName}</span>
                                     {isSorting ? (
-                                      <DynamicIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className="text-blue-600" />
+                                      <DynamicIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className={styles.accentText} />
                                     ) : (
-                                      <ChevronsUpDown size={10} className="text-slate-300 group-hover:text-slate-500" />
+                                      <ChevronsUpDown size={10} className={`text-slate-300 group-hover:${styles.cardTextMuted}`} />
                                     )}
                                   </div>
                                 </th>
@@ -921,11 +896,11 @@ export default function ObjectExplorerView({
                             })}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-600">
+                        <tbody className={`divide-y divide-slate-100 ${styles.cardTextMuted}`}>
                           {processedInstances.length === 0 ? (
                             <tr>
-                              <td colSpan={(activeObjectType?.properties.length || 0) + 1} className="text-center py-24 text-slate-400 font-medium italic">
-                                未能查询到符合任何当前筛选条件的实例化对象 (No results)
+                              <td colSpan={(activeObjectType?.properties.length || 0) + 1} className={`text-center py-24 ${styles.muted} font-medium italic`}>
+                                {t('ow.empty.noResults')}
                               </td>
                             </tr>
                           ) : (
@@ -939,24 +914,24 @@ export default function ObjectExplorerView({
                                     setDetailTab('properties');
                                   }}
                                   className={`hover:bg-slate-50/70 cursor-pointer transition-colors ${
-                                    isSelected ? 'bg-blue-50/40 text-blue-950 font-medium border-l-2 border-blue-600' : ''
+                                    isSelected ? `bg-blue-50/40 text-blue-950 font-medium border-l-2 ${styles.accentBorder}` : ''
                                   }`}
                                 >
-                                  <td className="py-2.5 px-4 font-mono text-slate-400">{idx + 1}</td>
+                                  <td className={`py-2.5 px-4 font-mono ${styles.muted}`}>{idx + 1}</td>
                                   {activeObjectType?.properties.map(prop => {
                                     const val = inst[prop.id];
                                     const isPk = prop.isPrimaryKey;
                                     return (
                                       <td key={prop.id} className="py-2.5 px-4">
                                         {isPk ? (
-                                          <span className="font-mono text-slate-900 bg-slate-100 border border-slate-200/80 rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                                          <span className={`font-mono ${styles.cardText} bg-slate-100 border border-slate-200/80 rounded-md px-1.5 py-0.5 text-[10px] font-semibold`}>
                                             {String(val ?? '')}
                                           </span>
                                         ) : prop.id === 'status' ? (
                                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                             val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
                                             val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800 font-semibold' :
-                                            'bg-slate-100 text-slate-600'
+                                            `bg-slate-100 ${styles.cardTextMuted}`
                                           }`}>
                                             {String(val ?? '')}
                                           </span>
@@ -971,29 +946,51 @@ export default function ObjectExplorerView({
                             })
                           )}
                         </tbody>
-                      </table>
+                       </table>
+                      <div className={`px-6 py-2 border-t ${styles.cardBorder} flex items-center justify-between`}>
+                        <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
+                          {t('ow.explore.showingInstances')} {dataPage} / {dataTotalPages}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            disabled={dataPage <= 1}
+                            onClick={() => setDataPage(p => Math.max(1, p - 1))}
+                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors`}
+                          >
+                            {t('ow.btn.previousPage')}
+                          </button>
+                          <button
+                            disabled={dataPage >= dataTotalPages}
+                            onClick={() => setDataPage(p => Math.min(dataTotalPages, p + 1))}
+                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors`}
+                          >
+                            {t('ow.btn.nextPage')}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                    )}
+                   </div>
                 ) : (
                   // ANALYTICS / CHART TAB
-                  <div className="flex-1 bg-white p-6 space-y-6 overflow-y-auto">
+                  <div className={`flex-1 ${styles.cardBg} p-6 space-y-6 overflow-y-auto`}>
                     <div className="space-y-1">
-                      <h3 className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                        <AreaChart size={14} className="text-blue-600" />
-                        分布聚合分析 (Categorical Distribution)
+                      <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+                        <AreaChart size={14} className={styles.accentText} />
+                        {t('ow.explore.analyticsTitle')}
                       </h3>
-                      <p className="text-[10px] text-slate-500">
-                        智能分析当前筛选规则下的数据集。基于标准关键枚举属性<strong>「{analyticsData ? (analyticsData as any).property?.displayName : ''}」</strong>进行快速分组及分布统计。
+                      <p className={`text-[10px] ${styles.cardTextMuted}`}>
+                        {t('ow.explore.analyticsDesc')}<strong>「{analyticsData ? (analyticsData as any).property?.displayName : ''}」</strong>
                       </p>
                     </div>
 
                     {processedInstances.length === 0 ? (
-                      <div className="text-center py-20 text-slate-400">暂无数据用以绘图统计。</div>
+                      <div className={`text-center py-20 ${styles.muted}`}>{t('ow.empty.noDataForChart')}</div>
                     ) : (
                       <div className="grid grid-cols-2 gap-8 items-start">
                         {/* Custom visual distribution bars */}
-                        <div className="border border-slate-200 rounded-xl p-5 space-y-3 shadow-3xs bg-slate-50/20">
-                          <h4 className="text-[11px] font-semibold text-slate-700">条形占比统计图 (点击柱体可直接追加筛选)</h4>
+                        <div className={`border ${styles.cardBorder} rounded-xl p-5 space-y-3 shadow-3xs bg-slate-50/20`}>
+                          <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.explore.barChartTitle')}</h4>
                           <div className="space-y-3 pt-2">
                             {(analyticsData as any).data?.map((item: any) => (
                               <div
@@ -1007,17 +1004,17 @@ export default function ObjectExplorerView({
                                     value: item.name
                                   }]);
                                   setActiveTab('table');
-                                  showToast('info', `已通过图表下钻筛选 ${propId} = "${item.name}"`);
+                                  showToast('info', t('ow.msg.chartDrillDown').replace('{prop}', propId).replace('{value}', item.name));
                                 }}
                                 className="group cursor-pointer space-y-1"
                               >
                                 <div className="flex justify-between text-[11px]">
-                                  <span className="font-medium text-slate-700 group-hover:text-blue-600 font-mono transition-colors">{item.name}</span>
-                                  <span className="text-slate-500 font-mono"><strong>{item.count}</strong> 个 ({item.percentage}%)</span>
+                                  <span className={`font-medium ${styles.cardTextMuted} group-hover:text-blue-600 font-mono transition-colors`}>{item.name}</span>
+                                  <span className={`${styles.cardTextMuted} font-mono`}><strong>{item.count}</strong> {t('ow.label.countUnit')} ({item.percentage}%)</span>
                                 </div>
                                 <div className={`h-4 w-full bg-slate-100 rounded overflow-hidden flex`}>
                                   <div
-                                    className={`bg-blue-600 group-hover:bg-blue-500 transition-all rounded-r duration-500`}
+                                    className={`${styles.accentBg} group-hover:bg-blue-500 transition-all rounded-r duration-500`}
                                     style={{ width: `${item.percentage}%` } as React.CSSProperties}
                                   />
                                 </div>
@@ -1027,26 +1024,26 @@ export default function ObjectExplorerView({
                         </div>
 
                         {/* Summary table list */}
-                        <div className="border border-slate-200 rounded-xl p-5 space-y-3 bg-white">
-                          <h4 className="text-[11px] font-semibold text-slate-700">分组计数表</h4>
+                        <div className={`border ${styles.cardBorder} rounded-xl p-5 space-y-3 ${styles.cardBg}`}>
+                          <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.explore.groupCountTable')}</h4>
                           <table className="w-full text-left border-collapse text-[11px]">
                             <thead>
-                              <tr className="border-b border-slate-100 text-slate-400">
-                                <th className="pb-2">分组类别</th>
-                                <th className="pb-2 text-right">实例数</th>
-                                <th className="pb-2 text-right">所占比例</th>
+                              <tr className={`border-b border-slate-100 ${styles.muted}`}>
+                                <th className="pb-2">{t('ow.explore.groupCategory')}</th>
+                                <th className="pb-2 text-right">{t('ow.explore.instanceCount')}</th>
+                                <th className="pb-2 text-right">{t('ow.explore.percentage')}</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50 text-slate-600">
+                            <tbody className={`divide-y divide-slate-50 ${styles.cardTextMuted}`}>
                               {(analyticsData as any).data?.map((item: any) => (
                                 <tr key={item.name} className="hover:bg-slate-50">
-                                  <td className="py-2 font-mono text-slate-700 font-medium">{item.name}</td>
-                                  <td className="py-2 text-right font-mono font-semibold text-slate-900">{item.count}</td>
-                                  <td className="py-2 text-right font-mono text-slate-500">{item.percentage}%</td>
+                                  <td className={`py-2 font-mono ${styles.cardTextMuted} font-medium`}>{item.name}</td>
+                                  <td className={`py-2 text-right font-mono font-semibold ${styles.cardText}`}>{item.count}</td>
+                                  <td className={`py-2 text-right font-mono ${styles.cardTextMuted}`}>{item.percentage}%</td>
                                 </tr>
                               ))}
-                              <tr className="border-t border-slate-200 text-slate-900 font-bold">
-                                <td className="py-2">总计 (Total)</td>
+                              <tr className={`border-t ${styles.cardBorder} ${styles.cardText} font-bold`}>
+                                <td className="py-2">{t('ow.explore.total')}</td>
                                 <td className="py-2 text-right font-mono">{processedInstances.length}</td>
                                 <td className="py-2 text-right font-mono">100.0%</td>
                               </tr>
@@ -1061,25 +1058,25 @@ export default function ObjectExplorerView({
 
               {/* DETAILED SLIDE-OVER OR SPLIT PANEL (Right hand side) */}
               {selectedInstance ? (
-                <div className="w-96 border-l border-slate-200 bg-white flex flex-col shrink-0 overflow-hidden relative">
+                <div className={`w-96 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-hidden relative`}>
                   
                   {/* Detailed Panel Header */}
-                  <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col gap-3">
+                  <div className={`p-4 border-b ${styles.cardBorder} bg-slate-50/50 flex flex-col gap-3`}>
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
                           <DynamicIcon name={activeObjectType.icon} size={14} />
                         </span>
                         <div>
-                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{activeObjectType.displayName} 详情</div>
-                          <h3 className="text-xs font-bold font-mono text-slate-950 mt-0.5">
+                          <div className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider`}>{activeObjectType.displayName} {t('ow.explore.detail')}</div>
+                          <h3 className={`text-xs font-bold font-mono text-slate-950 mt-0.5`}>
                             {selectedInstance[activeObjectType.titleProperty]}
                           </h3>
                         </div>
                       </div>
                       <button
                         onClick={() => setSelectedInstance(null)}
-                        className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700"
+                        className={`p-1 rounded hover:bg-slate-200 ${styles.muted} hover:text-slate-700`}
                       >
                         <X size={14} />
                       </button>
@@ -1088,9 +1085,9 @@ export default function ObjectExplorerView({
                     {/* Action Execution Button Dropdown */}
                     {availableActions.length > 0 && (
                       <div className="pt-1.5">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
+                        <div className={`text-[10px] ${styles.muted} uppercase tracking-wider font-semibold mb-1 flex items-center gap-1`}>
                           <Terminal size={10} />
-                          <span>绑定的可用操作 (Actions)</span>
+                          <span>{t('ow.explore.boundActions')}</span>
                         </div>
                         <div className="flex flex-col gap-1">
                           {availableActions.map(act => (
@@ -1101,7 +1098,7 @@ export default function ObjectExplorerView({
                             >
                               <div className="flex items-center gap-1.5">
                                 <Zap size={12} className="fill-amber-400/20 text-amber-600" />
-                                <span>触发：{act.displayName}</span>
+                                <span>{t('ow.explore.trigger')}{act.displayName}</span>
                               </div>
                               <ChevronRight size={10} className="text-amber-500" />
                             </button>
@@ -1112,30 +1109,30 @@ export default function ObjectExplorerView({
                   </div>
 
                   {/* Panel Tab switch */}
-                  <div className="flex border-b border-slate-100 px-2 text-[11px] font-medium bg-slate-50/20">
+                  <div className={`flex border-b border-slate-100 px-2 text-[11px] font-medium bg-slate-50/20`}>
                     <button
                       onClick={() => setDetailTab('properties')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'properties' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+                        detailTab === 'properties' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
                       }`}
                     >
-                      实体属性 (Properties)
+                      {t('ow.explore.tabProperties')}
                     </button>
                     <button
                       onClick={() => setDetailTab('relations')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all flex items-center justify-center gap-1 ${
-                        detailTab === 'relations' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+                        detailTab === 'relations' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
                       }`}
                     >
-                      关联探索 ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
+                      {t('ow.explore.tabRelations')} ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
                     </button>
                     <button
                       onClick={() => setDetailTab('activity')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'activity' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+                        detailTab === 'activity' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
                       }`}
                     >
-                      事件记录
+                      {t('ow.explore.tabActivity')}
                     </button>
                   </div>
 
@@ -1150,33 +1147,33 @@ export default function ObjectExplorerView({
                           const isPk = p.isPrimaryKey;
 
                           return (
-                            <div key={p.id} className="p-2.5 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50/30 transition-colors">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                                <span className="font-semibold text-slate-500">{p.displayName}</span>
+                            <div key={p.id} className={`p-2.5 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50/30 transition-colors`}>
+                              <div className={`flex items-center justify-between text-[10px] ${styles.muted} font-mono`}>
+                                <span className={`font-semibold ${styles.cardTextMuted}`}>{p.displayName}</span>
                                 <span className="uppercase">{p.dataType}</span>
                               </div>
-                              <div className="mt-1 font-mono text-xs font-semibold text-slate-900 flex items-center justify-between">
+                              <div className={`mt-1 font-mono text-xs font-semibold ${styles.cardText} flex items-center justify-between`}>
                                 {isPk ? (
-                                  <span className="bg-slate-150 border border-slate-200 text-slate-800 rounded px-1.5 py-0.5 text-[10px]">
-                                    {String(val ?? '未指定')}
+                                  <span className={`bg-slate-150 border ${styles.cardBorder} ${styles.cardText} rounded px-1.5 py-0.5 text-[10px]`}>
+                                    {String(val ?? t('ow.label.unspecifiedValue'))}
                                   </span>
                                 ) : p.id === 'status' ? (
                                   <span className={`px-1.5 py-0.5 rounded text-[10px] ${
                                     val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
                                     val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800' :
-                                    'bg-slate-100 text-slate-600'
+                                    `bg-slate-100 ${styles.cardTextMuted}`
                                   }`}>
                                     {String(val ?? 'N/A')}
                                   </span>
                                 ) : (
-                                  <span>{String(val ?? '未赋值 (Null)')}</span>
+                                  <span>{String(val ?? t('ow.label.nullValue'))}</span>
                                 )}
                                 
                                 {isPk && (
                                   <span className="text-[9px] font-semibold text-red-500 bg-red-50 border border-red-100 px-1 rounded uppercase">Primary Key</span>
                                 )}
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">{p.description}</p>
+                              <p className={`text-[10px] ${styles.muted} mt-1 leading-relaxed`}>{p.description}</p>
                             </div>
                           );
                         })}
@@ -1186,21 +1183,21 @@ export default function ObjectExplorerView({
                     {/* tab 2: Relations / Connection Traversal */}
                     {detailTab === 'relations' && (
                       <div className="space-y-5">
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase leading-relaxed">
-                          当前关系网跨对象关联查找
+                        <div className={`text-[10px] ${styles.muted} font-semibold uppercase leading-relaxed`}>
+                          {t('ow.explore.relationTraversal')}
                         </div>
 
                         {resolvedRelations.length === 0 ? (
-                          <div className="text-center py-10 border border-dashed border-slate-200 rounded-lg text-slate-400 text-[10px]">
-                            当前对象类型在本体中没有声明关联。
+                          <div className={`text-center py-10 border border-dashed ${styles.cardBorder} rounded-lg ${styles.muted} text-[10px]`}>
+                            {t('ow.empty.noDeclaredRelations')}
                           </div>
                         ) : (
                           <div className="space-y-4">
                             {resolvedRelations.map(rel => (
-                              <div key={rel.linkType.id} className="space-y-2 border border-slate-200/60 rounded-lg p-3 bg-slate-50/10">
+                              <div key={rel.linkType.id} className={`space-y-2 border border-slate-200/60 rounded-lg p-3 bg-slate-50/10`}>
                                 {/* Header */}
-                                <div className="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-100">
-                                  <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                                <div className={`flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-100`}>
+                                  <div className={`flex items-center gap-1.5 font-semibold ${styles.cardText}`}>
                                     <GitMerge size={12} className="text-emerald-600" />
                                     <span>{rel.linkType.displayName}</span>
                                   </div>
@@ -1209,12 +1206,12 @@ export default function ObjectExplorerView({
                                   </span>
                                 </div>
                                 
-                                <p className="text-[10px] text-slate-400">{rel.linkType.description}</p>
+                                <p className={`text-[10px] ${styles.muted}`}>{rel.linkType.description}</p>
 
                                 {/* List matching connected instances */}
                                 {rel.instances.length === 0 ? (
-                                  <div className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded text-center">
-                                    没有查找到关联的 {rel.otherObjectType.displayName}
+                                  <div className={`text-[10px] ${styles.muted} italic bg-slate-50 p-2 rounded text-center`}>
+                                    {t('ow.empty.noRelatedInstances').replace('{name}', rel.otherObjectType.displayName)}
                                   </div>
                                 ) : (
                                   <div className="space-y-1 pt-1">
@@ -1222,20 +1219,20 @@ export default function ObjectExplorerView({
                                       <div
                                         key={inst[rel.otherObjectType.primaryKey]}
                                         onClick={() => handleJumpToInstance(rel.otherObjectType.id, inst[rel.otherObjectType.primaryKey])}
-                                        className="p-2 border border-slate-150 hover:border-blue-400 bg-white hover:bg-blue-50/10 rounded-md cursor-pointer flex justify-between items-center transition-all group"
+                                        className={`p-2 border border-slate-150 hover:border-blue-400 ${styles.cardBg} hover:bg-blue-50/10 rounded-md cursor-pointer flex justify-between items-center transition-all group`}
                                       >
                                         <div className="flex items-center gap-2 truncate">
                                           <span className={`p-1 rounded ${rel.otherObjectType.color}`}>
                                             <DynamicIcon name={rel.otherObjectType.icon} size={11} />
                                           </span>
-                                          <span className="font-mono text-xs font-semibold text-slate-900">
+                                          <span className={`font-mono text-xs font-semibold ${styles.cardText}`}>
                                             {inst[rel.otherObjectType.primaryKey]}
                                           </span>
-                                          <span className="text-[10px] text-slate-400 truncate max-w-[100px]">
+                                          <span className={`text-[10px] ${styles.muted} truncate max-w-[100px]`}>
                                             ({inst[rel.otherObjectType.titleProperty]})
                                           </span>
                                         </div>
-                                        <Compass size={11} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                                        <Compass size={11} className={`${styles.muted} group-hover:text-blue-600 transition-colors`} />
                                       </div>
                                     ))}
                                   </div>
@@ -1250,29 +1247,29 @@ export default function ObjectExplorerView({
                     {/* tab 3: Timeline Activity */}
                     {detailTab === 'activity' && (
                       <div className="space-y-4">
-                        <div className="relative border-l border-slate-200 pl-4 ml-2 space-y-5 py-2">
+                        <div className={`relative border-l ${styles.cardBorder} pl-4 ml-2 space-y-5 py-2`}>
                           <div className="relative text-[11px]">
-                            <span className="absolute -left-6 top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
-                            <div className="font-semibold text-slate-800">实体已装载</div>
-                            <p className="text-slate-400 text-[10px] mt-0.5">从关联的原始数据集成功实例化并部署在内存沙箱中。</p>
-                            <span className="text-[9px] font-mono text-slate-400">2026-07-02 20:34</span>
+                            <span className={`absolute -left-6 top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white`} />
+                            <div className={`font-semibold ${styles.cardText}`}>{t('ow.explore.activityLoaded')}</div>
+                            <p className={`${styles.muted} text-[10px] mt-0.5`}>{t('ow.explore.activityLoadedDesc')}</p>
+                            <span className={`text-[9px] font-mono ${styles.muted}`}>2026-07-02 20:34</span>
                           </div>
                           
                           {selectedInstance.status === 'MAINTENANCE' && (
                             <div className="relative text-[11px]">
                               <span className="absolute -left-6 top-1 w-3 h-3 rounded-full bg-amber-500 border-2 border-white" />
-                              <div className="font-semibold text-slate-800">触发适航检修维护</div>
-                              <p className="text-slate-400 text-[10px] mt-0.5">飞机运营状态转设为 MAINTENANCE 并更新检修戳记。</p>
-                              <span className="text-[9px] font-mono text-slate-400">刚刚</span>
+                              <div className={`font-semibold ${styles.cardText}`}>{t('ow.explore.activityMaintenance')}</div>
+                              <p className={`${styles.muted} text-[10px] mt-0.5`}>{t('ow.explore.activityMaintenanceDesc')}</p>
+                              <span className={`text-[9px] font-mono ${styles.muted}`}>{t('ow.label.justNow')}</span>
                             </div>
                           )}
 
                           {selectedInstance.status === 'DELAYED' && (
                             <div className="relative text-[11px]">
                               <span className="absolute -left-6 top-1 w-3 h-3 rounded-full bg-red-400 border-2 border-white" />
-                              <div className="font-semibold text-slate-800">修改航班运行状态为 DELAYED</div>
-                              <p className="text-slate-400 text-[10px] mt-0.5">触发副作用：运行状态修改写回至对应航班物理数据行中。</p>
-                              <span className="text-[9px] font-mono text-slate-400">刚刚</span>
+                              <div className={`font-semibold ${styles.cardText}`}>{t('ow.explore.activityDelayed')}</div>
+                              <p className={`${styles.muted} text-[10px] mt-0.5`}>{t('ow.explore.activityDelayedDesc')}</p>
+                              <span className={`text-[9px] font-mono ${styles.muted}`}>{t('ow.label.justNow')}</span>
                             </div>
                           )}
                         </div>

@@ -10,6 +10,8 @@ const DATANET_DS = '/datanet/datasource';           // DataSourceController
 const INTEGRATION  = '/api/integration/metadata';   // CeosCompatController (connections + syncTasks)
 const PIPELINE_DEFS = '/api/v1/pipeline/definitions'; // PipelineController
 const DQ_RULES      = '/api/v1/ecos/dq/rules';         // DqController (camelCase 字段)
+const LINEAGE_NODES = '/api/v1/engine/data/lineage/nodes';
+const LINEAGE_EDGES = '/api/v1/engine/data/lineage/edges';
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -108,6 +110,7 @@ function mapSyncTask(t: Record<string, unknown>): DataSyncTask {
     lastRunTime: (t.lastRun as string) || (t.lastRunTime as string),
     recordsSynced: (t.recordsSynced as number) || (t.rowsSynced as number) || 0,
     syncMode: (t.syncMode as DataSyncTask['syncMode']) || 'snapshot',
+    taskType: (t.taskType as DataSyncTask['taskType']) || 'SYNC',
     durationMs: t.durationMs as number,
     description: (t.description as string) || '',
     errorMessage: t.errorMessage as string,
@@ -288,6 +291,51 @@ export async function fetchDataHealthChecks(): Promise<DataHealthCheck[]> {
     return data.map(mapDqRule);
   } catch (e) {
     console.warn('[data-workbench] fetchDataHealthChecks failed:', e);
+    return [];
+  }
+}
+
+/** Data Lineage — fetch nodes */
+export async function fetchLineageNodes(): Promise<unknown[]> {
+  try {
+    const data = await get<unknown[]>(LINEAGE_NODES);
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('[data-workbench] fetchLineageNodes failed:', e);
+    return [];
+  }
+}
+
+/** Data Lineage — fetch edges */
+export async function fetchLineageEdges(): Promise<unknown[]> {
+  try {
+    const data = await get<unknown[]>(LINEAGE_EDGES);
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('[data-workbench] fetchLineageEdges failed:', e);
+    return [];
+  }
+}
+
+/** Data Lineage — trigger build from pipeline execution records */
+export async function buildLineage(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/v1/engine/data/lineage/build', { method: 'POST' });
+    return res.ok;
+  } catch (e) {
+    console.warn('[data-workbench] buildLineage failed:', e);
+    return false;
+  }
+}
+
+/** Fetch sync tasks from PipelineTaskController (task_type=SYNC) */
+export async function fetchSyncTasksFromPipeline(): Promise<DataSyncTask[]> {
+  try {
+    const data = await get<unknown[]>('/api/v1/engine/data/pipeline/tasks?taskType=SYNC');
+    if (!Array.isArray(data)) return [];
+    return data.map(mapSyncTask);
+  } catch (e) {
+    console.warn('[data-workbench] fetchSyncTasksFromPipeline failed:', e);
     return [];
   }
 }

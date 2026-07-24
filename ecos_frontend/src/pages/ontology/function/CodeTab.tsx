@@ -5,6 +5,8 @@
 import React from 'react';
 import { Calculator, Info, Shield, Sparkles, TrendingUp } from 'lucide-react';
 import type { FunctionType } from '../../../types/ontology';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 
 interface CodeTabProps {
   func: FunctionType;
@@ -13,38 +15,40 @@ interface CodeTabProps {
 }
 
 export default function CodeTab({ func, handleFieldChange, loadTemplate }: CodeTabProps) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
   return (
     <div className="flex-1 flex overflow-hidden">
-      <div className="w-56 border-r border-gray-200 bg-slate-50/50 p-4 flex flex-col gap-4 overflow-y-auto select-none">
+      <div className={`w-56 border-r ${styles.cardBorder} ${styles.appBg} p-4 flex flex-col gap-4 overflow-y-auto select-none`}>
         <div>
-          <h4 className="text-xs font-semibold text-slate-700">ECOS 函数模板</h4>
-          <p className="text-[10px] text-slate-500 mt-0.5">选择契合您业务目标的TS模板一键生成标准代码结构。</p>
+          <h4 className={`text-xs font-semibold ${styles.cardTextMuted}`}>{t('ow.section.funcTemplates')}</h4>
+          <p className={`text-[10px] ${styles.muted} mt-0.5`}>{t('ow.section.funcTemplatesDesc')}</p>
         </div>
         <div className="space-y-2">
           <button onClick={() => loadTemplate('validation')}
-            className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2">
+            className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <Shield size={14} className="text-emerald-500 mt-0.5 shrink-0" />
-            <div><div className="text-[11px] font-semibold">拦截校验模板</div><div className="text-[10px] font-normal text-slate-400 mt-0.5">限制Action提交</div></div>
+            <div><div className="text-[11px] font-semibold">{t('ow.func.templateValidation')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateValidationDesc')}</div></div>
           </button>
           <button onClick={() => loadTemplate('default')}
-            className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2">
+            className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <Sparkles size={14} className="text-amber-500 mt-0.5 shrink-0" />
-            <div><div className="text-[11px] font-semibold">动态入参默认值</div><div className="text-[10px] font-normal text-slate-400 mt-0.5">默认值公式计算</div></div>
+            <div><div className="text-[11px] font-semibold">{t('ow.func.templateDefault')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateDefaultDesc')}</div></div>
           </button>
           <button onClick={() => loadTemplate('computed')}
-            className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2">
+            className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <Calculator size={14} className="text-blue-500 mt-0.5 shrink-0" />
-            <div><div className="text-[11px] font-semibold">派生计算属性</div><div className="text-[10px] font-normal text-slate-400 mt-0.5">实体派生衍生指标</div></div>
+            <div><div className="text-[11px] font-semibold">{t('ow.func.templateComputed')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateComputedDesc')}</div></div>
           </button>
           <button onClick={() => loadTemplate('aggregation')}
-            className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2">
+            className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <TrendingUp size={14} className="text-indigo-500 mt-0.5 shrink-0" />
-            <div><div className="text-[11px] font-semibold">对象集统计聚合</div><div className="text-[10px] font-normal text-slate-400 mt-0.5">多实体合并聚合计算</div></div>
+            <div><div className="text-[11px] font-semibold">{t('ow.func.templateAggregation')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateAggregationDesc')}</div></div>
           </button>
         </div>
-        <div className="mt-auto bg-blue-50 border border-blue-100 rounded-lg p-3 text-[11px] text-blue-700 leading-relaxed">
-          <div className="font-semibold flex items-center gap-1 mb-1"><Info size={12} /><span>TS代码要求:</span></div>
-          必须通过 <code>@Function()</code> 装饰器公开核心函数，以使 Workshop 应用和操作 (Actions) 能够发现并进行远程绑定。
+        <div className={`mt-auto ${styles.sidebarActiveBg} border border-blue-100 rounded-lg p-3 text-[11px] ${styles.accentText} leading-relaxed`}>
+          <div className="font-semibold flex items-center gap-1 mb-1"><Info size={12} /><span>{t('ow.label.tsCodeRequirements')}</span></div>
+          {t('ow.label.tsCodeRequirementsDesc')}
         </div>
       </div>
 

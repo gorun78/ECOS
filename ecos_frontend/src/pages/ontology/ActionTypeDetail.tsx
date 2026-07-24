@@ -15,6 +15,8 @@ import ParametersTab from './action/ParametersTab';
 import RulesTab from './action/RulesTab';
 import ValidationTab from './action/ValidationTab';
 import LayoutTab from './action/LayoutTab';
+import { useLanguage } from '../../components/LanguageContext';
+import { useTheme } from '../../components/ThemeContext';
 
 interface ActionTypeViewProps {
   actionType: ActionType;
@@ -25,6 +27,8 @@ interface ActionTypeViewProps {
 }
 
 export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDelete, onNavigateToObject }: ActionTypeViewProps) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<'parameters' | 'rules' | 'validation' | 'layout'>('parameters');
   const [newParamName, setNewParamName] = useState('');
   const [newParamType, setNewParamType] = useState<ActionParamDataType>('string');
@@ -39,7 +43,7 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
   const handleAddParam = () => {
     if (!newParamName.trim()) return;
     const paramId = newParamName.trim().replace(/\s+/g, '_').toLowerCase() + '_param';
-    const newParam: ActionParameter = { id: paramId, displayName: newParamName, dataType: newParamType, isRequired: true, description: `关于参数 ${newParamName} 的用途。`, objectTypeId: newParamType === 'object' ? newParamObjType : undefined };
+    const newParam: ActionParameter = { id: paramId, displayName: newParamName, dataType: newParamType, isRequired: true, description: t('ow.action.paramDefaultDescription').replace('{name}', newParamName), objectTypeId: newParamType === 'object' ? newParamObjType : undefined };
     onUpdate({ ...actionType, parameters: [...actionType.parameters, newParam] });
     setNewParamName('');
   };
@@ -77,7 +81,7 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
 
   const handleAddValidation = () => {
     if (!newValName.trim() || !newValExpression.trim()) return;
-    const newVal: ActionValidationRule = { id: `val_${Date.now()}`, displayName: newValName, expression: newValExpression, errorMessage: newValError || '验证未通过，请检查您的输入参数。' };
+    const newVal: ActionValidationRule = { id: `val_${Date.now()}`, displayName: newValName, expression: newValExpression, errorMessage: newValError || t('ow.action.defaultValidationError') };
     onUpdate({ ...actionType, validationRules: [...actionType.validationRules, newVal] });
     setNewValName(''); setNewValExpression(''); setNewValError('');
   };
@@ -87,26 +91,26 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+    <div className={`flex flex-col h-full ${styles.cardBg}`}>
+      <div className={`px-6 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-full border border-amber-300 bg-amber-50 text-amber-700 flex items-center justify-center"><Zap size={20} className="fill-amber-500" /></div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-slate-900">{actionType.displayName}</h2>
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{actionType.apiName}</span>
-              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-mono">{actionType.rules.length} 副作用规则</span>
+              <h2 className={`text-lg font-semibold ${styles.cardText}`}>{actionType.displayName}</h2>
+              <span className={`text-xs font-mono ${styles.badgeBg} ${styles.badgeText} px-1.5 py-0.5 rounded`}>{actionType.apiName}</span>
+              <span className={`text-xs ${styles.badgeBg} ${styles.muted} px-2 py-0.5 rounded-full font-mono`}>{actionType.rules.length} {t('ow.label.sideEffectsLabel')}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{actionType.description || '无详细描述'}</p>
+            <p className={`text-xs ${styles.muted} mt-0.5`}>{actionType.description || t('ow.empty.noDescription')}</p>
           </div>
         </div>
-        <button onClick={() => onDelete(actionType.id)} className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"><Trash2 size={13} />删除操作</button>
+        <button onClick={() => onDelete(actionType.id)} className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"><Trash2 size={13} />{t('ow.btn.deleteAction')}</button>
       </div>
 
-      <div className="flex px-6 border-b border-gray-200 bg-white">
+      <div className={`flex px-6 border-b ${styles.cardBorder} ${styles.cardBg}`}>
         {(['parameters', 'rules', 'validation', 'layout'] as const).map(tab => {
-          const labels: Record<string, string> = { parameters: '1. 参数定义', rules: '2. 副作用逻辑', validation: '3. 提交前验证', layout: '4. 表单与布局' };
-          return (<button key={tab} onClick={() => setActiveTab(tab)} className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{labels[tab]}</button>);
+          const labels: Record<string, string> = { parameters: t('ow.tab.actionParameters'), rules: t('ow.tab.actionRules'), validation: t('ow.tab.actionValidation'), layout: t('ow.tab.actionLayout') };
+          return (<button key={tab} onClick={() => setActiveTab(tab)} className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.muted} hover:${styles.cardText}`}`}>{labels[tab]}</button>);
         })}
       </div>
 

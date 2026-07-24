@@ -14,6 +14,8 @@ import type { FunctionType, FunctionParameter, ObjectType } from '../../types/on
 import SignatureTab from './function/SignatureTab';
 import CodeTab from './function/CodeTab';
 import TestTab from './function/TestTab';
+import { useLanguage } from '../../components/LanguageContext';
+import { useTheme } from '../../components/ThemeContext';
 
 interface FunctionTypeViewProps {
   func: FunctionType;
@@ -23,6 +25,8 @@ interface FunctionTypeViewProps {
 }
 
 export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete }: FunctionTypeViewProps) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<'signature' | 'code' | 'test'>('code');
   const [newParamName, setNewParamName] = useState('');
   const [newParamType, setNewParamType] = useState<string>('string');
@@ -55,7 +59,7 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
     const name = newParamName.trim().replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
     const newParam: FunctionParameter = {
       name, dataType: newParamType, isRequired: true,
-      description: `关于参数 ${name} 的描述信息。`,
+      description: t('ow.func.paramDefaultDescription').replace('{name}', name),
       objectTypeId: (newParamType === 'ObjectType' || newParamType === 'ObjectTypeSet') ? newParamObjType : undefined
     };
     onUpdate({ ...func, parameters: [...func.parameters, newParam] });
@@ -106,49 +110,46 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Detail Header */}
-      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+    <div className={`flex flex-col h-full ${styles.cardBg}`}>
+      <div className={`px-6 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700 flex items-center justify-center">
+          <div className={`p-2.5 rounded-full border border-violet-300 ${styles.badgeBg} ${styles.badgeText} flex items-center justify-center`}>
             <Code size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <input type="text" value={func.displayName} onChange={e => handleFieldChange('displayName', e.target.value)}
-                className="text-lg font-semibold text-slate-900 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5" />
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{func.apiName}</span>
-              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-mono">
+                className={`text-lg font-semibold ${styles.cardText} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5`} />
+              <span className={`text-xs font-mono ${styles.badgeBg} ${styles.badgeText} px-1.5 py-0.5 rounded`}>{func.apiName}</span>
+              <span className={`text-xs ${styles.badgeBg} ${styles.muted} px-2 py-0.5 rounded-full font-mono`}>
                 Returns {func.returnType === 'ObjectTypeSet' ? `Set<${func.returnObjectTypeId}>` : func.returnType}
               </span>
             </div>
             <input type="text" value={func.description} onChange={e => handleFieldChange('description', e.target.value)}
-              className="text-xs text-slate-500 mt-1 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]"
-              placeholder="添加函数的功能与作用描述" />
+              className={`text-xs ${styles.muted} mt-1 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]`}
+              placeholder={t('ow.placeholder.funcDescription')} />
           </div>
         </div>
         <button onClick={() => onDelete(func.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5">
-          <Trash2 size={13} />删除函数
+          <Trash2 size={13} />{t('ow.btn.deleteFunction')}
         </button>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex px-6 border-b border-gray-200 bg-white">
+      <div className={`flex px-6 border-b ${styles.cardBorder} ${styles.cardBg}`}>
         {(['signature', 'code', 'test'] as const).map(tab => {
           const labels: Record<string, string> = {
-            signature: '1. 签名与参数 (Signature)', code: '2. TS 代码编辑 (TypeScript Code)', test: '3. 沙盒测试运行 (Sandbox Runner)'
+            signature: t('ow.tab.funcSignature'), code: t('ow.tab.funcCode'), test: t('ow.tab.funcTest')
           };
           return (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.muted} hover:${styles.cardText}`
               }`}>{labels[tab]}</button>
           );
         })}
       </div>
 
-      {/* Content body */}
       <div className="flex-1 overflow-hidden flex">
         {activeTab === 'signature' && (
           <SignatureTab func={func} objectTypes={objectTypes} handleFieldChange={handleFieldChange}

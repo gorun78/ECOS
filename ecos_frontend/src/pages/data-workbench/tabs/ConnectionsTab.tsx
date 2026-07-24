@@ -4,6 +4,7 @@ import LucideIcon from '../LucideIcon';
 import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
+import { useLanguage } from "../../../components/LanguageContext";
 
 
 interface ConnectionsTabProps {
@@ -41,7 +42,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.txt.64d3b2")}</h3>
       <button
         onClick={() => setShowAddConn(true)}
-        className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs flex items-center gap-1 cursor-pointer font-medium"
+        className={`p-1 rounded ${styles.accentBg} text-white ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
       >
         <LucideIcon name="Plus" size={12} />
         <span>{t("dw.txt.30f7dd")}</span>
@@ -57,8 +58,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             onClick={() => setSelectedConnId(conn.id)}
             className={`w-full text-left p-3 rounded-lg border transition-all text-xs flex flex-col gap-1.5 ${
               isSelected
-                ? 'bg-blue-50/80 border-blue-200 shadow-2xs'
-                : '${styles.cardBorder} hover:${styles.appBg}'
+                ? `${styles.badgeBg} ${styles.accentBorder} shadow-2xs`
+                : `${styles.cardBorder} hover:${styles.appBg}`
             }`}
           >
             <div className="flex justify-between items-center">
@@ -69,8 +70,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               }`} title={conn.status} />
             </div>
             <div className={`flex justify-between text-[10px] ${styles.cardTextMuted} font-mono`}>
-              <span>类型: {conn.type.toUpperCase()}</span>
-              <span>{conn.tablesAvailable.length} 表/目录</span>
+              <span>{t("dw.type")} {conn.type.toUpperCase()}</span>
+              <span>{conn.tablesAvailable.length} {t("dw.tablesDirs")}</span>
             </div>
           </button>
         );
@@ -87,7 +88,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
         {/* Detail banner */}
         <div className={`p-6 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/50`}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-full border border-blue-300 bg-blue-50 text-blue-700 flex items-center justify-center">
+            <div className={`p-2.5 rounded-full border ${styles.accentBorder} ${styles.badgeBg} ${styles.badgeText} flex items-center justify-center`}>
               <LucideIcon name={getSourceIcon(conn.type)} size={20} />
             </div>
             <div>
@@ -97,7 +98,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                   {conn.type}
                 </span>
               </div>
-              <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{getSourceTypeLabel(conn.type)}</p>
+              <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{getSourceTypeLabel(conn.type, t)}</p>
             </div>
           </div>
 
@@ -105,7 +106,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             <button
               onClick={() => /* testConnection moved to parent */ (conn.id)}
               disabled={testingConnId !== null}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5"
+              className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5`}
             >
               <LucideIcon name="Wifi" size={13} />
               <span>{t("dw.txt.f636a1")}</span>
@@ -119,7 +120,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             <div className={`col-span-1 ${styles.appBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
               <h4 className={`text-xs font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-1.5 flex items-center gap-1.5`}>
                 <LucideIcon name="Settings" size={12} className={`${styles.cardTextMuted}`} />
-                物理连接配置参数
+                {t("dw.connConfigParams")}
               </h4>
 
               <div className="text-xs space-y-2.5">
@@ -156,7 +157,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <hr className={`${styles.cardBorder}`} />
                 <div>
                   <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.165c7b")}</span>
-                  <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || '从未测试'}</span>
+                   <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || t("dw.neverTested")}</span>
                 </div>
               </div>
             </div>
@@ -165,11 +166,11 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             <div className="col-span-2 space-y-4">
               <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
                 <span>{t("dw.txt.42bc1b")}</span>
-                <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> Ontology 映射只读元数据清单 ({conn.tablesAvailable.length} 表)</span>
+                <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
               </h4>
 
               {conn.tablesAvailable.length === 0 ? (
-                <div className={`p-8 border border-dashed border-slate-300 rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
+                 <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
                   <LucideIcon name="AlertTriangle" size={24} className="text-amber-500" />
                   <span>{t("dw.txt.2ce9e0")}</span>
                   <span>{t("dw.txt.44e8b3")}</span>
@@ -180,11 +181,11 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50`}>
                       <div className={`${styles.sidebarBg}/70 px-4 py-2 flex justify-between items-center border-b ${styles.cardBorder}`}>
                         <div className="flex items-center gap-2 text-xs">
-                          <LucideIcon name="Table" size={13} className="text-blue-500" />
+                           <LucideIcon name="Table" size={13} className={`${styles.accentText}`} />
                           <span className={`font-bold font-mono ${styles.cardText}`}>{tbl.name}</span>
                         </div>
                         <span className={`text-[10px] ${styles.cardTextMuted} ${styles.cardBg} border ${styles.cardBorder} px-2 py-0.5 rounded-full font-mono`}>
-                          物理总行数: {tbl.rowCount.toLocaleString()} 行
+                           {t("dw.physicalRows")} {tbl.rowCount.toLocaleString()} {t("dw.rowsUnit")}
                         </span>
                       </div>
 
@@ -207,16 +208,16 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 
           {/* Diagnostic Log Terminal */}
           {testingLogs.length > 0 && (
-            <div className="bg-slate-950 p-4 rounded-xl text-xs font-mono text-slate-200 space-y-1.5 border border-slate-800 select-text leading-relaxed">
-              <div className={`text-[10px] ${styles.cardTextMuted} tracking-wider uppercase font-semibold mb-2 border-b border-slate-900 pb-1 flex justify-between items-center select-none`}>
+            <div className={`${styles.sidebarBg} p-4 rounded-xl text-xs font-mono ${styles.sidebarText} space-y-1.5 border ${styles.sidebarBorder} select-text leading-relaxed`}>
+              <div className={`text-[10px] ${styles.cardTextMuted} tracking-wider uppercase font-semibold mb-2 border-b ${styles.sidebarBorder} pb-1 flex justify-between items-center select-none`}>
                 <span>{t("dw.txt.26079a")}</span>
-                <span className="text-blue-400">JDBC API Log v1.4</span>
+                <span className={`${styles.accentText}`}>JDBC API Log v1.4</span>
               </div>
               {testingLogs.map((log, i) => (
                 <div key={i} className={
                   log.includes('ERROR') || log.includes('❌') ? 'text-red-400' :
                   log.includes('SUCCESS') || log.includes('✅') ? 'text-emerald-400' :
-                  log.includes('🔑') ? 'text-blue-400' : 'text-slate-300'
+                  log.includes('🔑') ? `${styles.accentText}` : `${styles.cardTextMuted}`
                 }>
                   {log}
                 </div>
@@ -237,6 +238,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 // ═══ Inline SQL Query Console (嵌入式，复用数据源 ID) ═══
 function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [sql, setSql] = React.useState('SELECT * FROM orders LIMIT 10');
   const [result, setResult] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -257,7 +259,7 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
       const d = data.data || data;
       setResult({ columns: d.columns || [], rows: d.rows || [], rowCount: d.rowCount || 0, elapsedMs: d.elapsedMs || 0 });
     } catch (e: any) {
-      setError(e?.message || '执行失败');
+      setError(e?.message || t("dw.execFailed"));
       setResult(null);
     } finally { setLoading(false); }
   };
@@ -267,8 +269,8 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
       <div className={`${styles.sidebarBg} px-4 py-2 flex items-center justify-between cursor-pointer select-none`}
            onClick={() => setCollapsed(!collapsed)}>
         <div className={`flex items-center gap-2 text-xs font-bold ${styles.cardText}`}>
-          <LucideIcon name="Terminal" size={14} className="text-blue-600" />
-          <span>SQL 查询控制台</span>
+          <LucideIcon name="Terminal" size={14} className={`${styles.accentText}`} />
+          <span>{t("dw.sqlConsole")}</span>
         </div>
         <LucideIcon name={collapsed ? 'ChevronDown' : 'ChevronUp'} size={14} className={`${styles.cardTextMuted}`} />
       </div>
@@ -277,21 +279,21 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
           {/* SQL 编辑器 + 执行按钮 */}
           <div className="flex gap-2">
             <textarea value={sql} onChange={e => setSql(e.target.value)}
-              className={`flex-1 p-2 border ${styles.cardBorder} rounded text-xs font-mono resize-none outline-none focus:border-blue-400 h-16`}
+              className={`flex-1 p-2 border ${styles.inputBorder} rounded text-xs font-mono resize-none outline-none focus:${styles.accentBorder} h-16 ${styles.inputBg} ${styles.inputText}`}
               placeholder="SELECT * FROM ..." spellCheck={false} />
             <button onClick={execute} disabled={loading}
-              className="px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0">
-              {loading ? '执行中...' : '▶ 执行'}
+              className={`px-4 py-1 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0`}>
+              {loading ? t("dw.executing") : t("dw.runExec")}
             </button>
           </div>
           {/* 结果 */}
-          {error && <div className="text-rose-500 text-xs bg-rose-50 p-2 rounded">⚠ {error}</div>}
+          {error && <div className={`text-rose-500 text-xs ${styles.appBg} p-2 rounded`}>⚠ {error}</div>}
           {result && !error && (
             <div>
               <div className={`flex items-center gap-3 text-[10px] ${styles.cardTextMuted} mb-2`}>
-                <span className="text-emerald-600 font-bold">{result.rowCount} 行</span>
+                <span className={`font-bold ${styles.accentText}`}>{result.rowCount} {t("dw.rowsUnit")}</span>
                 <span>{result.elapsedMs}ms</span>
-                <span>{result.columns.length} 列</span>
+                <span>{result.columns.length} {t("dw.colsUnit")}</span>
               </div>
               <div className={`max-h-64 overflow-auto border ${styles.cardBorder} rounded`}>
                 <table className="w-full text-[11px]">
@@ -302,7 +304,7 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
                   </tr></thead>
                   <tbody>
                     {result.rows.slice(0, 50).map((row: any, i: number) => (
-                      <tr key={i} className={i % 2 ? 'bg-slate-50/50' : ''}>
+                      <tr key={i} className={i % 2 ? `${styles.appBg}/50` : ''}>
                         {result.columns.map((c: string) => (
                           <td key={c} className={`px-2 py-0.5 ${styles.cardTextMuted} border-b ${styles.cardBorder} max-w-[200px] truncate`}>
                             {row[c] === null ? <span className={`${styles.cardTextMuted} italic`}>NULL</span> : String(row[c])}

@@ -958,7 +958,7 @@ export default function DataWorkbenchLayout({
 
 }: DataWorkbenchLayoutProps = {}) {
 
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
   // --- Local showToast helper (fallback to console.log) ---
@@ -1081,7 +1081,7 @@ export default function DataWorkbenchLayout({
 
   // --- UI Navigation Tab ---
 
-  const [localActiveTab, setLocalActiveTab] = useState<'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'code-repositories' | 'code-workbooks' | 'contour' | 'guide' | 'sql-query' | 'engine-config'>('guide');
+  const [localActiveTab, setLocalActiveTab] = useState<'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'code-repositories' | 'code-workbooks' | 'contour' | 'guide' | 'sql-query' | 'engine-config'>('connections');
 
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
 
@@ -1510,23 +1510,14 @@ export default function DataWorkbenchLayout({
 
 
   const getSourceTypeLabel = (type: string) => {
-
     switch (type) {
-
-      case 'postgresql': return 'PostgreSQL 关系型数据库';
-
-      case 's3': return 'Amazon S3 云端对象存储';
-
-      case 'rest_api': return 'REST OpenAPI 服务端点';
-
-      case 'sftp': return 'SFTP 机组报文共享服务器';
-
-      case 'sap': return 'SAP ERP 业务流连接器';
-
-      default: return '未知数据源';
-
+      case 'postgresql': return t('dw.src.postgresql');
+      case 's3': return t('dw.src.s3');
+      case 'rest_api': return t('dw.src.rest_api');
+      case 'sftp': return t('dw.src.sftp');
+      case 'sap': return t('dw.src.sap');
+      default: return t('dw.src.unknown');
     }
-
   };
 
 
@@ -2047,71 +2038,6 @@ export default function DataWorkbenchLayout({
 
       
 
-      {/* Upper sub-banner */}
-
-      <div className="bg-slate-900 border-b border-slate-800 text-slate-300 px-6 py-2 flex justify-between items-center select-none text-[11px] font-medium shrink-0">
-
-        <div className="flex items-center gap-6">
-
-          <div className="flex items-center gap-1.5 text-blue-400">
-
-            <LucideIcon name="Workflow" size={13} />
-
-            <span className="font-semibold text-white">{t("dw.txt.7de8db")}</span>
-
-          </div>
-
-          <div className="h-3 w-px bg-slate-800" />
-
-          <div className="text-slate-400">{t("dw.txt.65779d")}</div>
-
-        </div>
-
-        <div className="flex items-center gap-4">
-
-          <button
-
-            onClick={() => setShowExternalInterfaces(!showExternalInterfaces)}
-
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 transition-colors cursor-pointer"
-
-          >
-
-            <LucideIcon name="Layers" size={11} className="text-amber-500" />
-
-            <span>外界系统接口视图 ({connections.length})</span>
-
-          </button>
-
-          <div className="text-slate-500">
-
-            活跃计算引擎: <span className="text-blue-400 font-bold">{computeEngine === 'doris' ? 'Apache Doris OLAP' : 'In-Memory JS'}</span>
-
-          </div>
-
-          <button
-
-            onClick={() => setShowCopilot(!showCopilot)}
-
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors cursor-pointer ${
-              showCopilot
-                ? 'bg-blue-600 text-white border-blue-500'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-            }`}
-
-          >
-
-            <LucideIcon name="MessageSquare" size={11} />
-
-            <span>Copilot</span>
-
-          </button>
-
-        </div>
-
-      </div>
-
-
       {/* Main workspace frame: Sidebar + Body + Copilot */}
       <div className="flex-1 flex overflow-hidden">
 
@@ -2120,230 +2046,136 @@ export default function DataWorkbenchLayout({
         
 
         {/* Left Sub-Navigation */}
-
-        <div className="w-52 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 select-none">
-
+        <div className={`w-52 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col justify-between shrink-0 select-none`}>
           <div className="py-3 px-3 space-y-1">
-
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2.5 mb-2">{t("dw.txt.58d7c8")}</div>
-
-            
+            <div className={`text-xs font-bold ${styles.cardText} px-2.5 mb-3`}>{locale === 'zh' ? '数据工作台' : 'Data Workbench'}</div>
 
             <button
-
-              onClick={() => setActiveTab('guide')}
-
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
-
-                activeTab === 'guide'
-
-                  ? 'bg-indigo-50 text-indigo-800 border-l-2 border-indigo-600 font-extrabold shadow-sm'
-
-                  : 'text-slate-600 hover:bg-slate-100'
-
-              }`}
-
-            >
-
-              <LucideIcon name="Lightbulb" size={14} className={activeTab === 'guide' ? 'text-indigo-600' : 'text-slate-400'} />
-
-              <span>{t("dw.txt.c56266")}</span>
-
-            </button>
-
-
-
-            <button
-
               onClick={() => setActiveTab('connections')}
-
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
-
                 activeTab === 'connections'
-
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-
-                  : 'text-slate-600 hover:bg-slate-100'
-
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
-
             >
-
-              <LucideIcon name="Database" size={14} className={activeTab === 'connections' ? 'text-blue-600' : 'text-slate-400'} />
-
-              <span>{t("dw.txt.102168")}</span>
-
+              <LucideIcon name="Database" size={14} className={activeTab === 'connections' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.connections")}</span>
             </button>
 
-
-
             <button
-
               onClick={() => setActiveTab('syncs')}
-
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
-
                 activeTab === 'syncs'
-
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-
-                  : 'text-slate-600 hover:bg-slate-100'
-
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
-
             >
-
-              <LucideIcon name="Import" size={14} className={activeTab === 'syncs' ? 'text-blue-600' : 'text-slate-400'} />
-
-              <span>{t("dw.txt.11cefc")}</span>
-
+              <LucideIcon name="Import" size={14} className={activeTab === 'syncs' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.syncs")}</span>
             </button>
 
-
-
             <button
-
               onClick={() => setActiveTab('pipelines')}
-
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
-
                 activeTab === 'pipelines'
-
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-
-                  : 'text-slate-600 hover:bg-slate-100'
-
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
-
             >
-
-              <LucideIcon name="Cpu" size={14} className={activeTab === 'pipelines' ? 'text-blue-600' : 'text-slate-400'} />
-
-              <span>{t("dw.txt.fdcb6f")}</span>
-
+              <LucideIcon name="Cpu" size={14} className={activeTab === 'pipelines' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.pipelines")}</span>
             </button>
 
-
-
             <button
-
               onClick={() => setActiveTab('health')}
-
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
-
                 activeTab === 'health'
-
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-
-                  : 'text-slate-600 hover:bg-slate-100'
-
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
-
             >
-
-              <LucideIcon name="ShieldAlert" size={14} className={activeTab === 'health' ? 'text-blue-600' : 'text-slate-400'} />
-
-              <span>{t("dw.txt.1b23b5")}</span>
-
+              <LucideIcon name="ShieldAlert" size={14} className={activeTab === 'health' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.health")}</span>
             </button>
-
-
 
             <button
-
               onClick={() => setActiveTab('lineage')}
-
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
-
                 activeTab === 'lineage'
-
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-
-                  : 'text-slate-600 hover:bg-slate-100'
-
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
-
             >
-
-              <LucideIcon name="Workflow" size={14} className={activeTab === 'lineage' ? 'text-blue-600' : 'text-slate-400'} />
-
-              <span>{t("dw.txt.0f541b")}</span>
-
+              <LucideIcon name="Workflow" size={14} className={activeTab === 'lineage' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.lineage")}</span>
             </button>
 
+            {/* Divider */}
+            <div className={`my-2 border-t ${styles.cardBorder}`} />
 
-            {/* 核心开发工具菜单隐藏，已根据顶层规划将 Pipeline Builder 等入口合并至 pipelines 列表编辑按钮 */}
-
-            {/* SQL 查询 */}
+            {/* Tools */}
             <button
               onClick={() => setActiveTab('sql-query')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
                 activeTab === 'sql-query'
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
             >
-              <LucideIcon name="Search" size={14} className={activeTab === 'sql-query' ? 'text-blue-600' : 'text-slate-400'} />
-              <span>SQL 查询</span>
+              <LucideIcon name="Search" size={14} className={activeTab === 'sql-query' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.sql_query")}</span>
             </button>
 
-            {/* 引擎配置 */}
             <button
               onClick={() => setActiveTab('engine-config')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${
                 activeTab === 'engine-config'
-                  ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm`
+                  : `${styles.cardTextMuted} hover:opacity-80`
               }`}
             >
-              <LucideIcon name="Settings" size={14} className={activeTab === 'engine-config' ? 'text-blue-600' : 'text-slate-400'} />
-              <span>⚙ 引擎配置</span>
+              <LucideIcon name="Settings" size={14} className={activeTab === 'engine-config' ? styles.accentText : styles.cardTextMuted} />
+              <span>{t("dw.tab.engine_config")}</span>
             </button>
 
             {/*
-
             ... Pipeline Builder / Code Repositories / Workbooks / Contour 待后续开放
-
             */}
-
           </div>
 
-
-
-          {/* Quick Stats sidebar footer */}
-
-          <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-2 text-[10px] text-slate-500">
-
-            <div className="font-semibold text-slate-700">{t("dw.txt.419d9f")}</div>
-
-            <div className="flex justify-between">
-
-              <span>{t("dw.txt.f7d9ac")}</span>
-
-              <span className="font-mono text-slate-800 font-semibold">{connections.length} 处</span>
-
+          <div>
+            <div className="px-3 pb-2">
+              <button
+                onClick={() => setShowCopilot(!showCopilot)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[10px] rounded transition-colors cursor-pointer ${
+                  showCopilot
+                    ? `${styles.accentBg} ${styles.accentText}`
+                    : `${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted}`
+                }`}
+              >
+                <LucideIcon name="MessageSquare" size={11} />
+                <span>{t("dw.btn.copilot")}</span>
+              </button>
             </div>
 
-            <div className="flex justify-between">
-
-              <span>{t("dw.txt.1988fc")}</span>
-
-              <span className="font-mono text-slate-800 font-semibold">{syncTasks.length} 个</span>
-
+            {/* Quick Stats sidebar footer */}
+            <div className={`p-4 border-t ${styles.cardBorder} ${styles.cardBg} space-y-2 text-[10px] ${styles.cardTextMuted}`}>
+              <div className={`font-semibold ${styles.cardText}`}>{t("dw.txt.419d9f")}</div>
+              <div className="flex justify-between">
+                <span>{t("dw.txt.f7d9ac")}</span>
+                <span className={`font-mono ${styles.cardText} font-semibold`}>{connections.length} {t("dw.label.connections_count")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("dw.txt.1988fc")}</span>
+                <span className={`font-mono ${styles.cardText} font-semibold`}>{syncTasks.length} {t("dw.label.syncs_count")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("dw.txt.44a230")}</span>
+                <span className={`font-mono ${styles.cardText} font-semibold`}>{objectTypes.length} {t("dw.label.objects_count")}</span>
+              </div>
             </div>
-
-            <div className="flex justify-between">
-
-              <span>{t("dw.txt.44a230")}</span>
-
-              <span className="font-mono text-slate-800 font-semibold">{objectTypes.length} 类</span>
-
-            </div>
-
           </div>
-
         </div>
-
 
 
         {/* Dynamic Inner Body */}

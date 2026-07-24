@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Shield, Database, Network, Brain,
+  Shield, Database, Network, Brain, BookOpen, Sparkles,
   Activity, Server, Settings, Loader2, AlertTriangle,
   RefreshCw, CheckCircle2, XCircle,
 } from 'lucide-react';
@@ -24,7 +24,9 @@ import { useTheme } from '../components/ThemeContext';
 // ── Types ────────────────────────────────────────────────────
 
 interface EngineMonitorProps {
-  engine: 'security' | 'data' | 'ontology' | 'cognitive';
+  engine: 'security' | 'data' | 'ontology' | 'cognitive' | 'knowledge' | 'ai';
+  initialHealth?: any;
+  initialStatus?: any;
 }
 
 interface HealthData {
@@ -46,11 +48,13 @@ interface StatusData {
   [key: string]: any;
 }
 
-const ENGINE_META: Record<string, { label: string; labelZh: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
+const ENGINE_META: Record<string, { label: string; labelZh: string; icon: React.ComponentType<{ className?: string }>; color: string; configPath?: string }> = {
   security: { label: 'Security Engine', labelZh: '安全引擎', icon: Shield, color: 'text-emerald-400' },
-  data:     { label: 'Data Engine', labelZh: '数据引擎', icon: Database, color: 'text-blue-400' },
+  data:     { label: 'Data Engine', labelZh: '数据引擎', icon: Database, color: 'text-blue-400', configPath: '/api/v1/engine/data/settings' },
   ontology: { label: 'Ontology Engine', labelZh: '本体引擎', icon: Network, color: 'text-purple-400' },
   cognitive:{ label: 'Cognitive Engine', labelZh: '认知引擎', icon: Brain, color: 'text-amber-400' },
+  knowledge:{ label: 'Knowledge Engine', labelZh: '知识引擎', icon: BookOpen, color: 'text-cyan-400' },
+  ai:       { label: 'AI Engine', labelZh: 'AI引擎', icon: Sparkles, color: 'text-rose-400' },
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -83,7 +87,7 @@ async function apiFetch<T = any>(url: string): Promise<T> {
 
 // ── Component ────────────────────────────────────────────────
 
-export default function EngineMonitor({ engine }: EngineMonitorProps) {
+export default function EngineMonitor({ engine, initialHealth, initialStatus }: EngineMonitorProps) {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const meta = ENGINE_META[engine];
@@ -96,16 +100,16 @@ export default function EngineMonitor({ engine }: EngineMonitorProps) {
   }, []);
 
   // ── State ──
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [healthLoading, setHealthLoading] = useState(true);
+  const [health, setHealth] = useState<HealthData | null>(initialHealth ?? null);
+  const [healthLoading, setHealthLoading] = useState(!initialHealth);
   const [healthError, setHealthError] = useState<string | null>(null);
 
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
 
-  const [status, setStatus] = useState<StatusData | null>(null);
-  const [statusLoading, setStatusLoading] = useState(true);
+  const [status, setStatus] = useState<StatusData | null>(initialStatus ?? null);
+  const [statusLoading, setStatusLoading] = useState(!initialStatus);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   // ── Load health ──
@@ -128,7 +132,7 @@ export default function EngineMonitor({ engine }: EngineMonitorProps) {
     setConfigLoading(true);
     setConfigError(null);
     try {
-      const data = await apiFetch<ConfigData>(`/api/v1/engine/${engine}/config`);
+      const data = await apiFetch<ConfigData>(meta.configPath || `/api/v1/engine/${engine}/config`);
       setConfig(data);
     } catch (e: any) {
       setConfigError(e.message || 'Unknown error');
@@ -367,7 +371,7 @@ export default function EngineMonitor({ engine }: EngineMonitorProps) {
               </pre>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">/config</span>
+              <span className="text-[10px] font-mono text-slate-500">{meta.configPath ? '/settings' : '/config'}</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {config ? JSON.stringify(config, null, 2) : (configError || '—')}
               </pre>
