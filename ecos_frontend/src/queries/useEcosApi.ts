@@ -37,7 +37,7 @@ export function useWorldModelState() {
   return useQuery({
     queryKey: ['world-model', 'state'],
     queryFn: async () => {
-      const resp = await fetch(`${API_BASE}/world-model/state`);
+      const resp = await fetch(`${API_BASE}/ecos/world-model-graph/state`);
       if (!resp.ok) throw new Error('Failed to fetch world state');
       const json = await resp.json();
       return json.data || json;
@@ -49,7 +49,7 @@ export function useCausalGraph() {
   return useQuery({
     queryKey: ['world-model', 'causal-graph'],
     queryFn: async () => {
-      const resp = await fetch(`${API_BASE}/world-model/causal-graph`);
+      const resp = await fetch(`${API_BASE}/ecos/world-model-graph/causal-graph`);
       if (!resp.ok) throw new Error('Failed to fetch causal graph');
       const json = await resp.json();
       return json.data || json || [];
@@ -61,7 +61,7 @@ export function useRunSimulation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (scenario: Record<string, unknown>) => {
-      const resp = await fetch(`${API_BASE}/world-model/scenarios`, {
+      const resp = await fetch(`${API_BASE}/ecos/world-model-graph/scenarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scenario),
@@ -80,7 +80,7 @@ export function useStrategyRecommendation(goal: string | null) {
   return useQuery({
     queryKey: ['world-model', 'strategy', goal],
     queryFn: async () => {
-      const resp = await fetch(`${API_BASE}/world-model/strategy/recommend?goal=${encodeURIComponent(goal!)}`, {
+      const resp = await fetch(`${API_BASE}/ecos/world-model-graph/strategy/recommend?goal=${encodeURIComponent(goal!)}`, {
         method: 'POST',
       });
       if (!resp.ok) throw new Error('Strategy recommendation failed');

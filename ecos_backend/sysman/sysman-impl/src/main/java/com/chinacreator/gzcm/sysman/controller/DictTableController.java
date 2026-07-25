@@ -21,13 +21,20 @@ public class DictTableController {
     private IDictTableService dictTableService;
 
     @GetMapping("/tables")
-    public ApiResponse<List<DictTable>> listTables(
+    public ApiResponse<List<Map<String, Object>>> listTables(
             @RequestParam(required = false) String schema,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
         try {
             List<DictTable> tables = dictTableService.listTables(schema, status, search);
-            return ApiResponse.success(tables);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (DictTable t : tables) {
+                Map<String, Object> m = tableToMap(t);
+                List<DictColumn> cols = dictTableService.listColumns(t.getId());
+                m.put("columns", cols.stream().map(this::columnToMap).toList());
+                result.add(m);
+            }
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询数据字典表失败", e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
@@ -229,7 +236,9 @@ public class DictTableController {
         m.put("rowCount", t.getRowCount());
         m.put("storageSize", t.getStorageSize());
         m.put("owner", t.getOwner());
-        m.put("tags", t.getTags() != null ? Arrays.asList(t.getTags().split(",")) : Collections.emptyList());
+        m.put("tags", t.getTags() != null && !t.getTags().isEmpty()
+            ? Arrays.stream(t.getTags().split(",")).filter(s -> !s.isEmpty()).toList()
+            : Collections.emptyList());
         m.put("createdBy", t.getCreatedBy());
         m.put("createdAt", t.getCreatedAt() != null ? t.getCreatedAt().toString() : null);
         m.put("updatedAt", t.getUpdatedAt() != null ? t.getUpdatedAt().toString() : null);

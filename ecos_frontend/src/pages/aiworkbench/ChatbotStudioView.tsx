@@ -377,7 +377,7 @@ export default function ChatbotStudioView({
 
       // If action proposal was generated, register in backend
       if (proposal) {
-        fetch('/api/ontology/proposals', {
+        fetch('/api/v1/ontology/proposals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -421,7 +421,7 @@ export default function ChatbotStudioView({
 
     if (approved) {
       // call the execute backend
-      fetch(`/api/ontology/proposals/${propId}/execute`, {
+      fetch(`/api/v1/ontology/proposals/${propId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

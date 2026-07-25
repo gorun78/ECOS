@@ -2031,7 +2031,7 @@ export async function callDiagnosticAgent(query: string): Promise<any> {
 // ── Entity Instances (Operational Apps) ──────────────────
 export async function fetchEntityInstances(entityType: string): Promise<any[]> {
   try {
-    return await apiFetchData<any[]>(`/api/ontology/entities/${entityType}/instances`);
+    return await apiFetchData<any[]>(`/api/v1/ontology/entities/${entityType}/instances`);
   } catch {
     return [];
   }

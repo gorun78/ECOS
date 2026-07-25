@@ -64,7 +64,9 @@ public class SecurityConfig {
                     "/api/v1/audit/**",
                     "/api/v1/data-masking/**",
                     "/api/v1/dict/**",
+                    "/api/dict/**",
                     "/api/v1/system/dict/**",
+                    "/api/system/dict/**",
                     // ── OPA 策略引擎
                     "/api/v1/policy-engine/**",
                     "/api/policy/**",
@@ -121,10 +123,31 @@ public class SecurityConfig {
                     "/api/v1/datanet/**",
                     // ── 临时: task types 免认证测试
                     "/api/v1/task/types",
+                    "/api/v1/task/**",
                     // ── Workspace 场景管理
                     "/api/v1/workspace/**",
-                    // ── Ontology Proposal
-                    "/api/v1/ontology/proposals/**",
+                    // ── Ontology Proposal + Mappings + Data
+                    "/api/v1/ontology/**",
+                    // ── Lineage (v1)
+                    "/api/v1/lineage/**",
+                    // ── ABAC / Data Permission / MFA / Privacy
+                    "/api/v1/abac/**",
+                    "/api/v1/data-permission/**",
+                    "/api/v1/mfa/**",
+                    "/api/v1/privacy/**",
+                    // ── World Model (v1)
+                    "/api/v1/world-model/**",
+                    // ── Agent Runtime
+                    "/api/v1/agent-runtime/**",
+                    // ── Evolution
+                    "/api/v1/evolution/**",
+                    // ── Data Lake / Workbook
+                    "/api/datalake/**",
+                    "/api/workbook/**",
+                    // ── Pareto
+                    "/api/pareto/**",
+                    // ── Catalog
+                    "/api/catalog/**",
                     // ── Engine endpoints (四引擎健康检查/配置/状态)
                     "/api/v1/engine/**"
                 ).permitAll()

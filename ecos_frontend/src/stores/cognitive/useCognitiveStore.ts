@@ -73,7 +73,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       fetchWorldState: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/world-model/state');
+          const resp = await fetch('/api/v1/ecos/world-model-graph/state');
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();
           set({ worldState: json.data || json, loading: false });
@@ -86,7 +86,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       fetchScenarios: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/world-model/scenarios');
+          const resp = await fetch('/api/v1/ecos/world-model-graph/scenarios');
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();
           set({ scenarios: json.data || json || [], loading: false });
@@ -101,7 +101,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       runSimulation: async (scenario) => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/world-model/scenarios', {
+          const resp = await fetch('/api/v1/ecos/world-model-graph/scenarios', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(scenario),
@@ -118,7 +118,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       getStrategyRecommendation: async (goal) => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch(`/api/v1/world-model/strategy/recommend?goal=${encodeURIComponent(goal)}`, {
+          const resp = await fetch(`/api/v1/ecos/world-model-graph/strategy/recommend?goal=${encodeURIComponent(goal)}`, {
             method: 'POST',
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -133,7 +133,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       fetchCausalGraph: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/world-model/causal-graph');
+          const resp = await fetch('/api/v1/ecos/world-model-graph/causal-graph');
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();
           set({ causalGraph: json.data || json || [], loading: false });

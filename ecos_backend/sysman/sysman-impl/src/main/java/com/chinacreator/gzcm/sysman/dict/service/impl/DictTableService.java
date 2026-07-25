@@ -152,21 +152,7 @@ public class DictTableService implements IDictTableService {
             "FROM dict_table WHERE id = ?",
             TABLE_MAPPER, id);
         if (tables.isEmpty()) return null;
-        DictTable table = tables.get(0);
-
-        List<DictColumn> columns = jdbc.query(
-            "SELECT id, table_id, name, type, length, precision_val, scale, nullable, primary_key, " +
-            "default_value, description, sort_order, created_at, updated_at " +
-            "FROM dict_column WHERE table_id = ? ORDER BY sort_order, name",
-            COL_MAPPER, id);
-        return table;
-    }
-
-    public DictTable getTableWithColumns(String id) {
-        DictTable table = getTable(id);
-        if (table == null) return null;
-        List<DictColumn> columns = listColumns(id);
-        return table;
+        return tables.get(0);
     }
 
     @Override

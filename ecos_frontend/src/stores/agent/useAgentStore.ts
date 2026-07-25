@@ -67,7 +67,7 @@ export const useAgentStore = create<AgentState>()(
       fetchAgents: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/ecos/agent-mesh/agents');
+          const resp = await fetch('/api/agent-mesh/agents');
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();
           set({ agents: json.data || json || [], loading: false });
@@ -82,7 +82,7 @@ export const useAgentStore = create<AgentState>()(
       fetchMissions: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/ecos/agent-mesh/missions');
+          const resp = await fetch('/api/agent-mesh/missions');
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();
           set({ missions: json.data || json || [], loading: false });
@@ -97,7 +97,7 @@ export const useAgentStore = create<AgentState>()(
       createMission: async (mission) => {
         set({ error: null });
         try {
-          const resp = await fetch('/api/ecos/agent-mesh/missions', {
+          const resp = await fetch('/api/agent-mesh/missions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(mission),
@@ -113,7 +113,7 @@ export const useAgentStore = create<AgentState>()(
       executeMission: async (id) => {
         set({ error: null });
         try {
-          const resp = await fetch(`/api/ecos/agent-mesh/missions/${id}/execute`, {
+          const resp = await fetch(`/api/agent-mesh/missions/${id}/execute`, {
             method: 'POST',
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
