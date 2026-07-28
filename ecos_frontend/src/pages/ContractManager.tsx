@@ -1,6 +1,6 @@
 /**
  * ContractManager — 高速信科合同管理
- * 调用 /api/v1/gsxk/objects/Contract 获取合同列表
+ * 调用 /api/v1/ecos/objects/Contract 获取合同列表
  *
  * @license Apache-2.0
  */
@@ -33,11 +33,11 @@ interface Contract {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: "履约中", color: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700" },
-  completed: { label: "已完成", color: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700" },
-  pending: { label: "待签署", color: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700" },
-  terminated: { label: "已终止", color: "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700" },
-  draft: { label: "草稿", color: "bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600" },
+  active: { label: "履约中", color: "bg-green-100 text-green-700 border-green-300" },
+  completed: { label: "已完成", color: "bg-blue-100 text-blue-700 border-blue-300" },
+  pending: { label: "待签署", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  terminated: { label: "已终止", color: "bg-red-100 text-red-700 border-red-300" },
+  draft: { label: "草稿", color: "styles.appBg styles.cardTextMuted styles.cardBorder" },
 };
 
 const PAGE_SIZE = 10;
@@ -75,7 +75,7 @@ export default function ContractManager() {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (searchQ.trim()) params.set("search", searchQ.trim());
 
-      const data: any = await apiFetchData(`/api/v1/gsxk/objects/Contract?${params.toString()}`);
+      const data: any = await apiFetchData(`/api/v1/ecos/objects/Contract?${params.toString()}`);
 
       if (Array.isArray(data)) {
         setContracts(data);
@@ -115,14 +115,14 @@ export default function ContractManager() {
       key: "code",
       label: locale === "zh" ? "合同编号" : "Contract No.",
       render: (_v, record) => (
-        <span className="font-mono text-[11px]">{record.code || record.contractNo || record.id || "—"}</span>
+        <span className={`font-mono text-[11px] ${styles.cardText}`}>{record.code || record.contractNo || record.id || "—"}</span>
       ),
     },
     {
       key: "name",
       label: locale === "zh" ? "合同名称" : "Contract Name",
       render: (_v, record) => (
-        <span className="font-medium truncate max-w-[180px] block">{record.name || "—"}</span>
+        <span className={`font-medium truncate max-w-[180px] block ${styles.cardText}`}>{record.name || "—"}</span>
       ),
     },
     {
@@ -131,8 +131,8 @@ export default function ContractManager() {
       render: (_v, record) => {
         const a = record.partyA || record.clientName;
         return (
-          <span className="flex items-center gap-1 text-xs">
-            <Building2 className="w-3 h-3 opacity-40" />
+          <span className={`flex items-center gap-1 text-xs ${styles.cardText}`}>
+            <Building2 className={`w-3 h-3 ${styles.cardTextMuted}`} />
             {a || "—"}
           </span>
         );
@@ -143,15 +143,15 @@ export default function ContractManager() {
       label: locale === "zh" ? "金额" : "Amount",
       align: "right",
       render: (_v, record) => (
-        <span className="font-mono text-xs font-semibold">{fmtAmount(record.amount)}</span>
+        <span className={`font-mono text-xs font-semibold ${styles.cardText}`}>{fmtAmount(record.amount)}</span>
       ),
     },
     {
       key: "signDate",
       label: locale === "zh" ? "签署日期" : "Sign Date",
       render: (_v, record) => (
-        <span className="flex items-center gap-1 text-xs whitespace-nowrap">
-          <Calendar className="w-3 h-3 opacity-40" />
+        <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${styles.cardTextMuted}`}>
+          <Calendar className={`w-3 h-3 ${styles.cardTextMuted}`} />
           {record.signDate || "—"}
         </span>
       ),
@@ -160,7 +160,7 @@ export default function ContractManager() {
       key: "status",
       label: locale === "zh" ? "状态" : "Status",
       render: (_v, record) => {
-        const s = STATUS_MAP[record.status] || { label: record.status, color: "bg-gray-100 text-gray-600 border-gray-300" };
+        const s = STATUS_MAP[record.status] || { label: record.status, color: "styles.appBg styles.cardTextMuted styles.cardBorder" };
         return (
           <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${s.color}`}>
             {s.label}
@@ -173,10 +173,10 @@ export default function ContractManager() {
   // ── Loading State ────────────────────────────────────
   if (loading && !contracts.length) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className={`h-full flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-          <p className="text-sm text-slate-400">
+          <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
+          <p className={`text-sm ${styles.muted}`}>
             {locale === "zh" ? "加载合同数据..." : "Loading contracts..."}
           </p>
         </div>
@@ -187,16 +187,16 @@ export default function ContractManager() {
   // ── Error State ──────────────────────────────────────
   if (error && !contracts.length) {
     return (
-      <div className="h-full flex items-center justify-center p-6">
+      <div className={`h-full flex items-center justify-center p-6 ${styles.appBg}`}>
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="text-sm font-semibold text-red-600 mb-1">
             {locale === "zh" ? "数据加载失败" : "Failed to load data"}
           </p>
-          <p className="text-xs text-slate-500 mb-4">{error}</p>
+          <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
             onClick={loadContracts}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             {locale === "zh" ? "重试" : "Retry"}
@@ -208,22 +208,22 @@ export default function ContractManager() {
 
   // ── Render ───────────────────────────────────────────
   return (
-    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4">
+    <div className={`flex-1 overflow-y-auto p-6 font-sans ${styles.appBg} ${styles.appText} space-y-4`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-500" />
+            <FileText className={`w-5 h-5 ${styles.accentText}`} />
             {locale === "zh" ? "合同管理" : "Contract Manager"}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className={`text-xs ${styles.muted} mt-1`}>
             {locale === "zh" ? "高速信科合同全生命周期管理" : "GSXK contract lifecycle management"}
           </p>
         </div>
         <button
           onClick={() => { setCurrentPage(1); loadContracts(); }}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50"
+          className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           {loading ? (locale === "zh" ? "刷新中..." : "Refreshing...") : (locale === "zh" ? "刷新" : "Refresh")}
@@ -237,29 +237,29 @@ export default function ContractManager() {
             icon={FileText}
             label={locale === "zh" ? "合同总数" : "Total Contracts"}
             value={totalCount}
-            color="text-indigo-500"
-            bgColor="bg-indigo-50 dark:bg-indigo-900/20"
+            color={styles.accentText}
+            styles={styles}
           />
           <KpiCard
             icon={DollarSign}
             label={locale === "zh" ? "合同总金额" : "Total Amount"}
             value={fmtAmount(totalAmount)}
             color="text-orange-500"
-            bgColor="bg-orange-50 dark:bg-orange-900/20"
+            styles={styles}
           />
           <KpiCard
             icon={CheckCircle}
             label={locale === "zh" ? "履约中" : "Active"}
             value={activeCount}
             color="text-green-500"
-            bgColor="bg-green-50 dark:bg-green-900/20"
+            styles={styles}
           />
           <KpiCard
             icon={TrendingUp}
             label={locale === "zh" ? "已完成" : "Completed"}
             value={completedCount}
             color="text-blue-500"
-            bgColor="bg-blue-50 dark:bg-blue-900/20"
+            styles={styles}
           />
         </div>
       )}
@@ -267,7 +267,7 @@ export default function ContractManager() {
       {/* Search & Filter */}
       <div className={`flex flex-col sm:flex-row gap-3 p-3 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${styles.muted}`} />
           <input
             type="text"
             value={searchQ}
@@ -309,7 +309,7 @@ export default function ContractManager() {
 
       {/* Error banner (when data exists but refresh fails) */}
       {error && contracts.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-400">
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button onClick={loadContracts} className="ml-auto font-semibold underline hover:no-underline">
@@ -322,15 +322,15 @@ export default function ContractManager() {
 }
 
 // ── KPI Card ────────────────────────────────────────────
-function KpiCard({ icon: Icon, label, value, color, bgColor }: {
-  icon: any; label: string; value: string | number; color: string; bgColor: string;
+function KpiCard({ icon: Icon, label, value, color, styles }: {
+  icon: any; label: string; value: string | number; color: string; styles: any;
 }) {
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 ${bgColor}`}>
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
       <Icon className={`w-8 h-8 ${color}`} />
       <div>
-        <div className="text-xl font-bold">{value}</div>
-        <div className="text-[10px] text-slate-500 dark:text-slate-400">{label}</div>
+        <div className={`text-xl font-bold ${styles.cardText}`}>{value}</div>
+        <div className={`text-[10px] ${styles.cardTextMuted}`}>{label}</div>
       </div>
     </div>
   );

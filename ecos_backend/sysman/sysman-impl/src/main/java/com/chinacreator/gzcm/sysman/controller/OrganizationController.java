@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping({"/api/v1/system/organizations", "/api/system/organizations"})
+@RequestMapping("/api/v1/system/organizations")
 public class OrganizationController {
 
     private static final Logger log = LoggerFactory.getLogger(OrganizationController.class);

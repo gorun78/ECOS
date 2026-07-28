@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping({"/api/dict", "/api/v1/dict"})
+@RequestMapping("/api/v1/dict")
 public class DictTableController {
 
     private static final Logger log = LoggerFactory.getLogger(DictTableController.class);

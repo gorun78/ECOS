@@ -234,7 +234,7 @@ export async function parseLineage(format: string, payload: string) {
 
 export async function fetchIntegrationMetadata() {
   try {
-    return await apiFetchData('/api/integration/metadata');
+    return await apiFetchData('/api/v1/integration/metadata');
   } catch {
     return null;
   }
@@ -242,7 +242,7 @@ export async function fetchIntegrationMetadata() {
 
 export async function fetchIntegrationLogs() {
   try {
-    return await apiFetchData('/api/integration/logs');
+    return await apiFetchData('/api/v1/integration/logs');
   } catch {
     return [];
   }
@@ -250,7 +250,7 @@ export async function fetchIntegrationLogs() {
 
 export async function toggleSimulationDrift(type: string, enabled: boolean) {
   try {
-    return await apiFetchData('/api/integration/metadata/drift', {
+    return await apiFetchData('/api/v1/integration/metadata/drift', {
       method: 'POST',
       body: JSON.stringify({ type, enabled }),
     });

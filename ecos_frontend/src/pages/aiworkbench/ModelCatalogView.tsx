@@ -36,7 +36,6 @@ export default function ModelCatalogView({
 
   const selectedModel = models.find(m => m.id === selectedModelId);
 
-  // Handle Temp sliders
   const handleTempChange = (modelId: string, temp: number) => {
     const updated = models.map(m => {
       if (m.id === modelId) {
@@ -47,7 +46,6 @@ export default function ModelCatalogView({
     onUpdateModels(updated);
   };
 
-  // Run Side-by-Side comparative evaluations
   const handleRunEvaluation = async () => {
     if (!testPrompt.trim()) return;
     setIsEvaluating(true);
@@ -88,7 +86,7 @@ export default function ModelCatalogView({
   };
 
   return (
-    <div className={`flex h-full overflow-hidden select-none ${styles.appBg} text-xs`}>
+    <div className={`flex h-full overflow-hidden select-none ${styles.appBg} ${styles.appText} text-xs`}>
       
       {/* 1. Left Models List */}
       <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
@@ -107,7 +105,7 @@ export default function ModelCatalogView({
                 className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1.5 ${
                   isSelected
                     ? `${styles.accentBg} text-white shadow-xs`
-                    : 'text-slate-600 hover:bg-slate-50'
+                    : `${styles.cardTextMuted} hover:${styles.inputBg}`
                 }`}
               >
                 <div className="flex items-center justify-between font-bold">
@@ -135,7 +133,7 @@ export default function ModelCatalogView({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h2 className={`text-sm font-black ${styles.cardText}`}>{selectedModel.displayName || selectedModel.name || selectedModel.id}</h2>
-                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 text-[9px] font-bold rounded">模型资产级</span>
+                  <span className={`px-1.5 py-0.5 ${styles.badgeBg} ${styles.accentText} ${styles.accentBorder} border text-[9px] font-bold rounded`}>模型资产级</span>
                 </div>
                 <p className={`text-[11px] ${styles.cardTextMuted}`}>托管方式: <span className={`font-bold ${styles.cardTextMuted}`}>{selectedModel.provider} 安全私有边界镜像</span> | 类型: {selectedModel.type.toUpperCase()}</p>
               </div>
@@ -153,7 +151,7 @@ export default function ModelCatalogView({
                   step="0.1"
                   value={selectedModel.temperature}
                   onChange={e => handleTempChange(selectedModel.id, parseFloat(e.target.value))}
-                  className="w-24 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className={`w-24 h-1 ${styles.cardBorder} rounded-lg appearance-none cursor-pointer accent-blue-600`}
                 />
               </div>
             </div>
@@ -179,7 +177,7 @@ export default function ModelCatalogView({
               
               <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-3`}>
                 <div className="flex items-center gap-2">
-                  <span className="p-1 rounded bg-indigo-50 text-indigo-600">
+                  <span className={`p-1 rounded ${styles.badgeBg} ${styles.accentText}`}>
                     <Layers size={13} />
                   </span>
                   <h3 className={`text-xs font-bold ${styles.cardText}`}>多模型对齐评测沙箱 (Side-by-Side Prompt Evaluation)</h3>
@@ -194,7 +192,7 @@ export default function ModelCatalogView({
                   value={testPrompt}
                   onChange={e => setTestPrompt(e.target.value)}
                   rows={2}
-                  className={`w-full px-3 py-2 border ${styles.cardBorder} rounded-lg text-xs focus:outline-hidden focus:border-blue-500 font-sans leading-relaxed`}
+                  className={`w-full px-3 py-2 border ${styles.cardBorder} rounded-lg text-xs focus:outline-hidden focus:border-blue-500 font-sans leading-relaxed ${styles.cardBg} ${styles.cardText}`}
                   placeholder="请输入用于对比测试的提示词..."
                 />
               </div>
@@ -202,7 +200,7 @@ export default function ModelCatalogView({
               <button
                 onClick={handleRunEvaluation}
                 disabled={isEvaluating || !testPrompt.trim()}
-                className={`w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
+                className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
                   isEvaluating ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               >
@@ -228,7 +226,7 @@ export default function ModelCatalogView({
                       {/* Grid header */}
                       <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
                         <span className={`font-bold ${styles.cardText} text-[11px]`}>{res.displayName}</span>
-                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[9px] font-mono font-bold">ALLOW</span>
+                        <span className={`px-1.5 py-0.5 ${styles.badgeBg} ${styles.accentText} ${styles.accentBorder} border rounded text-[9px] font-mono font-bold`}>ALLOW</span>
                       </div>
 
                       {/* Performance metrics tag */}

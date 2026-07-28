@@ -1,6 +1,6 @@
 /**
  * OperationsDashboard — 高速信科产值分配看板
- * 调用 /api/v1/gsxk/biz/dashboard 获取基础数据
+ * 调用 /api/v1/ecos/monitoring/summary 获取基础数据
  *
  * @license Apache-2.0
  */
@@ -33,8 +33,6 @@ interface DashboardData {
 
 // ── Colors ─────────────────────────────────────────────
 const PIE_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#F97316", "#84CC16"];
-
-const CHART_TICK_STYLE = { fontSize: 11, fill: "#94A3B8" };
 
 // ── Helpers ────────────────────────────────────────────
 function fmtMoney(v: number | string | undefined | null): string {
@@ -86,13 +84,15 @@ export default function OperationsDashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const CHART_TICK_STYLE = { fontSize: 11, fill: styles.muted.includes("text-") ? undefined : styles.muted };
+
   // ── Loading ──────────────────────────────────────────
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className={`h-full flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-          <p className="text-sm text-slate-400">
+          <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
+          <p className={`text-sm ${styles.muted}`}>
             {locale === "zh" ? "加载看板数据..." : "Loading dashboard..."}
           </p>
         </div>
@@ -103,16 +103,16 @@ export default function OperationsDashboard() {
   // ── Error ────────────────────────────────────────────
   if (error && !data) {
     return (
-      <div className="h-full flex items-center justify-center p-6">
+      <div className={`h-full flex items-center justify-center p-6 ${styles.appBg}`}>
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="text-sm font-semibold text-red-600 mb-1">
             {locale === "zh" ? "看板数据加载失败" : "Dashboard load failed"}
           </p>
-          <p className="text-xs text-slate-500 mb-4">{error}</p>
+          <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
             onClick={loadData}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             {locale === "zh" ? "重试" : "Retry"}
@@ -136,22 +136,22 @@ export default function OperationsDashboard() {
 
   // ── Render ───────────────────────────────────────────
   return (
-    <div className="h-full overflow-auto p-4 sm:p-6 space-y-5">
+    <div className={`flex-1 overflow-y-auto p-6 font-sans ${styles.appBg} ${styles.appText} space-y-5`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-indigo-500" />
+            <BarChart3 className={`w-5 h-5 ${styles.accentText}`} />
             {locale === "zh" ? "产值分配看板" : "Operations Dashboard"}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className={`text-xs ${styles.muted} mt-1`}>
             {locale === "zh" ? "高速信科养护产值、工程项目与设备运营总览" : "GSXK maintenance output, projects & equipment overview"}
           </p>
         </div>
         <button
           onClick={loadData}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50"
+          className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           {loading ? (locale === "zh" ? "刷新中..." : "Refreshing...") : (locale === "zh" ? "刷新" : "Refresh")}
@@ -165,43 +165,39 @@ export default function OperationsDashboard() {
           label={locale === "zh" ? "养护产值" : "Maint. Output"}
           value={fmtMoney(data?.maintenanceOutput)}
           color="text-emerald-500"
-          bg="bg-emerald-50 dark:bg-emerald-900/20"
-          border="border-emerald-200 dark:border-emerald-800"
+          styles={styles}
         />
         <KpiTile
           icon={Briefcase}
           label={locale === "zh" ? "工程项目数" : "Projects"}
           value={data?.projectCount ?? 0}
           color="text-blue-500"
-          bg="bg-blue-50 dark:bg-blue-900/20"
-          border="border-blue-200 dark:border-blue-800"
+          styles={styles}
         />
         <KpiTile
           icon={FileCheck}
           label={locale === "zh" ? "合同履约率" : "Fulfillment Rate"}
           value={fmtPercent(data?.contractFulfillmentRate)}
           color="text-violet-500"
-          bg="bg-violet-50 dark:bg-violet-900/20"
-          border="border-violet-200 dark:border-violet-800"
+          styles={styles}
         />
         <KpiTile
           icon={Wrench}
           label={locale === "zh" ? "设备完好率" : "Equipment Health"}
           value={fmtPercent(data?.equipmentHealthRate)}
           color="text-amber-500"
-          bg="bg-amber-50 dark:bg-amber-900/20"
-          border="border-amber-200 dark:border-amber-800"
+          styles={styles}
         />
       </div>
 
       {/* Empty state */}
       {!depts.length && !monthlyTrend.length && !contractTrend.length && (
         <div className={`text-center py-16 rounded-xl border border-dashed ${styles.cardBorder}`}>
-          <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-slate-500">
+          <Building2 className={`w-10 h-10 ${styles.cardTextMuted} mx-auto mb-3`} />
+          <p className={`text-sm font-semibold ${styles.muted}`}>
             {locale === "zh" ? "暂无业务数据" : "No business data"}
           </p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className={`text-xs ${styles.cardTextMuted} mt-1`}>
             {locale === "zh" ? "请确认后端服务已启动，或稍后刷新重试" : "Please verify backend is running, or refresh later"}
           </p>
         </div>
@@ -213,8 +209,8 @@ export default function OperationsDashboard() {
           {/* Monthly trend chart */}
           {monthlyTrend.length > 0 && (
             <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-4`}>
-              <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-indigo-500" />
+              <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>
+                <Activity className={`w-4 h-4 ${styles.accentText}`} />
                 {locale === "zh" ? "月度产值趋势" : "Monthly Output Trend"}
               </h3>
               <div className="h-[220px]">
@@ -259,8 +255,8 @@ export default function OperationsDashboard() {
           {/* Department distribution pie chart */}
           {deptChartData.length > 0 && deptChartData.some(d => d.value > 0) && (
             <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-4`}>
-              <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-indigo-500" />
+              <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>
+                <Building2 className={`w-4 h-4 ${styles.accentText}`} />
                 {locale === "zh" ? "部门产值分布" : "Department Output Distribution"}
               </h3>
               <div className="h-[220px]">
@@ -303,8 +299,8 @@ export default function OperationsDashboard() {
       {/* Contract fulfillment rate trend */}
       {contractTrend.length > 0 && (
         <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-4`}>
-          <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <FileCheck className="w-4 h-4 text-indigo-500" />
+          <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>
+            <FileCheck className={`w-4 h-4 ${styles.accentText}`} />
             {locale === "zh" ? "合同履约率趋势" : "Contract Fulfillment Rate Trend"}
           </h3>
           <div className="h-[180px]">
@@ -337,22 +333,22 @@ export default function OperationsDashboard() {
       {/* Department table */}
       {depts.length > 0 && (
         <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} overflow-hidden`}>
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-indigo-500" />
+          <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
+            <h3 className={`text-sm font-bold flex items-center gap-2 ${styles.cardText}`}>
+              <PieChart className={`w-4 h-4 ${styles.accentText}`} />
               {locale === "zh" ? "部门产值明细" : "Department Output Details"}
             </h3>
           </div>
           <table className="w-full text-xs">
             <thead>
               <tr className={`border-b ${styles.cardBorder}`}>
-                <th className="text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                <th className={`text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider ${styles.cardTextMuted}`}>
                   {locale === "zh" ? "部门" : "Department"}
                 </th>
-                <th className="text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                <th className={`text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider ${styles.cardTextMuted}`}>
                   {locale === "zh" ? "产值" : "Output"}
                 </th>
-                <th className="text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                <th className={`text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider ${styles.cardTextMuted}`}>
                   {locale === "zh" ? "占比" : "Share"}
                 </th>
               </tr>
@@ -363,7 +359,7 @@ export default function OperationsDashboard() {
                 const totalVal = depts.reduce((s, x) => s + (x.output ?? x.value ?? 0), 0);
                 const pct = totalVal > 0 ? (Number(val) / totalVal * 100) : 0;
                 return (
-                  <tr key={i} className={`border-b ${styles.cardBorder} hover:bg-black/5 dark:hover:bg-white/5 transition`}>
+                  <tr key={i} className={`border-b ${styles.cardBorder} hover:opacity-80 transition`}>
                     <td className="px-4 py-2.5">
                       <span className="flex items-center gap-2">
                         <span
@@ -373,10 +369,10 @@ export default function OperationsDashboard() {
                         {d.name}
                       </span>
                     </td>
-                    <td className="text-right px-4 py-2.5 font-mono">{fmtMoney(val)}</td>
+                    <td className={`text-right px-4 py-2.5 font-mono ${styles.cardText}`}>{fmtMoney(val)}</td>
                     <td className="text-right px-4 py-2.5">
                       <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className={`w-16 h-1.5 ${styles.inputBorder} border rounded-full overflow-hidden ${styles.inputBg}`}>
                           <div
                             className="h-full rounded-full"
                             style={{
@@ -385,7 +381,7 @@ export default function OperationsDashboard() {
                             }}
                           />
                         </div>
-                        <span className="w-10 text-right font-mono">{pct.toFixed(1)}%</span>
+                        <span className={`w-10 text-right font-mono ${styles.cardTextMuted}`}>{pct.toFixed(1)}%</span>
                       </div>
                     </td>
                   </tr>
@@ -398,7 +394,7 @@ export default function OperationsDashboard() {
 
       {/* Error banner */}
       {error && data && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-400">
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button onClick={loadData} className="ml-auto font-semibold underline hover:no-underline">
@@ -411,17 +407,17 @@ export default function OperationsDashboard() {
 }
 
 // ── KPI Tile ────────────────────────────────────────────
-function KpiTile({ icon: Icon, label, value, color, bg, border }: {
-  icon: any; label: string; value: string | number; color: string; bg: string; border: string;
+function KpiTile({ icon: Icon, label, value, color, styles }: {
+  icon: any; label: string; value: string | number; color: string; styles: any;
 }) {
   return (
-    <div className={`flex items-center gap-3 px-4 py-4 rounded-lg border ${border} ${bg}`}>
-      <div className={`p-2 rounded-lg ${bg}`}>
+    <div className={`flex items-center gap-3 px-4 py-4 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
+      <div className={`p-2 rounded-lg ${styles.cardBg}`}>
         <Icon className={`w-6 h-6 ${color}`} />
       </div>
       <div>
-        <div className="text-xl font-bold tracking-tight">{value}</div>
-        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">
+        <div className={`text-xl font-bold tracking-tight ${styles.cardText}`}>{value}</div>
+        <div className={`text-[10px] ${styles.cardTextMuted} font-medium uppercase tracking-wider`}>
           {label}
         </div>
       </div>

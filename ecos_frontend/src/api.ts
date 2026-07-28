@@ -620,7 +620,7 @@ export async function fetchMarketplaceAssets(
   const resp = await apiFetch<{
     success: boolean;
     data: { total: number; items: MarketplaceAsset[]; sort: string };
-  }>(`/marketplace/assets?sort=${sort}&limit=${limit}`);
+  }>(`/v1/marketplace/assets?sort=${sort}&limit=${limit}`);
   return resp.data || { total: 0, items: [], sort };
 }
 
@@ -628,7 +628,7 @@ export async function requestMarketplaceAccess(
   assetId: string,
   reason: string
 ): Promise<{ requestId: string; status: string }> {
-  return apiFetch("/marketplace/request-access", {
+  return apiFetch("/v1/marketplace/request-access", {
     method: "POST",
     body: JSON.stringify({ assetId, reason }),
   }).then(r => (r as any).data || r);
@@ -677,14 +677,14 @@ export async function fetchMarketAssets(
   if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
   const q = qs.toString();
   const raw = await apiFetch<{ success: boolean; data: { items?: MarketplaceBrowserAsset[]; total?: number; sort?: string } }>(
-    `/marketplace/assets${q ? "?" + q : ""}`
+    `/v1/marketplace/assets${q ? "?" + q : ""}`
   );
   return { data: raw.data?.items || [], total: raw.data?.total || 0 };
 }
 
 /** GET /api/marketplace/dashboard — 市场仪表盘统计数据 */
 export async function fetchMarketDashboard(): Promise<MarketplaceDashboard> {
-  return apiFetch<{ success: boolean; data: MarketplaceDashboard }>("/marketplace/dashboard")
+  return apiFetch<{ success: boolean; data: MarketplaceDashboard }>("/v1/marketplace/dashboard")
     .then(r => r.data || { totalAssets: 0, avgRating: 0, pendingRequests: 0 });
 }
 
@@ -695,7 +695,7 @@ export async function publishMarketAsset(body: {
   category: string;
   tags?: string[];
 }): Promise<MarketplaceBrowserAsset> {
-  return apiFetch<{ success: boolean; data: MarketplaceBrowserAsset }>("/marketplace/assets", {
+  return apiFetch<{ success: boolean; data: MarketplaceBrowserAsset }>("/v1/marketplace/assets", {
     method: "POST",
     body: JSON.stringify(body),
   }).then(r => r.data);
@@ -710,13 +710,13 @@ export async function searchMarketAssets(
   qs.set("keyword", keyword);
   if (category) qs.set("category", category);
   return apiFetch<{ success: boolean; data: MarketplaceBrowserAsset[] }>(
-    `/marketplace/search?${qs.toString()}`
+    `/v1/marketplace/search?${qs.toString()}`
   ).then(r => r.data || []);
 }
 
 /** GET /api/marketplace/assets/{id} — 获取单个资产详情 */
 export async function fetchMarketAssetDetail(id: string): Promise<MarketplaceBrowserAsset> {
-  return apiFetch<{ success: boolean; data: MarketplaceBrowserAsset }>(`/marketplace/assets/${id}`)
+  return apiFetch<{ success: boolean; data: MarketplaceBrowserAsset }>(`/v1/marketplace/assets/${id}`)
     .then(r => r.data);
 }
 
@@ -726,7 +726,7 @@ export async function requestAccess(
   reason: string
 ): Promise<{ requestId: string; status: string }> {
   return apiFetch<{ success: boolean; data: { requestId: string; status: string } }>(
-    "/marketplace/request-access",
+    "/v1/marketplace/request-access",
     { method: "POST", body: JSON.stringify({ assetId, reason }) }
   ).then(r => r.data || r as any);
 }
@@ -859,7 +859,7 @@ export async function fetchObjectTimeline(entityCode: string, id: string, page =
 }
 
 // ── Agent Mesh ───────────────────────────────────────────────
-const AGENT_MESH_BASE = "/api/agent-mesh";
+const AGENT_MESH_BASE = "/api/v1/agent-mesh";
 
 export interface AgentMeshAgent {
   id: string;
@@ -966,7 +966,7 @@ export async function testWorkflow(id: string, body?: any): Promise<any> {
 }
 
 // ── Pipeline Builder ──────────────────────────────────────────
-const PIPELINE_BASE = "/api/pipeline/definitions";
+const PIPELINE_BASE = "/api/v1/pipeline/definitions";
 
 export interface PipelineDefinition {
   id?: string;
@@ -1032,7 +1032,7 @@ export async function executePipeline(id: string): Promise<PipelineExecution> {
 
 /** GET /api/pipeline/executions/{id} — 执行状态 */
 export async function getExecution(executionId: string): Promise<PipelineExecution> {
-  return apiFetchData(`/api/pipeline/executions/${executionId}`);
+  return apiFetchData(`/api/v1/pipeline/executions/${executionId}`);
 }
 
 // ── Ontology Designer ─────────────────────────────────────────
@@ -1148,7 +1148,7 @@ export async function deleteEntityRelationship(entityId: string, relId: string):
 }
 
 // ── Data Quality Dashboard ────────────────────────────────────
-const DQ_BASE = "/api/dq";
+const DQ_BASE = "/api/v1/dq";
 
 export async function fetchDqRules(): Promise<any> {
   const resp = await doFetch(`${DQ_BASE}/rules`);
@@ -1262,7 +1262,7 @@ export async function compareWorldScenarios(body: any): Promise<any> {
 }
 
 // ── Pareto Optimization ───────────────────────────────────────
-const PARETO_BASE = "/api/pareto";
+const PARETO_BASE = "/api/v1/pareto";
 
 export interface ParetoSolution {
   variables: Record<string, number>;
@@ -1425,7 +1425,7 @@ export async function fetchPreview(resourceId: string, limit = 50): Promise<{row
 
 // ── Monitoring Dashboard ───────────────────────────────
 // 对接 MonitorController (/api/monitor)
-const MONITOR_BASE = "/api/monitor";
+const MONITOR_BASE = "/api/v1/monitor";
 
 export interface MonitoringKpi {
   label: string;
@@ -1529,7 +1529,7 @@ export async function runSystemDiagnostics(): Promise<{ database: { status: stri
 }
 
 // ── Knowledge Search (Cognitive Operating System) ─────────────
-const KNOWLEDGE_SEARCH_BASE = "/api/knowledge";
+const KNOWLEDGE_SEARCH_BASE = "/api/v1/knowledge";
 
 export async function searchKnowledge(q: string): Promise<any> {
   return doFetch(`${KNOWLEDGE_SEARCH_BASE}/search?q=${encodeURIComponent(q)}`);
@@ -1542,7 +1542,7 @@ export async function fetchKnowledgePath(s: string, t: string): Promise<{
   length: number;
 }> {
   return apiFetch<{ success: boolean; data: any }>(
-    `/knowledge/path?s=${encodeURIComponent(s)}&t=${encodeURIComponent(t)}`
+    `/v1/knowledge/path?s=${encodeURIComponent(s)}&t=${encodeURIComponent(t)}`
   ).then(r => r.data);
 }
 
@@ -1552,7 +1552,7 @@ export async function fetchKnowledgeNeighbors(id: string, d: number = 1): Promis
   edges: KnowledgeEdge[];
 }> {
   return apiFetch<{ success: boolean; data: any }>(
-    `/knowledge/neighbors/${encodeURIComponent(id)}?d=${d}`
+    `/v1/knowledge/neighbors/${encodeURIComponent(id)}?d=${d}`
   ).then(r => {
     const data = r.data || { nodes: [], edges: [] };
     return {
@@ -1600,21 +1600,18 @@ export async function globalSearch(
   q: string,
   type: string = 'all'
 ): Promise<SearchHit[]> {
-  return apiFetchData<SearchHit[]>(`/api/portal/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
+  return apiFetchData<SearchHit[]>(`/api/v1/portal/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
 }
 
 // ── Ontology Actions Execution (Operational Apps) ────────────
-export async function executeOntologyAction(body: {
+export async function executeOntologyAction(_body: {
   actionId: string;
   entityType: string;
   instanceId: string;
   operatorName: string;
   fields: Record<string, any>;
 }): Promise<any> {
-  return apiFetchData('/api/v1/gsxk/actions/execute', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  throw new Error('GSXK bridge removed — use /api/v1/ontology/actions instead');
 }
 
 // ── Goals / Causal / Scenarios (async with mock fallback) ─
@@ -1712,17 +1709,17 @@ export async function createOrg(body:Record<string,any>) {
 
 // Permissions
 export async function fetchPermissions(): Promise<IamPermission[]> {
-  try { return await apiFetchData<IamPermission[]>('/api/system/permissions'); }
+  try { return await apiFetchData<IamPermission[]>('/api/v1/system/permissions'); }
   catch (e) { console.warn("fetchPermissions: backend unavailable", e); return []; }
 }
 export async function createPermission(body: Record<string,any>) {
-  return apiFetchData('/api/system/permissions', { method:'POST', body:JSON.stringify(body) });
+  return apiFetchData('/api/v1/system/permissions', { method:'POST', body:JSON.stringify(body) });
 }
 export async function updatePermission(id:string, body:Record<string,any>) {
-  return apiFetchData(`/api/system/permissions/${id}`, { method:'PUT', body:JSON.stringify(body) });
+  return apiFetchData(`/api/v1/system/permissions/${id}`, { method:'PUT', body:JSON.stringify(body) });
 }
 export async function deletePermission(id:string) {
-  return apiFetchData(`/api/system/permissions/${id}`, { method:'DELETE' });
+  return apiFetchData(`/api/v1/system/permissions/${id}`, { method:'DELETE' });
 }
 
 // User-Role assignments
@@ -2012,7 +2009,7 @@ export async function fetchBizDashboard(): Promise<any> {
 // ── Goal Tracking ────────────────────────────────────────
 export async function fetchGoalTracking(goalId?: number): Promise<any> {
   const qs = goalId ? `?goalId=${goalId}` : '';
-  return apiFetchData(`/api/dq/goal-tracking${qs}`);
+  return apiFetchData(`/api/v1/dq/goal-tracking${qs}`);
 }
 
 // ── ECOS Knowledge Graph ─────────────────────────────────
@@ -2159,7 +2156,7 @@ export interface TwinCommandResult {
 
 export async function fetchTwinHealth(): Promise<TwinHealth> {
   try {
-    return await apiFetchData<TwinHealth>('/api/twins/health');
+    return await apiFetchData<TwinHealth>('/api/v1/twins/health');
   } catch {
     console.warn('fetchTwinHealth: backend unavailable');
     return { mqtt: { status: 'DOWN' }, device_count: 0 };
@@ -2168,7 +2165,7 @@ export async function fetchTwinHealth(): Promise<TwinHealth> {
 
 export async function fetchTwinDevices(): Promise<TwinDevice[]> {
   try {
-    return await apiFetchData<TwinDevice[]>('/api/twins/devices');
+    return await apiFetchData<TwinDevice[]>('/api/v1/twins/devices');
   } catch {
     console.warn('fetchTwinDevices: backend unavailable');
     return [];
@@ -2177,7 +2174,7 @@ export async function fetchTwinDevices(): Promise<TwinDevice[]> {
 
 export async function fetchTwinTelemetry(deviceId: string, limit = 20): Promise<TwinTelemetry[]> {
   try {
-    return await apiFetchData<TwinTelemetry[]>(`/api/twins/${encodeURIComponent(deviceId)}/telemetry?limit=${limit}`);
+    return await apiFetchData<TwinTelemetry[]>(`/api/v1/twins/${encodeURIComponent(deviceId)}/telemetry?limit=${limit}`);
   } catch {
     console.warn(`fetchTwinTelemetry(${deviceId}): backend unavailable`);
     return [];
@@ -2185,7 +2182,7 @@ export async function fetchTwinTelemetry(deviceId: string, limit = 20): Promise<
 }
 
 export async function sendTwinCommand(deviceId: string, command: string, params: Record<string, any> = {}): Promise<TwinCommandResult> {
-  return apiFetchData<TwinCommandResult>(`/api/twins/${encodeURIComponent(deviceId)}/command`, {
+  return apiFetchData<TwinCommandResult>(`/api/v1/twins/${encodeURIComponent(deviceId)}/command`, {
     method: 'POST',
     body: JSON.stringify({ command, params }),
   });
@@ -2193,7 +2190,7 @@ export async function sendTwinCommand(deviceId: string, command: string, params:
 
 export async function fetchTwinDeviceStatus(deviceId: string): Promise<TwinDeviceStatus> {
   try {
-    return await apiFetchData<TwinDeviceStatus>(`/api/twins/${encodeURIComponent(deviceId)}/status`);
+    return await apiFetchData<TwinDeviceStatus>(`/api/v1/twins/${encodeURIComponent(deviceId)}/status`);
   } catch {
     console.warn(`fetchTwinDeviceStatus(${deviceId}): backend unavailable`);
     return { deviceId, status: 'offline', shadow: { desired: {}, reported: {} }, telemetryCount: 0 };

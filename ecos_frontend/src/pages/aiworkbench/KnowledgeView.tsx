@@ -43,7 +43,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
   const fetchOntologyData = async () => {
     setIsOntologyLoading(true);
     try {
-      const res = await fetch('/api/ontology/mappings');
+      const res = await fetch('/api/v1/ontology/mappings');
       const data = await res.json();
       if (data.success) {
         setOntologyMappings(data.mappings || []);
@@ -58,7 +58,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
 
   const handleSaveOntologyMappings = async (updatedMappings: any[]) => {
     try {
-      const res = await fetch('/api/ontology/mappings', {
+      const res = await fetch('/api/v1/ontology/mappings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mappings: updatedMappings })
@@ -79,7 +79,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
   const handleExportOntology = async () => {
     setIsExporting(true);
     try {
-      const res = await fetch('/api/ontology/export');
+      const res = await fetch('/api/v1/ontology/export');
       const data = await res.json();
       if (data.success) {
         setExportedMarkdown(data.knowledgeMarkdown);
@@ -160,7 +160,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
   // Fetch current vector index status
   const fetchIndexStatus = async () => {
     try {
-      const res = await fetch('/api/knowledge/index-status');
+      const res = await fetch('/api/v1/knowledge/index-status');
       const data = await res.json();
       if (data.success) {
         setVectorChunks(data.chunks || []);
@@ -191,7 +191,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
   // Fetch initial metadata and states from Express backend
   const fetchMetadataAndLogs = async () => {
     try {
-      const resMeta = await fetch('/api/integration/metadata');
+      const resMeta = await fetch('/api/v1/integration/metadata');
       const dataMeta = await resMeta.json();
       setIsSchemaDrift(dataMeta.simulationState.isSchemaDriftActive);
       setIsSlaBreach(dataMeta.simulationState.isSlaBreachActive);
@@ -201,7 +201,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
         setLineageLinks(dataMeta.lineage.links || []);
       }
 
-      const resLogs = await fetch('/api/integration/logs');
+      const resLogs = await fetch('/api/v1/integration/logs');
       const dataLogs = await resLogs.json();
       setAuditLogs(dataLogs.logs || []);
 
@@ -229,7 +229,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
         return;
       }
 
-      const res = await fetch('/api/lineage/parse', {
+      const res = await fetch('/api/v1/lineage/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payload: parsedObj })
@@ -253,7 +253,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
   const handleRunImpactAnalysis = async (startNodeId: string) => {
     setIsAnalyzing(true);
     try {
-      const res = await fetch(`/api/lineage/impact?startNode=${encodeURIComponent(startNodeId)}`);
+      const res = await fetch(`/api/v1/lineage/impact?startNode=${encodeURIComponent(startNodeId)}`);
       const data = await res.json();
       if (res.ok && data.success) {
         setImpactResult(data);
@@ -282,7 +282,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
   // Handle setting Simulation state
   const handleToggleSimulation = async (type: 'drift' | 'sla' | 'reset') => {
     try {
-      const res = await fetch('/api/integration/metadata/drift', {
+      const res = await fetch('/api/v1/integration/metadata/drift', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type })
@@ -319,7 +319,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
     setSyncLogs(['🔄 [0.0s] 启动 AIP Closed-Loop 元数据提取与向量化索引计算管道...']);
 
     try {
-      const res = await fetch('/api/knowledge/sync', {
+      const res = await fetch('/api/v1/knowledge/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ embeddingModel, chunkSize, overlap })
@@ -355,7 +355,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
     setLlmOutput('');
 
     try {
-      const response = await fetch('/api/knowledge/query', {
+      const response = await fetch('/api/v1/knowledge/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: queryInput })
@@ -405,7 +405,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
               className={`w-full px-3 py-2 rounded-lg font-bold text-left flex items-center gap-2 transition-all cursor-pointer ${
                 isActive
                   ? `${styles.accentBg} text-white shadow-xs`
-                  : 'text-slate-600 hover:bg-slate-50'
+                  : 'styles.cardTextMuted hover:styles.inputBg'
               }`}
             >
               <Icon name={item.icon} size={13} />
@@ -522,7 +522,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
 
                 {/* Step 3 */}
                 <div className="p-3 bg-indigo-50/50 border border-indigo-200 rounded-xl space-y-1.5 relative">
-                  <div className="text-[10px] font-mono font-bold text-indigo-500">3. 安全中心 (阻断防漏)</div>
+                  <div className={`text-[10px] font-mono font-bold ${styles.accentText}`}>3. 安全中心 (阻断防漏)</div>
                   <h4 className="font-bold text-indigo-800 text-xs">安全规则网格</h4>
                   <p className="text-[10px] text-indigo-600 font-sans">隔离网域 (Orgs), 密级锁标记, 列级 REDACT 掩码及 row-filter</p>
                   <div className={`absolute top-1/2 -right-2 transform -translate-y-1/2 hidden md:block ${styles.cardTextMuted}`}>▶</div>
@@ -560,7 +560,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
               <button
                 onClick={handleSyncAll}
                 disabled={isSyncingAll}
-                className={`px-4 py-2 ${styles.cardBg} hover:bg-slate-800 text-white font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                className={`px-4 py-2 ${styles.cardBg} hover:styles.sidebarActiveBg text-white font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
                   isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               >
@@ -592,7 +592,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       <span>物理元数据漂移与调度 SLA 阻流仿真中心 (Exception Lab)</span>
                     </h3>
                     <div className="flex gap-1.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'styles.inputBg styles.cardBorder styles.cardTextMuted'}`}>
                         {isSchemaDrift || isSlaBreach ? '● 存在激活异常' : '● 网格运行稳定'}
                       </span>
                     </div>
@@ -608,7 +608,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
                         isSchemaDrift 
                           ? 'bg-rose-50 border-rose-300 text-rose-700 font-extrabold' 
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          : 'styles.cardBg styles.cardBorder styles.cardText hover:styles.inputBg'
                       }`}
                     >
                       <Icon name="AlertTriangle" size={11} className={isSchemaDrift ? 'animate-bounce' : ''} />
@@ -620,7 +620,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
                         isSlaBreach 
                           ? 'bg-amber-50 border-amber-300 text-amber-700 font-extrabold' 
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          : 'styles.cardBg styles.cardBorder styles.cardText hover:styles.inputBg'
                       }`}
                     >
                       <Icon name="Clock" size={11} className={isSlaBreach ? 'animate-pulse' : ''} />
@@ -629,7 +629,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
 
                     <button
                       onClick={() => handleToggleSimulation('reset')}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${styles.appBg} hover:bg-slate-200 ${styles.cardTextMuted} cursor-pointer transition-all flex items-center gap-1 border border-slate-300 ml-auto`}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${styles.appBg} hover:styles.inputBg ${styles.cardTextMuted} cursor-pointer transition-all flex items-center gap-1 border styles.cardBorder ml-auto`}
                     >
                       <Icon name="Check" size={11} />
                       <span>复位大盘状态 (Reset)</span>
@@ -654,7 +654,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                             <div className="flex items-center gap-2">
                               <span className={`px-1.5 py-0.2 rounded-xs font-bold text-[8px] uppercase ${
                                 log.severity === 'HIGH' ? 'bg-rose-100 text-rose-700' :
-                                log.severity === 'MEDIUM' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
+                                log.severity === 'MEDIUM' ? 'bg-amber-100 text-amber-700' : 'styles.appBg styles.cardText'
                               }`}>
                                 {log.severity}
                               </span>
@@ -772,7 +772,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                     </div>
                   ) : (
                     syncLogs.map((log, idx) => (
-                      <p key={idx} className={`${log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('🤖') ? 'text-blue-400 font-bold' : 'text-slate-300'}`}>
+                      <p key={idx} className={`${log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('🤖') ? 'text-blue-400 font-bold' : 'styles.cardTextMuted'}`}>
                         {log}
                       </p>
                     ))
@@ -824,7 +824,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                           "outputs": [{ "namespace": "doris_production_olap", "name": "ds_flights_clean" }]
                         }, null, 2));
                       }}
-                      className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${parserFormatSelected === 'openlineage' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${parserFormatSelected === 'openlineage' ? 'styles.cardBg styles.cardText shadow-xs' : 'styles.cardTextMuted hover:styles.cardText'}`}
                     >
                       OpenLineage
                     </button>
@@ -843,7 +843,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                           }
                         ], null, 2));
                       }}
-                      className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${parserFormatSelected === 'atlas' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${parserFormatSelected === 'atlas' ? 'styles.cardBg styles.cardText shadow-xs' : 'styles.cardTextMuted hover:styles.cardText'}`}
                     >
                       Apache Atlas
                     </button>
@@ -887,7 +887,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                   <textarea
                     value={rawPayloadInput}
                     onChange={(e) => setRawPayloadInput(e.target.value)}
-                    className={`flex-1 min-h-[160px] p-3 font-mono text-[10px] ${styles.appBg} text-slate-200 rounded-lg border ${styles.cardBorder} focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed resize-none`}
+                    className={`flex-1 min-h-[160px] p-3 font-mono text-[10px] ${styles.appBg} styles.cardText rounded-lg border ${styles.cardBorder} focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed resize-none`}
                     placeholder="输入 OpenLineage RunEvent 或 Apache Atlas JSON payload..."
                   />
                 </div>
@@ -895,7 +895,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                 <button
                   onClick={handleParseLineage}
                   disabled={isParsing || !rawPayloadInput.trim()}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                  className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white font-extrabold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs`}
                 >
                   {isParsing ? (
                     <>
@@ -934,8 +934,8 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       <div className={`text-[8px] font-extrabold ${styles.cardTextMuted} tracking-wider uppercase`}>1. 物理数据源与原始流水表 (Raw DataSources)</div>
                       <div className="flex flex-wrap gap-2">
                         {lineageNodes.filter(n => n.type === 'physical_table').map(node => (
-                          <div key={node.id} className={`p-2 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-center gap-2 hover:border-slate-400 transition-all cursor-pointer shadow-xs`}>
-                            <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          <div key={node.id} className={`p-2 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-center gap-2 ${styles.accentBorder} transition-all cursor-pointer shadow-xs`}>
+                            <span className={`w-2 h-2 rounded-full ${styles.cardBorder}`} />
                             <div>
                               <div className={`font-mono text-[9px] font-bold ${styles.cardTextMuted}`}>{node.id}</div>
                               <div className={`text-[8px] ${styles.cardTextMuted} font-sans`}>{node.label}</div>
@@ -983,10 +983,10 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       <div className="flex flex-wrap gap-2">
                         {lineageNodes.filter(n => n.type === 'ontology_object').map(node => (
                           <div key={node.id} className="p-2 bg-indigo-50/50 border border-indigo-200 rounded-lg flex items-center gap-2 hover:border-indigo-400 transition-all cursor-pointer shadow-xs">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                            <span className={`w-2 h-2 rounded-full ${styles.accentBg}`} />
                             <div>
                               <div className="font-mono text-[9px] font-bold text-indigo-800">{node.id}</div>
-                              <div className="text-[8px] text-indigo-500 font-sans">{node.label}</div>
+                              <div className={`text-[8px] ${styles.accentText} font-sans`}>{node.label}</div>
                             </div>
                           </div>
                         ))}
@@ -1111,7 +1111,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                     ) : (
                       <div className="space-y-2.5 max-h-48 overflow-y-auto">
                         {impactResult.impactedNodes.map((node: any, i: number) => (
-                          <div key={i} className={`flex items-center justify-between p-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} hover:bg-slate-100/70 transition-all text-[10px]`}>
+                          <div key={i} className={`flex items-center justify-between p-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} hover:styles.appBg/70 transition-all text-[10px]`}>
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-1.5">
                                 <span className={`px-1.5 py-0.2 rounded-xs font-bold text-[8px] uppercase ${
@@ -1262,18 +1262,18 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                           className={`w-full p-2.5 rounded-lg border text-left flex flex-col space-y-1 transition-all cursor-pointer ${
                             isSelected
                               ? '${styles.accentBg} ${styles.accentBorder} text-white shadow-sm'
-                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                              : 'styles.inputBg hover:styles.appBg styles.cardBorder styles.cardText'
                           }`}
                         >
                           <div className="flex items-center justify-between w-full">
                             <span className="font-black text-xs">{ent.entityId}</span>
                             <span className={`text-[8px] px-1.5 py-0.5 rounded font-mono ${
-                              isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
+                              isSelected ? 'bg-blue-500 text-white' : 'styles.inputBg styles.cardTextMuted'
                             }`}>
                               {ent.mappings?.length || 0} fields
                             </span>
                           </div>
-                          <span className={`text-[9px] truncate block ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                          <span className={`text-[9px] truncate block ${isSelected ? 'styles.cardTextMuted' : 'styles.cardTextMuted'}`}>
                             {ent.chineseName || ent.entityName}
                           </span>
                         </button>
@@ -1549,7 +1549,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       </div>
                       <button
                         onClick={() => handleSaveOntologyMappings(ontologyMappings)}
-                        className={`px-5 py-2 ${styles.appBg} hover:bg-slate-800 text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-colors`}
+                        className={`px-5 py-2 ${styles.appBg} hover:styles.sidebarActiveBg text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-colors`}
                       >
                         <Icon name="Save" size={12} />
                         <span>应用并保存强对齐契约 (Save & Apply)</span>
@@ -1593,7 +1593,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       下面的元数据包已成功融合成无幻觉 RAG 专属的非结构化上下文契约。当 Copilot 运行时，此文本会与检索意图自动对齐，强行拦截 AI 漂移并对齐底细列：
                     </p>
 
-                    <pre className={`p-4 ${styles.appBg} text-slate-200 rounded-xl font-mono text-[9px] whitespace-pre-wrap leading-relaxed select-text max-h-[350px] overflow-y-auto`}>
+                    <pre className={`p-4 ${styles.appBg} styles.cardText rounded-xl font-mono text-[9px] whitespace-pre-wrap leading-relaxed select-text max-h-[350px] overflow-y-auto`}>
                       {exportedMarkdown}
                     </pre>
 
@@ -1617,7 +1617,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                     </button>
                     <button
                       onClick={() => setShowExportModal(false)}
-                      className={`px-4 py-1.5 bg-slate-200 hover:bg-slate-300 ${styles.cardTextMuted} font-bold rounded-lg text-xs cursor-pointer transition-all`}
+                      className={`px-4 py-1.5 ${styles.inputBg} ${styles.sidebarHoverBg} ${styles.cardTextMuted} font-bold rounded-lg text-xs cursor-pointer transition-all`}
                     >
                       <span>关闭</span>
                     </button>
@@ -1685,7 +1685,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                         step={64}
                         value={chunkSize}
                         onChange={e => setChunkSize(Number(e.target.value))}
-                        className="w-full h-1.5 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        className={`w-full h-1.5 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-indigo-600`}
                       />
                     </div>
 
@@ -1701,7 +1701,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                         step={10}
                         value={overlap}
                         onChange={e => setOverlap(Number(e.target.value))}
-                        className="w-full h-1.5 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        className={`w-full h-1.5 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-indigo-600`}
                       />
                     </div>
                   </div>
@@ -1709,7 +1709,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                   <button
                     onClick={handleSyncAll}
                     disabled={isSyncingAll}
-                    className={`w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
+                    className={`w-full py-2 styles.accentBg styles.accentHover text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
                       isSyncingAll ? 'opacity-75 cursor-not-allowed' : ''
                     }`}
                   >
@@ -1729,7 +1729,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
 
                 {/* Live Monitor Console */}
                 <div className={`${styles.cardBg} rounded-xl p-4 border ${styles.cardBorder} space-y-2 shadow-inner`}>
-                  <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                  <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
                     <span className={`text-[10px] font-extrabold ${styles.cardTextMuted} font-mono tracking-wider flex items-center gap-1.5`}>
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                       SYSTEM PIPELINE MONITOR
@@ -1739,7 +1739,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                   <div className="font-mono text-[9.5px] leading-relaxed h-52 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
                     {syncLogs.length > 0 ? (
                       syncLogs.map((log, idx) => {
-                        let textClass = "text-slate-300";
+                        let textClass = "styles.cardTextMuted";
                         if (log.includes('🚨')) textClass = "text-rose-400 font-bold";
                         else if (log.includes('✅')) textClass = "text-emerald-400";
                         else if (log.includes('🔄')) textClass = "text-amber-400";
@@ -1852,8 +1852,8 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                         onClick={() => setPersistenceTab('pgvector')}
                         className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all cursor-pointer ${
                           persistenceTab === 'pgvector' 
-                            ? 'bg-white text-indigo-700 shadow-xs' 
-                            : 'text-slate-500 hover:text-slate-800'
+                            ? 'styles.cardBg text-indigo-700 shadow-xs' 
+                            : 'styles.cardTextMuted hover:styles.cardText'
                         }`}
                       >
                         PGVector (SQL)
@@ -1862,8 +1862,8 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                         onClick={() => setPersistenceTab('milvus')}
                         className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all cursor-pointer ${
                           persistenceTab === 'milvus' 
-                            ? 'bg-white text-indigo-700 shadow-xs' 
-                            : 'text-slate-500 hover:text-slate-800'
+                            ? 'styles.cardBg text-indigo-700 shadow-xs' 
+                            : 'styles.cardTextMuted hover:styles.cardText'
                         }`}
                       >
                         Milvus (Node.js)
@@ -1889,7 +1889,7 @@ export default function KnowledgeView({ showToast }: KnowledgeViewProps) {
                       </button>
                     </div>
 
-                    <div className={`${styles.appBg} ${styles.cardTextMuted} rounded-xl p-3 h-48 overflow-y-auto font-mono text-[9.5px] leading-relaxed border border-slate-850`}>
+                    <div className={`${styles.appBg} ${styles.cardTextMuted} rounded-xl p-3 h-48 overflow-y-auto font-mono text-[9.5px] leading-relaxed border styles.cardBorder`}>
                       {persistenceTab === 'pgvector' ? (
                         pgvectorSql ? (
                           <pre className="whitespace-pre">{pgvectorSql}</pre>

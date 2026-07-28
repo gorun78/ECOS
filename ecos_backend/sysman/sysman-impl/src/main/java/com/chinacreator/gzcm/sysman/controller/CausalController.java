@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @RestController("sysmanCausalController")
-@RequestMapping({"/api/causal", "/api/v1/causal"})
+@RequestMapping("/api/v1/causal")
 public class CausalController {
 
     private static final Logger log = LoggerFactory.getLogger(CausalController.class);

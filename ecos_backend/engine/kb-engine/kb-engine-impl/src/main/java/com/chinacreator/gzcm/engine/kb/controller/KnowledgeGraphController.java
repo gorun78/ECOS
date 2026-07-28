@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/knowledge")
+@RequestMapping("/api/v1/knowledge")
 public class KnowledgeGraphController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeGraphController.class);

@@ -39,12 +39,6 @@ interface ChatMessage {
   };
 }
 
-/**
- * Build a local mock simulation result when the backend sandbox endpoint
- * (/api/v1/guardrails/policies/preview) is unavailable. Produces a realistic
- * verdict trace so the Simulation Sandbox stays interactive (graceful
- * degradation) instead of showing a blank state.
- */
 function buildMockSimulationResult(userId: string, datasetId: string, query: string): any {
   const isSensitive = /ssn|社保|身份证|薪资|salary|电话|phone|住址|薪酬/i.test(query);
   const verdict = isSensitive ? 'BLOCKED' : 'GRANTED';
@@ -128,7 +122,6 @@ export default function AgentStudioView({
   const [chatInput, setChatInput] = useState('');
   const [isReplying, setIsReplying] = useState(false);
 
-  // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AIPAgent | null>(null);
   const [formName, setFormName] = useState('');
@@ -139,7 +132,6 @@ export default function AgentStudioView({
   const [formTools, setFormTools] = useState<string[]>([]);
   const [formGuardrails, setFormGuardrails] = useState<string[]>([]);
 
-  // Simulation Sandbox states
   const [sandboxMode, setSandboxMode] = useState<'chat' | 'simulation'>('chat');
   const [simUserId, setSimUserId] = useState<string>('analyst_li');
   const [simDatasetId, setSimDatasetId] = useState<string>('ds_pilots_biography');
@@ -184,9 +176,6 @@ export default function AgentStudioView({
         throw new Error(data.error || '仿真执行失败');
       }
     } catch (err) {
-      // Backend simulation-sandbox endpoint is not deployed yet — degrade
-      // gracefully by rendering a locally-computed mock verdict so the
-      // sandbox stays interactive instead of showing a blank state.
       console.warn('[AgentStudio] simulation-sandbox unavailable, using local fallback', err);
       setSimResult(buildMockSimulationResult(simUserId, simDatasetId, simQuery));
       showToast?.('info', '仿真引擎离线，已切换至本地沙箱推演模式');
@@ -197,12 +186,9 @@ export default function AgentStudioView({
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
-  // Connect to the real AgentMesh API (GET /api/agent-mesh/agents) and replace
-  // the mock agent list with live data. Uses authHeaders() for the Bearer token.
-  // Falls back to the existing (mock) list on error so the UI degrades gracefully.
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/agent-mesh/agents', { headers: authHeaders() })
+    fetch('/api/v1/agent-mesh/agents', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
         if (cancelled) return;
@@ -214,7 +200,6 @@ export default function AgentStudioView({
     return () => { cancelled = true; };
   }, []);
 
-  // Load welcome chat messages when selected agent changes
   useEffect(() => {
     if (selectedAgent) {
       setChatMessages([
@@ -313,12 +298,10 @@ export default function AgentStudioView({
     setShowCreateModal(false);
   };
 
-  // Chat Submission & Simulated Dynamic Multi-Step AI Reasoning
   const handleSendChat = (textToSend?: string) => {
     const text = textToSend || chatInput;
     if (!text.trim() || isReplying || !selectedAgent) return;
 
-    // Add user message
     const userMsgId = `user-${Date.now()}`;
     const timestampStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     const userMsg: ChatMessage = {
@@ -332,7 +315,6 @@ export default function AgentStudioView({
     setChatInput('');
     setIsReplying(true);
 
-    // Audit Log writing on request
     onAddAuditLog({
       id: `log-${Date.now()}`,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -345,7 +327,6 @@ export default function AgentStudioView({
       details: `通过交互沙箱向智能体发送问题: "${text.substring(0, 40)}..."`
     });
 
-    // Simulating thinking process and reply
     setTimeout(() => {
       const replyMsgId = `agent-${Date.now()}`;
       
@@ -390,7 +371,6 @@ export default function AgentStudioView({
       }
 
       if (proposal) {
-        // Send proposal to backend
         fetch('/api/v1/ontology/proposals', {
           method: 'POST',
           headers: authHeaders(),
@@ -424,13 +404,11 @@ export default function AgentStudioView({
     }, 1800);
   };
 
-  // Handle Action Approval Card Interactions
   const handleActionConsent = (msgId: string, approved: boolean) => {
     const targetMsg = chatMessages.find(m => m.id === msgId);
     const propId = targetMsg?.actionProposal?.id || 'prop-1';
 
     if (approved) {
-      // Execute via backend with role Check (defaulting to AOC Director / 签派总监)
       fetch(`/api/v1/ontology/proposals/${propId}/execute`, {
         method: 'POST',
         headers: authHeaders(),
@@ -457,7 +435,6 @@ export default function AgentStudioView({
             return msg;
           }));
 
-          // Add success log
           onAddAuditLog({
             id: `log-${Date.now()}`,
             timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -471,7 +448,6 @@ export default function AgentStudioView({
             details: `人工授权动作执行成功: ${data.executionDetail}`
           });
 
-          // Insert system confirmation bubble with verification details
           const matrixStr = data.verificationMatrix?.map((m: any) => 
             `• \`${m.logicalField}\` 映射到 \`${m.physicalCol}\`: 预估 [${m.expectedValue}] ↔ 物理读回 [${m.readbackValue}] ✅ 强对齐`
           ).join('\n') || '';
@@ -508,7 +484,7 @@ export default function AgentStudioView({
   };
 
   return (
-    <div className={`flex h-full overflow-hidden select-none ${styles.appBg} text-xs`}>
+    <div className={`flex h-full overflow-hidden select-none ${styles.appBg} ${styles.appText} text-xs`}>
       
       {/* 1. Left Agents List */}
       <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
@@ -516,7 +492,7 @@ export default function AgentStudioView({
           <span className={`font-bold ${styles.cardText}`}>智能助手工坊 ({agents.length})</span>
           <button
             onClick={handleStartCreate}
-            className="p-1 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-md transition-colors cursor-pointer"
+            className={`p-1 ${styles.badgeBg} hover:opacity-80 ${styles.accentText} ${styles.accentBorder} border rounded-md transition-colors cursor-pointer`}
             title="新增智能体"
           >
             <Icon name="Plus" size={12} />
@@ -533,11 +509,11 @@ export default function AgentStudioView({
                 className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 ${
                   isSelected
                     ? `${styles.accentBg} text-white shadow-xs`
-                    : 'text-slate-600 hover:bg-slate-50'
+                    : `${styles.cardTextMuted} hover:${styles.inputBg}`
                 }`}
               >
                 <div className="flex items-center gap-1.5 font-bold">
-                  <span className={`p-1 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`p-1 rounded ${isSelected ? 'bg-blue-600 text-white' : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
                     <Icon name={a.avatar} size={11} />
                   </span>
                   <span className="truncate">{a.name}</span>
@@ -547,7 +523,7 @@ export default function AgentStudioView({
                 </p>
                 <div className={`flex items-center justify-between text-[9px] pt-1 mt-0.5 border-t ${styles.inputBorder}/10`}>
                   <span className={`font-mono ${styles.cardTextMuted}`}>{a.modelId.replace('-1.5-pro', '')}</span>
-                  <span className="px-1 bg-blue-500/10 text-blue-500 rounded text-[8px] font-bold">ACTIVE</span>
+                  <span className={`px-1 ${styles.badgeBg} ${styles.accentText} rounded text-[8px] font-bold`}>ACTIVE</span>
                 </div>
               </div>
             );
@@ -563,12 +539,12 @@ export default function AgentStudioView({
             {/* Agent Header */}
             <div className={`${styles.cardBg} border ${styles.cardBorder} p-4 rounded-xl shadow-xs flex items-start justify-between`}>
               <div className="flex gap-3">
-                <span className="p-3 rounded-xl bg-blue-100 text-blue-600 shrink-0">
+                <span className={`p-3 rounded-xl ${styles.badgeBg} ${styles.accentText} shrink-0`}>
                   <Icon name={selectedAgent.avatar} size={20} />
                 </span>
                 <div className="space-y-1">
                   <h2 className={`text-sm font-black ${styles.cardText}`}>{selectedAgent.name}</h2>
-                  <p className="text-xs font-bold text-blue-600">{selectedAgent.role}</p>
+                  <p className={`text-xs font-bold ${styles.accentText}`}>{selectedAgent.role}</p>
                   <p className={`text-[11px] ${styles.cardTextMuted} max-w-lg leading-relaxed`}>{selectedAgent.description}</p>
                 </div>
               </div>
@@ -576,7 +552,7 @@ export default function AgentStudioView({
               <div className="flex gap-2">
                 <button
                   onClick={() => handleStartEdit(selectedAgent)}
-                  className={`px-2.5 py-1.5 ${styles.appBg} hover:bg-slate-200 ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-all cursor-pointer flex items-center gap-1`}
+                  className={`px-2.5 py-1.5 ${styles.appBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-all cursor-pointer flex items-center gap-1`}
                 >
                   <Icon name="Settings2" size={11} />
                   <span>管理智能体</span>
@@ -597,7 +573,7 @@ export default function AgentStudioView({
               {/* Box 1: Prompt Guidelines */}
               <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
                 <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
-                  <Icon name="Sliders" size={12} className="text-blue-500" />
+                  <Icon name="Sliders" size={12} className={styles.accentText} />
                   <span>系统角色指令 (System Persona)</span>
                 </h3>
                 <div className={`h-56 overflow-y-auto ${styles.inputBg} p-3 border ${styles.cardBorder} rounded-lg text-[11px] ${styles.cardTextMuted} font-sans leading-relaxed whitespace-pre-line`}>
@@ -610,7 +586,7 @@ export default function AgentStudioView({
                 
                 <div className="space-y-3">
                   <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
-                    <Icon name="Boxes" size={12} className="text-indigo-500" />
+                    <Icon name="Boxes" size={12} className={styles.accentText} />
                     <span>挂载本体动作与函数能力 (Tools Plugin)</span>
                   </h3>
                   
@@ -636,7 +612,7 @@ export default function AgentStudioView({
                           <p className={`font-bold text-[10px] ${styles.cardText}`}>{fn}</p>
                           <p className={`text-[9px] ${styles.cardTextMuted} font-mono`}>Ontology Function Query</p>
                         </div>
-                        <span className="px-1.5 bg-blue-500/10 text-blue-600 text-[8px] font-bold rounded">只读</span>
+                        <span className={`px-1.5 ${styles.badgeBg} ${styles.accentText} text-[8px] font-bold rounded`}>只读</span>
                       </div>
                     ))}
                   </div>
@@ -666,18 +642,18 @@ export default function AgentStudioView({
 
           </div>
 
-          {/* 3. Right: Live Sandbox Playground (Chat Box or Simulation Sandbox) */}
+          {/* 3. Right: Live Sandbox Playground */}
           <div className={`w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
             
             {/* Header with Tab Selectors */}
             <div className={`p-2 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between shrink-0`}>
-              <div className="flex bg-slate-200/60 p-1 rounded-lg">
+              <div className={`flex ${styles.inputBg} p-1 rounded-lg`}>
                 <button
                   onClick={() => setSandboxMode('chat')}
                   className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
                     sandboxMode === 'chat'
-                      ? 'bg-white text-slate-800 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? `${styles.cardBg} ${styles.cardText} shadow-xs`
+                      : styles.cardTextMuted
                   }`}
                 >
                   <Icon name="MessageSquare" size={10} />
@@ -688,7 +664,7 @@ export default function AgentStudioView({
                   className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
                     sandboxMode === 'simulation'
                       ? `${styles.accentBg} text-white shadow-xs`
-                      : 'text-slate-500 hover:text-slate-800'
+                      : styles.cardTextMuted
                   }`}
                 >
                   <Icon name="ShieldAlert" size={10} className="text-amber-400" />
@@ -708,7 +684,7 @@ export default function AgentStudioView({
                       }
                     ]);
                   }}
-                  className={`p-1 ${styles.cardTextMuted} hover:${styles.cardTextMuted} cursor-pointer`}
+                  className={`p-1 ${styles.cardTextMuted} cursor-pointer`}
                   title="清除聊天历史"
                 >
                   <Icon name="RefreshCcw" size={11} />
@@ -744,25 +720,25 @@ export default function AgentStudioView({
                         <div className={`flex items-center gap-1.5 text-[9px] ${styles.cardTextMuted} font-mono`}>
                           {!isUser && <span className={`font-bold ${styles.cardTextMuted}`}>{selectedAgent.name}</span>}
                           <span>{msg.timestamp}</span>
-                          {isUser && <span className="font-bold text-blue-600">You (签派总监)</span>}
+                          {isUser && <span className={`font-bold ${styles.accentText}`}>You (签派总监)</span>}
                         </div>
 
                         {/* Chat Bubble */}
                         <div className={`p-3 rounded-2xl max-w-[85%] leading-relaxed whitespace-pre-wrap text-[11px] ${
                           isUser
-                            ? 'bg-blue-600 text-white rounded-tr-none font-medium'
-                            : 'bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200/40'
+                            ? `${styles.accentBg} text-white rounded-tr-none font-medium`
+                            : `${styles.inputBg} ${styles.cardText} rounded-tl-none border ${styles.cardBorder}/40`
                         }`}>
                           {msg.content}
                         </div>
 
-                        {/* Embedded Reasoning Trace (Thinking Process) */}
+                        {/* Embedded Reasoning Trace */}
                         {msg.thinkingTrace && msg.thinkingTrace.length > 0 && (
                           <div className={`w-[85%] ${styles.appBg} ${styles.cardTextMuted} rounded-lg p-2.5 font-mono text-[9px] space-y-1`}>
-                            <span className="text-[8px] text-blue-400 uppercase font-extrabold block mb-1">AIP 逻辑链追踪 (AIP Trace):</span>
+                            <span className={`text-[8px] ${styles.accentText} uppercase font-extrabold block mb-1`}>AIP 逻辑链追踪 (AIP Trace):</span>
                             {msg.thinkingTrace.map((log, idx) => (
                               <div key={idx} className="flex items-start gap-1">
-                                <span className={`${styles.cardTextMuted}`}>▶</span>
+                                <span className={styles.cardTextMuted}>▶</span>
                                 <span>{log}</span>
                               </div>
                             ))}
@@ -833,9 +809,9 @@ export default function AgentStudioView({
                         <span>正在思考...</span>
                       </div>
                       <div className={`p-3 ${styles.appBg} rounded-2xl rounded-tl-none border ${styles.cardBorder}/40 flex items-center gap-1.5`}>
-                        <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span className={`w-1.5 h-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '0ms' }} />
+                        <span className={`w-1.5 h-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '150ms' }} />
+                        <span className={`w-1.5 h-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '300ms' }} />
                       </div>
                     </div>
                   )}
@@ -850,7 +826,7 @@ export default function AgentStudioView({
                     <button
                       key={p}
                       onClick={() => handleSendChat(p)}
-                      className={`px-2.5 py-1 ${styles.cardBg} hover:bg-blue-50 hover:border-blue-200 border ${styles.cardBorder} rounded-full text-[10px] ${styles.cardTextMuted} font-medium whitespace-nowrap cursor-pointer transition-colors`}
+                      className={`px-2.5 py-1 ${styles.cardBg} ${styles.accentHover} ${styles.accentBorder} hover:border-blue-200 border ${styles.cardBorder} rounded-full text-[10px] ${styles.cardTextMuted} font-medium whitespace-nowrap cursor-pointer transition-colors`}
                     >
                       {p}
                     </button>
@@ -870,7 +846,7 @@ export default function AgentStudioView({
                   <button
                     onClick={() => handleSendChat()}
                     disabled={isReplying || !chatInput.trim()}
-                    className="h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    className={`h-8 w-8 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0`}
                   >
                     <Icon name="Send" size={13} />
                   </button>
@@ -885,7 +861,7 @@ export default function AgentStudioView({
                 {/* Form Inputs Panel */}
                 <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} space-y-3 shrink-0`}>
                   <h3 className={`text-[11px] font-black ${styles.cardText} flex items-center gap-1`}>
-                    <Icon name="SlidersHorizontal" size={12} className="text-blue-600" />
+                    <Icon name="SlidersHorizontal" size={12} className={styles.accentText} />
                     <span>仿真推理上下文设置 (Context Inputs)</span>
                   </h3>
 
@@ -960,7 +936,7 @@ export default function AgentStudioView({
                         setSimDatasetId('ds_flights_clean');
                         setSimQuery('展示目前所有的航班延误与疲劳时长数据');
                       }}
-                      className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded text-[9px] text-blue-700 font-bold"
+                      className={`px-2 py-0.5 ${styles.badgeBg} hover:opacity-80 ${styles.accentBorder} border rounded text-[9px] ${styles.accentText} font-bold`}
                     >
                       常态数据检索
                     </button>
@@ -970,7 +946,7 @@ export default function AgentStudioView({
                   <button
                     onClick={handleRunSimulation}
                     disabled={isSimulating}
-                    className={`w-full py-2 ${styles.appBg} hover:bg-slate-850 text-white rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50`}
+                    className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50`}
                   >
                     {isSimulating ? (
                       <>
@@ -991,7 +967,7 @@ export default function AgentStudioView({
                   
                   {isSimulating && (
                     <div className={`flex flex-col items-center justify-center py-20 ${styles.cardTextMuted} space-y-3`}>
-                      <Icon name="ShieldAlert" size={32} className="text-blue-500 animate-pulse" />
+                      <Icon name="ShieldAlert" size={32} className={`${styles.accentText} animate-pulse`} />
                       <div className="text-center space-y-1">
                         <p className={`font-extrabold ${styles.cardTextMuted}`}>正在评估零信任级联门禁...</p>
                         <p className="text-[10px]">Org IP Whitelist ➔ Project DAC ➔ Marking MAC ➔ Purpose PBAC</p>
@@ -1001,7 +977,7 @@ export default function AgentStudioView({
 
                   {!isSimulating && !simResult && (
                     <div className={`flex flex-col items-center justify-center py-24 ${styles.cardTextMuted} text-center space-y-2`}>
-                      <Icon name="Tv" size={28} className={`${styles.cardTextMuted}`} />
+                      <Icon name="Tv" size={28} className={styles.cardTextMuted} />
                       <span className={`font-bold ${styles.cardTextMuted}`}>待执行仿真模拟</span>
                       <p className={`text-[10px] ${styles.cardTextMuted} max-w-xs`}>设置好上方的模拟角色和提问，点击运行，系统将追踪每一个决策节点的放行/阻断判定日志。</p>
                     </div>
@@ -1073,7 +1049,7 @@ export default function AgentStudioView({
                                   <Icon
                                     name={isExpanded ? 'ChevronDown' : 'ChevronRight'}
                                     size={12}
-                                    className={`${styles.cardTextMuted}`}
+                                    className={styles.cardTextMuted}
                                   />
                                 </div>
                               </div>
@@ -1096,7 +1072,7 @@ export default function AgentStudioView({
                                     })}
                                   </div>
 
-                                  {/* Special Node 2 Visualization: RAG Documents and PII Redaction */}
+                                  {/* Special Node 2: RAG */}
                                   {node.id === 'node_rag_retrieval' && (
                                     <div className={`space-y-2 border-t ${styles.cardBorder} pt-2.5`}>
                                       <div className="flex items-center justify-between">
@@ -1115,7 +1091,7 @@ export default function AgentStudioView({
                                     </div>
                                   )}
 
-                                  {/* Special Node 3 Visualization: LLM Response */}
+                                  {/* Special Node 3: LLM */}
                                   {node.id === 'node_llm_inference' && (
                                     <div className={`space-y-2 border-t ${styles.cardBorder} pt-2.5`}>
                                       <span className={`font-bold ${styles.cardTextMuted} block`}>LLM 主权审计闭环答复 (Final Answer)</span>
@@ -1125,7 +1101,7 @@ export default function AgentStudioView({
                                     </div>
                                   )}
 
-                                  {/* Special Node 4 Visualization: Data Firewall Table Rows */}
+                                  {/* Special Node 4: Data Firewall */}
                                   {node.id === 'node_data_masking' && (
                                     <div className={`space-y-2 border-t ${styles.cardBorder} pt-2.5`}>
                                       <span className={`font-bold ${styles.cardTextMuted} block`}>行/列防火墙隔离后物理数据输出 (Masked Records)</span>
@@ -1178,7 +1154,7 @@ export default function AgentStudioView({
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} cursor-pointer`}
+                className={`${styles.cardTextMuted} cursor-pointer`}
               >
                 <Icon name="X" size={15} />
               </button>
@@ -1192,7 +1168,7 @@ export default function AgentStudioView({
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
                   placeholder="例如: 机场地面调度专家"
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs`}
+                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
                   required
                 />
               </div>
@@ -1204,7 +1180,7 @@ export default function AgentStudioView({
                   value={formRole}
                   onChange={e => setFormRole(e.target.value)}
                   placeholder="例如: 机场廊桥与行李分发智能化调度管家"
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs`}
+                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
                   required
                 />
               </div>
@@ -1216,7 +1192,7 @@ export default function AgentStudioView({
                   onChange={e => setFormDesc(e.target.value)}
                   placeholder="说明该智能体的定位及服务群体"
                   rows={2}
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none`}
+                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none ${styles.cardBg} ${styles.cardText}`}
                 />
               </div>
 
@@ -1225,7 +1201,7 @@ export default function AgentStudioView({
                 <select
                   value={formModel}
                   onChange={e => setFormModel(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs`}
+                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
                 >
                   {models.map(m => (
                     <option key={m.id} value={m.id}>{m.displayName}</option>
@@ -1240,7 +1216,7 @@ export default function AgentStudioView({
                   onChange={e => setFormPrompt(e.target.value)}
                   placeholder="在此写入详细的 Persona、操作规范、CAAC 执照评定约束和工具调用流程..."
                   rows={4}
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none font-sans leading-relaxed`}
+                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none font-sans leading-relaxed ${styles.cardBg} ${styles.cardText}`}
                   required
                 />
               </div>
@@ -1263,7 +1239,7 @@ export default function AgentStudioView({
                               setFormTools([...formTools, tool]);
                             }
                           }}
-                          className="rounded text-blue-600 border-slate-300 h-3 w-3"
+                          className={`rounded ${styles.accentText} ${styles.inputBorder} h-3 w-3`}
                         />
                         <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{tool}</span>
                       </label>
@@ -1290,7 +1266,7 @@ export default function AgentStudioView({
                               setFormGuardrails([...formGuardrails, g.id]);
                             }
                           }}
-                          className="rounded text-blue-600 border-slate-300 h-3 w-3"
+                          className={`rounded ${styles.accentText} ${styles.inputBorder} h-3 w-3`}
                         />
                         <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>{g.name}</span>
                       </label>
@@ -1309,7 +1285,7 @@ export default function AgentStudioView({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-[11px]"
+                  className={`px-4 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-[11px]`}
                 >
                   确认部署
                 </button>

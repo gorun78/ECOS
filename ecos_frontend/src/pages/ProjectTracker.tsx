@@ -1,6 +1,6 @@
 /**
  * ProjectTracker — 高速信科项目跟踪
- * 调用 /api/v1/gsxk/objects/Project 获取项目列表
+ * 调用 /api/v1/ecos/objects/Project 获取项目列表
  *
  * @license Apache-2.0
  */
@@ -31,10 +31,10 @@ interface Project {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: "进行中", color: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700" },
-  completed: { label: "已完成", color: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700" },
-  paused: { label: "暂停", color: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700" },
-  planning: { label: "规划中", color: "bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600" },
+  active: { label: "进行中", color: "bg-green-100 text-green-700 border-green-300" },
+  completed: { label: "已完成", color: "bg-blue-100 text-blue-700 border-blue-300" },
+  paused: { label: "暂停", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  planning: { label: "规划中", color: "styles.appBg styles.cardTextMuted styles.cardBorder" },
 };
 
 const PAGE_SIZE = 10;
@@ -63,7 +63,7 @@ export default function ProjectTracker() {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (searchQ.trim()) params.set("search", searchQ.trim());
 
-      const data: any = await apiFetchData(`/api/v1/gsxk/objects/Project?${params.toString()}`);
+      const data: any = await apiFetchData(`/api/v1/ecos/objects/Project?${params.toString()}`);
       if (Array.isArray(data)) {
         setProjects(data);
         setTotal(data.length);
@@ -99,7 +99,7 @@ export default function ProjectTracker() {
       label: locale === "zh" ? "项目名称" : "Project Name",
       render: (_v, record) => (
         <button
-          className="text-left font-medium hover:underline flex items-center gap-1"
+          className={`text-left font-medium hover:underline flex items-center gap-1 ${styles.cardText}`}
           onClick={(e) => {
             e.stopPropagation();
             setExpandedId(expandedId === record.id ? null : record.id);
@@ -117,7 +117,7 @@ export default function ProjectTracker() {
       key: "status",
       label: locale === "zh" ? "状态" : "Status",
       render: (_v, record) => {
-        const s = STATUS_MAP[record.status] || { label: record.status, color: "bg-gray-100 text-gray-600 border-gray-300" };
+        const s = STATUS_MAP[record.status] || { label: record.status, color: "styles.appBg styles.cardTextMuted styles.cardBorder" };
         return (
           <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${s.color}`}>
             {s.label}
@@ -132,13 +132,13 @@ export default function ProjectTracker() {
         const pct = typeof record.progress === "number" ? record.progress : Number(record.progress) || 0;
         return (
           <div className="flex items-center gap-2 min-w-[80px]">
-            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className={`flex-1 h-1.5 ${styles.inputBorder} border rounded-full overflow-hidden ${styles.inputBg}`}>
               <div
-                className="h-full bg-indigo-500 rounded-full transition-all"
-                style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                className={`h-full ${styles.accentBg.replace("bg-", "bg-")} rounded-full transition-all`}
+                style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: undefined }}
               />
             </div>
-            <span className="text-[10px] font-mono w-8 text-right">{pct}%</span>
+            <span className={`text-[10px] font-mono w-8 text-right ${styles.cardTextMuted}`}>{pct}%</span>
           </div>
         );
       },
@@ -147,8 +147,8 @@ export default function ProjectTracker() {
       key: "manager",
       label: locale === "zh" ? "负责人" : "Manager",
       render: (_v, record) => (
-        <span className="flex items-center gap-1 text-xs">
-          <User className="w-3 h-3 opacity-50" />
+        <span className={`flex items-center gap-1 text-xs ${styles.cardText}`}>
+          <User className={`w-3 h-3 ${styles.cardTextMuted}`} />
           {record.manager || "—"}
         </span>
       ),
@@ -169,7 +169,7 @@ export default function ProjectTracker() {
       key: "startDate",
       label: locale === "zh" ? "起止日期" : "Duration",
       render: (_v, record) => (
-        <span className="text-xs whitespace-nowrap">
+        <span className={`text-xs whitespace-nowrap ${styles.cardTextMuted}`}>
           {record.startDate || "—"} ~ {record.endDate || "—"}
         </span>
       ),
@@ -179,10 +179,10 @@ export default function ProjectTracker() {
   // ── Loading State ────────────────────────────────────
   if (loading && !projects.length) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className={`h-full flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-          <p className="text-sm text-slate-400">
+          <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
+          <p className={`text-sm ${styles.muted}`}>
             {locale === "zh" ? "加载项目数据..." : "Loading projects..."}
           </p>
         </div>
@@ -193,16 +193,16 @@ export default function ProjectTracker() {
   // ── Error State ──────────────────────────────────────
   if (error && !projects.length) {
     return (
-      <div className="h-full flex items-center justify-center p-6">
+      <div className={`h-full flex items-center justify-center p-6 ${styles.appBg}`}>
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="text-sm font-semibold text-red-600 mb-1">
             {locale === "zh" ? "数据加载失败" : "Failed to load data"}
           </p>
-          <p className="text-xs text-slate-500 mb-4">{error}</p>
+          <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
             onClick={loadProjects}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             {locale === "zh" ? "重试" : "Retry"}
@@ -214,22 +214,22 @@ export default function ProjectTracker() {
 
   // ── Render ───────────────────────────────────────────
   return (
-    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4">
+    <div className={`flex-1 overflow-y-auto p-6 font-sans ${styles.appBg} ${styles.appText} space-y-4`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-indigo-500" />
+            <Briefcase className={`w-5 h-5 ${styles.accentText}`} />
             {locale === "zh" ? "项目跟踪" : "Project Tracker"}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className={`text-xs ${styles.muted} mt-1`}>
             {locale === "zh" ? "高速信科工程项目全生命周期管理" : "GSXK project lifecycle management"}
           </p>
         </div>
         <button
           onClick={() => { setCurrentPage(1); loadProjects(); }}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50"
+          className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           {loading ? (locale === "zh" ? "刷新中..." : "Refreshing...") : (locale === "zh" ? "刷新" : "Refresh")}
@@ -240,7 +240,7 @@ export default function ProjectTracker() {
       <div className={`flex flex-col sm:flex-row gap-3 p-3 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
         {/* Search */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${styles.muted}`} />
           <input
             type="text"
             value={searchQ}
@@ -267,10 +267,10 @@ export default function ProjectTracker() {
       {/* Summary stats */}
       {!loading && projects.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatPill icon={Briefcase} label={locale === "zh" ? "总项目" : "Total"} value={total} color="text-indigo-500" />
-          <StatPill icon={Target} label={locale === "zh" ? "进行中" : "Active"} value={projects.filter(p => p.status === "active").length} color="text-green-500" />
-          <StatPill icon={Clock} label={locale === "zh" ? "已完成" : "Done"} value={projects.filter(p => p.status === "completed").length} color="text-blue-500" />
-          <StatPill icon={DollarSign} label={locale === "zh" ? "总金额(万)" : "Total (万)"} value={projects.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) / 10000} color="text-orange-500" fmt="money" />
+          <StatPill icon={Briefcase} label={locale === "zh" ? "总项目" : "Total"} value={total} color={styles.accentText} styles={styles} />
+          <StatPill icon={Target} label={locale === "zh" ? "进行中" : "Active"} value={projects.filter(p => p.status === "active").length} color="text-green-500" styles={styles} />
+          <StatPill icon={Clock} label={locale === "zh" ? "已完成" : "Done"} value={projects.filter(p => p.status === "completed").length} color="text-blue-500" styles={styles} />
+          <StatPill icon={DollarSign} label={locale === "zh" ? "总金额(万)" : "Total (万)"} value={projects.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) / 10000} color="text-orange-500" fmt="money" styles={styles} />
         </div>
       )}
 
@@ -299,13 +299,13 @@ export default function ProjectTracker() {
         return (
           <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-5 space-y-4`}>
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-indigo-500" />
+              <h3 className={`text-base font-bold flex items-center gap-2 ${styles.cardText}`}>
+                <Briefcase className={`w-4 h-4 ${styles.accentText}`} />
                 {proj.name}
               </h3>
               <button
                 onClick={() => setExpandedId(null)}
-                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition"
+                className={`text-xs ${styles.cardTextMuted} hover:opacity-70 transition`}
               >
                 {locale === "zh" ? "收起 ▲" : "Collapse ▲"}
               </button>
@@ -316,42 +316,49 @@ export default function ProjectTracker() {
                 icon={Target}
                 label={locale === "zh" ? "状态" : "Status"}
                 value={STATUS_MAP[proj.status]?.label || proj.status}
+                styles={styles}
               />
               <DetailField
                 icon={Target}
                 label={locale === "zh" ? "进度" : "Progress"}
                 value={`${proj.progress ?? 0}%`}
+                styles={styles}
               />
               <DetailField
                 icon={User}
                 label={locale === "zh" ? "负责人" : "Manager"}
                 value={proj.manager || "—"}
+                styles={styles}
               />
               <DetailField
                 icon={DollarSign}
                 label={locale === "zh" ? "合同金额" : "Amount"}
                 value={proj.amount != null ? `${(Number(proj.amount) / 10000).toFixed(1)} 万` : "—"}
+                styles={styles}
               />
               <DetailField
                 icon={Calendar}
                 label={locale === "zh" ? "开始日期" : "Start Date"}
                 value={proj.startDate || "—"}
+                styles={styles}
               />
               <DetailField
                 icon={Calendar}
                 label={locale === "zh" ? "结束日期" : "End Date"}
                 value={proj.endDate || "—"}
+                styles={styles}
               />
               <DetailField
                 icon={Clock}
                 label="ID"
                 value={proj.id}
+                styles={styles}
               />
             </div>
 
             {proj.description && (
               <div>
-                <p className="text-xs font-semibold text-slate-500 mb-1">
+                <p className={`text-xs font-semibold ${styles.cardTextMuted} mb-1`}>
                   {locale === "zh" ? "项目描述" : "Description"}
                 </p>
                 <p className={`text-sm ${styles.cardText}`}>{proj.description}</p>
@@ -365,30 +372,30 @@ export default function ProjectTracker() {
 }
 
 // ── Sub-components ─────────────────────────────────────
-function StatPill({ icon: Icon, label, value, color, fmt }: {
-  icon: any; label: string; value: number; color: string; fmt?: string;
+function StatPill({ icon: Icon, label, value, color, fmt, styles }: {
+  icon: any; label: string; value: number; color: string; fmt?: string; styles: any;
 }) {
   const display = fmt === "money" ? `${value.toFixed(1)} 万` : value;
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
       <Icon className={`w-4 h-4 ${color}`} />
       <div>
-        <div className="text-lg font-bold">{display}</div>
-        <div className="text-[10px] text-slate-400">{label}</div>
+        <div className={`text-lg font-bold ${styles.cardText}`}>{display}</div>
+        <div className={`text-[10px] ${styles.cardTextMuted}`}>{label}</div>
       </div>
     </div>
   );
 }
 
-function DetailField({ icon: Icon, label, value }: {
-  icon: any; label: string; value: string;
+function DetailField({ icon: Icon, label, value, styles }: {
+  icon: any; label: string; value: string; styles: any;
 }) {
   return (
     <div className="flex items-start gap-2">
-      <Icon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+      <Icon className={`w-3.5 h-3.5 ${styles.cardTextMuted} mt-0.5 shrink-0`} />
       <div>
-        <p className="text-[10px] text-slate-400 uppercase">{label}</p>
-        <p className="text-sm font-medium">{value}</p>
+        <p className={`text-[10px] ${styles.cardTextMuted} uppercase`}>{label}</p>
+        <p className={`text-sm font-medium ${styles.cardText}`}>{value}</p>
       </div>
     </div>
   );

@@ -41,7 +41,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author CDRC Design Team
  */
 @RestController
-@RequestMapping("/api/agent-mesh")
+@RequestMapping("/api/v1/agent-mesh")
 public class AgentMeshController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentMeshController.class);

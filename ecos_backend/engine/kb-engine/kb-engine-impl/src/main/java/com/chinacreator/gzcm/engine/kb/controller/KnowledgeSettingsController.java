@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
-@RequestMapping("/api/knowledge/settings")
+@RequestMapping("/api/v1/knowledge/settings")
 public class KnowledgeSettingsController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeSettingsController.class);

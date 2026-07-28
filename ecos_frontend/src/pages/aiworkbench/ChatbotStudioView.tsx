@@ -56,21 +56,17 @@ export default function ChatbotStudioView({
   showToast
 }: ChatbotStudioViewProps) {
   const { styles } = useTheme();
-  // Master Chatbot Selected
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id || '');
   const activeChatbot = agents.find(a => a.id === selectedAgentId);
 
-  // Configuration Workspace Tabs
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'prompt' | 'ontology' | 'knowledge' | 'guardrails' | 'publish'>('prompt');
 
-  // Sandbox Testing States
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [activeUserRole, setActiveUserRole] = useState<'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR'>('AOC_DIRECTOR');
   const [activeContextDataset, setActiveContextDataset] = useState<string>('all_ontology');
 
-  // Local editable draft state for active Chatbot
   const [tempName, setTempName] = useState('');
   const [tempRole, setTempRole] = useState('');
   const [tempDesc, setTempDesc] = useState('');
@@ -80,13 +76,11 @@ export default function ChatbotStudioView({
   const [tempTopP, setTempTopP] = useState(0.9);
   const [tempMaxTokens, setTempMaxTokens] = useState(2048);
 
-  // Bindings
   const [selectedObjects, setSelectedObjects] = useState<string[]>(['AviationFlight', 'AviationPilot']);
   const [selectedActions, setSelectedActions] = useState<string[]>(['act_reschedule_flight']);
   const [selectedFunctions, setSelectedFunctions] = useState<string[]>(['func_get_flight_weather']);
   const [selectedGuardrails, setSelectedGuardrails] = useState<string[]>(['gr-pii', 'gr-approval', 'gr-hallucination']);
 
-  // RAG / Documents list
   const [ragDocs, setRagDocs] = useState<RAGDocument[]>([
     { id: 'doc-1', name: 'CAAC_AOC_Safety_Rules_v4.pdf', type: 'PDF 文档', size: '2.4 MB', chunksCount: 142, status: 'synced', lastModified: '2026-07-02 11:20' },
     { id: 'doc-2', name: 'SOP_Emergency_Reschedule_Guide.md', type: 'Markdown', size: '124 KB', chunksCount: 45, status: 'synced', lastModified: '2026-07-01 10:45' },
@@ -96,20 +90,17 @@ export default function ChatbotStudioView({
   const [isSyncingRAG, setIsSyncingRAG] = useState(false);
   const [ragLogs, setRagLogs] = useState<string[]>([]);
 
-  // Publishing Panel States
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishingLogs, setPublishingLogs] = useState<string[]>([]);
   const [chatbotVersion, setChatbotVersion] = useState<string>('v1.0.4');
   const [embedTab, setEmbedTab] = useState<'iframe' | 'web-component' | 'widget-json'>('iframe');
   const [apiLang, setApiLang] = useState<'typescript' | 'curl'>('curl');
 
-  // Modals
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Sync state when active chatbot switches
   useEffect(() => {
     if (activeChatbot) {
       setTempName(activeChatbot.name);
@@ -122,7 +113,6 @@ export default function ChatbotStudioView({
       setSelectedFunctions([...activeChatbot.assignedTools.functionIds]);
       setSelectedGuardrails([...activeChatbot.guardrailIds]);
 
-      // Reload welcome chat messages
       setChatMessages([
         {
           id: 'welcome',
@@ -134,12 +124,10 @@ export default function ChatbotStudioView({
     }
   }, [selectedAgentId]);
 
-  // Scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isReplying]);
 
-  // Handle Drag and Drop for Files
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(true);
@@ -180,7 +168,6 @@ export default function ChatbotStudioView({
     showToast('info', `已添加 ${files.length} 个知识文档到待切块索引列表`);
   };
 
-  // RAG / Chunking Vectorization Simulation
   const handleSyncRAG = () => {
     setIsSyncingRAG(true);
     setRagLogs(['🔄 [0.0s] 启动 AIP Chatbot RAG 向量增量切片管道...']);
@@ -208,7 +195,6 @@ export default function ChatbotStudioView({
     }, 700);
   };
 
-  // Publishing / Testing Compile Simulation
   const handlePublishChatbot = () => {
     setIsPublishing(true);
     setPublishingLogs(['🚀 [0.0s] 启动 Chatbot Studio 构建流，检查模型及本体连接...']);
@@ -232,7 +218,6 @@ export default function ChatbotStudioView({
         setIsPublishing(false);
         setChatbotVersion('v1.0.5');
         
-        // Update master agents state
         if (activeChatbot) {
           const updated = agents.map(a => {
             if (a.id === activeChatbot.id) {
@@ -255,7 +240,6 @@ export default function ChatbotStudioView({
           onUpdateAgents(updated);
         }
 
-        // Add Audit Log
         onAddAuditLog({
           id: `log-pub-${Date.now()}`,
           timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -274,12 +258,10 @@ export default function ChatbotStudioView({
     }, 600);
   };
 
-  // Chat Submission & Sandbox Dynamic Inference Logic
   const handleSendChat = (textToSend?: string) => {
     const text = textToSend || chatInput;
     if (!text.trim() || isReplying || !activeChatbot) return;
 
-    // Add user message to chat state
     const userMsgId = `user-${Date.now()}`;
     const timestampStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     const userMsg: ChatMessage = {
@@ -293,7 +275,6 @@ export default function ChatbotStudioView({
     setChatInput('');
     setIsReplying(true);
 
-    // Dynamic Server-Side Simulation Trigger
     setTimeout(() => {
       const replyMsgId = `agent-${Date.now()}`;
       let replyContent = '';
@@ -302,7 +283,6 @@ export default function ChatbotStudioView({
 
       const queryLower = text.toLowerCase();
 
-      // CASE 1: External Contractor - STRICT RBAC Block
       if (activeUserRole === 'EXTERNAL_CONTRACTOR') {
         thinkingTrace = [
           '⚡ 正在解析用户请求，检查 activeUserRole 鉴权身份...',
@@ -311,7 +291,6 @@ export default function ChatbotStudioView({
         ];
         replyContent = `⚠️ **安全网安全拦截通知 (Sovereign Safety Block)**：\n\n对不起，系统检测到您当前身份为 **[外部承包商 (External Contractor)]**。  \n由于您未持有民航 AOC 核心签派员鉴权角色，受安全中心 **AIP Row-Level & RBAC 隔离护栏** 强制阻断约束：\n- 🔒 禁止读取 \`AviationPilot\` 与 \`AviationFlight\` 核心物理实体数据。\n- 🔒 无法使用任何写回指令（Ontology Actions）。\n\n如有排班调配需求，请联系 AOC 签派总监王凯进行授权处理。`;
       } 
-      // CASE 2: General Query about Flight UA102 / Object lookup (Grounded retrieval)
       else if (queryLower.includes('ua102') || queryLower.includes('查询')) {
         thinkingTrace = [
           '⚡ 正在提取查询本体目标: Flight (ID: UA102)',
@@ -321,14 +300,12 @@ export default function ChatbotStudioView({
           '🛡️ 安全审查：Guardrail [gr-pii] 已激活，检测 Pilot PII 数据，执行动态遮蔽...'
         ];
 
-        // check if PII masking is selected
         const isPiiMasked = selectedGuardrails.includes('gr-pii');
         const ssnValue = isPiiMasked ? '`[REDACTED_BY_PII_GUARDRAIL_MASK_SSN]`' : '`32010619841203XXXX (真实值: S-2289410)`';
         const payrollValue = isPiiMasked ? '`[REDACTED_BY_PII_GUARDRAIL_MASK_SALARY]`' : '`¥38,400 / 月 (Base)`';
 
         replyContent = `已为您在航空核心本体(Aviation Core)中成功拉取 **UA102** 航班的最新高精度数据：\n\n### ✈️ 航班运行档案 (ObjectType: Flight)\n- **航班号**: UA102 (芝加哥 ORD → 旧金山 SFO)\n- **计划起飞**: 今日 08:00 (ON_TIME 准点)\n- **执飞机型**: Boeing 737-800 (尾号: **N101UA**)\n- **适航状态**: 【极佳 (Excellent)】（最后一次 C 检维保于 2026-05-12）\n\n### 👨‍✈️ 签派飞行员资质与安全审计 (ObjectType: Pilot)\n- **责任机长**: **张建国** (资质: D-121部机长, 累积安全飞行 8200 小时)\n- **CAAC 资质状态**: ✅ 资质在有效期内\n- **机长社保保障号 (SSN)**: ${ssnValue}\n- **机长保底薪资标准**: ${payrollValue}\n\n**AIP 决策引擎建议**：\n当前执飞方案完全符合 CAAC 121 部执勤时间规章。芝加哥与旧金山航路上目前无明显对流云团，气象评估结果为适航，推荐维持当前编排方案。`;
       } 
-      // CASE 3: Trigger Action Intent / Write-back (Reschedule flight)
       else if (queryLower.includes('延误') || queryLower.includes('改期') || queryLower.includes('小时') || queryLower.includes('reschedule')) {
         thinkingTrace = [
           '⚡ 用户发起对本体数据修改之事务请求。操作目标: 航班重调度与状态变更',
@@ -352,7 +329,6 @@ export default function ChatbotStudioView({
           status: 'pending'
         };
       } 
-      // CASE 4: PII Masking direct test
       else if (queryLower.includes('ssn') || queryLower.includes('工资') || queryLower.includes('薪') || queryLower.includes('身份证')) {
         const isPiiMasked = selectedGuardrails.includes('gr-pii');
         thinkingTrace = [
@@ -366,7 +342,6 @@ export default function ChatbotStudioView({
           replyContent = `⚠️ **安全免责警告 (PII 护栏未启用)**：\n\n系统检测到您的指令正在尝试拉取敏感隐私信息（SSN / 薪资）。由于您在当前 Chatbot 中**未勾选启用 [gr-pii] 安全护栏**，数据将以明文导出，请妥善保管机密！\n\n- 👨‍✈️ 机长张建国身份证 SSN: \`32010619841203XXXX\`\n- 💰 责任保底薪酬标准: \`¥38,400 / 月\`\n\n*提示：为了生产环境合规，建议立即在左侧「安全护栏」设置中启用 PII 脱敏机制！*`;
         }
       } 
-      // CASE 5: Default Generic Conversation
       else {
         thinkingTrace = [
           '⚡ 提取通用交互会话意图...',
@@ -375,7 +350,6 @@ export default function ChatbotStudioView({
         replyContent = `我是您的 **${activeChatbot.name}**。我可以基于您的本地航空本体与 RAG 规章知识库，为您提供无缝、可信的多维航空签派问答：\n\n您可以尝试对我输入以下交互问题测试：\n1. 🔍 **实体查询**："UA102 航班今天准点吗？机组配置如何？"\n2. 🛡️ **脱敏测试**："显示张建国机长的社会保障和薪水标准"\n3. ⚙️ **调配写回**："UA102 航班因暴雨改派，延误2小时，通知调度大厅"`;
       }
 
-      // If action proposal was generated, register in backend
       if (proposal) {
         fetch('/api/v1/ontology/proposals', {
           method: 'POST',
@@ -398,7 +372,6 @@ export default function ChatbotStudioView({
         .catch(err => console.error('Failed to create proposal', err));
       }
 
-      // Append chatbot message to chat state
       setChatMessages(prev => [...prev, {
         id: replyMsgId,
         sender: 'agent',
@@ -412,7 +385,6 @@ export default function ChatbotStudioView({
     }, 1500);
   };
 
-  // Human Approval Card Execution
   const handleProposalConsent = (msgId: string, approved: boolean) => {
     const targetMsg = chatMessages.find(m => m.id === msgId);
     if (!targetMsg || !targetMsg.actionProposal) return;
@@ -420,7 +392,6 @@ export default function ChatbotStudioView({
     const propId = targetMsg.actionProposal.id || 'prop-1';
 
     if (approved) {
-      // call the execute backend
       fetch(`/api/v1/ontology/proposals/${propId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -434,7 +405,6 @@ export default function ChatbotStudioView({
         if (data.success) {
           showToast('success', 'Ontology Action 物理写回成功并通过双向核对对账！');
 
-          // update chat proposal status
           setChatMessages(prev => prev.map(msg => {
             if (msg.id === msgId && msg.actionProposal) {
               return {
@@ -448,7 +418,6 @@ export default function ChatbotStudioView({
             return msg;
           }));
 
-          // add audit log
           onAddAuditLog({
             id: `log-exec-${Date.now()}`,
             timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -462,12 +431,10 @@ export default function ChatbotStudioView({
             details: `人工授权执行动作 act_reschedule_flight: 航班 UA102 成功延误 120 分钟并完成 Doris 双向字段值核算对账。`
           });
 
-          // Generate verification details
           const checkItems = data.verificationMatrix?.map((m: any) => 
             `• **[逻辑字段对齐]** \`${m.logicalField}\` ➔ \`${m.physicalCol}\`: 预估 [${m.expectedValue}] ↔ 物理读回 [${m.readbackValue}] ✅ 强一致对齐`
           ).join('\n') || '';
 
-          // Add verification report system message
           setChatMessages(prev => [...prev, {
             id: `sys-report-${Date.now()}`,
             sender: 'system',
@@ -500,7 +467,6 @@ export default function ChatbotStudioView({
     }
   };
 
-  // Create or update Chatbot Metadata
   const handleSaveMetadata = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempName.trim() || !tempRole.trim()) return;
@@ -578,19 +544,19 @@ export default function ChatbotStudioView({
   };
 
   return (
-    <div className={`h-full w-full flex flex-col md:flex-row overflow-hidden ${styles.appBg} text-xs select-none`}>
+    <div className={`h-full w-full flex flex-col md:flex-row overflow-hidden ${styles.appBg} ${styles.appText} text-xs select-none`}>
       
       {/* 1. Left Side: Chatbot Workspace Selector */}
       <div className={`w-full md:w-60 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
         
-        <div className={`p-3 border-b ${styles.cardBorder} bg-slate-50/80 flex items-center justify-between`}>
+        <div className={`p-3 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
           <div className="flex items-center gap-1.5">
-            <Icon name="Bot" size={14} className="text-blue-600" />
+            <Icon name="Bot" size={14} className={styles.accentText} />
             <span className={`font-bold ${styles.cardText}`}>对齐工坊实例 ({agents.length})</span>
           </div>
           <button
             onClick={handleStartCreate}
-            className="p-1 text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 hover:border-blue-600 rounded-md transition-all cursor-pointer flex items-center justify-center"
+            className={`p-1 ${styles.accentText} ${styles.accentHover} hover:text-white ${styles.accentBorder} hover:border-transparent border rounded-md transition-all cursor-pointer flex items-center justify-center`}
             title="新建 Chatbot"
           >
             <Icon name="Plus" size={11} />
@@ -608,23 +574,23 @@ export default function ChatbotStudioView({
                 className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 border ${
                   isSelected
                     ? `${styles.accentBg} ${styles.cardBorder} text-white shadow-xs`
-                    : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-700'
+                    : `${styles.cardBg} hover:${styles.inputBg} ${styles.cardBorder} ${styles.cardTextMuted}`
                 }`}
               >
                 <div className="flex items-center justify-between min-w-0">
                   <div className="flex items-center gap-1.5 font-bold min-w-0">
-                    <span className={`p-1 rounded shrink-0 ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`p-1 rounded shrink-0 ${isSelected ? 'bg-blue-600 text-white' : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
                       <Icon name={a.avatar} size={11} />
                     </span>
                     <span className="truncate text-[11px]">{a.name}</span>
                   </div>
                 </div>
-                <p className={`text-[10px] line-clamp-1 leading-normal ${isSelected ? 'text-slate-300' : 'text-slate-400 font-medium'}`}>
+                <p className={`text-[10px] line-clamp-1 leading-normal ${isSelected ? 'styles.cardText' : styles.cardTextMuted}`}>
                   {a.role}
                 </p>
                 <div className={`flex items-center justify-between text-[8px] pt-1 mt-1 border-t ${styles.cardBorder}/10 font-mono`}>
-                  <span className={isSelected ? 'text-slate-400' : 'text-slate-400'}>{a.modelId.replace('-1.5-pro', '')}</span>
-                  <span className={`px-1 rounded-sm font-extrabold ${isSelected ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-50 text-emerald-600'}`}>ACTIVE</span>
+                  <span className={styles.cardTextMuted}>{a.modelId.replace('-1.5-pro', '')}</span>
+                  <span className={`px-1 rounded-sm font-extrabold ${isSelected ? 'bg-blue-500/20 text-blue-300' : 'bg-emerald-50 text-emerald-600'}`}>ACTIVE</span>
                 </div>
               </div>
             );
@@ -653,7 +619,7 @@ export default function ChatbotStudioView({
             <div className={`p-4 border-b ${styles.cardBorder} ${styles.appBg} flex flex-col gap-2 shrink-0`}>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex gap-2.5 items-center min-w-0">
-                  <span className="p-2 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                  <span className={`p-2 rounded-lg ${styles.badgeBg} ${styles.accentText} shrink-0`}>
                     <Icon name={activeChatbot.avatar} size={16} />
                   </span>
                   <div className="min-w-0">
@@ -678,7 +644,7 @@ export default function ChatbotStudioView({
                       setTempPrompt(activeChatbot.systemPrompt);
                       setShowMetadataModal(true);
                     }}
-                    className={`p-1.5 ${styles.appBg} hover:bg-slate-200 ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center`}
+                    className={`p-1.5 ${styles.appBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center`}
                     title="配置元数据"
                   >
                     <Icon name="Settings2" size={12} />
@@ -708,7 +674,7 @@ export default function ChatbotStudioView({
                       key={tab.id}
                       onClick={() => setActiveWorkspaceTab(tab.id as any)}
                       className={`flex-1 py-1 px-2 rounded-md font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                        isActive ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                        isActive ? `${styles.cardBg} ${styles.cardText} shadow-2xs` : `${styles.cardTextMuted} ${styles.accentHover}`
                       }`}
                     >
                       <Icon name={tab.icon} size={11} />
@@ -732,7 +698,7 @@ export default function ChatbotStudioView({
                     <textarea
                       value={tempPrompt}
                       onChange={(e) => setTempPrompt(e.target.value)}
-                      className={`w-full h-64 p-3 border ${styles.cardBorder} rounded-xl text-[11px] font-mono leading-relaxed ${styles.appBg} focus:${styles.cardBg} focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none`}
+                      className={`w-full h-64 p-3 border ${styles.cardBorder} rounded-xl text-[11px] font-mono leading-relaxed ${styles.inputBg} ${styles.cardText} focus:${styles.cardBg} focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none`}
                       placeholder="指定智能体的系统设定、专业知识限制、执行指令契约..."
                     />
                     <p className={`text-[9px] ${styles.cardTextMuted} leading-normal`}>
@@ -742,7 +708,7 @@ export default function ChatbotStudioView({
 
                   <div className={`${styles.inputBg} border ${styles.cardBorder} rounded-xl p-3.5 space-y-3`}>
                     <h3 className={`font-bold ${styles.cardTextMuted} text-[11px] flex items-center gap-1`}>
-                      <Icon name="Settings" size={12} className="text-blue-500" />
+                      <Icon name="Settings" size={12} className={styles.accentText} />
                       <span>大模型超参数精细微调 (Hyperparameters)</span>
                     </h3>
                     
@@ -751,7 +717,7 @@ export default function ChatbotStudioView({
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center text-[10px]">
                           <span className={`${styles.cardTextMuted} font-bold`}>Temperature (温度值)</span>
-                          <span className="font-mono text-blue-600 font-extrabold">{tempTemperature}</span>
+                          <span className={`font-mono ${styles.accentText} font-extrabold`}>{tempTemperature}</span>
                         </div>
                         <input
                           type="range"
@@ -760,7 +726,7 @@ export default function ChatbotStudioView({
                           step="0.05"
                           value={tempTemperature}
                           onChange={(e) => setTempTemperature(parseFloat(e.target.value))}
-                          className="w-full accent-blue-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
+                          className={`w-full accent-blue-600 h-1 ${styles.inputBg} rounded-lg cursor-pointer`}
                         />
                         <span className={`text-[8px] ${styles.cardTextMuted} block`}>较低值使回复稳定，较高值激发创意</span>
                       </div>
@@ -769,7 +735,7 @@ export default function ChatbotStudioView({
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center text-[10px]">
                           <span className={`${styles.cardTextMuted} font-bold`}>Top P (核采样)</span>
-                          <span className="font-mono text-blue-600 font-extrabold">{tempTopP}</span>
+                          <span className={`font-mono ${styles.accentText} font-extrabold`}>{tempTopP}</span>
                         </div>
                         <input
                           type="range"
@@ -778,7 +744,7 @@ export default function ChatbotStudioView({
                           step="0.05"
                           value={tempTopP}
                           onChange={(e) => setTempTopP(parseFloat(e.target.value))}
-                          className="w-full accent-blue-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
+                          className={`w-full accent-blue-600 h-1 ${styles.inputBg} rounded-lg cursor-pointer`}
                         />
                         <span className={`text-[8px] ${styles.cardTextMuted} block`}>多核概率截断阈值</span>
                       </div>
@@ -787,7 +753,7 @@ export default function ChatbotStudioView({
                       <div className="space-y-1.5 md:col-span-2">
                         <div className="flex justify-between items-center text-[10px]">
                           <span className={`${styles.cardTextMuted} font-bold`}>Max Output Tokens (最大输出字数限制)</span>
-                          <span className="font-mono text-blue-600 font-extrabold">{tempMaxTokens}</span>
+                          <span className={`font-mono ${styles.accentText} font-extrabold`}>{tempMaxTokens}</span>
                         </div>
                         <input
                           type="range"
@@ -796,7 +762,7 @@ export default function ChatbotStudioView({
                           step="256"
                           value={tempMaxTokens}
                           onChange={(e) => setTempMaxTokens(parseInt(e.target.value))}
-                          className="w-full accent-blue-600 h-1 bg-slate-200 rounded-lg cursor-pointer"
+                          className={`w-full accent-blue-600 h-1 ${styles.inputBg} rounded-lg cursor-pointer`}
                         />
                       </div>
                     </div>
@@ -807,7 +773,7 @@ export default function ChatbotStudioView({
               {/* TAB 2: Ontology bindings */}
               {activeWorkspaceTab === 'ontology' && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-200/50 flex items-start gap-2">
+                  <div className={`p-3 ${styles.badgeBg} ${styles.accentText} rounded-xl border ${styles.accentBorder} flex items-start gap-2`}>
                     <Icon name="Info" size={14} className="shrink-0 mt-0.5" />
                     <p className="leading-relaxed">
                       <strong>本体对齐映射协议：</strong> 在此配置 Chatbot 允许调取的 **ObjectType（本体实体）**、**Ontology Actions（写回动作）** 及 **Functions（执行算子）**。AIP 引擎会自动将实体数据转化为上下文，供模型执行工具调用。
@@ -817,7 +783,7 @@ export default function ChatbotStudioView({
                   {/* 1. Object Types */}
                   <div className="space-y-2">
                     <h3 className={`text-[11px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono flex items-center gap-1`}>
-                      <Icon name="Layers" size={11} className={`${styles.cardTextMuted}`} />
+                      <Icon name="Layers" size={11} className={styles.cardTextMuted} />
                       <span>授权读取的对象主体 (ObjectType Bindings)</span>
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -837,7 +803,7 @@ export default function ChatbotStudioView({
                               );
                             }}
                             className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                              isBound ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                              isBound ? `${styles.badgeBg} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardBorder} hover:${styles.inputBg}`
                             }`}
                           >
                             <input
@@ -859,7 +825,7 @@ export default function ChatbotStudioView({
                   {/* 2. Action Types */}
                   <div className="space-y-2">
                     <h3 className={`text-[11px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono flex items-center gap-1`}>
-                      <Icon name="Settings" size={11} className={`${styles.cardTextMuted}`} />
+                      <Icon name="Settings" size={11} className={styles.cardTextMuted} />
                       <span>授权执行的写回算子 (ActionType Bindings)</span>
                     </h3>
                     <div className="space-y-2">
@@ -877,7 +843,7 @@ export default function ChatbotStudioView({
                               );
                             }}
                             className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
-                              isBound ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                              isBound ? 'bg-indigo-50/50 border-indigo-200' : `${styles.cardBg} ${styles.cardBorder} hover:${styles.inputBg}`
                             }`}
                           >
                             <input
@@ -913,8 +879,8 @@ export default function ChatbotStudioView({
                     onDrop={handleDrop}
                     className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all cursor-pointer ${
                       dragOver 
-                        ? 'border-blue-500 bg-blue-50/40' 
-                        : 'border-slate-300 bg-slate-50/40 hover:bg-slate-50 hover:border-slate-400'
+                        ? `border-blue-500 ${styles.badgeBg}/40` 
+                        : `${styles.inputBorder} ${styles.appBg}/40 hover:${styles.inputBg}`
                     }`}
                   >
                     <input
@@ -925,7 +891,7 @@ export default function ChatbotStudioView({
                       onChange={handleFileSelect}
                     />
                     <label htmlFor="file-upload" className="flex flex-col items-center cursor-pointer space-y-2">
-                      <Icon name="UploadCloud" size={32} className={`${styles.cardTextMuted}`} />
+                      <Icon name="UploadCloud" size={32} className={styles.cardTextMuted} />
                       <span className={`font-bold ${styles.cardTextMuted} text-xs text-center`}>拖拽规章、SOP、PDF至此上传</span>
                       <span className={`text-[10px] ${styles.cardTextMuted} text-center`}>支持 PDF, Markdown, TXT, Excel 等 RAG 知识源 (单个最大 100MB)</span>
                     </label>
@@ -939,7 +905,7 @@ export default function ChatbotStudioView({
                     <button
                       onClick={handleSyncRAG}
                       disabled={isSyncingRAG || !ragDocs.some(d => d.status === 'pending')}
-                      className={`px-3 py-1 ${styles.accentBg} hover:bg-slate-800 text-white font-bold rounded-lg transition-all text-[10px] flex items-center gap-1 cursor-pointer ${
+                      className={`px-3 py-1 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all text-[10px] flex items-center gap-1 cursor-pointer ${
                         isSyncingRAG || !ragDocs.some(d => d.status === 'pending') ? 'opacity-40 cursor-not-allowed' : ''
                       }`}
                     >
@@ -962,7 +928,7 @@ export default function ChatbotStudioView({
                     {ragDocs.map(doc => (
                       <div key={doc.id} className={`p-2 ${styles.cardBg} border ${styles.cardBorder}/80 hover:${styles.inputBg} rounded-lg flex items-center justify-between gap-4 transition-colors`}>
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <span className={`p-1.5 rounded ${doc.type === 'PDF' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>
+                          <span className={`p-1.5 rounded ${doc.type === 'PDF' ? 'bg-red-50 text-red-500' : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
                             <Icon name="FileText" size={12} />
                           </span>
                           <div className="min-w-0">
@@ -1004,12 +970,12 @@ export default function ChatbotStudioView({
                   {ragLogs.length > 0 && (
                     <div className={`${styles.cardBg} p-3 rounded-xl shadow-xs border ${styles.cardBorder} flex flex-col space-y-2`}>
                       <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-1.5`}>
-                        <span className="font-mono text-white text-[9px] font-bold">RAG Pipeline Vectorization Stream</span>
+                        <span className={`font-mono ${styles.cardText} text-[9px] font-bold`}>RAG Pipeline Vectorization Stream</span>
                         <span className={`text-[8px] ${styles.cardTextMuted} font-mono`}>text-embedding-004</span>
                       </div>
                       <div className={`space-y-1 font-mono text-[8.5px] ${styles.cardTextMuted} leading-normal max-h-24 overflow-y-auto`}>
                         {ragLogs.map((log, idx) => (
-                          <p key={idx} className={log.includes('✅') ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
+                          <p key={idx} className={log.includes('✅') ? 'text-emerald-400 font-bold' : styles.cardTextMuted}>
                             {log}
                           </p>
                         ))}
@@ -1023,7 +989,7 @@ export default function ChatbotStudioView({
               {/* TAB 4: Safety guardrails */}
               {activeWorkspaceTab === 'guardrails' && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200/50 flex items-start gap-2">
+                  <div className={`p-3 ${styles.badgeBg} ${styles.accentText} rounded-xl border ${styles.accentBorder} flex items-start gap-2`}>
                     <Icon name="ShieldAlert" size={14} className="shrink-0 mt-0.5" />
                     <p className="leading-relaxed text-[11px]">
                       <strong>安全拦截围网 (AIP Guardrails Protection)：</strong> 强制对输入和输出流量执行即时过滤、隐私（PII）脱敏、幻觉阻断及动作对账阻拦，拦截任何违反 GDPR、CAAC 规章或超出特权的操作指令。
@@ -1042,18 +1008,17 @@ export default function ChatbotStudioView({
                             );
                           }}
                           className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-4 ${
-                            isEnabled ? 'bg-indigo-50/40 border-indigo-200/80 shadow-xs' : 'bg-white border-slate-200 hover:bg-slate-50'
+                            isEnabled ? `${styles.badgeBg} ${styles.accentBorder} shadow-xs` : `${styles.cardBg} ${styles.cardBorder} hover:${styles.inputBg}`
                           }`}
                         >
                           <div className="flex items-start gap-3">
-                            <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${isEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${isEnabled ? `${styles.badgeBg} ${styles.accentText}` : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
                               <Icon name={gr.type === 'pii_redaction' ? 'EyeOff' : gr.type === 'human_approval' ? 'KeyRound' : 'FileCheck'} size={14} />
                             </span>
                             <div className="space-y-1">
                               <h4 className={`font-extrabold ${styles.cardText} text-[11px]`}>{gr.name}</h4>
                               <p className={`text-[10px] ${styles.cardTextMuted} leading-normal font-sans`}>{gr.description}</p>
                               
-                              {/* Guardrail Params Detail tag */}
                               {gr.type === 'pii_redaction' && (
                                 <div className="flex flex-wrap gap-1 pt-1.5">
                                   {gr.parameters.piiTypes?.map(t => (
@@ -1066,7 +1031,7 @@ export default function ChatbotStudioView({
                               {gr.type === 'human_approval' && (
                                 <div className="flex flex-wrap gap-1 pt-1.5">
                                   {gr.parameters.requiredActionIds?.map(a => (
-                                    <span key={a} className="px-1.5 py-0.2 bg-indigo-50 border border-indigo-150 rounded text-[8px] font-mono font-bold text-indigo-500">
+                                    <span key={a} className={`px-1.5 py-0.2 ${styles.badgeBg} ${styles.accentBorder} rounded text-[8px] font-mono font-bold ${styles.accentText}`}>
                                       ACTION: {a}
                                     </span>
                                   ))}
@@ -1079,14 +1044,14 @@ export default function ChatbotStudioView({
                             <span className={`px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase ${
                               gr.severity === 'block' ? 'bg-rose-50 border border-rose-200 text-rose-600' :
                               gr.severity === 'warn' ? 'bg-amber-50 border border-amber-200 text-amber-600' :
-                              'bg-slate-50 border border-slate-200 text-slate-500'
+                              `${styles.appBg} border ${styles.cardBorder} ${styles.cardTextMuted}`
                             }`}>
                               {gr.severity === 'block' ? '🛡️ 拦截拦截' : gr.severity === 'warn' ? '⚠️ 弹窗告警' : '📝 仅审计存底'}
                             </span>
 
                             {/* Toggle Switch */}
-                            <div className={`w-8 h-4.5 rounded-full p-0.5 transition-all ${isEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                              <div className={`w-3.5 h-3.5 rounded-full bg-white transition-all transform ${isEnabled ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                            <div className={`w-8 h-4.5 rounded-full p-0.5 transition-all ${isEnabled ? styles.accentBg : `${styles.inputBorder}`}`}>
+                              <div className={`w-3.5 h-3.5 rounded-full styles.cardBg transition-all transform ${isEnabled ? 'translate-x-3.5' : 'translate-x-0'}`} />
                             </div>
                           </div>
                         </div>
@@ -1102,7 +1067,7 @@ export default function ChatbotStudioView({
                 <div className="space-y-4 font-sans">
                   
                   {/* Compile & Publish zone */}
-                  <div className={`p-4 ${styles.appBg} rounded-2xl text-white space-y-4 relative overflow-hidden shadow-md`}>
+                  <div className={`p-4 ${styles.accentBg} rounded-2xl text-white space-y-4 relative overflow-hidden shadow-md`}>
                     <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-4 scale-150">
                       <Icon name="Send" size={120} />
                     </div>
@@ -1112,7 +1077,7 @@ export default function ChatbotStudioView({
                         Sovereign Compiler v2.4
                       </span>
                       <h3 className="font-extrabold text-sm">编译部署发布 (Compile & Publish)</h3>
-                      <p className={`text-[10px] ${styles.cardTextMuted}`}>
+                      <p className={`text-[10px] ${styles.cardText}`}>
                         检查本体映射规则约束、RAG 向量特征、幻觉护栏对账单并一键生成编译包。
                       </p>
                     </div>
@@ -1120,13 +1085,13 @@ export default function ChatbotStudioView({
                     <button
                       onClick={handlePublishChatbot}
                       disabled={isPublishing}
-                      className={`px-4 py-2 bg-white hover:bg-slate-100 text-slate-900 font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                      className={`px-4 py-2 styles.cardBg hover:styles.appBg styles.cardText font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
                         isPublishing ? 'opacity-70 cursor-not-allowed' : ''
                       }`}
                     >
                       {isPublishing ? (
                         <>
-                          <span className="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                          <span className={`w-3.5 h-3.5 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />
                           <span>编译验证中...</span>
                         </>
                       ) : (
@@ -1142,12 +1107,12 @@ export default function ChatbotStudioView({
                   {publishingLogs.length > 0 && (
                     <div className={`${styles.cardBg} p-3.5 rounded-xl border ${styles.cardBorder} ${styles.cardTextMuted} font-mono text-[9px] space-y-1.5`}>
                       <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-1.5`}>
-                        <span className="text-white font-bold">AIP Copilot Compiler Logs</span>
+                        <span className={`${styles.cardText} font-bold`}>AIP Copilot Compiler Logs</span>
                         <span className={`text-[8px] ${styles.cardTextMuted}`}>v1.0.5</span>
                       </div>
                       <div className="space-y-1 max-h-32 overflow-y-auto leading-relaxed">
                         {publishingLogs.map((log, i) => (
-                          <p key={i} className={log.includes('🎉') || log.includes('✅') ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
+                          <p key={i} className={log.includes('🎉') || log.includes('✅') ? 'text-emerald-400 font-bold' : styles.cardTextMuted}>
                             {log}
                           </p>
                         ))}
@@ -1159,7 +1124,7 @@ export default function ChatbotStudioView({
                   <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
                     <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
                       <h4 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
-                        <Icon name="Code" size={13} className="text-blue-500" />
+                        <Icon name="Code" size={13} className={styles.accentText} />
                         <span>多终端应用与集成发布方式 (Integration Channels)</span>
                       </h4>
                     </div>
@@ -1167,19 +1132,19 @@ export default function ChatbotStudioView({
                     <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.cardBorder} text-[9px] font-bold`}>
                       <button
                         onClick={() => setEmbedTab('iframe')}
-                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'iframe' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500'}`}
+                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'iframe' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : styles.cardTextMuted}`}
                       >
                         Workshop 网页嵌入 (iFrame)
                       </button>
                       <button
                         onClick={() => setEmbedTab('web-component')}
-                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'web-component' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500'}`}
+                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'web-component' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : styles.cardTextMuted}`}
                       >
                         Web Component (自定义标签)
                       </button>
                       <button
                         onClick={() => setEmbedTab('widget-json')}
-                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'widget-json' ? 'bg-white text-slate-900 shadow-3xs' : 'text-slate-500'}`}
+                        className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'widget-json' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : styles.cardTextMuted}`}
                       >
                         AIP Widget JSON
                       </button>
@@ -1256,13 +1221,13 @@ export default function ChatbotStudioView({
                         <div className="flex gap-1">
                           <button
                             onClick={() => setApiLang('curl')}
-                            className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'curl' ? `${styles.accentBg} text-white` : 'bg-slate-100 text-slate-500'}`}
+                            className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'curl' ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.cardTextMuted}`}`}
                           >
                             cURL
                           </button>
                           <button
                             onClick={() => setApiLang('typescript')}
-                            className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'typescript' ? `${styles.accentBg} text-white` : 'bg-slate-100 text-slate-500'}`}
+                            className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'typescript' ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.cardTextMuted}`}`}
                           >
                             TypeScript
                           </button>
@@ -1322,7 +1287,6 @@ async function runInference() {
                 <span className={`font-extrabold ${styles.cardText}`}>Chatbot 交互调试沙箱 (Sandbox)</span>
               </div>
               
-              {/* Reset state */}
               <button
                 onClick={() => {
                   setChatMessages([
@@ -1335,7 +1299,7 @@ async function runInference() {
                   ]);
                   showToast('info', '沙箱交互历史已清空');
                 }}
-                className={`p-1 ${styles.cardTextMuted} hover:${styles.cardTextMuted} rounded cursor-pointer transition-colors`}
+                className={`p-1 ${styles.cardTextMuted} rounded cursor-pointer transition-colors`}
                 title="清空历史"
               >
                 <Icon name="RotateCw" size={11} />
@@ -1346,10 +1310,9 @@ async function runInference() {
             <div className={`p-3 ${styles.inputBg} border-b ${styles.cardBorder} space-y-2 shrink-0`}>
               <div className="grid grid-cols-2 gap-2 text-[9px] font-sans">
                 
-                {/* Simulated User Role selector */}
                 <div className="space-y-1">
                   <label className={`${styles.cardTextMuted} font-extrabold flex items-center gap-1`}>
-                    <Icon name="User" size={10} className="text-indigo-500" />
+                    <Icon name="User" size={10} className={styles.accentText} />
                     <span>沙箱模拟用户角色 (RBAC Role)</span>
                   </label>
                   <select
@@ -1365,10 +1328,9 @@ async function runInference() {
                   </select>
                 </div>
 
-                {/* Simulated database selector */}
                 <div className="space-y-1">
                   <label className={`${styles.cardTextMuted} font-extrabold flex items-center gap-1`}>
-                    <Icon name="Database" size={10} className="text-blue-500" />
+                    <Icon name="Database" size={10} className={styles.accentText} />
                     <span>数据上下文 (Grounded Scope)</span>
                   </label>
                   <select
@@ -1385,7 +1347,7 @@ async function runInference() {
             </div>
 
             {/* Chat Sandbox Message History */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-100/50">
+            <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${styles.appBg}/50`}>
               {chatMessages.map((msg) => {
                 const isUser = msg.sender === 'user';
                 const isSystem = msg.sender === 'system';
@@ -1409,7 +1371,7 @@ async function runInference() {
                     
                     {/* Avatar */}
                     <span className={`p-1.5 rounded-lg shrink-0 h-7 w-7 flex items-center justify-center font-bold text-white shadow-3xs ${
-                      isUser ? 'bg-indigo-600' : 'bg-slate-800'
+                      isUser ? styles.accentBg : styles.sidebarActiveBg
                     }`}>
                       <Icon name={isUser ? 'User' : activeChatbot.avatar} size={12} />
                     </span>
@@ -1419,24 +1381,23 @@ async function runInference() {
                       
                       <div className={`p-3 rounded-2xl leading-normal text-[11px] whitespace-pre-line shadow-3xs ${
                         isUser 
-                          ? 'bg-indigo-600 text-white font-medium rounded-tr-none' 
-                          : 'bg-white text-slate-800 border border-slate-200/60 rounded-tl-none font-sans'
+                          ? `${styles.accentBg} text-white font-medium rounded-tr-none` 
+                          : `${styles.cardBg} ${styles.cardText} ${styles.cardBorder} border rounded-tl-none font-sans`
                       }`}>
-                        {/* Elegant rendering for chatbot markdown paragraphs */}
                         {msg.content}
                       </div>
 
-                      {/* Thinking Trace (Chain of Thought logs) */}
+                      {/* Thinking Trace */}
                       {!isUser && msg.thinkingTrace && msg.thinkingTrace.length > 0 && (
-                        <details className={`group ${styles.cardBg}/60 border ${styles.cardBorder}/50 rounded-lg p-1.5 transition-all`}>
-                          <summary className={`flex items-center gap-1 font-mono text-[9px] ${styles.cardTextMuted} font-bold cursor-pointer select-none outline-none hover:${styles.cardTextMuted}`}>
+                        <details className={`group ${styles.cardBg}/60 ${styles.cardBorder}/50 border rounded-lg p-1.5 transition-all`}>
+                          <summary className={`flex items-center gap-1 font-mono text-[9px] ${styles.cardTextMuted} font-bold cursor-pointer select-none outline-none`}>
                             <span className="transition-transform group-open:rotate-90">▶</span>
                             <Icon name="Cpu" size={9} />
                             <span>推理决策链路追踪 (CoT Thinking Trace)</span>
                           </summary>
                           <div className={`mt-1.5 pl-3 border-l ${styles.cardBorder} font-mono text-[8.5px] ${styles.cardTextMuted} space-y-1 leading-normal`}>
                             {msg.thinkingTrace.map((trace, tIdx) => (
-                              <p key={tIdx} className={trace.includes('🛡️') || trace.includes('⛔') ? 'text-rose-600 font-bold' : trace.includes('🔍') ? 'text-blue-500 font-medium' : 'text-slate-500'}>
+                              <p key={tIdx} className={trace.includes('🛡️') || trace.includes('⛔') ? 'text-rose-600 font-bold' : trace.includes('🔍') ? `${styles.accentText} font-medium` : styles.cardTextMuted}>
                                 {trace}
                               </p>
                             ))}
@@ -1446,9 +1407,9 @@ async function runInference() {
 
                       {/* Interactive Ontology Action Proposal Consent Card */}
                       {!isUser && msg.actionProposal && (
-                        <div className={`p-3.5 ${styles.cardBg} border border-indigo-200/80 rounded-xl space-y-2.5 shadow-2xs`}>
-                          <div className="flex items-center justify-between border-b border-indigo-50 pb-2">
-                            <span className="font-extrabold text-[11px] text-indigo-700 flex items-center gap-1.5">
+                        <div className={`p-3.5 ${styles.cardBg} border ${styles.accentBorder} rounded-xl space-y-2.5 shadow-2xs`}>
+                          <div className={`flex items-center justify-between border-b ${styles.badgeBg} pb-2`}>
+                            <span className={`font-extrabold text-[11px] ${styles.accentText} flex items-center gap-1.5`}>
                               <Icon name="Settings" size={12} />
                               <span>对账写回申请卡片 (Ontology Action Request)</span>
                             </span>
@@ -1464,12 +1425,12 @@ async function runInference() {
 
                           <div className={`font-mono text-[9px] space-y-1 ${styles.cardTextMuted} leading-normal ${styles.inputBg} p-2.5 rounded-lg border ${styles.cardBorder}`}>
                             <p><span className={`${styles.cardTextMuted} font-bold`}>算子标识</span>: <span className={`${styles.cardText} font-extrabold`}>{msg.actionProposal.actionId}</span></p>
-                            <p><span className={`${styles.cardTextMuted} font-bold`}>目标物理表</span>: <span className="text-indigo-600 font-extrabold">ds_flights_clean / flights_raw</span></p>
+                            <p><span className={`${styles.cardTextMuted} font-bold`}>目标物理表</span>: <span className={`${styles.accentText} font-extrabold`}>ds_flights_clean / flights_raw</span></p>
                             <div className={`border-t ${styles.cardBorder} my-1.5 pt-1.5 space-y-0.5`}>
                               <p><span className={`${styles.cardTextMuted} font-bold`}>变动字段/参数 mappings</span>:</p>
                               {Object.entries(msg.actionProposal.payload).map(([k, v]) => (
                                 <p key={k} className="pl-2">
-                                  <span className={`${styles.cardTextMuted}`}>• {k}</span>: <span className={`${styles.cardText} font-bold`}>"{v}"</span>
+                                  <span className={styles.cardTextMuted}>• {k}</span>: <span className={`${styles.cardText} font-bold`}>"{v}"</span>
                                 </p>
                               ))}
                             </div>
@@ -1486,7 +1447,7 @@ async function runInference() {
                               </button>
                               <button
                                 onClick={() => handleProposalConsent(msg.id, false)}
-                                className={`px-3 py-1.5 ${styles.appBg} hover:bg-slate-200 ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-colors cursor-pointer`}
+                                className={`px-3 py-1.5 ${styles.cardBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-colors cursor-pointer`}
                               >
                                 <span>安全拒绝</span>
                               </button>
@@ -1504,13 +1465,13 @@ async function runInference() {
               {/* Chatbot typing loading spinner */}
               {isReplying && (
                 <div className="flex gap-2.5">
-                  <span className="p-1.5 rounded-lg bg-slate-800 shrink-0 h-7 w-7 flex items-center justify-center text-white">
+                  <span className={`p-1.5 rounded-lg ${styles.sidebarActiveBg} shrink-0 h-7 w-7 flex items-center justify-center text-white`}>
                     <Icon name={activeChatbot.avatar} size={12} className="animate-spin" />
                   </span>
                   <div className={`p-3 rounded-2xl ${styles.cardBg} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-tl-none font-sans text-[11px] flex items-center gap-1.5 shadow-3xs`}>
-                    <span className="h-1.5 w-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="h-1.5 w-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="h-1.5 w-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className={`h-1.5 w-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '0ms' }} />
+                    <span className={`h-1.5 w-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '150ms' }} />
+                    <span className={`h-1.5 w-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '300ms' }} />
                     <span className={`text-[10px] ${styles.cardTextMuted} ml-1`}>本体语义对齐及 RAG 召回中...</span>
                   </div>
                 </div>
@@ -1540,7 +1501,7 @@ async function runInference() {
                   type="submit"
                   disabled={!chatInput.trim() || isReplying}
                   className={`px-3 py-2 ${styles.accentBg} text-white rounded-xl font-bold transition-all flex items-center justify-center cursor-pointer shrink-0 ${
-                    !chatInput.trim() || isReplying ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-800'
+                    !chatInput.trim() || isReplying ? 'opacity-40 cursor-not-allowed' : styles.accentHover
                   }`}
                 >
                   <Icon name="Send" size={12} />
@@ -1553,32 +1514,31 @@ async function runInference() {
         </div>
       ) : (
         <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} p-8 text-center space-y-2`}>
-          <Icon name="Bot" size={48} className={`${styles.cardTextMuted}`} />
+          <Icon name="Bot" size={48} className={styles.cardTextMuted} />
           <h2 className={`font-extrabold ${styles.cardTextMuted}`}>没有就绪的 Chatbot</h2>
           <p>请在左上角点击 + 按钮，创建部署您的首个 Chatbot 对齐工坊实例。</p>
         </div>
       )}
 
-      {/* 3. Metadata Manager Modal (Create/Edit Chatbot) */}
+      {/* 3. Metadata Manager Modal */}
       {showMetadataModal && (
         <div className={`fixed inset-0 ${styles.appBg}/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none`}>
           <div className={`${styles.cardBg} rounded-2xl shadow-xl border ${styles.cardBorder} w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200`}>
             
             <div className={`p-4 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
               <div className={`flex items-center gap-1.5 font-bold ${styles.cardText} text-xs`}>
-                <Icon name="Bot" size={13} className="text-blue-500" />
+                <Icon name="Bot" size={13} className={styles.accentText} />
                 <span>{isCreatingNew ? '部署全新 AIP Chatbot 实例' : '修改 Chatbot 架构元参数'}</span>
               </div>
               <button
                 onClick={() => setShowMetadataModal(false)}
-                className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} cursor-pointer`}
+                className={`${styles.cardTextMuted} cursor-pointer`}
               >
                 <Icon name="X" size={14} />
               </button>
             </div>
 
             <form onSubmit={handleSaveMetadata} className="p-4 space-y-3.5 flex-1 overflow-y-auto">
-              {/* Chatbot Name */}
               <div className="space-y-1">
                 <label className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>Chatbot 名称</label>
                 <input
@@ -1586,12 +1546,11 @@ async function runInference() {
                   required
                   value={tempName}
                   onChange={(e) => setTempName(e.target.value)}
-                  className={`w-full p-2 border ${styles.cardBorder} rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500`}
+                  className={`w-full p-2 border ${styles.cardBorder} rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500 ${styles.cardBg} ${styles.cardText}`}
                   placeholder="如: AOC 运行协同助手"
                 />
               </div>
 
-              {/* Chatbot Role */}
               <div className="space-y-1">
                 <label className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>担当岗位角色</label>
                 <input
@@ -1599,29 +1558,27 @@ async function runInference() {
                   required
                   value={tempRole}
                   onChange={(e) => setTempRole(e.target.value)}
-                  className={`w-full p-2 border ${styles.cardBorder} rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500`}
+                  className={`w-full p-2 border ${styles.cardBorder} rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500 ${styles.cardBg} ${styles.cardText}`}
                   placeholder="如: 航空运行控制中心智能协调助理"
                 />
               </div>
 
-              {/* Chatbot Desc */}
               <div className="space-y-1">
                 <label className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>简述简介</label>
                 <textarea
                   value={tempDesc}
                   onChange={(e) => setTempDesc(e.target.value)}
-                  className={`w-full h-16 p-2 border ${styles.cardBorder} rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500`}
+                  className={`w-full h-16 p-2 border ${styles.cardBorder} rounded-lg outline-none text-[11px] focus:ring-1 focus:ring-blue-500 ${styles.cardBg} ${styles.cardText}`}
                   placeholder="说明此 Chatbot 的业务目标和限制范围..."
                 />
               </div>
 
-              {/* LLM Model selector */}
               <div className="space-y-1">
                 <label className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>关联的模型后端 (Model Catalog)</label>
                 <select
                   value={tempModel}
                   onChange={(e) => setTempModel(e.target.value)}
-                  className={`w-full p-2 border ${styles.cardBorder} ${styles.cardBg} rounded-lg outline-none text-[11px]`}
+                  className={`w-full p-2 border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} rounded-lg outline-none text-[11px]`}
                 >
                   {models.map(m => (
                     <option key={m.id} value={m.id}>{m.displayName}</option>
@@ -1639,7 +1596,7 @@ async function runInference() {
                 </button>
                 <button
                   type="submit"
-                  className={`px-4 py-1.5 ${styles.appBg} hover:bg-slate-800 text-white rounded-lg cursor-pointer shadow-sm`}
+                  className={`px-4 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg cursor-pointer shadow-sm`}
                 >
                   保存部署
                 </button>

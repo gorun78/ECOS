@@ -13,7 +13,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping({"/api/v1/system/roles", "/api/system/roles"})
+@RequestMapping("/api/v1/system/roles")
 public class RoleController {
 
     private static final Logger log = LoggerFactory.getLogger(RoleController.class);

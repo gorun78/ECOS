@@ -17,7 +17,7 @@ import java.util.*;
  * 网关层 Controller，通过 JdbcTemplate 直连数据库。
  */
 @RestController
-@RequestMapping({"/api/v1/system/config", "/api/system/config"})
+@RequestMapping("/api/v1/system/config")
 public class SysConfigController {
 
     private static final Logger log = LoggerFactory.getLogger(SysConfigController.class);

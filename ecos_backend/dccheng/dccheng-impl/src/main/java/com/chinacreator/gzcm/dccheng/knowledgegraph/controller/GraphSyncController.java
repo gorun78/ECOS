@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * </ol>
  */
 @RestController
-@RequestMapping("/api/knowledge")
+@RequestMapping("/api/v1/knowledge")
 public class GraphSyncController {
 
     private static final Logger log = LoggerFactory.getLogger(GraphSyncController.class);

@@ -13,7 +13,7 @@ import java.util.*;
  * @author DataBridge Datanet Team
  */
 @RestController
-@RequestMapping({"/api/v1/pipeline", "/api/pipeline"})
+@RequestMapping("/api/v1/pipeline")
 public class PipelineController {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineController.class);

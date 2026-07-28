@@ -909,7 +909,7 @@ export default function AIPCopilotDrawer({
         else if (securitySimUser === 'EU_DPO') clientIp = '10.120.9.15';
         else if (securitySimUser === 'unauthorized_ip_user') clientIp = '198.51.100.45';
 
-        const res = await fetch('/api/knowledge/query', {
+        const res = await fetch('/api/v1/knowledge/query', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -939,7 +939,7 @@ export default function AIPCopilotDrawer({
         // Sync audit logs list on screen if the query was intercepted
         if (data.verdict === 'DENIED') {
           showToast('error', `🛡️ AIP 警报：拦截敏感解密请求并强制零化明文数据流！`);
-          const logsRes = await fetch('/api/security/audit-logs');
+          const logsRes = await fetch('/api/v1/security/audit-logs');
           if (logsRes.ok) {
             const logs = await logsRes.json();
             setSecurityAuditLogs(logs);

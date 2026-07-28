@@ -27,7 +27,7 @@ import com.chinacreator.gzcm.dccheng.glossary.GlossaryRepository;
  * 状态流转: DRAFT → REVIEW → PUBLISHED → DEPRECATED
  */
 @RestController
-@RequestMapping("/api/glossary")
+@RequestMapping("/api/v1/glossary")
 public class GlossaryController {
 
     private static final Logger log = LoggerFactory.getLogger(GlossaryController.class);

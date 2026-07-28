@@ -39,7 +39,7 @@ import com.chinacreator.gzcm.aimod.ObjectQLParser;
  * </ol>
  */
 @RestController
-@RequestMapping({"/api/v1/query", "/api/query"})
+@RequestMapping("/api/v1/query")
 public class NLQController {
 
     private static final Logger log = LoggerFactory.getLogger(NLQController.class);

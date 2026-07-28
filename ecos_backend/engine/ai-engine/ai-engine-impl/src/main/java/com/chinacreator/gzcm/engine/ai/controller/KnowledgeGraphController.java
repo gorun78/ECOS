@@ -27,7 +27,7 @@ import java.util.*;
  * </ol>
  */
 @RestController
-@RequestMapping("/api/knowledge")
+@RequestMapping("/api/v1/knowledge")
 public class KnowledgeGraphController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeGraphController.class);

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/system/config/params")
+@RequestMapping("/api/v1/system/config/params")
 public class SystemParamController {
     private static final Logger log = LoggerFactory.getLogger(SystemParamController.class);
     @Autowired(required = false)

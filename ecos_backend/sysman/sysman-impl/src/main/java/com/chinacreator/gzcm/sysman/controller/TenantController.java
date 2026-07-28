@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * 并合并了原 TenantBillingController 的配额/用量/账单端点。
  */
 @RestController
-@RequestMapping({"/api/v1/system/tenants", "/api/system/tenants"})
+@RequestMapping("/api/v1/system/tenants")
 public class TenantController {
 
     private static final Logger log = LoggerFactory.getLogger(TenantController.class);

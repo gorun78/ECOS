@@ -18,7 +18,7 @@ import java.util.*;
  * 前端 SystemConfigManager 通过此接口按分组管理配置项。
  */
 @RestController
-@RequestMapping({"/api/v1/system/config", "/api/system/config"})
+@RequestMapping("/api/v1/system/config")
 public class SysConfigController {
 
     private static final Logger log = LoggerFactory.getLogger(SysConfigController.class);

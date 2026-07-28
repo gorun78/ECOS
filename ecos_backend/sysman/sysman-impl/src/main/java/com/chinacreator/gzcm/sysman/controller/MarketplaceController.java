@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @RestController("sysmanMarketplaceController")
-@RequestMapping({"/api/marketplace", "/api/v1/marketplace"})
+@RequestMapping("/api/v1/marketplace")
 public class MarketplaceController {
 
     private static final Logger log = LoggerFactory.getLogger(MarketplaceController.class);

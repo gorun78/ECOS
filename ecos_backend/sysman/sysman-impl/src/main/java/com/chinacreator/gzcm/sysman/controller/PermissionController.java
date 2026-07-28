@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/system/permissions")
+@RequestMapping("/api/v1/system/permissions")
 public class PermissionController {
 
     private static final Logger log = LoggerFactory.getLogger(PermissionController.class);

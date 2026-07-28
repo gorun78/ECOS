@@ -29,7 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * 返回分级建议和识别标签。</p>
  */
 @RestController
-@RequestMapping("/api/catalog")
+@RequestMapping("/api/v1/catalog")
 public class ClassificationController {
 
     private static final Logger log = LoggerFactory.getLogger(ClassificationController.class);

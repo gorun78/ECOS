@@ -27,7 +27,7 @@ interface AgentMeshAgentRaw {
 
 export async function fetchAIPAgentsFromMesh(): Promise<AIPAgent[]> {
   try {
-    const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/agent-mesh/agents');
+    const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
     return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
   } catch (e) {
     console.warn('[ai-workbench] fetchAIPAgentsFromMesh failed', e);

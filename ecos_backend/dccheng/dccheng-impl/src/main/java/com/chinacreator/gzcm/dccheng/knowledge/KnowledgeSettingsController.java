@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/knowledge/settings")
+@RequestMapping("/api/v1/knowledge/settings")
 public class KnowledgeSettingsController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeSettingsController.class);

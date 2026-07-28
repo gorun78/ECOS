@@ -6,7 +6,7 @@
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
-const API_BASE = '/api/dict';
+const API_BASE = '/api/v1/dict';
 
 // ── Types ─────────────────────────────────────────────
 

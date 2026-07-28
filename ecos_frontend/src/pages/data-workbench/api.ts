@@ -7,7 +7,7 @@ import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck } from
 
 // ─── API 端点常量 ──────────────────────────────────────────
 const DATANET_DS = '/datanet/datasource';           // DataSourceController
-const INTEGRATION  = '/api/integration/metadata';   // CeosCompatController (connections + syncTasks)
+const INTEGRATION  = '/api/v1/integration/metadata';   // CeosCompatController (connections + syncTasks)
 const PIPELINE_DEFS = '/api/v1/pipeline/definitions'; // PipelineController
 const DQ_RULES      = '/api/v1/ecos/dq/rules';         // DqController (camelCase 字段)
 const LINEAGE_NODES = '/api/v1/engine/data/lineage/nodes';
