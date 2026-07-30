@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.aimod.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.runtime.hermes.model.ProfileConfig;
-import com.chinacreator.gzcm.sysman.hermes.service.IAgentProfileService;
+import com.chinacreator.gzcm.runtime.llm.model.ProfileConfig;
+import com.chinacreator.gzcm.sysman.llm.service.IAgentProfileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

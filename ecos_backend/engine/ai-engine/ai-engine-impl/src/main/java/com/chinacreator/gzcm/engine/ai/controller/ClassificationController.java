@@ -12,8 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.runtime.hermes.HermesEngine;
-import com.chinacreator.gzcm.runtime.hermes.scheduler.AgentResult;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -25,7 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li>POST /api/catalog/assets/{assetId}/auto-classify — Agent自动识别敏感字段并建议分级</li>
  * </ol>
  *
- * <p>调用 HermesEngine 让 AI 扫描字段名和样本数据，识别身份证/手机号/邮箱/银行卡/地址等敏感信息，
+ * <p>调用 LLMGatewayService 让 AI 扫描字段名和样本数据，识别身份证/手机号/邮箱/银行卡/地址等敏感信息，
  * 返回分级建议和识别标签。</p>
  */
 @RestController
@@ -36,7 +36,7 @@ public class ClassificationController {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired(required = false)
-    private HermesEngine hermesEngine;
+    private LLMGatewayService llmGatewayService;
 
     /** 系统提示词 — 数据分类专家 */
     private static final String SYSTEM_PROMPT =
@@ -64,7 +64,7 @@ public class ClassificationController {
     @PostMapping("/assets/{assetId}/auto-classify")
     public ApiResponse<Map<String, Object>> autoClassify(@PathVariable String assetId,
                                                           @RequestBody(required = false) Map<String, Object> body) {
-        if (hermesEngine == null) {
+        if (llmGatewayService == null) {
             return ApiResponse.internalError("Hermes 引擎未就绪，请确认 Agent Runtime 已启动");
         }
 
@@ -78,7 +78,7 @@ public class ClassificationController {
         log.info("Auto-classify agent invoked for asset: {}", assetId);
 
         try {
-            AgentResult result = hermesEngine.execute("sysman", "sysman-assistant", prompt);
+            AgentResult result = llmGatewayService.execute("sysman", "sysman-assistant", prompt);
 
             if (!result.isSuccess()) {
                 log.warn("Agent classify failed: {}", result.getErrorMsg());

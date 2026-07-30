@@ -22,7 +22,7 @@
         <module>runtime-monitor</module>
         <module>runtime-crypto</module>
         <module>runtime-task</module>
-        <module>hermes-engine</module>
+        <module>llm-gateway</module>
     </modules>
 
 </project>

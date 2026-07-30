@@ -251,7 +251,7 @@
         <!-- P2-13 Hermes Engine (LLM Gateway, Agent Scheduler) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>hermes-engine</artifactId>
+            <artifactId>llm-gateway</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

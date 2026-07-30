@@ -49,6 +49,7 @@ auth:
       - "/api/v1/security/**"
       - "/api/v1/marketplace/**"
       - "/api/v1/agent/**"
+      - "/api/v1/agent-call/**"
       - "/api/v1/agent-mesh/**"
       - "/api/v1/knowledge/**"
       - "/api/v1/glossary/**"
@@ -83,6 +84,8 @@ auth:
       - "/api/v1/policy-engine/**"
       - "/api/v1/audit/**"
       - "/api/v1/data-masking/**"
+      - "/api/v1/cron-jobs/**"
+      - "/api/v1/skills/**"
       - "/api/alerts/**"
       - "/api/datalake/**"
       - "/api/workbook/**"
@@ -100,9 +103,22 @@ neo4j:
 # LLM Configuration
 llm:
   deepseek:
-    api-key: ${DEEPSEEK_API_KEY:}
+    api-key: "***"
     base-url: https://api.deepseek.com
     model: deepseek-chat
+  engine:
+    running: false
+    default-provider: openrouter
+    default-model: deepseek/deepseek-chat
+    max-concurrency: 5
+    default-timeout: 600
+  gateway:
+    retry-max-attempts: 3
+    request-timeout: 60s
+
+profile:
+  cache-enabled: false
+  cache-ttl-minutes: 30
 
 logging:
   level:
@@ -158,18 +174,3 @@ jwt:
     5EPhuY4zaMDG1n6+kz5BiB+7zbIuECUgsDdA5V7L/nAJwO10pwuHIDb45jWu47hn
     BQIDAQAB
     -----END PUBLIC KEY-----
-
-# Hermes Agent Engine Configuration
-hermes:
-  engine:
-    running: false
-    default-provider: openrouter
-    default-model: deepseek/deepseek-chat
-    max-concurrency: 5
-    default-timeout: 600
-  gateway:
-    retry-max-attempts: 3
-    request-timeout: 60s
-  profile:
-    cache-enabled: false
-    cache-ttl-minutes: 30

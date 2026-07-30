@@ -8,8 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.runtime.hermes.HermesEngine;
-import com.chinacreator.gzcm.runtime.hermes.scheduler.AgentResult;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 import com.chinacreator.gzcm.aimod.SemanticQueryService;
 import com.chinacreator.gzcm.aimod.ObjectQLParser;
 
@@ -33,7 +33,7 @@ import com.chinacreator.gzcm.aimod.ObjectQLParser;
  * <ol>
  *   <li>接收自然语言问题</li>
  *   <li>调用 {@link SemanticQueryService#translate(String)} → ObjectQL JSON</li>
- *   <li>translate 返回 null → 调 Agent Runtime 解析（HermesEngine fallback）</li>
+ *   <li>translate 返回 null → 调 Agent Runtime 解析（LLMGatewayService fallback）</li>
  *   <li>{@link ObjectQLParser#parse(String)} → SQL → JDBC 执行</li>
  *   <li>返回翻译结果 + 数据</li>
  * </ol>
@@ -46,11 +46,11 @@ public class NLQController {
 
     private final JdbcTemplate jdbc;
     private final SemanticQueryService semanticQueryService;
-    private final HermesEngine hermesEngine;
+    private final LLMGatewayService llmGatewayService;
 
-    public NLQController(JdbcTemplate jdbc, HermesEngine hermesEngine) {
+    public NLQController(JdbcTemplate jdbc, LLMGatewayService llmGatewayService) {
         this.jdbc = jdbc;
-        this.hermesEngine = hermesEngine;
+        this.llmGatewayService = llmGatewayService;
         this.semanticQueryService = new SemanticQueryService();
     }
 
@@ -74,11 +74,11 @@ public class NLQController {
             // 2. 语义翻译 → ObjectQL
             Map<String, Object> objectQL = semanticQueryService.translate(question);
 
-            // 3. 词典无匹配 → Agent Runtime fallback（调用 HermesEngine）
+            // 3. 词典无匹配 → Agent Runtime fallback（调用 LLMGatewayService）
             if (objectQL == null) {
                 log.warn("NLQ 词典无匹配: {}，进入 Agent Runtime fallback", question);
                 try {
-                    AgentResult agentResult = hermesEngine.execute("sysman", "nlq-fallback", question);
+                    AgentResult agentResult = llmGatewayService.execute("sysman", "nlq-fallback", question);
                     Map<String, Object> fallbackResult = new LinkedHashMap<>();
                     if (agentResult.isSuccess()) {
                         log.info("Agent Runtime fallback 成功: session={}, duration={}ms",

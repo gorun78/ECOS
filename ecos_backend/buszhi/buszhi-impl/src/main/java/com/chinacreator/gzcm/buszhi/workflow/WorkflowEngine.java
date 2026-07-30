@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
-import com.chinacreator.gzcm.runtime.hermes.HermesEngine;
-import com.chinacreator.gzcm.runtime.hermes.scheduler.AgentResult;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,18 +34,18 @@ public class WorkflowEngine {
     private final ExpressionService expressionService;
     private final WorkflowTaskService taskService;
     private final WorkflowLogRepository logRepo;
-    private final HermesEngine hermesEngine;
+    private final LLMGatewayService llmGatewayService;
 
     public WorkflowEngine(ObjectMapper objectMapper,
                           ExpressionService expressionService,
                           WorkflowTaskService taskService,
                           WorkflowLogRepository logRepo,
-                          HermesEngine hermesEngine) {
+                          LLMGatewayService llmGatewayService) {
         this.objectMapper = objectMapper;
         this.expressionService = expressionService;
         this.taskService = taskService;
         this.logRepo = logRepo;
-        this.hermesEngine = hermesEngine;
+        this.llmGatewayService = llmGatewayService;
     }
 
     /**
@@ -268,7 +268,7 @@ public class WorkflowEngine {
                     }
                 }
                 case "agentTask" -> {
-                    // Resolve agent config and invoke HermesEngine
+                    // Resolve agent config and invoke LLMGatewayService
                     @SuppressWarnings("unchecked")
                     Map<String, Object> agentConfig = (Map<String, Object>) config.get("agentConfig");
                     @SuppressWarnings("unchecked")
@@ -290,9 +290,9 @@ public class WorkflowEngine {
                             "Agent 调用: " + agentId, toJson(Map.of("agentId", agentId)), null, null);
                     }
 
-                    // Try to invoke HermesEngine
+                    // Try to invoke LLMGatewayService
                     try {
-                        AgentResult agentResult = hermesEngine.execute("workflow", agentId, userPrompt);
+                        AgentResult agentResult = llmGatewayService.execute("workflow", agentId, userPrompt);
                         if (agentResult.isSuccess()) {
                             // Map output to variables
                             applyAgentOutput(config, agentResult, context);

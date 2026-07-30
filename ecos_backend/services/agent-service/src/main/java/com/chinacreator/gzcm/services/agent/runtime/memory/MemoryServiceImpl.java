@@ -6,6 +6,8 @@ import com.chinacreator.gzcm.services.agent.runtime.model.MemoryQuery;
 import com.chinacreator.gzcm.services.agent.runtime.model.MemoryRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,12 +25,24 @@ public class MemoryServiceImpl implements MemoryService {
     private final ConcurrentHashMap<String, List<MemoryRecord>> store = new ConcurrentHashMap<>();
     private final JdbcTemplate jdbcTemplate;
 
+    @Autowired(required = false)
+    @Qualifier("ecosHermesMemoryAdapter")
+    private MemoryService hermesMemoryAdapter;
+
     public MemoryServiceImpl(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     public void store(MemoryRecord record) {
+        try {
+            if (hermesMemoryAdapter != null) {
+                hermesMemoryAdapter.store(record);
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("Hermes Memory store fallback: {}", e.getMessage());
+        }
         log.debug("Storing memory for agent: {} layer: {}", record.getAgentId(), record.getLayer());
         if (record.getId() == null) {
             record.setId(UUID.randomUUID().toString());
@@ -46,6 +60,13 @@ public class MemoryServiceImpl implements MemoryService {
 
     @Override
     public List<MemoryRecord> retrieve(String agentId, MemoryQuery query) {
+        try {
+            if (hermesMemoryAdapter != null) {
+                return hermesMemoryAdapter.retrieve(agentId, query);
+            }
+        } catch (Exception e) {
+            log.warn("Hermes Memory retrieve fallback: {}", e.getMessage());
+        }
         if (query.getLayer() == MemoryLayer.LONG_TERM || query.getLayer() == MemoryLayer.ENTERPRISE) {
             return queryFromDb(agentId, query);
         }
@@ -58,6 +79,13 @@ public class MemoryServiceImpl implements MemoryService {
 
     @Override
     public MemoryContext buildContext(String agentId, String sessionId) {
+        try {
+            if (hermesMemoryAdapter != null) {
+                return hermesMemoryAdapter.buildContext(agentId, sessionId);
+            }
+        } catch (Exception e) {
+            log.warn("Hermes Memory buildContext fallback: {}", e.getMessage());
+        }
         MemoryContext ctx = new MemoryContext();
         ctx.setAgentId(agentId);
         ctx.setSessionId(sessionId);

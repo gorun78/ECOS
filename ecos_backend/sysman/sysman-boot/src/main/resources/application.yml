@@ -57,11 +57,21 @@ auth:
 # LLM Configuration
 llm:
   deepseek:
-    api-key: ${DEEPSEEK_API_KEY:}
+    api-key: ${DEEP...EY:}
     base-url: https://api.deepseek.com
     model: deepseek-chat
-
-logging:
+  engine:
+    running: false
+    default-provider: openrouter
+    default-model: deepseek/deepseek-chat
+    max-concurrency: 5
+    default-timeout: 600
+  gateway:
+    retry-max-attempts: 3
+    request-timeout: 60s
+  profile:
+    cache-enabled: false
+    cache-ttl-minutes: 30
   level:
     root: INFO
     com.chinacreator.gzcm: DEBUG
@@ -110,17 +120,4 @@ jwt:
     BQIDAQAB
     -----END PUBLIC KEY-----
 
-# Hermes Agent Engine Configuration
-hermes:
-  engine:
-    running: false
-    default-provider: openrouter
-    default-model: deepseek/deepseek-chat
-    max-concurrency: 5
-    default-timeout: 600
-  gateway:
-    retry-max-attempts: 3
-    request-timeout: 60s
-  profile:
-    cache-enabled: false
-    cache-ttl-minutes: 30
+# end of sysman-boot application.yml

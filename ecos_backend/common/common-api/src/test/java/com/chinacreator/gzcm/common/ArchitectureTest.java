@@ -62,7 +62,7 @@ public class ArchitectureTest {
             "runtime/runtime-task",
             "runtime/runtime-monitor",
             "runtime/runtime-crypto",
-            "runtime/hermes-engine",
+            "runtime/llm-gateway",
             "sysman/sysman-api",
             "sysman/sysman-impl",
             "sysman/sysman-boot",

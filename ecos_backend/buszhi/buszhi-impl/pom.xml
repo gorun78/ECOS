@@ -36,7 +36,7 @@
         </dependency>
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>hermes-engine</artifactId>
+            <artifactId>llm-gateway</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <!-- 阶段5.1: worldmodel→buszhi 已吸收，源码已复制，无需外部依赖 -->

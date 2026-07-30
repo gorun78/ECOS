@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.aimod;
 
-import com.chinacreator.gzcm.runtime.hermes.HermesEngine;
-import com.chinacreator.gzcm.runtime.hermes.metrics.AgentMetrics;
-import com.chinacreator.gzcm.runtime.hermes.model.ProfileConfig;
-import com.chinacreator.gzcm.runtime.hermes.repository.ProfileConfigRepository;
-import com.chinacreator.gzcm.sysman.hermes.service.IAgentProfileService;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.metrics.AgentMetrics;
+import com.chinacreator.gzcm.runtime.llm.model.ProfileConfig;
+import com.chinacreator.gzcm.runtime.llm.repository.ProfileConfigRepository;
+import com.chinacreator.gzcm.sysman.llm.service.IAgentProfileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +28,7 @@ public class AgentProfileServiceImpl implements IAgentProfileService {
     private ProfileConfigRepository profileConfigRepository;
 
     @Autowired(required = false)
-    private HermesEngine hermesEngine;
+    private LLMGatewayService llmGatewayService;
 
     @Autowired(required = false)
     private AgentMetrics agentMetrics;
@@ -69,8 +69,8 @@ public class AgentProfileServiceImpl implements IAgentProfileService {
         config.setUpdatedTime(LocalDateTime.now());
         profileConfigRepository.update(config);
         // 刷新引擎缓存
-        if (hermesEngine != null) {
-            hermesEngine.refreshProfileCache(config.getSubsystem());
+        if (llmGatewayService != null) {
+            llmGatewayService.refreshProfileCache(config.getSubsystem());
         }
         log.info("Updated agent profile: id={}, name={}, subsystem={}",
                 config.getId(), config.getProfileName(), config.getSubsystem());
@@ -86,8 +86,8 @@ public class AgentProfileServiceImpl implements IAgentProfileService {
         }
         profileConfigRepository.deleteById(id);
         // 刷新引擎缓存
-        if (hermesEngine != null && existing.getSubsystem() != null) {
-            hermesEngine.refreshProfileCache(existing.getSubsystem());
+        if (llmGatewayService != null && existing.getSubsystem() != null) {
+            llmGatewayService.refreshProfileCache(existing.getSubsystem());
         }
         log.info("Deleted agent profile: id={}", id);
     }
@@ -103,8 +103,8 @@ public class AgentProfileServiceImpl implements IAgentProfileService {
         config.setUpdatedTime(LocalDateTime.now());
         profileConfigRepository.update(config);
         // 刷新引擎缓存
-        if (hermesEngine != null && config.getSubsystem() != null) {
-            hermesEngine.refreshProfileCache(config.getSubsystem());
+        if (llmGatewayService != null && config.getSubsystem() != null) {
+            llmGatewayService.refreshProfileCache(config.getSubsystem());
         }
         log.info("Toggled agent profile enabled={}: id={}", enabled, id);
     }

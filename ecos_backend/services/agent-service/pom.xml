@@ -29,7 +29,7 @@
         </dependency>
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>hermes-engine</artifactId>
+            <artifactId>llm-gateway</artifactId>
             <version>${databridge.version}</version>
         </dependency>
         <dependency>

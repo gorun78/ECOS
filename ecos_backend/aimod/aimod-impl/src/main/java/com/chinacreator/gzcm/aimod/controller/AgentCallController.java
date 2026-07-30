@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.aimod.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.runtime.hermes.HermesEngine;
-import com.chinacreator.gzcm.runtime.hermes.metrics.AgentMetrics;
-import com.chinacreator.gzcm.runtime.hermes.scheduler.AgentResult;
-import com.chinacreator.gzcm.sysman.hermes.service.IAgentProfileService;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.metrics.AgentMetrics;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
+import com.chinacreator.gzcm.sysman.llm.service.IAgentProfileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,7 @@ public class AgentCallController {
     private static final Logger log = LoggerFactory.getLogger(AgentCallController.class);
 
     @Autowired(required = false)
-    private HermesEngine hermesEngine;
+    private LLMGatewayService llmGatewayService;
 
     @Autowired(required = false)
     private IAgentProfileService agentProfileService;
@@ -49,7 +49,7 @@ public class AgentCallController {
     @PostMapping("/chat")
     public ApiResponse<Map<String, Object>> chat(@RequestBody Map<String, Object> body) {
         try {
-            if (hermesEngine == null) {
+            if (llmGatewayService == null) {
                 return ApiResponse.internalError("Hermes 引擎未就绪");
             }
 
@@ -67,7 +67,7 @@ public class AgentCallController {
                 return ApiResponse.badRequest("message 不能为空");
             }
 
-            AgentResult result = hermesEngine.execute(subsystem, profileName, message);
+            AgentResult result = llmGatewayService.execute(subsystem, profileName, message);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("sessionId", result.getSessionId());

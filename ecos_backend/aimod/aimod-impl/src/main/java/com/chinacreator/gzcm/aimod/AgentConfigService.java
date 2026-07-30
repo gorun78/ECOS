@@ -14,10 +14,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.chinacreator.gzcm.runtime.hermes.HermesEngine;
-import com.chinacreator.gzcm.runtime.hermes.model.ProfileConfig;
-import com.chinacreator.gzcm.runtime.hermes.repository.ProfileConfigRepository;
-import com.chinacreator.gzcm.runtime.hermes.scheduler.AgentResult;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.model.ProfileConfig;
+import com.chinacreator.gzcm.runtime.llm.repository.ProfileConfigRepository;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -40,7 +40,7 @@ public class AgentConfigService {
     private final ObjectMapper objectMapper;
 
     @Autowired(required = false)
-    private HermesEngine hermesEngine;
+    private LLMGatewayService llmGatewayService;
 
     @Autowired(required = false)
     private ProfileConfigRepository profileConfigRepository;
@@ -153,11 +153,11 @@ public class AgentConfigService {
     }
 
     /**
-     * 测试 Agent — 通过 HermesEngine 执行真实对话
+     * 测试 Agent — 通过 LLMGatewayService 执行真实对话
      * <p>
      * 1. 根据 Agent 配置创建临时 ProfileConfig
      * 2. 持久化到 DB 并刷新引擎缓存
-     * 3. 通过 HermesEngine 执行用户消息
+     * 3. 通过 LLMGatewayService 执行用户消息
      * 4. 清理临时 Profile
      * </p>
      */
@@ -169,8 +169,8 @@ public class AgentConfigService {
         String message = (String) body.getOrDefault("message", "你好");
         String tempProfileName = TEST_PROFILE_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
-        // 2. 如果 HermesEngine 不可用，返回降级信息
-        if (hermesEngine == null || profileConfigRepository == null) {
+        // 2. 如果 LLMGatewayService 不可用，返回降级信息
+        if (llmGatewayService == null || profileConfigRepository == null) {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("agentId", id);
             result.put("status", "unavailable");
@@ -187,10 +187,10 @@ public class AgentConfigService {
             profileConfigRepository.insert(profile);
 
             // 5. 刷新引擎缓存
-            hermesEngine.refreshProfileCache(TEST_SUBSYSTEM);
+            llmGatewayService.refreshProfileCache(TEST_SUBSYSTEM);
 
-            // 6. 通过 HermesEngine 执行
-            AgentResult result = hermesEngine.execute(TEST_SUBSYSTEM, tempProfileName, message);
+            // 6. 通过 LLMGatewayService 执行
+            AgentResult result = llmGatewayService.execute(TEST_SUBSYSTEM, tempProfileName, message);
 
             // 7. 映射返回值
             Map<String, Object> response = new LinkedHashMap<>();
@@ -224,7 +224,7 @@ public class AgentConfigService {
             // 8. 清理临时 Profile
             try {
                 profileConfigRepository.deleteById(tempProfileName);
-                hermesEngine.refreshProfileCache(TEST_SUBSYSTEM);
+                llmGatewayService.refreshProfileCache(TEST_SUBSYSTEM);
             } catch (Exception e) {
                 log.warn("Failed to clean up test profile: {}", tempProfileName, e);
             }
