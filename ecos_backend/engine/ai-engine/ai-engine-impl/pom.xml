@@ -83,5 +83,26 @@
             <artifactId>agent-service</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+
+        <!-- Ontology Engine API (ExtractedSubGraph, ExtractedEntity, etc.) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ontology-engine-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- KB Engine API (KnowledgeGraphService) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>kb-engine-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- LLM Gateway (LLMGatewayService for LLM calls) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>llm-gateway</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 </project>

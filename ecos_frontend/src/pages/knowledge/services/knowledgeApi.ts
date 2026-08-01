@@ -6,6 +6,8 @@ import type {
   SyncStatus,
   SyncLog,
   MetadataAsset,
+  RuleRepository,
+  RuleVersion,
 } from '../typesAndConstants';
 
 const KNOWLEDGE_BASE = '/api/knowledge';
@@ -13,6 +15,7 @@ const GRAPH_BASE = '/api/knowledge';
 const GLOSSARY_BASE = '/api/glossary';
 const CATALOG_BASE = '/api/catalog';
 const COGNITIVE_BASE = '/api/v1/cognitive';
+const RULES_BASE = '/api/v1/rules';
 
 export async function fetchGraph(domain?: string) {
   const q = domain ? `?domain=${encodeURIComponent(domain)}` : '';
@@ -259,6 +262,44 @@ export async function toggleSimulationDrift(type: string, enabled: boolean) {
   }
 }
 
+// ── Rule Repository ─────────────────────────────────────
+
+export async function fetchRules(params?: { domain?: string; status?: string; keyword?: string }): Promise<RuleRepository[]> {
+  const qs = new URLSearchParams();
+  if (params?.domain) qs.set('domain', params.domain);
+  if (params?.status) qs.set('status', params.status);
+  if (params?.keyword) qs.set('keyword', params.keyword);
+  const query = qs.toString();
+  const url = query ? `${RULES_BASE}?${query}` : RULES_BASE;
+  try {
+    const data = await apiFetchData<RuleRepository[]>(url);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createRule(data: Partial<RuleRepository>) {
+  return apiFetchData<RuleRepository>(RULES_BASE, { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateRule(id: string, data: Partial<RuleRepository>) {
+  return apiFetchData<RuleRepository>(`${RULES_BASE}/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteRule(id: string) {
+  return apiFetchData(`${RULES_BASE}/${id}`, { method: 'DELETE' });
+}
+
+export async function fetchRuleVersions(ruleId: string): Promise<RuleVersion[]> {
+  try {
+    const data = await apiFetchData<RuleVersion[]>(`${RULES_BASE}/${ruleId}/versions`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 export const knowledgeApi = {
   fetchGraph,
   fetchNode,
@@ -293,4 +334,9 @@ export const knowledgeApi = {
   fetchIntegrationMetadata,
   fetchIntegrationLogs,
   toggleSimulationDrift,
+  fetchRules,
+  createRule,
+  updateRule,
+  deleteRule,
+  fetchRuleVersions,
 };

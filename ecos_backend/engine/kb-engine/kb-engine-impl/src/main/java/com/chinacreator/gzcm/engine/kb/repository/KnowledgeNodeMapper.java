@@ -14,6 +14,9 @@ public interface KnowledgeNodeMapper {
     @Select("SELECT id, label, node_type as nodeType, description, properties as propertiesJson, domain, created_at as createdAt, updated_at as updatedAt FROM ecos_knowledge.graph_node WHERE domain = #{domain}")
     List<KnowledgeNode> findByDomain(@Param("domain") String domain);
 
+    @Select("SELECT id, label, node_type as nodeType, description, properties as propertiesJson, domain, created_at as createdAt, updated_at as updatedAt FROM ecos_knowledge.graph_node WHERE label = #{label}")
+    KnowledgeNode findByLabel(@Param("label") String label);
+
     @Select("SELECT id, label, node_type as nodeType, description, properties as propertiesJson, domain, created_at as createdAt, updated_at as updatedAt FROM ecos_knowledge.graph_node WHERE label ILIKE CONCAT('%', #{query}, '%')")
     List<KnowledgeNode> searchByLabel(@Param("query") String query);
 

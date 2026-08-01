@@ -52,6 +52,7 @@ auth:
       - "/api/v1/agent-call/**"
       - "/api/v1/agent-mesh/**"
       - "/api/v1/knowledge/**"
+      - "/api/v1/rules/**"
       - "/api/v1/glossary/**"
       - "/api/v1/catalog/**"
       - "/api/v1/system/**"

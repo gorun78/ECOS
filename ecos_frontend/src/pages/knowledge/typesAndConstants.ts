@@ -91,6 +91,32 @@ export interface SyncLog {
   message: string;
 }
 
+export interface RuleRepository {
+  id: string;
+  name: string;
+  domain: string;
+  status: 'DRAFT' | 'IN_REVIEW' | 'ACTIVE' | 'DEPRECATED';
+  priority: number;
+  version: number;
+  description?: string;
+  content?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RuleVersion {
+  id: string;
+  ruleId: string;
+  version: number;
+  changeLog: string;
+  content?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export const RULE_STATUS_OPTIONS = ['DRAFT', 'IN_REVIEW', 'ACTIVE', 'DEPRECATED'] as const;
+
 export const CHUNK_SIZE_OPTIONS = [256, 512, 1024, 2048] as const;
 
 export const VECTOR_MODELS = [
@@ -105,6 +131,14 @@ export const KNOWLEDGE_TAB_GROUPS = [
     labelZh: '闭环设计',
     label: 'Closed Loop',
     tabs: [{ id: 'closed_loop' as const, labelZh: '闭环设计', label: 'Closed Loop', icon: 'FileText' as const }],
+  },
+  {
+    id: 'extraction',
+    labelZh: '知识抽取',
+    label: 'Extraction',
+    tabs: [
+      { id: 'extraction' as const, labelZh: '知识抽取', label: 'Extraction', icon: 'Zap' as const },
+    ],
   },
   {
     id: 'data',
@@ -126,6 +160,16 @@ export const KNOWLEDGE_TAB_GROUPS = [
       { id: 'index' as const, labelZh: '向量索引', label: 'Index & Settings', icon: 'Cpu' as const },
       { id: 'rag' as const, labelZh: 'RAG模拟', label: 'RAG', icon: 'SearchCheck' as const },
       { id: 'cognitive_config' as const, labelZh: '认知引擎配置', label: 'Cognitive Config', icon: 'Brain' as const },
+    ],
+  },
+  {
+    id: 'operations',
+    labelZh: '知识运营',
+    label: 'Knowledge Ops',
+    tabs: [
+      { id: 'knowledge_extraction' as const, labelZh: '知识抽取', label: 'Knowledge Extraction', icon: 'Sparkles' as const },
+      { id: 'rules' as const, labelZh: '规则库', label: 'Rule Repository', icon: 'FileText' as const },
+      { id: 'compliance_check' as const, labelZh: '合规检查', label: 'Compliance Check', icon: 'ShieldCheck' as const },
     ],
   },
 ] as const;

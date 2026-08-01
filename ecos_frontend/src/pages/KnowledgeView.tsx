@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   FileText, Combine, Network, Workflow, Cpu, SearchCheck,
-  Database, Tag, Brain,
+  Database, Tag, Brain, Zap, Sparkles, ShieldCheck, Shield,
 } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
@@ -16,10 +16,13 @@ import RagTab from './knowledge/tabs/RagTab';
 import GraphSyncTab from './knowledge/tabs/GraphSyncTab';
 import ClassificationTab from './knowledge/tabs/ClassificationTab';
 import CognitiveConfigTab from './knowledge/tabs/CognitiveConfigTab';
+import KnowledgeExtractionTab from './knowledge/tabs/KnowledgeExtractionTab';
+import KnowledgeRuleRepositoryTab from './knowledge/tabs/KnowledgeRuleRepositoryTab';
+import KnowledgeComplianceCheckTab from './knowledge/tabs/KnowledgeComplianceCheckTab';
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   FileText, Combine, Network, Workflow, Cpu, SearchCheck,
-  Database, Tag, Brain,
+  Database, Tag, Brain, Zap, Sparkles, ShieldCheck, Shield,
 };
 
 const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
@@ -32,6 +35,9 @@ const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
   index: IndexTab,
   rag: RagTab,
   cognitive_config: CognitiveConfigTab,
+  knowledge_extraction: KnowledgeExtractionTab,
+  rules: KnowledgeRuleRepositoryTab,
+  compliance_check: KnowledgeComplianceCheckTab,
 };
 
 export default function KnowledgeView() {
