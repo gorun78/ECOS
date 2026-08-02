@@ -64,6 +64,9 @@ public class AgentLoopService {
     @Autowired(required = false)
     private ToolExecutorService toolExecutorService;
 
+    @org.springframework.beans.factory.annotation.Value("${llm.deepseek.api-key:}")
+    private String deepseekApiKey;
+
     // ─── Public API ────────────────────────────────────────────────────
 
     /**
@@ -242,6 +245,7 @@ public class AgentLoopService {
                 ? config.getMaxTokens() : 4096;
 
         ChatRequest request = new ChatRequest(model, chatMessages, temperature, maxTokens, false);
+        request.setApiKey(deepseekApiKey);
 
         try {
             return llmGateway.call(request);

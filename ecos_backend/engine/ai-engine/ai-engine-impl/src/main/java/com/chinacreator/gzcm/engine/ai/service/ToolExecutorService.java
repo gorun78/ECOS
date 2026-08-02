@@ -41,6 +41,8 @@ public class ToolExecutorService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    // 使用 @Lazy 打破 AgentDelegationService → AgentLoopService → ToolExecutorService 循环依赖
+    @org.springframework.context.annotation.Lazy
     @Autowired(required = false)
     private AgentDelegationService agentDelegationService;
 
