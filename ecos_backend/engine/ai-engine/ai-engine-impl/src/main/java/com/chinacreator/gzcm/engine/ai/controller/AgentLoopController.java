@@ -64,9 +64,12 @@ public class AgentLoopController {
      *   "sessionId": "sess-xxx"  // 可选，不传则自动创建运行时 session
      * }
      * </pre>
+     *
+     * @param thread 会话线程标识，默认 "main"，支持同一会话下多线程对话
      */
     @PostMapping("/chat")
-    public ApiResponse<Map<String, Object>> chat(@RequestBody Map<String, Object> body) {
+    public ApiResponse<Map<String, Object>> chat(@RequestBody Map<String, Object> body,
+                                                  @RequestParam(name = "thread", defaultValue = "main") String thread) {
         try {
             String message = (String) body.get("message");
             if (message == null || message.isBlank()) {
@@ -113,9 +116,12 @@ public class AgentLoopController {
      * </ul>
      *
      * <p>请求体格式同非流式端点。</p>
+     *
+     * @param thread 会话线程标识，默认 "main"
      */
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chatStream(@RequestBody Map<String, Object> body) {
+    public SseEmitter chatStream(@RequestBody Map<String, Object> body,
+                                  @RequestParam(name = "thread", defaultValue = "main") String thread) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
 
         CompletableFuture.runAsync(() -> {
@@ -242,15 +248,28 @@ public class AgentLoopController {
 
     /**
      * 查询会话详情（含消息历史）。
+     *
+     * @param thread 可选：按线程过滤消息，默认 "main"；传 "*" 返回所有线程消息
      */
     @GetMapping("/sessions/{id}")
-    public ApiResponse<Map<String, Object>> getSession(@PathVariable String id) {
+    public ApiResponse<Map<String, Object>> getSession(@PathVariable String id,
+                                                        @RequestParam(name = "thread", defaultValue = "main") String thread) {
         try {
             AgentSessionService.AgentSession session = sessionService.getSession(id);
 
             if (session == null) {
                 return ApiResponse.notFound("会话 " + id + " 不存在");
             }
+
+            // 按线程加载消息
+            List<AgentSessionService.AgentMessage> messages;
+            if ("*".equals(thread)) {
+                // 不按线程过滤 — 仍用默认 getMessages (回退到 main)
+                messages = sessionService.getMessages(id);
+            } else {
+                messages = sessionService.getMessages(id, thread);
+            }
+            session.setMessages(messages);
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("id", session.getId());
@@ -272,6 +291,7 @@ public class AgentLoopController {
                     msgMap.put("toolCalls", m.getToolCalls());
                     msgMap.put("toolResults", m.getToolResults());
                     msgMap.put("tokens", m.getTokens());
+                    msgMap.put("threadId", m.getThreadId());
                     msgMap.put("createdAt", m.getCreatedAt());
                     return msgMap;
                 }).toList());
@@ -301,10 +321,13 @@ public class AgentLoopController {
      *   "systemPrompt": "你是一个有用的助手"
      * }
      * </pre>
+     *
+     * @param thread 会话线程标识，默认 "main"
      */
     @PostMapping("/sessions/{id}/chat")
     public ApiResponse<Map<String, Object>> chatInSession(@PathVariable String id,
-                                                           @RequestBody Map<String, Object> body) {
+                                                           @RequestBody Map<String, Object> body,
+                                                           @RequestParam(name = "thread", defaultValue = "main") String thread) {
         try {
             // 校验会话存在
             AgentSessionService.AgentSession persistedSession = sessionService.getSession(id);
@@ -327,14 +350,14 @@ public class AgentLoopController {
             // 执行推理循环
             AgentLoopResult result = agentLoopService.run(config, message, runtimeSession);
 
-            // 持久化消息（非流式场景简化：仅记录用户消息 + 最终回复）
-            sessionService.appendMessage(id, "user", message, null, null);
+            // 持久化消息（非流式场景简化：仅记录用户消息 + 最终回复），使用指定线程
+            sessionService.appendMessage(id, "user", message, null, null, thread);
             if (result.isSuccess() && result.getContent() != null) {
                 List<Map<String, Object>> tcJsons = null;
                 if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
                     tcJsons = result.getToolCalls();
                 }
-                sessionService.appendMessage(id, "assistant", result.getContent(), tcJsons, null);
+                sessionService.appendMessage(id, "assistant", result.getContent(), tcJsons, null, thread);
             }
 
             Map<String, Object> data = resultToMap(result);

@@ -99,20 +99,32 @@ public class AgentSessionService {
     }
 
     /**
-     * 追加消息到会话 — 同时更新会话的 last_active_at 和 message_count
+     * 追加消息到会话 — 同时更新会话的 last_active_at 和 message_count。
+     * 使用默认线程 'main'。
      */
     public AgentMessage appendMessage(String sessionId, String role, String content,
                                        List<Map<String, Object>> toolCalls,
                                        Object toolResults) {
+        return appendMessage(sessionId, role, content, toolCalls, toolResults, "main");
+    }
+
+    /**
+     * 追加消息到会话（指定线程） — 同时更新会话的 last_active_at 和 message_count
+     */
+    public AgentMessage appendMessage(String sessionId, String role, String content,
+                                       List<Map<String, Object>> toolCalls,
+                                       Object toolResults,
+                                       String threadId) {
         long now = System.currentTimeMillis();
 
         String toolCallsJson = toJson(toolCalls);
         String toolResultsJson = (toolResults != null) ? toJson(toolResults) : null;
+        String tid = threadId != null && !threadId.isBlank() ? threadId : "main";
 
         jdbc.update(
-            "INSERT INTO sys_agent_message (session_id, role, content, tool_calls, tool_results, created_at) "
-            + "VALUES (?::varchar, ?::varchar, ?::text, ?::jsonb, ?::jsonb, ?)",
-            sessionId, role, content, toolCallsJson, toolResultsJson, now
+            "INSERT INTO sys_agent_message (session_id, role, content, tool_calls, tool_results, thread_id, created_at) "
+            + "VALUES (?::varchar, ?::varchar, ?::text, ?::jsonb, ?::jsonb, ?::varchar, ?)",
+            sessionId, role, content, toolCallsJson, toolResultsJson, tid, now
         );
 
         // 更新会话计数与活跃时间
@@ -121,8 +133,8 @@ public class AgentSessionService {
             now, sessionId
         );
 
-        log.debug("Message appended: sessionId={} role={} toolCalls={} toolResults={}",
-            sessionId, role, toolCalls != null, toolResults != null);
+        log.debug("Message appended: sessionId={} role={} threadId={} toolCalls={} toolResults={}",
+            sessionId, role, tid, toolCalls != null, toolResults != null);
 
         // 构建返回对象 (id 由数据库序列生成，此处用 -1 占位)
         AgentMessage msg = new AgentMessage();
@@ -132,18 +144,27 @@ public class AgentSessionService {
         msg.setContent(content);
         msg.setToolCalls(toolCalls);
         msg.setToolResults(toolResults);
+        msg.setThreadId(tid);
         msg.setCreatedAt(now);
         return msg;
     }
 
     /**
-     * 查所有消息按时间正序
+     * 查所有消息按时间正序（默认线程 'main'）
      */
     public List<AgentMessage> getMessages(String sessionId) {
+        return getMessages(sessionId, "main");
+    }
+
+    /**
+     * 查指定线程的所有消息按时间正序
+     */
+    public List<AgentMessage> getMessages(String sessionId, String threadId) {
+        String tid = threadId != null && !threadId.isBlank() ? threadId : "main";
         return jdbc.query(
-            "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, created_at "
-            + "FROM sys_agent_message WHERE session_id = ? ORDER BY id ASC",
-            new MessageRowMapper(), sessionId
+            "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, thread_id, created_at "
+            + "FROM sys_agent_message WHERE session_id = ? AND thread_id = ? ORDER BY id ASC",
+            new MessageRowMapper(), sessionId, tid
         );
     }
 
@@ -279,6 +300,7 @@ public class AgentSessionService {
             m.setToolCalls(parseJsonListOfMap(rs.getString("tool_calls")));
             m.setToolResultsRaw(rs.getString("tool_results"));
             m.setTokens(getInt(rs, "tokens"));
+            m.setThreadId(rs.getString("thread_id"));
             m.setCreatedAt(getLong(rs, "created_at"));
             return m;
         }
@@ -360,6 +382,7 @@ public class AgentSessionService {
         private Object toolResults;
         private String toolResultsRaw; // 原始 JSONB 字符串，供前端使用
         private Integer tokens;
+        private String threadId;
         private Long createdAt;
 
         public Long getId() { return id; }
@@ -385,6 +408,9 @@ public class AgentSessionService {
 
         public Integer getTokens() { return tokens; }
         public void setTokens(Integer tokens) { this.tokens = tokens; }
+
+        public String getThreadId() { return threadId; }
+        public void setThreadId(String threadId) { this.threadId = threadId; }
 
         public Long getCreatedAt() { return createdAt; }
         public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }

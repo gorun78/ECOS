@@ -10,12 +10,13 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.persistence.ITaskPersistenceService;
-import com.chinacreator.gzcm.runtime.core.task.persistence.impl.TaskPersistenceServiceImpl;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
-import com.chinacreator.gzcm.runtime.core.task.service.impl.TaskManagementServiceImpl;
 
 /**
  * 任务调度服务实现
@@ -23,6 +24,7 @@ import com.chinacreator.gzcm.runtime.core.task.service.impl.TaskManagementServic
  * 
  * @author CDRC Runtime Team
  */
+@Component
 public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
@@ -31,13 +33,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     private final ITaskPersistenceService taskPersistenceService;
     private final ITaskManagementService taskManagementService;
     
-    public TaskSchedulerServiceImpl() {
-        this.taskPersistenceService = new TaskPersistenceServiceImpl();
-        TaskManagementServiceImpl managementService = new TaskManagementServiceImpl();
-        managementService.setPersistenceService(this.taskPersistenceService);
-        this.taskManagementService = managementService;
-    }
-    
+    @Autowired
     public TaskSchedulerServiceImpl(ITaskPersistenceService taskPersistenceService, 
             ITaskManagementService taskManagementService) {
         this.taskPersistenceService = taskPersistenceService;

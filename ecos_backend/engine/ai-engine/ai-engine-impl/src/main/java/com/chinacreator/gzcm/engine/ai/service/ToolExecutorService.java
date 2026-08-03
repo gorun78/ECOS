@@ -46,6 +46,10 @@ public class ToolExecutorService {
     @Autowired(required = false)
     private AgentDelegationService agentDelegationService;
 
+    /** 工具注册中心 — 优先走注册表，未命中时回退到 DB/fallback 逻辑 */
+    @Autowired
+    private ToolRegistry toolRegistry;
+
     public ToolExecutorService() {
         this.restTemplate = new RestTemplate();
         initFallbackTools();
@@ -74,6 +78,11 @@ public class ToolExecutorService {
 
     private ToolResult execute(String toolName, Map<String, Object> arguments, String callId) {
         long startNs = System.nanoTime();
+
+        // 优先走 ToolRegistry（统一工具管理）
+        if (toolRegistry != null && toolRegistry.has(toolName)) {
+            return toolRegistry.execute(toolName, arguments);
+        }
 
         try {
             ToolDefinitionEntry def = loadToolDefinition(toolName);

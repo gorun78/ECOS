@@ -1,0 +1,47 @@
+[
+  {
+    "id": "q1",
+    "question": "查询所有数据源列表",
+    "expectedTool": "list_tables",
+    "category": "data_query",
+    "expectedKeywords": ["数据源", "表", "list"],
+    "minScore": 1,
+    "description": "验证Agent能否正确调用 list_tables 工具查询数据源"
+  },
+  {
+    "id": "q2",
+    "question": "帮我查询 sys_agent_session 表中有多少条记录",
+    "expectedTool": "query_database",
+    "category": "sql_query",
+    "expectedKeywords": ["SELECT", "COUNT", "sys_agent_session"],
+    "minScore": 1,
+    "description": "验证Agent能否生成正确的SQL查询并执行"
+  },
+  {
+    "id": "q3",
+    "question": "创建一个名为 test_eval 的会话，agentId 为 default",
+    "expectedTool": "create_session",
+    "category": "session_management",
+    "expectedKeywords": ["test_eval", "session", "default"],
+    "minScore": 1,
+    "description": "验证Agent能否正确调用会话管理工具"
+  },
+  {
+    "id": "q4",
+    "question": "请列出当前可用的所有工具/技能",
+    "expectedTool": "list_skills",
+    "category": "tool_discovery",
+    "expectedKeywords": ["工具", "技能", "skills", "tools"],
+    "minScore": 1,
+    "description": "验证Agent能否发现并列出可用的工具"
+  },
+  {
+    "id": "q5",
+    "question": "用中文简要解释什么是知识图谱，并说明它的主要用途",
+    "expectedTool": null,
+    "category": "knowledge_qa",
+    "expectedKeywords": ["知识图谱", "实体", "关系", "语义", "推理"],
+    "minScore": 1,
+    "description": "验证Agent在不调用工具时的知识问答能力"
+  }
+]

@@ -33,6 +33,9 @@ public interface CronJobService {
     /** 执行历史 */
     List<CronJobExecutionEntity> listExecutionHistory(Long cronJobId, int limit);
 
+    /** 立即执行 CronJob */
+    Optional<CronJobEntity> executeNow(Long id);
+
     /** 总数量 */
     long totalCount();
 }

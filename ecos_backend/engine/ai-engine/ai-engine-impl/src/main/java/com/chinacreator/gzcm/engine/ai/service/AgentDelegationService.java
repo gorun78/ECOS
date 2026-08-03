@@ -98,10 +98,14 @@ public class AgentDelegationService {
 
         // 构建子 Agent 配置
         AgentLoopConfig config = new AgentLoopConfig(
-                systemPrompt,
+                "deepseek",
                 model,
                 DEFAULT_TEMPERATURE,
-                DEFAULT_MAX_TOKENS
+                DEFAULT_MAX_TOKENS,
+                8000,        // maxContextTokens
+                5,           // maxIterations
+                SUB_AGENT_TIMEOUT_SECONDS * 1000L,
+                systemPrompt
         );
 
         // 创建子 Agent 空会话

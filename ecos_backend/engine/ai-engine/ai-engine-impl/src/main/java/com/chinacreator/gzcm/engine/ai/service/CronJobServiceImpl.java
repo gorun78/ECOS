@@ -1,6 +1,5 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -23,11 +22,14 @@ public class CronJobServiceImpl implements CronJobService {
 
     private final CronJobRepository cronJobRepository;
     private final CronJobExecutionRepository executionRepository;
+    private final AgentCronJobBridge agentCronJobBridge;
 
     public CronJobServiceImpl(CronJobRepository cronJobRepository,
-                              CronJobExecutionRepository executionRepository) {
+                              CronJobExecutionRepository executionRepository,
+                              AgentCronJobBridge agentCronJobBridge) {
         this.cronJobRepository = cronJobRepository;
         this.executionRepository = executionRepository;
+        this.agentCronJobBridge = agentCronJobBridge;
     }
 
     @Override
@@ -54,6 +56,23 @@ public class CronJobServiceImpl implements CronJobService {
 
         cronJobRepository.insert(entity);
         log.info("CronJob created: id={} name={}", entity.getId(), entity.getName());
+
+        // ── 注册到全局任务中心 ──
+        try {
+            String prompt = getString(body, "prompt");
+            String agentId = getString(body, "agentId");
+            String userId = getString(body, "userId");
+            if (userId == null) {
+                userId = entity.getCreatedBy();
+            }
+
+            if (Boolean.TRUE.equals(entity.getEnabled())) {
+                agentCronJobBridge.register(entity, prompt, agentId, userId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to register CronJob to task center: id={}, {}", entity.getId(), e.getMessage());
+        }
+
         return entity;
     }
 
@@ -77,6 +96,13 @@ public class CronJobServiceImpl implements CronJobService {
 
     @Override
     public boolean deleteCronJob(Long id) {
+        // ── 先从全局任务中心取消调度 ──
+        try {
+            agentCronJobBridge.cancel(id);
+        } catch (Exception e) {
+            log.warn("Failed to cancel CronJob in task center before delete: id={}, {}", id, e.getMessage());
+        }
+
         int affected = cronJobRepository.deleteById(id);
         if (affected > 0) {
             log.info("CronJob deleted: id={}", id);
@@ -93,7 +119,54 @@ public class CronJobServiceImpl implements CronJobService {
         cronJobRepository.updateEnabled(id, enabled);
         CronJobEntity entity = existing.get();
         entity.setEnabled(enabled);
+
+        // ── 同步到全局任务中心 ──
+        try {
+            if (enabled) {
+                // 重新启用：用缓存的参数重新注册
+                String prompt = agentCronJobBridge.getCachedPrompt(id);
+                String agentId = agentCronJobBridge.getCachedAgentId(id);
+                String userId = agentCronJobBridge.getCachedUserId(id);
+                agentCronJobBridge.reschedule(entity, prompt, agentId, userId);
+            } else {
+                // 禁用：取消调度
+                agentCronJobBridge.cancel(id);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to sync CronJob toggle to task center: id={}, enabled={}, {}", id, enabled, e.getMessage());
+        }
+
         log.info("CronJob toggled: id={} enabled={}", id, enabled);
+        return Optional.of(entity);
+    }
+
+    @Override
+    public Optional<CronJobEntity> executeNow(Long id) {
+        Optional<CronJobEntity> existing = cronJobRepository.findById(id);
+        if (existing.isEmpty()) return Optional.empty();
+
+        CronJobEntity entity = existing.get();
+
+        // ── 通过全局任务中心立即调度 ──
+        try {
+            String prompt = agentCronJobBridge.getCachedPrompt(id);
+            String agentId = agentCronJobBridge.getCachedAgentId(id);
+            String userId = agentCronJobBridge.getCachedUserId(id);
+
+            // 如果缓存中没有参数，使用实体上的信息
+            if (prompt == null && entity.getDescription() != null) {
+                prompt = entity.getDescription();
+            }
+            if (userId == null) {
+                userId = entity.getCreatedBy();
+            }
+
+            agentCronJobBridge.executeNow(entity, prompt, agentId, userId);
+            log.info("CronJob executed now: id={}", id);
+        } catch (Exception e) {
+            log.warn("Failed to execute CronJob now via task center: id={}, {}", id, e.getMessage());
+        }
+
         return Optional.of(entity);
     }
 

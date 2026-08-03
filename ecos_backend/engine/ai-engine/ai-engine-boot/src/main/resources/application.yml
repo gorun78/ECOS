@@ -17,6 +17,10 @@ spring:
       ddl-auto: none
   flyway:
     enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml

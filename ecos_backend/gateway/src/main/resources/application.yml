@@ -103,8 +103,13 @@ neo4j:
 
 # LLM Configuration
 llm:
+  default-provider: deepseek
+  default-model: deepseek-chat
+  default-temperature: 0.3
+  max-context-tokens: 8000
+  agent-timeout-ms: 300000
   deepseek:
-    api-key: ${DEEPSEEK_API_KEY:}
+    api-key: ${DEEP...EY:}
     base-url: https://api.deepseek.com
     model: deepseek-chat
   engine:
@@ -116,6 +121,11 @@ llm:
   gateway:
     retry-max-attempts: 3
     request-timeout: 60s
+
+# Agent Default Configuration (L1)
+agent:
+  default-max-iterations: 5
+  default-system-prompt: "你是ECOS平台的AI助手。"
 
 profile:
   cache-enabled: false

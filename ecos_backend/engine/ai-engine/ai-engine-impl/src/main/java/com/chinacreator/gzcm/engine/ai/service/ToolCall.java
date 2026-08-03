@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,12 +18,18 @@ public class ToolCall {
     /** 工具参数 JSON（已反序列化为 Map） */
     private Map<String, Object> arguments;
 
-    public ToolCall() {}
+    /** Schema 校验失败的参数名列表（供 LLM 下一轮修正参数） */
+    private List<String> invalidParams;
+
+    public ToolCall() {
+        this.invalidParams = new ArrayList<>();
+    }
 
     public ToolCall(String id, String name, Map<String, Object> arguments) {
         this.id = id;
         this.name = name;
         this.arguments = arguments;
+        this.invalidParams = new ArrayList<>();
     }
 
     public String getId() { return id; }
@@ -33,8 +41,12 @@ public class ToolCall {
     public Map<String, Object> getArguments() { return arguments; }
     public void setArguments(Map<String, Object> arguments) { this.arguments = arguments; }
 
+    public List<String> getInvalidParams() { return invalidParams; }
+    public void setInvalidParams(List<String> invalidParams) { this.invalidParams = invalidParams; }
+
     @Override
     public String toString() {
-        return "ToolCall{id=" + id + ", name=" + name + ", args=" + arguments + "}";
+        return "ToolCall{id=" + id + ", name=" + name + ", args=" + arguments
+                + ", invalidParams=" + invalidParams + "}";
     }
 }

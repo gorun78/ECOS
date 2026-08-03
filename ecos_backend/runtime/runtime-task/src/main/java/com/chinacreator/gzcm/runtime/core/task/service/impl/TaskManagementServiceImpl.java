@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
@@ -546,10 +547,12 @@ public class TaskManagementServiceImpl implements ITaskManagementService {
         executors.put(executorType, executor);
     }
 
+    @Autowired
     public void setStatusCallback(ITaskStatusCallback callback) {
         this.statusCallback = callback;
     }
     
+    @Autowired
     public void setPersistenceService(ITaskPersistenceService persistenceService) {
         this.persistenceService = persistenceService;
     }

@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import org.springframework.stereotype.Repository;
+
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
@@ -19,6 +21,7 @@ import com.chinacreator.gzcm.runtime.core.task.persistence.TaskPersistenceExcept
  * 
  * @author CDRC Runtime Team
  */
+@Repository
 public class TaskPersistenceServiceImpl implements ITaskPersistenceService {
 
     private final Map<String, TaskDescription> tasks = new ConcurrentHashMap<>();
