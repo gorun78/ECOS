@@ -46,6 +46,7 @@ public class ApiResponse<T> implements Serializable {
 
     // ── 字段 ────────────────────────────────────────
     private int code;
+    private String errorCode;
     private String message;
     private T data;
     private Long timestamp;
@@ -58,6 +59,14 @@ public class ApiResponse<T> implements Serializable {
 
     private ApiResponse(int code, String message, T data) {
         this.code = code;
+        this.message = message;
+        this.data = data;
+        this.timestamp = Instant.now().toEpochMilli();
+    }
+
+    private ApiResponse(int code, String errorCode, String message, T data) {
+        this.code = code;
+        this.errorCode = errorCode;
         this.message = message;
         this.data = data;
         this.timestamp = Instant.now().toEpochMilli();
@@ -83,6 +92,11 @@ public class ApiResponse<T> implements Serializable {
     /** 失败 */
     public static <T> ApiResponse<T> error(int code, String message) {
         return new ApiResponse<>(code, message, null);
+    }
+
+    /** 失败（带errorCode，用于精细客户端处理） */
+    public static <T> ApiResponse<T> error(int code, String errorCode, String message) {
+        return new ApiResponse<>(code, errorCode, message, null);
     }
 
     /** 业务错误 */

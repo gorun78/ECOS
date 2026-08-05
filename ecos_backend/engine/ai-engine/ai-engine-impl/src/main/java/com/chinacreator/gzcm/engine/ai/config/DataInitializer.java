@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.config;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import com.chinacreator.gzcm.engine.ai.CronJobService;
@@ -25,6 +27,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * <p>
  * 预置内容：
  * <ul>
+ *   <li>5 个角色 + 22 条权限：admin, data-manager, ontology-designer,
+ *       knowledge-engineer, analyst</li>
  *   <li>2 个 CronJob："每日数据质量巡检"、"每周认知诊断报告"</li>
  *   <li>3 个 Skill："数据治理"、"企业经营诊断"、"政务一件事"</li>
  *   <li>6 个内置 Agent：data-engine, ontology-engine, cognitive-engine,
@@ -94,6 +98,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SkillRepository skillRepository;
     private final CronJobService cronJobService;
     private final SkillService skillService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Autowired(required = false)
     private AgentRegistryRepository agentRepo;
@@ -102,17 +107,20 @@ public class DataInitializer implements CommandLineRunner {
                            CronJobExecutionRepository executionRepository,
                            SkillRepository skillRepository,
                            CronJobService cronJobService,
-                           SkillService skillService) {
+                           SkillService skillService,
+                           JdbcTemplate jdbcTemplate) {
         this.cronJobRepository = cronJobRepository;
         this.executionRepository = executionRepository;
         this.skillRepository = skillRepository;
         this.cronJobService = cronJobService;
         this.skillService = skillService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     public void run(String... args) {
         ensureTables();
+        seedRoles();
         seedCronJobs();
         seedSkills();
         seedBuiltinAgents();
@@ -200,6 +208,122 @@ public class DataInitializer implements CommandLineRunner {
         skillService.createSkill(skill3);
 
         log.info("Seeded {} Skills", 3);
+    }
+
+    private void seedRoles() {
+        try {
+            Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM td_role", Long.class);
+            if (count != null && count > 0) {
+                log.info("td_role table already has {} records, skip seeding", count);
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to check td_role count, proceeding with seed: {}", e.getMessage());
+        }
+
+        String now = LocalDateTime.now().toString().substring(0, 19);
+
+        // ── 5 个角色 ──────────────────────────────────────────
+        Object[][] roles = {
+            {"role_admin",              "系统管理员",  "ADMIN",              "系统最高权限角色"},
+            {"role_data_manager",       "数据管理员",  "DATA_MANAGER",       "数据源、管道、质量规则、血缘与数据目录管理"},
+            {"role_ontology_designer",  "本体建模师",  "ONTOLOGY_DESIGNER",  "本体、版本、函数全生命周期管理"},
+            {"role_knowledge_engineer", "知识工程师",  "KNOWLEDGE_ENGINEER", "知识图谱、规则、分类、知识抽取管理"},
+            {"role_analyst",            "业务分析师",  "ANALYST",            "只读分析角色，含AI问答、诊断、场景分析"}
+        };
+
+        for (Object[] r : roles) {
+            jdbcTemplate.update(
+                "INSERT INTO td_role (ROLE_ID, ROLE_NAME, ROLE_CODE, DESCRIPTION, STATUS, CREATED_TIME, CREATED_BY) "
+                + "VALUES (?, ?, ?, ?, 'ACTIVE', ?::timestamp, 'system')",
+                r[0], r[1], r[2], r[3], now);
+        }
+        log.info("Seeded 5 roles into td_role");
+
+        // ── 权限定义（去重） ──────────────────────────────────
+        Object[][] perms = {
+            // admin — 全局通配
+            {"perm_global_all",         "全局所有权限",   "*:*",       "*",       "*",     "超级管理员的全局通配权限"},
+
+            // data-manager
+            {"perm_datasource_all",     "数据源全权限",   "data-source:*",    "data-source",    "*",    "数据源管理全权限"},
+            {"perm_pipeline_all",       "管道全权限",     "pipeline:*",       "pipeline",       "*",    "管道管理全权限"},
+            {"perm_dqrule_all",         "质量规则全权限",  "dq-rule:*",        "dq-rule",        "*",    "数据质量规则管理全权限"},
+            {"perm_lineage_read",       "血缘只读",       "lineage:read",     "lineage",         "read", "数据血缘只读权限"},
+            {"perm_datacatalog_read",   "数据目录只读",    "data-catalog:read", "data-catalog",  "read", "数据目录只读权限"},
+
+            // ontology-designer
+            {"perm_ontology_all",       "本体全权限",     "ontology:*",          "ontology",          "*", "本体模型全权限"},
+            {"perm_ontologyver_all",    "本体版本全权限",  "ontology-version:*",  "ontology-version",  "*", "本体版本管理全权限"},
+            {"perm_ontologyfunc_all",   "本体函数全权限",  "ontology-function:*", "ontology-function", "*", "本体函数管理全权限"},
+
+            // knowledge-engineer
+            {"perm_kg_all",             "知识图谱全权限",  "kg:*",                "kg",                "*", "知识图谱全权限"},
+            {"perm_rule_all",           "规则全权限",      "rule:*",              "rule",              "*", "规则管理全权限"},
+            {"perm_classification_all", "分类全权限",      "classification:*",    "classification",    "*", "分类管理全权限"},
+            {"perm_kextract_all",       "知识抽取全权限",  "knowledge-extract:*", "knowledge-extract", "*", "知识抽取全权限"},
+            {"perm_rag_read",           "RAG只读",        "rag:read",            "rag",               "read", "RAG检索只读权限"},
+
+            // analyst (只读为主)
+            {"perm_datasource_read",    "数据源只读",      "data-source:read",    "data-source",    "read", "数据源只读"},
+            {"perm_ontology_read",      "本体只读",        "ontology:read",       "ontology",       "read", "本体模型只读"},
+            {"perm_kg_read",            "知识图谱只读",    "kg:read",             "kg",             "read", "知识图谱只读"},
+            {"perm_ai_chat",            "AI问答",         "ai:chat",             "ai",             "chat", "AI智能问答"},
+            {"perm_ai_diagnose",        "AI诊断",         "ai:diagnose",         "ai",             "diagnose", "AI诊断分析"},
+            {"perm_ai_scenario",        "AI场景分析",      "ai:scenario",         "ai",             "scenario", "AI场景分析"}
+        };
+
+        for (Object[] p : perms) {
+            jdbcTemplate.update(
+                "INSERT INTO td_permission (PERMISSION_ID, PERMISSION_NAME, PERMISSION_CODE, RESOURCE_ID, ACTION, DESCRIPTION, CREATED_TIME, CREATED_BY) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?::timestamp, 'system')",
+                p[0], p[1], p[2], p[3], p[4], p[5], now);
+        }
+        log.info("Seeded {} permissions into td_permission", perms.length);
+
+        // ── 角色-权限映射 ────────────────────────────────────
+        String[][] rolePerms = {
+            // admin → *
+            {"role_admin", "perm_global_all"},
+
+            // data-manager
+            {"role_data_manager", "perm_datasource_all"},
+            {"role_data_manager", "perm_pipeline_all"},
+            {"role_data_manager", "perm_dqrule_all"},
+            {"role_data_manager", "perm_lineage_read"},
+            {"role_data_manager", "perm_datacatalog_read"},
+
+            // ontology-designer
+            {"role_ontology_designer", "perm_ontology_all"},
+            {"role_ontology_designer", "perm_ontologyver_all"},
+            {"role_ontology_designer", "perm_ontologyfunc_all"},
+
+            // knowledge-engineer
+            {"role_knowledge_engineer", "perm_kg_all"},
+            {"role_knowledge_engineer", "perm_rule_all"},
+            {"role_knowledge_engineer", "perm_classification_all"},
+            {"role_knowledge_engineer", "perm_kextract_all"},
+            {"role_knowledge_engineer", "perm_rag_read"},
+
+            // analyst
+            {"role_analyst", "perm_datasource_read"},
+            {"role_analyst", "perm_datacatalog_read"},
+            {"role_analyst", "perm_ontology_read"},
+            {"role_analyst", "perm_kg_read"},
+            {"role_analyst", "perm_rag_read"},
+            {"role_analyst", "perm_ai_chat"},
+            {"role_analyst", "perm_ai_diagnose"},
+            {"role_analyst", "perm_ai_scenario"}
+        };
+
+        for (String[] rp : rolePerms) {
+            jdbcTemplate.update(
+                "INSERT INTO td_role_permission (ROLE_ID, PERMISSION_ID, CREATED_TIME) "
+                + "VALUES (?, ?, ?::timestamp)",
+                rp[0], rp[1], now);
+        }
+        log.info("Seeded {} role-permission mappings into td_role_permission", rolePerms.length);
     }
 
     @SuppressWarnings("unchecked")

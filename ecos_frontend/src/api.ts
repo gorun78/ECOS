@@ -7,7 +7,7 @@ import type {
   DataAsset, EntityDefinition, EntityInstance, AuditEvent,
   AgentDefinition, ToolDefinition, PromptTemplate,
   KnowledgeNode, KnowledgeEdge, Goal, CausalLink, Scenario,
-  DataSource, DataResource, DataField,
+  DataSource, DataResource, DataField, AuditStats,
 } from "./types";
 
 // Import mock data as fallback
@@ -477,6 +477,17 @@ export async function fetchAuditLogs(
   } catch (e) {
     console.warn("fetchAuditLogs: backend unavailable, returning empty", e);
     return { data: [], total: 0, page, pageSize };
+  }
+}
+
+// ── Audit Stats ───────────────────────────────────────────
+// 对接 AuditController: GET /api/v1/audit/stats
+export async function fetchAuditStats(): Promise<AuditStats> {
+  try {
+    return await apiFetchData<AuditStats>('/api/v1/audit/stats');
+  } catch (e) {
+    console.warn("fetchAuditStats: backend unavailable", e);
+    return { todayCount: 0, failureCount: 0, activeUsers: 0, anomalyIps: 0 };
   }
 }
 
@@ -1748,6 +1759,26 @@ export async function deleteOrg(id:string) {
   return apiFetchData(`/api/v1/system/organizations/${id}`, { method:'DELETE' });
 }
 
+// ── User Management Enhanced APIs (T3a) ──────────────────────
+
+/** POST /api/v1/system/users/{id}/force-logout — 强制用户下线 */
+export async function forceLogoutUser(id: string) {
+  return apiFetchData(`/api/v1/system/users/${id}/force-logout`, { method: "POST" });
+}
+
+/** POST /api/v1/system/users/{id}/reset-password — 重置密码 (生成临时密码) */
+export async function resetPasswordGenerate(id: string): Promise<{ tempPassword: string }> {
+  return apiFetchData(`/api/v1/system/users/${id}/reset-password`, { method: "POST" });
+}
+
+/** POST /api/v1/system/users/batch — CSV批量导入用户 */
+export async function batchCreateUsers(users: Record<string, any>[]) {
+  return apiFetchData("/api/v1/system/users/batch", {
+    method: "POST",
+    body: JSON.stringify({ users }),
+  });
+}
+
 // ── Tenant Management (对接 TenantController) ─────────────────
 // 后端端点: /api/v1/system/tenants
 
@@ -1848,6 +1879,135 @@ export async function updateTenantQuota(
   return apiFetchData<TenantQuota>(`/api/v1/system/tenants/${tenantId}/quota`, {
     method: "PUT",
     body: JSON.stringify(body),
+  });
+}
+
+// ── Security Policies (RLS / CLS / ABAC Evaluate / Masking) ────────────────────────
+
+export interface RlsPolicy {
+  id?: number;
+  policyName: string;
+  tableName: string;
+  filterExpression: string;
+  roles: string[];
+  status: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ClsPolicy {
+  id?: number;
+  policyName: string;
+  tableName: string;
+  visibleColumns: string[];
+  blockedColumns: string[];
+  roles: string[];
+  status: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AbacEvaluateRequest {
+  subject: { userId: string; roles: string[] };
+  resource: { type: string; id: string };
+  action: string;
+  context?: Record<string, any>;
+}
+
+export interface AbacEvaluateResponse {
+  allowed: boolean;
+  message?: string;
+  details?: Record<string, any>;
+}
+
+export interface MaskRequest {
+  input: string;
+  maskType: string;
+}
+
+export interface MaskResponse {
+  masked: string;
+  maskType: string;
+}
+
+/** GET /api/v1/security/rls/policies — 列表RLS策略 */
+export async function fetchRlsPolicies(params?: {
+  tableName?: string; page?: number; pageSize?: number;
+}): Promise<{ data: RlsPolicy[]; total: number }> {
+  try {
+    const sp = new URLSearchParams();
+    if (params?.tableName) sp.set('tableName', params.tableName);
+    sp.set('page', String(params?.page || 1));
+    sp.set('pageSize', String(params?.pageSize || 50));
+    return await apiFetchData(`/api/v1/security/rls/policies?${sp.toString()}`);
+  } catch (e) {
+    console.warn('fetchRlsPolicies: backend unavailable', e);
+    return { data: [], total: 0 };
+  }
+}
+
+/** POST /api/v1/security/rls/policies — 创建RLS策略 */
+export async function createRlsPolicy(data: Partial<RlsPolicy>): Promise<RlsPolicy> {
+  return apiFetchData('/api/v1/security/rls/policies', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** PUT /api/v1/security/rls/policies/{id} — 更新RLS策略 */
+export async function updateRlsPolicy(id: number, data: Partial<RlsPolicy>): Promise<RlsPolicy> {
+  return apiFetchData(`/api/v1/security/rls/policies/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/** DELETE /api/v1/security/rls/policies/{id} — 删除RLS策略 */
+export async function deleteRlsPolicy(id: number): Promise<void> {
+  await apiFetchData(`/api/v1/security/rls/policies/${id}`, { method: 'DELETE' });
+}
+
+/** GET /api/v1/security/cls/policies — 列表CLS策略 */
+export async function fetchClsPolicies(params?: {
+  tableName?: string; page?: number; pageSize?: number;
+}): Promise<{ data: ClsPolicy[]; total: number }> {
+  try {
+    const sp = new URLSearchParams();
+    if (params?.tableName) sp.set('tableName', params.tableName);
+    sp.set('page', String(params?.page || 1));
+    sp.set('pageSize', String(params?.pageSize || 50));
+    return await apiFetchData(`/api/v1/security/cls/policies?${sp.toString()}`);
+  } catch (e) {
+    console.warn('fetchClsPolicies: backend unavailable', e);
+    return { data: [], total: 0 };
+  }
+}
+
+/** POST /api/v1/security/cls/policies — 创建CLS策略 */
+export async function createClsPolicy(data: Partial<ClsPolicy>): Promise<ClsPolicy> {
+  return apiFetchData('/api/v1/security/cls/policies', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** POST /api/v1/security/policy/evaluate — ABAC策略评估 */
+export async function evaluateAbacPolicy(
+  data: AbacEvaluateRequest
+): Promise<AbacEvaluateResponse> {
+  return apiFetchData('/api/v1/security/policy/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** POST /api/security/mask — 数据脱敏 */
+export async function maskData(data: MaskRequest): Promise<MaskResponse> {
+  return apiFetchData('/api/security/mask', {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 
@@ -2270,6 +2430,13 @@ export async function updateSysConfig(key: string, value: string): Promise<SysCo
   return apiFetch<SysConfigItem>(`/v1/system/config/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: JSON.stringify({ value }),
+  });
+}
+
+/** PUT /api/v1/sysconfig/{key}/reset — reset a config to its default value */
+export async function resetSysConfig(key: string): Promise<SysConfigItem> {
+  return apiFetch<SysConfigItem>(`/v1/sysconfig/${encodeURIComponent(key)}/reset`, {
+    method: 'PUT',
   });
 }
 

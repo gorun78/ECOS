@@ -87,6 +87,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/agent-mesh")
                 || path.startsWith("/datanet")
                 || path.startsWith("/api/security")
+                || path.startsWith("/api/v1/security")
                 || path.startsWith("/api/twins")
                 || path.startsWith("/api/v1/system/tenants")
                 || path.startsWith("/api/v1/ecos/ontologies")

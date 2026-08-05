@@ -11,17 +11,24 @@
 - 加密服务（密钥管理）
 
 ## 我暴露的端点
+
+### Phase 1 当前可用
 | 端点 | 方法 | 用途 |
 |------|------|------|
-| /api/v1/auth/login | POST | 登录（实际在Gateway，security-engine提供验证逻辑） |
-| /api/v1/security/users | * | 用户CRUD |
-| /api/v1/security/roles | * | 角色CRUD |
-| /api/v1/security/permissions | * | 权限CRUD |
-| /api/v1/audit/logs | GET | 审计日志查询 |
-| /api/v1/abac/policies | * | ABAC策略管理 |
-| /api/v1/data-masking/rules | * | 脱敏规则管理 |
-| /api/v1/data-permission/rules | * | 数据权限规则 |
-| /api/v1/policy-engine/evaluate | POST | 策略评估 |
+| `/api/security/mask` | POST | 数据脱敏（SHA256/PHONE/EMAIL/ID_CARD/AMOUNT） |
+| `/api/security/evaluate-filter` | POST | 安全过滤规则评估 |
+| `/api/security/decrypt` | POST | 解密仿真 |
+| `/api/security/audit-logs` | GET | 审计日志查询 |
+
+### Phase 2+ 规划
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/api/v1/security/policy/evaluate` | POST | ABAC策略评估 |
+| `/api/v1/security/audit/log` | POST | 写审计日志 |
+| `/api/v1/security/rls/apply` | POST | 行级安全 |
+| `/api/v1/security/cls/columns` | POST | 列级安全 |
+
+> 完整接入规则: `docs/1-sysman/03-安全接入规则.md`
 
 ## 我的数据库表
 - 用户表、角色表、权限表、审计日志表、脱敏规则表、ABAC策略表

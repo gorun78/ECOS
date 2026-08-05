@@ -18,11 +18,8 @@ import {
   Target,
   Store,
   Cpu,
-  Users as UsersIcon,
   Network,
   Table2,
-  Settings,
-  Building,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -87,7 +84,6 @@ export default function Sidebar({
     items: [
       { id: "world_model", label: "Strategic Goals", labelZh: "战略目标", icon: Target, desc: "Enterprise strategic goals", descZh: "企业战略目标与决策模拟" },
       { id: "monitor", label: "Monitoring Center", labelZh: "监控中心", icon: Gauge, desc: "System status & alerts", descZh: "系统运行状态与告警" },
-      { id: "security-center", label: "Security Center", labelZh: "安全中心", icon: Shield, desc: "Security org, access control, audit logs", descZh: "安全组织、访问控制、分类标记、审计日志" },
     ],
   };
 
@@ -107,10 +103,8 @@ export default function Sidebar({
     group: "系统管理",
     groupZh: "系统管理",
     items: [
-      { id: "iam", label: "IAM User Mgmt", labelZh: "用户管理", icon: UsersIcon, desc: "Users, roles, orgs & permissions", descZh: "用户/角色/组织/权限统一管理" },
+      { id: "security-center", label: "Security Center", labelZh: "安全中心", icon: Shield, desc: "IAM, access control, audit logs", descZh: "用户管理·访问控制·安全审计" },
       { id: "dict", label: "Data Dictionary", labelZh: "数据字典", icon: Table2, desc: "Data dictionary management", descZh: "数据字典与表结构定义管理" },
-      { id: "system-config", label: "System Config", labelZh: "系统配置", icon: Settings, desc: "System configuration", descZh: "系统可配置参数管理" },
-      { id: "tenants", label: "Tenant Mgmt", labelZh: "租户管理", icon: Building, desc: "Multi-tenant management", descZh: "多租户创建/配额/用量/账单管理" },
     ],
   };
 

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -23,7 +24,7 @@ public class AgentToolController {
 
     private final ToolRegistry toolRegistry;
 
-    public AgentToolController(ToolRegistry toolRegistry) {
+    public AgentToolController(@Lazy ToolRegistry toolRegistry) {
         this.toolRegistry = toolRegistry;
     }
 

@@ -32,12 +32,8 @@ import ActionTypeView from './ActionTypeView';
 import FunctionTypeView from './FunctionTypeView';
 import { InterfaceView, SharedPropertyView, DatasetView } from './OtherViews';
 import ObjectExplorerView from './ObjectExplorerView';
-import SecurityCenterView, {
-  SecurityOrg, ProjectDAC, SecurityMarking, PurposePBAC, RowColPolicy, SecurityAuditLog,
-  mockSecurityOrgs, mockProjectDACs, mockSecurityMarkings, mockPurposes,
-} from './SecurityCenterView';
 
-type ViewMode = 'ontology' | 'security' | 'explorer';
+type ViewMode = 'ontology' | 'explorer';
 type SelectedCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
 
 interface BusinessWorkbenchLayoutProps {
@@ -78,19 +74,6 @@ export default function BusinessWorkbenchLayout({
   const [showCopilot, setShowCopilot] = useState(false);
 
   // --- Security State ---
-  const [securityOrgs, setSecurityOrgs] = useState<SecurityOrg[]>(mockSecurityOrgs);
-  const [securityProjects, setSecurityProjects] = useState<ProjectDAC[]>(mockProjectDACs);
-  const [securityMarkings, setSecurityMarkings] = useState<SecurityMarking[]>(mockSecurityMarkings);
-  const [securityPurposes, setSecurityPurposes] = useState<PurposePBAC[]>(mockPurposes);
-  const [securityRowColPolicies, setSecurityRowColPolicies] = useState<RowColPolicy[]>([]);
-  const [securityAuditLogs, setSecurityAuditLogs] = useState<SecurityAuditLog[]>([]);
-  const [securitySimUser, setSecuritySimUser] = useState('analyst_li');
-  const [securitySimDataset, setSecuritySimDataset] = useState('ds_flight_schedules');
-  const [securitySimPurpose, setSecuritySimPurpose] = useState('operational_analytics');
-  const [securitySimResult, setSecuritySimResult] = useState<{ verdict: 'GRANTED' | 'DENIED'; traces: string[] } | null>(null);
-  const [securitySelectedRowColDs, setSecuritySelectedRowColDs] = useState('');
-
-  // --- Toast ---
   const showToast = useCallback((type: 'success' | 'info' | 'error', message: string) => {
     if (propShowToast) {
       propShowToast(type, message);
@@ -333,7 +316,6 @@ export default function BusinessWorkbenchLayout({
   // --- Tab bar ---
   const tabs: { id: ViewMode; label: string; icon: string }[] = [
     { id: 'ontology', label: '本体建模', icon: 'Boxes' },
-    { id: 'security', label: '安全中心', icon: 'ShieldCheck' },
     { id: 'explorer', label: '数据浏览器', icon: 'Compass' },
   ];
 
@@ -379,33 +361,7 @@ export default function BusinessWorkbenchLayout({
 
       {/* Content */}
       <div className="flex-1 flex overflow-hidden">
-        {viewMode === 'security' ? (
-          <SecurityCenterView
-            showToast={showToast}
-            orgs={securityOrgs}
-            setOrgs={setSecurityOrgs}
-            projects={securityProjects}
-            setProjects={setSecurityProjects}
-            markings={securityMarkings}
-            setMarkings={setSecurityMarkings}
-            purposes={securityPurposes}
-            setPurposes={setSecurityPurposes}
-            rowColPolicies={securityRowColPolicies}
-            setRowColPolicies={setSecurityRowColPolicies}
-            auditLogs={securityAuditLogs}
-            setAuditLogs={setSecurityAuditLogs}
-            simUser={securitySimUser}
-            setSimUser={setSecuritySimUser}
-            simDataset={securitySimDataset}
-            setSimDataset={setSecuritySimDataset}
-            simPurpose={securitySimPurpose}
-            setSimPurpose={setSecuritySimPurpose}
-            simResult={securitySimResult}
-            setSimResult={setSecuritySimResult}
-            selectedRowColDs={securitySelectedRowColDs}
-            setSelectedRowColDs={setSecuritySelectedRowColDs}
-          />
-        ) : viewMode === 'explorer' ? (
+        {viewMode === 'explorer' ? (
           <div className="flex-1 flex overflow-hidden">
             <ObjectExplorerView
               objectTypes={objectTypes}

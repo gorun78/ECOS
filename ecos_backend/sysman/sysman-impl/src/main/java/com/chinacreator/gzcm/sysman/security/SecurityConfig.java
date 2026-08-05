@@ -30,6 +30,7 @@ public class SecurityConfig {
                     // ── Auth (public)
                     "/auth/**",
                     "/api/v1/auth/**",
+                    "/api/security/**",
                     // ── Public read-only domains
                     "/api/v1/ecos/**",
                     "/api/v1/security/**",

@@ -88,8 +88,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // 构建 Authentication
+            // ── T5: 检查 Token 是否在黑名单中 (forceLogout) ──
+            String jti = claims.getId();
             String userId = claims.getSubject();
+            if (jti != null && isTokenBlacklisted(jti)) {
+                log.warn("Token已被强制踢出: userId={}, jti={}", userId, jti);
+                sendUnauthorized(response, "Token已被强制踢出，请重新登录");
+                return;
+            }
+
+            // 构建 Authentication
 
             // 从 JWT claims 中提取角色列表（如 ["ROLE_SUPER_ADMIN","admin","SECURITY_AUDITOR"]）
             List<String> tokenRoles = extractRolesFromClaims(claims);
@@ -160,6 +168,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write(ApiResponse.unauthorized(message).toJson());
+    }
+
+    /**
+     * 检查 token jti 是否在黑名单中（已被强制踢出）。
+     */
+    private boolean isTokenBlacklisted(String jti) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ecos_token_blacklist WHERE jti = ? AND expires_at > NOW()",
+                Integer.class, jti);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            log.warn("查询token黑名单失败: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

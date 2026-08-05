@@ -12,7 +12,7 @@ import {
   PurposePBAC,
   RowColPolicy,
   SecurityAuditLog
-} from '../../pages/business-workbench/SecurityCenterView';
+} from '../../pages/security-center/types';
 
 interface AIPCopilotDrawerProps {
   isOpen: boolean;

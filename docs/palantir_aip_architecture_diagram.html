@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Palantir AIP 架构深度解析</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f5f0;
+  --card: #ffffff;
+  --border: #e2ddd4;
+  --border-light: #ede9e0;
+  --text: #14171e;
+  --text-2: #3a4256;
+  --text-3: #6b7280;
+  --text-4: #9ca3af;
+  --primary: #1a5f5a;
+  --primary-light: #2a7a74;
+  --primary-bg: #eef6f5;
+  --accent: #c97b3f;
+  --accent-bg: #fdf3e8;
+  --danger: #b84a4a;
+  --danger-bg: #fdf0f0;
+  --info: #3b6ea5;
+  --info-bg: #eef4fd;
+  --line: #e5e1da;
+  --shadow: 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px -2px rgba(0,0,0,0.07);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+::selection { background: #d4ede9; color: var(--primary); }
+
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(247,245,240,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+}
+.nav-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; gap: 32px; height: 56px;
+}
+.nav-logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 18px; color: var(--primary);
+  white-space: nowrap; letter-spacing: -0.02em;
+}
+.nav-links { display: flex; gap: 24px; list-style: none; overflow-x: auto; }
+.nav-links a {
+  text-decoration: none; color: var(--text-3);
+  font-size: 13px; font-weight: 500;
+  padding: 4px 0; border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+}
+.nav-links a:hover { color: var(--primary); border-color: var(--primary); }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+.hero { padding: 64px 0 48px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent);
+}
+.hero-eyebrow::before { content: ''; width: 20px; height: 2px; background: var(--accent); border-radius: 1px; }
+.hero h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 38px; font-weight: 400; letter-spacing: -0.03em;
+  color: var(--text); line-height: 1.2; margin-bottom: 16px;
+}
+.hero-sub { font-size: 16px; color: var(--text-3); max-width: 640px; line-height: 1.7; }
+.hero-meta { display: flex; gap: 32px; margin-top: 28px; flex-wrap: wrap; }
+.hero-stat { display: flex; flex-direction: column; gap: 2px; }
+.hero-stat .val { font-size: 22px; font-weight: 700; color: var(--primary); letter-spacing: -0.03em; }
+.hero-stat .label { font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.section { margin-bottom: 64px; }
+.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.section-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--primary-bg); display: flex; align-items: center; justify-content: center;
+  color: var(--primary); flex-shrink: 0;
+}
+.section-icon.accent { background: var(--accent-bg); color: var(--accent); }
+.section-icon.info { background: var(--info-bg); color: var(--info); }
+.section-icon.danger { background: var(--danger-bg); color: var(--danger); }
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px; font-weight: 400; letter-spacing: -0.02em; color: var(--text);
+}
+.section-desc { font-size: 13px; color: var(--text-3); margin-top: 4px; margin-bottom: 0 !important; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+/* ARCH ROW */
+.arch-stack { display: flex; flex-direction: column; gap: 3px; }
+.arch-row { display: grid; grid-template-columns: 110px 1fr; gap: 0; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.arch-tier { display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; line-height: 1.4; writing-mode: horizontal-tb; }
+.arch-blocks { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px; background: var(--card); }
+.arch-block { display: flex; flex-direction: column; padding: 9px 13px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg); flex: 1; min-width: 130px; transition: transform 0.15s, box-shadow 0.15s; }
+.arch-block:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.arch-block .name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.arch-block .desc { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+
+/* LAYER COLORS */
+.layer-5 .arch-tier { background: #fef3c7; color: #92400e; }
+.layer-5 .arch-blocks { border: 1px solid #fde68a; border-left: none; border-radius: 0 12px 12px 0; }
+.layer-4 .arch-tier { background: #ede9fe; color: #5b21b6; }
+.layer-4 .arch-blocks { border: 1px solid #c4b5fd; border-left: none; border-radius: 0 12px 12px 0; }
+.layer-3 .arch-tier { background: #fff1f5; color: #9d174d; border: 1px solid #fecdd3; border-right: none; }
+.layer-3 .arch-blocks { background: #fffaf5; border: 1px solid #fed7aa; border-left: none; border-radius: 0 12px 12px 0; }
+.layer-3 .arch-block { background: #fff1f5; border-color: #fecdd3; }
+.layer-2 .arch-tier { background: #dbeafe; color: #1e40af; }
+.layer-2 .arch-blocks { border: 1px solid #93c5fd; border-left: none; border-radius: 0 12px 12px 0; }
+.layer-1 .arch-tier { background: #d1fae5; color: #065f46; }
+.layer-1 .arch-blocks { border: 1px solid #6ee7b7; border-left: none; border-radius: 0 12px 12px 0; }
+.layer-0 .arch-tier { background: #e0e7ff; color: #3730a3; }
+.layer-0 .arch-blocks { border: 1px solid #a5b4fc; border-left: none; border-radius: 0 12px 12px 0; }
+
+/* ONTOLOGY 3 CARDS */
+.ontology-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.ontology-card {
+  background: var(--card); border-radius: 14px; padding: 20px;
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+}
+.ontology-card .oc-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
+}
+.ontology-card .oc-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.ontology-card .oc-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.ontology-card .oc-body { font-size: 12px; color: var(--text-3); line-height: 1.6; margin-bottom: 12px; }
+.ontology-card pre {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  padding: 10px 12px; border-radius: 8px; line-height: 1.7;
+  overflow-x: auto; margin: 0;
+}
+
+/* OAG FLOW */
+.oag-flow { display: flex; align-items: stretch; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+.oag-node { flex: 1; min-width: 130px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; box-shadow: var(--shadow); }
+.oag-node .on-icon { width: 38px; height: 38px; border-radius: 10px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; }
+.oag-node .on-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+.oag-node .on-sub { font-size: 10px; color: var(--text-3); line-height: 1.4; }
+.oag-arrow { display: flex; align-items: center; color: var(--text-4); flex-shrink: 0; padding: 0 2px; }
+
+/* ACTION FLOW */
+.action-flow { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: var(--shadow); }
+.af-grid { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 14px; align-items: start; }
+.af-col { text-align: center; }
+.af-col-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-4); margin-bottom: 8px; }
+.af-card { background: var(--bg); border: 1px solid var(--border-light); border-radius: 10px; padding: 12px; font-size: 11px; color: var(--text-2); line-height: 1.6; text-align: left; }
+.af-card .code { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--info); background: var(--info-bg); padding: 1px 5px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+.af-arrow { display: flex; flex-direction: column; gap: 4px; align-items: center; padding-top: 20px; color: var(--text-4); }
+.af-arrow span { font-size: 9px; color: var(--text-4); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.af-divider { display: flex; justify-content: center; padding: 10px 0; color: var(--text-4); }
+
+/* COMPARE TABLE */
+.compare-table-wrap { overflow-x: auto; }
+.compare-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
+.compare-table th { background: var(--bg); padding: 13px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); border-bottom: 2px solid var(--border); }
+.compare-table td { padding: 11px 14px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table tr:hover td { background: #faf9f7; }
+.compare-table .has { color: var(--primary); font-weight: 600; }
+.compare-table .none { color: var(--text-4); }
+.compare-table .gap { color: var(--accent); font-weight: 600; }
+.compare-table .partial { color: #b45309; font-weight: 600; }
+.compare-table .dim { color: var(--text-3); font-size: 12px; }
+.compare-table .col-aip { background: #f8fffe; }
+.compare-table .col-h { background: #f8faff; }
+
+/* ROADMAP */
+.roadmap { position: relative; }
+.roadmap::before { content: ''; position: absolute; left: 21px; top: 28px; bottom: 20px; width: 2px; background: linear-gradient(180deg, var(--primary), var(--accent)); border-radius: 1px; }
+.roadmap-step { position: relative; padding-left: 62px; padding-bottom: 36px; }
+.roadmap-step:last-child { padding-bottom: 0; }
+.roadmap-icon { position: absolute; left: 6px; top: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--card); border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; color: var(--primary); z-index: 1; }
+.roadmap-step:nth-child(2) .roadmap-icon { border-color: var(--accent); color: var(--accent); }
+.roadmap-step:nth-child(3) .roadmap-icon { border-color: var(--info); color: var(--info); }
+.roadmap-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.roadmap-time { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-4); margin-bottom: 10px; }
+.roadmap-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 8px; }
+.roadmap-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 13px; box-shadow: var(--shadow); }
+.roadmap-card .rc-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+.roadmap-card .rc-title svg { color: var(--primary); flex-shrink: 0; }
+.roadmap-card .rc-body { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+.priority-badge { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 5px; border-radius: 3px; margin-left: auto; }
+.badge-p0 { background: #fee2e2; color: #991b1b; }
+.badge-p1 { background: #fef3c7; color: #92400e; }
+.badge-p2 { background: #e0f2fe; color: #075985; }
+
+/* SECURITY */
+.security-arch { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
+.sec-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.sec-zone { border-radius: 12px; padding: 16px; }
+.sec-zone h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.sec-node { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 7px; font-size: 11px; color: var(--text-2); }
+.sec-node svg { color: var(--text-3); flex-shrink: 0; margin-top: 1px; }
+.zone-inner { background: #fef2f2; border: 1px solid #fecaca; }
+.zone-inner h4 { color: #991b1b; }
+.zone-ai { background: #eff6ff; border: 1px solid #bfdbfe; }
+.zone-ai h4 { color: #1e40af; }
+.zone-ui { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.zone-ui h4 { color: #166534; }
+.sec-divider { display: flex; justify-content: center; padding: 8px 0; color: var(--text-4); font-size: 10px; gap: 8px; align-items: center; }
+
+/* INSIGHT */
+.insight-box { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: 0 12px 12px 0; padding: 18px 22px; box-shadow: var(--shadow); margin-top: 20px; }
+.insight-box .it { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary); margin-bottom: 8px; }
+.insight-box p { font-size: 14px; color: var(--text-2); line-height: 1.7; }
+
+/* HERMES ARCH */
+.hermes-row { display: grid; grid-template-columns: 110px 1fr; gap: 0; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 4px; }
+.hermes-tier { display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.hermes-blocks { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px; background: var(--card); }
+.hermes-block { display: flex; flex-direction: column; padding: 9px 13px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg); flex: 1; min-width: 130px; transition: transform 0.15s; }
+.hermes-block:hover { transform: translateY(-1px); }
+.hermes-block .name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.hermes-block .desc { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+
+.h-layer-entry .hermes-tier { background: #dbeafe; color: #1e40af; }
+.h-layer-entry .hermes-blocks { border: 1px solid #93c5fd; border-left: none; border-radius: 0 12px 12px 0; }
+.h-layer-entry .hermes-block { background: #eff6ff; border-color: #bfdbfe; }
+
+.h-layer-core .hermes-tier { background: #bae6fd; color: #0369a1; }
+.h-layer-core .hermes-blocks { border: 1px solid #7dd3fc; border-left: none; border-radius: 0 12px 12px 0; }
+.h-layer-core .hermes-block { background: #f0f9ff; border-color: #bae6fd; }
+
+.h-layer-tools .hermes-tier { background: #bbf7d0; color: #166534; }
+.h-layer-tools .hermes-blocks { border: 1px solid #86efac; border-left: none; border-radius: 0 12px 12px 0; }
+.h-layer-tools .hermes-block { background: #f0fdf4; border-color: #bbf7d0; }
+
+.h-layer-storage .hermes-tier { background: #e7e5e4; color: #44403c; }
+.h-layer-storage .hermes-blocks { border: 1px solid #d6d3d1; border-left: none; border-radius: 0 12px 12px 0; }
+.h-layer-storage .hermes-block { background: #fafaf9; border-color: #d6d3d1; }
+
+/* FOOTER */
+.footer { border-top: 1px solid var(--border); padding: 28px 0; text-align: center; color: var(--text-4); font-size: 12px; }
+
+/* SCENARIO SECTIONS */
+.scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.scenario-card {
+  background: var(--card); border-radius: 14px; border: 1px solid var(--border);
+  box-shadow: var(--shadow); overflow: hidden; transition: box-shadow 0.2s;
+}
+.scenario-card:hover { box-shadow: var(--shadow-md); }
+.scenario-card-header {
+  padding: 18px 20px; display: flex; align-items: center; gap: 10px;
+}
+.scenario-card-header .sc-icon {
+  width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.scenario-card-header .sc-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.scenario-card-header .sc-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.scenario-card-body { padding: 0 20px 20px; }
+
+/* OAG vertical pipeline */
+.oag-pipeline { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.oag-pipe-node {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: var(--bg); border: 1px solid var(--border-light); border-radius: 10px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.oag-pipe-node:hover { transform: translateX(3px); box-shadow: var(--shadow-md); }
+.oag-pipe-step {
+  width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.oag-pipe-info { flex: 1; min-width: 0; }
+.oag-pipe-info .pi-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.oag-pipe-info .pi-desc { font-size: 10px; color: var(--text-3); line-height: 1.4; }
+.oag-pipe-arrow { display: flex; align-items: center; justify-content: center; padding: 4px 0 4px 30px; color: var(--text-4); }
+
+/* Scenario flow items */
+.sc-flow { display: flex; flex-direction: column; gap: 6px; }
+.sc-flow-item {
+  display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px;
+  background: var(--bg); border-radius: 8px; border: 1px solid var(--border-light);
+  font-size: 11px; color: var(--text-2); line-height: 1.5;
+}
+.sc-flow-item .sf-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+}
+.sc-flow-item .sf-label { font-weight: 600; color: var(--text); white-space: nowrap; margin-right: 4px; }
+
+/* Scenario tags */
+.sc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.sc-tag {
+  font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 3px 8px; border-radius: 5px;
+}
+.tag-erp { background: #eef6f5; color: #1a5f5a; border: 1px solid #cceae8; }
+.tag-gov { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.tag-sec { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.tag-data { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+/* Scenario small grid */
+.sc-obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 10px; margin-top: 12px; }
+.sc-obj-item { padding: 6px 8px; border-radius: 6px; }
+.sc-obj-item strong { display: block; margin-bottom: 1px; }
+.sc-obj-item span { color: var(--text-3); }
+
+/* Scenario section header */
+.sc-sec-title { font-size: 11px; font-weight: 700; color: var(--text-2); margin-bottom: 8px; margin-top: 16px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 28px; }
+  .ontology-cards { grid-template-columns: 1fr; }
+  .af-grid { grid-template-columns: 1fr; gap: 10px; }
+  .af-arrow { transform: rotate(90deg); padding: 0; }
+  .sec-grid { grid-template-columns: 1fr; }
+  .roadmap-cards { grid-template-columns: 1fr; }
+  .hermes-row { grid-template-columns: 80px 1fr; }
+  .arch-row { grid-template-columns: 80px 1fr; }
+  .nav { padding: 0 16px; }
+  .compare-table { font-size: 12px; }
+  .scenario-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">Palantir AIP 架构图谱</div>
+    <ul class="nav-links">
+      <li><a href="#aip-arch">AIP 整体架构</a></li>
+      <li><a href="#ontology">Ontology 核心</a></li>
+      <li><a href="#hermes">Hermes-Agent</a></li>
+      <li><a href="#compare">能力对比</a></li>
+      <li><a href="#roadmap">开发路线</a></li>
+      <li><a href="#scenarios">业务场景</a></li>
+      <li><a href="#security">安全架构</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="hero">
+    <div class="hero-eyebrow">技术架构深度解析</div>
+    <h1>Palantir AIP 架构全景图谱</h1>
+    <p class="hero-sub">从数据基础设施到 Agent 决策行动，完整拆解 AIP 的五层架构体系，并分析基于 Hermes-Agent 框架进行国产化二次开发的可行性与路径。</p>
+    <div class="hero-meta">
+      <div class="hero-stat"><span class="val">5</span><span class="label">架构层次</span></div>
+      <div class="hero-stat"><span class="val">12</span><span class="label">核心能力</span></div>
+      <div class="hero-stat"><span class="val">3</span><span class="label">本体类型</span></div>
+      <div class="hero-stat"><span class="val">3000亿</span><span class="label">美元市值</span></div>
+    </div>
+  </div>
+
+  <!-- ============ AIP ARCH ============ -->
+  <div class="section" id="aip-arch">
+    <div class="section-header">
+      <div class="section-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+      <div>
+        <div class="section-title">AIP 五层架构全景</div>
+        <div class="section-desc">自底向上：数据基础层 → 模型服务层 → ★本体核心层★ → 应用交互层 → 决策行动层。Ontology 是灵魂，Apollo + Rubix 是底座。</div>
+      </div>
+    </div>
+
+    <div class="arch-stack">
+      <!-- L5 -->
+      <div class="arch-row layer-5">
+        <span class="arch-tier">决策<br>行动层</span>
+        <div class="arch-blocks">
+          <div class="arch-block"><span class="name">AI FDE</span><span class="desc">Foundry 开发增强，AI 辅助写 Ontology 对象和 Action</span></div>
+          <div class="arch-block"><span class="name">AIP Analyst</span><span class="desc">数据分析代理，理解业务问题 → 写 Ontology 查询 → 生成报告</span></div>
+          <div class="arch-block"><span class="name">AIP Logic</span><span class="desc">多 Agent 协作编排，Supervisor Pattern + 事件驱动自动化</span></div>
+          <div class="arch-block"><span class="name">Human-in-the-Loop</span><span class="desc">关键决策节点强制人工审批，同一套 Ontology 接口</span></div>
+        </div>
+      </div>
+      <!-- L4 -->
+      <div class="arch-row layer-4">
+        <span class="arch-tier">应用<br>交互层</span>
+        <div class="arch-blocks">
+          <div class="arch-block"><span class="name">Workshop</span><span class="desc">无代码应用构建，拖拽组件绑定 Ontology 对象</span></div>
+          <div class="arch-block"><span class="name">Slate</span><span class="desc">数据面板与可视化，地图 / 图表 / 时空分析</span></div>
+          <div class="arch-block"><span class="name">Developer Workspaces</span><span class="desc">VS Code 插件直读 Ontology，Python/TypeScript SDK</span></div>
+          <div class="arch-block"><span class="name">AIP Logic 画布</span><span class="desc">可视化工作流编辑器，if-then 规则 + 定时调度</span></div>
+        </div>
+      </div>
+      <!-- L3 ★ -->
+      <div class="arch-row layer-3">
+        <span class="arch-tier" style="background:#fff1f5; color:#9d174d; border:1px solid #fecdd3; border-right:none; border-radius:12px 0 0 12px;">本体<br>核心层<br><span style="font-size:9px;font-weight:400;text-transform:none;letter-spacing:0">★ 灵魂</span></span>
+        <div class="arch-blocks" style="background:#fffaf5; border:1px solid #fed7aa; border-left:none; border-radius:0 12px 12px 0;">
+          <div class="arch-block"><span class="name">ObjectType</span><span class="desc">名词（审批件/设备/人员），含语义注释和属性约束</span></div>
+          <div class="arch-block"><span class="name">LinkType</span><span class="desc">关系（申请人 ↔ 审批件），关系本身有属性</span></div>
+          <div class="arch-block"><span class="name">ActionType</span><span class="desc">动词（approve_permit），含前置/后置条件和审计</span></div>
+          <div class="arch-block"><span class="name">Function</span><span class="desc">计算模块 = 业务逻辑（预测/规则/模型）</span></div>
+          <div class="arch-block"><span class="name">Permission Engine</span><span class="desc">语义级权限：实体/字段/关系/操作四级控制</span></div>
+          <div class="arch-block"><span class="name">Audit Logger</span><span class="desc">全链路审计，Agent 每次操作不可绕过</span></div>
+        </div>
+      </div>
+      <!-- L2 -->
+      <div class="arch-row layer-2">
+        <span class="arch-tier">模型<br>服务层</span>
+        <div class="arch-blocks">
+          <div class="arch-block"><span class="name">LLM Router</span><span class="desc">多模型路由（GPT-4o / Claude / 通义 / DeepSeek / 盘古）</span></div>
+          <div class="arch-block"><span class="name">Embedding Service</span><span class="desc">向量化服务，Milvus / Chroma，支持昇腾芯片</span></div>
+          <div class="arch-block"><span class="name">Compute Engine</span><span class="desc">Spark / Flink / DuckDB 多引擎统一抽象</span></div>
+          <div class="arch-block"><span class="name">Tool Factory</span><span class="desc">Function Calling 接口标准化，工具注册与安全校验</span></div>
+          <div class="arch-block"><span class="name">AIP Evals</span><span class="desc">Agent 评估框架，跨模型性能对比 / 幻觉检测</span></div>
+        </div>
+      </div>
+      <!-- L1 -->
+      <div class="arch-row layer-1">
+        <span class="arch-tier">数据<br>基础层</span>
+        <div class="arch-blocks">
+          <div class="arch-block"><span class="name">Data Connectors</span><span class="desc">JDBC / API / Kafka，物理层数据不动，虚拟映射</span></div>
+          <div class="arch-block"><span class="name">OMS</span><span class="desc">Ontology Metadata Service，管理类型定义与版本</span></div>
+          <div class="arch-block"><span class="name">OSv2</span><span class="desc">Object Storage v2，列存 + 语义索引</span></div>
+          <div class="arch-block"><span class="name">OSS</span><span class="desc">Object Set Service，集合查询与跨 Ontology 联合查询</span></div>
+          <div class="arch-block"><span class="name">MMDP</span><span class="desc">多模态数据平面，文本/图像/视频/传感器统一处理</span></div>
+        </div>
+      </div>
+      <!-- L0 -->
+      <div class="arch-row layer-0">
+        <span class="arch-tier">底座<br>Apollo<br>Rubix</span>
+        <div class="arch-blocks">
+          <div class="arch-block"><span class="name">Apollo Control Plane</span><span class="desc">配置即代码，多云 / 政务私有云 / 混合云统一管理</span></div>
+          <div class="arch-block"><span class="name">Apollo Upgrade Engine</span><span class="desc">零停机更新，灰度发布与快速回滚</span></div>
+          <div class="arch-block"><span class="name">Rubix Service Mesh</span><span class="desc">Foundry + AIP 共享服务网格基础设施</span></div>
+          <div class="arch-block"><span class="name">Policy Engine</span><span class="desc">合规策略强制执行，RBAC + ABAC + 标签级安全</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <div class="it">核心洞察</div>
+      <p>AIP 的本质是 <strong>Ontology = 企业业务的可执行数字孪生</strong>。数据不搬、逻辑不重写——所有现有系统的数据在 Ontology 层被赋予"业务语义身份"，让 LLM 和 Agent 真正理解"这个数据代表什么业务含义、谁能操作它、怎么操作才是对的"，而不是在碎片化文本里靠 RAG 硬猜。</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ ONTOLOGY CORE ============ -->
+  <div class="section" id="ontology">
+    <div class="section-header">
+      <div class="section-icon accent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></div>
+      <div>
+        <div class="section-title">Ontology 本体核心</div>
+        <div class="section-desc">ObjectType + LinkType + ActionType 三大核心类型，构成 AIP 的语义基础设施。</div>
+      </div>
+    </div>
+
+    <!-- 3 ontology type cards -->
+    <div class="ontology-cards">
+      <div class="ontology-card">
+        <div class="oc-icon" style="background:#fff1f5; color:#be185d;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </div>
+        <div class="oc-label" style="color:#be185d;">ObjectType — 名词</div>
+        <div class="oc-title">行政许可 / 设备 / 人员</div>
+        <div class="oc-body">描述业务世界的"有什么"，每个对象自带业务语义注释，属性可枚举、可约束。</div>
+        <pre style="background:#fff1f5; color:#9d174d; border:1px solid #fecdd3;">permit_type: Enum[
+  "食品经营",
+  "工程建设"
+]
+status: Enum[
+  "受理","审核中",
+  "通过","驳回"
+]</pre>
+      </div>
+
+      <div class="ontology-card">
+        <div class="oc-icon" style="background:#eff6ff; color:#1d4ed8;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <div class="oc-label" style="color:#1d4ed8;">LinkType — 关系</div>
+        <div class="oc-title">申请人 ↔ 审批件</div>
+        <div class="oc-body">关系本身是一等公民，有属性（role / mandatory / verified）。这是与图数据库的本质区别。</div>
+        <pre style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe;">HAS_APPLICANT {
+  source: Permit
+  target: Person
+  role: Enum[
+    "主申请人",
+    "共同申请人"
+  ]
+}</pre>
+      </div>
+
+      <div class="ontology-card">
+        <div class="oc-icon" style="background:#ecfdf5; color:#065f46;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div class="oc-label" style="color:#065f46;">ActionType — 动词</div>
+        <div class="oc-title">approve_permit</div>
+        <div class="oc-body">平台级行动，含前置条件、后置动作和审计约束。人类和 Agent 共用同一套 ActionType。</div>
+        <pre style="background:#ecfdf5; color:#065f46; border:1px solid #6ee7b7;">preconditions: [
+  role == "审批员",
+  docs.verified
+]
+post: [
+  status="通过",
+  notify(applicant)
+]
+audit: required</pre>
+      </div>
+    </div>
+
+    <!-- OAG flow — 增强版 8 步闭环 -->
+    <div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:14px;">本体增强生成（OAG）增强工作流 — 8 步闭环</div>
+    <div class="oag-pipeline">
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#fff1f5; color:#be185d;">1</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">用户提问</div>
+          <div class="pi-desc">自然语言输入业务问题 / 服务请求，支持多轮对话上下文追踪</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#fce7f3; color:#9d174d;">2</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">意图识别与实体抽取</div>
+          <div class="pi-desc">NLU 解析意图类型（查询/操作/咨询）+ NER 抽取业务实体 → Ontology ObjectType 映射匹配</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#eff6ff; color:#1d4ed8;">3</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">本体知识检索</div>
+          <div class="pi-desc">图数据库遍历 ObjectType + LinkType 关联关系 + 属性约束校验 + 上下文语义消歧</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#fef2f2; color:#991b1b;">4</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">权限校验与数据安全</div>
+          <div class="pi-desc">角色级权限 RBAC + 属性级权限 ABAC + 行级过滤 + 敏感字段自动脱敏 + 操作全链路审计</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#fef3c7; color:#92400e;">5</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">OAG Prompt 构建</div>
+          <div class="pi-desc">结构化 Ontology 语义 + 权限过滤后数据 + 业务规则约束 → 注入 LLM 上下文（非碎片化 RAG）</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#ede9fe; color:#5b21b6;">6</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">LLM 推理生成</div>
+          <div class="pi-desc">多模型智能路由（GPT-4o / 通义 / DeepSeek）+ AIP Evals 幻觉检测 + 结果质量评分</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#ecfdf5; color:#065f46;">7</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">结果验证与审计</div>
+          <div class="pi-desc">业务规则校验（数据一致性/合规约束/权限合规）+ 全链路审计日志（不可绕过）</div>
+        </div>
+      </div>
+      <div class="oag-pipe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+      <div class="oag-pipe-node">
+        <div class="oag-pipe-step" style="background:#d1fae5; color:#065f46;">8</div>
+        <div class="oag-pipe-info">
+          <div class="pi-title">结构化回复 / 操作执行</div>
+          <div class="pi-desc">带业务语义的准确回答 + 可追溯数据来源 + 可选触发 ActionType 写回目标系统</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action execution flow -->
+    <div style="margin-top:24px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-3); margin-bottom:12px;">ActionType 执行全链路</div>
+    <div class="action-flow">
+      <div class="af-grid">
+        <div class="af-col">
+          <div class="af-col-title">请求解析</div>
+          <div class="af-card">
+            <span class="code">LLM 解析</span>
+            用户意图 → ActionType 名称 → 参数构造 → 目标对象 ID
+          </div>
+        </div>
+        <div class="af-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>权限</span>
+        </div>
+        <div class="af-col">
+          <div class="af-col-title">权限检查</div>
+          <div class="af-card">
+            <span class="code">角色检查</span> 当前用户角色是否有权执行<br>
+            <span class="code">ACL 检查</span> 实体级 + 字段级权限验证
+          </div>
+        </div>
+        <div class="af-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>前置</span>
+        </div>
+        <div class="af-col">
+          <div class="af-col-title">前置条件</div>
+          <div class="af-card">
+            <span class="code">状态验证</span> 申请状态是否仍是"审核中"<br>
+            <span class="code">材料完整</span> 所有必交材料已审核
+          </div>
+        </div>
+      </div>
+      <div class="af-divider">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      </div>
+      <div class="af-grid">
+        <div class="af-col">
+          <div class="af-col-title">业务执行</div>
+          <div class="af-card">
+            <span class="code">Action.execute()</span>
+            修改 Ontology 状态<br>
+            写回目标系统（ERP/政务 OA）<br>
+            触发下游流程
+          </div>
+        </div>
+        <div class="af-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>后置</span>
+        </div>
+        <div class="af-col">
+          <div class="af-col-title">后置动作</div>
+          <div class="af-card">
+            <span class="code">状态变更</span> status = "审批通过"<br>
+            <span class="code">通知</span> 发送企微 / 短信给申请人
+          </div>
+        </div>
+        <div class="af-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>审计</span>
+        </div>
+        <div class="af-col">
+          <div class="af-col-title">全链路审计</div>
+          <div class="af-card">
+            <span class="code">audit.write()</span>
+            操作人 / 时间戳 / 参数哈希<br>
+            / IP / 设备 ID / 快照
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENARIOS ============ -->
+  <div class="section" id="scenarios">
+    <div class="section-header">
+      <div class="section-icon accent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div>
+      <div>
+        <div class="section-title">OAG 业务场景落地</div>
+        <div class="section-desc">将本体增强生成（OAG）应用于两大核心业务领域：ERP 经营数据智能问数 + 政务服务事项咨询与办理，全链路覆盖权限控制与数据安全。</div>
+      </div>
+    </div>
+
+    <div class="scenario-grid">
+      <!-- ===== Scenario 1: ERP 问数 ===== -->
+      <div class="scenario-card">
+        <div class="scenario-card-header" style="background: linear-gradient(135deg, #eef6f5, #f0fdf4);">
+          <div class="sc-icon" style="background:#1a5f5a; color:#fff;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div>
+            <div class="sc-title">ERP 经营数据智能问数</div>
+            <div class="sc-sub">数据库表 → 本体数据对象 → 权限控制 → 安全合规</div>
+          </div>
+        </div>
+        <div class="scenario-card-body">
+          <div class="sc-tags">
+            <span class="sc-tag tag-erp">数据库表映射</span>
+            <span class="sc-tag tag-erp">本体数据对象</span>
+            <span class="sc-tag tag-sec">数据权限</span>
+            <span class="sc-tag tag-sec">数据安全</span>
+            <span class="sc-tag tag-data">审计追踪</span>
+          </div>
+
+          <div class="sc-sec-title">OAG 问数流程</div>
+          <div class="sc-flow">
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#1a5f5a;"></div>
+              <div><span class="sf-label">① 自然语言输入</span>"本月华东区采购订单总额及各供应商排名"</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#2a7a74;"></div>
+              <div><span class="sf-label">② 本体对象匹配</span>ObjectType: 采购订单/供应商/物料/组织架构 + LinkType 关联解析</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#c97b3f;"></div>
+              <div><span class="sf-label">③ 数据权限过滤</span>部门级隔离（华东区）+ 角色级（采购经理/财务）+ 行级安全（供应商敏感标记）</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#991b1b;"></div>
+              <div><span class="sf-label">④ 安全脱敏</span>金额阈值控制 / 供应商评级字段脱敏 / 成本字段 ABAC 属性级访问控制</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#5b21b6;"></div>
+              <div><span class="sf-label">⑤ OAG Prompt 注入</span>Ontology 语义（采购订单.总额、供应商.名称、组织.区域）→ 生成精确本体查询 / SQL</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#065f46;"></div>
+              <div><span class="sf-label">⑥ 结果审计输出</span>自动生成表格+趋势图 + 数据来源追溯 + 操作全量审计日志</div>
+            </div>
+          </div>
+
+          <div class="sc-sec-title">核心本体数据对象</div>
+          <div class="sc-obj-grid">
+            <div class="sc-obj-item" style="background:#eef6f5; border:1px solid #cceae8;"><strong>物料主数据</strong><span>编码/名称/规格/成本/库存</span></div>
+            <div class="sc-obj-item" style="background:#eef6f5; border:1px solid #cceae8;"><strong>供应商</strong><span>名称/评级/合同/履约</span></div>
+            <div class="sc-obj-item" style="background:#eef6f5; border:1px solid #cceae8;"><strong>采购订单</strong><span>金额/状态/物料/供应商</span></div>
+            <div class="sc-obj-item" style="background:#eef6f5; border:1px solid #cceae8;"><strong>财务科目</strong><span>科目编码/余额/预算</span></div>
+            <div class="sc-obj-item" style="background:#fef2f2; border:1px solid #fecaca;"><strong>组织架构</strong><span>部门/区域/成本中心</span></div>
+            <div class="sc-obj-item" style="background:#fef2f2; border:1px solid #fecaca;"><strong>权限矩阵</strong><span>RBAC+ABAC+行级控制</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Scenario 2: 政务服务 ===== -->
+      <div class="scenario-card">
+        <div class="scenario-card-header" style="background: linear-gradient(135deg, #eff6ff, #f0f4ff);">
+          <div class="sc-icon" style="background:#1e40af; color:#fff;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div>
+            <div class="sc-title">政务服务事项咨询与办理</div>
+            <div class="sc-sub">咨询 → 意图定位 → 导办 → 材料 → 填表 → 权限 → 安全</div>
+          </div>
+        </div>
+        <div class="scenario-card-body">
+          <div class="sc-tags">
+            <span class="sc-tag tag-gov">智能咨询</span>
+            <span class="sc-tag tag-gov">意图定位</span>
+            <span class="sc-tag tag-gov">导办服务</span>
+            <span class="sc-tag tag-sec">材料审核</span>
+            <span class="sc-tag tag-sec">权限安全</span>
+            <span class="sc-tag tag-data">表单填写</span>
+          </div>
+
+          <div class="sc-sec-title">OAG 办事流程</div>
+          <div class="sc-flow">
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#1e40af;"></div>
+              <div><span class="sf-label">① 智能咨询</span>用户自然语言描述办理需求 → NLU 理解 → 事项智能推荐</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#2563eb;"></div>
+              <div><span class="sf-label">② 意图定位</span>Ontology 匹配事项类型（行政许可/公共服务/备案）+ 情形判断与分流</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#3b6ea5;"></div>
+              <div><span class="sf-label">③ 导办服务</span>条件预检 → 办事指南生成 → 流程节点推送 → 部门/窗口导航</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#c97b3f;"></div>
+              <div><span class="sf-label">④ 材料清单</span>Ontology 关联材料模板（LinkType: REQUIRES_DOCUMENT）→ 智能预审</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#b45309;"></div>
+              <div><span class="sf-label">⑤ 智能填表</span>表单字段与 Ontology 属性绑定 → 自动填充已知信息 → 实时校验</div>
+            </div>
+            <div class="sc-flow-item">
+              <div class="sf-dot" style="background:#991b1b;"></div>
+              <div><span class="sf-label">⑥ 权限与安全</span>实名认证 / 电子签名 / 材料脱敏 / 办件隔离 / 全程留痕审计</div>
+            </div>
+          </div>
+
+          <div class="sc-sec-title">核心本体对象</div>
+          <div class="sc-obj-grid">
+            <div class="sc-obj-item" style="background:#eff6ff; border:1px solid #bfdbfe;"><strong>行政事项</strong><span>编码/名称/类型/设立依据</span></div>
+            <div class="sc-obj-item" style="background:#eff6ff; border:1px solid #bfdbfe;"><strong>办事指南</strong><span>条件/流程/时限/窗口</span></div>
+            <div class="sc-obj-item" style="background:#eff6ff; border:1px solid #bfdbfe;"><strong>材料清单</strong><span>名称/类型/模板/是否必需</span></div>
+            <div class="sc-obj-item" style="background:#eff6ff; border:1px solid #bfdbfe;"><strong>申请表单</strong><span>字段/校验规则/关联事项</span></div>
+            <div class="sc-obj-item" style="background:#fef2f2; border:1px solid #fecaca;"><strong>办件信息</strong><span>状态/申请人/时间轴</span></div>
+            <div class="sc-obj-item" style="background:#fef2f2; border:1px solid #fecaca;"><strong>权限主体</strong><span>实名/角色/数据隔离</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ HERMES ============ -->
+  <div class="section" id="hermes">
+    <div class="section-header">
+      <div class="section-icon info"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+      <div>
+        <div class="section-title">Hermes-Agent 架构</div>
+        <div class="section-desc">NousResearch 开源框架（Apache 2.0，28K+ GitHub Stars），可作为二次开发的基础 Agent 运行时。</div>
+      </div>
+    </div>
+
+    <div class="arch-stack">
+      <div class="hermes-row h-layer-entry">
+        <span class="hermes-tier">入口层</span>
+        <div class="hermes-blocks">
+          <div class="hermes-block"><span class="name">CLI</span><span class="desc">交互式终端对话，hermes run</span></div>
+          <div class="hermes-block"><span class="name">Gateway</span><span class="desc">Telegram / Discord / 企微 / 钉钉消息接入</span></div>
+          <div class="hermes-block"><span class="name">API Server</span><span class="desc">REST API，嵌入到现有应用</span></div>
+          <div class="hermes-block"><span class="name">Batch Runner</span><span class="desc">定时任务 / 批处理自动化</span></div>
+        </div>
+      </div>
+
+      <div class="hermes-row h-layer-core">
+        <span class="hermes-tier">核心<br>引擎</span>
+        <div class="hermes-blocks">
+          <div class="hermes-block"><span class="name">AIAgent（~15,700 LOC）</span><span class="desc">核心对话循环：Prompt 组装 / Provider 选择 / 工具调度 / 会话压缩</span></div>
+          <div class="hermes-block"><span class="name">Context Engine</span><span class="desc">上下文压缩 + 记忆持久化，SQLite + FTS5</span></div>
+          <div class="hermes-block"><span class="name">Model Provider</span><span class="desc">OpenAI / Anthropic / 通义 / DeepSeek / Ollama 统一抽象</span></div>
+          <div class="hermes-block"><span class="name">自我进化引擎</span><span class="desc">偏好学习 / 策略优化 / 效果评估 / 技能沉淀</span></div>
+        </div>
+      </div>
+
+      <div class="hermes-row h-layer-tools">
+        <span class="hermes-tier">工具层</span>
+        <div class="hermes-blocks">
+          <div class="hermes-block"><span class="name">Tool Registry</span><span class="desc">70+ 工具，ABC 可插拔架构</span></div>
+          <div class="hermes-block"><span class="name">28 Toolsets</span><span class="desc">git / docker / file / vision / browser / mcp</span></div>
+          <div class="hermes-block"><span class="name">Terminal Backend</span><span class="desc">7 种后端（local / docker / ssh）</span></div>
+          <div class="hermes-block"><span class="name">MCP</span><span class="desc">动态工具发现协议</span></div>
+        </div>
+      </div>
+
+      <div class="hermes-row h-layer-storage">
+        <span class="hermes-tier">存储层</span>
+        <div class="hermes-blocks">
+          <div class="hermes-block"><span class="name">MEMORY.md</span><span class="desc">长期记忆，跨会话持久化</span></div>
+          <div class="hermes-block"><span class="name">USER.md</span><span class="desc">用户画像与偏好记录</span></div>
+          <div class="hermes-block"><span class="name">Skills</span><span class="desc">可复用技能包，SKILL.md 格式，slash commands</span></div>
+          <div class="hermes-block"><span class="name">Sessions</span><span class="desc">hermes --continue 恢复历史会话</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <div class="it">可复用 vs 需新增</div>
+      <p><strong>直接复用</strong>：Model Adapter / Tool Registry / Skills / 自我进化引擎<br>
+      <strong>必须新增</strong>：Ontology 层（ObjectType + LinkType + ActionType + 权限引擎）——这是 AIP 区别于一切通用 Agent 框架的核心，AIP 的护城河所在。</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ COMPARE ============ -->
+  <div class="section" id="compare">
+    <div class="section-header">
+      <div class="section-icon danger"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+      <div>
+        <div class="section-title">能力对比：AIP vs Hermes-Agent</div>
+        <div class="section-desc">逐维度对标，分析差距与国产化改造优先级。</div>
+      </div>
+    </div>
+
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th style="width:160px;">能力维度</th>
+            <th class="col-aip">Palantir AIP</th>
+            <th class="col-h">Hermes-Agent</th>
+            <th style="width:120px;">差距</th>
+            <th>改造策略</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>本体系统</strong></td>
+            <td class="has col-aip">✓ ObjectType + LinkType + ActionType 完整建模</td>
+            <td class="none col-h">✗ 无本体概念，纯 prompt 注入</td>
+            <td class="gap">最大差距</td>
+            <td class="dim">自研 Ontology 层（PostgreSQL + TuGraph）</td>
+          </tr>
+          <tr>
+            <td><strong>权限体系</strong></td>
+            <td class="has col-aip">✓ 语义级（实体/字段/关系/操作四级）</td>
+            <td class="none col-h">✗ 无企业级权限，工具调用无控制</td>
+            <td class="gap">核心差距</td>
+            <td class="dim">基于 Ontology 构建 Permission Engine</td>
+          </tr>
+          <tr>
+            <td><strong>Agent 生命周期</strong></td>
+            <td class="has col-aip">✓ Build/Orchestrate/Evaluate/Deploy/Monitor</td>
+            <td class="partial col-h">◑ 仅构建 + 运行，无生产级管理</td>
+            <td class="gap">显著差距</td>
+            <td class="dim">自研 DevOps for AI 平台层</td>
+          </tr>
+          <tr>
+            <td><strong>多 Agent 协作</strong></td>
+            <td class="has col-aip">✓ Supervisor Pattern + Ontology 约束</td>
+            <td class="partial col-h">◑ 工具调用 + 消息传递，无结构化约束</td>
+            <td class="gap">较大差距</td>
+            <td class="dim">基于 ActionType 构建 Supervisor Agent</td>
+          </tr>
+          <tr>
+            <td><strong>可观测性</strong></td>
+            <td class="has col-aip">✓ 端到端追踪 + 资源消耗 + 合规审计</td>
+            <td class="partial col-h">◑ 基础日志，无企业级监控</td>
+            <td class="gap">较大差距</td>
+            <td class="dim">自研监控面板 + 审计日志引擎</td>
+          </tr>
+          <tr>
+            <td><strong>持续交付</strong></td>
+            <td class="has col-aip">✓ Apollo 离线 / 政务云 / 混合云</td>
+            <td class="partial col-h">◑ Docker 部署，无离线适配</td>
+            <td class="gap">显著差距</td>
+            <td class="dim">自研 Apollo 简化版 + 信创适配</td>
+          </tr>
+          <tr>
+            <td><strong>数据层</strong></td>
+            <td class="has col-aip">✓ 虚拟本体映射，MMDP 多模态</td>
+            <td class="partial col-h">◑ 直接读文件 + API</td>
+            <td>中等</td>
+            <td class="dim">复用 Hermes Model Adapter，新增数据连接器</td>
+          </tr>
+          <tr>
+            <td><strong>国产适配</strong></td>
+            <td class="none col-aip">✗ 商业产品，政务私有化成本极高</td>
+            <td class="has col-h">✓ 开源，可完全自主可控</td>
+            <td class="gap">优势方向</td>
+            <td class="dim">信创全栈：鲲鹏 / 昇腾 / 麒麟 / 人大金仓</td>
+          </tr>
+          <tr>
+            <td><strong>自我进化</strong></td>
+            <td class="none col-aip">✗ 无（固定能力边界）</td>
+            <td class="has col-h">✓ 偏好学习 + 策略优化 + 技能沉淀</td>
+            <td class="gap">反向优势</td>
+            <td class="dim">Hermes 进化引擎保留，整合进 Ontology</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ ROADMAP ============ -->
+  <div class="section" id="roadmap">
+    <div class="section-header">
+      <div class="section-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div>
+        <div class="section-title">国产化开发路线图</div>
+        <div class="section-desc">基于 Hermes-Agent 的三阶段二次开发计划。</div>
+      </div>
+    </div>
+
+    <div class="roadmap">
+      <div class="roadmap-step">
+        <div class="roadmap-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <div>
+          <div class="roadmap-title">阶段一：打基础，补本体</div>
+          <div class="roadmap-time">0 → 9 个月 &nbsp;·&nbsp; P0：Ontology 核心层</div>
+          <div class="roadmap-cards">
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                ObjectType Registry
+                <span class="priority-badge badge-p0">P0</span>
+              </div>
+              <div class="rc-body">Pydantic 模型 + 语义注释元数据 + 枚举约束 + PostgreSQL 行级安全</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                LinkType Engine
+                <span class="priority-badge badge-p0">P0</span>
+              </div>
+              <div class="rc-body">蚂蚁 TuGraph 图数据库，关系 + 属性查询，跨对象关联推理</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                ActionType + Permission
+                <span class="priority-badge badge-p0">P0</span>
+              </div>
+              <div class="rc-body">前置/后置条件引擎 + RBAC/ABAC 四级权限 + 全链路审计</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                国产 LLM 接入
+                <span class="priority-badge badge-p1">P1</span>
+              </div>
+              <div class="rc-body">通义千问（Qwen-Max）+ DeepSeekGLM + 盘古，Model Adapter 适配</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="roadmap-step">
+        <div class="roadmap-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <div>
+          <div class="roadmap-title">阶段二：建平台，补 Agent 全生命周期</div>
+          <div class="roadmap-time">9 → 18 个月 &nbsp;·&nbsp; P1：DevOps for AI</div>
+          <div class="roadmap-cards">
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                Supervisor Agent
+                <span class="priority-badge badge-p1">P1</span>
+              </div>
+              <div class="rc-body">多 Agent 协作框架，基于 ActionType 约束，确保操作安全可控</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                AIP Evals 框架
+                <span class="priority-badge badge-p2">P2</span>
+              </div>
+              <div class="rc-body">测试用例 + 跨模型对比 + 幻觉检测 + 执行稳定性测试</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                Workshop 简化版
+                <span class="priority-badge badge-p2">P2</span>
+              </div>
+              <div class="rc-body">拖拽式可视化画布，政务人员无需代码，快速构建 Ontology 应用</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+                Apollo 离线版
+                <span class="priority-badge badge-p2">P2</span>
+              </div>
+              <div class="rc-body">配置即代码 + 离线部署包 + 政务私有云（华为 Stack / 阿里政务云）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="roadmap-step">
+        <div class="roadmap-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <div class="roadmap-title">阶段三：做场景，深耕政企垂直领域</div>
+          <div class="roadmap-time">18 个月+ &nbsp;·&nbsp; P1：场景 Ontology 模型库</div>
+          <div class="roadmap-cards">
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                行政许可助手
+              </div>
+              <div class="rc-body">审批材料智能预审 / 自动分发 / 风险预警 / 政策匹配</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                基层治理 Agent
+              </div>
+              <div class="rc-body">网格事件智能分类 / 责任部门自动匹配 / 处置进度跟踪</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                12345 热线助手
+              </div>
+              <div class="rc-body">工单智能分类 / 责任单位推荐 / 满意度预测 / 热点分析</div>
+            </div>
+            <div class="roadmap-card">
+              <div class="rc-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+                供应链风险预警
+              </div>
+              <div class="rc-body">多源数据关联分析 / 供应商风险画像 / 自动预警推送</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ SECURITY ============ -->
+  <div class="section" id="security">
+    <div class="section-header">
+      <div class="section-icon danger"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div>
+        <div class="section-title">三网隔离数据安全架构</div>
+        <div class="section-desc">针对中国政务场景（涉密数据不出内网）的核心安全设计。</div>
+      </div>
+    </div>
+
+    <div class="security-arch">
+      <div class="sec-grid">
+        <div class="sec-zone zone-inner">
+          <h4>政务内网 · 涉密数据层</h4>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            PostgreSQL / 人大金仓
+          </div>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/></svg>
+            原始业务数据（ERP/政务 OA）
+          </div>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Ontology 对象存储（OSv2）
+          </div>
+          <div style="margin-top:10px; font-size:10px; color:#991b1b; font-weight:700; text-align:center;">🔒 数据永远不出网</div>
+        </div>
+
+        <div class="sec-zone zone-ai">
+          <h4>政务外网 · AI 推理层</h4>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+            Ontology Proxy（只出不进）
+          </div>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            权限过滤 + 数据脱敏
+          </div>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            LLM 推理（国产模型，本地部署）
+          </div>
+          <div style="margin-top:10px; font-size:10px; color:#1e40af; font-weight:700; text-align:center;">⚡ 只进结构化结果，不进原始数据</div>
+        </div>
+
+        <div class="sec-zone zone-ui">
+          <h4>政务外网 · 用户交互层</h4>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Workshop 简化版（浏览器）
+          </div>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72"/></svg>
+            企微 / 钉钉 / 飞书接入
+          </div>
+          <div class="sec-node">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            数据可视化面板
+          </div>
+          <div style="margin-top:10px; font-size:10px; color:#166534; font-weight:700; text-align:center;">✅ 决策建议 + 操作入口，无原始数据</div>
+        </div>
+      </div>
+
+      <div class="sec-divider">
+        <span>结构化结果（不含原始数据）</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+      <div class="sec-divider">
+        <span>决策建议（不含原始数据）</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <div class="it">安全设计的核心原则</div>
+      <p>涉密数据永远留在内网。Ontology Proxy 只向外传递"结构化查询结果"（谁、有哪些、状态如何），不传递原始字段（身份证号、合同内容）。Agent 在外网的每次写操作（审批通过/工单派发）都必须经过内网 Permission Engine 校验，无法绕过。</p>
+    </div>
+  </div>
+
+  <div class="footer">数据来源：Palantir 官方文档 · CSDN 技术博客 · GitHub NousResearch/Hermes-Agent · 架构图谱 v1.0</div>
+</div>
+
+<script>
+  document.querySelectorAll('.nav-links a').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  const sections = document.querySelectorAll('.section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.getAttribute('id');
+        navLinks.forEach(link => {
+          link.style.color = '';
+          link.style.borderColor = 'transparent';
+          if (link.getAttribute('href') === '#' + id) {
+            link.style.color = 'var(--primary)';
+            link.style.borderColor = 'var(--primary)';
+          }
+        });
+      }
+    });
+  }, { threshold: 0.2 });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

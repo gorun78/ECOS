@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.sysman.boot.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.dto.ChangePasswordRequest;
 import com.chinacreator.gzcm.sysman.dto.LoginRequest;
 import com.chinacreator.gzcm.sysman.dto.LoginResponse;
 import com.chinacreator.gzcm.sysman.dto.RefreshTokenRequest;
@@ -18,15 +20,19 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 认证控制器 — 登录 / 获取用户信息 / 刷新 Token。
+ * 认证控制器 — 登录 / 获取用户信息 / 刷新 Token / 修改密码。
  * <p>
- * 数据库用户表验证 + BCrypt 密码比对。
+ * 数据库用户表验证 + BCrypt 密码比对 + 登录锁定 + 密码强度校验。
  */
 @RestController
 @RequestMapping({"/api/v1/auth", "/auth"})
@@ -36,25 +42,44 @@ public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final JdbcTemplate jdbcTemplate;
+    private final SysConfigService sysConfigService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 内存中的 Refresh Token 存储（生产环境应使用 Redis） */
     private static final Map<String, String> refreshTokens = new ConcurrentHashMap<>();
 
-    public AuthController(JwtTokenProvider jwtTokenProvider, JdbcTemplate jdbcTemplate) {
+    public AuthController(JwtTokenProvider jwtTokenProvider,
+                          JdbcTemplate jdbcTemplate,
+                          SysConfigService sysConfigService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.jdbcTemplate = jdbcTemplate;
+        this.sysConfigService = sysConfigService;
     }
 
+    // ── 配置读取辅助方法 ──────────────────────────────────
+
+    private int getIntConfig(String key, int defaultValue) {
+        return sysConfigService.getInt(key, defaultValue);
+    }
+
+    private boolean getBoolConfig(String key, boolean defaultValue) {
+        return sysConfigService.getBoolean(key, defaultValue);
+    }
+
+    // ── 登录 ──────────────────────────────────────────────
+
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<?>> login(@RequestBody LoginRequest request) {
         String username = request.username();
         String password = request.password();
 
-        // 查询用户
+        // 查询用户（含安全字段）
         List<Map<String, Object>> users = jdbcTemplate.queryForList(
-                "SELECT id, username, password_hash, display_name, roles FROM users WHERE username = ? AND enabled = true",
+                "SELECT id, username, password_hash, display_name, roles, "
+                        + "failed_attempts, locked_until, password_change_required, "
+                        + "last_password_change, password_history "
+                        + "FROM users WHERE username = ? AND enabled = true",
                 username);
 
         if (users.isEmpty()) {
@@ -65,21 +90,100 @@ public class AuthController {
         Map<String, Object> user = users.get(0);
         String passwordHash = (String) user.get("password_hash");
 
-        // BCrypt 密码验证
-        if (!passwordEncoder.matches(password, passwordHash)) {
-            log.warn("Login failed — wrong password for user: {}", username);
-            return ResponseEntity.status(401).body(ApiResponse.unauthorized("用户名或密码错误"));
+        // ── T1-1: 检查账户是否被锁定 ──
+        Timestamp lockedUntil = (Timestamp) user.get("locked_until");
+        if (lockedUntil != null && lockedUntil.toInstant().isAfter(Instant.now())) {
+            log.warn("Login blocked — account locked until {}: {}", lockedUntil, username);
+            // 使用 423 Locked 状态码
+            return ResponseEntity.status(423)
+                    .body(ApiResponse.error(423, "ACCOUNT_LOCKED", "账户已锁定，请稍后再试"));
         }
 
-        // 提取用户信息
+        // ── 密码比对 ──
+        if (!passwordEncoder.matches(password, passwordHash)) {
+            // ── T1-2: 密码错误 — 增加失败计数 ──
+            int failedAttempts = user.get("failed_attempts") != null
+                    ? ((Number) user.get("failed_attempts")).intValue() : 0;
+            failedAttempts++;
+
+            int maxLoginAttempts = getIntConfig("max_login_attempts", 5);
+            int lockoutDurationMinutes = getIntConfig("lockout_duration_minutes", 15);
+            int remainingAttempts = maxLoginAttempts - failedAttempts;
+
+            if (failedAttempts >= maxLoginAttempts) {
+                // 锁定账户
+                jdbcTemplate.update(
+                        "UPDATE users SET failed_attempts = ?, locked_until = NOW() + (? * INTERVAL '1 minute') WHERE username = ?",
+                        failedAttempts, lockoutDurationMinutes, username);
+                log.warn("Account locked — {} failed attempts for user: {}", failedAttempts, username);
+                return ResponseEntity.status(423)
+                        .body(ApiResponse.error(423, "ACCOUNT_LOCKED",
+                                "账户已锁定" + lockoutDurationMinutes + "分钟，请稍后再试"));
+            } else {
+                jdbcTemplate.update(
+                        "UPDATE users SET failed_attempts = ? WHERE username = ?",
+                        failedAttempts, username);
+                log.warn("Login failed — wrong password for user: {} (attempt {}/{})",
+                        username, failedAttempts, maxLoginAttempts);
+                return ResponseEntity.status(401)
+                        .body(ApiResponse.unauthorized(
+                                "用户名或密码错误（剩余尝试" + remainingAttempts + "次）"));
+            }
+        }
+
+        // ── 密码正确 ──
         String userId = (String) user.get("id");
+
+        // ── T1-3a: 检查是否需要强制修改密码 ──
+        Boolean passwordChangeRequired = (Boolean) user.get("password_change_required");
+        if (Boolean.TRUE.equals(passwordChangeRequired)) {
+            String changeToken = jwtTokenProvider.createChangeToken(userId);
+            // 重置失败计数（密码正确但需换密）
+            jdbcTemplate.update(
+                    "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
+                    userId);
+            log.info("User {} (id={}) password change required, changeToken issued", username, userId);
+            Map<String, String> data = Map.of("changeToken", changeToken,
+                    "message", "首次登录需修改密码");
+            return ResponseEntity.status(200)
+                    .body(ApiResponse.success("PASSWORD_CHANGE_REQUIRED", data));
+        }
+
+        // ── T1-3b: 检查密码是否过期 ──
+        int passwordExpireDays = getIntConfig("password_expire_days", 90);
+        if (passwordExpireDays > 0) {
+            Timestamp lastPasswordChange = (Timestamp) user.get("last_password_change");
+            if (lastPasswordChange != null) {
+                LocalDateTime expireTime = lastPasswordChange.toLocalDateTime().plusDays(passwordExpireDays);
+                if (LocalDateTime.now().isAfter(expireTime)) {
+                    log.warn("User {} (id={}) password expired (last change: {})",
+                            username, userId, lastPasswordChange);
+                    // 颁发 changeToken 让用户能修改密码
+                    String changeToken = jwtTokenProvider.createChangeToken(userId);
+                    jdbcTemplate.update(
+                            "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
+                            userId);
+                    Map<String, String> data = Map.of("changeToken", changeToken,
+                            "message", "密码已过期，请修改密码");
+                    return ResponseEntity.status(200)
+                            .body(ApiResponse.success("PASSWORD_EXPIRED", data));
+                }
+            }
+        }
+
+        // ── 正常登录：重置失败计数 ──
+        jdbcTemplate.update(
+                "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
+                userId);
+
+        // 提取用户信息
         List<String> roles = parseRoles((String) user.get("roles"));
 
         // 查询租户ID
         Map<String, Object> extraClaims = new java.util.HashMap<>();
         try {
             List<Map<String, Object>> tenantRows = jdbcTemplate.queryForList(
-                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+                    "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
             if (tenantRows != null && !tenantRows.isEmpty()) {
                 Object tid = tenantRows.get(0).get("TENANT_ID");
                 if (tid != null && !tid.toString().isBlank()) {
@@ -105,6 +209,8 @@ public class AuthController {
         LoginResponse data = new LoginResponse(accessToken, refreshToken, username, userId, roles);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
+
+    // ── 获取当前用户信息 ──────────────────────────────────
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserInfoResponse>> me(
@@ -150,20 +256,144 @@ public class AuthController {
         }
     }
 
+    // ── 修改密码 ──────────────────────────────────────────
+
     /**
-     * 解析 roles 字段（JSON 数组字符串 → List&lt;String&gt;）。
+     * 修改密码端点 — 首次登录强制修改 / 密码过期修改。
+     * <p>
+     * 使用 login 时颁发的 changeToken 验证身份，
+     * 校验密码强度 + 密码历史，BCrypt 加密后更新。
      */
-    private List<String> parseRoles(String rolesJson) {
-        if (rolesJson == null || rolesJson.isBlank()) {
-            return Collections.emptyList();
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Map<String, String>>> changePassword(
+            @RequestBody ChangePasswordRequest request) {
+
+        String changeToken = request.changeToken();
+        String newPassword = request.newPassword();
+
+        if (changeToken == null || changeToken.isEmpty()) {
+            return ResponseEntity.status(400).body(ApiResponse.badRequest("changeToken不能为空"));
         }
+        if (newPassword == null || newPassword.isEmpty()) {
+            return ResponseEntity.status(400).body(ApiResponse.badRequest("newPassword不能为空"));
+        }
+
+        // ── T2-1: 验证 changeToken ──
+        String userId;
         try {
-            return objectMapper.readValue(rolesJson, new TypeReference<List<String>>() {});
-        } catch (Exception e) {
-            log.warn("Failed to parse roles JSON: {}", rolesJson, e);
-            return Collections.emptyList();
+            Claims claims = jwtTokenProvider.validateToken(changeToken);
+            String type = claims.get("type", String.class);
+            String purpose = claims.get("purpose", String.class);
+            if (!"change-password".equals(type) && !"change-password".equals(purpose)) {
+                return ResponseEntity.status(401)
+                        .body(ApiResponse.unauthorized("Token类型无效，请使用change-password token"));
+            }
+            userId = claims.getSubject();
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(401).body(ApiResponse.unauthorized("changeToken无效或已过期"));
         }
+
+        // 查询用户（需要 password_hash 和 password_history）
+        List<Map<String, Object>> users = jdbcTemplate.queryForList(
+                "SELECT id, username, password_hash, password_history FROM users WHERE id = ? AND enabled = true",
+                userId);
+
+        if (users.isEmpty()) {
+            return ResponseEntity.status(404).body(ApiResponse.notFound("用户不存在"));
+        }
+
+        Map<String, Object> user = users.get(0);
+        String currentPasswordHash = (String) user.get("password_hash");
+
+        // ── T2-2: 密码强度校验 ──
+        String strengthError = validatePasswordStrength(newPassword);
+        if (strengthError != null) {
+            return ResponseEntity.status(400).body(ApiResponse.badRequest(strengthError));
+        }
+
+        // ── T2-3: 密码历史校验（不重复最近 N 条） ──
+        int historyCount = getIntConfig("password_history_count", 3);
+        String passwordHistoryJson = (String) user.get("password_history");
+        if (passwordHistoryJson != null && !passwordHistoryJson.isEmpty()) {
+            try {
+                List<String> historyHashes = objectMapper.readValue(
+                        passwordHistoryJson, new TypeReference<List<String>>() {});
+                // 取最近 N 条进行检查
+                int checkCount = Math.min(historyCount, historyHashes.size());
+                for (int i = historyHashes.size() - checkCount; i < historyHashes.size(); i++) {
+                    if (passwordEncoder.matches(newPassword, historyHashes.get(i))) {
+                        return ResponseEntity.status(400)
+                                .body(ApiResponse.badRequest("新密码不能与最近使用的" + historyCount + "个密码相同"));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse password_history for user {}: {}", userId, e.getMessage());
+            }
+        }
+
+        // ── T2-4: BCrypt 加密新密码 ──
+        String newPasswordHash = passwordEncoder.encode(newPassword);
+
+        // ── T2-5/6: 更新密码、取消强制改密标记、更新密码历史 ──
+        List<String> historyList = new ArrayList<>();
+        if (passwordHistoryJson != null && !passwordHistoryJson.isEmpty() && !"[]".equals(passwordHistoryJson)) {
+            try {
+                historyList = objectMapper.readValue(passwordHistoryJson,
+                        new TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse password_history for user {}: {}", userId, e.getMessage());
+            }
+        }
+        historyList.add(newPasswordHash);
+        // 只保留最近 historyCount 条
+        while (historyList.size() > historyCount) {
+            historyList.remove(0);
+        }
+        String updatedHistoryJson;
+        try {
+            updatedHistoryJson = objectMapper.writeValueAsString(historyList);
+        } catch (Exception e) {
+            updatedHistoryJson = "[]";
+        }
+
+        jdbcTemplate.update(
+                "UPDATE users SET password_hash = ?, password_change_required = FALSE, "
+                        + "last_password_change = NOW(), password_history = CAST(? AS jsonb) WHERE id = ?",
+                newPasswordHash, updatedHistoryJson, userId);
+
+        log.info("Password changed successfully for userId: {}", userId);
+
+        Map<String, String> data = Map.of("message", "密码修改成功，请重新登录");
+        return ResponseEntity.ok(ApiResponse.success("密码修改成功", data));
     }
+
+    // ── 密码强度校验 ──────────────────────────────────────
+
+    /**
+     * 校验密码强度。返回 null 表示通过，否则返回错误提示。
+     */
+    private String validatePasswordStrength(String password) {
+        int minLength = getIntConfig("password_min_length", 8);
+        boolean requireUpper = getBoolConfig("password_require_upper", true);
+        boolean requireDigit = getBoolConfig("password_require_digit", true);
+        boolean requireSpecial = getBoolConfig("password_require_special", false);
+
+        if (password.length() < minLength) {
+            return "密码长度至少" + minLength + "位";
+        }
+        if (requireUpper && !password.matches(".*[A-Z].*")) {
+            return "密码必须包含至少一个大写字母";
+        }
+        if (requireDigit && !password.matches(".*[0-9].*")) {
+            return "密码必须包含至少一个数字";
+        }
+        if (requireSpecial && !password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
+            return "密码必须包含至少一个特殊字符";
+        }
+        return null;
+    }
+
+    // ── Token 刷新 ────────────────────────────────────────
 
     /**
      * 使用 Refresh Token 换取新的 Access Token。
@@ -214,6 +444,23 @@ public class AuthController {
 
         } catch (JwtException | IllegalArgumentException e) {
             return ResponseEntity.status(401).body(ApiResponse.unauthorized("Refresh Token无效或已过期"));
+        }
+    }
+
+    // ── 工具方法 ──────────────────────────────────────────
+
+    /**
+     * 解析 roles 字段（JSON 数组字符串 → List&lt;String&gt;）。
+     */
+    private List<String> parseRoles(String rolesJson) {
+        if (rolesJson == null || rolesJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(rolesJson, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.warn("Failed to parse roles JSON: {}", rolesJson, e);
+            return Collections.emptyList();
         }
     }
 }

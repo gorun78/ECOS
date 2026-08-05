@@ -113,6 +113,25 @@ public class JwtTokenProvider {
     }
 
     /**
+     * 创建 Change Password Token（5分钟有效），用于首次登录后强制修改密码。
+     *
+     * @param userId 用户ID
+     * @return JWT token string
+     */
+    public String createChangeToken(String userId) {
+        Date now = new Date();
+        return Jwts.builder()
+            .subject(userId)
+            .claim("type", "change-password")
+            .claim("purpose", "change-password")
+            .issuedAt(now)
+            .expiration(new Date(now.getTime() + 5 * 60 * 1000L))
+            .id(UUID.randomUUID().toString())
+            .signWith(privateKey, Jwts.SIG.RS256)
+            .compact();
+    }
+
+    /**
      * 校验并解析 Token。
      *
      * @param token JWT token string

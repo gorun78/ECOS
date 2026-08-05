@@ -40,7 +40,7 @@ import DictManager from './pages/DictManager.tsx';
 import SystemDictionary from './pages/SystemDictionary.tsx';
 import SystemConfigManager from './pages/SystemConfigManager.tsx';
 import DataSourceManager from './pages/DataSourceManager.tsx';
-import SecurityCenter from './pages/security-center/SecurityCenter.tsx';
+import SecurityCenter from './pages/security-center/SecurityCenterLayout';
 import DataLake from './pages/DataLake.tsx';
 import TelemetryViewer from './pages/TelemetryViewer.tsx';
 import TokenDashboard from './pages/TokenDashboard.tsx';
@@ -120,8 +120,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="alerts" element={<AlertPanel />} />
               {/* 安全 */}
               <Route path="security-center" element={<SecurityCenter />} />
-              <Route path="security" element={<SecurityCenter />} />
-              <Route path="policy-engine" element={<SecurityCenter />} />
               <Route path="guardrails" element={<GuardrailsView />} />
               {/* 系统管理 */}
               <Route path="iam" element={<UserManagement />} />

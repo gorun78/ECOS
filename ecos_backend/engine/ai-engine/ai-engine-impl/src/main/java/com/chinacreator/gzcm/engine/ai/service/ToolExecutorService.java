@@ -47,6 +47,7 @@ public class ToolExecutorService {
     private AgentDelegationService agentDelegationService;
 
     /** 工具注册中心 — 优先走注册表，未命中时回退到 DB/fallback 逻辑 */
+    @org.springframework.context.annotation.Lazy
     @Autowired
     private ToolRegistry toolRegistry;
 

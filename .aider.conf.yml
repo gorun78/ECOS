@@ -1,0 +1,8 @@
+## Aider config for ECOS Frontend
+## API key loaded from ~/.bashrc (sourced before interactive guard)
+model: openai/deepseek-chat
+openai-api-base: https://api.deepseek.com/v1
+edit-format: whole
+no-git: true
+yes-always: true
+dark-mode: true

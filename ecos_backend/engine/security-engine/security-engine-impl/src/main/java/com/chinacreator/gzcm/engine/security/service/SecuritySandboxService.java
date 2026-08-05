@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.common.dto.PipelineEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
@@ -15,8 +17,10 @@ public class SecuritySandboxService {
     private static final Logger log = LoggerFactory.getLogger(SecuritySandboxService.class);
 
     private final List<Map<String, Object>> auditLogs = new CopyOnWriteArrayList<>();
+    private final ApplicationEventPublisher eventPublisher;
 
-    public SecuritySandboxService() {
+    public SecuritySandboxService(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
         seedAuditLogs();
     }
 
@@ -51,6 +55,9 @@ public class SecuritySandboxService {
             result.put("engine", engine);
             result.put("original_length", value.length());
             auditLog("DATA_MASK", "SUCCESS", "Masked value with " + maskType + ", engine=" + engine);
+
+            // ── T6: 脱敏联动通知 ──
+            publishMaskingEvent(maskType);
         } catch (Exception e) {
             result.put("masked_value", "ERROR: " + e.getMessage());
             result.put("engine", "Java-fallback-failed");
@@ -168,6 +175,25 @@ public class SecuritySandboxService {
         auditLogs.add(0, entry);
         while (auditLogs.size() > 100) {
             auditLogs.remove(auditLogs.size() - 1);
+        }
+    }
+
+    /**
+     * T6: 脱敏操作后发布 PipelineEvent，通知下游模块。
+     */
+    private void publishMaskingEvent(String maskType) {
+        try {
+            PipelineEvent event = new PipelineEvent();
+            event.setSourceModule("security-engine");
+            event.withMetadata(Map.of(
+                "type", "DATA_MASKING_RULES_CHANGED",
+                "maskType", maskType,
+                "timestamp", Instant.now().toString()
+            ));
+            eventPublisher.publishEvent(event);
+            log.debug("PipelineEvent 发布成功: DATA_MASKING_RULES_CHANGED, maskType={}", maskType);
+        } catch (Exception e) {
+            log.warn("PipelineEvent 发布失败: {}", e.getMessage());
         }
     }
 

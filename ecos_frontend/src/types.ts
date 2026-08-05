@@ -324,6 +324,13 @@ export interface SecurityPolicy {
   condition?: string; // e.g. "region = APAC"
 }
 
+export interface AuditStats {
+  todayCount: number;
+  failureCount: number;
+  activeUsers: number;
+  anomalyIps: number;
+}
+
 // ── Datanet: 物理表注册 & 元数据采集 ──────────────────────────
 
 export interface DataSource {

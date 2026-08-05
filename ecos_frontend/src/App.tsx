@@ -44,7 +44,6 @@ const TAB_LABELS: Record<string, string> = {
   iam: "用户管理",
   dict: "数据字典",
   "system-config": "系统配置",
-  tenants: "租户管理",
   project_workbench: "项目工作台",
   "ai-workbench": "AI工作台",
   agent_studio: "AI工作台",
