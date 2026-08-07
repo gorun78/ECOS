@@ -5,7 +5,7 @@
  * @license Apache-2.0
  */
 import { apiFetchData } from '../../api';
-import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel } from '../../types/aiworkbench';
+import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAgentVersion } from '../../types/aiworkbench';
 
 // ── AgentMesh ──────────────────────────────────────────────────
 
@@ -145,7 +145,93 @@ export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
   }
 }
 
-// ── Models ─────────────────────────────────────────────────────
+// ── ActionTypes (Ontology) ─────────────────────────────────────
+
+interface ActionTypeRaw {
+  id?: string;
+  name: string;
+  objectTypeId: string;
+  objectTypeName?: string;
+  preconditions?: Record<string, unknown>[];
+  postActions?: Array<{ type: string; params: Record<string, string> }>;
+  auditEnabled?: boolean;
+  enabled?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function fetchActionTypes(objectTypeId?: string): Promise<AIPActionType[]> {
+  try {
+    const url = objectTypeId
+      ? `/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
+      : '/api/v1/ontology/actions';
+    const data = await apiFetchData<ActionTypeRaw[]>(url);
+    return (Array.isArray(data) ? data : []).map(convertActionType);
+  } catch (e) {
+    console.warn('[ai-workbench] fetchActionTypes failed', e);
+    return [];
+  }
+}
+
+function convertActionType(raw: ActionTypeRaw): AIPActionType {
+  return {
+    id: raw.id || raw.name,
+    name: raw.name,
+    objectTypeId: raw.objectTypeId,
+    objectTypeName: raw.objectTypeName || raw.objectTypeId,
+    preconditions: Array.isArray(raw.preconditions) ? raw.preconditions : [],
+    postActions: Array.isArray(raw.postActions) ? raw.postActions : [],
+    auditEnabled: raw.auditEnabled !== false,
+    enabled: raw.enabled !== false,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+export async function createActionType(data: {
+  name: string;
+  objectTypeId: string;
+  preconditions?: Record<string, unknown>[];
+  postActions?: Array<{ type: string; params: Record<string, string> }>;
+  auditEnabled?: boolean;
+}): Promise<AIPActionType> {
+  const result = await apiFetchData<ActionTypeRaw>('/api/v1/ontology/actions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return convertActionType(result);
+}
+
+export async function updateActionType(id: string, data: {
+  name?: string;
+  objectTypeId?: string;
+  preconditions?: Record<string, unknown>[];
+  postActions?: Array<{ type: string; params: Record<string, string> }>;
+  auditEnabled?: boolean;
+}): Promise<AIPActionType> {
+  const result = await apiFetchData<ActionTypeRaw>(`/api/v1/ontology/actions/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  return convertActionType(result);
+}
+
+export async function deleteActionType(id: string): Promise<void> {
+  await apiFetchData<void>(`/api/v1/ontology/actions/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function executeActionType(
+  id: string,
+  objectId: string,
+  context?: Record<string, unknown>
+): Promise<ExecuteActionResult> {
+  return apiFetchData<ExecuteActionResult>(`/api/v1/ontology/actions/${encodeURIComponent(id)}/execute`, {
+    method: 'POST',
+    body: JSON.stringify({ objectId, context }),
+  });
+}
 
 export async function fetchAgentModels(): Promise<AIPModel[]> {
   try {
@@ -171,6 +257,156 @@ export async function fetchAgentModels(): Promise<AIPModel[]> {
     }));
   } catch (e) {
     console.warn('[ai-workbench] fetchAgentModels failed', e);
+    return [];
+  }
+}
+
+// ── Agent Market (T9-1) ──────────────────────────────────────
+
+export async function fetchAgentTemplates(): Promise<AIPAgentTemplate[]> {
+  try {
+    const raw = await apiFetchData<any[]>('/api/v1/aip/agents/templates');
+    return (Array.isArray(raw) ? raw : []).map((t: any) => ({
+      id: t.id,
+      name: t.name || t.id,
+      icon: t.icon || 'Bot',
+      description: t.description || '',
+      model: t.model || 'gemini-1.5-pro',
+      temperature: t.temperature || 0.7,
+      maxIterations: t.maxIterations || 10,
+      category: t.category || 'chat',
+      isInstantiated: t.isInstantiated === true,
+    }));
+  } catch (e) {
+    console.warn('[ai-workbench] fetchAgentTemplates failed', e);
+    return [];
+  }
+}
+
+export async function instantiateAgent(
+  templateId: string,
+  name: string
+): Promise<AIPAgent> {
+  const data = await apiFetchData<any>('/api/v1/aip/agents/instantiate', {
+    method: 'POST',
+    body: JSON.stringify({ templateId, name }),
+  });
+  return {
+    id: data.id || `agent-${Date.now()}`,
+    name: data.name || name,
+    avatar: data.icon || 'Bot',
+    role: data.role || 'assistant',
+    description: data.description || '',
+    modelId: data.model || 'gemini-1.5-pro',
+    systemPrompt: data.systemPrompt || '',
+    assignedTools: { actionIds: (data.tools || []) as string[], functionIds: [] as string[] },
+    guardrailIds: (data.guardrails || []) as string[],
+    status: 'active',
+    lastModified: new Date().toISOString(),
+  };
+}
+
+// ── Agent Manager (T9-2) ─────────────────────────────────────
+
+export async function fetchManagedAgents(): Promise<AIPAgent[]> {
+  try {
+    const raw = await apiFetchData<any[]>('/api/v1/aip/agents');
+    return (Array.isArray(raw) ? raw : []).map((a: any) => ({
+      id: a.id,
+      name: a.name || a.id,
+      avatar: a.icon || 'Bot',
+      role: a.role || 'assistant',
+      description: a.description || '',
+      modelId: a.model || 'gemini-1.5-pro',
+      systemPrompt: a.systemPrompt || '',
+      assignedTools: { actionIds: (a.tools || []) as string[], functionIds: [] as string[] },
+      guardrailIds: (a.guardrails || []) as string[],
+      status: (a.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
+      lastModified: a.updatedAt || a.createdAt || new Date().toISOString(),
+    }));
+  } catch (e) {
+    console.warn('[ai-workbench] fetchManagedAgents failed', e);
+    return [];
+  }
+}
+
+export async function updateManagedAgent(
+  id: string,
+  data: { name?: string; systemPrompt?: string; model?: string; temperature?: number; maxIterations?: number }
+): Promise<void> {
+  await apiFetchData(`/api/v1/aip/agents/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function toggleAgentStatus(id: string, status: 'active' | 'development'): Promise<void> {
+  await apiFetchData(`/api/v1/aip/agents/${encodeURIComponent(id)}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status: status === 'active' ? 'ACTIVE' : 'INACTIVE' }),
+  });
+}
+
+export async function fetchAgentVersions(agentId: string): Promise<AIPAgentVersion[]> {
+  try {
+    const raw = await apiFetchData<any[]>(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/versions`);
+    return (Array.isArray(raw) ? raw : []).map((v: any) => ({
+      id: v.id,
+      agentId: v.agentId || agentId,
+      version: v.version || 0,
+      config: typeof v.config === 'string' ? v.config : JSON.stringify(v.config || {}),
+      createdAt: v.createdAt || new Date().toISOString(),
+    }));
+  } catch (e) {
+    console.warn('[ai-workbench] fetchAgentVersions failed', e);
+    return [];
+  }
+}
+
+export async function rollbackAgent(agentId: string, version: number): Promise<void> {
+  await apiFetchData(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/rollback`, {
+    method: 'POST',
+    body: JSON.stringify({ version }),
+  });
+}
+
+// ── Agent Monitor (T9-3) ─────────────────────────────────────
+
+export async function fetchAgentMetrics(agentId: string): Promise<AIPAgentMetrics> {
+  try {
+    const data = await apiFetchData<any>(`/api/v1/agent-metrics/${encodeURIComponent(agentId)}`);
+    return {
+      agentId: data.agentId || agentId,
+      agentName: data.agentName || agentId,
+      totalCalls: data.totalCalls || 0,
+      successRate: data.successRate || 0,
+      avgLatencyMs: data.avgLatencyMs || 0,
+      p99LatencyMs: data.p99LatencyMs || 0,
+      trend24h: Array.isArray(data.trend24h) ? data.trend24h : [],
+      trend7d: Array.isArray(data.trend7d) ? data.trend7d : [],
+      trend30d: Array.isArray(data.trend30d) ? data.trend30d : [],
+      lastUpdated: data.lastUpdated || new Date().toISOString(),
+    };
+  } catch (e) {
+    console.warn('[ai-workbench] fetchAgentMetrics failed', e);
+    throw e;
+  }
+}
+
+export async function fetchAgentErrors(agentId: string): Promise<AIPAgentError[]> {
+  try {
+    const raw = await apiFetchData<any[]>(`/api/v1/agent-metrics/${encodeURIComponent(agentId)}/errors`);
+    return (Array.isArray(raw) ? raw : []).map((e: any) => ({
+      id: e.id || `err-${Date.now()}`,
+      timestamp: e.timestamp || new Date().toISOString(),
+      agentId: e.agentId || agentId,
+      agentName: e.agentName || agentId,
+      errorMessage: e.errorMessage || e.message || 'Unknown error',
+      traceId: e.traceId || '',
+      status: e.status || 'unresolved',
+    }));
+  } catch (e) {
+    console.warn('[ai-workbench] fetchAgentErrors failed', e);
     return [];
   }
 }

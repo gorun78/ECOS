@@ -36,10 +36,12 @@ public class SecurityConfig {
                     "/api/v1/security/**",
                     "/api/v1/marketplace/**",
                     "/api/v1/agent/**",
+                    "/api/v1/agent-loop/**",
                     "/api/v1/agent-mesh/**",
                     "/api/v1/knowledge/**",
                     "/api/v1/glossary/**",
                     "/api/v1/catalog/**",
+                    "/api/v1/oag/**",
                     // ── System management
                     "/api/v1/system/**",
                     "/api/v1/audit/**",

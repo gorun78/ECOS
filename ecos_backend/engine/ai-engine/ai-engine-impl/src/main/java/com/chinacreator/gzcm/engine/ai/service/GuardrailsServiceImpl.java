@@ -21,6 +21,13 @@ public class GuardrailsServiceImpl implements GuardrailsService {
     private static final Pattern PII_ID_CARD = Pattern.compile("\\d{17}[\\dXx]");
     private static final Pattern PII_EMAIL = Pattern.compile("[\\w.-]+@[\\w.-]+\\.\\w+");
 
+    // ─── Prompt 注入检测 ──────────────────────────────────────
+    private static final Pattern SQL_INJECTION = Pattern.compile(
+            "(?i)(\\bdrop\\s+table\\b|\\bdelete\\s+from\\b|\\binsert\\s+into\\b|--)");
+    private static final Pattern JAILBREAK = Pattern.compile(
+            "(?i)(ignore\\s+(all\\s+)?(previous|above)\\s+instructions?" +
+            "|pretend\\s+you\\s+are|you\\s+are\\s+DAN|override\\s+system\\s+prompt|ignore\\s+all\\s+constraints)");
+
     private final JdbcTemplate jdbc;
 
     public GuardrailsServiceImpl(JdbcTemplate jdbc) {
@@ -47,6 +54,16 @@ public class GuardrailsServiceImpl implements GuardrailsService {
         }
         if (PII_EMAIL.matcher(llmOutput).find()) {
             violations.add("PII_DETECTED: 邮箱");
+            passed = false;
+        }
+
+        // ── Prompt 注入检测 ──────────────────────────
+        if (SQL_INJECTION.matcher(llmOutput).find()) {
+            violations.add("PROMPT_INJECTION: SQL注入");
+            passed = false;
+        }
+        if (JAILBREAK.matcher(llmOutput).find()) {
+            violations.add("PROMPT_INJECTION: 越狱指令");
             passed = false;
         }
 

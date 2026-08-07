@@ -93,3 +93,170 @@ export interface AIPAuditLog {
   actionTaken?: string;
   details: string;
 }
+
+export interface AIPPostAction {
+  type: string;
+  params: Record<string, string>;
+}
+
+export interface AIPActionType {
+  id: string;
+  name: string;
+  objectTypeId: string;
+  objectTypeName: string;
+  preconditions: Record<string, unknown>[];
+  postActions: AIPPostAction[];
+  auditEnabled: boolean;
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ExecuteActionResult {
+  success: boolean;
+  auditId?: string;
+  preconditionResults: Array<{ key: string; passed: boolean; message: string }>;
+  changes: Array<{ field: string; before: string; after: string }>;
+  postActionStatuses: Array<{ type: string; status: 'success' | 'failed'; message: string }>;
+}
+
+// ── Evaluation Types ────────────────────────────────────────────
+
+export interface EvaluationQuestion {
+  id: string;
+  question: string;
+  category: string;
+}
+
+export interface EvaluationQuestionSet {
+  id: string;
+  name: string;
+  description: string;
+  questions: EvaluationQuestion[];
+}
+
+export interface EvaluationResult {
+  questionId: string;
+  question: string;
+  category: string;
+  score: number;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  response?: string;
+  latency?: number;
+}
+
+export interface EvaluationSession {
+  id: string;
+  agentId: string;
+  questionSetId: string;
+  status: 'idle' | 'running' | 'completed';
+  progress: number;
+  results: EvaluationResult[];
+  radarScores: Record<string, number>;
+}
+
+// ── Agent Platform Types (PMO-17) ────────────────────────────
+
+export interface AIPAgentTemplate {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  model: string;
+  temperature: number;
+  maxIterations: number;
+  category: 'chat' | 'workflow' | 'retrieval' | 'codegen' | 'vision' | 'data';
+  isInstantiated: boolean;
+}
+
+export interface AIPAgentMetrics {
+  agentId: string;
+  agentName: string;
+  totalCalls: number;
+  successRate: number;
+  avgLatencyMs: number;
+  p99LatencyMs: number;
+  // 24h/7d/30d trend data points
+  trend24h: number[];
+  trend7d: number[];
+  trend30d: number[];
+  lastUpdated: string;
+}
+
+export interface AIPAgentError {
+  id: string;
+  timestamp: string;
+  agentId: string;
+  agentName: string;
+  errorMessage: string;
+  traceId: string;
+  status: 'unresolved' | 'investigating' | 'resolved';
+}
+
+export interface AIPAgentVersion {
+  id: string;
+  agentId: string;
+  version: number;
+  config: string; // JSON string of the full agent config
+  createdAt: string;
+}
+
+// ── Logic Canvas Types (PMO-18) ────────────────────────────
+
+export type LogicNodeType = 'llm' | 'tool' | 'ontology' | 'approval' | 'condition' | 'trigger';
+
+export type LogicNodeStatus = 'idle' | 'running' | 'success' | 'error';
+
+export interface LogicLLMConfig {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+}
+
+export interface LogicToolConfig {
+  toolName: string;
+  parameters: string; // JSON string
+}
+
+export interface LogicOntologyConfig {
+  objectType: string;
+  queryType: 'get' | 'list' | 'search' | 'query';
+  filter: string;
+}
+
+export interface LogicApprovalConfig {
+  approver: string;
+  timeout: number; // seconds
+}
+
+export interface LogicConditionConfig {
+  conditionExpr: string; // JSONPath
+  thenBranch: string;
+  elseBranch: string;
+}
+
+export interface LogicTriggerConfig {
+  cronExpr: string;
+  timezone: string;
+}
+
+export type LogicNodeConfig =
+  | LogicLLMConfig
+  | LogicToolConfig
+  | LogicOntologyConfig
+  | LogicApprovalConfig
+  | LogicConditionConfig
+  | LogicTriggerConfig;
+
+export interface LogicNodeData {
+  type: LogicNodeType;
+  label: string;
+  status: LogicNodeStatus;
+  duration?: number;
+  config: LogicNodeConfig;
+}
+
+export interface LogicEdgeData {
+  condition?: string;
+}

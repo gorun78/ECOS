@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.engine.ai.service;
 import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,6 +51,9 @@ public class AgentLoopConfig {
 
     /** 系统提示词 */
     private String systemPrompt;
+
+    /** 工具白名单 — 非空时只有列表中工具可被调用 */
+    private List<String> toolWhitelist;
 
     // ─── 构造器 ────────────────────────────────────────────────────────
 
@@ -121,6 +126,15 @@ public class AgentLoopConfig {
         if (templateMeta.containsKey("systemPrompt") && templateMeta.get("systemPrompt") != null) {
             String v = stringOrNull(templateMeta.get("systemPrompt"));
             if (v != null) this.systemPrompt = v;
+        }
+        if (templateMeta.containsKey("toolWhitelist") && templateMeta.get("toolWhitelist") != null) {
+            Object tw = templateMeta.get("toolWhitelist");
+            if (tw instanceof List<?> lst) {
+                this.toolWhitelist = new ArrayList<>();
+                for (Object item : lst) {
+                    if (item instanceof String s) this.toolWhitelist.add(s);
+                }
+            }
         }
         return this;
     }
@@ -199,6 +213,9 @@ public class AgentLoopConfig {
 
     public String getSystemPrompt() { return systemPrompt; }
     public void setSystemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; }
+
+    public List<String> getToolWhitelist() { return toolWhitelist; }
+    public void setToolWhitelist(List<String> toolWhitelist) { this.toolWhitelist = toolWhitelist; }
 
     public String getModel() { return model; }
     public void setModel(String model) { this.model = model; }

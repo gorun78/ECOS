@@ -36,6 +36,9 @@ public class AgentSessionService {
     /** 30分钟空闲阈值 (毫秒) */
     private static final long IDLE_THRESHOLD_MS = 30 * 60 * 1000L;
 
+    /** 上下文压缩阈值 — 消息条数超过此值时触发压缩 */
+    private static final int COMPRESS_THRESHOLD = 20;
+
     private final JdbcTemplate jdbc;
 
     public AgentSessionService(JdbcTemplate jdbc) {
@@ -235,6 +238,87 @@ public class AgentSessionService {
             + "FROM sys_agent_session WHERE agent_id = ? ORDER BY last_active_at DESC",
             new SessionRowMapper(), agentId
         );
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  上下文压缩
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * 压缩会话历史 — 当消息数超过阈值时，将旧消息压缩为摘要。
+     * <p>
+     * 当前实现为简化版：取前 20 条旧消息拼接为摘要文本，
+     * 删除旧消息，插入一条 system 摘要消息。
+     * 后续可替换为 LLM 摘要调用。
+     * </p>
+     *
+     * @param sessionId 会话 ID
+     * @param threshold 压缩阈值（消息数），默认 20
+     */
+    public void compressHistory(String sessionId, int threshold) {
+        if (sessionId == null || threshold <= 0) {
+            return;
+        }
+        try {
+            // 统计该会话的总消息数
+            Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?",
+                Integer.class, sessionId);
+            if (count == null || count < threshold) {
+                return; // 未达阈值，无需压缩
+            }
+
+            // 取最早 20 条消息，拼接为摘要
+            List<AgentMessage> oldMessages = jdbc.query(
+                "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, thread_id, created_at "
+                + "FROM sys_agent_message WHERE session_id = ? ORDER BY id ASC LIMIT ?",
+                new MessageRowMapper(), sessionId, threshold);
+
+            if (oldMessages.isEmpty()) return;
+
+            StringBuilder summary = new StringBuilder("[会话历史摘要]\n");
+            for (AgentMessage msg : oldMessages) {
+                if (msg.getContent() != null && !msg.getContent().isBlank()) {
+                    String role = "user".equals(msg.getRole()) ? "用户" : "助手";
+                    String snippet = msg.getContent().length() > 200
+                            ? msg.getContent().substring(0, 197) + "..."
+                            : msg.getContent();
+                    summary.append(role).append(": ").append(snippet).append("\n");
+                }
+            }
+
+            // 删除旧消息
+            Long maxId = oldMessages.stream()
+                    .mapToLong(AgentMessage::getId)
+                    .max().orElse(0);
+            jdbc.update("DELETE FROM sys_agent_message WHERE session_id = ? AND id <= ?",
+                    sessionId, maxId);
+
+            // 插入摘要 system 消息
+            long now = System.currentTimeMillis();
+            jdbc.update(
+                "INSERT INTO sys_agent_message (session_id, role, content, thread_id, created_at) "
+                + "VALUES (?::varchar, 'system', ?::text, 'main', ?)",
+                sessionId, summary.toString(), now);
+
+            // 重新校准 message_count
+            jdbc.update(
+                "UPDATE sys_agent_session SET message_count = (SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?) WHERE id = ?",
+                sessionId, sessionId);
+
+            log.info("[AgentSession] Compressed history for session={}, removed {} old messages",
+                    sessionId, oldMessages.size());
+        } catch (Exception e) {
+            log.warn("[AgentSession] Failed to compress history for session={}: {}",
+                    sessionId, e.getMessage());
+        }
+    }
+
+    /**
+     * 使用默认阈值（20）压缩会话历史。
+     */
+    public void compressHistory(String sessionId) {
+        compressHistory(sessionId, COMPRESS_THRESHOLD);
     }
 
     // ═══════════════════════════════════════════════════

@@ -1,0 +1,219 @@
+================================================================================
+ECOS AI WORKBENCH FRONTEND SURVEY REPORT
+Generated: 2026-08-05
+Scope: /home/guorongxiao/ECOS/ecos_frontend/src/
+  - pages/aiworkbench/  (all .tsx/.ts)
+  - pages/AgentStudio/  (all .tsx/.ts)
+  - pages/AgentTestConsole.tsx
+  Note: AIPStudio.tsx, AgentCreatorWizard.tsx, AIPCopilotDrawer.tsx,
+        KnowledgeBaseManager.tsx, AgentBuilder.tsx, AgentMesh.tsx DO NOT EXIST
+================================================================================
+
+================================================================================
+1. LARGE FILES (>800 lines — candidates for splitting)
+================================================================================
+
+  Lines   File
+  ------  --------------------------------------------------------------------
+  2074    pages/aiworkbench/KnowledgeView.tsx        *** CRITICAL ***
+  1613    pages/aiworkbench/ChatbotStudioView.tsx    *** CRITICAL ***
+  1465    pages/aiworkbench/GuardrailsView.tsx       *** CRITICAL ***
+  1302    pages/aiworkbench/AgentStudioView.tsx      *** CRITICAL ***
+
+  Total files >800 lines: 4
+  Total files checked: 14
+
+  All 4 files are in pages/aiworkbench/. None are >2000 except KnowledgeView.
+  These files should be split into smaller sub-components.
+  Recommended: extract reusable sections into components/aiworkbench/ subdir.
+
+  Files under 800 lines (no action needed):
+    638   pages/aiworkbench/LogicView.tsx
+    398   pages/AgentTestConsole.tsx
+    313   pages/aiworkbench/mockData.ts
+    291   pages/aiworkbench/DashboardView.tsx
+    289   pages/aiworkbench/CognitiveOperatingSystem.tsx
+    264   pages/aiworkbench/ModelCatalogView.tsx
+    224   pages/aiworkbench/index.tsx
+    177   pages/aiworkbench/api.ts
+     83   pages/AgentStudio/CreateAgentModal.tsx
+     72   pages/AgentStudio/MetricsPanel.tsx
+     27   pages/AgentStudio/helpers.ts
+
+================================================================================
+2. i18n INTERNATIONALIZATION AUDIT
+================================================================================
+
+2.1 Summary Table
+
+  File                                          Lines  useLanguage  t() calls  CN chars  CN lines
+  ------------------------------------------------------------------------------------------------
+  pages/aiworkbench/ChatbotStudioView.tsx        1613     ❌          0         3131       161
+  pages/aiworkbench/KnowledgeView.tsx            2074     ❌          0         3271       199
+  pages/aiworkbench/AgentStudioView.tsx          1302     ❌          0         2012       138
+  pages/aiworkbench/GuardrailsView.tsx           1465     ❌          0         1466       135
+  pages/aiworkbench/mockData.ts                   313     ❌          0         1105        51
+  pages/aiworkbench/ModelCatalogView.tsx          264     ❌          0          742        20
+  pages/aiworkbench/LogicView.tsx                 638     ❌          0          717        75
+  pages/aiworkbench/DashboardView.tsx             291     ❌          0          230        28
+  pages/aiworkbench/CognitiveOperatingSystem.tsx  289     ✅          0          147        17
+  pages/aiworkbench/index.tsx                     224     ❌          0          135        16
+  pages/AgentTestConsole.tsx                      398     ✅          0          109        25
+  pages/AgentStudio/CreateAgentModal.tsx           83     ✅          6           31         5
+  pages/AgentStudio/MetricsPanel.tsx               72     ✅          8            1         1
+  pages/AgentStudio/helpers.ts                     27     ❌          0            0         0
+  pages/aiworkbench/api.ts                        177     ❌          0            0         0
+
+2.2 Critical Findings
+
+  ❌ 10 of 15 files (67%) do NOT use useLanguage() or t() i18n functions
+  ❌ 11 of 15 files (73%) contain hardcoded Chinese characters
+  ❌ TOTAL hardcoded Chinese characters across all files: ~12,096
+
+  Files with >50 Chinese chars (NEED IMMEDIATE ATTENTION):
+    - ChatbotStudioView.tsx:     3,131 Chinese chars in 161 lines
+    - KnowledgeView.tsx:         3,271 Chinese chars in 199 lines
+    - AgentStudioView.tsx:       2,012 Chinese chars in 138 lines
+    - GuardrailsView.tsx:        1,466 Chinese chars in 135 lines
+    - mockData.ts:               1,105 Chinese chars in  51 lines
+    - ModelCatalogView.tsx:        742 Chinese chars in  20 lines
+    - LogicView.tsx:               717 Chinese chars in  75 lines
+    - DashboardView.tsx:           230 Chinese chars in  28 lines
+    - CognitiveOperatingSystem.tsx:147 Chinese chars in  17 lines
+    - index.tsx:                   135 Chinese chars in  16 lines
+    - AgentTestConsole.tsx:        109 Chinese chars in  25 lines
+
+2.3 Files with useLanguage but NO t() calls (imported but unused)
+    - CognitiveOperatingSystem.tsx: useLanguage imported, but 0 t() calls
+    - AgentTestConsole.tsx:         useLanguage imported, but 0 t() calls
+    → These import the hook but never call t() — dead code.
+
+2.4 Only files with proper i18n setup (useLanguage + t() calls):
+    - CreateAgentModal.tsx:  6 t() calls, 31 CN chars remaining
+    - MetricsPanel.tsx:      8 t() calls,  1 CN char remaining
+
+2.5 No i18n namespace configuration found in any AI workbench file.
+    No files define or reference an i18n namespace (e.g. "aiworkbench.*").
+    A dedicated namespace should be created for the AI workbench domain.
+
+================================================================================
+3. MISSING FEATURES & OPERATIONS AUDIT
+================================================================================
+
+3.1 Summary Matrix (❌ = missing, ✅ = present)
+
+                             CRUD           State Management         Interaction              Dialogs     Export
+  File                       Add  Edit Del  Load Empty Err  Page    Search Sort Batch Refr  Confirm Mod  Export
+  ---------------------------------------------------------------------------------------------------------------
+  KnowledgeView.tsx          ✅   ✅   ✅    ✅   ✅   ✅    ❌      ✅    ❌   ✅    ✅     ✅     ✅    ✅
+  ChatbotStudioView.tsx      ✅   ✅   ✅    ✅   ❌   ✅    ✅      ✅    ❌   ✅    ✅     ✅     ✅    ✅
+  GuardrailsView.tsx         ✅   ✅   ❌    ✅   ✅   ✅    ❌      ✅    ❌   ✅    ✅     ❌     ❌    ✅
+  AgentStudioView.tsx        ✅   ✅   ✅    ❌   ✅   ✅    ✅      ✅    ❌   ✅    ✅     ✅     ✅    ✅
+  LogicView.tsx              ✅   ✅   ✅    ❌   ✅   ✅    ❌      ✅    ❌   ✅    ❌     ✅     ✅    ✅
+  DashboardView.tsx          ❌   ❌   ❌    ❌   ❌   ✅    ✅      ✅    ❌   ❌    ❌     ❌     ❌    ✅
+  ModelCatalogView.tsx       ✅   ✅   ❌    ❌   ❌   ✅    ❌      ❌    ❌   ❌    ❌     ❌     ❌    ✅
+  CogOperatingSystem.tsx     ❌   ❌   ❌    ✅   ✅   ❌    ❌      ✅    ❌   ❌    ✅     ❌     ❌    ✅
+  AgentTestConsole.tsx       ✅   ✅   ❌    ✅   ❌   ✅    ❌      ❌    ❌   ❌    ✅     ❌     ❌    ✅
+
+3.2 Detailed Findings by Category
+
+--- CRUD Completeness ---
+  ❌ 5/9 files missing at least one CRUD operation:
+      - DashboardView.tsx:          MISSING Create, Edit, Delete (read-only dashboard)
+      - CognitiveOperatingSystem.tsx: MISSING Create, Edit, Delete (read-only display)
+      - GuardrailsView.tsx:         MISSING Delete
+      - ModelCatalogView.tsx:       MISSING Delete
+      - AgentTestConsole.tsx:       MISSING Delete
+
+--- State Coverage ---
+  ❌ Loading state missing in: AgentStudioView, LogicView, DashboardView, ModelCatalogView
+     → No Skeleton or loading indicator while data fetches
+  ❌ Empty state missing in: ChatbotStudioView, DashboardView, ModelCatalogView, AgentTestConsole
+     → No "no data" / empty placeholder when list is empty
+  ❌ Error state missing in: CognitiveOperatingSystem
+     → No error boundary or error display
+  ❌ Pagination missing in: KnowledgeView, GuardrailsView, LogicView, ModelCatalogView,
+                            CognitiveOperatingSystem, AgentTestConsole
+     → Large datasets may render without page controls (6/9 files)
+
+--- Interaction Details ---
+  ❌ Sort missing in ALL 9 files (0%)
+     → No column sorting capability in any view
+  ❌ Batch/select missing in: DashboardView, CognitiveOperatingSystem, AgentTestConsole
+     → No multi-select or batch operations
+  ❌ Search/Filter missing in: ModelCatalogView, AgentTestConsole
+  ❌ Refresh missing in: LogicView, DashboardView, ModelCatalogView
+     → No manual refresh button for stale data
+
+--- Confirm Dialogs ---
+  ❌ No ConfirmDialog in: GuardrailsView, DashboardView, ModelCatalogView,
+                          CognitiveOperatingSystem, AgentTestConsole
+     → Dangerous operations (delete, reset, clear) lack confirmation
+  ❌ No Modal/Drawer in: GuardrailsView, DashboardView, ModelCatalogView,
+                         CognitiveOperatingSystem, AgentTestConsole
+     → No detail views or edit modals
+
+--- Export ---
+  ✅ All files have some export reference (keyword match)
+     → Actual export functionality needs manual verification (some may be
+       import/export statements, not CSV/Excel download features)
+
+3.3 File-by-File Deficiency Count
+
+  File                          Missing Checks
+  ------------------------------------------------------------------
+  DashboardView.tsx                  11  *** WORST ***
+  ModelCatalogView.tsx                9  *** CRITICAL ***
+  CognitiveOperatingSystem.tsx        8  *** CRITICAL ***
+  AgentTestConsole.tsx                8  *** CRITICAL ***
+  GuardrailsView.tsx                  6
+  LogicView.tsx                       4
+  AgentStudioView.tsx                 2
+  ChatbotStudioView.tsx               2
+  KnowledgeView.tsx                   2
+
+================================================================================
+4. RECOMMENDATIONS (Priority-Ordered)
+================================================================================
+
+P0 — IMMEDIATE (Blocking internationalization / release readiness):
+  1. Extract i18n strings from all 11 files with hardcoded Chinese
+     → Create namespace translations (e.g., aiworkbench.*)
+     → ~12,000 Chinese characters to migrate
+  2. Add useLanguage() + t() to the 10 files missing it:
+     ChatbotStudioView, KnowledgeView, AgentStudioView, GuardrailsView,
+     LogicView, DashboardView, ModelCatalogView, mockData, index, api
+
+P1 — HIGH (Large file splitting):
+  3. Split KnowledgeView.tsx (2074 lines) into sub-components
+  4. Split ChatbotStudioView.tsx (1613 lines) into sub-components
+  5. Split GuardrailsView.tsx (1465 lines) into sub-components
+  6. Split AgentStudioView.tsx (1302 lines) into sub-components
+
+P2 — MEDIUM (Feature gaps):
+  7. Add loading skeletons to: AgentStudioView, LogicView, DashboardView, ModelCatalogView
+  8. Add empty states to: ChatbotStudioView, DashboardView, ModelCatalogView, AgentTestConsole
+  9. Add pagination to: KnowledgeView, GuardrailsView, LogicView, ModelCatalogView,
+     CognitiveOperatingSystem, AgentTestConsole
+  10. Add sort functionality (all 9 files — none have it)
+  11. Add ConfirmDialog for destructive operations in 5 files missing it
+
+P3 — LOW (Polish):
+  12. Add batch selection to DashboardView, CognitiveOperatingSystem, AgentTestConsole
+  13. Add refresh buttons to LogicView, DashboardView, ModelCatalogView
+  14. Add search/filter to ModelCatalogView, AgentTestConsole
+
+================================================================================
+5. METHODOLOGY NOTES
+================================================================================
+
+  - Line counts: wc -l
+  - Chinese detection: regex [\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]
+  - Feature detection: regex pattern matching for common React patterns
+    (loading, Skeleton, Empty, Modal, Dialog, Confirm, pagination, etc.)
+  - This is a static analysis — some patterns may exist under different names
+    or may be imported from shared components not scanned here.
+  - Actual export functionality (CSV/Excel download) requires manual code review
+    to distinguish import statements from actual data export features.
+
+================================================================================

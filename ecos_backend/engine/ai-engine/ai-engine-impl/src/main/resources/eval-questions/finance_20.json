@@ -1,0 +1,22 @@
+[
+  {"id":"f1","question":"查询供应商表中所有未结清的应付账款记录","expectedTool":"query_database","category":"finance_ap","expectedKeywords":["应付账款","未结清","供应商","SELECT"],"minScore":1,"description":"验证Agent能否查询应付账款数据"},
+  {"id":"f2","question":"生成2025年Q3的现金流量表","expectedTool":"query_database","category":"finance_report","expectedKeywords":["现金流量表","Q3","2025","经营","投资"],"minScore":1,"description":"验证Agent能否生成现金流量表"},
+  {"id":"f3","question":"帮我计算项目PROJ-2025-089的ROI，投资额500万，预计3年累计收益820万","expectedTool":"calculate","category":"finance_analysis","expectedKeywords":["ROI","投资回报率","64","820","500"],"minScore":1,"description":"验证Agent能否进行ROI计算"},
+  {"id":"f4","question":"查询近30天内所有超过10万元的大额支出，按部门汇总","expectedTool":"query_database","category":"finance_audit","expectedKeywords":["大额支出","部门","汇总","GROUP BY","100000"],"minScore":1,"description":"验证Agent能否执行财务审计查询"},
+  {"id":"f5","question":"对比2024年和2025年各季度的营收增长率","expectedTool":"query_database","category":"finance_analysis","expectedKeywords":["营收","增长率","季度","同比","对比"],"minScore":1,"description":"验证Agent能否执行同比分析查询"},
+  {"id":"f6","question":"导出本月所有已审批的报销单列表，按金额降序排列","expectedTool":"query_database","category":"finance_expense","expectedKeywords":["报销单","已审批","ORDER BY","降序","金额"],"minScore":1,"description":"验证Agent能否查询报销单数据"},
+  {"id":"f7","question":"计算当前所有固定资产的折旧率，假设直线折旧法，年限为5年","expectedTool":"calculate","category":"finance_asset","expectedKeywords":["折旧","固定资产","直线","年限","残值"],"minScore":1,"description":"验证Agent能否计算固定资产折旧"},
+  {"id":"f8","question":"查询银行账户BANK-001近90天的交易流水","expectedTool":"query_database","category":"finance_bank","expectedKeywords":["交易流水","银行","BANK-001","90天","SELECT"],"minScore":1,"description":"验证Agent能否查询银行交易记录"},
+  {"id":"f9","question":"创建本月财务报表的汇总视图，包含资产负债表和利润表关键指标","expectedTool":"generate_report","category":"finance_report","expectedKeywords":["资产负债表","利润表","汇总","报表","指标"],"minScore":1,"description":"验证Agent能否生成财务报表"},
+  {"id":"f10","question":"分析应收账款的账龄分布：30天以内、30-60天、60-90天、90天以上","expectedTool":"query_database","category":"finance_ar","expectedKeywords":["应收账款","账龄","CASE WHEN","30天","90天"],"minScore":1,"description":"验证Agent能否进行账龄分析"},
+  {"id":"f11","question":"查询目前所有超预算的项目，列出预实差异率超过20%的","expectedTool":"query_database","category":"finance_budget","expectedKeywords":["预算","超预算","差异率","20%","项目"],"minScore":1,"description":"验证Agent能否查询预算偏差数据"},
+  {"id":"f12","question":"根据当前税率计算应缴增值税：销售额500万，进项税额45万","expectedTool":"calculate","category":"finance_tax","expectedKeywords":["增值税","销项","进项","税率","500"],"minScore":1,"description":"验证Agent能否计算增值税"},
+  {"id":"f13","question":"查询所有已到期但未付款的合同清单","expectedTool":"query_database","category":"finance_contract","expectedKeywords":["合同","已到期","未付款","应付","到期日"],"minScore":1,"description":"验证Agent能否查询到期未付合同"},
+  {"id":"f14","question":"生成各成本中心的费用明细对比表，包含预算执行率","expectedTool":"generate_report","category":"finance_cost","expectedKeywords":["成本中心","费用明细","预算执行率","对比","汇总"],"minScore":1,"description":"验证Agent能否生成成本分析报表"},
+  {"id":"f15","question":"计算当前月度的毛利率和净利率，并与上月环比对比","expectedTool":"query_database","category":"finance_analysis","expectedKeywords":["毛利率","净利率","环比","月度","利润"],"minScore":1,"description":"验证Agent能否计算利润率指标"},
+  {"id":"f16","question":"查询关联方交易记录，筛选出交易金额大于50万的","expectedTool":"query_database","category":"finance_compliance","expectedKeywords":["关联方","交易","50万","筛选","合规"],"minScore":1,"description":"验证Agent能否查询关联方交易"},
+  {"id":"f17","question":"审核最近一个月的差旅费用，标记出超标项（日标准≥500元）","expectedTool":"query_database","category":"finance_audit","expectedKeywords":["差旅费","超标","500","审核","标记"],"minScore":1,"description":"验证Agent能否执行费用审核"},
+  {"id":"f18","question":"预测下季度现金流：基于过去6个月的平均收入和支出趋势","expectedTool":"query_database","category":"finance_forecast","expectedKeywords":["现金流","预测","趋势","季度","平均"],"minScore":1,"description":"验证Agent能否进行现金流预测"},
+  {"id":"f19","question":"用中文解释杜邦分析法的三个核心指标及其关系","expectedTool":null,"category":"finance_knowledge","expectedKeywords":["杜邦","ROE","净利率","资产周转率","权益乘数"],"minScore":1,"description":"验证Agent对财务分析理论的理解"},
+  {"id":"f20","question":"查询税务申报状态：列出所有未按时申报的税种及逾期天数","expectedTool":"query_database","category":"finance_tax","expectedKeywords":["税务申报","逾期","未申报","税种","天数"],"minScore":1,"description":"验证Agent能否查询税务合规状态"}
+]

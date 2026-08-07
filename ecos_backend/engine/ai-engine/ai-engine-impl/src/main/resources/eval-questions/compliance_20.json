@@ -1,0 +1,22 @@
+[
+  {"id":"c1","question":"查询所有未完成合规审查的供应商列表","expectedTool":"query_database","category":"compliance_supplier","expectedKeywords":["合规审查","供应商","未完成","SELECT","审查状态"],"minScore":1,"description":"验证Agent能否查询供应商合规状态"},
+  {"id":"c2","question":"生成ISO 27001信息安全管理体系的合规差距分析报告","expectedTool":"generate_report","category":"compliance_iso","expectedKeywords":["ISO 27001","信息安全","差距分析","合规","报告"],"minScore":1,"description":"验证Agent能否生成合规差距分析"},
+  {"id":"c3","question":"检查所有员工的背景调查是否在入职前完成，列出遗漏记录","expectedTool":"query_database","category":"compliance_hr","expectedKeywords":["背景调查","入职","遗漏","员工","LEFT JOIN"],"minScore":1,"description":"验证Agent能否检查员工合规记录"},
+  {"id":"c4","question":"审核最近一个季度的数据访问日志中是否存在越权访问","expectedTool":"query_database","category":"compliance_data","expectedKeywords":["访问日志","越权","审核","数据","权限"],"minScore":1,"description":"验证Agent能否审计数据访问合规性"},
+  {"id":"c5","question":"查询所有许可证和资质的到期日期，标记30天内即将过期的","expectedTool":"query_database","category":"compliance_license","expectedKeywords":["许可证","资质","到期","30天","过期"],"minScore":1,"description":"验证Agent能否追踪资质过期时间"},
+  {"id":"c6","question":"生成GDPR数据主体请求(DSAR)的月度处理统计报告","expectedTool":"generate_report","category":"compliance_gdpr","expectedKeywords":["GDPR","数据主体","DSAR","统计","月度"],"minScore":1,"description":"验证Agent能否生成GDPR合规报告"},
+  {"id":"c7","question":"检查系统中是否存储了未脱敏的个人敏感信息（身份证号、手机号等）","expectedTool":"query_database","category":"compliance_pii","expectedKeywords":["脱敏","敏感信息","身份证","手机号","PII"],"minScore":1,"description":"验证Agent能否检测未脱敏数据"},
+  {"id":"c8","question":"评估当前系统的等保三级差距，列出需要整改的控制项","expectedTool":"search_documents","category":"compliance_mlps","expectedKeywords":["等保","三级","差距","整改","控制项"],"minScore":1,"description":"验证Agent能否评估等保合规差距"},
+  {"id":"c9","question":"查询所有涉及跨境数据传输的业务场景，标注合规状态","expectedTool":"query_database","category":"compliance_crossborder","expectedKeywords":["跨境","数据传输","合规","标注","业务"],"minScore":1,"description":"验证Agent能否识别跨境数据场景"},
+  {"id":"c10","question":"审计用户权限：列出所有拥有管理员权限但超过90天未活跃的账号","expectedTool":"query_database","category":"compliance_access","expectedKeywords":["权限","管理员","未活跃","90天","审计"],"minScore":1,"description":"验证Agent能否审计休眠管理员账号"},
+  {"id":"c11","question":"生成反腐合规自查清单：礼品招待、利益冲突、政治献金","expectedTool":"generate_report","category":"compliance_anti","expectedKeywords":["反腐","自查","礼品","利益冲突","政治献金"],"minScore":1,"description":"验证Agent能否生成反腐自查清单"},
+  {"id":"c12","question":"检索网络安全法关于关键信息基础设施的保护要求","expectedTool":"search_documents","category":"compliance_cnlaw","expectedKeywords":["网络安全法","关键信息基础设施","CII","保护","等级"],"minScore":1,"description":"验证Agent能否检索网络安全法规"},
+  {"id":"c13","question":"查询所有第三方服务商的SOC2审计报告状态","expectedTool":"query_database","category":"compliance_vendor","expectedKeywords":["第三方","服务商","SOC2","审计","报告"],"minScore":1,"description":"验证Agent能否追踪第三方合规审计"},
+  {"id":"c14","question":"检查合同条款中是否包含数据保护附录(DPA)","expectedTool":"search_documents","category":"compliance_contract","expectedKeywords":["数据保护","DPA","合同","附录","处理者"],"minScore":1,"description":"验证Agent能否审查数据保护条款"},
+  {"id":"c15","question":"统计本月安全事件数量、类型分布和平均响应时间","expectedTool":"query_database","category":"compliance_security","expectedKeywords":["安全事件","统计","类型","响应时间","本月"],"minScore":1,"description":"验证Agent能否统计安全事件数据"},
+  {"id":"c16","question":"查询内部审计发现的高风险项，按部门分布和整改状态展示","expectedTool":"query_database","category":"compliance_audit","expectedKeywords":["内部审计","高风险","部门","整改","状态"],"minScore":1,"description":"验证Agent能否查询内审发现项"},
+  {"id":"c17","question":"评估隐私政策声明是否符合《个人信息保护法》透明度要求","expectedTool":"search_documents","category":"compliance_privacy","expectedKeywords":["隐私政策","个人信息保护法","透明度","声明","告知"],"minScore":1,"description":"验证Agent能否评估隐私政策合规性"},
+  {"id":"c18","question":"用中文解释合规管理的三道防线模型","expectedTool":null,"category":"compliance_knowledge","expectedKeywords":["三道防线","合规","业务","风险","审计"],"minScore":1,"description":"验证Agent对合规理论的理解"},
+  {"id":"c19","question":"查询所有涉及数据泄露通知义务的事件，确认是否按时上报监管","expectedTool":"query_database","category":"compliance_breach","expectedKeywords":["数据泄露","通知","上报","监管","时效"],"minScore":1,"description":"验证Agent能否追踪数据泄露通知"},
+  {"id":"c20","question":"生成反腐败与反贿赂(FCPA/中国反商业贿赂法)合规差距矩阵","expectedTool":"generate_report","category":"compliance_fcpa","expectedKeywords":["反腐败","反贿赂","FCPA","差距","矩阵"],"minScore":1,"description":"验证Agent能否生成反腐败合规矩阵"}
+]

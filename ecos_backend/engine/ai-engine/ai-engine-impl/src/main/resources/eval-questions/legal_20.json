@@ -1,0 +1,22 @@
+[
+  {"id":"l1","question":"查询所有处于诉讼中的案件，按立案日期降序排列","expectedTool":"query_database","category":"legal_case","expectedKeywords":["诉讼","案件","立案","降序","SELECT"],"minScore":1,"description":"验证Agent能否查询诉讼案件列表"},
+  {"id":"l2","question":"审查合同CONTRACT-2025-047的违约金条款是否合规","expectedTool":"search_documents","category":"legal_review","expectedKeywords":["违约金","合同","条款","合规","审查"],"minScore":1,"description":"验证Agent能否审查合同条款"},
+  {"id":"l3","question":"帮我计算知识产权侵权案件的法定赔偿范围：权利人损失50万，侵权人获利80万","expectedTool":"calculate","category":"legal_damages","expectedKeywords":["知识产权","侵权","赔偿","50万","80万"],"minScore":1,"description":"验证Agent能否计算损害赔偿"},
+  {"id":"l4","question":"查询近一年所有劳动争议案件的裁决结果分布","expectedTool":"query_database","category":"legal_labor","expectedKeywords":["劳动争议","裁决","案件","GROUP BY","分布"],"minScore":1,"description":"验证Agent能否查询劳动争议案件统计"},
+  {"id":"l5","question":"检索与'数据隐私保护'相关的法律法规全文","expectedTool":"search_documents","category":"legal_search","expectedKeywords":["数据隐私","保护","法律","法规","个人信息"],"minScore":1,"description":"验证Agent能否检索法律法规"},
+  {"id":"l6","question":"检查供应商合同中是否包含了知识产权归属条款","expectedTool":"search_documents","category":"legal_review","expectedKeywords":["知识产权","归属","供应商","合同","条款"],"minScore":1,"description":"验证Agent能否审查合同知识产权条款"},
+  {"id":"l7","question":"列出所有即将到期的法律诉讼时效（30天内）的案件","expectedTool":"query_database","category":"legal_deadline","expectedKeywords":["诉讼时效","到期","30天","案件","WHERE"],"minScore":1,"description":"验证Agent能否追踪诉讼时效"},
+  {"id":"l8","question":"分析《个人信息保护法》第13条的法律要件","expectedTool":"search_documents","category":"legal_analysis","expectedKeywords":["个人信息保护法","第13条","同意","要件","处理"],"minScore":1,"description":"验证Agent能否分析法律条款"},
+  {"id":"l9","question":"查询所有签署日期在2025年的合同总数及总金额","expectedTool":"query_database","category":"legal_contract","expectedKeywords":["合同","签署","2025","COUNT","SUM"],"minScore":1,"description":"验证Agent能否统计合同数据"},
+  {"id":"l10","question":"检索与竞业限制相关的司法解释和典型案例","expectedTool":"search_documents","category":"legal_search","expectedKeywords":["竞业限制","司法解释","案例","判例","违约金"],"minScore":1,"description":"验证Agent能否检索案例和司法解释"},
+  {"id":"l11","question":"比较公司法中有限责任公司和股份有限公司的区别","expectedTool":null,"category":"legal_knowledge","expectedKeywords":["有限责任公司","股份有限公司","区别","股东","出资"],"minScore":1,"description":"验证Agent对公司法知识的掌握"},
+  {"id":"l12","question":"查询所有涉诉金额超过100万的合同纠纷案件","expectedTool":"query_database","category":"legal_case","expectedKeywords":["合同纠纷","涉诉金额","100万","SELECT","案件"],"minScore":1,"description":"验证Agent能否查询大额纠纷案件"},
+  {"id":"l13","question":"审核公司规章制度是否包含反歧视和反骚扰条款","expectedTool":"search_documents","category":"legal_compliance","expectedKeywords":["反歧视","反骚扰","规章制度","审核","条款"],"minScore":1,"description":"验证Agent能否审查制度合规性"},
+  {"id":"l14","question":"计算劳动争议案件的N+1经济补偿金：月薪2.5万，工龄8年","expectedTool":"calculate","category":"legal_labor","expectedKeywords":["经济补偿","N+1","月薪","工龄","2.5万"],"minScore":1,"description":"验证Agent能否计算劳动补偿金"},
+  {"id":"l15","question":"检索数据出境安全评估的最新监管要求","expectedTool":"search_documents","category":"legal_regulatory","expectedKeywords":["数据出境","安全评估","监管","网信办","合规"],"minScore":1,"description":"验证Agent能否检索最新监管政策"},
+  {"id":"l16","question":"查询所有尚未结案的仲裁案件，按仲裁机构分组","expectedTool":"query_database","category":"legal_arbitration","expectedKeywords":["仲裁","未结案","仲裁机构","GROUP BY","案件"],"minScore":1,"description":"验证Agent能否查询仲裁案件"},
+  {"id":"l17","question":"分析商业秘密侵权的三要素：秘密性、价值性、保密措施","expectedTool":null,"category":"legal_knowledge","expectedKeywords":["商业秘密","侵权","秘密性","价值性","保密措施"],"minScore":1,"description":"验证Agent对知识产权法的理解"},
+  {"id":"l18","question":"查询法务部门本月处理的合同审批数量和驳回率","expectedTool":"query_database","category":"legal_ops","expectedKeywords":["合同审批","驳回率","法务","本月","COUNT"],"minScore":1,"description":"验证Agent能否统计法务运营数据"},
+  {"id":"l19","question":"检索ESG信息披露的强制性要求，适用于上市公司的条款","expectedTool":"search_documents","category":"legal_regulatory","expectedKeywords":["ESG","信息披露","上市公司","强制性","环境"],"minScore":1,"description":"验证Agent能否检索ESG合规要求"},
+  {"id":"l20","question":"查询所有涉及行政处罚的案件，按处罚类型和金额排序","expectedTool":"query_database","category":"legal_penalty","expectedKeywords":["行政处罚","处罚","金额","排序","类型"],"minScore":1,"description":"验证Agent能否查询行政处罚案件"}
+]

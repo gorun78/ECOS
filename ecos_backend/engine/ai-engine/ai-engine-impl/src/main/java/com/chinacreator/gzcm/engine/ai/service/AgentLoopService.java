@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
 import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
@@ -21,6 +22,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -82,6 +84,15 @@ public class AgentLoopService {
     @Autowired
     private AgentConfigResolver agentConfigResolver;
 
+    @Autowired(required = false)
+    private GuardrailsService guardrailsService;
+
+    @Autowired(required = false)
+    private AgentMetricsCollector metricsCollector;
+
+    @Autowired(required = false)
+    private AgentSessionService sessionService;
+
     /** 正则：匹配 function_name(arg1=val1, arg2=val2) 模式 */
     private static final Pattern FUNCTION_CALL_PATTERN =
             Pattern.compile("(\\w+)\\s*\\(\\s*([^)]*)\\s*\\)");
@@ -109,8 +120,38 @@ public class AgentLoopService {
         int totalTokens = 0;
         List<Map<String, Object>> toolCallRecords = new ArrayList<>();
 
+        // T0a: 生成 traceId
+        String traceId = AgentTracer.newTrace();
+
         if (llmGateway == null) {
-            return AgentLoopResult.error(sessionId, "LLM Gateway 未就绪", 0);
+            AgentLoopResult r = AgentLoopResult.error(sessionId, "LLM Gateway 未就绪", 0);
+            r.setTraceId(traceId);
+            return r;
+        }
+
+        // T0b-1: 护栏输入过滤
+        if (guardrailsService != null && userMessage != null) {
+            try {
+                Map<String, Object> inputCheck = guardrailsService.validate(Map.of("llmOutput", userMessage));
+                if (inputCheck.get("passed") != null && !(Boolean) inputCheck.get("passed")) {
+                    log.warn("[AgentLoop] Guardrails blocked input for session={}: {}", sessionId, inputCheck.get("violations"));
+                    AgentLoopResult r = AgentLoopResult.error(sessionId,
+                            "输入包含敏感内容: " + inputCheck.get("violations"), 0);
+                    r.setTraceId(traceId);
+                    return r;
+                }
+            } catch (Exception e) {
+                log.warn("[AgentLoop] Guardrails input check failed: {}", e.getMessage());
+            }
+        }
+
+        // T0c-1: 上下文压缩
+        if (sessionService != null && sessionId != null) {
+            try {
+                sessionService.compressHistory(sessionId, 20);
+            } catch (Exception e) {
+                log.warn("[AgentLoop] History compression failed: {}", e.getMessage());
+            }
         }
 
         // ── 三层配置解析：L1(yaml) → L2(builtin模板) → L3(实例) → 运行时覆盖 ──
@@ -127,10 +168,22 @@ public class AgentLoopService {
 
         // 2. think → tool → observe 循环
         for (int turn = 1; turn <= maxTurns; turn++) {
-            log.info("[AgentLoop] turn={}/{} session={}", turn, maxTurns, sessionId);
+            log.info("[AgentLoop] turn={}/{} session={} trace={}", turn, maxTurns, sessionId, traceId);
+
+            // T0a: 记录 think 阶段开始
+            long thinkStart = System.currentTimeMillis();
 
             // 2a. 调用 LLM
             ChatResponse resp = callLLM(messages, resolvedConfig);
+            long thinkElapsed = System.currentTimeMillis() - thinkStart;
+            boolean thinkSuccess = resp != null && resp.isSuccess();
+            int thinkTokens = resp != null ? resp.getTokensInput() + resp.getTokensOutput() : 0;
+            AgentTracer.record(traceId, turn, "think", thinkElapsed, thinkTokens, null, thinkSuccess);
+            // T0a-3: 慢查询告警
+            if (metricsCollector != null) {
+                metricsCollector.alertSlow(agentId, traceId, "think", thinkElapsed);
+            }
+
             if (resp == null || !resp.isSuccess()) {
                 String err = resp != null ? resp.getErrorMsg() : "LLM 调用返回 null";
                 log.error("[AgentLoop] LLM call failed at turn {}: {}", turn, err);
@@ -139,12 +192,14 @@ public class AgentLoopService {
                     log.info("[AgentLoop] Retrying LLM call once after format error");
                     resp = callLLM(messages, resolvedConfig);
                     if (resp == null || !resp.isSuccess()) {
-                        return AgentLoopResult.error(sessionId,
-                                "LLM 调用失败（已重试）: " + (resp != null ? resp.getErrorMsg() : "null"), totalTokens);
+                        // T0c-2: 友好错误文案
+                        String friendlyErr = "LLM 调用失败（已重试）: " + (resp != null ? resp.getErrorMsg() : "null");
+                        return addTrace(setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId));
                     }
                 } else {
-                    return AgentLoopResult.error(sessionId,
-                            "LLM 调用失败: " + err, totalTokens);
+                    // T0c-2: 友好错误文案
+                    String friendlyErr = "LLM 调用失败: " + err;
+                    return addTrace(setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId));
                 }
             }
 
@@ -165,16 +220,25 @@ public class AgentLoopService {
 
                 // 逐个执行工具
                 for (ToolCall tc : toolCalls) {
-                    long toolStart = System.currentTimeMillis();
-                    ToolExecutorService.ToolResult tr = executeTool(tc);
-                    long toolDuration = System.currentTimeMillis() - toolStart;
+                    // T0a: 记录 act 阶段开始
+                    long actStart = System.currentTimeMillis();
+
+                    ToolExecutorService.ToolResult tr = executeTool(tc, resolvedConfig);
+                    long actElapsed = System.currentTimeMillis() - actStart;
+
+                    // T0a: trace 记录
+                    AgentTracer.record(traceId, turn, "act", actElapsed, 0, tc.getName(), tr.isSuccess());
+                    // T0a-3: 慢查询告警
+                    if (metricsCollector != null) {
+                        metricsCollector.alertSlow(agentId, traceId, "act", actElapsed);
+                    }
 
                     // 记录到 toolCallRecords
                     Map<String, Object> record = new LinkedHashMap<>();
                     record.put("turn", turn);
                     record.put("toolName", tc.getName());
                     record.put("toolCallId", tc.getId());
-                    record.put("durationMs", toolDuration);
+                    record.put("durationMs", actElapsed);
                     record.put("success", tr.isSuccess());
                     record.put("resultSnippet", truncate(tr.getContent(), 200));
                     toolCallRecords.add(record);
@@ -183,12 +247,15 @@ public class AgentLoopService {
                     messages.add(Message.toolResult(tr));
 
                     log.info("[AgentLoop] turn={} tool={} completed in {}ms success={}",
-                            turn, tc.getName(), toolDuration, tr.isSuccess());
+                            turn, tc.getName(), actElapsed, tr.isSuccess());
 
                     if (session != null) {
                         session.touch();
                     }
                 }
+
+                // T0a: 记录 observe 阶段（工具结果被 LLM 消化）
+                AgentTracer.record(traceId, turn, "observe", 0, 0, null, true);
 
                 // continue → 回到循环顶部，LLM 看到工具结果后继续推理
                 continue;
@@ -204,12 +271,43 @@ public class AgentLoopService {
                 session.touch();
             }
 
-            return AgentLoopResult.success(content, turn, sessionId, totalTokens, toolCallRecords);
+            // T0b-1: 护栏输出净化
+            String finalContent = content;
+            if (guardrailsService != null && finalContent != null) {
+                try {
+                    Map<String, Object> outputCheck = guardrailsService.validate(Map.of("llmOutput", finalContent));
+                    if (outputCheck.get("passed") != null && !(Boolean) outputCheck.get("passed")) {
+                        log.warn("[AgentLoop] Guardrails filtered output for session={}: {}", sessionId, outputCheck.get("violations"));
+                        finalContent = "[内容已根据安全策略过滤]";
+                    }
+                } catch (Exception e) {
+                    log.warn("[AgentLoop] Guardrails output check failed: {}", e.getMessage());
+                }
+            }
+
+            // T0a: 记录最终 observe
+            AgentTracer.record(traceId, turn, "observe", 0, 0, null, true);
+
+            // T0a-2: 记录 metrics
+            if (metricsCollector != null) {
+                metricsCollector.record(agentId, "run", true,
+                        System.currentTimeMillis() - startTime,
+                        resp.getTokensInput(), resp.getTokensOutput(), traceId);
+            }
+
+            AgentLoopResult result = AgentLoopResult.success(finalContent, turn, sessionId, totalTokens, toolCallRecords);
+            result.setTraceId(traceId);
+            return result;
         }
 
         // 3. 超过最大轮次
         log.warn("[AgentLoop] Max turns ({}) exceeded for session={}", maxTurns, sessionId);
-        return AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords);
+        // T0a-2: 记录 metrics（超限）
+        if (metricsCollector != null) {
+            metricsCollector.record(agentId, "run", false,
+                    System.currentTimeMillis() - startTime, 0, 0, traceId);
+        }
+        return addTrace(AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords));
     }
 
     // ─── Message 构建 ──────────────────────────────────────────────────
@@ -965,12 +1063,27 @@ public class AgentLoopService {
     // ─── 工具执行 ──────────────────────────────────────────────────────
 
     /**
-     * 执行工具调用 — 带超时和截断保护。
+     * 执行工具调用 — 带超时、截断保护和工具白名单。
      * <p>
      * 若未注入 ToolExecutorService 则返回 mock 结果。
      * </p>
      */
-    private ToolExecutorService.ToolResult executeTool(ToolCall tc) {
+    private ToolExecutorService.ToolResult executeTool(ToolCall tc, AgentLoopConfig config) {
+        // T0b-2: 工具白名单检查
+        if (config != null && config.getToolWhitelist() != null && !config.getToolWhitelist().isEmpty()) {
+            if (!config.getToolWhitelist().contains(tc.getName())) {
+                log.warn("[AgentLoop] Tool '{}' blocked by whitelist", tc.getName());
+                ToolExecutorService.ToolResult tr = new ToolExecutorService.ToolResult();
+                tr.setSuccess(false);
+                tr.setError("工具 '" + tc.getName() + "' 不在Agent允许的工具白名单中");
+                tr.setToolCallId(tc.getId());
+                tr.setToolName(tc.getName());
+                tr.setContent("");
+                tr.setElapsedMs(0);
+                return tr;
+            }
+        }
+
         if (toolExecutorService == null) {
             log.warn("[AgentLoop] ToolExecutorService not available, returning mock result for tool={}", tc.getName());
             return buildMockToolResult(tc);
@@ -1028,5 +1141,23 @@ public class AgentLoopService {
         if (config.getMaxIterations() != null) overrides.put("maxIterations", config.getMaxIterations());
         if (config.getAgentTimeoutMs() != null) overrides.put("agentTimeoutMs", config.getAgentTimeoutMs());
         return overrides;
+    }
+
+    // ─── T0 辅助方法 ────────────────────────────────────────────────
+
+    /** 为 AgentLoopResult 设置 traceId */
+    private static AgentLoopResult addTrace(AgentLoopResult result) {
+        if (result != null) {
+            result.setTraceId(null);  // traceId already set in run()
+        }
+        return result;
+    }
+
+    /** 设置 traceId 到 result */
+    private static AgentLoopResult setErrMsg(AgentLoopResult result, String traceId) {
+        if (result != null) {
+            result.setTraceId(traceId);
+        }
+        return result;
     }
 }

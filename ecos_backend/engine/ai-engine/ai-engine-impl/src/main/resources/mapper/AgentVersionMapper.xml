@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  ecos_agent_version 表 — MyBatis Mapper
+  CREATE TABLE IF NOT EXISTS ecos_agent_version (
+      id         VARCHAR(64)  PRIMARY KEY,
+      agent_id   VARCHAR(64)  NOT NULL,
+      version    INT          NOT NULL,
+      config     TEXT,
+      created_at TIMESTAMP    DEFAULT NOW()
+  );
+-->
+
+<mapper namespace="com.chinacreator.gzcm.engine.ai.mapper.AgentVersionMapper">
+
+    <resultMap id="agentVersionMap" type="java.util.LinkedHashMap">
+        <id column="id" property="id" javaType="java.lang.String"/>
+        <result column="agent_id" property="agentId" javaType="java.lang.String"/>
+        <result column="version" property="version" javaType="java.lang.Integer"/>
+        <result column="config" property="config" javaType="java.lang.String"/>
+        <result column="created_at" property="createdAt" javaType="java.util.Date"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, agent_id, version, config, created_at
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO ecos_agent_version (id, agent_id, version, config, created_at)
+        VALUES (#{id}, #{agentId}, #{version}, #{config}, NOW())
+    </insert>
+
+    <select id="selectByAgentId" resultMap="agentVersionMap">
+        SELECT <include refid="baseColumns"/>
+        FROM ecos_agent_version
+        WHERE agent_id = #{agentId}
+        ORDER BY version DESC
+    </select>
+
+    <select id="selectLatest" resultMap="agentVersionMap">
+        SELECT <include refid="baseColumns"/>
+        FROM ecos_agent_version
+        WHERE agent_id = #{agentId}
+        ORDER BY version DESC
+        LIMIT 1
+    </select>
+
+</mapper>

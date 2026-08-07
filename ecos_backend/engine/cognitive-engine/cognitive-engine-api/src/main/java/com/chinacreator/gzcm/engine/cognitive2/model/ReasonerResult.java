@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * KAG Reasoner 推理结果。
- * 包含答案、子问题分解、使用的检索策略和置信度。
+ * 包含答案、子问题分解、使用的检索策略、置信度、来源标注和耗时。
  */
 public class ReasonerResult {
 
@@ -26,10 +26,17 @@ public class ReasonerResult {
     /** 推理链（可选）：ruleId → condition → facts → conclusion → source */
     private List<Map<String, String>> reasoningChain;
 
+    /** 来源标注列表 */
+    private List<Map<String, Object>> sources;
+
+    /** 总耗时（毫秒） */
+    private long elapsedMs;
+
     public ReasonerResult() {
         this.subQueries = new ArrayList<>();
         this.retrievalStrategies = new LinkedHashMap<>();
         this.reasoningChain = new ArrayList<>();
+        this.sources = new ArrayList<>();
     }
 
     public String getAnswer() { return answer; }
@@ -46,6 +53,12 @@ public class ReasonerResult {
 
     public List<Map<String, String>> getReasoningChain() { return reasoningChain; }
     public void setReasoningChain(List<Map<String, String>> reasoningChain) { this.reasoningChain = reasoningChain; }
+
+    public List<Map<String, Object>> getSources() { return sources; }
+    public void setSources(List<Map<String, Object>> sources) { this.sources = sources; }
+
+    public long getElapsedMs() { return elapsedMs; }
+    public void setElapsedMs(long elapsedMs) { this.elapsedMs = elapsedMs; }
 
     /** 便捷构造：成功结果 */
     public static ReasonerResult success(String answer, List<String> subQueries,

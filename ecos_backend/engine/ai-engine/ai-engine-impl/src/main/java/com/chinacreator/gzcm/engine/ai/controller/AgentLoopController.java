@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.engine.ai.service.AgentLoopConfig;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopService;
 import com.chinacreator.gzcm.engine.ai.service.AgentSessionService;
+import com.chinacreator.gzcm.engine.ai.service.AgentCircuitBreaker;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,8 @@ public class AgentLoopController {
     @Autowired
     private AgentSessionService sessionService;
 
+    private final AgentCircuitBreaker circuitBreaker = new AgentCircuitBreaker();
+
     // ═══════════════════════════════════════════════════════════════
     //  1. POST /api/v1/agent-loop/chat — 非流式对话
     // ═══════════════════════════════════════════════════════════════
@@ -76,6 +79,12 @@ public class AgentLoopController {
                 return ApiResponse.badRequest("message 不能为空");
             }
 
+            // T0c-3: 熔断器检查
+            String agentId = (String) body.getOrDefault("agentId", "default");
+            if (!circuitBreaker.isAllowed(agentId)) {
+                return ApiResponse.internalError("Agent 服务暂时不可用（熔断保护），请稍后重试");
+            }
+
             // 构建 AgentLoopConfig
             AgentLoopConfig config = buildConfig(body);
 
@@ -84,6 +93,13 @@ public class AgentLoopController {
 
             // 执行推理循环
             AgentLoopResult result = agentLoopService.run(config, message, session);
+
+            // T0c-3: 记录结果
+            if (result.isSuccess()) {
+                circuitBreaker.recordSuccess(agentId);
+            } else {
+                circuitBreaker.recordFailure(agentId);
+            }
 
             // 转换为响应 Map
             Map<String, Object> data = resultToMap(result);
@@ -133,11 +149,26 @@ public class AgentLoopController {
                     return;
                 }
 
+                // T0c-3: 熔断器检查
+                String agentId = (String) body.getOrDefault("agentId", "default");
+                if (!circuitBreaker.isAllowed(agentId)) {
+                    sendEvent(emitter, "error", Map.of("message", "Agent 服务暂时不可用（熔断保护），请稍后重试"));
+                    emitter.complete();
+                    return;
+                }
+
                 AgentLoopConfig config = buildConfig(body);
                 AgentSession session = buildRuntimeSession(body);
 
                 // 执行推理循环
                 AgentLoopResult result = agentLoopService.run(config, message, session);
+
+                // T0c-3: 记录结果
+                if (result.isSuccess()) {
+                    circuitBreaker.recordSuccess(agentId);
+                } else {
+                    circuitBreaker.recordFailure(agentId);
+                }
 
                 // 推送 tool_call 事件
                 if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
@@ -340,6 +371,12 @@ public class AgentLoopController {
                 return ApiResponse.badRequest("message 不能为空");
             }
 
+            // T0c-3: 熔断器检查
+            String agentId = (String) body.getOrDefault("agentId", "default");
+            if (!circuitBreaker.isAllowed(agentId)) {
+                return ApiResponse.internalError("Agent 服务暂时不可用（熔断保护），请稍后重试");
+            }
+
             // 构建配置（systemPrompt 优先使用请求参数，fallback 到持久化 session 的 agentId）
             AgentLoopConfig config = buildConfig(body);
 
@@ -349,6 +386,13 @@ public class AgentLoopController {
 
             // 执行推理循环
             AgentLoopResult result = agentLoopService.run(config, message, runtimeSession);
+
+            // T0c-3: 记录结果
+            if (result.isSuccess()) {
+                circuitBreaker.recordSuccess(agentId);
+            } else {
+                circuitBreaker.recordFailure(agentId);
+            }
 
             // 持久化消息（非流式场景简化：仅记录用户消息 + 最终回复），使用指定线程
             sessionService.appendMessage(id, "user", message, null, null, thread);
@@ -413,6 +457,7 @@ public class AgentLoopController {
     private Map<String, Object> resultToMap(AgentLoopResult result) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("sessionId", result.getSessionId());
+        data.put("traceId", result.getTraceId());
         data.put("content", result.getContent());
         data.put("turns", result.getTurns());
         data.put("totalTokens", result.getTotalTokens());

@@ -17,6 +17,7 @@ public class AgentLoopResult {
     private String sessionId;
     private boolean success;
     private String errorMsg;
+    private String traceId;
 
     public AgentLoopResult() {}
 
@@ -85,6 +86,9 @@ public class AgentLoopResult {
     public String getErrorMsg() { return errorMsg; }
     public void setErrorMsg(String errorMsg) { this.errorMsg = errorMsg; }
 
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+
     // ─── Serialisation ──────────────────────────────────────────────────
 
     public Map<String, Object> toMap() {
@@ -97,6 +101,9 @@ public class AgentLoopResult {
         map.put("success", success);
         if (errorMsg != null) {
             map.put("errorMsg", errorMsg);
+        }
+        if (traceId != null) {
+            map.put("traceId", traceId);
         }
         return map;
     }

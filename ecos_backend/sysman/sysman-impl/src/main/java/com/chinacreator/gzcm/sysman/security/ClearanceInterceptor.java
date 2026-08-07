@@ -79,6 +79,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/guardrails")
                 || path.startsWith("/api/v1/pipeline")
                 || path.startsWith("/api/v1/agents")
+                || path.startsWith("/api/v1/agent-loop")
                 || path.startsWith("/api/v1/aip")
                 || path.startsWith("/api/ontology")
                 || path.startsWith("/api/integration")
@@ -94,7 +95,14 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/workspace")
                 || path.startsWith("/api/v1/ontology/proposals")
                 || path.startsWith("/api/monitor")
-                || path.startsWith("/api/v1/engine")) {
+                || path.startsWith("/api/v1/ontology/action-types")
+                || path.startsWith("/api/v1/engine")
+                || path.startsWith("/api/v1/cognitive")) {
+            return true;
+        }
+
+        // OAG Pipeline — 8步闭环对话
+        if (path.startsWith("/api/v1/oag")) {
             return true;
         }
 

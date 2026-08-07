@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  ecos_action_type 表 — MyBatis Mapper
+  CREATE TABLE IF NOT EXISTS ecos_action_type (
+      id             VARCHAR(64)  PRIMARY KEY,
+      name           VARCHAR(128) NOT NULL UNIQUE,
+      description    TEXT,
+      object_type_id VARCHAR(64)  NOT NULL,
+      preconditions  TEXT,
+      post_actions   TEXT,
+      audit_required BOOLEAN      DEFAULT true,
+      enabled        BOOLEAN      DEFAULT true,
+      created_by     VARCHAR(64),
+      created_at     TIMESTAMP    DEFAULT NOW(),
+      updated_at     TIMESTAMP    DEFAULT NOW()
+  );
+-->
+
+<mapper namespace="com.chinacreator.gzcm.engine.ontology.mapper.ActionTypeMapper">
+
+    <resultMap id="actionTypeMap" type="com.chinacreator.gzcm.engine.ontology.model.ActionType">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="objectTypeId" column="object_type_id"/>
+        <result property="preconditions" column="preconditions"/>
+        <result property="postActions" column="post_actions"/>
+        <result property="auditRequired" column="audit_required"/>
+        <result property="enabled" column="enabled"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, name, description, object_type_id, preconditions, post_actions,
+        audit_required, enabled, created_by, created_at, updated_at
+    </sql>
+
+    <select id="findAll" resultMap="actionTypeMap">
+        SELECT <include refid="baseColumns"/>
+        FROM ecos_action_type
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="findByObjectTypeId" resultMap="actionTypeMap">
+        SELECT <include refid="baseColumns"/>
+        FROM ecos_action_type
+        WHERE object_type_id = #{objectTypeId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="findById" resultMap="actionTypeMap">
+        SELECT <include refid="baseColumns"/>
+        FROM ecos_action_type
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.chinacreator.gzcm.engine.ontology.model.ActionType">
+        INSERT INTO ecos_action_type (
+            id, name, description, object_type_id, preconditions, post_actions,
+            audit_required, enabled, created_by, created_at, updated_at
+        ) VALUES (
+            #{id}, #{name}, #{description}, #{objectTypeId}, #{preconditions}, #{postActions},
+            #{auditRequired}, #{enabled}, #{createdBy}, NOW(), NOW()
+        )
+    </insert>
+
+    <update id="update" parameterType="com.chinacreator.gzcm.engine.ontology.model.ActionType">
+        UPDATE ecos_action_type SET
+            name          = COALESCE(#{name}, name),
+            description   = COALESCE(#{description}, description),
+            object_type_id = COALESCE(#{objectTypeId}, object_type_id),
+            preconditions = COALESCE(#{preconditions}, preconditions),
+            post_actions  = COALESCE(#{postActions}, post_actions),
+            audit_required = COALESCE(#{auditRequired}, audit_required),
+            enabled       = COALESCE(#{enabled}, enabled),
+            updated_at    = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM ecos_action_type WHERE id = #{id}
+    </delete>
+
+</mapper>

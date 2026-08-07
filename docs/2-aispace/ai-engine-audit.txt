@@ -1,0 +1,383 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║        ECOS ai-engine 企业级 Agent 完善度审计报告                           ║
+║        审计日期：2026-08-05 | 审计范围：engine/ai-engine 全量代码          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+代码基数：80个Java源文件，36个Controller，约25个核心Service
+技术栈：Java 17 + Spring Boot 3.2.2 + JdbcTemplate + JDK HttpClient
+架构：ai-engine-api (接口) → ai-engine-impl (实现) → ai-engine-boot (启动)
+端口：18084
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Agent Loop 执行引擎 — 评分: 4.0/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • AgentLoopService (1032行) 实现了完整的 think→tool_call→observe→think 循环
+  • 多轮工具调用循环：支持连续工具调用后 LLM 继续推理，直到输出 final response
+  • 最大迭代限制：默认5轮，通过三层配置可动态调整（maxIterations字段）
+  • 超时控制：工具调用30s超时(TOOL_TIMEOUT_MS)，单LLM HTTP请求120s超时
+  • SSE流式输出：AgentLoopController实现完整SSE streaming，5种事件类型
+    (token/tool_call/tool_result/done/error)，异步执行+回调
+  • Token预算管理：trimHistory()实现从近到远的token裁剪，保留system消息
+  • LLM响应解析策略丰富：5级回退(JSON原生→```json代码块→<tool_call>标签→
+    正则function_call→普通文本)，极强兼容性
+  • ToolCall Schema校验：parseToolCalls后自动validateToolCalls（必填/类型/默认值）
+  • Skill运行时注入：buildSystemPrompt将DB中Skill列表动态注入System Prompt
+  • MemoryExtractor注入点预留（T3阶段，已实现接口但暂未接入历史消息）
+
+⚠️ 问题：
+  • AgentLoop整体超时控制未实现：虽然AgentLoopConfig有agentTimeoutMs参数
+    (默认300s)，但AgentLoopService.run()方法并未使用该值做整体超时中断——
+    所有超时仅在单个工具调用层面（30s）和单LLM调用层面（120s HTTP超时）。
+    如果Agent连续5轮LLM调用每轮都用满120s，总耗时可能达到600s+
+  • SSE流式并非真正token级流式：splitIntoTokens()是按段落/句子切分后逐块发送，
+    且每个"token"间有10ms延迟。不是LLM原生streaming（逐token返回），而是
+    等待完整AgentLoop执行完成后一次性拆分输出
+  • LLM调用失败重试过于简单：仅在turn==1时重试一次，没有指数退避，
+    后续轮次的LLM失败直接返回error
+  • tool_result消息的tool_call_id传递不完整：DeepSeekProvider.convertMessages()
+    中tool角色消息未设置tool_call_id字段，可能导致某些LLM的多工具并行调用混乱
+
+📊 代码证据：
+  AgentLoopService.java L106-213: run()方法 — 完整loop但缺整体超时
+  AgentLoopController.java L122-201: chatStream — 伪流式(exec loop后拆分)
+  AgentLoopService.java L573-612: parseToolCalls — 5级解析回退
+  AgentLoopService.java L384-443: trimHistory — token预算裁剪
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. Tool 系统 — 评分: 4.5/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • 双层架构：ToolRegistry(注册中心, 609行) + ToolExecutorService(执行器, 536行)
+  • ToolRegistry优先级执行：AgentLoopService先查ToolRegistry，未命中的回退到
+    ToolExecutorService的DB fallback逻辑
+  • 内置8个工具：query_db / invoke_rest / delegate_to_agent / read_file / 
+    write_file / search_files / patch (FileToolService) + getCurrentTime / 
+    calculateRisk (Builtin)
+  • 三种执行模式全覆盖：SQL(JdbcTemplate)、REST(RestTemplate/HttpExchange)、
+    BUILTIN(Java函数)
+  • 数据库加载：ecos_ai.ecos_tool_definition表动态加载(WHERE status='ACTIVE')
+  • Fallback机制：DB无数据时回退到内存fallbackTools(7个预定义工具)
+  • ToolSchema完整定义：支持参数类型/必填/默认值/枚举值/描述，自动生成
+    OpenAI function-calling兼容的JSON Schema
+  • 结果截断保护：TOOL_RESULT_MAX_CHARS=2000，ToolExecutorService和
+    AgentLoopService双层截断
+  • SQL安全：仅允许SELECT/WITH语句
+  • REST URL模板：支持{paramName}占位符替换
+
+⚠️ 问题：
+  • 工具注册是硬编码的：initBuiltinTools()在构造函数中调用，不支持运行时
+    热注册/热更新。新增工具需改代码重新部署
+  • template agent声明的toolWhitelist未在运行时被执行过滤：AgentLoopService
+    解析tool_call后直接执行，未根据Agent模板的toolWhitelist做权限校验——
+    toolWhitelist只在AgentTemplateService实例化时写入capability，未被
+    AgentLoopService消费
+  • FileToolService实现了文件操作但类内容未审计(可能缺少路径遍历防护)
+  • query_db没有结果行数限制(LIMIT)，恶意SELECT可能拉全表
+
+📊 代码证据：
+  ToolRegistry.java L152-157: initBuiltinTools — 8个硬编码工具
+  ToolExecutorService.java L132-155: loadFromDatabase — ecos_tool_definition表
+  ToolSchema.java L69-111: toFunctionCallSchema — OpenAI兼容Schema生成
+  ToolRegistry.java L183-189: SQL安全 — 仅允许SELECT/WITH
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. 会话管理 — 评分: 3.5/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • PG持久化：sys_agent_session + sys_agent_message 两张表完整CRUD
+  • 生命周期状态机：ACTIVE → IDLE(30min无活动) → EXPIRED → ARCHIVED
+  • 线程支持：支持thread_id字段，同一会话下多线程对话
+  • 消息持久化：chatInSession端点自动持久化user+assistant消息
+  • markIdleSessions()批量标记过期
+  • 查询支持：按状态/agent/thread多维度查询
+
+⚠️ 问题：
+  • 🔴 上下文窗口管理缺失：AgentSessionService仅做持久化存储，不管理上下文窗口。
+    Token裁剪在AgentLoopService.trimHistory()中基于estimate估算，且裁剪后
+    消息不写回DB——即每次对话重新加载全量消息再做裁剪，对长会话性能差
+  • 🔴 历史消息压缩完全缺失：无消息摘要/压缩机制。长会话超过token上限后只能
+    简单从近到远丢弃，丢失早期上下文
+  • 会话过期定时清理未实现：markIdleSessions()存在但无Spring @Scheduled调用，
+    需要外部触发
+  • AgentSessionService与AgentLoopService中的AgentSession是两个不同类：
+    AgentSessionService.AgentSession (DB持久化POJO, 418行)
+    vs runtime AgentSession (AgentLoopService.run的参数, 来自runtime.llm.session包)
+    两者不统一，会话内对话持久化时仅记录user+assistant，不记录tool messages
+  • chat端点(非会话)不持久化消息——每次调用都是无状态
+
+📊 代码证据：
+  AgentSessionService.java L37-38: IDLE_THRESHOLD_MS = 30min
+  AgentSessionService.java L52-75: createSession — PG INSERT
+  AgentSessionService.java L245-255: refreshLifecycle — ACTIVE→IDLE判断
+  AgentLoopService.java L384-443: trimHistory — 纯内存裁剪不写DB
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. 多Agent协作 — 评分: 3.0/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • AgentDelegationService (220行)：完整的子Agent委托实现
+  • delegate_to_agent作为内置工具注册到ToolRegistry，LLM可自然调用
+  • 超时控制：子Agent 120s超时，通过Future.get(timeout)实现
+  • 单层委托约束：子Agent的system prompt不包含delegate_to_agent工具描述
+  • 子Agent结果带元数据：轮次/token/截断信息
+  • 自定义参数支持：可指定agentName/instruction/systemPrompt/model
+
+⚠️ 问题：
+  • 仅支持单层委托，不支持orchestrate模式（主Agent同时委托多个子Agent并行执行
+    后聚合结果）——虽然AgentLoopService支持连续的多个tool_call，但那是串行逐个执行
+  • 子Agent结果仅截断至3000字符，但未做结构化合并
+  • 无并发控制：如果主Agent在一次turn中发出多个delegate_to_agent，是串行执行的
+  • 无子Agent间通信机制：子Agent之间完全隔离，无法协作
+  • 无委托预算控制：主Agent理论上可以在5轮中每轮都delegate，产生25个子Agent调用
+
+📊 代码证据：
+  AgentDelegationService.java L75-161: delegate() — 完整委托流程
+  AgentDelegationService.java L171-184: buildSubAgentSystemPrompt — 单层约束
+  AgentDelegationService.java L38-42: 120s超时 / 3000字符截断
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. 配置体系 — 评分: 4.5/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • AgentLoopConfig (278行)：完整的可变配置对象，支持链式调用
+  • AgentConfigResolver (202行)：三层解析器 — L1(yml) → L2(builtin模板) → 
+    L3(实例) → 运行时覆盖，每层只覆盖非空字段
+  • L1全局默认值从@Value注解注入(8项配置)，含合理的生产级默认值
+  • L2模板查找：自动根据templateId查找builtin模板并合并
+  • L3实例覆盖：用户级AgentRegistryEntity覆盖builtin默认值
+  • 运行时覆盖：API请求参数body直接作为覆盖源
+  • resolveFromRequest便捷方法：一键从请求体解析三层配置
+  • 安全兜底：agentId为"default"或AgentRegistry不可用时仅用L1+请求覆盖
+  • maxIterations可配置：默认5，可被L2/L3/运行时逐层覆盖
+  • @Deprecated标记旧构造器，保持兼容
+
+⚠️ 问题：
+  • 🔴 工具白名单未在配置体系中生效：AgentLoopConfig中没有toolWhitelist字段，
+    AgentLoopService.run()未根据配置的工具白名单过滤ToolRegistry。
+    模板的toolWhitelist仅写入capability JSON，运行时未被读取
+  • maxTokens在L1层面未设默认值(null)，可能导致某些Provider缺少该字段
+  • AgentLoopConfig和AgentConfigResolver分属两个类但紧密耦合——
+    resolve()方法返回的配置又需要被AgentLoopService重新提取覆盖值传给
+    configToOverrides()，存在循环信息流
+
+📊 代码证据：
+  AgentConfigResolver.java L76-167: resolve() — 完整三层解析
+  AgentLoopConfig.java L83-193: applyTemplate/Instance/Overrides — 链式覆盖
+  AgentConfigResolver.java L43-62: @Value注入 — 8项L1默认值
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. Agent模板 — 评分: 3.5/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • AgentTemplateService (208行)：从classpath自动扫描加载模板
+  • 6个内置模板，覆盖ECOS各引擎：data-agent / ai-agent / security-agent / 
+    ontology-agent / cognitive-agent / kb-agent
+  • 模板定义质量高：每个模板含id/name/role/description/model/maxIterations/
+    temperature/icon/systemPrompt/toolWhitelist完整字段
+  • 模板实例化：instantiate()支持基于模板创建用户Agent，覆盖参数
+  • System Prompt设计精良：每个Agent有明确的职责边界和工具使用指引
+  • 模板角色控制：builtin模板受删除保护(role=builtin)，实例化后role=user
+
+⚠️ 问题：
+  • 模板仅6个，缺少：pipeline-agent(流水线编排)、monitoring-agent(监控告警)、
+    report-agent(报表生成)等企业常见Agent
+  • 模板中的toolWhitelist工具名与ToolRegistry中的工具名未校验一致性——
+    如data-agent声明了list_tables/get_table_schema/get_lineage/run_dq_check，
+    但ToolRegistry中并未注册这些工具
+  • 模板存储为classpath JSON文件，不支持运行时创建/修改
+  • 无模板版本管理：修改JSON文件后无迁移/兼容机制
+
+📊 代码证据：
+  agent-templates/data-agent.json: data-agent完整定义
+  AgentTemplateService.java L52-71: loadTemplates — classpath扫描
+  AgentTemplateService.java L107-179: instantiate — 模板实例化
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. 安全护栏 — 评分: 2.0/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • GuardrailsServiceImpl (125行)：实现了GuardrailsService接口
+  • 输出侧PII检测：手机号/身份证/邮箱正则匹配
+  • 幻觉检测：contextFacts对比，检测输出是否包含上下文事实
+  • 护栏策略管理：listPolicies/createPolicy/deletePolicy CRUD
+  • 数据库持久化：ecos_guardrail_policy表
+
+⚠️ 问题：
+  • 🔴 输入过滤完全缺失：只做输出侧PII检测，不做输入侧敏感词/注入攻击过滤。
+    LLM prompt injection没有防护
+  • 🔴 工具调用权限控制缺失：任何Agent可以调用ToolRegistry中任意工具，
+    无基于Agent/toolWhitelist的运行时拦截。Agent模板的toolWhitelist
+    仅作为元数据存储，不被执行层消费
+  • 🔴 Guardrails未集成到主流程：AgentLoopService.run()中没有调用
+    GuardrailsService.validate()——护栏代码写了但没接入执行链路
+  • PII检测过于简单：仅3个正则，缺少银行卡/地址/IP/密钥等敏感信息检测
+  • 无内容安全审核：未对接任何内容安全API(如阿里云/腾讯云内容审核)
+  • createPolicy的parameters字段硬编码为"[]"而非真正的jsonb序列化
+
+📊 代码证据：
+  GuardrailsServiceImpl.java L32-72: validate() — 输出侧PII+幻觉检测
+  AgentLoopService.java L106-213: run() — 全程无Guardrails调用
+  GuardrailsServiceImpl.java L103-107: createPolicy — parameters硬编码"[]"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. 可观测性 — 评分: 1.5/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • 日志覆盖较好：AgentLoop每一轮都有INFO日志(turn/maxTurns/sessionId)，
+    工具调用有duration/name/success记录
+  • AgentLoopResult记录丰富：turns/totalTokens/toolCalls/sessionId
+  • AiEngineHealthService：health check端点(DB ping + agent/mission/policy计数)
+  • DeepSeekProvider记录token用量(input/output)
+
+⚠️ 问题：
+  • 🔴 调用链追踪完全缺失：无traceId/spanId，无OpenTelemetry/Jaeger集成，
+    跨模块(ai-engine→cognitive-engine)调用不可追踪
+  • 🔴 Agent调用量统计缺失：无调用计数/成功率/延迟分布/P99延迟等指标，
+    无Prometheus metrics导出，无Micrometer集成
+  • 无资源消耗记录：仅记录token用量但无成本核算，无token按Agent/用户维度的
+    聚合统计
+  • 无错误率统计：虽然有log.error但无聚合/告警，错误散落在日志中
+  • agentTimeoutMs虽然配置了(300s)但未被实际使用于超时中断，所以也无法
+    基于超时率做监控
+  • 工具调用记录(toolCallRecords)仅在AgentLoopResult中携带，未持久化到DB
+
+📊 代码证据：
+  AgentLoopService.java L130-207: 每轮日志记录
+  AiEngineHealthService.java L19-59: 基础health check
+  — 全代码库未找到 Metric/Micrometer/Prometheus/OpenTelemetry 引用
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. 模型路由 — 评分: 3.0/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • LLMProvider抽象接口：支持多Provider插件式注册(priority/supportsFunctionCalling)
+  • DeepSeekProvider (283行)：完整的DeepSeek API适配，原生function-calling支持，
+    使用JDK HttpClient零额外依赖
+  • Provider选择器：selectProvider()按priority排序，选择第一个可用且支持
+    function-calling的Provider
+  • 双路径fallback：Provider优先→LLMGateway兜底，配置了deepseekApiKey
+  • Provider不可用时自动跳过(isAvailable()检查api-key)
+  • AgentLoopConfig的defaultProvider字段支持运行时切换
+
+⚠️ 问题：
+  • 🔴 目前只有1个Provider实现(DeepSeekProvider)，无通义千问/OpenAI/Anthropic
+    等其他厂商的实现——LLMProvider接口设计了多Provider架构但实际只有deepseek
+  • 无故障转移(failover)机制：如果DeepSeekProvider返回失败，代码会fallback到
+    LLMGateway，但LLMGateway本质是同一个deepseek。不存在"A厂商挂了自动切B厂商"
+  • 无速率限制(rate limiting)：对DeepSeek API无QPS控制，高并发下可能触发
+    API限流
+  • 无断路器(circuit breaker)：Provider连续失败后无熔断保护
+  • 无模型级别的选择和路由——AgentLoopConfig中的model字段直接透传，
+    但LLMProvider.selectProvider()只看Provider不看model
+
+📊 代码证据：
+  LLMProvider.java: 接口定义 — supportsFunctionCalling/priority/isAvailable
+  DeepSeekProvider.java: 唯一实现 — JDK HttpClient, 120s超时
+  AgentLoopService.java L515-525: selectProvider — priority排序选择
+  AgentLoopService.java L482-505: LLM调用 — Provider→LLMGateway fallback
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. 错误处理 — 评分: 2.5/5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 优势：
+  • 统一结果模型：AgentLoopResult以success/errorMsg区分成功/失败
+  • ToolResult以success标识工具执行成功/失败，error字段含错误详情
+  • ChatResponse统一LLM响应模型(success/errorMsg/tokens)
+  • LLM调用重试：turn==1时格式错误自动重试一次
+  • Controller层统一try-catch返回ApiResponse
+  • DeepSeekProvider区分了超时异常(HttpTimeoutException)和通用异常
+  • JdbcTemplate不可用时的降级处理（返回fallbackTools或友好错误）
+
+⚠️ 问题：
+  • 🔴 无业务异常分类体系：没有ErrorCode枚举或BizException层级。
+    错误信息用裸字符串传递，无法按错误类型做分类处理
+  • 无指数退避重试：LLM重试仅一次且无延迟，网络波动下可能连续失败
+  • 降级策略不完整：工具执行失败后AgentLoop直接continue下一轮，
+    不会告知LLM"工具失败了请换一个方案"
+  • AgentLoopResult.maxTurnsExceeded硬编码turns=5而非实际maxTurns值
+  • Controller层错误文案不一致：ApiResponse.success("Agent 推理未成功完成", data)
+    在非成功场景仍返回success外层，语义混淆
+  • 工具执行超时(TimeoutException)后ExecutorService shutdownNow未处理
+    interrupt信号传播
+
+📊 代码证据：
+  AgentLoopResult.java L24-63: 静态工厂方法 — success/maxTurnsExceeded/error
+  AgentLoopController.java L91-95: 非成功场景仍返回ApiResponse.success()
+  ToolExecutorService.java L159-177: executeWithTimeout — Future.get(30s)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+综合评估
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────┬───────┬────────────────────────────────────────┐
+│ 维度                 │ 评分  │ 评级                                  │
+├──────────────────────┼───────┼────────────────────────────────────────┤
+│ 1. Agent Loop执行引擎 │ 4.0/5 │ 🟢 核心完善，缺整体超时+真流式       │
+│ 2. Tool系统           │ 4.5/5 │ 🟢 完整，缺运行时注册+权限校验       │
+│ 3. 会话管理           │ 3.5/5 │ 🟡 持久化OK，缺上下文压缩+定时清理   │
+│ 4. 多Agent协作        │ 3.0/5 │ 🟡 单层委托可用，缺编排/并发/通信    │
+│ 5. 配置体系           │ 4.5/5 │ 🟢 三层覆盖设计精良，缺Tool白名单校验 │
+│ 6. Agent模板          │ 3.5/5 │ 🟡 6个模板质量高，缺更多类型+校验    │
+│ 7. 安全护栏           │ 2.0/5 │ 🔴 写了但没接入，输入过滤完全缺失   │
+│ 8. 可观测性           │ 1.5/5 │ 🔴 有日志无指标，企业级不可用        │
+│ 9. 模型路由           │ 3.0/5 │ 🟡 架构OK仅1个Provider，缺故障转移   │
+│ 10. 错误处理          │ 2.5/5 │ 🔴 缺异常分类体系+重试+降级         │
+├──────────────────────┼───────┼────────────────────────────────────────┤
+│ 加权综合              │ 3.20  │ 🟡 功能骨架完整，生产加固需3-4个迭代 │
+└──────────────────────┴───────┴────────────────────────────────────────┘
+
+总体评价：
+  ai-engine 整体架构设计质量较高，核心Agent Loop执行引擎和Tool系统实现完整，
+  配置体系设计精良。作为企业级Agent运行时，核心路径（单Agent+工具调用+SSE输出）
+  已经可用。主要短板集中在三个方面：
+
+  🔴 P0（阻塞生产上线）：
+     1. 安全护栏未接入主流程 — toolWhitelist未执行、输入过滤缺失
+     2. 可观测性为零 — 无trace/metric/alert，生产故障不可排查
+     3. 模型路由单点 — DeepSeek唯一，无故障转移
+
+  🟡 P1（影响规模化）：
+     4. 会话管理缺上下文压缩 — 长会话token爆炸
+     5. 多Agent编排缺并发模式 — delegate_to_agent只能串行
+     6. 错误处理缺异常分类+退避重试
+
+  🟢 P2（体验优化）：
+     7. Agent Loop缺整体超时中断
+     8. SSE非真流式
+     9. 工具需运行时热注册
+
+代码行数对比：
+  AgentLoopService:  1032行 ✅ 核心驱动力强
+  ToolRegistry:       609行 ✅ 注册机制完整
+  ToolExecutorService: 536行 ✅ 执行模式丰富
+  AgentSessionService: 418行 🟡 缺压缩/清理
+  DeepSeekProvider:    283行 ✅ API适配完整
+  AgentLoopConfig:     278行 ✅ 配置层次清晰
+  AgentLoopController: 482行 ✅ SSE实现完整
+  AgentDelegationService: 220行 🟡 功能可用但单一
+  AgentConfigResolver: 202行 ✅ 三层解析清晰
+  AgentTemplateService: 208行 🟡 模板数偏少
+  GuardrailsServiceImpl: 125行 🔴 已实现但未接入
+  MemoryExtractor:      114行 ⚠️  预留接口未激活
