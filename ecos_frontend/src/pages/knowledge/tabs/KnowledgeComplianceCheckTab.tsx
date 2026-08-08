@@ -151,16 +151,16 @@ export default function KnowledgeComplianceCheckTab() {
     const zh = locale === 'zh';
     const lines: string[] = [
       '═══════════════════════════════════════',
-      zh ? '  合规检查报告' : '  Compliance Check Report',
+      t("knowledge.knowledgecompli.231"),
       '═══════════════════════════════════════',
       '',
-      `${zh ? '业务对象' : 'Business Object'}: ${businessObject}`,
-      `${zh ? '检查时间' : 'Check Time'}: ${new Date().toLocaleString()}`,
+      `${t("knowledge.knowledgecompli.232")}: ${businessObject}`,
+      `${t("knowledge.knowledgecompli.233")}: ${new Date().toLocaleString()}`,
       '',
-      `${zh ? '总结' : 'Summary'}:`,
-      `  ${zh ? '总计' : 'Total'}: ${results.summary.total}`,
-      `  ${zh ? '通过' : 'Passed'}: ${results.summary.passed} ✓`,
-      `  ${zh ? '未通过' : 'Failed'}: ${results.summary.failed} ✗`,
+      `${t("knowledge.knowledgecompli.234")}:`,
+      `  ${t("knowledge.knowledgecompli.235")}: ${results.summary.total}`,
+      `  ${t("knowledge.knowledgecompli.236")}: ${results.summary.passed} ✓`,
+      `  ${t("knowledge.knowledgecompli.237")}: ${results.summary.failed} ✗`,
       '',
       '───────────────────────────────────────',
     ];
@@ -169,9 +169,9 @@ export default function KnowledgeComplianceCheckTab() {
       lines.push(
         '',
         `${r.passed ? '✓' : '✗'} [${r.ruleId}] ${r.ruleName}`,
-        `  ${zh ? '条件' : 'Condition'}: ${r.condition}`,
-        `  ${zh ? '结论' : 'Conclusion'}: ${r.conclusion}`,
-        `  ${zh ? '来源' : 'Source'}: ${r.source}`,
+        `  ${t("knowledge.knowledgecompli.238")}: ${r.condition}`,
+        `  ${t("knowledge.knowledgecompli.239")}: ${r.conclusion}`,
+        `  ${t("knowledge.knowledgecompli.240")}: ${r.source}`,
       );
     }
     lines.push('', '═══════════════════════════════════════');
@@ -195,12 +195,10 @@ export default function KnowledgeComplianceCheckTab() {
       <div className="border-b border-slate-200 pb-3 space-y-1">
         <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
           <Shield size={16} className="text-indigo-600" />
-          {zh ? '合规检查 (Compliance Check)' : 'Compliance Check'}
+          {t("knowledge.knowledgecompli.241")}
         </h2>
         <p className="text-xs text-slate-500">
-          {zh
-            ? '选择业务对象并输入事实，系统将自动匹配规则库进行合规性校验，输出每个规则的判定结果与推理链路。'
-            : 'Select a business object and input facts. The system matches rules automatically, validating compliance and outputting per-rule verdicts with reasoning chains.'}
+          {t("knowledge.knowledgecompli.242")}
         </p>
       </div>
 
@@ -214,7 +212,7 @@ export default function KnowledgeComplianceCheckTab() {
                 <Search size={13} />
               </span>
               <h3 className="font-bold text-slate-800 text-xs">
-                {zh ? '选择业务对象' : 'Business Object'}
+                {t("knowledge.knowledgecompli.243")}
               </h3>
             </div>
             <select
@@ -223,7 +221,7 @@ export default function KnowledgeComplianceCheckTab() {
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-sans text-slate-700 bg-white focus:outline-hidden focus:border-indigo-500 cursor-pointer"
             >
               <option value="">
-                {zh ? '-- 请选择业务对象 --' : '-- Select Business Object --'}
+                {t("knowledge.knowledgecompli.244")}
               </option>
               {BUSINESS_OBJECTS.map(obj => (
                 <option key={obj.value} value={obj.value}>
@@ -241,7 +239,7 @@ export default function KnowledgeComplianceCheckTab() {
                   <FileText size={13} />
                 </span>
                 <h3 className="font-bold text-slate-800 text-xs">
-                  {zh ? '事实输入' : 'Facts Input'}
+                  {t("knowledge.knowledgecompli.245")}
                 </h3>
               </div>
               {/* 模式切换 */}
@@ -286,7 +284,7 @@ export default function KnowledgeComplianceCheckTab() {
                     <input
                       value={f.key}
                       onChange={e => updateFact(f.id, 'key', e.target.value)}
-                      placeholder={zh ? '事实名 (例: 灭菌工艺变更)' : 'Fact key (e.g. process_change)'}
+                      placeholder={t("knowledge.knowledgecompli.246")}
                       className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 focus:outline-hidden focus:border-violet-500"
                     />
                     <select
@@ -312,7 +310,7 @@ export default function KnowledgeComplianceCheckTab() {
                   className="w-full py-1.5 border border-dashed border-slate-300 rounded-lg text-[10px] text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
                 >
                   <Plus size={11} />
-                  {zh ? '添加事实' : 'Add Fact'}
+                  {t("knowledge.knowledgecompli.247")}
                 </button>
               </div>
             )}
@@ -327,12 +325,12 @@ export default function KnowledgeComplianceCheckTab() {
             {isChecking ? (
               <>
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {zh ? '合规检查中...' : 'Checking...'}
+                {t("knowledge.knowledgecompli.248")}
               </>
             ) : (
               <>
                 <ClipboardCheck size={14} />
-                {zh ? '执行合规检查' : 'Run Compliance Check'}
+                {t("knowledge.knowledgecompli.249")}
               </>
             )}
           </button>
@@ -364,7 +362,7 @@ export default function KnowledgeComplianceCheckTab() {
             <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-xs text-center space-y-3">
               <span className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto block" />
               <p className="text-xs text-slate-500 font-medium">
-                {zh ? '正在调用规则引擎进行合规校验...' : 'Invoking rule engine for compliance validation...'}
+                {t("knowledge.knowledgecompli.250")}
               </p>
             </div>
           )}
@@ -377,29 +375,29 @@ export default function KnowledgeComplianceCheckTab() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
                   <h3 className="font-bold text-slate-800 text-xs flex items-center gap-2">
                     <ClipboardCheck size={13} className="text-indigo-600" />
-                    {zh ? '检查结果' : 'Check Results'}
+                    {t("knowledge.knowledgecompli.251")}
                   </h3>
                   <button
                     onClick={handleExportReport}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-[10px] transition-colors shadow-sm"
                   >
                     <Download size={12} />
-                    {zh ? '导出报告' : 'Export Report'}
+                    {t("knowledge.knowledgecompli.252")}
                   </button>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-1 bg-slate-50 rounded-lg p-3 text-center">
                     <div className="text-lg font-black text-slate-800">{results.summary.total}</div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase">{zh ? '总计' : 'Total'}</div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">{t("knowledge.knowledgecompli.235")}</div>
                   </div>
                   <div className="flex-1 bg-emerald-50 rounded-lg p-3 text-center">
                     <div className="text-lg font-black text-emerald-700">{results.summary.passed}</div>
-                    <div className="text-[9px] text-emerald-600 font-bold uppercase">{zh ? '通过' : 'Passed'}</div>
+                    <div className="text-[9px] text-emerald-600 font-bold uppercase">{t("knowledge.knowledgecompli.236")}</div>
                   </div>
                   <div className="flex-1 bg-red-50 rounded-lg p-3 text-center">
                     <div className="text-lg font-black text-red-700">{results.summary.failed}</div>
-                    <div className="text-[9px] text-red-600 font-bold uppercase">{zh ? '未通过' : 'Failed'}</div>
+                    <div className="text-[9px] text-red-600 font-bold uppercase">{t("knowledge.knowledgecompli.237")}</div>
                   </div>
                 </div>
               </div>
@@ -441,7 +439,7 @@ export default function KnowledgeComplianceCheckTab() {
                             : 'bg-red-100 text-red-700'
                         }`}
                       >
-                        {r.passed ? (zh ? '通过' : 'PASS') : (zh ? '未通过' : 'FAIL')}
+                        {r.passed ? (t("knowledge.knowledgecompli.256")) : (t("knowledge.knowledgecompli.257"))}
                       </span>
                       <ChevronDown
                         size={14}
@@ -456,7 +454,7 @@ export default function KnowledgeComplianceCheckTab() {
                       <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 space-y-2">
                         {/* 推理链路图 */}
                         <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                          {zh ? '推理链' : 'Reasoning Chain'}:
+                          {t("knowledge.knowledgecompli.258")}:
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
                           <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-mono font-bold rounded">
@@ -464,11 +462,11 @@ export default function KnowledgeComplianceCheckTab() {
                           </span>
                           <ChevronRight size={10} className="text-slate-400" />
                           <span className="px-2 py-0.5 bg-violet-100 text-violet-700 font-mono rounded">
-                            {zh ? '条件' : 'Condition'}
+                            {t("knowledge.knowledgecompli.238")}
                           </span>
                           <ChevronRight size={10} className="text-slate-400" />
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 font-mono rounded">
-                            {zh ? '事实' : 'Facts'}
+                            {t("knowledge.knowledgecompli.260")}
                           </span>
                           <ChevronRight size={10} className="text-slate-400" />
                           <span
@@ -478,26 +476,26 @@ export default function KnowledgeComplianceCheckTab() {
                                 : 'bg-red-100 text-red-700'
                             }`}
                           >
-                            {zh ? '结论' : 'Conclusion'}
+                            {t("knowledge.knowledgecompli.239")}
                           </span>
                           <ChevronRight size={10} className="text-slate-400" />
                           <span className="px-2 py-0.5 bg-slate-200 text-slate-600 font-mono rounded">
-                            {zh ? '来源' : 'Source'}
+                            {t("knowledge.knowledgecompli.240")}
                           </span>
                         </div>
 
                         {/* 详细信息 */}
                         <div className="grid grid-cols-1 gap-1.5 mt-1">
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{zh ? '规则ID' : 'Rule ID'}:</span>
+                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.263")}:</span>
                             <span className="text-slate-700 font-mono">{r.ruleId}</span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{zh ? '条件' : 'Condition'}:</span>
+                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.238")}:</span>
                             <span className="text-slate-700">{r.condition}</span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{zh ? '事实' : 'Facts'}:</span>
+                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.260")}:</span>
                             <div className="flex flex-wrap gap-1">
                               {Object.entries(r.facts).map(([k, v]) => (
                                 <span
@@ -516,18 +514,18 @@ export default function KnowledgeComplianceCheckTab() {
                             </div>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{zh ? '结论' : 'Conclusion'}:</span>
+                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.239")}:</span>
                             <span className={`font-bold ${r.passed ? 'text-emerald-700' : 'text-red-700'}`}>
                               {r.conclusion}
                             </span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{zh ? '来源' : 'Source'}:</span>
+                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.240")}:</span>
                             <span className="text-slate-600 font-mono">{r.source}</span>
                           </div>
                           {r.reasoningChain && (
                             <div className="flex gap-2 text-[10px]">
-                              <span className="text-slate-400 font-bold w-12 shrink-0">{zh ? '推理' : 'Reasoning'}:</span>
+                              <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.268")}:</span>
                               <span className="text-slate-600 whitespace-pre-wrap">{r.reasoningChain}</span>
                             </div>
                           )}

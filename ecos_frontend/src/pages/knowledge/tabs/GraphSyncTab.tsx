@@ -101,7 +101,7 @@ export default function GraphSyncTab() {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold flex items-center gap-2">
             <Database size={14} className="text-blue-400" />
-            图谱同步状态总览
+            {t("knowledge.graphsynctab.304")}
           </h3>
           <div className="flex items-center gap-2">
             <button
@@ -132,7 +132,7 @@ export default function GraphSyncTab() {
         {/* Overall progress bar */}
         <div className="space-y-1.5">
           <div className={`flex justify-between text-[11px] ${styles.cardTextMuted}`}>
-            <span>总同步进度</span>
+            <span>{t("knowledge.graphsynctab.305")}</span>
             <span className="font-bold text-slate-300">{syncedAll} / {totalAll} ({progressPct}%)</span>
           </div>
           <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -156,11 +156,11 @@ export default function GraphSyncTab() {
             <thead>
               <tr className={`bg-slate-800 ${styles.cardTextMuted} uppercase tracking-wider`}>
                 <th className="text-left px-4 py-2.5 font-bold">Object类型</th>
-                <th className="text-center px-3 py-2.5 font-bold">已同步数</th>
-                <th className="text-center px-3 py-2.5 font-bold">未同步数</th>
-                <th className="text-left px-3 py-2.5 font-bold">最近同步时间</th>
-                <th className="text-center px-3 py-2.5 font-bold">启用</th>
-                <th className="text-center px-3 py-2.5 font-bold">操作</th>
+                <th className="text-center px-3 py-2.5 font-bold">{t("knowledge.graphsynctab.306")}</th>
+                <th className="text-center px-3 py-2.5 font-bold">{t("knowledge.graphsynctab.307")}</th>
+                <th className="text-left px-3 py-2.5 font-bold">{t("knowledge.graphsynctab.308")}</th>
+                <th className="text-center px-3 py-2.5 font-bold">{t("knowledge.graphsynctab.309")}</th>
+                <th className="text-center px-3 py-2.5 font-bold">{t("knowledge.graphsynctab.310")}</th>
               </tr>
             </thead>
             <tbody>
@@ -168,7 +168,7 @@ export default function GraphSyncTab() {
                 <tr>
                   <td colSpan={6} className={`text-center py-8 ${styles.cardTextMuted}`}>
                     {isLoadingStatus
-                      ? <span className="flex items-center justify-center gap-2"><Loader2 size={12} className="animate-spin" /> 加载中...</span>
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 size={12} className="animate-spin" /> {t("knowledge.graphsynctab.311")}</span>
                       : '暂无同步数据，点击"刷新状态"获取'}
                   </td>
                 </tr>
@@ -227,12 +227,12 @@ export default function GraphSyncTab() {
       <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
           <Clock size={13} className={`${styles.cardTextMuted}`} />
-          <span className="text-xs font-bold text-slate-300">同步历史日志 (最近10条)</span>
+          <span className="text-xs font-bold text-slate-300">{t("knowledge.graphsynctab.312")}</span>
         </div>
         <div className="overflow-auto max-h-48">
           {syncLogs.length === 0 ? (
             <div className={`text-center py-6 ${styles.cardTextMuted} text-[11px]`}>
-              暂无同步日志
+              {t("knowledge.graphsynctab.313")}
             </div>
           ) : (
             syncLogs.map((log) => (
