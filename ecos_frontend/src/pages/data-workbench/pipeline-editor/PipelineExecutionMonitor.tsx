@@ -174,7 +174,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
   return (
     <>
       {/* Monitor Panel */}
-      <div className={`flex flex-col bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden ${className}`}>
+      <div className={`flex flex-col ${styles.cardBg} border border-slate-200 rounded-lg shadow-sm overflow-hidden ${className}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0">
           <div className="flex items-center gap-2">
@@ -279,7 +279,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
       {selectedStep && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/30" onClick={() => setSelectedStep(null)} />
-          <div className="relative z-10 bg-white rounded-xl shadow-2xl w-[480px] max-h-[500px] flex flex-col overflow-hidden">
+          <div className="relative z-10 ${styles.cardBg} rounded-xl shadow-2xl w-[480px] max-h-[500px] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
               <div className="flex items-center gap-2">

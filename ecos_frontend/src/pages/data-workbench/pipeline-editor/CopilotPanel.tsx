@@ -179,7 +179,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white ${className}`}>
+    <div className={`flex flex-col h-full ${styles.cardBg} ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50 shrink-0">
         <div className="flex items-center gap-2">

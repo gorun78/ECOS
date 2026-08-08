@@ -349,7 +349,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
 
   // ── Render ──
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white">
+    <div className="flex-1 flex flex-col min-h-0 ${styles.cardBg}">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 bg-slate-50/80 shrink-0">
         <Settings size={16} className="text-slate-500" />
@@ -403,7 +403,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
           ) : (
             <>
               {/* Group Title */}
-              <div className="px-5 py-3 border-b border-slate-100 bg-white sticky top-0 z-10">
+              <div className="px-5 py-3 border-b border-slate-100 ${styles.cardBg} sticky top-0 z-10">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">
                     {currentGroup.icon}
@@ -460,7 +460,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
                             }`}
                           >
                             <span
-                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
+                              className={`inline-block h-3.5 w-3.5 transform rounded-full ${styles.cardBg} transition-transform shadow-sm ${
                                 displayValue === true || displayValue === 'true' ? 'translate-x-[18px]' : 'translate-x-[3px]'
                               }`}
                             />
@@ -473,7 +473,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
                         <select
                           value={String(displayValue)}
                           onChange={e => handleValueChange(item.key, e.target.value)}
-                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white text-slate-700 focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
+                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} text-slate-700 focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
                         >
                           {item.options.map(opt => (
                             <option key={opt} value={opt}>{opt}</option>
@@ -485,7 +485,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
                             type={passwordRevealed ? 'text' : 'password'}
                             value={passwordRevealed ? String(displayValue ?? '') : '********'}
                             onChange={e => handleValueChange(item.key, e.target.value)}
-                            className="w-full px-2.5 py-1.5 pr-16 text-xs border border-slate-300 rounded-md bg-white text-slate-700 font-mono focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none transition-colors"
+                            className="w-full px-2.5 py-1.5 pr-16 text-xs border border-slate-300 rounded-md ${styles.cardBg} text-slate-700 font-mono focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none transition-colors"
                             placeholder="********"
                           />
                           <button
@@ -503,7 +503,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
                           step="1"
                           value={displayValue as number}
                           onChange={e => handleValueChange(item.key, parseInt(e.target.value, 10) || 0)}
-                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white text-slate-700 font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
+                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} text-slate-700 font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
                         />
                       ) : item.type === 'float' ? (
                         <input
@@ -513,14 +513,14 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
                           max="1"
                           value={displayValue as number}
                           onChange={e => handleValueChange(item.key, parseFloat(e.target.value) || 0)}
-                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white text-slate-700 font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
+                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} text-slate-700 font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
                         />
                       ) : (
                         <input
                           type="text"
                           value={String(displayValue ?? '')}
                           onChange={e => handleValueChange(item.key, e.target.value)}
-                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white text-slate-700 font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
+                          className="w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} text-slate-700 font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors"
                         />
                       )}
 

@@ -4,12 +4,13 @@ import {
   createDqItem, updateDqItem, deleteDqItem,
   runDqCheck, resolveDqIssue,
 } from "../api";
-import { Shield, AlertTriangle, CheckCircle2, Plus, Play, RefreshCw, X, ExternalLink } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, Plus, Play, RefreshCw, X, ExternalLink, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import { useDict } from "../hooks/useDict";
 import { commit as gitCommit } from '../services/gitService';
+import RuleTemplateLibrary from './data-workbench/RuleTemplateLibrary';
 
 const SEV_COLORS: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700 border-red-200",
@@ -38,6 +39,7 @@ export default function DataQualityDashboard() {
   const [resolveIssue, setResolveIssue] = useState<any>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [tplLibOpen, setTplLibOpen] = useState(false);
 
   const tl = (zh: string, en: string) => locale === "zh" ? zh : en;
 
@@ -205,6 +207,11 @@ export default function DataQualityDashboard() {
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5">
                 <Play className="w-3 h-3" />
                 {tl("执行检查", "Run Check")}
+              </button>
+              <button onClick={() => setTplLibOpen(true)}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                <BookOpen className="w-3 h-3" />
+                {tl("模板库", "Templates")}
               </button>
             </div>
             <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden`}>
@@ -438,6 +445,26 @@ export default function DataQualityDashboard() {
                   {tl("确认解决", "Confirm")}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TEMPLATE LIBRARY MODAL */}
+        {tplLibOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setTplLibOpen(false)}>
+            <div className={`${styles.cardBg} rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 border ${styles.cardBorder} max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-lg font-bold ${styles.cardText}`}>
+                  {tl("DQ规则模板库", "DQ Rule Template Library")}
+                </h2>
+                <button onClick={() => setTplLibOpen(false)} className="p-1 hover:bg-slate-100 rounded">
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+              <RuleTemplateLibrary
+                onClose={() => setTplLibOpen(false)}
+                onApplied={fetchAll}
+              />
             </div>
           </div>
         )}

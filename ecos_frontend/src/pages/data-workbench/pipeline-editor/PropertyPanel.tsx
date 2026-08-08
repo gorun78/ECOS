@@ -125,7 +125,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
 
     if (!node) {
       return (
-        <div className="w-72 border-l border-slate-200 bg-white flex flex-col h-full">
+        <div className="w-72 border-l border-slate-200 ${styles.cardBg} flex flex-col h-full">
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">属性面板</span>
           </div>
@@ -137,7 +137,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
     }
 
     return (
-      <div className="w-80 border-l border-slate-200 bg-white flex flex-col h-full overflow-hidden">
+      <div className="w-80 border-l border-slate-200 ${styles.cardBg} flex flex-col h-full overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50 shrink-0">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">

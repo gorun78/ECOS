@@ -126,73 +126,73 @@ export default function DataWorkbenchLayout({
     const conn = connections.find(c => c.id === connId);
     if (!conn) return;
     const addLog = (msg: string, d: number) => setTimeout(() => setTestingLogs(p => [...p, msg]), d);
-    addLog(`[ECOS Ingress] 🔌 初始化协议驱动程序：[${conn.type.toUpperCase()}]`, 100);
-    addLog(`[ECOS Ingress] 📡 连线目标端点...`, 400);
+    addLog(`${t('databench.layout.testLog.initDriver')}[${conn.type.toUpperCase()}]`, 100);
+    addLog(t('databench.layout.testLog.connecting'), 400);
     setTimeout(() => {
       if (connId === 'crew_schedules_sftp') {
-        setTestingLogs(p => [...p, '[SFTP ERROR] ❌ SSH 握手失败', '[ECOS Core] ⚠️ 测试未通过。']);
+        setTestingLogs(p => [...p, t('databench.layout.testLog.sshFailed'), t('databench.layout.testLog.testFailed')]);
         setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'error' as const } : c));
-        showToast('error', `数据源 [${conn.name}] 连通性测试失败！`);
+        showToast('error', t('databench.layout.toast.connTestFailed', { name: conn.name }));
       } else {
         const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-        setTestingLogs(p => [...p, '[ECOS Ingress] ✅ 连通成功！', '[ECOS Ingress] 📖 成功拉取元数据。']);
+        setTestingLogs(p => [...p, t('databench.layout.testLog.connected'), t('databench.layout.testLog.metadataOk')]);
         setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'connected' as const, config: { ...c.config, lastTested: tn } } : c));
-        showToast('success', `数据源 [${conn.name}] 连通性验证通过！`);
+        showToast('success', t('databench.layout.toast.connTestPassed', { name: conn.name }));
       }
       setTestingConnId(null);
     }, 1800);
   };
 
   const createConnection = () => {
-    if (!ncName.trim()) { showToast('error', '请输入连接名称'); return; }
+    if (!ncName.trim()) { showToast('error', t('databench.layout.toast.connNameRequired')); return; }
     const id = `conn_${Date.now().toString().slice(-4)}`;
     const c: DataConnection = { id, name: ncName, type: ncType, status: 'testing', config: { host: ncHost || 'localhost', port: ncPort, username: ncUser || 'anonymous' }, tablesAvailable: [{ name: 'raw_imported_table_1', rowCount: 25000, columns: [{ name: 'id', type: 'integer' }, { name: 'record_payload', type: 'string' }, { name: 'sync_timestamp', type: 'timestamp' }] }] };
     setConnections([...connections, c]); setSelConnId(id); setShowAddConn(false);
-    showToast('success', `新建连接 [${ncName}] 成功！`);
+    showToast('success', t('databench.layout.toast.connCreated', { name: ncName }));
     setTimeout(() => testConnection(id), 500);
   };
 
   const triggerSync = (taskId: string) => {
     setSyncTasks(p => p.map(t => t.id === taskId ? { ...t, status: 'running' as const } : t));
-    showToast('info', '正在后台调度集群执行拉取任务...');
+    showToast('info', t('databench.layout.toast.syncRunning'));
     setTimeout(() => {
       const task = syncTasks.find(t => t.id === taskId);
       const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
       if (taskId !== 'sync_sap_costs') {
         setSyncTasks(p => p.map(t => t.id === taskId ? { ...t, status: 'success' as const, lastRunTime: tn, recordsSynced: (t.recordsSynced || 0) + Math.floor(Math.random() * 200) + 5, errorMessage: undefined } : t));
-        showToast('success', `任务 [${task?.name}] 执行成功！`);
+        showToast('success', t('databench.layout.toast.syncSuccess', { name: task?.name }));
       } else {
         setSyncTasks(p => p.map(t => t.id === taskId ? { ...t, status: 'failed' as const, lastRunTime: tn, errorMessage: '[SAP RFC ERROR] Gateway timed out.' } : t));
-        showToast('error', `任务 [${task?.name}] 执行失败。`);
+        showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
       }
     }, 1500);
   };
 
   const createSync = () => {
-    if (!nsName.trim() || !nsTable.trim()) { showToast('error', '请完整输入任务名称与目标表名'); return; }
+    if (!nsName.trim() || !nsTable.trim()) { showToast('error', t('databench.layout.toast.syncFormIncomplete')); return; }
     const t: DataSyncTask = { id: `sync_${Date.now().toString().slice(-4)}`, name: nsName, sourceConnectionId: nsConn || (connections[0]?.id || ''), sourceTable: nsTable, targetDatasetId: `ds_raw_${nsTable.toLowerCase()}`, syncMode: nsMode, schedule: nsSched, status: 'paused', recordsSynced: 0 };
     setSyncTasks([...syncTasks, t]); setSelTaskId(t.id); setShowAddSync(false);
-    showToast('success', `同步任务 [${nsName}] 初始化完成。`);
+    showToast('success', t('databench.layout.toast.syncCreated', { name: nsName }));
   };
 
   const createHealth = () => {
-    if (!nhName.trim()) { showToast('error', '请输入健康检查名称'); return; }
-    const c: DataHealthCheck = { id: `check_${Date.now().toString().slice(-4)}`, datasetId: nhDs || 'ds_flights_clean', name: nhName, checkType: nhType, config: { minRows: nhType === 'row_count' ? parseInt(nhThr) : undefined, maxNullPercentage: nhType === 'null_check' ? parseFloat(nhThr) : undefined, maxDelayMinutes: nhType === 'freshness' ? parseInt(nhThr) : undefined, targetColumn: 'pilot_id' }, status: 'pending', lastChecked: '无', message: '尚未开始运行检测' };
+    if (!nhName.trim()) { showToast('error', t('databench.layout.toast.healthNameRequired')); return; }
+    const c: DataHealthCheck = { id: `check_${Date.now().toString().slice(-4)}`, datasetId: nhDs || 'ds_flights_clean', name: nhName, checkType: nhType, config: { minRows: nhType === 'row_count' ? parseInt(nhThr) : undefined, maxNullPercentage: nhType === 'null_check' ? parseFloat(nhThr) : undefined, maxDelayMinutes: nhType === 'freshness' ? parseInt(nhThr) : undefined, targetColumn: 'pilot_id' }, status: 'pending', lastChecked: t('databench.layout.health.none'), message: t('databench.layout.health.notRun') };
     setHealthChecks([...healthChecks, c]); setSelCheckId(c.id); setShowAddCheck(false);
-    showToast('success', `新建健康检查 [${nhName}] 成功！`);
+    showToast('success', t('databench.layout.toast.healthCreated', { name: nhName }));
   };
 
   const runCheck = (checkId: string) => {
-    setHealthChecks(p => p.map(c => c.id === checkId ? { ...c, status: 'pending' as const, message: computeEngine === 'doris' ? '正在下推 Apache Doris 执行多维质量分析...' : '正在启动 Client In-Memory 沙箱校验...' } : c));
+    setHealthChecks(p => p.map(c => c.id === checkId ? { ...c, status: 'pending' as const, message: computeEngine === 'doris' ? t('databench.layout.health.dorisCheck') : t('databench.layout.health.memoryCheck') } : c));
     setTimeout(() => {
       const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
       setHealthChecks(p => p.map(c => {
         if (c.id !== checkId) return c;
         const finalStatus = c.checkType === 'freshness' ? 'warning' as const : 'passed' as const;
-        const msg = c.checkType === 'freshness' ? '警告：当前最新数据时间延时达 105 分钟，触及警戒水平。' : '通过：规则判定完全符合标准。';
+        const msg = c.checkType === 'freshness' ? t('databench.layout.health.warningFreshness') : t('databench.layout.health.passed');
         return { ...c, status: finalStatus, lastChecked: tn, message: msg };
       }));
-      showToast('success', '数据健康规则检测运算结束');
+      showToast('success', t('databench.layout.toast.healthCheckComplete'));
     }, 1000);
   };
 
@@ -203,7 +203,7 @@ export default function DataWorkbenchLayout({
         {/* Sidebar */}
         <div className={`w-52 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col justify-between shrink-0 select-none`}>
           <div className="py-3 px-3 space-y-1 overflow-y-auto">
-            <div className={`text-xs font-bold ${styles.cardText} px-2.5 mb-3`}>{locale === 'zh' ? '数据工作台' : 'Data Workbench'}</div>
+            <div className={`text-xs font-bold ${styles.cardText} px-2.5 mb-3`}>{t('databench.layout.sidebarTitle')}</div>
             {TAB_CONFIG.map((tab, idx) => {
               const prevGrp = idx > 0 ? TAB_CONFIG[idx - 1].i18nKey.split('.')[2] : '';
               const thisGrp = tab.i18nKey.split('.')[2];

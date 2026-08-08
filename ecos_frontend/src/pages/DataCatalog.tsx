@@ -5,12 +5,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Database, Cpu, Activity, Shield, Filter, Plus, FileText, Settings, ShieldAlert, BadgeInfo, AlertCircle, X, RefreshCw, Loader2, Table, Eye, GitBranch } from "lucide-react";
+import { Search, Database, Cpu, Activity, Shield, Filter, Plus, FileText, Settings, ShieldAlert, BadgeInfo, AlertCircle, X, RefreshCw, Loader2, Table, Eye, GitBranch, LayoutGrid, ListTree } from "lucide-react";
 import { DataAsset, DataResource, DataSource } from "../types";
 import { fetchDataSources, fetchResources, fetchAllResources, BulkResource } from "../api";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import { useDict } from "../hooks/useDict";
+import CatalogTree, { TreeNode } from "./data-workbench/CatalogTree";
+import CatalogContextMenu from "./data-workbench/CatalogContextMenu";
 
 /** Map a DataResource to a DataAsset for the existing catalog UI */
 function resourceToAsset(r: DataResource, ds: DataSource): DataAsset {
@@ -71,6 +73,12 @@ export default function DataCatalog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ datasources: 0, tables: 0, views: 0 });
+  const [viewMode, setViewMode] = useState<"tree" | "card">("tree");
+  const [contextMenu, setContextMenu] = useState<{
+    node: TreeNode;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const loadAssets = async () => {
     setLoading(true);
@@ -139,7 +147,7 @@ export default function DataCatalog() {
         <div className="rounded-lg p-3 mb-4 flex items-center gap-2 text-sm bg-amber-50 border border-amber-200 text-amber-700">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span className="flex-1">{error}</span>
-          <button onClick={loadAssets} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-white border border-current/20 rounded hover:bg-opacity-80 transition">
+          <button onClick={loadAssets} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold ${styles.cardBg} border border-current/20 rounded hover:bg-opacity-80 transition">
             <RefreshCw className="w-3 h-3" />{locale === "zh" ? "重试" : "Retry"}
           </button>
           <button onClick={() => setError(null)} className="text-current/60 hover:text-current">&times;</button>
@@ -160,6 +168,30 @@ export default function DataCatalog() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-center p-0.5`}>
+            <button
+              onClick={() => setViewMode("tree")}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === "tree"
+                  ? "bg-indigo-500 text-white shadow-sm"
+                  : `${styles.cardText} opacity-60 hover:opacity-100`
+              }`}
+            >
+              <ListTree className="w-3.5 h-3.5" />
+              {locale === "zh" ? "树形" : "Tree"}
+            </button>
+            <button
+              onClick={() => setViewMode("card")}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === "card"
+                  ? "bg-indigo-500 text-white shadow-sm"
+                  : `${styles.cardText} opacity-60 hover:opacity-100`
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              {locale === "zh" ? "卡片" : "Card"}
+            </button>
+          </div>
           <button
             onClick={() => navigate("/lineage")}
             className={`${styles.cardBg} hover:bg-slate-50 border ${styles.cardBorder} hover:border-slate-300 ${styles.cardText} rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition shadow-xs`}
@@ -229,106 +261,129 @@ export default function DataCatalog() {
         </div>
       </div>
 
-      {/* Grid of Datasets */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
-        {loading ? (
-          <div className={`py-24 text-center ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-xs`}>
-            <Loader2 className="w-10 h-10 mx-auto text-indigo-500 mb-2 animate-spin" />
-            <p className={`text-sm ${styles.muted} font-bold`}>{locale === "zh" ? "正在加载数据资源..." : "Loading data resources..."}</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className={`py-24 text-center ${styles.cardBg} border border-dashed ${styles.cardBorder} rounded-xl shadow-xs`}>
-            <ShieldAlert className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-            <p className={`text-sm ${styles.muted} font-bold`}>{locale === "zh" ? "在当前的过滤条件下，没有符合条件的企业资产" : "No matching catalogs in target filter options"}</p>
-          </div>
-        ) : (
-          filtered.map((asset) => {
-            return (
-              <div
-                key={asset.id}
-                id={`catalog-asset-${asset.id}`}
-                onClick={() => navigate("/dataset_explorer/" + asset.id)}
-                className={`${styles.cardBg} hover:bg-slate-50 border ${styles.cardBorder} hover:border-slate-300 rounded-xl p-5 transition duration-150 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs`}
-              >
-                {/* Visual block */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span className={`text-sm font-bold ${styles.cardText} hover:text-indigo-500 transition`}>
-                      {asset.name}
-                    </span>
-                    <span className="text-[10px] font-bold font-mono bg-slate-50 border border-slate-200 text-slate-500 px-2.5 py-0.5 rounded-md">
-                      {asset.domain}
-                    </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 font-bold rounded-md border ${
-                        asset.status === "Healthy"
-                          ? "bg-green-50 border-green-200 text-green-700"
-                          : asset.status === "Warning"
-                          ? "bg-amber-50 border-amber-200 text-amber-700"
-                          : "bg-red-50 border-red-200 text-red-700"
-                      }`}
-                    >
-                      {getStatusLabel(asset.status) !== asset.status
-                        ? getStatusLabel(asset.status)
-                        : locale === "zh"
-                        ? asset.status === "Healthy"
-                          ? "良好"
-                          : asset.status === "Warning"
-                          ? "警告"
-                          : "故障"
-                        : asset.status}
-                    </span>
+      {/* Content: Tree or Card Grid */}
+      {viewMode === "tree" ? (
+        <div
+          className="flex-1 overflow-hidden"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <CatalogTree
+            onContextMenu={(e, node) =>
+              setContextMenu({ node, x: e.clientX, y: e.clientY })
+            }
+          />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+          {loading ? (
+            <div className={`py-24 text-center ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-xs`}>
+              <Loader2 className="w-10 h-10 mx-auto text-indigo-500 mb-2 animate-spin" />
+              <p className={`text-sm ${styles.muted} font-bold`}>{locale === "zh" ? "正在加载数据资源..." : "Loading data resources..."}</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className={`py-24 text-center ${styles.cardBg} border border-dashed ${styles.cardBorder} rounded-xl shadow-xs`}>
+              <ShieldAlert className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+              <p className={`text-sm ${styles.muted} font-bold`}>{locale === "zh" ? "在当前的过滤条件下，没有符合条件的企业资产" : "No matching catalogs in target filter options"}</p>
+            </div>
+          ) : (
+            filtered.map((asset) => {
+              return (
+                <div
+                  key={asset.id}
+                  id={`catalog-asset-${asset.id}`}
+                  onClick={() => navigate("/dataset_explorer/" + asset.id)}
+                  className={`${styles.cardBg} hover:bg-slate-50 border ${styles.cardBorder} hover:border-slate-300 rounded-xl p-5 transition duration-150 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs`}
+                >
+                  {/* Visual block */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 mb-2 flex-wrap">
+                      <span className={`text-sm font-bold ${styles.cardText} hover:text-indigo-500 transition`}>
+                        {asset.name}
+                      </span>
+                      <span className="text-[10px] font-bold font-mono bg-slate-50 border border-slate-200 text-slate-500 px-2.5 py-0.5 rounded-md">
+                        {asset.domain}
+                      </span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 font-bold rounded-md border ${
+                          asset.status === "Healthy"
+                            ? "bg-green-50 border-green-200 text-green-700"
+                            : asset.status === "Warning"
+                            ? "bg-amber-50 border-amber-200 text-amber-700"
+                            : "bg-red-50 border-red-200 text-red-700"
+                        }`}
+                      >
+                        {getStatusLabel(asset.status) !== asset.status
+                          ? getStatusLabel(asset.status)
+                          : locale === "zh"
+                          ? asset.status === "Healthy"
+                            ? "良好"
+                            : asset.status === "Warning"
+                            ? "警告"
+                            : "故障"
+                          : asset.status}
+                      </span>
+                    </div>
+
+                    <p className={`text-xs ${styles.muted} line-clamp-2 max-w-3xl leading-relaxed`}>
+                      {asset.description}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4.5 text-[11px] text-slate-400 font-mono">
+                      <span className="flex items-center gap-1.5">
+                        <Database className="w-3.5 h-3.5 text-slate-400" />
+                        {locale === "zh" ? "数据源" : "Source"}: <strong className={`${styles.cardText} font-sans font-bold`}>{asset.owner}</strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        {locale === "zh" ? "列数" : "Columns"}: <strong className={`${styles.cardText} font-sans font-bold`}>{asset.columns}</strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        {locale === "zh" ? "类型" : "Type"}: <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold font-sans ${
+                          asset.type === "view" 
+                            ? "bg-purple-50 text-purple-600 border border-purple-200" 
+                            : "bg-blue-50 text-blue-600 border border-blue-200"
+                        }`}>{asset.type === "view" ? "VIEW" : "TABLE"}</span>
+                      </span>
+                      {asset.tags && asset.tags.length > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            {asset.tags.map((tag, i) => (
+                              <span key={i} className="text-[10px] bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-sans">{tag}</span>
+                            ))}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <p className={`text-xs ${styles.muted} line-clamp-2 max-w-3xl leading-relaxed`}>
-                    {asset.description}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4.5 text-[11px] text-slate-400 font-mono">
-                    <span className="flex items-center gap-1.5">
-                      <Database className="w-3.5 h-3.5 text-slate-400" />
-                      {locale === "zh" ? "数据源" : "Source"}: <strong className={`${styles.cardText} font-sans font-bold`}>{asset.owner}</strong>
-                    </span>
-                    <span>•</span>
-                    <span>
-                      {locale === "zh" ? "列数" : "Columns"}: <strong className={`${styles.cardText} font-sans font-bold`}>{asset.columns}</strong>
-                    </span>
-                    <span>•</span>
-                    <span>
-                      {locale === "zh" ? "类型" : "Type"}: <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold font-sans ${
-                        asset.type === "view" 
-                          ? "bg-purple-50 text-purple-600 border border-purple-200" 
-                          : "bg-blue-50 text-blue-600 border border-blue-200"
-                      }`}>{asset.type === "view" ? "VIEW" : "TABLE"}</span>
-                    </span>
-                    {asset.tags && asset.tags.length > 0 && (
-                      <>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          {asset.tags.map((tag, i) => (
-                            <span key={i} className="text-[10px] bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-sans">{tag}</span>
-                          ))}
-                        </span>
-                      </>
-                    )}
+                  {/* Right side: column count badge */}
+                  <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold font-mono tracking-wider text-slate-450 block">{locale === "zh" ? "字段数" : "Fields"}</span>
+                      <span className={`text-xl font-extrabold font-sans ${styles.cardText}`}>
+                        {asset.columns}
+                      </span>
+                    </div>
                   </div>
+
                 </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
-                {/* Right side: column count badge */}
-                <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold font-mono tracking-wider text-slate-450 block">{locale === "zh" ? "字段数" : "Fields"}</span>
-                    <span className={`text-xl font-extrabold font-sans ${styles.cardText}`}>
-                      {asset.columns}
-                    </span>
-                  </div>
-                </div>
-
-              </div>
-            );
-          })
-        )}
-      </div>
+      {/* Context Menu */}
+      {contextMenu && (
+        <CatalogContextMenu
+          node={contextMenu.node}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
 
     </div>
   );

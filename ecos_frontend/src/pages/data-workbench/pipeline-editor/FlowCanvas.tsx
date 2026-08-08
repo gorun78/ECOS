@@ -80,7 +80,7 @@ const SourceNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
   const status: NodeStatus = config.nodeStatus || 'idle';
   return (
     <div
-      className={`relative min-w-[180px] rounded-xl border-2 bg-white shadow-md transition-shadow ${
+      className={`relative min-w-[180px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
         selected ? 'border-blue-500 shadow-lg ring-2 ring-blue-200' : 'border-blue-300'
       }`}
     >
@@ -116,7 +116,7 @@ const TransformNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
   const ruleCount = config.transformRules?.length || 0;
   return (
     <div
-      className={`relative min-w-[180px] rounded-xl border-2 bg-white shadow-md transition-shadow ${
+      className={`relative min-w-[180px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
         selected ? 'border-emerald-500 shadow-lg ring-2 ring-emerald-200' : 'border-emerald-300'
       }`}
     >
@@ -152,7 +152,7 @@ const JoinNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
   const condCount = config.joinConditions?.length || 0;
   return (
     <div
-      className={`relative min-w-[200px] rounded-xl border-2 bg-white shadow-md transition-shadow ${
+      className={`relative min-w-[200px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
         selected ? 'border-purple-500 shadow-lg ring-2 ring-purple-200' : 'border-purple-300'
       }`}
     >
@@ -191,7 +191,7 @@ const AggregateNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
   const groupByCols = config.aggregateGroupBy?.length || 0;
   return (
     <div
-      className={`relative min-w-[200px] rounded-xl border-2 bg-white shadow-md transition-shadow ${
+      className={`relative min-w-[200px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
         selected ? 'border-orange-500 shadow-lg ring-2 ring-orange-200' : 'border-orange-300'
       }`}
     >
@@ -226,7 +226,7 @@ const SinkNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
   const status: NodeStatus = config.nodeStatus || 'idle';
   return (
     <div
-      className={`relative min-w-[180px] rounded-xl border-2 bg-white shadow-md transition-shadow ${
+      className={`relative min-w-[180px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
         selected ? 'border-slate-500 shadow-lg ring-2 ring-slate-200' : 'border-slate-300'
       }`}
     >

@@ -14,6 +14,7 @@ import {
   type PBFunctionCategory,
   CATEGORY_LABELS,
 } from './pbFunctions';
+import { useLanguage } from '../../../components/LanguageContext';
 
 // ─── Props ────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
   onClose,
   className = '',
 }) => {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [copiedFn, setCopiedFn] = useState<string | null>(null);
@@ -73,8 +75,8 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
       if (
         query === '' ||
         fn.name.toLowerCase().includes(query) ||
-        fn.description.toLowerCase().includes(query) ||
-        CATEGORY_LABELS[fn.category].includes(query)
+        t(fn.description).toLowerCase().includes(query) ||
+        t(CATEGORY_LABELS[fn.category]).includes(query)
       ) {
         if (!groups[fn.category]) groups[fn.category] = [];
         groups[fn.category].push(fn);
@@ -107,15 +109,15 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
   );
 
   return (
-    <div className={`flex flex-col bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden ${className}`}>
+    <div className={`flex flex-col ${styles.cardBg} border border-slate-200 rounded-lg shadow-xl overflow-hidden ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0">
         <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          函数库
+          {t('databench.pipeline.functionLibrary')}
         </h3>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-slate-400">
-            {PB_FUNCTIONS.length} 个函数
+            {t('databench.pipeline.functionCount', { count: PB_FUNCTIONS.length })}
           </span>
           {onClose && (
             <button
@@ -137,8 +139,8 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索函数名、描述或分类..."
-            className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white text-slate-700 placeholder:text-slate-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 outline-none transition-colors"
+            placeholder={t('databench.pipeline.searchPlaceholder')}
+            className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-md ${styles.cardBg} text-slate-700 placeholder:text-slate-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 outline-none transition-colors"
           />
         </div>
       </div>
@@ -148,7 +150,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
         {Object.keys(groupedFunctions).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-slate-400">
             <Search size={24} className="mb-2" />
-            <span className="text-xs">未找到匹配的函数</span>
+            <span className="text-xs">{t('databench.pipeline.noFunctionsFound')}</span>
           </div>
         ) : (
           Object.entries(groupedFunctions).map(([category, functions]) => {
@@ -159,7 +161,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                 {/* Category header */}
                 <button
                   onClick={() => toggleCategory(category)}
-                  className={`flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors sticky top-0 bg-white z-10`}
+                  className={`flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors sticky top-0 ${styles.cardBg} z-10`}
                 >
                   {isCollapsed ? (
                     <ChevronRight size={12} className="text-slate-400" />
@@ -172,7 +174,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                     {CATEGORY_ICONS[catKey]}
                   </span>
                   <span className="text-xs font-semibold text-slate-700 flex-1">
-                    {CATEGORY_LABELS[catKey]}
+                    {t(CATEGORY_LABELS[catKey])}
                   </span>
                   <span className="text-[10px] text-slate-400 tabular-nums">
                     {functions.length}
@@ -198,7 +200,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                             </span>
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5 truncate">
-                            {fn.description}
+                            {t(fn.description)}
                           </div>
                           <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">
                             {fn.example}
@@ -211,7 +213,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                               handleCopyExample(fn);
                             }}
                             className="p-0.5 rounded hover:bg-purple-200 text-slate-400 hover:text-purple-600 transition-colors"
-                            title="复制示例"
+                            title={t('databench.pipeline.copyExample')}
                           >
                             {copiedFn === fn.name ? (
                               <Check size={12} className="text-green-500" />
@@ -225,7 +227,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                               handleSelect(fn);
                             }}
                             className="p-0.5 rounded hover:bg-purple-200 text-slate-400 hover:text-purple-600 transition-colors"
-                            title="插入函数"
+                            title={t('databench.pipeline.insertFunction')}
                           >
                             <Info size={12} />
                           </button>

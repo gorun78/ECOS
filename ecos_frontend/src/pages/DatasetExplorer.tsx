@@ -235,7 +235,7 @@ export default function DatasetExplorer() {
           </button>
           
           <div>
-            <div className="text-xs text-gray-500 mb-0.5">
+            <div className="text-xs ${styles.cardTextMuted} mb-0.5">
               <button onClick={() => navigate("/catalog")} className="hover:text-gray-300 transition">
                 {locale === "zh" ? "数据目录" : "Data Catalog"}
               </button>
@@ -251,7 +251,7 @@ export default function DatasetExplorer() {
               </span>
             </div>
             
-            <p className="text-[11px] text-gray-500 mt-1 max-w-2xl truncate">
+            <p className="text-[11px] ${styles.cardTextMuted} mt-1 max-w-2xl truncate">
               {locale === "zh" && asset.id === "ds_customer360"
                 ? "包含企业客户全生命周期收益价值、注册账单电邮、高维地理细分及流失模型估值的多维度360度基础关系物理表。"
                 : locale === "zh" && asset.id === "ds_plantops"
@@ -304,7 +304,7 @@ export default function DatasetExplorer() {
               className={`h-9 px-4 font-sans text-[11px] font-semibold tracking-wide border-b-2 transition ${
                 isActive
                   ? "border-blue-500 text-blue-400 font-bold"
-                  : "border-transparent text-gray-500 hover:text-gray-300"
+                  : "border-transparent ${styles.cardTextMuted} hover:text-gray-300"
               }`}
               onClick={() => setActiveTab(tab.id as any)}
             >
@@ -327,19 +327,19 @@ export default function DatasetExplorer() {
                 <h2 className="text-xs font-bold uppercase font-mono tracking-wider text-gray-400 mb-3 block">{t("db.stats.title")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
                   <div className="bg-[#0b0e14] p-3 rounded-md border border-gray-900">
-                    <span className="text-[10px] uppercase font-mono text-gray-500 block">{t("db.stats.rows")}</span>
+                    <span className="text-[10px] uppercase font-mono ${styles.cardTextMuted} block">{t("db.stats.rows")}</span>
                     <strong className="text-lg font-bold text-white mt-1 block">{asset.rows.toLocaleString()}</strong>
                   </div>
                   <div className="bg-[#0b0e14] p-3 rounded-md border border-gray-900">
-                    <span className="text-[10px] uppercase font-mono text-gray-500 block">{t("db.stats.cols")}</span>
+                    <span className="text-[10px] uppercase font-mono ${styles.cardTextMuted} block">{t("db.stats.cols")}</span>
                     <strong className="text-lg font-bold text-white mt-1 block">{asset.columns}</strong>
                   </div>
                   <div className="bg-[#0b0e14] p-3 rounded-md border border-gray-900">
-                    <span className="text-[10px] uppercase font-mono text-gray-500 block">{t("db.stats.size")}</span>
+                    <span className="text-[10px] uppercase font-mono ${styles.cardTextMuted} block">{t("db.stats.size")}</span>
                     <strong className="text-lg font-bold text-white mt-1 block">{asset.storageSize}</strong>
                   </div>
                   <div className="bg-[#0b0e14] p-3 rounded-md border border-gray-900">
-                    <span className="text-[10px] uppercase font-mono text-gray-500 block">{t("db.stats.quality")}</span>
+                    <span className="text-[10px] uppercase font-mono ${styles.cardTextMuted} block">{t("db.stats.quality")}</span>
                     <strong className="text-lg font-bold text-blue-400 mt-1 block">{asset.qualityScore}%</strong>
                   </div>
                 </div>
@@ -353,7 +353,7 @@ export default function DatasetExplorer() {
                 </h2>
                 
                 {asset.history.length === 0 ? (
-                  <p className="text-xs text-gray-500 text-center py-6">{t("db.history.empty")}</p>
+                  <p className="text-xs ${styles.cardTextMuted} text-center py-6">{t("db.history.empty")}</p>
                 ) : (
                   <div className="space-y-4 font-sans text-xs">
                     {asset.history.map((record, index) => (
@@ -369,7 +369,7 @@ export default function DatasetExplorer() {
                             <span className="font-bold text-gray-200">
                               {locale === "zh" ? "版本修订" : "Revision"} {record.version} • {getHistoryAction(record.action)}
                             </span>
-                            <span className="text-gray-500">{record.timestamp}</span>
+                            <span className="${styles.cardTextMuted}">{record.timestamp}</span>
                           </div>
                           <p className="text-gray-400 leading-normal text-[11px]">
                             {getHistorySummary(record.id, record.summary)}
@@ -393,7 +393,7 @@ export default function DatasetExplorer() {
                 <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-gray-400 mb-3 block">{t("db.meta.title")}</h3>
                 <div className="space-y-3 text-xs">
                   <div>
-                    <span className="text-gray-500 block text-[10px] uppercase font-mono">{t("db.meta.domain")}</span>
+                    <span className="${styles.cardTextMuted} block text-[10px] uppercase font-mono">{t("db.meta.domain")}</span>
                     <span className="text-gray-350 font-medium block mt-0.5 text-gray-300">
                       {locale === "zh" && asset.domain === "Marketing & Analytics"
                         ? "市场营销与跨端分析域"
@@ -405,7 +405,7 @@ export default function DatasetExplorer() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500 block text-[10px] uppercase font-mono">{t("db.meta.tags")}</span>
+                    <span className="${styles.cardTextMuted} block text-[10px] uppercase font-mono">{t("db.meta.tags")}</span>
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {asset.tags.map((tag) => (
                         <span key={tag} className="text-[10px] bg-[#1c2230] px-2 py-0.5 rounded-xs text-gray-400 border border-gray-800">
@@ -438,20 +438,20 @@ export default function DatasetExplorer() {
                 <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-gray-400 mb-3 block">{t("db.permissions.title")}</h3>
                 <div className="space-y-2.5 text-xs">
                   <div>
-                    <span className="text-gray-500 text-[10px] uppercase font-mono flex items-center gap-1">
+                    <span className="${styles.cardTextMuted} text-[10px] uppercase font-mono flex items-center gap-1">
                       <Shield className="w-3.5 h-3.5 text-amber-500" /> {t("db.permissions.owner")}
                     </span>
                     <p className="text-gray-300 font-sans mt-1 pl-4.5">{asset.permissions.owner.join(", ")}</p>
                   </div>
                   <div>
-                    <span className="text-gray-500 text-[10px] uppercase font-mono flex items-center gap-1">
+                    <span className="${styles.cardTextMuted} text-[10px] uppercase font-mono flex items-center gap-1">
                       <UserCheck className="w-3.5 h-3.5 text-blue-500" /> {t("db.permissions.editor")}
                     </span>
                     <p className="text-gray-300 font-sans mt-0.5 pl-4.5">{asset.permissions.editor.join(", ")}</p>
                   </div>
                   <div>
-                    <span className="text-gray-500 text-[10px] uppercase font-mono flex items-center gap-1">
-                      <Lock className="w-3.5 h-3.5 text-gray-500" /> {t("db.permissions.viewer")}
+                    <span className="${styles.cardTextMuted} text-[10px] uppercase font-mono flex items-center gap-1">
+                      <Lock className="w-3.5 h-3.5 ${styles.cardTextMuted}" /> {t("db.permissions.viewer")}
                     </span>
                     <p className="text-gray-300 font-sans mt-0.5 pl-4.5">{asset.permissions.viewer.join(", ")}</p>
                   </div>
@@ -474,7 +474,7 @@ export default function DatasetExplorer() {
               
               <div className="flex-1 overflow-auto scrollbar-thin">
                 <table className="w-full text-xs text-left text-gray-400">
-                  <thead className="bg-[#0b0e14]/50 font-mono text-[10px] text-gray-500 uppercase sticky top-0 border-b border-gray-850">
+                  <thead className="bg-[#0b0e14]/50 font-mono text-[10px] ${styles.cardTextMuted} uppercase sticky top-0 border-b border-gray-850">
                     <tr>
                       <th className="px-4 py-2">{t("db.fields.col_field")}</th>
                       <th className="px-4 py-2">{t("db.fields.col_type")}</th>
@@ -515,7 +515,7 @@ export default function DatasetExplorer() {
               {selectedColumn ? (
                 <div className="space-y-4">
                   <div>
-                    <span className="text-[9px] uppercase font-mono tracking-wider text-gray-500 block">{t("db.inspector.title")}</span>
+                    <span className="text-[9px] uppercase font-mono tracking-wider ${styles.cardTextMuted} block">{t("db.inspector.title")}</span>
                     <h3 className="text-sm font-bold text-white mt-1 font-mono flex items-center gap-1.5">
                       {selectedColumn.primaryKey && <Lock className="w-3.5 h-3.5 text-amber-500" />}
                       {selectedColumn.name}
@@ -524,17 +524,17 @@ export default function DatasetExplorer() {
 
                   <div className="space-y-2.5 text-xs">
                     <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-mono">{t("db.inspector.type")}</span>
+                      <span className="${styles.cardTextMuted} block text-[10px] uppercase font-mono">{t("db.inspector.type")}</span>
                       <code className="text-blue-400 font-mono text-xs block mt-0.5">{selectedColumn.type}</code>
                     </div>
                     <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-mono">{t("db.inspector.nullability")}</span>
+                      <span className="${styles.cardTextMuted} block text-[10px] uppercase font-mono">{t("db.inspector.nullability")}</span>
                       <span className="text-gray-350 block font-mono mt-0.5">
                         {selectedColumn.nullable ? t("db.inspector.null_yes") : t("db.inspector.null_no")}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-mono">{t("db.inspector.semantics")}</span>
+                      <span className="${styles.cardTextMuted} block text-[10px] uppercase font-mono">{t("db.inspector.semantics")}</span>
                       <p className="text-gray-300 mt-1 leading-normal">
                         {getColDesc(selectedColumn.name, selectedColumn.description || "")}
                       </p>
@@ -544,7 +544,7 @@ export default function DatasetExplorer() {
                   {/* Quality details inside inspector */}
                   <div className="pt-4 border-t border-gray-850">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] uppercase font-mono text-gray-500 flex items-center gap-1">
+                      <span className="text-[10px] uppercase font-mono ${styles.cardTextMuted} flex items-center gap-1">
                         <Award className="w-3.5 h-3.5 text-green-500" /> {t("db.inspector.quality")}
                       </span>
                       <span className="text-xs font-bold font-mono text-green-400">{selectedColumn.qualityScore}%</span>
@@ -577,18 +577,18 @@ export default function DatasetExplorer() {
           <div className="border border-gray-800 rounded-md bg-[#141924] flex flex-col h-full overflow-hidden shadow-xs">
             <div className="px-4 py-2 bg-[#1b2130] text-[10px] font-mono uppercase tracking-wider text-gray-400 font-bold border-b border-gray-850 shrink-0 flex items-center justify-between">
               <span>{t("db.preview.title").replace("limit", `${previewRows.length}`)}</span>
-              <span className="text-gray-500 text-[9px] font-mono normal-case">{t("db.preview.desc")}</span>
+              <span className="${styles.cardTextMuted} text-[9px] font-mono normal-case">{t("db.preview.desc")}</span>
             </div>
 
             {previewRows.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+              <div className="flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted}">
                 <Database className="w-8 h-8 mb-2 text-gray-600" />
                 <p className="text-xs font-mono">{t("db.preview.empty") || "No preview data available. Connect the backend to view sample rows."}</p>
               </div>
             ) : (
               <div className="flex-1 overflow-auto scrollbar-thin">
                 <table className="w-full text-xs text-left text-gray-400">
-                  <thead className="bg-[#0b0e14]/50 border-b border-gray-850 font-mono text-[10px] text-gray-500 uppercase sticky top-0">
+                  <thead className="bg-[#0b0e14]/50 border-b border-gray-850 font-mono text-[10px] ${styles.cardTextMuted} uppercase sticky top-0">
                     <tr>
                       {Object.keys(previewRows[0]).map((key) => (
                         <th key={key} className="px-4 py-2.5 font-medium">{key}</th>
@@ -622,7 +622,7 @@ export default function DatasetExplorer() {
               </div>
             )}
 
-            <div className="px-4 py-1.5 border-t border-gray-850 bg-[#0c1017] text-[10px] text-gray-500 font-mono">
+            <div className="px-4 py-1.5 border-t border-gray-850 bg-[#0c1017] text-[10px] ${styles.cardTextMuted} font-mono">
               {t("db.preview.sql")}<strong className="text-gray-350 select-all font-mono font-semibold">SELECT * FROM {asset.name} LIMIT 100;</strong>
             </div>
           </div>
@@ -663,7 +663,7 @@ export default function DatasetExplorer() {
                             </span>
                           </div>
                           <p className="text-gray-400 leading-normal mb-1">{getRuleDesc(rule.id, rule.description)}</p>
-                          <div className="text-[10px] font-mono text-gray-500">{t("db.quality.method")}{rule.type}</div>
+                          <div className="text-[10px] font-mono ${styles.cardTextMuted}">{t("db.quality.method")}{rule.type}</div>
                         </div>
                       </div>
                     );
@@ -675,7 +675,7 @@ export default function DatasetExplorer() {
             {/* Quality Summary dashboard */}
             <div className="space-y-4">
               <div className="bg-[#141924] border border-gray-800 rounded-md p-4 text-center">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-gray-500 block">{t("db.quality.health_grade")}</span>
+                <span className="text-[10px] uppercase font-mono tracking-wider ${styles.cardTextMuted} block">{t("db.quality.health_grade")}</span>
                 <strong className={`text-4xl font-extrabold block mt-2 font-sans ${asset.qualityScore >= 95 ? "text-green-400" : "text-amber-500"}`}>
                   {asset.qualityScore >= 95 ? "A+" : "B"}
                 </strong>
@@ -708,11 +708,11 @@ export default function DatasetExplorer() {
               <span className="text-xs text-gray-400">
                 {lineageNodes.length} nodes · {lineageLinks.length} edges
               </span>
-              {lineageLoading && <RefreshCw className="w-3 h-3 animate-spin text-gray-500" />}
+              {lineageLoading && <RefreshCw className="w-3 h-3 animate-spin ${styles.cardTextMuted}" />}
             </div>
             <div className="flex-1 flex min-h-0">
               {lineageNodes.length === 0 && !lineageLoading ? (
-                <div className="flex-1 flex items-center justify-center text-gray-500">
+                <div className="flex-1 flex items-center justify-center ${styles.cardTextMuted}">
                   <Database className="w-10 h-10 mb-3 text-gray-600" />
                   <p className="text-xs font-mono ml-3">{t("db.lineage.empty") || "No lineage data available."}</p>
                 </div>

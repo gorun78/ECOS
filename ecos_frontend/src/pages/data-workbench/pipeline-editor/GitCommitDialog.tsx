@@ -151,7 +151,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
 
       {/* Dialog */}
-      <div className="relative z-10 bg-white rounded-xl shadow-2xl w-[520px] max-h-[600px] flex flex-col overflow-hidden">
+      <div className="relative z-10 ${styles.cardBg} rounded-xl shadow-2xl w-[520px] max-h-[600px] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
           <div className="flex items-center gap-2">
@@ -224,7 +224,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg appearance-none bg-white focus:border-indigo-400 outline-none transition-colors"
+                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg appearance-none ${styles.cardBg} focus:border-indigo-400 outline-none transition-colors"
                   >
                     {branches.map((b) => (
                       <option key={b.name} value={b.name}>

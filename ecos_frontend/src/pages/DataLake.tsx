@@ -160,7 +160,7 @@ export default function DataLake() {
   const renderHealthBadge = (label: string, status: string | undefined) => {
     if (!status) {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 ${styles.cardTextMuted} dark:bg-gray-800 dark:text-gray-400">
           <Loader2 className="w-3 h-3 animate-spin" />
           {label}
         </span>
@@ -209,7 +209,7 @@ export default function DataLake() {
           <button
             onClick={() => { fetchHealth(); fetchTables(); }}
             disabled={healthLoading}
-            className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-md hover:bg-black/5 dark:hover:${styles.cardBg}/10 transition-colors"
             title={tzh("刷新", "Refresh")}
           >
             <RefreshCw className={`w-4 h-4 opacity-60 ${healthLoading ? "animate-spin" : ""}`} />
@@ -246,7 +246,7 @@ export default function DataLake() {
                     className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors duration-100 ${
                       selectedTable === tbl.table
                         ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
-                        : "hover:bg-black/5 dark:hover:bg-white/5"
+                        : "hover:bg-black/5 dark:hover:${styles.cardBg}/5"
                     }`}
                   >
                     <Table className="w-4 h-4 shrink-0 mt-0.5 opacity-60" />
@@ -272,7 +272,7 @@ export default function DataLake() {
               disabled={!selectedTable || exportLoading}
               className={`w-full py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-2 transition-colors ${
                 !selectedTable || exportLoading
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500"
+                  ? "${styles.appBg} ${styles.cardTextMuted} cursor-not-allowed"
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}
             >
@@ -327,7 +327,7 @@ export default function DataLake() {
                 disabled={queryLoading || !sql.trim()}
                 className={`shrink-0 px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors self-start ${
                   queryLoading || !sql.trim()
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500"
+                    ? "${styles.appBg} ${styles.cardTextMuted} cursor-not-allowed"
                     : "bg-emerald-600 text-white hover:bg-emerald-700"
                 }`}
               >
@@ -381,17 +381,17 @@ export default function DataLake() {
 
                 {/* Table */}
                 {columns.length > 0 ? (
-                  <div className="overflow-auto rounded-lg border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-420px)]">
+                  <div className="overflow-auto rounded-lg border ${styles.cardBorder} dark:border-gray-700 max-h-[calc(100vh-420px)]">
                     <table className="w-full text-xs border-collapse">
                       <thead>
-                        <tr className="bg-gray-50 dark:bg-gray-800/60">
-                          <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-left font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 w-10">
+                        <tr className="${styles.appBg} dark:bg-gray-800/60">
+                          <th className="sticky left-0 z-10 ${styles.appBg} dark:bg-gray-800/60 px-3 py-2 text-left font-semibold ${styles.cardTextMuted} dark:text-gray-400 border-b ${styles.cardBorder} dark:border-gray-700 w-10">
                             #
                           </th>
                           {columns.map((col) => (
                             <th
                               key={col}
-                              className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap"
+                              className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300 border-b ${styles.cardBorder} dark:border-gray-700 whitespace-nowrap"
                             >
                               {col}
                             </th>
@@ -402,11 +402,11 @@ export default function DataLake() {
                         {queryResult.data.map((row, idx) => (
                           <tr
                             key={idx}
-                            className={`border-b border-gray-100 dark:border-gray-800 ${
-                              idx % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/50 dark:bg-gray-800/30"
+                            className={`border-b $${styles.cardBorder} ${
+                              idx % 2 === 0 ? "${styles.cardBg} dark:bg-gray-900" : "${styles.appBg}/50 dark:bg-gray-800/30"
                             } hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20`}
                           >
-                            <td className="sticky left-0 z-10 px-3 py-1.5 text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800 font-mono bg-inherit">
+                            <td className="sticky left-0 z-10 px-3 py-1.5 text-gray-400 dark:${styles.cardTextMuted} border-b $${styles.cardBorder} font-mono bg-inherit">
                               {idx + 1}
                             </td>
                             {columns.map((col) => {
@@ -419,7 +419,7 @@ export default function DataLake() {
                               return (
                                 <td
                                   key={col}
-                                  className="px-3 py-1.5 text-gray-700 dark:text-gray-300 max-w-xs truncate font-mono border-b border-gray-100 dark:border-gray-800"
+                                  className="px-3 py-1.5 text-gray-700 dark:text-gray-300 max-w-xs truncate font-mono border-b $${styles.cardBorder}"
                                   title={val !== null && val !== undefined ? String(val) : undefined}
                                 >
                                   {display}

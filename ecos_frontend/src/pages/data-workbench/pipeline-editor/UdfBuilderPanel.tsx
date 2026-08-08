@@ -128,7 +128,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
   }, [udfName, showToast]);
 
   return (
-    <div className={`flex flex-col h-full bg-white ${className}`}>
+    <div className={`flex flex-col h-full ${styles.cardBg} ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50 shrink-0">
         <div className="flex items-center gap-2">
@@ -142,7 +142,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as UdfLanguage)}
-            className="px-2 py-1 text-[10px] border border-slate-200 rounded bg-white text-slate-600 focus:border-purple-400 outline-none"
+            className="px-2 py-1 text-[10px] border border-slate-200 rounded ${styles.cardBg} text-slate-600 focus:border-purple-400 outline-none"
           >
             <option value="python">Python</option>
             <option value="sql">SQL</option>
