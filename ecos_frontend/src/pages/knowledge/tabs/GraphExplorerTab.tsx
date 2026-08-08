@@ -39,16 +39,16 @@ interface GraphExplorerTabProps {
   // Independent tab, no external props
 }
 
-const DOMAIN_OPTIONS = [
-  { value: '', label: '全部' },
-  { value: 'ontology', label: '本体域' },
-  { value: 'data', label: '数据域' },
-  { value: 'business', label: '业务域' },
-];
-
 export default function GraphExplorerTab() {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
+
+  const DOMAIN_OPTIONS = [
+    { value: '', label: t('knowledge.graph.all') },
+    { value: 'ontology', label: t('knowledge.graph.ontologyDomain') },
+    { value: 'data', label: t('knowledge.graph.dataDomain') },
+    { value: 'business', label: t('knowledge.graph.businessDomain') },
+  ];
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -87,11 +87,11 @@ export default function GraphExplorerTab() {
       setPathNodes(new Set());
       setPathEdges(new Set());
     } catch (e: any) {
-      showToast('error', '加载图谱异常: ' + e.message);
+      showToast('error', t('knowledge.graph.loadGraphError') + e.message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -107,9 +107,9 @@ export default function GraphExplorerTab() {
         description: r.description,
       }));
       setSearchResults(results);
-      if (results.length === 0) showToast('info', '未找到匹配节点');
+      if (results.length === 0) showToast('info', t('knowledge.graph.noMatch'));
     } catch (e: any) {
-      showToast('error', '搜索异常: ' + e.message);
+      showToast('error', t('knowledge.graph.searchError') + e.message);
     } finally {
       setIsLoading(false);
     }
@@ -148,9 +148,9 @@ export default function GraphExplorerTab() {
       setExpandedNodeIds(prev => new Set(prev).add(nodeId));
       setNodes(prev => { const existing = new Set(prev.map(n => n.id)); return [...prev, ...newNodes.filter((n: GraphNode) => !existing.has(n.id))]; });
       setEdges(prev => { const existing = new Set(prev.map(e => e.id)); return [...prev, ...newEdges.filter((e: GraphEdge) => !existing.has(e.id))]; });
-      showToast('success', `已展开 ${nodeId} 的邻居节点`);
+      showToast('success', t('knowledge.graph.expandSuccess', { nodeId }));
     } catch (e: any) {
-      showToast('error', '展开邻居异常: ' + e.message);
+      showToast('error', t('knowledge.graph.expandError') + e.message);
     } finally {
       setIsLoading(false);
     }
@@ -172,7 +172,7 @@ export default function GraphExplorerTab() {
       expansionChildrenRef.current.delete(nodeId);
     }
     setExpandedNodeIds(prev => { const s = new Set(prev); s.delete(nodeId); return s; });
-    showToast('success', `已收起 ${nodeId} 的邻居`);
+    showToast('success', t('knowledge.graph.collapseSuccess', { nodeId }));
   };
 
   const handleSelectNode = async (nodeId: string | null) => {
@@ -194,7 +194,7 @@ export default function GraphExplorerTab() {
   const handleDoubleClickNode = (nodeId: string) => { handleExpandNeighbors(nodeId); };
 
   const handleComputePath = async () => {
-    if (!pathSource || !pathTarget) { showToast('error', '请选择起点和终点节点'); return; }
+    if (!pathSource || !pathTarget) { showToast('error', t('knowledge.graph.pathRequired')); return; }
     setIsComputingPath(true);
     try {
       const data = await knowledgeApi.findPath(pathSource, pathTarget) as any;
@@ -202,39 +202,39 @@ export default function GraphExplorerTab() {
       const pathEdgeList: string[] = data?.pathEdges || data?.edgeIds || [];
       setPathNodes(new Set(pathNodeList));
       setPathEdges(new Set(pathEdgeList));
-      showToast('success', `路径计算完成，共 ${pathNodeList.length} 个节点`);
+      showToast('success', t('knowledge.graph.pathSuccess', { count: pathNodeList.length }));
     } catch (e: any) {
-      showToast('error', '路径计算异常: ' + e.message);
+      showToast('error', t('knowledge.graph.pathError') + e.message);
     } finally {
       setIsComputingPath(false);
     }
   };
 
   const handleCreateNode = async () => {
-    if (!newNodeForm.label.trim()) { showToast('error', '节点标签不能为空'); return; }
+    if (!newNodeForm.label.trim()) { showToast('error', t('knowledge.graph.nodeLabelRequired')); return; }
     try {
       let properties = {};
-      if (newNodeForm.properties.trim()) { try { properties = JSON.parse(newNodeForm.properties); } catch { showToast('error', '属性JSON格式错误'); return; } }
+      if (newNodeForm.properties.trim()) { try { properties = JSON.parse(newNodeForm.properties); } catch { showToast('error', t('knowledge.graph.propertiesJsonError')); return; } }
       await knowledgeApi.createNode({ label: newNodeForm.label, nodeType: newNodeForm.nodeType || 'default', description: newNodeForm.description, properties });
-      showToast('success', '节点创建成功');
+      showToast('success', t('knowledge.graph.nodeCreateSuccess'));
       setShowCreateForm(null);
       setNewNodeForm({ label: '', nodeType: '', description: '', properties: '' });
       loadGraph();
     } catch (e: any) {
-      showToast('error', '创建节点异常: ' + e.message);
+      showToast('error', t('knowledge.graph.nodeCreateError') + e.message);
     }
   };
 
   const handleCreateEdge = async () => {
-    if (!newEdgeForm.sourceNodeId || !newEdgeForm.targetNodeId) { showToast('error', '源节点和目标节点不能为空'); return; }
+    if (!newEdgeForm.sourceNodeId || !newEdgeForm.targetNodeId) { showToast('error', t('knowledge.graph.edgeRequired')); return; }
     try {
       await knowledgeApi.createEdge({ sourceNodeId: newEdgeForm.sourceNodeId, targetNodeId: newEdgeForm.targetNodeId, relationship: newEdgeForm.relationship || 'related_to', weight: parseFloat(newEdgeForm.weight) || 1 });
-      showToast('success', '边创建成功');
+      showToast('success', t('knowledge.graph.edgeCreateSuccess'));
       setShowCreateForm(null);
       setNewEdgeForm({ sourceNodeId: '', targetNodeId: '', relationship: '', weight: '1' });
       loadGraph();
     } catch (e: any) {
-      showToast('error', '创建边异常: ' + e.message);
+      showToast('error', t('knowledge.graph.edgeCreateError') + e.message);
     }
   };
 
@@ -261,7 +261,7 @@ export default function GraphExplorerTab() {
       <div className="w-56 border-r border-slate-700 flex flex-col shrink-0 p-3 space-y-3 bg-slate-900">
         {/* Search — full-text graph search */}
         <div className="space-y-1.5 relative">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("knowledge.graphexplorerta.269")}</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('knowledge.graph.fullTextSearch')}</label>
           <div className="flex gap-1.5">
             <input
               type="text"
@@ -269,7 +269,7 @@ export default function GraphExplorerTab() {
               onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(false); }}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
-              placeholder={t("knowledge.graphexplorerta.224")}
+              placeholder={t('knowledge.graph.searchPlaceholder')}
               className="flex-1 px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
             />
             <button
@@ -299,13 +299,13 @@ export default function GraphExplorerTab() {
 
         {/* Path finder — inline inputs */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("knowledge.graphexplorerta.270")}</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('knowledge.graph.pathFinder')}</label>
           <div className="flex gap-1 items-center">
             <input
               type="text"
               value={pathSource}
               onChange={(e) => setPathSource(e.target.value)}
-              placeholder={t("knowledge.graphexplorerta.225")}
+              placeholder={t('knowledge.graph.pathSourcePlaceholder')}
               className="w-[70px] px-2 py-1 text-[10px] bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500"
             />
             <ArrowRight size={10} className="text-slate-500 shrink-0" />
@@ -313,11 +313,11 @@ export default function GraphExplorerTab() {
               type="text"
               value={pathTarget}
               onChange={(e) => setPathTarget(e.target.value)}
-              placeholder={t("knowledge.graphexplorerta.226")}
+              placeholder={t('knowledge.graph.pathTargetPlaceholder')}
               className="w-[70px] px-2 py-1 text-[10px] bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500"
             />
             <button
-              onClick={() => { if (pathSource && pathTarget) handleComputePath(); else showToast('error', '请输入起点和终点'); }}
+              onClick={() => { if (pathSource && pathTarget) handleComputePath(); else showToast('error', t('knowledge.graph.pathRequired')); }}
               disabled={isComputingPath}
               className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
             >
@@ -328,7 +328,7 @@ export default function GraphExplorerTab() {
 
         {/* Domain Filter */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("knowledge.graphexplorerta.271")}</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('knowledge.graph.domainFilter')}</label>
           <select
             value={domainFilter}
             onChange={(e) => handleDomainChange(e.target.value)}
@@ -347,13 +347,13 @@ export default function GraphExplorerTab() {
           className="w-full px-3 py-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-600 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
         >
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Network size={12} />}
-          加载全图
+          {t('knowledge.graph.loadFullGraph')}
         </button>
 
         {/* Neighbor Expand */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            {t("knowledge.graphexplorerta.272")}
+            {t('knowledge.graph.neighborDegree')}
           </label>
           <input
             type="range"
@@ -372,16 +372,16 @@ export default function GraphExplorerTab() {
 
         {/* Legend */}
         <div className="mt-auto p-2.5 bg-slate-800 rounded-lg border border-slate-700 space-y-1.5">
-          <span className="text-[9px] font-bold text-slate-500 uppercase">{t("knowledge.graphexplorerta.273")}</span>
+          <span className="text-[9px] font-bold text-slate-500 uppercase">{t('knowledge.graph.legend')}</span>
           <div className="space-y-1 text-[10px] text-slate-400">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500" /> {t("knowledge.graphexplorerta.274")}
+              <span className="w-2 h-2 rounded-full bg-blue-500" /> {t('knowledge.graph.dataDomain')}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t("knowledge.graphexplorerta.275")}
+              <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t('knowledge.graph.ontologyDomain')}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500" /> {t("knowledge.graphexplorerta.276")}
+              <span className="w-2 h-2 rounded-full bg-amber-500" /> {t('knowledge.graph.businessDomain')}
             </div>
           </div>
         </div>
@@ -392,7 +392,7 @@ export default function GraphExplorerTab() {
         {isLoading && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
             <Loader2 size={12} className="animate-spin" />
-            {t("knowledge.graphexplorerta.277")}
+            {t('knowledge.graph.loadingGraph')}
           </div>
         )}
 
@@ -400,7 +400,7 @@ export default function GraphExplorerTab() {
           <div className="flex items-center justify-center h-full text-slate-500 text-xs">
             <div className="text-center space-y-2">
               <Network size={32} className="mx-auto text-slate-600" />
-              <p>{t("knowledge.graphexplorerta.278")}</p>
+              <p>{t('knowledge.graph.emptyHint')}</p>
             </div>
           </div>
         ) : (
@@ -426,17 +426,17 @@ export default function GraphExplorerTab() {
             className="px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-lg"
           >
             <Plus size={12} />
-            {t("knowledge.graphexplorerta.279")}
+            {t('knowledge.graph.newNode')}
           </button>
           <button
             onClick={() => setShowCreateForm('edge')}
             className="px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-lg"
           >
             <ArrowRight size={12} />
-            {t("knowledge.graphexplorerta.280")}
+            {t('knowledge.graph.newEdge')}
           </button>
           <span className="text-[10px] text-slate-500 self-center ml-auto">
-            {nodes.length} 节点 · {edges.length} 边
+            {t('knowledge.graph.nodeEdgeCount', { nodes: nodes.length, edges: edges.length })}
           </span>
         </div>
       </div>
@@ -447,7 +447,7 @@ export default function GraphExplorerTab() {
           <div className="px-3 py-2.5 border-b border-slate-700 flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
               <Info size={12} className="text-blue-400" />
-              {t("knowledge.graphexplorerta.281")}
+              {t('knowledge.graph.nodeDetail')}
             </h3>
             <button
               onClick={() => { setShowDetailPanel(false); setSelectedNodeId(null); }}
@@ -479,7 +479,7 @@ export default function GraphExplorerTab() {
               {detailDisplayNode.properties && Object.keys(detailDisplayNode.properties).length > 0 && (
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    {t("knowledge.graphexplorerta.282")}
+                    {t('knowledge.graph.properties')}
                   </span>
                   <div className="bg-slate-800 rounded-lg p-2 space-y-1">
                     {Object.entries(detailDisplayNode.properties).map(([key, value]) => (
@@ -497,10 +497,10 @@ export default function GraphExplorerTab() {
               {/* Related Edges */}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  {t("knowledge.graphexplorerta.283")}
+                  {t('knowledge.graph.relatedEdges', { count: nodeEdges.length })}
                 </span>
                 {nodeEdges.length === 0 ? (
-                  <p className="text-slate-600 text-[10px]">{t("knowledge.graphexplorerta.284")}</p>
+                  <p className="text-slate-600 text-[10px]">{t('knowledge.graph.noRelatedEdges')}</p>
                 ) : (
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {nodeEdges.map((edge) => (
@@ -530,7 +530,7 @@ export default function GraphExplorerTab() {
                     className="w-full px-3 py-1.5 text-[11px] font-bold bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Minimize2 size={11} />
-                    {t("knowledge.graphexplorerta.285")}
+                    {t('knowledge.graph.collapseNode')}
                   </button>
                 ) : (
                   <button
@@ -538,7 +538,7 @@ export default function GraphExplorerTab() {
                     className="w-full px-3 py-1.5 text-[11px] font-bold bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <ExternalLink size={11} />
-                    {t("knowledge.graphexplorerta.286")}
+                    {t('knowledge.graph.expandNode')}
                   </button>
                 )}
                 <button
@@ -548,13 +548,13 @@ export default function GraphExplorerTab() {
                   className="w-full px-3 py-1.5 text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   <GitBranch size={11} />
-                  {t("knowledge.graphexplorerta.287")}
+                  {t('knowledge.graph.setAsPathSource')}
                 </button>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-slate-500 text-[11px]">
-              {t("knowledge.graphexplorerta.288")}
+              {t('knowledge.graph.noNodeSelected')}
             </div>
           )}
         </div>
@@ -567,8 +567,8 @@ export default function GraphExplorerTab() {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
                 {showCreateForm === 'node'
-                  ? <><Plus size={14} className="text-blue-400" /> {t("knowledge.graphexplorerta.289")}</>
-                  : <><ArrowRight size={14} className="text-emerald-400" /> {t("knowledge.graphexplorerta.290")}</>
+                  ? <><Plus size={14} className="text-blue-400" /> {t('knowledge.graph.newNode')}</>
+                  : <><ArrowRight size={14} className="text-emerald-400" /> {t('knowledge.graph.newEdge')}</>
                 }
               </h3>
               <button
@@ -582,41 +582,41 @@ export default function GraphExplorerTab() {
             {showCreateForm === 'node' ? (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.291")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeLabel')}</label>
                   <input
                     type="text"
                     value={newNodeForm.label}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, label: e.target.value }))}
-                    placeholder={t("knowledge.graphexplorerta.227")}
+                    placeholder={t('knowledge.graph.nodeLabelPlaceholder')}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.292")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeType')}</label>
                   <input
                     type="text"
                     value={newNodeForm.nodeType}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, nodeType: e.target.value }))}
-                    placeholder={t("knowledge.graphexplorerta.228")}
+                    placeholder={t('knowledge.graph.nodeTypePlaceholder')}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.293")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeDescription')}</label>
                   <textarea
                     value={newNodeForm.description}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, description: e.target.value }))}
-                    placeholder={t("knowledge.graphexplorerta.229")}
+                    placeholder={t('knowledge.graph.nodeDescriptionPlaceholder')}
                     rows={2}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 resize-none"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.294")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeProperties')}</label>
                   <textarea
                     value={newNodeForm.properties}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, properties: e.target.value }))}
-                    placeholder='例如: {"domain": "finance", "owner": "admin"}'
+                    placeholder='{"domain": "finance", "owner": "admin"}'
                     rows={2}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 resize-none font-mono"
                   />
@@ -626,56 +626,56 @@ export default function GraphExplorerTab() {
                     onClick={() => setShowCreateForm(null)}
                     className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-600 transition cursor-pointer"
                   >
-                    {t("knowledge.graphexplorerta.295")}
+                    {t('knowledge.graph.cancel')}
                   </button>
                   <button
                     onClick={handleCreateNode}
                     className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition cursor-pointer"
                   >
-                    {t("knowledge.graphexplorerta.296")}
+                    {t('knowledge.graph.create')}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.297")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.sourceNode')}</label>
                   <select
                     value={newEdgeForm.sourceNodeId}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, sourceNodeId: e.target.value }))}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-emerald-500 cursor-pointer"
                   >
-                    <option value="">{t("knowledge.graphexplorerta.298")}</option>
+                    <option value="">{t('knowledge.graph.selectNode')}</option>
                     {nodes.map(n => (
                       <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.299")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.targetNode')}</label>
                   <select
                     value={newEdgeForm.targetNodeId}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, targetNodeId: e.target.value }))}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-emerald-500 cursor-pointer"
                   >
-                    <option value="">{t("knowledge.graphexplorerta.300")}</option>
+                    <option value="">{t('knowledge.graph.selectNode')}</option>
                     {nodes.map(n => (
                       <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.301")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.relationship')}</label>
                   <input
                     type="text"
                     value={newEdgeForm.relationship}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, relationship: e.target.value }))}
-                    placeholder={t("knowledge.graphexplorerta.230")}
+                    placeholder={t('knowledge.graph.relationshipPlaceholder')}
                     className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-emerald-500"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t("knowledge.graphexplorerta.302")}</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.weight')}</label>
                   <input
                     type="number"
                     value={newEdgeForm.weight}
@@ -690,13 +690,13 @@ export default function GraphExplorerTab() {
                     onClick={() => setShowCreateForm(null)}
                     className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-600 transition cursor-pointer"
                   >
-                    {t("knowledge.graphexplorerta.295")}
+                    {t('knowledge.graph.cancel')}
                   </button>
                   <button
                     onClick={handleCreateEdge}
                     className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer"
                   >
-                    {t("knowledge.graphexplorerta.304")}
+                    {t('knowledge.graph.create')}
                   </button>
                 </div>
               </div>
