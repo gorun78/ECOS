@@ -96,6 +96,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/ontology/proposals")
                 || path.startsWith("/api/monitor")
                 || path.startsWith("/api/v1/ontology/action-types")
+                || path.startsWith("/api/v1/ontology/functions")
                 || path.startsWith("/api/v1/engine")
                 || path.startsWith("/api/v1/cognitive")
                 || path.startsWith("/api/v1/kb/")) {
