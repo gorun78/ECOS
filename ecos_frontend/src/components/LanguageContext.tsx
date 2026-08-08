@@ -4,8 +4,18 @@
  */
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import zhTranslations from "../locales/zh-CN.json";
-import enTranslations from "../locales/en.json";
+import ontologyZh from "../locales/ontology/zh-CN.json";
+import aiworkbenchZh from "../locales/aiworkbench/zh-CN.json";
+import dwZh from "../locales/dw/zh-CN.json";
+import knowledgeZh from "../locales/knowledge/zh-CN.json";
+import secZh from "../locales/sec/zh-CN.json";
+import commonZh from "../locales/common/zh-CN.json";
+import ontologyEn from "../locales/ontology/en.json";
+import aiworkbenchEn from "../locales/aiworkbench/en.json";
+import dwEn from "../locales/dw/en.json";
+import knowledgeEn from "../locales/knowledge/en.json";
+import secEn from "../locales/sec/en.json";
+import commonEn from "../locales/common/en.json";
 
 export type Locale = "zh" | "en";
 
@@ -16,8 +26,8 @@ interface LanguageContextType {
 }
 
 const TRANSLATIONS: Record<Locale, Record<string, string>> = {
-  zh: zhTranslations,
-  en: enTranslations,
+  zh: { ...ontologyZh, ...aiworkbenchZh, ...dwZh, ...knowledgeZh, ...secZh, ...commonZh },
+  en: { ...ontologyEn, ...aiworkbenchEn, ...dwEn, ...knowledgeEn, ...secEn, ...commonEn },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
