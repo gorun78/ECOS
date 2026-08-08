@@ -1,15 +1,15 @@
 /**
- * OntologyObjectBrowser — 本体对象浏览器
+ * OntologyObjectBrowser — Object Type Browser
  *
- * 左侧：OntologyWorkbenchSidebar（域 → 对象类型树）
- * 右侧：选中对象类型的详情（元信息 + 属性表 + 映射）
+ * Left: OntologyWorkbenchSidebar (Domain → Object Type tree)
+ * Right: Details for selected object type (meta info + property table + mapping)
  *
- * 数据源：
- *   - GET /api/v1/ontology/domains  （域列表，用于解析域名）
- *   - GET /api/v1/ontology/objects  （对象类型列表，由侧边栏加载并透传）
+ * Data sources:
+ *   - GET /api/v1/ontology/domains  (domain list, for resolving domain names)
+ *   - GET /api/v1/ontology/objects  (object type list, loaded by sidebar and passed through)
  *
- * 类型来源：src/types/ontology.ts (OntologyDomain / ObjectType / PropertyType)
- * 不引入新依赖，不使用 mockData。
+ * Type source: src/types/ontology.ts (OntologyDomain / ObjectType / PropertyType)
+ * No new dependencies, no mockData.
  *
  * @license Apache-2.0
  */
@@ -33,6 +33,7 @@ import {
   Table2,
 } from "lucide-react";
 import OntologyWorkbenchSidebar from "../components/ontology-workbench/OntologyWorkbenchSidebar";
+import { useLanguage } from "../components/LanguageContext";
 import { apiFetchData } from "../api";
 import type {
   OntologyDomain,
@@ -42,7 +43,7 @@ import type {
 } from "../types/ontology";
 
 // ──────────────────────────────────────────────────────────────
-// 图标 / 颜色解析（与侧边栏保持一致的本地副本，避免循环依赖）
+// Icon / Color resolution (local copy, consistent with sidebar, avoids circular deps)
 // ──────────────────────────────────────────────────────────────
 type IconComp = React.ComponentType<{ size?: number | string; className?: string }>;
 const ICON_REGISTRY: Record<string, IconComp> = {
@@ -99,7 +100,7 @@ const STATUS_BADGE: Record<string, string> = {
   DEPRECATED: "text-rose-400 bg-rose-500/10 border-rose-500/30",
 };
 
-// 属性数据类型 → 展示标签 + 颜色
+// Property data type → display label + color
 const DATATYPE_STYLE: Record<PropertyDataType, string> = {
   string: "text-slate-300 bg-slate-500/10",
   integer: "text-blue-400 bg-blue-500/10",
@@ -113,9 +114,10 @@ const DATATYPE_STYLE: Record<PropertyDataType, string> = {
 const DOMAINS_API = "/api/v1/ontology/domains";
 
 // ──────────────────────────────────────────────────────────────
-// 属性表行
+// Property Table Row
 // ──────────────────────────────────────────────────────────────
 function PropertyRow({ prop }: { prop: PropertyType }) {
+  const { t } = useLanguage();
   const isPK = prop.isPrimaryKey;
   const dtStyle = DATATYPE_STYLE[prop.dataType] || "text-slate-300 bg-slate-500/10";
   return (
@@ -123,7 +125,7 @@ function PropertyRow({ prop }: { prop: PropertyType }) {
       <td className="px-3 py-2">
         <div className="flex items-center gap-1.5">
           {isPK && (
-            <span title="主键" className="shrink-0">
+            <span title={t("ontology.browser.tooltip.primaryKey")} className="shrink-0">
               <Key size={11} className="text-amber-400" />
             </span>
           )}
@@ -155,7 +157,7 @@ function PropertyRow({ prop }: { prop: PropertyType }) {
       <td className="px-3 py-2 text-center">
         {prop.sharedPropertyId ? (
           <span className="text-[9px] text-indigo-400 font-mono" title={prop.sharedPropertyId}>
-            共享
+            {t("ontology.browser.property.shared")}
           </span>
         ) : (
           <span className="text-[9px] text-slate-600">—</span>
@@ -166,7 +168,7 @@ function PropertyRow({ prop }: { prop: PropertyType }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 元信息卡片
+// Meta Info Card
 // ──────────────────────────────────────────────────────────────
 function MetaItem({
   icon,
@@ -196,9 +198,10 @@ function MetaItem({
 }
 
 // ──────────────────────────────────────────────────────────────
-// 主组件
+// Main Component
 // ──────────────────────────────────────────────────────────────
 export default function OntologyObjectBrowser() {
+  const { t } = useLanguage();
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [domainsLoading, setDomainsLoading] = useState(true);
   const [selected, setSelected] = useState<ObjectType | null>(null);
@@ -206,7 +209,7 @@ export default function OntologyObjectBrowser() {
   const [propSearch, setPropSearch] = useState("");
   const [error, setError] = useState("");
 
-  // ── 加载域（用于解析域名）──
+  // ── Load domains (for resolving domain names) ──
   useEffect(() => {
     let alive = true;
     setDomainsLoading(true);
@@ -215,7 +218,7 @@ export default function OntologyObjectBrowser() {
         if (alive) setDomains(Array.isArray(d) ? d : []);
       })
       .catch((e: any) => {
-        if (alive) setError(e?.message || "加载业务域失败");
+        if (alive) setError(e?.message || t("ontology.browser.loadDomainsFailed"));
       })
       .finally(() => {
         if (alive) setDomainsLoading(false);
@@ -226,12 +229,12 @@ export default function OntologyObjectBrowser() {
   }, []);
 
   const domainName = useMemo(() => {
-    if (!selected?.domainId) return "未分组";
+    if (!selected?.domainId) return t("ontology.browser.ungrouped");
     const d = domains.find((x) => x.id === selected.domainId);
     return d?.displayName || selected.domainId;
   }, [selected, domains]);
 
-  // 主键 / 标题属性解析
+  // Primary Key / Title Property resolution
   const pkProp = useMemo(
     () => selected?.properties.find((p) => p.id === selected.primaryKey) || null,
     [selected]
@@ -241,7 +244,7 @@ export default function OntologyObjectBrowser() {
     [selected]
   );
 
-  // 属性表过滤
+  // Property table filter
   const filteredProps = useMemo(() => {
     if (!selected) return [];
     const q = propSearch.trim().toLowerCase();
@@ -266,7 +269,7 @@ export default function OntologyObjectBrowser() {
 
   return (
     <div className="flex-1 flex h-full overflow-hidden bg-[#0f1117] font-sans">
-      {/* ═══════ 左侧：侧边栏 ═══════ */}
+      {/* ═══════ Left: Sidebar ═══════ */}
       <div className="w-[280px] min-w-[220px] border-r border-[#1E293B] shrink-0">
         <OntologyWorkbenchSidebar
           selectedDomainId={selectedDomainId}
@@ -276,12 +279,12 @@ export default function OntologyObjectBrowser() {
         />
       </div>
 
-      {/* ═══════ 右侧：详情区 ═══════ */}
+      {/* ═══════ Right: Details Area ═══════ */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* 顶部栏 */}
+        {/* Top Bar */}
         <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[#1E293B] bg-[#141924]">
           <Box className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="text-[11px] font-medium text-slate-300">对象浏览器</span>
+          <span className="text-[11px] font-medium text-slate-300">{t("ontology.browser.title")}</span>
           {selected && (
             <>
               <ChevronRight size={12} className="text-slate-600" />
@@ -293,11 +296,11 @@ export default function OntologyObjectBrowser() {
             </>
           )}
           <span className="ml-auto text-[10px] text-slate-600 font-mono">
-            {domainsLoading ? "加载域..." : `${domains.length} 域`}
+            {domainsLoading ? t("ontology.browser.loadingDomains") : t("ontology.browser.domainCount", { n: domains.length })}
           </span>
         </div>
 
-        {/* 错误浮层 */}
+        {/* Error Overlay */}
         {error && (
           <div className="mx-4 mt-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-3 py-2 text-xs flex items-center gap-2">
             <AlertCircle size={14} className="shrink-0" />
@@ -308,13 +311,13 @@ export default function OntologyObjectBrowser() {
           </div>
         )}
 
-        {/* 内容区 */}
+        {/* Content Area */}
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {!selected ? (
             <EmptyState />
           ) : (
             <div className="p-4 space-y-4">
-              {/* ── 对象类型头部 ── */}
+              {/* ── Object Type Header ── */}
               <ObjectHeader
                 obj={selected}
                 domainName={domainName}
@@ -322,45 +325,45 @@ export default function OntologyObjectBrowser() {
                 titleProp={titleProp?.displayName}
               />
 
-              {/* ── 元信息网格 ── */}
+              {/* ── Meta Info Grid ── */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <MetaItem
                   icon={<Layers size={10} />}
-                  label="所属域"
+                  label={t("ontology.browser.meta.domain")}
                   value={domainName}
                 />
                 <MetaItem
                   icon={<Key size={10} />}
-                  label="主键属性"
+                  label={t("ontology.browser.meta.primaryKey")}
                   value={pkProp?.displayName || selected.primaryKey}
                   mono={!pkProp}
                 />
                 <MetaItem
                   icon={<Type size={10} />}
-                  label="标题属性"
+                  label={t("ontology.browser.meta.titleProperty")}
                   value={titleProp?.displayName || selected.titleProperty}
                   mono={!titleProp}
                 />
                 <MetaItem
                   icon={<Link2 size={10} />}
-                  label="实现接口"
+                  label={t("ontology.browser.meta.interfaces")}
                   value={
                     selected.interfaces?.length
-                      ? `${selected.interfaces.length} 个`
-                      : "无"
+                      ? t("ontology.browser.meta.interfaceCount", { n: selected.interfaces.length })
+                      : t("ontology.browser.meta.none")
                   }
                 />
               </div>
 
-              {/* ── 属性表 ── */}
+              {/* ── Property Table ── */}
               <div className="bg-[#141924] border border-[#1E293B] rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1E293B]">
                   <Table2 size={13} className="text-indigo-400" />
                   <span className="text-xs font-semibold text-slate-200">
-                    属性定义
+                    {t("ontology.browser.properties.title")}
                   </span>
                   <span className="text-[10px] text-slate-500">
-                    {selected.properties.length} 项
+                    {t("ontology.browser.properties.count", { n: selected.properties.length })}
                   </span>
                   <div className="ml-auto relative">
                     <Search
@@ -370,7 +373,7 @@ export default function OntologyObjectBrowser() {
                     <input
                       value={propSearch}
                       onChange={(e) => setPropSearch(e.target.value)}
-                      placeholder="过滤属性..."
+                      placeholder={t("ontology.browser.properties.searchPlaceholder")}
                       className="w-44 bg-[#0b0e14] border border-[#1E293B] rounded-md pl-6 pr-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/40 transition"
                     />
                   </div>
@@ -379,11 +382,11 @@ export default function OntologyObjectBrowser() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="text-[9px] uppercase tracking-wider text-slate-500 border-b border-[#1E293B]">
-                        <th className="px-3 py-2 font-medium">属性名</th>
-                        <th className="px-3 py-2 font-medium">API 名</th>
-                        <th className="px-3 py-2 font-medium">类型</th>
-                        <th className="px-3 py-2 font-medium text-center">主键</th>
-                        <th className="px-3 py-2 font-medium text-center">共享</th>
+                        <th className="px-3 py-2 font-medium">{t("ontology.browser.properties.column.name")}</th>
+                        <th className="px-3 py-2 font-medium">{t("ontology.browser.properties.column.apiName")}</th>
+                        <th className="px-3 py-2 font-medium">{t("ontology.browser.properties.column.type")}</th>
+                        <th className="px-3 py-2 font-medium text-center">{t("ontology.browser.properties.column.primaryKey")}</th>
+                        <th className="px-3 py-2 font-medium text-center">{t("ontology.browser.properties.column.shared")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -394,8 +397,8 @@ export default function OntologyObjectBrowser() {
                             className="px-3 py-8 text-center text-[11px] text-slate-500"
                           >
                             {selected.properties.length === 0
-                              ? "该对象类型暂无属性定义"
-                              : "无匹配属性"}
+                              ? t("ontology.browser.properties.empty")
+                              : t("ontology.browser.properties.noMatch")}
                           </td>
                         </tr>
                       ) : (
@@ -408,13 +411,13 @@ export default function OntologyObjectBrowser() {
                 </div>
               </div>
 
-              {/* ── 数据映射（可选）── */}
+              {/* ── Data Mapping (optional) ── */}
               {selected.mapping && (
                 <div className="bg-[#141924] border border-[#1E293B] rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1E293B]">
                     <Database size={13} className="text-indigo-400" />
                     <span className="text-xs font-semibold text-slate-200">
-                      数据集映射
+                      {t("ontology.browser.mapping.title")}
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono truncate">
                       {selected.mapping.datasetId}
@@ -422,7 +425,7 @@ export default function OntologyObjectBrowser() {
                   </div>
                   <div className="p-3">
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">
-                      属性 → 列映射（{Object.keys(selected.mapping.propertyMappings).length} 项）
+                      {t("ontology.browser.mapping.propertyToColumn", { n: Object.keys(selected.mapping.propertyMappings).length })}
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                       {Object.entries(selected.mapping.propertyMappings).map(
@@ -451,13 +454,13 @@ export default function OntologyObjectBrowser() {
                 </div>
               )}
 
-              {/* ── 接口列表（可选）── */}
+              {/* ── Interface List (optional) ── */}
               {selected.interfaces && selected.interfaces.length > 0 && (
                 <div className="bg-[#141924] border border-[#1E293B] rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1E293B]">
                     <Link2 size={13} className="text-indigo-400" />
                     <span className="text-xs font-semibold text-slate-200">
-                      实现接口
+                      {t("ontology.browser.interfaces.title")}
                     </span>
                   </div>
                   <div className="p-3 flex flex-wrap gap-1.5">
@@ -481,7 +484,7 @@ export default function OntologyObjectBrowser() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 对象类型头部
+// Object Type Header
 // ──────────────────────────────────────────────────────────────
 function ObjectHeader({
   obj,
@@ -537,7 +540,7 @@ function ObjectHeader({
             )}
             {titleProp && (
               <span className="flex items-center gap-1">
-                <Type size={9} /> 标题: {titleProp}
+                <Type size={9} /> {t("ontology.browser.meta.title", { name: titleProp })}
               </span>
             )}
           </div>
@@ -548,17 +551,18 @@ function ObjectHeader({
 }
 
 // ──────────────────────────────────────────────────────────────
-// 空态
+// Empty State
 // ──────────────────────────────────────────────────────────────
 function EmptyState() {
+  const { t } = useLanguage();
   return (
     <div className="h-full flex flex-col items-center justify-center text-slate-500 px-6">
       <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-4">
         <Box size={28} className="text-indigo-400/60" />
       </div>
-      <p className="text-sm font-medium text-slate-400">未选择对象类型</p>
+      <p className="text-sm font-medium text-slate-400">{t("ontology.browser.empty.title")}</p>
       <p className="text-[11px] text-slate-600 mt-1 text-center max-w-xs">
-        从左侧侧边栏选择一个业务域并展开，点击其中的对象类型以查看其属性定义与数据映射。
+        {t("ontology.browser.empty.description")}
       </p>
     </div>
   );

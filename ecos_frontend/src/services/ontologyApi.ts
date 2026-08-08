@@ -762,6 +762,61 @@ export const ontologyApi = {
 };
 
 // ================================================================
+// 版本管理 (Version Timeline) — T3
+// ================================================================
+
+const VERSION_BASE = "/api/v1/ontology/versions";
+
+/** 版本列表项 */
+export interface VersionItem {
+  version: string;
+  createdAt: string;
+  author: string;
+  summary?: {
+    addedEntities: number;
+    modifiedEntities: number;
+    deletedEntities: number;
+  };
+}
+
+/** 版本差异中的实体变更 */
+export interface VersionDiffEntity {
+  entityCode: string;
+  entityName: string;
+  changeType: 'added' | 'modified' | 'deleted';
+  propertiesAdded?: { name: string; type: string }[];
+  propertiesModified?: { name: string; oldType: string; newType: string }[];
+  propertiesDeleted?: string[];
+}
+
+/** 版本差异响应 */
+export interface VersionDiff {
+  v1: string;
+  v2: string;
+  entities: VersionDiffEntity[];
+}
+
+/**
+ * 获取版本历史列表
+ * GET /api/v1/ontology/versions?domainCode=finance
+ */
+export async function fetchVersions(domainCode: string): Promise<VersionItem[]> {
+  return apiFetchData<VersionItem[]>(
+    `${VERSION_BASE}?domainCode=${encodeURIComponent(domainCode)}`
+  );
+}
+
+/**
+ * 获取两个版本之间的 diff
+ * GET /api/v1/ontology/versions/diff?v1=3.1&v2=3.2
+ */
+export async function fetchVersionDiff(v1: string, v2: string): Promise<VersionDiff> {
+  return apiFetchData<VersionDiff>(
+    `${VERSION_BASE}/diff?v1=${encodeURIComponent(v1)}&v2=${encodeURIComponent(v2)}`
+  );
+}
+
+// ================================================================
 // 自动发现 (Auto Discover) — T1
 // ================================================================
 

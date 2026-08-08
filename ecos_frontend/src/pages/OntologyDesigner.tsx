@@ -1,6 +1,6 @@
 /**
- * OntologyDesigner — 可视化本体设计器
- * 创建/编辑实体、属性、关系，图形化查看本体结构
+ * OntologyDesigner — Visual Ontology Designer
+ * Create/edit entities, properties, relationships; visualize ontology structure
  * @license Apache-2.0
  */
 import React, { useState, useEffect, useCallback } from "react";
@@ -73,7 +73,7 @@ export default function OntologyDesigner() {
         }));
         setRelationships(allRels);
       }
-    } catch (e: any) { showToast("err", e.message || "加载失败"); }
+    } catch (e: any) { showToast("err", e.message || t("ontology.designer.loadFailed")); }
     finally { setLoading(false); }
   }, []);
 
@@ -87,7 +87,7 @@ export default function OntologyDesigner() {
       setProperties(prev => ({ ...prev, [created.id]: [] }));
       setShowAddEntity(false);
       setNewEntity({ code: "", name: "", description: "", entityType: "MASTER" });
-      showToast("ok", `实体 "${created.name}" 已创建`);
+      showToast("ok", t("ontology.designer.entityCreated", { name: created.name }));
     } catch (e: any) { showToast("err", e.message); }
   };
 
@@ -97,7 +97,7 @@ export default function OntologyDesigner() {
       const updated = await updateOntologyEntity(ONTOLOGY_ID, editEntity.id, editEntity);
       setEntities(prev => prev.map(e => e.id === updated.id ? updated : e));
       setEditEntity(null);
-      showToast("ok", "实体已更新");
+      showToast("ok", t("ontology.designer.entityUpdated"));
     } catch (e: any) { showToast("err", e.message); }
   };
 
@@ -107,7 +107,7 @@ export default function OntologyDesigner() {
       await deleteOntologyEntity(ONTOLOGY_ID, id);
       setEntities(prev => prev.filter(e => e.id !== id));
       if (selectedEntityId === id) setSelectedEntityId(null);
-      showToast("ok", "实体已删除");
+      showToast("ok", t("ontology.designer.entityDeleted"));
     } catch (e: any) { showToast("err", e.message); }
   };
 
@@ -118,7 +118,7 @@ export default function OntologyDesigner() {
       setProperties(prev => ({ ...prev, [selectedEntityId]: [...(prev[selectedEntityId] || []), created] }));
       setShowAddProp(false);
       setNewProp({ code: "", name: "", propertyType: "STRING", functionType: "EXPRESSION", functionExpression: "", requiredFlag: 0, searchableFlag: 0 });
-      showToast("ok", `属性 "${created.name || created.code}" 已添加`);
+      showToast("ok", t("ontology.designer.propertyAdded", { name: created.name || created.code }));
     } catch (e: any) { showToast("err", e.message); }
   };
 
@@ -128,7 +128,7 @@ export default function OntologyDesigner() {
       const updated = await updateEntityProperty(selectedEntityId, editingProp.id, editingProp);
       setProperties(prev => ({ ...prev, [selectedEntityId]: prev[selectedEntityId].map(p => p.id === updated.id ? updated : p) }));
       setEditingProp(null);
-      showToast("ok", "属性已更新");
+      showToast("ok", t("ontology.designer.propertyUpdated"));
     } catch (e: any) { showToast("err", e.message); }
   };
 
@@ -147,7 +147,7 @@ export default function OntologyDesigner() {
       setRelationships(prev => [...prev, created]);
       setShowAddRel(false);
       setNewRel({ targetEntityId: "", code: "", name: "", relationshipType: "ONE_TO_MANY" });
-      showToast("ok", `关系 "${created.code}" 已创建`);
+      showToast("ok", t("ontology.designer.relationCreated", { code: created.code }));
     } catch (e: any) { showToast("err", e.message); }
   };
 
@@ -182,9 +182,9 @@ export default function OntologyDesigner() {
       <div className={`w-full lg:w-64 shrink-0 border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col max-h-48 lg:max-h-full`}>
         <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
           <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <Box className="w-3.5 h-3.5 text-indigo-500" /> 实体列表 ({entities.length})
+            <Box className="w-3.5 h-3.5 text-indigo-500" /> {t("ontology.designer.entityList")} ({entities.length})
           </h3>
-          <button onClick={() => setShowAddEntity(true)} className="p-1 hover:bg-indigo-50 rounded text-indigo-600 transition" title="添加实体">
+          <button onClick={() => setShowAddEntity(true)} className="p-1 hover:bg-indigo-50 rounded text-indigo-600 transition" title={t("ontology.designer.addEntity")}>
             <Plus className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -234,7 +234,7 @@ export default function OntologyDesigner() {
           <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
             <div className="text-center">
               <Globe className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              选择左侧或画布中的实体
+              {t("ontology.designer.selectEntity")}
             </div>
           </div>
         ) : (
@@ -247,10 +247,10 @@ export default function OntologyDesigner() {
                   {selectedEntity!.code}
                 </h3>
                 <div className="flex gap-1">
-                  <button onClick={() => setEditEntity({ ...selectedEntity! })} className={`p-1.5 hover:${styles.sidebarBg} rounded text-slate-500 transition`} title="编辑实体">
+                  <button onClick={() => setEditEntity({ ...selectedEntity! })} className={`p-1.5 hover:${styles.sidebarBg} rounded text-slate-500 transition`} title={t("ontology.designer.editEntity")}>
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => handleDeleteEntity(selectedEntity!.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400 transition" title="删除实体">
+                  <button onClick={() => handleDeleteEntity(selectedEntity!.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400 transition" title={t("ontology.designer.deleteEntity")}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -259,26 +259,26 @@ export default function OntologyDesigner() {
               {editEntity && editEntity.id === selectedEntityId ? (
                 <div className={`space-y-2 ${styles.appBg} rounded-lg p-3`}>
                   <input value={editEntity.code || ""} onChange={e => setEditEntity(prev => ({ ...prev, code: e.target.value }))}
-                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder="编码" />
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder={t("ontology.designer.field.code")} />
                   <input value={editEntity.name || ""} onChange={e => setEditEntity(prev => ({ ...prev, name: e.target.value }))}
-                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder="名称" />
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder={t("ontology.designer.field.name")} />
                   <textarea value={editEntity.description || ""} onChange={e => setEditEntity(prev => ({ ...prev, description: e.target.value }))}
-                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder="描述" rows={2} />
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder={t("ontology.designer.field.description")} rows={2} />
                   <select value={editEntity.entityType || "MASTER"} onChange={e => setEditEntity(prev => ({ ...prev, entityType: e.target.value }))}
                     className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`}>
-                    <option value="MASTER">主数据 (MASTER)</option>
-                    <option value="TRANSACTION">事务 (TRANSACTION)</option>
+                    <option value="MASTER">{t("ontology.designer.entityType.master")}</option>
+                    <option value="TRANSACTION">{t("ontology.designer.entityType.transaction")}</option>
                   </select>
                   <div className="flex gap-2">
-                    <button onClick={handleUpdateEntity} className="flex-1 bg-indigo-500 text-white rounded px-3 py-1.5 text-xs font-semibold hover:bg-indigo-600 transition">保存</button>
-                    <button onClick={() => setEditEntity(null)} className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded text-xs hover:bg-slate-300 transition">取消</button>
+                    <button onClick={handleUpdateEntity} className="flex-1 bg-indigo-500 text-white rounded px-3 py-1.5 text-xs font-semibold hover:bg-indigo-600 transition">{t("ontology.designer.save")}</button>
+                    <button onClick={() => setEditEntity(null)} className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded text-xs hover:bg-slate-300 transition">{t("ontology.designer.cancel")}</button>
                   </div>
                 </div>
               ) : (
                 <div className="text-[11px] text-slate-500 space-y-0.5">
-                  <div><span className="text-slate-400">名称：</span>{selectedEntity!.name}</div>
-                  <div><span className="text-slate-400">类型：</span>{entTypeLabel(selectedEntity!.entityType)}</div>
-                  {selectedEntity!.description && <div><span className="text-slate-400">描述：</span>{selectedEntity!.description}</div>}
+                  <div><span className="text-slate-400">{t("ontology.designer.label.name")}</span>{selectedEntity!.name}</div>
+                  <div><span className="text-slate-400">{t("ontology.designer.label.type")}</span>{entTypeLabel(selectedEntity!.entityType)}</div>
+                  {selectedEntity!.description && <div><span className="text-slate-400">{t("ontology.designer.label.description")}</span>{selectedEntity!.description}</div>}
                 </div>
               )}
             </div>
@@ -287,19 +287,19 @@ export default function OntologyDesigner() {
             <div className={`p-4 border-b ${styles.cardBorder}`}>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <List className="w-3 h-3" /> 属性 ({selectedProps.length})
+                  <List className="w-3 h-3" /> {t("ontology.designer.properties")} ({selectedProps.length})
                 </h4>
                 <button onClick={() => setShowAddProp(true)} className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> 添加
+                  <Plus className="w-3 h-3" /> {t("ontology.designer.add")}
                 </button>
               </div>
 
               {showAddProp && (
                 <div className="bg-indigo-50 rounded-lg p-3 mb-3 space-y-2">
                   <input value={newProp.code} onChange={e => setNewProp(p => ({...p, code: e.target.value}))}
-                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder="属性编码 (英文)" />
+                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder={t("ontology.designer.propertyCode")} />
                   <input value={newProp.name} onChange={e => setNewProp(p => ({...p, name: e.target.value}))}
-                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder="属性名称" />
+                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder={t("ontology.designer.propertyName")} />
                   <select value={newProp.propertyType} onChange={e => setNewProp(p => ({...p, propertyType: e.target.value}))}
                     className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs">
                     {PROP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -311,16 +311,16 @@ export default function OntologyDesigner() {
                         {FUNCTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <textarea value={newProp.functionExpression} onChange={e => setNewProp(p => ({...p, functionExpression: e.target.value}))}
-                        className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs font-mono" placeholder="表达式，如: UPPER({name})" rows={2} />
+                        className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs font-mono" placeholder={t("ontology.designer.functionExpression")} rows={2} />
                     </>
                   )}
                   <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-1 text-[10px] text-slate-600"><input type="checkbox" checked={newProp.requiredFlag === 1} onChange={e => setNewProp(p => ({...p, requiredFlag: e.target.checked ? 1 : 0}))} />必填</label>
-                    <label className="flex items-center gap-1 text-[10px] text-slate-600"><input type="checkbox" checked={newProp.searchableFlag === 1} onChange={e => setNewProp(p => ({...p, searchableFlag: e.target.checked ? 1 : 0}))} />可搜索</label>
+                    <label className="flex items-center gap-1 text-[10px] text-slate-600"><input type="checkbox" checked={newProp.requiredFlag === 1} onChange={e => setNewProp(p => ({...p, requiredFlag: e.target.checked ? 1 : 0}))} />{t("ontology.designer.required")}</label>
+                    <label className="flex items-center gap-1 text-[10px] text-slate-600"><input type="checkbox" checked={newProp.searchableFlag === 1} onChange={e => setNewProp(p => ({...p, searchableFlag: e.target.checked ? 1 : 0}))} />{t("ontology.designer.searchable")}</label>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={handleCreateProp} className="flex-1 bg-indigo-500 text-white rounded px-3 py-1.5 text-xs font-semibold">添加</button>
-                    <button onClick={() => setShowAddProp(false)} className="px-3 py-1.5 bg-slate-200 rounded text-xs">取消</button>
+                    <button onClick={handleCreateProp} className="flex-1 bg-indigo-500 text-white rounded px-3 py-1.5 text-xs font-semibold">{t("ontology.designer.add")}</button>
+                    <button onClick={() => setShowAddProp(false)} className="px-3 py-1.5 bg-slate-200 rounded text-xs">{t("ontology.designer.cancel")}</button>
                   </div>
                 </div>
               )}
@@ -332,8 +332,8 @@ export default function OntologyDesigner() {
                       <div className="flex-1 space-y-1">
                         <input value={editingProp.code || ""} onChange={e => setEditingProp(p => ({...p, code: e.target.value}))} className="w-full border rounded px-2 py-1 text-[10px]" />
                         <div className="flex gap-1">
-                          <button onClick={handleUpdateProp} className="text-[10px] bg-green-500 text-white rounded px-2 py-0.5">保存</button>
-                          <button onClick={() => setEditingProp(null)} className="text-[10px] bg-slate-200 rounded px-2 py-0.5">取消</button>
+                          <button onClick={handleUpdateProp} className="text-[10px] bg-green-500 text-white rounded px-2 py-0.5">{t("ontology.designer.save")}</button>
+                          <button onClick={() => setEditingProp(null)} className="text-[10px] bg-slate-200 rounded px-2 py-0.5">{t("ontology.designer.cancel")}</button>
                         </div>
                       </div>
                     ) : (
@@ -348,7 +348,7 @@ export default function OntologyDesigner() {
                     )}
                   </div>
                 ))}
-                {selectedProps.length === 0 && <div className="text-[10px] text-slate-400 text-center py-4">暂无属性</div>}
+                {selectedProps.length === 0 && <div className="text-[10px] text-slate-400 text-center py-4">{t("ontology.designer.noProperties")}</div>}
               </div>
             </div>
 
@@ -356,10 +356,10 @@ export default function OntologyDesigner() {
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <GitBranch className="w-3 h-3" /> 关系 ({selectedRels.length})
+                  <GitBranch className="w-3 h-3" /> {t("ontology.designer.relationships")} ({selectedRels.length})
                 </h4>
                 <button onClick={() => setShowAddRel(true)} className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> 添加
+                  <Plus className="w-3 h-3" /> {t("ontology.designer.add")}
                 </button>
               </div>
 
@@ -367,20 +367,20 @@ export default function OntologyDesigner() {
                 <div className="bg-indigo-50 rounded-lg p-3 mb-3 space-y-2">
                   <select value={newRel.targetEntityId} onChange={e => setNewRel(r => ({...r, targetEntityId: e.target.value}))}
                     className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs">
-                    <option value="">选择目标实体</option>
+                    <option value="">{t("ontology.designer.selectTargetEntity")}</option>
                     {entities.filter(e => e.id !== selectedEntityId).map(e => <option key={e.id} value={e.id}>{e.code} ({e.name})</option>)}
                   </select>
                   <input value={newRel.code} onChange={e => setNewRel(r => ({...r, code: e.target.value}))}
-                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder="关系编码 (英文)" />
+                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder={t("ontology.designer.relationCode")} />
                   <input value={newRel.name} onChange={e => setNewRel(r => ({...r, name: e.target.value}))}
-                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder="关系名称" />
+                    className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs" placeholder={t("ontology.designer.relationName")} />
                   <select value={newRel.relationshipType} onChange={e => setNewRel(r => ({...r, relationshipType: e.target.value}))}
                     className="w-full border border-indigo-200 rounded px-2.5 py-1.5 text-xs">
                     {REL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                   <div className="flex gap-2">
-                    <button onClick={handleCreateRel} className="flex-1 bg-indigo-500 text-white rounded px-3 py-1.5 text-xs font-semibold">添加</button>
-                    <button onClick={() => setShowAddRel(false)} className="px-3 py-1.5 bg-slate-200 rounded text-xs">取消</button>
+                    <button onClick={handleCreateRel} className="flex-1 bg-indigo-500 text-white rounded px-3 py-1.5 text-xs font-semibold">{t("ontology.designer.add")}</button>
+                    <button onClick={() => setShowAddRel(false)} className="px-3 py-1.5 bg-slate-200 rounded text-xs">{t("ontology.designer.cancel")}</button>
                   </div>
                 </div>
               )}
@@ -408,7 +408,7 @@ export default function OntologyDesigner() {
                     </div>
                   );
                 })}
-                {selectedRels.length === 0 && <div className="text-[10px] text-slate-400 text-center py-4">暂无关系</div>}
+                {selectedRels.length === 0 && <div className="text-[10px] text-slate-400 text-center py-4">{t("ontology.designer.noRelations")}</div>}
               </div>
             </div>
           </>
