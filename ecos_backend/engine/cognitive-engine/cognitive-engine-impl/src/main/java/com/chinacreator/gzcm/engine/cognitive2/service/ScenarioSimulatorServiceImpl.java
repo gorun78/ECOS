@@ -38,7 +38,7 @@ public class ScenarioSimulatorServiceImpl implements ScenarioSimulatorService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${ecos.agent.completion.url:http://localhost:8080/api/v1/agents/completion}")
+    @Value("${ecos.agent.completion.url:http://localhost:8080/api/v1/agent-loop/chat}")
     private String agentCompletionUrl;
 
     public ScenarioSimulatorServiceImpl(KnowledgeRetrievalService retrievalService) {
@@ -166,17 +166,16 @@ public class ScenarioSimulatorServiceImpl implements ScenarioSimulatorService {
     // ──────────── LLM Agent 调用 ────────────
 
     /**
-     * 构造 prompt 并调用 Agent completion 端点获取预测。
+     * 调用 ai-engine Agent Loop 进行 What-if 推演预测。
      */
     private Map<String, Object> callAgentCompletion(Map<String, Object> baseline,
                                                      SimRequest request) {
         String prompt = buildPrompt(baseline, request);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("prompt", prompt);
-        payload.put("mode", "what-if");
-        payload.put("domain", request.getDomain());
-        payload.put("variables", request.getVariables());
+        payload.put("message", prompt);
+        payload.put("systemPrompt", "你是一个业务推演引擎。根据当前业务基线和变量变更，预测变化后的业务指标。只输出JSON。");
+        payload.put("temperature", 0.3);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -185,19 +184,42 @@ public class ScenarioSimulatorServiceImpl implements ScenarioSimulatorService {
 
         log.debug("POST {} with prompt length={}", agentCompletionUrl, prompt.length());
 
-        ResponseEntity<Map> response = restTemplate.exchange(
-                agentCompletionUrl,
-                HttpMethod.POST,
-                entity,
-                Map.class);
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    agentCompletionUrl,
+                    HttpMethod.POST,
+                    entity,
+                    Map.class);
 
-        if (response.getBody() == null) {
-            log.warn("Agent completion returned empty body, using fallback");
+            if (response.getBody() == null) {
+                log.warn("Agent返回空body，使用降级预测");
+                return buildFallbackResponse(baseline, request);
+            }
+
+            // 解析 ApiResponse 包装，提取 data.content
+            @SuppressWarnings("unchecked")
+            Map<String, Object> respBody = response.getBody();
+            Object data = respBody.get("data");
+            if (data instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> dataMap = (Map<String, Object>) data;
+                Object content = dataMap.get("content");
+                if (content != null) {
+                    log.info("Agent推演完成: content长度={}", content.toString().length());
+                    // 包装为统一格式返回
+                    Map<String, Object> wrapped = new LinkedHashMap<>();
+                    wrapped.put("predicted", content.toString());
+                    wrapped.put("llmConfidence", 0.65);
+                    return wrapped;
+                }
+            }
+
+            log.info("Agent completion OK: keys={}", respBody.keySet());
+            return respBody;
+        } catch (Exception e) {
+            log.warn("ai-engine Agent调用失败，使用降级预测: {}", e.getMessage());
             return buildFallbackResponse(baseline, request);
         }
-
-        log.info("Agent completion OK: keys={}", response.getBody().keySet());
-        return response.getBody();
     }
 
     /**

@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Service
 public class QueryExecutionServiceImpl implements QueryExecutionService {
@@ -56,6 +57,12 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
         runningQueries.put(historyId, null);
 
         String resolvedSql = resolveParams(sql, params);
+
+        // 大表查询保护：SQL不含LIMIT时自动注入 LIMIT 10000
+        if (!Pattern.compile("(?i)\\bLIMIT\\b").matcher(resolvedSql).find()) {
+            resolvedSql = resolvedSql + " LIMIT 10000";
+        }
+
         Map<String, String> connConfig = parseConnectionConfig(ds.getConnectionConfig());
 
         long startMs = System.currentTimeMillis();
@@ -82,7 +89,13 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             }
 
             List<Map<String, Object>> rows = new ArrayList<>();
+            boolean truncated = false;
             while (rs.next()) {
+                // 大表查询保护：结果行数上限10000
+                if (rows.size() >= 10000) {
+                    truncated = true;
+                    break;
+                }
                 Map<String, Object> row = new LinkedHashMap<>();
                 for (int i = 1; i <= colCount; i++) {
                     row.put(rsmd.getColumnLabel(i), rs.getObject(i));
@@ -99,6 +112,9 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             result.put("rowCount", rows.size());
             result.put("elapsedMs", elapsed);
             result.put("historyId", historyId);
+            if (truncated) {
+                result.put("truncated", true);
+            }
             return result;
 
         } catch (SQLException e) {

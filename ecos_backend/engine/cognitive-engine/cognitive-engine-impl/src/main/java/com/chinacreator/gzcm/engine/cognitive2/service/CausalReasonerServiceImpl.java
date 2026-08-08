@@ -50,8 +50,8 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
     private static final double LLM_CONFIDENCE_MIN = 0.50;
     private static final double LLM_CONFIDENCE_MAX = 0.70;
 
-    /** LLM 补全端点（ai-engine） */
-    private static final String LLM_COMPLETION_URL = "/api/v1/agents/completion";
+    /** ai-engine Agent Loop 端点 */
+    private static final String AGENT_LOOP_URL = "http://localhost:8080/api/v1/agent-loop/chat";
 
     private final KnowledgeGraphService knowledgeGraphService;
     private final RestTemplate restTemplate;
@@ -360,34 +360,62 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
     }
 
     /**
-     * 调用LLM补全端点。
+     * 调用 ai-engine Agent Loop（经营诊断Agent）进行推理。
      */
     private String callLlm(String prompt) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("prompt", prompt);
+        body.put("message", prompt);
+        body.put("systemPrompt", "你是一个企业经营诊断专家。根据输入的因果推理提示，分析指标的深层原因，输出JSON格式的因果链。");
+        body.put("temperature", 0.3);
         body.put("maxTokens", 2048);
-        body.put("temperature", 0.3); // 低温度保证推理一致性
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
-            String url = "http://localhost:8080" + LLM_COMPLETION_URL;
-            // 也尝试 ai-engine 独立端口
-            String response;
-            try {
-                response = restTemplate.postForObject(url, request, String.class);
-            } catch (Exception e1) {
-                log.debug("Gateway端点不可用，尝试ai-engine直接端口: {}", e1.getMessage());
-                url = "http://localhost:18084" + LLM_COMPLETION_URL;
-                response = restTemplate.postForObject(url, request, String.class);
+            String response = restTemplate.postForObject(AGENT_LOOP_URL, request, String.class);
+            if (response != null) {
+                // 解析 ApiResponse 包装
+                try {
+                    Map<String, Object> apiResp = objectMapper.readValue(response,
+                            new TypeReference<Map<String, Object>>() {});
+                    // ApiResponse.success 在顶层
+                    Boolean topSuccess = (Boolean) apiResp.get("success");
+                    if (topSuccess != null && !topSuccess) {
+                        String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
+                        log.warn("ai-engine Agent调用失败: {}", msg);
+                        throw new RuntimeException("Agent调用失败: " + msg);
+                    }
+                    Object data = apiResp.get("data");
+                    if (data instanceof Map) {
+                        Map<?, ?> dataMap = (Map<?, ?>) data;
+                        // Agent Loop 返回的嵌套 success 字段（LLM推理可能失败但HTTP 200）
+                        Boolean dataSuccess = (Boolean) dataMap.get("success");
+                        if (dataSuccess != null && !dataSuccess) {
+                            Object errObj = dataMap.get("errorMsg");
+                            String errMsg = errObj != null ? String.valueOf(errObj) : "Agent推理未完成";
+                            log.warn("ai-engine Agent推理失败: {}", errMsg);
+                            throw new RuntimeException("Agent推理失败: " + errMsg);
+                        }
+                        Object content = dataMap.get("content");
+                        if (content != null && !content.toString().isEmpty()) {
+                            return content.toString();
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.debug("解析Agent响应失败: {}", e.getMessage());
+                }
+                return response;
             }
-            return response != null ? response : "";
+            return "";
         } catch (Exception e) {
-            log.warn("LLM调用失败: {}", e.getMessage());
-            throw new RuntimeException("LLM服务不可用: " + e.getMessage());
+            log.warn("ai-engine Agent调用失败: {}", e.getMessage());
+            throw new RuntimeException("ai-engine Agent不可用: " + e.getMessage());
         }
     }
 

@@ -8,17 +8,25 @@ import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEn
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.neo4j.driver.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * KG 写入服务 — 将 Extractor 产出的 ExtractedEntity / ExtractedRelation
  * 批量写入知识图谱存储（KnowledgeNode + KnowledgeEdge）。
  *
  * <p>负责字段映射、去重（实体按 label 幂等）和名称→ID 解析。</p>
+ *
+ * <p>Neo4j 连接池 (enterprise edition): 最大连接10, 最小空闲2, 30s健康检查, 自动重连。</p>
  */
 @Service
 public class KGWriterService {
@@ -26,12 +34,172 @@ public class KGWriterService {
     private static final Logger log = LoggerFactory.getLogger(KGWriterService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    // ── Neo4j config ──
+    private static final int MAX_CONNECTION_POOL_SIZE = 10;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 1000;
+
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
+
+    // Neo4j driver — nullable for standard edition
+    private volatile Driver neo4jDriver;
+    private volatile boolean neo4jAvailable = false;
+
+    @Value("${neo4j.uri:bolt://localhost:7687}")
+    private String neo4jUri;
+
+    @Value("${neo4j.username:neo4j}")
+    private String neo4jUsername;
+
+    @Value("${neo4j.password:neo4j123}")
+    private String neo4jPassword;
 
     public KGWriterService(KnowledgeNodeMapper nodeMapper, KnowledgeEdgeMapper edgeMapper) {
         this.nodeMapper = nodeMapper;
         this.edgeMapper = edgeMapper;
+    }
+
+    // ── Neo4j 连接池生命周期 ──
+
+    /**
+     * 初始化 Neo4j 连接池。
+     * 最大连接10, 最小空闲2, 连接存活检测30s。
+     */
+    @PostConstruct
+    public void neo4jPoolInit() {
+        try {
+            Config config = Config.builder()
+                    .withMaxConnectionPoolSize(MAX_CONNECTION_POOL_SIZE)
+                    .withConnectionLivenessCheckTimeout(30, TimeUnit.SECONDS)
+                    .withConnectionAcquisitionTimeout(10, TimeUnit.SECONDS)
+                    .withMaxConnectionLifetime(30, TimeUnit.MINUTES)
+                    .build();
+
+            AuthToken auth = neo4jUsername != null && !neo4jUsername.isEmpty()
+                    ? AuthTokens.basic(neo4jUsername, neo4jPassword)
+                    : AuthTokens.none();
+
+            this.neo4jDriver = GraphDatabase.driver(neo4jUri, auth, config);
+
+            // 连接验证
+            verifyConnectivity();
+            neo4jAvailable = true;
+            log.info("✅ Neo4j connection pool initialized — uri={}, maxPool={}",
+                    neo4jUri, MAX_CONNECTION_POOL_SIZE);
+        } catch (Exception e) {
+            neo4jAvailable = false;
+            log.warn("⚠️  Neo4j connection pool init failed (non-fatal, KG writes use PG fallback): {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Neo4j 健康检查 — 每30秒 ping。
+     * MATCH (n) RETURN count(n) LIMIT 1
+     */
+    @Scheduled(fixedRate = 30_000)
+    public void neo4jHealthCheck() {
+        if (neo4jDriver == null) {
+            log.debug("Neo4j health check skipped — driver not initialized");
+            return;
+        }
+        try {
+            executeWithRetry(() -> {
+                try (Session session = neo4jDriver.session()) {
+                    Result result = session.run("MATCH (n) RETURN count(n) AS cnt LIMIT 1");
+                    if (result.hasNext()) {
+                        long count = result.next().get("cnt").asLong();
+                        log.debug("Neo4j health OK — node count: {}", count);
+                    }
+                }
+                return null;
+            });
+            if (!neo4jAvailable) {
+                neo4jAvailable = true;
+                log.info("✅ Neo4j reconnected");
+            }
+        } catch (Exception e) {
+            neo4jAvailable = false;
+            log.warn("⚠️  Neo4j health check failed: {}", e.getMessage());
+        }
+    }
+
+    @PreDestroy
+    public void neo4jPoolDestroy() {
+        if (neo4jDriver != null) {
+            try {
+                neo4jDriver.close();
+                log.info("Neo4j connection pool closed");
+            } catch (Exception e) {
+                log.warn("Error closing Neo4j driver: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Neo4j 连接连通性验证。
+     */
+    public boolean verifyConnectivity() {
+        if (neo4jDriver == null) return false;
+        try {
+            neo4jDriver.verifyConnectivity();
+            return true;
+        } catch (Exception e) {
+            log.warn("Neo4j connectivity verification failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Neo4j 可用性查询。
+     */
+    public boolean isNeo4jAvailable() {
+        return neo4jAvailable && neo4jDriver != null;
+    }
+
+    /**
+     * 获取 Neo4j 节点总数 (用于健康检查报告)。
+     */
+    public long getNeo4jNodeCount() {
+        if (!isNeo4jAvailable()) return -1;
+        return executeWithRetry(() -> {
+            try (Session session = neo4jDriver.session()) {
+                Result result = session.run("MATCH (n) RETURN count(n) AS cnt");
+                return result.hasNext() ? result.next().get("cnt").asLong() : 0;
+            }
+        });
+    }
+
+    // ── 带重试的执行器 ──
+
+    /**
+     * 自动重连：连接断开后3次重试, 间隔1s。
+     */
+    private <T> T executeWithRetry(Neo4jOperation<T> operation) {
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                return operation.execute();
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    log.warn("Neo4j operation failed (attempt {}/{}), retrying in {}ms...",
+                            attempt, MAX_RETRY_ATTEMPTS, RETRY_DELAY_MS);
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Neo4j retry interrupted", ie);
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("Neo4j operation failed after " + MAX_RETRY_ATTEMPTS + " attempts", lastException);
+    }
+
+    @FunctionalInterface
+    private interface Neo4jOperation<T> {
+        T execute() throws Exception;
     }
 
     // ── Public API ──

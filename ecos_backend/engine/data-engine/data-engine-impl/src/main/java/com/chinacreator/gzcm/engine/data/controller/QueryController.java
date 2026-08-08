@@ -6,7 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 统一 SQL 查询控制器。
@@ -44,9 +50,22 @@ public class QueryController {
                 return ApiResponse.badRequest("数据源 ID 和 SQL 不能为空");
             }
 
-            Map<String, Object> result = queryExecutionService.execute(
-                    datasourceId, sql, params, maxRows, timeoutSeconds);
-            return ApiResponse.success(result);
+            // 大表查询保护：ExecutorService 超时保护 (30秒)
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            try {
+                Future<Map<String, Object>> future = executor.submit(() ->
+                        queryExecutionService.execute(datasourceId, sql, params, maxRows, timeoutSeconds));
+                Map<String, Object> result = future.get(30, TimeUnit.SECONDS);
+                return ApiResponse.success(result);
+            } catch (TimeoutException e) {
+                log.warn("Query execution timeout after 30s for datasource={}", datasourceId);
+                Map<String, Object> timeoutResult = new LinkedHashMap<>();
+                timeoutResult.put("timeout", true);
+                timeoutResult.put("message", "查询超时（30秒）");
+                return ApiResponse.success(timeoutResult);
+            } finally {
+                executor.shutdownNow();
+            }
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {

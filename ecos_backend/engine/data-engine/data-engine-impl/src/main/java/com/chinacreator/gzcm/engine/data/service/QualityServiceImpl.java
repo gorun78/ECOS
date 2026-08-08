@@ -422,4 +422,144 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
             log.warn("Failed to trigger evolution for quality alert: {}", e.getMessage());
         }
     }
+
+    // ── evaluateAll: 全量巡检 ─────────────────────────
+
+    @Override
+    public Map<String, Object> evaluateAll() {
+        long startTime = System.currentTimeMillis();
+        log.info("=== 全量 DQ 巡检开始 ===");
+
+        List<Map<String, Object>> enabledRules = jdbc.queryForList(
+            "SELECT * FROM ecos_quality_rule WHERE enabled = true ORDER BY rule_type, rule_id");
+
+        if (enabledRules.isEmpty()) {
+            log.info("无已启用的 DQ 规则");
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", true);
+            result.put("totalRules", 0);
+            result.put("successCount", 0);
+            result.put("failCount", 0);
+            return result;
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+        List<Map<String, Object>> details = new ArrayList<>();
+
+        for (int i = 0; i < enabledRules.size(); i++) {
+            Map<String, Object> rule = enabledRules.get(i);
+            String ruleId = (String) rule.get("rule_id");
+            String ruleName = (String) rule.get("rule_name");
+
+            log.info("巡检 [{}/{}] ruleId={}, ruleName={}", i + 1, enabledRules.size(), ruleId, ruleName);
+
+            try {
+                Map<String, Object> ruleResult = evaluateSingleRuleForAll(rule);
+                successCount++;
+                details.add(Map.of(
+                    "ruleId", ruleId,
+                    "ruleName", ruleName != null ? ruleName : "",
+                    "status", "SUCCESS",
+                    "result", ruleResult));
+                log.info("  ✓ 通过: {}", ruleId);
+            } catch (Exception e) {
+                failCount++;
+                details.add(Map.of(
+                    "ruleId", ruleId,
+                    "ruleName", ruleName != null ? ruleName : "",
+                    "status", "FAILED",
+                    "error", e.getMessage() != null ? e.getMessage() : "未知错误"));
+                log.warn("  ✗ 失败: {} — {}", ruleId, e.getMessage());
+            }
+        }
+
+        long duration = System.currentTimeMillis() - startTime;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("totalRules", enabledRules.size());
+        result.put("successCount", successCount);
+        result.put("failCount", failCount);
+        result.put("durationMs", duration);
+        result.put("details", details);
+
+        log.info("=== 全量 DQ 巡检完成: 成功={}, 失败={}, 耗时={}ms ===", successCount, failCount, duration);
+        return result;
+    }
+
+    /**
+     * 对单条规则执行评估，用于全量巡检。
+     */
+    private Map<String, Object> evaluateSingleRuleForAll(Map<String, Object> ruleRow) {
+        String ruleId = (String) ruleRow.get("rule_id");
+        QualityRule rule = mapToRule(ruleRow);
+
+        // 解析 target: "table.column" → tableName, fieldName
+        String target = rule.getTarget();
+        String tableName = null;
+        String fieldName = target;
+        if (target != null && target.contains(".")) {
+            tableName = target.substring(0, target.lastIndexOf('.'));
+            fieldName = target.substring(target.lastIndexOf('.') + 1);
+        }
+
+        // 尝试从 dataset 解析 datasourceId
+        String datasetId = (String) ruleRow.get("dataset_id");
+        String datasourceId = resolveDatasourceFromDataset(datasetId);
+
+        // 加载样本数据
+        List<Map<String, Object>> rows = loadSampleData(datasourceId, tableName, 1000);
+
+        // 评估
+        long totalRows = rows.size();
+        long failedRows = 0;
+        List<String> sampleFailures = new ArrayList<>();
+
+        for (Map<String, Object> row : rows) {
+            Object value = row.get(fieldName);
+            boolean passed = evaluateValue(rule, value);
+            if (!passed) {
+                failedRows++;
+                if (sampleFailures.size() < 10) {
+                    sampleFailures.add(fieldName + "=" + value);
+                }
+            }
+        }
+
+        boolean allPassed = failedRows == 0;
+        String message = allPassed ? "PASS" : failedRows + "/" + totalRows + " rows failed";
+
+        // 持久化评估记录
+        Map<String, Object> evalRecord = new LinkedHashMap<>();
+        evalRecord.put("id", UUID.randomUUID().toString());
+        evalRecord.put("ruleId", ruleId);
+        evalRecord.put("target", target);
+        evalRecord.put("passed", allPassed);
+        evalRecord.put("totalRows", totalRows);
+        evalRecord.put("failedRows", failedRows);
+        evalRecord.put("passRate", totalRows > 0 ? (double)(totalRows - failedRows) / totalRows : 1.0);
+        evalRecord.put("message", message);
+
+        saveEvaluation(new QualityResult(ruleId, target, allPassed, message,
+            totalRows, failedRows, sampleFailures), datasetId, 1000);
+
+        return evalRecord;
+    }
+
+    /**
+     * 尝试根据 dataset_id 解析关联的 datasourceId。
+     */
+    private String resolveDatasourceFromDataset(String datasetId) {
+        if (datasetId == null || datasetId.isEmpty()) return null;
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT datasource_id FROM ecos_pipeline WHERE dataset_id = ? LIMIT 1", datasetId);
+            if (!rows.isEmpty()) {
+                return (String) rows.get(0).get("datasource_id");
+            }
+        } catch (Exception e) {
+            log.debug("解析 datasourceId 失败: {}", e.getMessage());
+        }
+        return null;
+    }
 }

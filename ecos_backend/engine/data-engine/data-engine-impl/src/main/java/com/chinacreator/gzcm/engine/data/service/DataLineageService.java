@@ -16,6 +16,12 @@ public class DataLineageService {
     private static final Logger log = LoggerFactory.getLogger(DataLineageService.class);
 
     private final JdbcTemplate jdbc;
+    private final SqlLineageParser parser = new SqlLineageParser();
+
+    /** SQL 提取正则：匹配 YAML 块中 sql: / query: 后的内容 */
+    private static final Pattern SQL_EXTRACT_PAT = Pattern.compile(
+        "(?i)(?:sql|query|expression)\\s*:\\s*(?:\\||>)\\s*\\n(.*?)(?=\\n\\S|\\Z)",
+        Pattern.DOTALL);
 
     public DataLineageService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -59,6 +65,174 @@ public class DataLineageService {
             log.warn("Data Lineage table init warning: {}", e.getMessage());
         }
     }
+
+    // ── SQL 血缘：字段级解析 ──
+
+    /**
+     * 根据 datasourceId 和 tableName 获取字段级血缘关系。
+     * <p>
+     * 从 ecos_pipeline_task 表的 yaml_content 中提取包含目标表名的 SQL，
+     * 使用 JSqlParser 解析为 nodes/edges 图结构。
+     * </p>
+     *
+     * @param datasourceId 数据源 ID
+     * @param tableName    表名
+     * @return 包含 nodes / edges / total_nodes / total_edges 的 Map
+     */
+    public Map<String, Object> getLineage(String datasourceId, String tableName) {
+        if (tableName == null || tableName.isBlank()) {
+            return emptyLineageResult();
+        }
+
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        List<Map<String, Object>> edges = new ArrayList<>();
+        Set<String> seenNodeIds = new LinkedHashSet<>();
+
+        // 1. 从 pipeline_tasks 查找包含目标表名的任务
+        List<Map<String, Object>> tasks;
+        try {
+            tasks = jdbc.queryForList(
+                "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content ILIKE ?",
+                "%" + tableName + "%");
+        } catch (Exception e) {
+            log.warn("查询 pipeline_tasks 失败: {}", e.getMessage());
+            tasks = List.of();
+        }
+
+        // 2. 如果是特定数据源，进一步过滤（通过 yaml_content 中 datasource 引用）
+        List<Map<String, Object>> filtered = new ArrayList<>();
+        if (datasourceId != null && !datasourceId.isBlank()) {
+            for (Map<String, Object> task : tasks) {
+                String yaml = (String) task.get("yaml_content");
+                if (yaml != null && yaml.contains(datasourceId)) {
+                    filtered.add(task);
+                }
+            }
+        } else {
+            filtered = tasks;
+        }
+
+        // 3. 对每个任务提取 SQL 并解析
+        for (Map<String, Object> task : filtered) {
+            String taskId = (String) task.get("id");
+            String taskName = (String) task.get("name");
+            String yaml = (String) task.get("yaml_content");
+            if (yaml == null) continue;
+
+            // 从 yaml 中提取 SQL 块
+            List<String> sqlBlocks = extractSqlFromYaml(yaml);
+            if (sqlBlocks.isEmpty()) {
+                // 如果 YAML 没有显式 sql: 块，尝试将整个 yaml 作为 SQL 解析
+                // （某些简单任务可能直接存储 SQL）
+                parseAndMerge(taskId, taskName, yaml, tableName, nodes, edges, seenNodeIds);
+            } else {
+                for (String sql : sqlBlocks) {
+                    if (sql.contains(tableName)) {
+                        parseAndMerge(taskId, taskName, sql, tableName, nodes, edges, seenNodeIds);
+                    }
+                }
+            }
+        }
+
+        // 4. 如果没有找到任何血缘，返回空结果（非错误）
+        if (nodes.isEmpty()) {
+            return emptyLineageResult();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("datasource_id", datasourceId);
+        result.put("table_name", tableName);
+        result.put("nodes", nodes);
+        result.put("edges", edges);
+        result.put("total_nodes", nodes.size());
+        result.put("total_edges", edges.size());
+        result.put("pipeline_count", filtered.size());
+        return result;
+    }
+
+    private void parseAndMerge(String taskId, String taskName, String sql, String targetTable,
+                                List<Map<String, Object>> allNodes, List<Map<String, Object>> allEdges,
+                                Set<String> seenIds) {
+        try {
+            Map<String, Object> lineage = parser.parse(sql);
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> parsedNodes = (List<Map<String, String>>) lineage.get("nodes");
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> parsedEdges = (List<Map<String, String>>) lineage.get("edges");
+
+            if (parsedNodes != null) {
+                for (Map<String, String> n : parsedNodes) {
+                    String id = n.get("id");
+                    if (id == null || !seenIds.add(id)) continue;
+                    Map<String, Object> node = new LinkedHashMap<>();
+                    node.put("id", id);
+                    node.put("type", n.get("type"));
+                    node.put("table", n.get("table"));
+                    node.put("pipeline_task_id", taskId);
+                    node.put("pipeline_task_name", taskName);
+                    allNodes.add(node);
+                }
+            }
+
+            if (parsedEdges != null) {
+                for (Map<String, String> e : parsedEdges) {
+                    Map<String, Object> edge = new LinkedHashMap<>();
+                    edge.put("source", e.get("source"));
+                    edge.put("target", e.get("target"));
+                    edge.put("transform", e.getOrDefault("transform", "read"));
+                    edge.put("pipeline_task_id", taskId);
+                    allEdges.add(edge);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("SQL 解析跳过 (taskId={}): {}", taskId, e.getMessage());
+        }
+    }
+
+    /**
+     * 从 YAML 内容中提取 SQL 块。
+     * 支持格式：
+     * <pre>
+     *   sql: |
+     *     SELECT ...
+     *   query: >
+     *     SELECT ...
+     *   expression: |
+     *     INSERT INTO ...
+     * </pre>
+     */
+    private List<String> extractSqlFromYaml(String yaml) {
+        List<String> sqls = new ArrayList<>();
+        if (yaml == null) return sqls;
+
+        // 匹配 YAML 多行文本块
+        Matcher m = SQL_EXTRACT_PAT.matcher(yaml);
+        while (m.find()) {
+            String block = m.group(1).trim();
+            if (!block.isEmpty()) {
+                // 去除 YAML 缩进
+                block = block.replaceAll("(?m)^\\s{2,}", "").trim();
+                if (block.length() > 10) {
+                    sqls.add(block);
+                }
+            }
+        }
+
+        // 兼容格式：sql: "SELECT ..." (单行双引号)
+        Matcher singleLine = Pattern.compile(
+            "(?i)(?:sql|query|expression)\\s*:\\s*\"([^\"]+)\"",
+            Pattern.DOTALL).matcher(yaml);
+        while (singleLine.find()) {
+            String sql = singleLine.group(1).trim();
+            if (sql.length() > 10) {
+                sqls.add(sql);
+            }
+        }
+
+        return sqls;
+    }
+
+    // ── 已有方法 (保留不变) ──
 
     public Map<String, Object> getPipelineLineage(String taskId) {
         Map<String, Object> task = jdbc.queryForMap(
@@ -171,7 +345,7 @@ public class DataLineageService {
             if (dm.find()) {
                 String deps = dm.group(1);
                 for (String dep : deps.split(",")) {
-                    String clean = dep.trim().replaceAll("[\\[\\]\"]", "");
+                    String clean = dep.trim().replaceAll("[\\[\\]\\\"]", "");
                     if (!clean.isEmpty()) {
                         Map<String, Object> edge = new LinkedHashMap<>();
                         edge.put("source", clean);
@@ -193,5 +367,14 @@ public class DataLineageService {
     private String extractYaml(String text, String regex) {
         Matcher m = Pattern.compile(regex, Pattern.MULTILINE).matcher(text);
         return m.find() ? m.group(1).trim() : null;
+    }
+
+    private Map<String, Object> emptyLineageResult() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("nodes", List.of());
+        result.put("edges", List.of());
+        result.put("total_nodes", 0);
+        result.put("total_edges", 0);
+        return result;
     }
 }

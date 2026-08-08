@@ -100,4 +100,16 @@ public class QualityController {
             @RequestParam(defaultValue = "20") int pageSize) {
         return ApiResponse.success(qualityService.getEvaluationHistory(datasetId, page, pageSize));
     }
+
+    /**
+     * 手动全量巡检 — 遍历所有 enabled 的 DQ 规则并逐条评估。
+     */
+    @PostMapping("/evaluate-all")
+    public ApiResponse<Map<String, Object>> evaluateAll() {
+        try {
+            return ApiResponse.success(qualityService.evaluateAll());
+        } catch (Exception e) {
+            return ApiResponse.internalError("全量巡检失败: " + e.getMessage());
+        }
+    }
 }

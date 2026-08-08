@@ -25,6 +25,21 @@ public class DataLineageController {
         }
     }
 
+    @GetMapping
+    public ApiResponse<Map<String, Object>> getLineage(
+            @RequestParam(required = false) String datasourceId,
+            @RequestParam String tableName) {
+        try {
+            Map<String, Object> result = lineageService.getLineage(datasourceId, tableName);
+            if ((int) result.getOrDefault("total_nodes", 0) == 0) {
+                return ApiResponse.success("未找到表 " + tableName + " 的血缘关系", result);
+            }
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            return ApiResponse.badRequest("血缘解析失败: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/nodes")
     public ApiResponse<List<Map<String, Object>>> listNodes() {
         return ApiResponse.success(lineageService.listNodes());
