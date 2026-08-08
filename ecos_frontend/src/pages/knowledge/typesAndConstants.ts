@@ -69,8 +69,15 @@ export interface RagRequest {
 
 export interface RagResult {
   answer: string;
-  sources: Array<{ title: string; snippet: string; score: number }>;
+  sources: Array<{
+    title: string;
+    type?: string;
+    snippet: string;
+    score: number;
+    page?: number;
+  }>;
   tokensUsed: number;
+  overallConfidence?: number;
 }
 
 export interface SyncStatus {

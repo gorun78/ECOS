@@ -27,7 +27,7 @@ const DEMO_CLASSIFICATIONS: ClassificationNode[] = [
 ];
 
 export default function ClassificationTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const [classifications, setClassifications] = useState<ClassificationNode[]>(DEMO_CLASSIFICATIONS);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +42,7 @@ export default function ClassificationTab() {
       const result = await knowledgeApi.classifyAsset(classifyingAssetId);
       setClassifyResult(result);
     } catch {
-      setClassifyResult({ error: true, message: locale === 'zh' ? '分类失败，后端未响应' : 'Classify failed' });
+      setClassifyResult({ error: true, message: t("knowledge.classificationtab.分类失败_后端未响应") });
     } finally {
       setIsClassifying(false);
     }
@@ -57,10 +57,10 @@ export default function ClassificationTab() {
         <div className="space-y-1">
           <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
             <Tag size={16} className="text-purple-600" />
-            {locale === 'zh' ? '分类体系 (Classification Taxonomy)' : 'Classification Taxonomy'}
+            {t("knowledge.classificationtab.分类体系_classification_taxonomy")}
           </h2>
           <p className="text-xs text-slate-500">
-            {locale === 'zh' ? '构建资产分类层级，支持自动分类与人工标注' : 'Build asset classification hierarchy with auto-classify and manual tagging'}
+            {t("knowledge.classificationtab.构建资产分类层级_支持自动分类与人工标注")}
           </p>
         </div>
         <button
@@ -68,7 +68,7 @@ export default function ClassificationTab() {
           className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs"
         >
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {locale === 'zh' ? '刷新' : 'Refresh'}
+          {t("knowledge.classificationtab.刷新")}
         </button>
       </div>
 
@@ -111,15 +111,15 @@ export default function ClassificationTab() {
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
             <h3 className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
               <Sparkles size={13} className="text-purple-600" />
-              {locale === 'zh' ? '自动分类' : 'Auto Classify'}
+              {t("knowledge.classificationtab.自动分类_auto_classify")}
             </h3>
             <p className="text-[10px] text-slate-500">
-              {locale === 'zh' ? '输入资产ID，系统自动推荐分类归属' : 'Enter asset ID for auto-classification'}
+              {t("knowledge.classificationtab.输入资产id_系统自动推荐分类归属")}
             </p>
             <input
               value={classifyingAssetId}
               onChange={e => setClassifyingAssetId(e.target.value)}
-              placeholder={locale === 'zh' ? '资产ID (如: ds_flights_clean)' : 'Asset ID'}
+              placeholder={t("knowledge.classificationtab.资产id_如_ds_flights_clean")}
               className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs"
             />
             <button
@@ -128,7 +128,7 @@ export default function ClassificationTab() {
               className="w-full py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
               {isClassifying ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              {locale === 'zh' ? '执行分类' : 'Classify'}
+              {t("knowledge.classificationtab.执行分类")}
             </button>
             {classifyResult && (
               <div className={`p-3 rounded-lg text-[10px] ${

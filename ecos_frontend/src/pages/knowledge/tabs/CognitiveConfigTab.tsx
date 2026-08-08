@@ -11,7 +11,7 @@ interface CognitiveConfigItem {
 }
 
 export default function CognitiveConfigTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const [configs, setConfigs] = useState<CognitiveConfigItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,14 +32,14 @@ export default function CognitiveConfigTab() {
       }
     } catch {
       setConfigs([
-        { config_key: 'cognitive.model.default', config_value: 'deepseek-chat', description: locale === 'zh' ? '默认推理模型' : 'Default reasoning model' },
-        { config_key: 'cognitive.max_tokens', config_value: '4096', description: locale === 'zh' ? '最大Token数' : 'Max tokens' },
-        { config_key: 'cognitive.temperature', config_value: '0.7', description: locale === 'zh' ? '推理温度' : 'Temperature' },
-        { config_key: 'cognitive.guardrails.enabled', config_value: 'true', description: locale === 'zh' ? '启用安全护栏' : 'Enable guardrails' },
-        { config_key: 'cognitive.pii_detection.enabled', config_value: 'true', description: locale === 'zh' ? '启用PII检测' : 'Enable PII detection' },
-        { config_key: 'cognitive.hallucination_check.enabled', config_value: 'true', description: locale === 'zh' ? '启用幻觉校验' : 'Enable hallucination check' },
-        { config_key: 'cognitive.action_bridge.enabled', config_value: 'true', description: locale === 'zh' ? '启用动作桥接' : 'Enable action bridge' },
-        { config_key: 'cognitive.agent_mesh.mode', config_value: 'sequential', description: locale === 'zh' ? 'Agent Mesh执行模式' : 'Agent Mesh execution mode' },
+        { config_key: 'cognitive.model.default', config_value: 'deepseek-chat', description: t("knowledge.cognitiveconfigtab.默认推理模型") },
+        { config_key: 'cognitive.max_tokens', config_value: '4096', description: t("knowledge.cognitiveconfigtab.最大token数") },
+        { config_key: 'cognitive.temperature', config_value: '0.7', description: t("knowledge.cognitiveconfigtab.推理温度") },
+        { config_key: 'cognitive.guardrails.enabled', config_value: 'true', description: t("knowledge.cognitiveconfigtab.启用安全护栏") },
+        { config_key: 'cognitive.pii_detection.enabled', config_value: 'true', description: t("knowledge.cognitiveconfigtab.启用pii检测") },
+        { config_key: 'cognitive.hallucination_check.enabled', config_value: 'true', description: t("knowledge.cognitiveconfigtab.启用幻觉校验") },
+        { config_key: 'cognitive.action_bridge.enabled', config_value: 'true', description: t("knowledge.cognitiveconfigtab.启用动作桥接") },
+        { config_key: 'cognitive.agent_mesh.mode', config_value: 'sequential', description: t("knowledge.cognitiveconfigtab.agent_mesh执行模式") },
       ]);
     } finally {
       setIsLoading(false);
@@ -55,9 +55,9 @@ export default function CognitiveConfigTab() {
         config_key: c.config_key,
         config_value: c.config_value,
       })));
-      setToast({ type: 'success', msg: locale === 'zh' ? '认知引擎配置已保存' : 'Cognitive config saved' });
+      setToast({ type: 'success', msg: t("knowledge.cognitiveconfigtab.认知引擎配置已保存") });
     } catch {
-      setToast({ type: 'error', msg: locale === 'zh' ? '保存失败' : 'Save failed' });
+      setToast({ type: 'error', msg: t("knowledge.settingstab.保存失败") });
     } finally {
       setIsSaving(false);
       setTimeout(() => setToast(null), 3000);
@@ -78,27 +78,27 @@ export default function CognitiveConfigTab() {
         <div className="space-y-1">
           <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
             <Brain size={16} className="text-purple-600" />
-            {locale === 'zh' ? '认知引擎配置 (Cognitive Engine Config)' : 'Cognitive Engine Config'}
+            {t("knowledge.cognitiveconfigtab.认知引擎配置_cognitive_engine_config")}
           </h2>
           <p className="text-xs text-slate-500">
-            {locale === 'zh' ? '配置认知引擎的模型参数、安全策略和执行模式' : 'Configure cognitive engine model params, guardrails, and execution mode'}
+            {t("knowledge.cognitiveconfigtab.配置认知引擎的模型参数_安全策略和执行模式")}
           </p>
         </div>
         <div className="flex gap-2">
           <button onClick={loadConfigs} disabled={isLoading} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs">
             {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            {locale === 'zh' ? '刷新' : 'Refresh'}
+            {t("knowledge.classificationtab.刷新")}
           </button>
           <button onClick={handleSave} disabled={isSaving} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-60">
             {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-            {locale === 'zh' ? '保存配置' : 'Save'}
+            {t("knowledge.settingstab.保存配置")}
           </button>
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
         {isLoading ? (
-          <div className="py-8 text-center text-slate-400 flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" />{locale === 'zh' ? '加载中...' : 'Loading...'}</div>
+          <div className="py-8 text-center text-slate-400 flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" />{t("knowledge.glossarytab.加载中")}</div>
         ) : (
           configs.map((config, idx) => (
             <div key={config.config_key} className="flex items-center gap-4 py-2 border-b border-slate-100 last:border-0">

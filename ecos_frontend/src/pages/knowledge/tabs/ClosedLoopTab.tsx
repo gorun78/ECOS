@@ -4,7 +4,7 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 
 export default function ClosedLoopTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -13,25 +13,23 @@ export default function ClosedLoopTab() {
         <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10 scale-150"><Bot size={240} /></div>
         <div className="space-y-1 z-10">
           <span className="px-2 py-0.5 bg-blue-500 text-white text-[9px] font-black rounded uppercase tracking-wider">
-            {locale === 'zh' ? '双轨知识闭环' : 'DUAL-TRACK CLOSED LOOP'}
+            {t("knowledge.closedlooptab.双轨知识闭环")}
           </span>
           <h1 className="text-base font-black tracking-tight">
-            {locale === 'zh' ? '知识闭环设计器 (AIP Pipeline Configurator)' : 'Knowledge Closed-Loop Designer'}
+            {t("knowledge.closedlooptab.知识闭环设计器_aip_pipeline_configura")}
           </h1>
           <p className="text-xs text-slate-300 font-sans max-w-2xl leading-relaxed">
-            {locale === 'zh'
-              ? '轨道A（平台自用）→ 元数据同步 → 血缘解析 → 本体对齐；轨道B（智能体知识）→ 图谱同步 → 术语/分类 → 向量索引。两条轨道汇合于RAG检索闭环。'
-              : 'Track A (Platform) → Sync → Lineage → Ontology; Track B (Agent) → Graph → Glossary/Classification → Index. Both converge at RAG retrieval.'}
+            {t("knowledge.closedlooptab.轨道a_平台自用_元数据同步_血缘解析_本体对齐")}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
-          { q: locale === 'zh' ? '为什么需要双轨知识闭环？' : 'Why dual-track closed loop?', a: locale === 'zh' ? '传统AI Copilot仅有通用常识，对业务上下文、数据时效、本体语义、合规性完全缺失。轨道A提供平台级数据底座，轨道B构建智能体可理解的知识语义层，二者融合才能消除幻觉、防止安全溢出。' : 'Traditional AI Copilots lack business context, data freshness, ontology semantics, and compliance. Track A provides the data foundation; Track B builds agent-consumable knowledge. Together they eliminate hallucinations.' },
-          { q: locale === 'zh' ? '知识库如何自动装配？' : 'How is the knowledge base assembled?', a: locale === 'zh' ? '联邦多模元数据同步引擎从集成工作台拉取宽表结构与血缘，提取本体ObjectType结构及Action，叠加安全围栏与行列掩码。元数据统一由Embedding模型向量化切片，构建结构化向量知识库。' : 'The federated metadata sync engine pulls table schemas and lineage from the integration workspace, extracts ObjectType structures and Actions, and layers security fences. All metadata is chunked and vectorized via Embedding models.' },
-          { q: locale === 'zh' ? '安全护栏的作用？' : 'Role of guardrails?', a: locale === 'zh' ? '闭环关键在于数据流的向外延展与阻断返回。当Agent利用知识库生成修改建议时，强制触发Ontology Action人工确认，该修改行为在安全中心生成审计记录，实现自适应进化闭环。' : 'The loop key is data extension and blocking return. When an agent proposes changes via the knowledge base, Ontology Action human confirmation is enforced, generating audit records in the security center.' },
-          { q: locale === 'zh' ? 'Agent Sandbox如何完善？' : 'How does Agent Sandbox work?', a: locale === 'zh' ? 'AIP Workbench中建立一键同步与仿真沙箱，开发者可在发布智能体之前，通过提示词和真实元数据对齐进行干涉测试，确保PII遮蔽和SQL row-filter在LLM推理层提前拦截。' : 'AIP Workbench provides one-click sync and simulation sandbox. Developers can test prompts against real metadata before agent deployment, ensuring PII masking and row-filter enforcement at the LLM layer.' },
+          { q: t("knowledge.closedlooptab.为什么需要双轨知识闭环"), a: t("knowledge.closedlooptab.传统ai_copilot仅有通用常识_对业务上下文_数据时效") },
+          { q: t("knowledge.closedlooptab.知识库如何自动装配"), a: t("knowledge.closedlooptab.联邦多模元数据同步引擎从集成工作台拉取宽表结构与血缘_提取本") },
+          { q: t("knowledge.closedlooptab.安全护栏的作用"), a: t("knowledge.closedlooptab.闭环关键在于数据流的向外延展与阻断返回_当agent利用知识") },
+          { q: t("knowledge.closedlooptab.agent_sandbox如何完善"), a: t("knowledge.closedlooptab.aip_workbench中建立一键同步与仿真沙箱_开发者可") },
         ].map((item, i) => (
           <div key={i} className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs space-y-2">
             <h3 className="font-black text-slate-800 text-xs flex items-center gap-1.5 text-blue-600">
@@ -46,15 +44,15 @@ export default function ClosedLoopTab() {
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
         <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
           <Activity size={12} className="text-blue-500" />
-          <span>{locale === 'zh' ? '闭环拓扑流程' : 'Closed-Loop Topology'}</span>
+          <span>{t("knowledge.closedlooptab.闭环拓扑流程")}</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-center">
           {[
-            { label: 'STEP 1', title: locale === 'zh' ? '元数据同步' : 'Sync', desc: locale === 'zh' ? 'Doris宽表、血缘、数据监控' : 'Doris tables, lineage, monitoring', color: 'slate' },
-            { label: 'STEP 2', title: locale === 'zh' ? '本体对齐' : 'Ontology', desc: locale === 'zh' ? 'ObjectTypes, Links, Action算子' : 'ObjectTypes, Links, Actions', color: 'blue' },
-            { label: 'STEP 3', title: locale === 'zh' ? '安全护栏' : 'Security', desc: locale === 'zh' ? '隔离网域, 密级锁, REDACT掩码' : 'Isolation, classification, REDACT', color: 'indigo' },
-            { label: 'STEP 4', title: locale === 'zh' ? 'RAG闭环' : 'RAG Loop', desc: locale === 'zh' ? '统一向量切片，零幻觉生成' : 'Unified vectors, zero-hallucination', color: 'dark' },
+            { label: 'STEP 1', title: t("knowledge.closedlooptab.元数据同步"), desc: t("knowledge.closedlooptab.doris宽表_血缘_数据监控"), color: 'slate' },
+            { label: 'STEP 2', title: t("knowledge.closedlooptab.本体对齐"), desc: t("knowledge.closedlooptab.objecttypes_links_action算子"), color: 'blue' },
+            { label: 'STEP 3', title: t("knowledge.closedlooptab.安全护栏"), desc: t("knowledge.closedlooptab.隔离网域_密级锁_redact掩码"), color: 'indigo' },
+            { label: 'STEP 4', title: t("knowledge.closedlooptab.rag闭环"), desc: t("knowledge.closedlooptab.统一向量切片_零幻觉生成"), color: 'dark' },
           ].map((step, i) => (
             <div key={i} className={`p-3 rounded-xl space-y-1.5 relative ${
               step.color === 'dark' ? 'bg-slate-900 text-slate-300' :
@@ -79,9 +77,7 @@ export default function ClosedLoopTab() {
 
         <div className="p-3 bg-blue-50 border border-blue-200/50 rounded-lg text-[11px] text-blue-700 leading-relaxed flex items-start gap-2">
           <Info size={14} className="shrink-0 mt-0.5" />
-          <span>{locale === 'zh'
-            ? '闭环行动倡议： 使用下方配置面板启动闭环管道，或在侧边栏切换到各子模块进行精细操作。'
-            : 'Action: Use the config panel below to start the pipeline, or navigate to sub-modules via the sidebar.'}</span>
+          <span>{t("knowledge.closedlooptab.闭环行动倡议_使用下方配置面板启动闭环管道")}</span>
         </div>
       </div>
     </div>

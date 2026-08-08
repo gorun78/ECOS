@@ -24,7 +24,7 @@ const STATUS_LABELS_ZH: Record<string, string> = {
 };
 
 export default function KnowledgeRuleRepositoryTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const [rules, setRules] = useState<RuleRepository[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,43 +110,43 @@ export default function KnowledgeRuleRepositoryTab() {
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
-      showToast('error', locale === 'zh' ? '规则名称不能为空' : 'Name required');
+      showToast('error', t("knowledge.knowledgerulerepository.规则名称不能为空"));
       return;
     }
     try {
       await knowledgeApi.createRule(form);
-      showToast('success', locale === 'zh' ? '规则创建成功' : 'Rule created');
+      showToast('success', t("knowledge.knowledgerulerepository.规则创建成功"));
       closeDrawer();
       loadRules();
     } catch {
-      showToast('error', locale === 'zh' ? '创建失败' : 'Create failed');
+      showToast('error', t("knowledge.glossarytab.创建失败"));
     }
   };
 
   const handleUpdate = async () => {
     if (!editingRule) return;
     if (!form.name.trim()) {
-      showToast('error', locale === 'zh' ? '规则名称不能为空' : 'Name required');
+      showToast('error', t("knowledge.knowledgerulerepository.规则名称不能为空"));
       return;
     }
     try {
       await knowledgeApi.updateRule(editingRule.id, form);
-      showToast('success', locale === 'zh' ? '规则更新成功' : 'Rule updated');
+      showToast('success', t("knowledge.knowledgerulerepository.规则更新成功"));
       closeDrawer();
       loadRules();
     } catch {
-      showToast('error', locale === 'zh' ? '更新失败' : 'Update failed');
+      showToast('error', t("knowledge.glossarytab.更新失败"));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(locale === 'zh' ? '确定删除此规则？' : 'Delete this rule?')) return;
+    if (!confirm(t("knowledge.knowledgerulerepository.确定删除此规则"))) return;
     try {
       await knowledgeApi.deleteRule(id);
-      showToast('success', locale === 'zh' ? '已删除' : 'Deleted');
+      showToast('success', t("knowledge.glossarytab.已删除"));
       loadRules();
     } catch {
-      showToast('error', locale === 'zh' ? '删除失败' : 'Delete failed');
+      showToast('error', t("knowledge.glossarytab.删除失败"));
     }
   };
 
@@ -167,7 +167,7 @@ export default function KnowledgeRuleRepositoryTab() {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '—';
     try {
-      return new Date(dateStr).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US');
+      return new Date(dateStr).toLocaleString(t("knowledge.knowledgerulerepository.zh_cn"));
     } catch {
       return dateStr;
     }
@@ -192,12 +192,10 @@ export default function KnowledgeRuleRepositoryTab() {
         <div className="space-y-1">
           <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
             <Shield size={16} className="text-indigo-600" />
-            {locale === 'zh' ? '规则库 (Rule Repository)' : 'Rule Repository'}
+            {t("knowledge.knowledgerulerepository.规则库_rule_repository")}
           </h2>
           <p className="text-xs text-slate-500">
-            {locale === 'zh'
-              ? '管理业务规则定义，支持版本追踪与状态生命周期管理'
-              : 'Manage business rule definitions with version tracking and status lifecycle'}
+            {t("knowledge.knowledgerulerepository.管理业务规则定义_支持版本追踪与状态生命周期管理")}
           </p>
         </div>
         <button
@@ -205,7 +203,7 @@ export default function KnowledgeRuleRepositoryTab() {
           className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs"
         >
           <Plus size={12} />
-          {locale === 'zh' ? '新建规则' : 'New Rule'}
+          {t("knowledge.knowledgerulerepository.新建规则")}
         </button>
       </div>
 
@@ -216,7 +214,7 @@ export default function KnowledgeRuleRepositoryTab() {
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={locale === 'zh' ? '搜索规则名称...' : 'Search rules...'}
+            placeholder={t("knowledge.knowledgerulerepository.搜索规则名称")}
             className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs"
           />
         </div>
@@ -225,7 +223,7 @@ export default function KnowledgeRuleRepositoryTab() {
           onChange={e => setStatusFilter(e.target.value)}
           className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white"
         >
-          <option value="">{locale === 'zh' ? '全部状态' : 'All Status'}</option>
+          <option value="">{t("knowledge.glossarytab.全部状态")}</option>
           {RULE_STATUS_OPTIONS.map(s => (
             <option key={s} value={s}>{STATUS_LABELS_ZH[s] || s}</option>
           ))}
@@ -237,25 +235,25 @@ export default function KnowledgeRuleRepositoryTab() {
         {isLoading ? (
           <div className="py-12 text-center text-slate-400 flex items-center justify-center gap-2">
             <Loader2 size={14} className="animate-spin" />
-            {locale === 'zh' ? '加载中...' : 'Loading...'}
+            {t("knowledge.glossarytab.加载中")}
           </div>
         ) : filteredRules.length === 0 ? (
           <div className="py-12 text-center text-slate-400">
             <Shield size={28} className="mx-auto text-slate-300 mb-2" />
-            <p className="text-xs">{locale === 'zh' ? '暂无规则数据' : 'No rules found'}</p>
+            <p className="text-xs">{t("knowledge.knowledgerulerepository.暂无规则数据")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-left">
-                  <th className="py-2 px-3 font-black text-slate-600">{locale === 'zh' ? '名称' : 'Name'}</th>
-                  <th className="py-2 px-3 font-black text-slate-600">{locale === 'zh' ? '域' : 'Domain'}</th>
-                  <th className="py-2 px-3 font-black text-slate-600">{locale === 'zh' ? '状态' : 'Status'}</th>
-                  <th className="py-2 px-3 font-black text-slate-600 text-center">{locale === 'zh' ? '优先级' : 'Priority'}</th>
-                  <th className="py-2 px-3 font-black text-slate-600 text-center">{locale === 'zh' ? '版本' : 'Version'}</th>
-                  <th className="py-2 px-3 font-black text-slate-600">{locale === 'zh' ? '更新时间' : 'Updated'}</th>
-                  <th className="py-2 px-3 font-black text-slate-600 text-right">{locale === 'zh' ? '操作' : 'Actions'}</th>
+                  <th className="py-2 px-3 font-black text-slate-600">{t("knowledge.knowledgerulerepository.名称")}</th>
+                  <th className="py-2 px-3 font-black text-slate-600">{t("knowledge.knowledgerulerepository.域")}</th>
+                  <th className="py-2 px-3 font-black text-slate-600">{t("knowledge.knowledgerulerepository.状态")}</th>
+                  <th className="py-2 px-3 font-black text-slate-600 text-center">{t("knowledge.knowledgerulerepository.优先级")}</th>
+                  <th className="py-2 px-3 font-black text-slate-600 text-center">{t("knowledge.knowledgerulerepository.版本")}</th>
+                  <th className="py-2 px-3 font-black text-slate-600">{t("knowledge.knowledgerulerepository.更新时间")}</th>
+                  <th className="py-2 px-3 font-black text-slate-600 text-right">{t("knowledge.ontologytab.操作")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -288,21 +286,21 @@ export default function KnowledgeRuleRepositoryTab() {
                         <button
                           onClick={() => openVersionHistory(rule)}
                           className="p-1.5 text-slate-400 hover:text-indigo-600 cursor-pointer rounded hover:bg-slate-100"
-                          title={locale === 'zh' ? '版本历史' : 'Version History'}
+                          title={t("knowledge.knowledgerulerepository.版本历史")}
                         >
                           <History size={12} />
                         </button>
                         <button
                           onClick={() => openEditDrawer(rule)}
                           className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer rounded hover:bg-slate-100"
-                          title={locale === 'zh' ? '编辑' : 'Edit'}
+                          title={t("knowledge.knowledgerulerepository.编辑")}
                         >
                           <Edit3 size={12} />
                         </button>
                         <button
                           onClick={() => handleDelete(rule.id)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer rounded hover:bg-slate-100"
-                          title={locale === 'zh' ? '删除' : 'Delete'}
+                          title={t("knowledge.ontologytab.删除")}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -324,8 +322,8 @@ export default function KnowledgeRuleRepositoryTab() {
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-slate-200 bg-inherit">
               <h3 className="text-sm font-black text-slate-800">
                 {drawerMode === 'create'
-                  ? (locale === 'zh' ? '新建规则' : 'New Rule')
-                  : (locale === 'zh' ? '编辑规则' : 'Edit Rule')}
+                  ? (t("knowledge.knowledgerulerepository.新建规则"))
+                  : (t("knowledge.knowledgerulerepository.编辑规则"))}
               </h3>
               <button onClick={closeDrawer} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X size={18} />
@@ -335,24 +333,24 @@ export default function KnowledgeRuleRepositoryTab() {
             <div className="p-4 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  {locale === 'zh' ? '规则名称' : 'Rule Name'} <span className="text-rose-500">*</span>
+                  {t("knowledge.knowledgerulerepository.规则名称")} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   value={form.name}
                   onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder={locale === 'zh' ? '请输入规则名称' : 'Rule name'}
+                  placeholder={t("knowledge.knowledgerulerepository.请输入规则名称")}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  {locale === 'zh' ? '所属域' : 'Domain'}
+                  {t("knowledge.knowledgerulerepository.所属域")}
                 </label>
                 <input
                   value={form.domain}
                   onChange={e => setForm(prev => ({ ...prev, domain: e.target.value }))}
-                  placeholder={locale === 'zh' ? '如: security, business, data' : 'e.g. security, business, data'}
+                  placeholder={t("knowledge.knowledgerulerepository.如_security_business_data")}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none"
                 />
               </div>
@@ -360,7 +358,7 @@ export default function KnowledgeRuleRepositoryTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    {locale === 'zh' ? '状态' : 'Status'}
+                    {t("knowledge.knowledgerulerepository.状态")}
                   </label>
                   <select
                     value={form.status}
@@ -374,7 +372,7 @@ export default function KnowledgeRuleRepositoryTab() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    {locale === 'zh' ? '优先级' : 'Priority'}
+                    {t("knowledge.knowledgerulerepository.优先级")}
                   </label>
                   <input
                     type="number"
@@ -389,12 +387,12 @@ export default function KnowledgeRuleRepositoryTab() {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  {locale === 'zh' ? '描述' : 'Description'}
+                  {t("knowledge.knowledgerulerepository.描述")}
                 </label>
                 <textarea
                   value={form.description}
                   onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder={locale === 'zh' ? '规则描述说明...' : 'Rule description...'}
+                  placeholder={t("knowledge.knowledgerulerepository.规则描述说明")}
                   rows={3}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none resize-none"
                 />
@@ -402,12 +400,12 @@ export default function KnowledgeRuleRepositoryTab() {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  {locale === 'zh' ? '规则内容' : 'Rule Content'}
+                  {t("knowledge.knowledgerulerepository.规则内容")}
                 </label>
                 <textarea
                   value={form.content}
                   onChange={e => setForm(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder={locale === 'zh' ? '规则定义内容 (如 DRL/DSL/表达式)...' : 'Rule definition (e.g. DRL/DSL/expression)...'}
+                  placeholder={t("knowledge.knowledgerulerepository.规则定义内容_如_drl_dsl_表达式")}
                   rows={5}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none resize-none"
                 />
@@ -419,7 +417,7 @@ export default function KnowledgeRuleRepositoryTab() {
                 onClick={closeDrawer}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
               >
-                {locale === 'zh' ? '取消' : 'Cancel'}
+                {t("knowledge.glossarytab.取消")}
               </button>
               <button
                 onClick={drawerMode === 'create' ? handleCreate : handleUpdate}
@@ -427,8 +425,8 @@ export default function KnowledgeRuleRepositoryTab() {
               >
                 <Save size={11} />
                 {drawerMode === 'create'
-                  ? (locale === 'zh' ? '创建' : 'Create')
-                  : (locale === 'zh' ? '保存' : 'Save')}
+                  ? (t("knowledge.glossarytab.创建"))
+                  : (t("knowledge.knowledgerulerepository.保存"))}
               </button>
             </div>
           </div>
@@ -443,7 +441,7 @@ export default function KnowledgeRuleRepositoryTab() {
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-slate-200 bg-inherit">
               <div>
                 <h3 className="text-sm font-black text-slate-800">
-                  {locale === 'zh' ? '版本历史' : 'Version History'}
+                  {t("knowledge.knowledgerulerepository.版本历史")}
                 </h3>
                 <p className="text-[10px] text-slate-500 mt-0.5 font-bold">{versionRuleName}</p>
               </div>
@@ -459,12 +457,12 @@ export default function KnowledgeRuleRepositoryTab() {
               {isLoadingVersions ? (
                 <div className="py-8 text-center text-slate-400 flex items-center justify-center gap-2">
                   <Loader2 size={14} className="animate-spin" />
-                  {locale === 'zh' ? '加载中...' : 'Loading...'}
+                  {t("knowledge.glossarytab.加载中")}
                 </div>
               ) : versions.length === 0 ? (
                 <div className="py-8 text-center text-slate-400">
                   <History size={24} className="mx-auto text-slate-300 mb-2" />
-                  <p className="text-xs">{locale === 'zh' ? '暂无版本记录' : 'No version history'}</p>
+                  <p className="text-xs">{t("knowledge.knowledgerulerepository.暂无版本记录")}</p>
                 </div>
               ) : (
                 <div className="relative">
@@ -489,16 +487,16 @@ export default function KnowledgeRuleRepositoryTab() {
                           <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs">
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-black text-xs text-slate-800">
-                                {locale === 'zh' ? '版本' : 'Version'} {v.version}
+                                {t("knowledge.knowledgerulerepository.版本")} {v.version}
                               </span>
                               {idx === 0 && (
                                 <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded">
-                                  {locale === 'zh' ? '当前' : 'Current'}
+                                  {t("knowledge.knowledgerulerepository.当前")}
                                 </span>
                               )}
                             </div>
                             <p className="text-[11px] text-slate-600 leading-relaxed mb-2">
-                              {v.changeLog || (locale === 'zh' ? '无变更说明' : 'No changelog')}
+                              {v.changeLog || (t("knowledge.knowledgerulerepository.无变更说明"))}
                             </p>
                             <div className="flex items-center gap-4 text-[10px] text-slate-400">
                               <span className="flex items-center gap-1">
@@ -526,7 +524,7 @@ export default function KnowledgeRuleRepositoryTab() {
                 onClick={() => setVersionDrawerOpen(false)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
               >
-                {locale === 'zh' ? '关闭' : 'Close'}
+                {t("knowledge.ontologytab.关闭")}
               </button>
             </div>
           </div>

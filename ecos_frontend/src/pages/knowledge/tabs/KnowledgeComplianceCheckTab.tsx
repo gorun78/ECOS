@@ -78,7 +78,7 @@ function buildFactsPayload(
 // ── 组件 ──────────────────────────────────────────────────
 
 export default function KnowledgeComplianceCheckTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
   const [businessObject, setBusinessObject] = useState('');
@@ -117,12 +117,12 @@ export default function KnowledgeComplianceCheckTab() {
 
   const handleCheck = async () => {
     if (!businessObject) {
-      setError(locale === 'zh' ? '请选择业务对象' : 'Please select a business object');
+      setError(t("knowledge.knowledgecompliancechecktab.请选择业务对象"));
       return;
     }
     const factsPayload = buildFactsPayload(facts, jsonMode, jsonInput);
     if (Object.keys(factsPayload).length === 0) {
-      setError(locale === 'zh' ? '请至少输入一条事实' : 'Please enter at least one fact');
+      setError(t("knowledge.knowledgecompliancechecktab.请至少输入一条事实"));
       return;
     }
     setError('');
@@ -138,7 +138,7 @@ export default function KnowledgeComplianceCheckTab() {
       });
       setResults(data);
     } catch (e: any) {
-      setError(e?.message || (locale === 'zh' ? '合规检查请求失败' : 'Compliance check request failed'));
+      setError(e?.message || (t("knowledge.knowledgecompliancechecktab.合规检查请求失败")));
     } finally {
       setIsChecking(false);
     }

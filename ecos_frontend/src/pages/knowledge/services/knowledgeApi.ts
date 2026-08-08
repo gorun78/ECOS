@@ -34,6 +34,18 @@ export async function findPath(source: string, target: string) {
   return apiFetchData(`${GRAPH_BASE}/path?s=${encodeURIComponent(source)}&t=${encodeURIComponent(target)}`);
 }
 
+// ── PMO-26 T1: Graph full-text search & path ──
+export async function graphSearch(query: string) {
+  return apiFetchData(`/api/v1/kb/graph/search?q=${encodeURIComponent(query)}`);
+}
+
+export async function graphPath(source: string, target: string) {
+  return apiFetchData('/api/v1/kb/graph/path', {
+    method: 'POST',
+    body: JSON.stringify({ source, target }),
+  });
+}
+
 export async function fetchNeighbors(id: string, depth = 1) {
   return apiFetchData(`${GRAPH_BASE}/neighbors/${encodeURIComponent(id)}?d=${depth}`);
 }
@@ -305,6 +317,8 @@ export const knowledgeApi = {
   fetchNode,
   searchKnowledge,
   findPath,
+  graphSearch,
+  graphPath,
   fetchNeighbors,
   createNode,
   createEdge,

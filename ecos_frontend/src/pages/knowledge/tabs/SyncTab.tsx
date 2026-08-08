@@ -86,16 +86,16 @@ export default function SyncTab() {
       <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-3`}>
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText}`}>
-            {locale === 'zh' ? '多模态联邦元数据集成中心' : 'Federated Metadata Integration'}
+            {t("knowledge.synctab.多模态联邦元数据集成中心")}
           </h2>
           <p className={`text-xs ${styles.cardTextMuted}`}>
-            {locale === 'zh' ? '动态监控、抓取和转换物理数据集、逻辑本体语义以及最高安全规则定义至本地缓存中，等待切块向量化。' : 'Monitor, fetch and transform datasets, ontology semantics and security rules for chunked vectorization.'}
+            {t("knowledge.synctab.动态监控_抓取和转换物理数据集_逻辑本体语义以及最高安全规则")}
           </p>
         </div>
         <button onClick={handleSyncAll} disabled={isSyncingAll} className={`px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''}`}>
           {isSyncingAll
-            ? <><span className="w-3.5 h-3.5 border-2 border-slate-100 border-t-transparent rounded-full animate-spin" /><span>{locale === 'zh' ? '联邦网格抓取中...' : 'Syncing...'}</span></>
-            : <><RefreshCw size={12} /><span>{locale === 'zh' ? '一键全站元数据同步' : 'Full Sync'}</span></>
+            ? <><span className="w-3.5 h-3.5 border-2 border-slate-100 border-t-transparent rounded-full animate-spin" /><span>{t("knowledge.synctab.联邦网格抓取中")}</span></>
+            : <><RefreshCw size={12} /><span>{t("knowledge.synctab.一键全站元数据同步")}</span></>
           }
         </button>
       </div>
@@ -105,7 +105,7 @@ export default function SyncTab() {
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5 text-rose-600">
-                <ShieldAlert size={13} /><span>{locale === 'zh' ? '物理元数据漂移与调度 SLA 仿真中心' : 'Exception Lab'}</span>
+                <ShieldAlert size={13} /><span>{t("knowledge.synctab.物理元数据漂移与调度_sla_仿真中心")}</span>
               </h3>
               <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
                 {isSchemaDrift || isSlaBreach ? '● 异常激活' : '● 稳定'}
@@ -113,24 +113,24 @@ export default function SyncTab() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => handleToggleSimulation('drift')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSchemaDrift ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
-                <AlertTriangle size={11} className={isSchemaDrift ? 'animate-bounce' : ''} /><span>{locale === 'zh' ? '注入 Schema 漂移' : 'Schema Drift'}</span>
+                <AlertTriangle size={11} className={isSchemaDrift ? 'animate-bounce' : ''} /><span>{t("knowledge.synctab.注入_schema_漂移")}</span>
               </button>
               <button onClick={() => handleToggleSimulation('sla')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSlaBreach ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
-                <Clock size={11} className={isSlaBreach ? 'animate-pulse' : ''} /><span>{locale === 'zh' ? '注入 SLA 断流' : 'SLA Breach'}</span>
+                <Clock size={11} className={isSlaBreach ? 'animate-pulse' : ''} /><span>{t("knowledge.synctab.注入_sla_断流")}</span>
               </button>
               <button onClick={() => handleToggleSimulation('reset')} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-all flex items-center gap-1 border border-slate-300 ml-auto">
-                <Check size={11} /><span>{locale === 'zh' ? '复位' : 'Reset'}</span>
+                <Check size={11} /><span>{t("knowledge.synctab.复位")}</span>
               </button>
             </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-2.5">
             <h4 className="font-extrabold text-slate-800 text-[11px] flex items-center gap-1 text-slate-700 border-b border-slate-100 pb-2">
-              <FileClock size={12} /><span>{locale === 'zh' ? '审计记录' : 'Audit Logs'} ({auditLogs.length})</span>
+              <FileClock size={12} /><span>{t("knowledge.synctab.审计记录")} ({auditLogs.length})</span>
             </h4>
             <div className="space-y-1.5 max-h-36 overflow-y-auto font-mono text-[9px]">
               {auditLogs.length === 0
-                ? <p className="text-slate-400 py-4 text-center">{locale === 'zh' ? '暂无审计事件' : 'No audit events'}</p>
+                ? <p className="text-slate-400 py-4 text-center">{t("knowledge.synctab.暂无审计事件")}</p>
                 : auditLogs.map((log: any, i: number) => (
                   <div key={i} className="p-2 rounded-lg bg-slate-50 border border-slate-150 flex items-start justify-between gap-4">
                     <div className="space-y-1">
@@ -148,19 +148,19 @@ export default function SyncTab() {
           </div>
 
           <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider pt-2">
-            {locale === 'zh' ? '三大工作台元数据同步列表' : 'Metadata Sync List'} ({assets.length})
+            {t("knowledge.synctab.三大工作台元数据同步列表")} ({assets.length})
           </h3>
 
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-400 text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-200">
-                  <th className="p-3">{locale === 'zh' ? '资产名称' : 'Asset'}</th>
-                  <th className="p-3">{locale === 'zh' ? '来源' : 'Source'}</th>
-                  <th className="p-3">{locale === 'zh' ? '类型' : 'Type'}</th>
-                  <th className="p-3">{locale === 'zh' ? '体量' : 'Size'}</th>
-                  <th className="p-3">{locale === 'zh' ? '切块' : 'Chunks'}</th>
-                  <th className="p-3 text-right">{locale === 'zh' ? '状态/操作' : 'Status'}</th>
+                  <th className="p-3">{t("knowledge.synctab.资产名称")}</th>
+                  <th className="p-3">{t("knowledge.synctab.来源")}</th>
+                  <th className="p-3">{t("knowledge.synctab.类型")}</th>
+                  <th className="p-3">{t("knowledge.synctab.体量")}</th>
+                  <th className="p-3">{t("knowledge.synctab.切块")}</th>
+                  <th className="p-3 text-right">{t("knowledge.synctab.状态_操作")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150">
@@ -173,9 +173,9 @@ export default function SyncTab() {
                         asset.source === 'ontology' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
                         'bg-rose-50 text-rose-600 border border-rose-200'
                       }`}>
-                        {asset.source === 'integration' ? (locale === 'zh' ? '集成' : 'Integration') :
-                         asset.source === 'ontology' ? (locale === 'zh' ? '本体' : 'Ontology') :
-                         (locale === 'zh' ? '安全' : 'Security')}
+                        {asset.source === 'integration' ? (t("knowledge.synctab.集成")) :
+                         asset.source === 'ontology' ? (t("knowledge.synctab.本体")) :
+                         (t("knowledge.synctab.安全"))}
                       </span>
                     </td>
                     <td className="p-3 text-slate-500 font-medium">{asset.type}</td>
@@ -184,16 +184,16 @@ export default function SyncTab() {
                     <td className="p-3 text-right">
                       {asset.syncStatus === 'synced' ? (
                         <div className="flex items-center justify-end gap-1.5">
-                          <span className="text-emerald-600 font-bold text-[10px] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{locale === 'zh' ? '已对齐' : 'Synced'}</span>
+                          <span className="text-emerald-600 font-bold text-[10px] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{t("knowledge.synctab.已对齐")}</span>
                           <button onClick={() => handleSyncAsset(asset.id)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"><RotateCw size={10} /></button>
                         </div>
                       ) : asset.syncStatus === 'out_of_date' ? (
                         <button onClick={() => handleSyncAsset(asset.id)} className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-md transition-colors cursor-pointer text-[9px] flex items-center gap-1 ml-auto">
-                          <AlertCircle size={9} />{locale === 'zh' ? '更新' : 'Update'}
+                          <AlertCircle size={9} />{t("knowledge.synctab.更新")}
                         </button>
                       ) : (
                         <button onClick={() => handleSyncAsset(asset.id)} className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md transition-colors cursor-pointer text-[9px] flex items-center gap-1 ml-auto">
-                          <Download size={9} />{locale === 'zh' ? '拉取' : 'Sync'}
+                          <Download size={9} />{t("knowledge.synctab.拉取")}
                         </button>
                       )}
                     </td>
@@ -216,7 +216,7 @@ export default function SyncTab() {
             {syncLogs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center space-y-1.5">
                 <Terminal size={24} className="text-slate-600" />
-                <p>{locale === 'zh' ? '等待联邦同步事件触发...' : 'Waiting for sync events...'}</p>
+                <p>{t("knowledge.synctab.等待联邦同步事件触发")}</p>
               </div>
             ) : syncLogs.map((log, idx) => (
               <p key={idx} className={`${log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('❌') ? 'text-rose-400 font-bold' : 'text-slate-300'}`}>{log}</p>

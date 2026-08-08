@@ -7,10 +7,11 @@
  * 复用 GraphCanvas 组件做图谱可视化渲染
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   Search, Share2, Network, Plus, ArrowRight, Loader2,
-  X, ExternalLink, GitBranch, Info, Hash, Tag
+  X, ExternalLink, GitBranch, Info, Hash, Tag,
+  Minimize2, CornerDownRight
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
@@ -52,14 +53,16 @@ export default function GraphExplorerTab() {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<GraphNode[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [domainFilter, setDomainFilter] = useState('');
   const [neighborDegree, setNeighborDegree] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [nodeDetail, setNodeDetail] = useState<GraphNode | null>(null);
   const [nodeEdges, setNodeEdges] = useState<GraphEdge[]>([]);
-  const [showPathModal, setShowPathModal] = useState(false);
   const [pathSource, setPathSource] = useState('');
   const [pathTarget, setPathTarget] = useState('');
   const [pathNodes, setPathNodes] = useState<Set<string>>(new Set());
@@ -70,6 +73,10 @@ export default function GraphExplorerTab() {
   const [newEdgeForm, setNewEdgeForm] = useState({ sourceNodeId: '', targetNodeId: '', relationship: '', weight: '1' });
   const [toast, setToast] = useState<{ type: string; msg: string } | null>(null);
   const showToast = (type: string, msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 3000); };
+
+  // ── Expand/collapse tracking ──
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
+  const expansionChildrenRef = useRef<Map<string, Set<string>>>(new Map());
 
   const loadGraph = useCallback(async (domain?: string) => {
     setIsLoading(true);
@@ -86,13 +93,40 @@ export default function GraphExplorerTab() {
     }
   }, []);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setIsLoading(true);
-    knowledgeApi.searchKnowledge(searchQuery).then((data: any) => {
-      setNodes(data?.nodes || []);
-      setEdges(data?.edges || data?.links || []);
-    }).catch((e: any) => showToast('error', '搜索异常: ' + e.message)).finally(() => setIsLoading(false));
+    setShowSearchResults(true);
+    try {
+      const data = await knowledgeApi.graphSearch(searchQuery) as any;
+      const results = (data?.results || data?.nodes || []).map((r: any) => ({
+        id: r.id || r.nodeId,
+        label: r.label || r.name || r.id,
+        type: r.type || r.nodeType || 'default',
+        properties: r.properties,
+        description: r.description,
+      }));
+      setSearchResults(results);
+      if (results.length === 0) showToast('info', '未找到匹配节点');
+    } catch (e: any) {
+      showToast('error', '搜索异常: ' + e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearchResultClick = (nodeId: string) => {
+    setShowSearchResults(false);
+    // Ensure the node is loaded in the graph
+    const existing = nodes.find(n => n.id === nodeId);
+    if (!existing) {
+      const fromResults = searchResults.find(r => r.id === nodeId);
+      if (fromResults) {
+        setNodes(prev => [...prev.filter(n => n.id !== nodeId), fromResults]);
+      }
+    }
+    setFocusNodeId(nodeId);
+    setSelectedNodeId(nodeId);
   };
 
   const handleDomainChange = (domain: string) => {
@@ -106,8 +140,12 @@ export default function GraphExplorerTab() {
     setIsLoading(true);
     try {
       const data = await knowledgeApi.fetchNeighbors(nodeId, neighborDegree) as any;
-      const newNodes = data?.nodes || [];
-      const newEdges = data?.edges || data?.links || [];
+      const newNodes: GraphNode[] = data?.nodes || [];
+      const newEdges: GraphEdge[] = data?.edges || data?.links || [];
+      // Track expansion children for collapse
+      const childIds = new Set(newNodes.map(n => n.id));
+      expansionChildrenRef.current.set(nodeId, childIds);
+      setExpandedNodeIds(prev => new Set(prev).add(nodeId));
       setNodes(prev => { const existing = new Set(prev.map(n => n.id)); return [...prev, ...newNodes.filter((n: GraphNode) => !existing.has(n.id))]; });
       setEdges(prev => { const existing = new Set(prev.map(e => e.id)); return [...prev, ...newEdges.filter((e: GraphEdge) => !existing.has(e.id))]; });
       showToast('success', `已展开 ${nodeId} 的邻居节点`);
@@ -116,6 +154,25 @@ export default function GraphExplorerTab() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCollapseNode = (nodeId: string) => {
+    const children = expansionChildrenRef.current.get(nodeId);
+    if (children && children.size > 0) {
+      // Collect children of other expanded nodes (shared children stay)
+      const otherChildren = new Set<string>();
+      expansionChildrenRef.current.forEach((kids, parent) => {
+        if (parent !== nodeId) kids.forEach(k => otherChildren.add(k));
+      });
+      const toRemove = new Set([...children].filter(c => !otherChildren.has(c)));
+      if (toRemove.size > 0) {
+        setNodes(prev => prev.filter(n => !toRemove.has(n.id)));
+        setEdges(prev => prev.filter(e => !toRemove.has(e.source) && !toRemove.has(e.target)));
+      }
+      expansionChildrenRef.current.delete(nodeId);
+    }
+    setExpandedNodeIds(prev => { const s = new Set(prev); s.delete(nodeId); return s; });
+    showToast('success', `已收起 ${nodeId} 的邻居`);
   };
 
   const handleSelectNode = async (nodeId: string | null) => {
@@ -150,7 +207,6 @@ export default function GraphExplorerTab() {
       showToast('error', '路径计算异常: ' + e.message);
     } finally {
       setIsComputingPath(false);
-      setShowPathModal(false);
     }
   };
 
@@ -203,16 +259,17 @@ export default function GraphExplorerTab() {
     <div className="flex h-full bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
       {/* Left Toolbar */}
       <div className="w-56 border-r border-slate-700 flex flex-col shrink-0 p-3 space-y-3 bg-slate-900">
-        {/* Search */}
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">搜索节点</label>
+        {/* Search — full-text graph search */}
+        <div className="space-y-1.5 relative">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">全文搜索</label>
           <div className="flex gap-1.5">
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(false); }}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="节点标签..."
+              onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
+              placeholder="搜索节点 / 实体..."
               className="flex-1 px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
             />
             <button
@@ -220,6 +277,51 @@ export default function GraphExplorerTab() {
               className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer transition"
             >
               <Search size={13} />
+            </button>
+          </div>
+          {/* Search results dropdown */}
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="absolute z-30 left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+              {searchResults.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => handleSearchResultClick(r.id)}
+                  className="w-full text-left px-2.5 py-1.5 text-[11px] text-slate-300 hover:bg-slate-700 border-b border-slate-700 last:border-0 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <CornerDownRight size={10} className="text-blue-400 shrink-0" />
+                  <span className="truncate">{r.label}</span>
+                  <span className="text-[9px] text-slate-500 shrink-0 ml-auto">{r.type}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Path finder — inline inputs */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">路径查找</label>
+          <div className="flex gap-1 items-center">
+            <input
+              type="text"
+              value={pathSource}
+              onChange={(e) => setPathSource(e.target.value)}
+              placeholder="起点..."
+              className="w-[70px] px-2 py-1 text-[10px] bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500"
+            />
+            <ArrowRight size={10} className="text-slate-500 shrink-0" />
+            <input
+              type="text"
+              value={pathTarget}
+              onChange={(e) => setPathTarget(e.target.value)}
+              placeholder="终点..."
+              className="w-[70px] px-2 py-1 text-[10px] bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500"
+            />
+            <button
+              onClick={() => { if (pathSource && pathTarget) handleComputePath(); else showToast('error', '请输入起点和终点'); }}
+              disabled={isComputingPath}
+              className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
+            >
+              {isComputingPath ? <Loader2 size={10} className="animate-spin" /> : <GitBranch size={10} />}
             </button>
           </div>
         </div>
@@ -268,15 +370,6 @@ export default function GraphExplorerTab() {
           </div>
         </div>
 
-        {/* Path Analysis */}
-        <button
-          onClick={() => setShowPathModal(true)}
-          className="w-full px-3 py-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg border border-slate-600 flex items-center justify-center gap-2 transition cursor-pointer"
-        >
-          <GitBranch size={12} />
-          路径分析
-        </button>
-
         {/* Legend */}
         <div className="mt-auto p-2.5 bg-slate-800 rounded-lg border border-slate-700 space-y-1.5">
           <span className="text-[9px] font-bold text-slate-500 uppercase">图例</span>
@@ -315,10 +408,13 @@ export default function GraphExplorerTab() {
             nodes={canvasNodes}
             links={canvasLinks}
             selectedNodeId={selectedNodeId}
+            focusNodeId={focusNodeId}
             onSelectNode={handleSelectNode}
             onDoubleClickNode={handleDoubleClickNode}
+            onCollapseNode={handleCollapseNode}
             pathNodeIds={pathNodes}
             pathEdgeIds={pathEdges}
+            expandedNodeIds={expandedNodeIds}
             interactive={true}
           />
         )}
@@ -428,22 +524,31 @@ export default function GraphExplorerTab() {
 
               {/* Action Buttons */}
               <div className="space-y-1.5 pt-2 border-t border-slate-800">
-                <button
-                  onClick={() => handleExpandNeighbors(detailDisplayNode.id)}
-                  className="w-full px-3 py-1.5 text-[11px] font-bold bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
-                >
-                  <ExternalLink size={11} />
-                  展开邻居
-                </button>
+                {expandedNodeIds.has(detailDisplayNode.id) ? (
+                  <button
+                    onClick={() => handleCollapseNode(detailDisplayNode.id)}
+                    className="w-full px-3 py-1.5 text-[11px] font-bold bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Minimize2 size={11} />
+                    收起邻居
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleExpandNeighbors(detailDisplayNode.id)}
+                    className="w-full px-3 py-1.5 text-[11px] font-bold bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <ExternalLink size={11} />
+                    展开邻居
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setPathSource(detailDisplayNode.id);
-                    setShowPathModal(true);
                   }}
                   className="w-full px-3 py-1.5 text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   <GitBranch size={11} />
-                  高亮路径
+                  设为路径起点
                 </button>
               </div>
             </div>
@@ -452,80 +557,6 @@ export default function GraphExplorerTab() {
               加载中...
             </div>
           )}
-        </div>
-      )}
-
-      {/* Path Analysis Modal */}
-      {showPathModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-96 p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                <GitBranch size={14} className="text-amber-400" />
-                路径分析
-              </h3>
-              <button
-                onClick={() => setShowPathModal(false)}
-                className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300 cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  起点节点 ID
-                </label>
-                <select
-                  value={pathSource}
-                  onChange={(e) => setPathSource(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-amber-500 cursor-pointer"
-                >
-                  <option value="">选择起点节点</option>
-                  {nodes.map(n => (
-                    <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  终点节点 ID
-                </label>
-                <select
-                  value={pathTarget}
-                  onChange={(e) => setPathTarget(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-amber-500 cursor-pointer"
-                >
-                  <option value="">选择终点节点</option>
-                  {nodes.map(n => (
-                    <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setShowPathModal(false)}
-                className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-600 transition cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleComputePath}
-                disabled={isComputingPath}
-                className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50"
-              >
-                {isComputingPath
-                  ? <Loader2 size={12} className="animate-spin" />
-                  : <GitBranch size={12} />
-                }
-                计算路径
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

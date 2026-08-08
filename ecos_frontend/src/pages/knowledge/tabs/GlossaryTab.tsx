@@ -6,7 +6,7 @@ import { knowledgeApi } from '../services/knowledgeApi';
 import type { GlossaryTerm, GlossaryFilter, Domain } from '../typesAndConstants';
 
 export default function GlossaryTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [filter, setFilter] = useState<GlossaryFilter>({ domain: '', status: '' });
@@ -37,37 +37,37 @@ export default function GlossaryTab() {
   useEffect(() => { loadTerms(); }, [filter]);
 
   const handleCreate = async () => {
-    if (!newTerm.name.trim()) { showToast('error', locale === 'zh' ? '术语名称不能为空' : 'Name required'); return; }
+    if (!newTerm.name.trim()) { showToast('error', t("knowledge.glossarytab.术语名称不能为空")); return; }
     try {
       await knowledgeApi.createGlossaryTerm(newTerm);
-      showToast('success', locale === 'zh' ? '术语创建成功' : 'Term created');
+      showToast('success', t("knowledge.glossarytab.术语创建成功"));
       setIsCreating(false);
       setNewTerm({ name: '', definition: '', domain: '' });
       loadTerms();
     } catch {
-      showToast('error', locale === 'zh' ? '创建失败' : 'Create failed');
+      showToast('error', t("knowledge.glossarytab.创建失败"));
     }
   };
 
   const handleUpdate = async (id: string, data: Record<string, unknown>) => {
     try {
       await knowledgeApi.updateGlossaryTerm(id, data);
-      showToast('success', locale === 'zh' ? '术语更新成功' : 'Term updated');
+      showToast('success', t("knowledge.glossarytab.术语更新成功"));
       setEditingTerm(null);
       loadTerms();
     } catch {
-      showToast('error', locale === 'zh' ? '更新失败' : 'Update failed');
+      showToast('error', t("knowledge.glossarytab.更新失败"));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(locale === 'zh' ? '确定删除此术语？' : 'Delete this term?')) return;
+    if (!confirm(t("knowledge.glossarytab.确定删除此术语"))) return;
     try {
       await knowledgeApi.deleteGlossaryTerm(id);
-      showToast('success', locale === 'zh' ? '已删除' : 'Deleted');
+      showToast('success', t("knowledge.glossarytab.已删除"));
       loadTerms();
     } catch {
-      showToast('error', locale === 'zh' ? '删除失败' : 'Delete failed');
+      showToast('error', t("knowledge.glossarytab.删除失败"));
     }
   };
 
@@ -82,10 +82,10 @@ export default function GlossaryTab() {
         <div className="space-y-1">
           <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
             <BookOpen size={16} className="text-blue-600" />
-            {locale === 'zh' ? '术语库 (Glossary Manager)' : 'Glossary Manager'}
+            {t("knowledge.glossarytab.术语库_glossary_manager")}
           </h2>
           <p className="text-xs text-slate-500">
-            {locale === 'zh' ? '管理业务术语定义，构建智能体可理解的语义词汇表' : 'Manage business term definitions for agent-consumable semantic vocabulary'}
+            {t("knowledge.glossarytab.管理业务术语定义_构建智能体可理解的语义词汇表")}
           </p>
         </div>
         <button
@@ -93,7 +93,7 @@ export default function GlossaryTab() {
           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs"
         >
           <Plus size={12} />
-          {locale === 'zh' ? '新建术语' : 'New Term'}
+          {t("knowledge.glossarytab.新建术语")}
         </button>
       </div>
 
@@ -103,7 +103,7 @@ export default function GlossaryTab() {
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={locale === 'zh' ? '搜索术语...' : 'Search terms...'}
+            placeholder={t("knowledge.glossarytab.搜索术语")}
             className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs"
           />
         </div>
@@ -112,61 +112,61 @@ export default function GlossaryTab() {
           onChange={e => setFilter(prev => ({ ...prev, domain: e.target.value }))}
           className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white"
         >
-          <option value="">{locale === 'zh' ? '全部领域' : 'All Domains'}</option>
-          <option value="data">{locale === 'zh' ? '数据域' : 'Data'}</option>
-          <option value="business">{locale === 'zh' ? '业务域' : 'Business'}</option>
-          <option value="technology">{locale === 'zh' ? '技术域' : 'Technology'}</option>
+          <option value="">{t("knowledge.glossarytab.全部领域")}</option>
+          <option value="data">{t("knowledge.glossarytab.数据域")}</option>
+          <option value="business">{t("knowledge.glossarytab.业务域")}</option>
+          <option value="technology">{t("knowledge.glossarytab.技术域")}</option>
         </select>
         <select
           value={filter.status}
           onChange={e => setFilter(prev => ({ ...prev, status: e.target.value }))}
           className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white"
         >
-          <option value="">{locale === 'zh' ? '全部状态' : 'All Status'}</option>
-          <option value="draft">{locale === 'zh' ? '草稿' : 'Draft'}</option>
-          <option value="published">{locale === 'zh' ? '已发布' : 'Published'}</option>
+          <option value="">{t("knowledge.glossarytab.全部状态")}</option>
+          <option value="draft">{t("knowledge.glossarytab.草稿")}</option>
+          <option value="published">{t("knowledge.glossarytab.已发布")}</option>
         </select>
       </div>
 
       {isCreating && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-xs text-blue-800">{locale === 'zh' ? '新建术语' : 'New Term'}</span>
+            <span className="font-bold text-xs text-blue-800">{t("knowledge.glossarytab.新建术语")}</span>
             <button onClick={() => setIsCreating(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X size={14} /></button>
           </div>
           <input
             value={newTerm.name}
             onChange={e => setNewTerm(prev => ({ ...prev, name: e.target.value }))}
-            placeholder={locale === 'zh' ? '术语名称' : 'Term name'}
+            placeholder={t("knowledge.glossarytab.术语名称")}
             className="w-full px-3 py-1.5 border border-blue-200 rounded-lg text-xs"
           />
           <textarea
             value={newTerm.definition}
             onChange={e => setNewTerm(prev => ({ ...prev, definition: e.target.value }))}
-            placeholder={locale === 'zh' ? '定义说明' : 'Definition'}
+            placeholder={t("knowledge.glossarytab.定义说明")}
             rows={3}
             className="w-full px-3 py-1.5 border border-blue-200 rounded-lg text-xs"
           />
           <input
             value={newTerm.domain}
             onChange={e => setNewTerm(prev => ({ ...prev, domain: e.target.value }))}
-            placeholder={locale === 'zh' ? '领域 (如: data, business, technology)' : 'Domain'}
+            placeholder={t("knowledge.glossarytab.领域_如_data_business_technology")}
             className="w-full px-3 py-1.5 border border-blue-200 rounded-lg text-xs"
           />
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setIsCreating(false)} className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs cursor-pointer">{locale === 'zh' ? '取消' : 'Cancel'}</button>
-            <button onClick={handleCreate} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1"><Save size={11} />{locale === 'zh' ? '创建' : 'Create'}</button>
+            <button onClick={() => setIsCreating(false)} className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs cursor-pointer">{t("knowledge.glossarytab.取消")}</button>
+            <button onClick={handleCreate} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1"><Save size={11} />{t("knowledge.glossarytab.创建")}</button>
           </div>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto space-y-2">
         {isLoading ? (
-          <div className="py-8 text-center text-slate-400 flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" />{locale === 'zh' ? '加载中...' : 'Loading...'}</div>
+          <div className="py-8 text-center text-slate-400 flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" />{t("knowledge.glossarytab.加载中")}</div>
         ) : filteredTerms.length === 0 ? (
           <div className="py-8 text-center text-slate-400">
             <BookOpen size={24} className="mx-auto text-slate-300 mb-2" />
-            <p className="text-xs">{locale === 'zh' ? '暂无术语数据' : 'No terms found'}</p>
+            <p className="text-xs">{t("knowledge.glossarytab.暂无术语数据")}</p>
           </div>
         ) : (
           filteredTerms.map(term => (

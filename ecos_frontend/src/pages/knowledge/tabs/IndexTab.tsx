@@ -6,7 +6,7 @@ import { knowledgeApi } from '../services/knowledgeApi';
 import { CHUNK_SIZE_OPTIONS, VECTOR_MODELS } from '../typesAndConstants';
 
 export default function IndexTab() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const [embeddingModel, setEmbeddingModel] = useState('text-embedding-004');
   const [chunkSize, setChunkSize] = useState(512);
@@ -52,32 +52,32 @@ export default function IndexTab() {
   return (
     <div className="space-y-6">
       <div className={`border-b ${styles.cardBorder} pb-3 space-y-1`}>
-        <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}><span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600"><Binary size={16} /></span>{locale === 'zh' ? '联邦知识库切块向量化索引引擎' : 'Vector Index Engine'}</h2>
-        <p className={`text-xs ${styles.cardTextMuted}`}>{locale === 'zh' ? '统一序列化切块，调用嵌入模型转换为特征向量，提供 PGVector / Milvus 持久化演示。' : 'Unified chunked serialization, embedding model vectorization, PGVector/Milvus persistence demo.'}</p>
+        <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}><span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600"><Binary size={16} /></span>{t("knowledge.indextab.联邦知识库切块向量化索引引擎")}</h2>
+        <p className={`text-xs ${styles.cardTextMuted}`}>{t("knowledge.indextab.统一序列化切块_调用嵌入模型转换为特征向量_提供_pgvec")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-5 space-y-4">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-4`}>
-            <h3 className={`font-extrabold ${styles.cardText} text-xs border-b ${styles.cardBorder} pb-2 flex items-center gap-1.5`}><Settings size={13} className={`${styles.cardTextMuted}`} />{locale === 'zh' ? '向量分片参数配置' : 'Chunking Config'}</h3>
+            <h3 className={`font-extrabold ${styles.cardText} text-xs border-b ${styles.cardBorder} pb-2 flex items-center gap-1.5`}><Settings size={13} className={`${styles.cardTextMuted}`} />{t("knowledge.indextab.向量分片参数配置")}</h3>
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{locale === 'zh' ? '向量模型' : 'Embedding Model'}</label>
+                <label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{t("knowledge.indextab.向量模型")}</label>
                 <select value={embeddingModel} onChange={e => setEmbeddingModel(e.target.value)} className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs font-mono ${styles.cardBg} ${styles.cardText}`}>
                   {VECTOR_MODELS.map(m => <option key={m.id} value={m.id}>{m.label} ({m.dim}d)</option>)}
                 </select>
               </div>
               <div className="space-y-1">
-                <div className="flex justify-between items-center"><label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{locale === 'zh' ? '切块大小' : 'Chunk Size'}</label><span className={`font-mono text-[10px] font-bold ${styles.cardTextMuted} ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>{chunkSize}</span></div>
+                <div className="flex justify-between items-center"><label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{t("knowledge.indextab.切块大小")}</label><span className={`font-mono text-[10px] font-bold ${styles.cardTextMuted} ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>{chunkSize}</span></div>
                 <input type="range" min={128} max={2048} step={64} value={chunkSize} onChange={e => setChunkSize(Number(e.target.value))} className="w-full h-1.5 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
               </div>
               <div className="space-y-1">
-                <div className="flex justify-between items-center"><label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{locale === 'zh' ? '重叠度' : 'Overlap'}</label><span className={`font-mono text-[10px] font-bold ${styles.cardTextMuted} ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>{overlap}</span></div>
+                <div className="flex justify-between items-center"><label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{t("knowledge.indextab.重叠度")}</label><span className={`font-mono text-[10px] font-bold ${styles.cardTextMuted} ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>{overlap}</span></div>
                 <input type="range" min={10} max={200} step={10} value={overlap} onChange={e => setOverlap(Number(e.target.value))} className="w-full h-1.5 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
               </div>
             </div>
             <button onClick={handleSyncAll} disabled={isSyncingAll} className={`w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${isSyncingAll ? 'opacity-75 cursor-not-allowed' : ''}`}>
-              {isSyncingAll ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{locale === 'zh' ? '向量对齐中...' : 'Syncing...'}</> : <><Cpu size={13} />{locale === 'zh' ? '构建闭环元数据向量库' : 'Build Vector Index'}</>}
+              {isSyncingAll ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{t("knowledge.indextab.向量对齐中")}</> : <><Cpu size={13} />{t("knowledge.indextab.构建闭环元数据向量库")}</>}
             </button>
           </div>
           <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-2 shadow-inner">
@@ -85,7 +85,7 @@ export default function IndexTab() {
               <span className={`text-[10px] font-extrabold ${styles.cardTextMuted} font-mono tracking-wider flex items-center gap-1.5`}><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />SYSTEM PIPELINE MONITOR</span>
             </div>
             <div className="font-mono text-[9.5px] leading-relaxed h-52 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
-              {syncLogs.length > 0 ? syncLogs.map((log, idx) => <div key={idx} className={log.includes('✅') ? 'text-emerald-400' : log.includes('❌') ? 'text-rose-400 font-bold' : 'text-slate-300'}>{log}</div>) : <div className={`${styles.cardTextMuted} italic`}>{locale === 'zh' ? '等待启动...' : 'Waiting...'}</div>}
+              {syncLogs.length > 0 ? syncLogs.map((log, idx) => <div key={idx} className={log.includes('✅') ? 'text-emerald-400' : log.includes('❌') ? 'text-rose-400 font-bold' : 'text-slate-300'}>{log}</div>) : <div className={`${styles.cardTextMuted} italic`}>{t("knowledge.indextab.等待启动")}</div>}
             </div>
           </div>
         </div>
@@ -99,7 +99,7 @@ export default function IndexTab() {
 
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
             <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
-              <h3 className={`font-bold ${styles.cardText} text-xs`}>{locale === 'zh' ? '分片浏览器' : 'Vector Chunk Browser'} ({vectorChunks.length})</h3>
+              <h3 className={`font-bold ${styles.cardText} text-xs`}>{t("knowledge.indextab.分片浏览器")} ({vectorChunks.length})</h3>
             </div>
             <div className="space-y-2.5 max-h-60 overflow-y-auto">
               {vectorChunks.length > 0 ? vectorChunks.map((chunk, idx) => (
@@ -111,13 +111,13 @@ export default function IndexTab() {
                   <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed font-sans ${styles.cardBg} border ${styles.cardBorder} p-2 rounded-md`}>{chunk.text}</p>
                   {chunk.vectorPreview && <div className="text-[8.5px] text-indigo-600 bg-indigo-50/50 p-1 rounded font-mono truncate">{chunk.vectorPreview}</div>}
                 </div>
-              )) : <div className={`py-8 text-center ${styles.cardTextMuted} space-y-1`}><FolderClosed size={24} className="text-slate-300 mx-auto" /><p className="text-xs">{locale === 'zh' ? '暂无切块向量' : 'No chunks yet'}</p></div>}
+              )) : <div className={`py-8 text-center ${styles.cardTextMuted} space-y-1`}><FolderClosed size={24} className="text-slate-300 mx-auto" /><p className="text-xs">{t("knowledge.indextab.暂无切块向量")}</p></div>}
             </div>
           </div>
 
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
             <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-2 gap-2`}>
-              <h3 className={`font-bold ${styles.cardText} text-xs flex items-center gap-1.5`}><Database size={13} className="text-indigo-600" />{locale === 'zh' ? '持久化演示' : 'Persistence Demo'}</h3>
+              <h3 className={`font-bold ${styles.cardText} text-xs flex items-center gap-1.5`}><Database size={13} className="text-indigo-600" />{t("knowledge.indextab.持久化演示")}</h3>
               <div className={`flex ${styles.sidebarBg} p-0.5 rounded-lg border ${styles.cardBorder}/60 shrink-0`}>
                 <button onClick={() => setPersistenceTab('pgvector')} className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all cursor-pointer ${persistenceTab === 'pgvector' ? '${styles.cardBg} text-indigo-700 shadow-xs' : '${styles.cardTextMuted}'}`}>PGVector</button>
                 <button onClick={() => setPersistenceTab('milvus')} className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all cursor-pointer ${persistenceTab === 'milvus' ? '${styles.cardBg} text-indigo-700 shadow-xs' : '${styles.cardTextMuted}'}`}>Milvus</button>
@@ -126,10 +126,10 @@ export default function IndexTab() {
             <div className="space-y-2">
               <div className={`flex justify-between items-center text-[10px] ${styles.cardTextMuted}`}>
                 <span>{persistenceTab === 'pgvector' ? '🐘 PGVector SQL' : '⚡ Milvus Node.js'}</span>
-                <button onClick={() => handleCopy(persistenceTab === 'pgvector' ? pgvectorSql : milvusCode)} className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"><Copy size={11} />{locale === 'zh' ? '复制' : 'Copy'}</button>
+                <button onClick={() => handleCopy(persistenceTab === 'pgvector' ? pgvectorSql : milvusCode)} className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"><Copy size={11} />{t("knowledge.ontologytab.复制")}</button>
               </div>
               <div className="bg-slate-900 text-slate-300 rounded-xl p-3 h-48 overflow-y-auto font-mono text-[9.5px] leading-relaxed border border-slate-850">
-                {(persistenceTab === 'pgvector' ? pgvectorSql : milvusCode) ? <pre className="whitespace-pre">{persistenceTab === 'pgvector' ? pgvectorSql : milvusCode}</pre> : <div className={`${styles.cardTextMuted} italic py-12 text-center`}>{locale === 'zh' ? '暂无代码' : 'No code yet'}</div>}
+                {(persistenceTab === 'pgvector' ? pgvectorSql : milvusCode) ? <pre className="whitespace-pre">{persistenceTab === 'pgvector' ? pgvectorSql : milvusCode}</pre> : <div className={`${styles.cardTextMuted} italic py-12 text-center`}>{t("knowledge.indextab.暂无代码")}</div>}
               </div>
             </div>
           </div>
@@ -140,20 +140,20 @@ export default function IndexTab() {
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
         <h3 className={`font-extrabold ${styles.cardText} text-xs border-b ${styles.cardBorder} pb-2 flex items-center gap-1.5`}>
           <Settings size={13} className={`${styles.cardTextMuted}`} />
-          {locale === 'zh' ? '全局配置 (Knowledge Settings)' : 'Global Settings'}
+          {t("knowledge.indextab.全局配置_knowledge_settings")}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className={`flex items-center gap-2 text-xs ${styles.cardText} font-medium`}>
             <input type="checkbox" className="accent-indigo-600" />
-            <span>{locale === 'zh' ? '启用 Neo4j 图谱' : 'Neo4j Graph'}</span>
+            <span>{t("knowledge.indextab.启用_neo4j_图谱")}</span>
           </label>
           <label className={`flex items-center gap-2 text-xs ${styles.cardText} font-medium`}>
             <input type="checkbox" className="accent-indigo-600" defaultChecked />
-            <span>{locale === 'zh' ? '自动同步' : 'Auto Sync'}</span>
+            <span>{t("knowledge.settingstab.自动同步")}</span>
           </label>
           <div className="space-y-1">
             <label className={`${styles.cardTextMuted} font-bold text-[10px] uppercase`}>
-              {locale === 'zh' ? '最大检索数' : 'Max Retrieval Results'}
+              {t("knowledge.indextab.最大检索数")}
             </label>
             <input type="number" defaultValue={5} min={1} max={50}
               className={`w-full px-2 py-1 border ${styles.cardBorder} rounded text-xs font-mono`} />
