@@ -8,7 +8,6 @@ import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck, Objec
 
 // ─── Props ───────────────────────────────────────────────────
 
-export interface LineageMapViewProps {
   connections: DataConnection[];
   syncTasks: DataSyncTask[];
   pipelines: DataPipeline[];
