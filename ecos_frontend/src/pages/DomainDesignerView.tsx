@@ -23,11 +23,15 @@ import {
   Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen,
   PanelRightClose, PanelRightOpen, ChevronLeft, Filter,
   Globe, List, Edit3, Trash2, SlidersHorizontal, Eye,
+  Sparkles,
 } from 'lucide-react';
+import { useLanguage } from '../components/LanguageContext';
+import { useTheme } from '../components/ThemeContext';
 import { useWorkbenchStore } from '../stores/useWorkbenchStore';
 import type { Entity, Relationship } from '../types/workbench';
 import CreateEntityModal from '../components/ontology-workbench/modals/CreateEntityModal';
 import CreateRelationshipModal from '../components/ontology-workbench/modals/CreateRelationshipModal';
+import AutoDiscoverPanel from './ontology/AutoDiscoverPanel';
 
 // ── 辅助函数：从 URL hash 中提取 domainCode ──────────────────
 
@@ -76,12 +80,12 @@ const ENTITY_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string 
   },
 };
 
-function getEntityTypeLabel(et: string): string {
+function getEntityTypeLabel(et: string, t: (key: string) => string): string {
   const map: Record<string, string> = {
-    MASTER: '主数据',
-    TRANSACTION: '事务',
-    EVENT: '事件',
-    REFERENCE: '引用',
+    MASTER: t('ontology.designer.entityType.master'),
+    TRANSACTION: t('ontology.designer.entityType.transaction'),
+    EVENT: t('ontology.designer.entityType.event'),
+    REFERENCE: t('ontology.designer.entityType.reference'),
   };
   return map[et] || et;
 }
@@ -92,7 +96,9 @@ export default function DomainDesignerView() {
   // 从 URL 提取 domainCode
   const domainCode = useMemo(() => extractDomainCode(), []);
 
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
+  const { t } = useLanguage();
   const {
     entities,
     relationships,
@@ -110,6 +116,7 @@ export default function DomainDesignerView() {
   const [showCreateRelation, setShowCreateRelation] = useState(false);
   const [createRelationSourceId, setCreateRelationSourceId] = useState<string>('');
   const [entitySearch, setEntitySearch] = useState('');
+  const [showAutoDiscover, setShowAutoDiscover] = useState(false);
 
   // ── 初始化：设置域并加载数据 ──
   useEffect(() => {
@@ -163,16 +170,16 @@ export default function DomainDesignerView() {
 
   if (!domainCode) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#0f1117]">
+      <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center">
           <AlertCircle size={40} className="text-red-400 mx-auto mb-3" />
-          <p className="text-sm text-red-400">缺少域参数</p>
-          <p className="text-xs text-slate-500 mt-1">请从域列表页面进入</p>
+          <p className="text-sm text-red-400">{t("ontology.designer.missingDomainParam")}</p>
+          <p className="text-xs text-slate-500 mt-1">{t("ontology.designer.enterFromDomainList")}</p>
           <button
             onClick={handleBack}
             className="mt-4 px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600"
           >
-            返回域列表
+            {t("ontology.designer.backToDomainList")}
           </button>
         </div>
       </div>
@@ -180,18 +187,18 @@ export default function DomainDesignerView() {
   }
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-[#0f1117] font-sans">
+    <div className={`flex-1 flex h-full overflow-hidden ${styles.appBg} font-sans`}>
       {/* ═══════ 左侧面板 (280px) — 域选择器 + 实体树 ═══════ */}
       {!leftPanelCollapsed && (
-        <div className="w-[280px] min-w-[240px] border-r border-[#1E293B] bg-[#141924] flex flex-col shrink-0">
+        <div className={`w-[280px] min-w-[240px] border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0`}>
           {/* 域标题 */}
-          <div className="px-4 py-3 border-b border-[#1E293B]">
+          <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
             <button
               onClick={handleBack}
               className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-400 mb-2.5 transition"
             >
               <ChevronLeft size={12} />
-              返回域列表
+              {t("ontology.designer.backToDomainList")}
             </button>
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-indigo-500/10">
@@ -202,23 +209,23 @@ export default function DomainDesignerView() {
                   {domainCode}
                 </h3>
                 <p className="text-[10px] text-slate-500">
-                  {entities.length} 实体 · {relationships.length} 关系
+                  {t('ontology.designer.entityRelationshipCount', { entities: entities.length, relationships: relationships.length })}
                 </p>
               </div>
             </div>
           </div>
 
           {/* 实体搜索 */}
-          <div className="px-4 py-2 border-b border-[#1E293B]">
+          <div className={`px-4 py-2 border-b ${styles.cardBorder}`}>
             <div className="relative">
               <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 value={entitySearch}
                 onChange={(e) => setEntitySearch(e.target.value)}
-                placeholder="搜索实体..."
-                className="w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg pl-7 pr-3 py-1.5
+                placeholder={t("ontology.designer.searchEntity")}
+                className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg pl-7 pr-3 py-1.5
                   text-xs text-white placeholder:text-slate-600
-                  focus:outline-none focus:border-indigo-500/40 transition"
+                  focus:outline-none focus:border-indigo-500/40 transition`}
               />
             </div>
           </div>
@@ -234,7 +241,7 @@ export default function DomainDesignerView() {
                 <div className="text-center">
                   <Box size={24} className="mx-auto mb-2 opacity-30" />
                   <p className="text-xs">
-                    {entitySearch ? '无匹配实体' : '暂无实体'}
+                    {entitySearch ? t('ontology.designer.noMatchEntity') : t('ontology.designer.noEntity')}
                   </p>
                 </div>
               </div>
@@ -249,10 +256,10 @@ export default function DomainDesignerView() {
                     <button
                       key={entity.id}
                       onClick={() => store.selectEntity(entity.id)}
-                      className={`w-full text-left px-4 py-2.5 border-b border-[#1E293B]/50 transition flex items-center gap-2.5 ${
+                      className={`w-full text-left px-4 py-2.5 border-b ${styles.cardBorder}/50 transition flex items-center gap-2.5 ${
                         isSelected
                           ? 'bg-indigo-500/10 border-l-2 border-l-indigo-500'
-                          : 'hover:bg-white/[0.03] border-l-2 border-l-transparent'
+                          : `hover:${styles.cardBg}/[0.03] border-l-2 border-l-transparent`
                       }`}
                     >
                       {config.icon}
@@ -260,7 +267,7 @@ export default function DomainDesignerView() {
                         <div className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
                           {entity.name || entity.code}
                           <span className="text-[9px] font-normal text-slate-500">
-                            ({getEntityTypeLabel(entity.entityType)})
+                            ({getEntityTypeLabel(entity.entityType, t)})
                           </span>
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono truncate">
@@ -278,7 +285,7 @@ export default function DomainDesignerView() {
           </div>
 
           {/* 底部：创建实体按钮 */}
-          <div className="px-4 py-2.5 border-t border-[#1E293B]">
+          <div className={`px-4 py-2.5 border-t ${styles.cardBorder}`}>
             <button
               onClick={() => setShowCreateEntity(true)}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
@@ -287,7 +294,7 @@ export default function DomainDesignerView() {
                 bg-indigo-500/5 hover:bg-indigo-500/10 transition"
             >
               <Plus size={13} />
-              新建实体
+              {t("ontology.designer.newEntity")}
             </button>
           </div>
         </div>
@@ -296,21 +303,21 @@ export default function DomainDesignerView() {
       {/* ═══════ 中间画布 (flex: 1) ═══════ */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* 工具栏 */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#1E293B] bg-[#141924] shrink-0">
+        <div className={`flex items-center justify-between px-4 py-2 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <div className="flex items-center gap-1.5">
             {/* 左侧面板折叠按钮 */}
             <button
               onClick={() => store.toggleLeftPanel()}
-              className="p-1.5 rounded hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
-              title={leftPanelCollapsed ? '展开实体树' : '折叠实体树'}
+              className={`p-1.5 rounded hover:${styles.cardBg}/5 text-slate-400 hover:text-slate-300 transition`}
+              title={leftPanelCollapsed ? t('ontology.designer.expandEntityTree') : t('ontology.designer.collapseEntityTree')}
             >
               {leftPanelCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
             </button>
 
-            <div className="w-px h-5 bg-[#1E293B] mx-1" />
+            <div className={`w-px h-5 border-l ${styles.cardBorder} mx-1`} />
 
             <Network size={14} className="text-indigo-400" />
-            <span className="text-xs font-medium text-slate-300">本体设计器</span>
+            <span className="text-xs font-medium text-slate-300">{t("ontology.designer.ontologyDesigner")}</span>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -322,7 +329,7 @@ export default function DomainDesignerView() {
                 hover:bg-indigo-600/30 transition"
             >
               <Plus size={11} />
-              实体
+              {t("ontology.designer.entity")}
             </button>
 
             {/* 创建关系 */}
@@ -335,15 +342,26 @@ export default function DomainDesignerView() {
                 disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
               <GitBranch size={11} />
-              关系
+              {t("ontology.designer.relationship")}
             </button>
 
-            <div className="w-px h-5 bg-[#1E293B] mx-1" />
+            {/* 自动发现 */}
+            <button
+              onClick={() => setShowAutoDiscover(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px]
+                bg-purple-600/20 text-purple-300 border border-purple-500/30
+                hover:bg-purple-600/30 transition"
+            >
+              <Sparkles size={11} />
+              {t("ontology.autoDiscover.title")}
+            </button>
+
+            <div className={`w-px h-5 border-l ${styles.cardBorder} mx-1`} />
 
             {/* 布局按钮（Sprint 3 接入） */}
             <button
-              className="p-1.5 rounded hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
-              title="自动布局"
+              className={`p-1.5 rounded hover:${styles.cardBg}/5 text-slate-400 hover:text-slate-300 transition`}
+              title={t("ontology.designer.autoLayout")}
             >
               <Maximize2 size={13} />
             </button>
@@ -351,8 +369,8 @@ export default function DomainDesignerView() {
             {/* 右侧面板折叠按钮 */}
             <button
               onClick={() => store.toggleRightPanel()}
-              className="p-1.5 rounded hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
-              title={rightPanelCollapsed ? '展开属性面板' : '折叠属性面板'}
+              className={`p-1.5 rounded hover:${styles.cardBg}/5 text-slate-400 hover:text-slate-300 transition`}
+              title={rightPanelCollapsed ? t('ontology.designer.expandPropertyPanel') : t('ontology.designer.collapsePropertyPanel')}
             >
               {rightPanelCollapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
             </button>
@@ -362,14 +380,14 @@ export default function DomainDesignerView() {
         {/* 画布区域 */}
         <div className="flex-1 relative overflow-hidden">
           {isLoading ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#0b0e14]">
+            <div className={`absolute inset-0 flex items-center justify-center ${styles.appBg}`}>
               <div className="text-center">
                 <Loader2 size={28} className="animate-spin text-indigo-400 mx-auto mb-3" />
-                <p className="text-xs text-slate-500">正在加载域数据...</p>
+                <p className="text-xs text-slate-500">{t("ontology.designer.loadingDomainData")}</p>
               </div>
             </div>
           ) : error ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#0b0e14]">
+            <div className={`absolute inset-0 flex items-center justify-center ${styles.appBg}`}>
               <div className="text-center p-8">
                 <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
                 <p className="text-xs text-red-400 mb-3">{error}</p>
@@ -377,7 +395,7 @@ export default function DomainDesignerView() {
                   onClick={() => store.fetchDomainData()}
                   className="px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600"
                 >
-                  重试
+                  {t("ontology.designer.retry")}
                 </button>
               </div>
             </div>
@@ -395,7 +413,7 @@ export default function DomainDesignerView() {
 
       {/* ═══════ 右侧面板 (320px) — 属性编辑器 ═══════ */}
       {!rightPanelCollapsed && (
-        <div className="w-[320px] min-w-[260px] border-l border-[#1E293B] bg-[#141924] flex flex-col shrink-0 overflow-y-auto">
+        <div className={`w-[320px] min-w-[260px] border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-y-auto`}>
           <PropertyEditorPanel
             entity={selectedEntity || null}
             relationships={entityRelationships}
@@ -422,6 +440,14 @@ export default function DomainDesignerView() {
         sourceEntityId={createRelationSourceId}
         entities={entities}
       />
+
+      {/* 自动发现面板 */}
+      {showAutoDiscover && (
+        <AutoDiscoverPanel
+          domainCode={domainCode}
+          onClose={() => setShowAutoDiscover(false)}
+        />
+      )}
     </div>
   );
 }
@@ -471,12 +497,12 @@ function DomainGraphCanvas({
 
   if (entities.length === 0) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-[#0b0e14]">
+      <div className={`absolute inset-0 flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center">
           <Network size={40} className="mx-auto mb-3 opacity-20 text-slate-500" />
-          <p className="text-sm text-slate-500 mb-2">空域 · 暂无实体</p>
+          <p className="text-sm text-slate-500 mb-2">{t("ontology.designer.emptyDomain")}</p>
           <p className="text-[11px] text-slate-600">
-            点击上方「实体」按钮创建第一个实体
+            {t("ontology.designer.clickEntityToCreate")}
           </p>
         </div>
       </div>
@@ -484,7 +510,7 @@ function DomainGraphCanvas({
   }
 
   return (
-    <div className="absolute inset-0 overflow-auto bg-[#0b0e14]">
+    <div className={`absolute inset-0 overflow-auto ${styles.appBg}`}>
       <svg
         width={Math.max(svgWidth, 600)}
         height={Math.max(svgHeight, 400)}
@@ -670,14 +696,15 @@ function PropertyEditorPanel({
   onCreateRelation,
   saving,
 }: PropertyEditorPanelProps) {
+  const { t } = useLanguage();
   if (!entity) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500">
         <div className="text-center p-6">
           <Eye size={32} className="mx-auto mb-2 opacity-20" />
-          <p className="text-xs">选择实体查看详情</p>
+          <p className="text-xs">{t("ontology.designer.selectEntityDetail")}</p>
           <p className="text-[10px] mt-1 opacity-60">
-            点击画布节点或左侧实体树
+            {t("ontology.designer.clickCanvasOrTree")}
           </p>
         </div>
       </div>
@@ -689,7 +716,7 @@ function PropertyEditorPanel({
   return (
     <div className="flex-1 flex flex-col">
       {/* 标题 */}
-      <div className="px-4 py-3 border-b border-[#1E293B]">
+      <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <div className="flex items-center gap-2 mb-2">
           {config.icon}
           <h3 className="text-sm font-semibold text-white">
@@ -699,7 +726,7 @@ function PropertyEditorPanel({
         <p className="text-[10px] font-mono text-slate-500">{entity.code}</p>
         <div className="flex items-center gap-2 mt-2">
           <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">
-            {getEntityTypeLabel(entity.entityType)}
+            {getEntityTypeLabel(entity.entityType, t)}
           </span>
           {entity.entityType && (
             <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">
@@ -710,29 +737,29 @@ function PropertyEditorPanel({
       </div>
 
       {/* 基本信息 */}
-      <div className="px-4 py-3 border-b border-[#1E293B]">
+      <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <h4 className="text-[11px] font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
           <Edit3 size={11} className="text-slate-500" />
-          基本信息
+          {t("ontology.designer.basicInfo")}
         </h4>
         <div className="space-y-1.5 text-[11px]">
           <div className="flex justify-between">
-            <span className="text-slate-500">编码</span>
+            <span className="text-slate-500">{t("ontology.designer.code")}</span>
             <span className="text-white font-mono">{entity.code}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">名称</span>
+            <span className="text-slate-500">{t("ontology.designer.name")}</span>
             <span className="text-white">{entity.name}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">类型</span>
+            <span className="text-slate-500">{t("ontology.designer.type")}</span>
             <span className="text-white">
-              {getEntityTypeLabel(entity.entityType)} ({entity.entityType})
+              {getEntityTypeLabel(entity.entityType, t)} ({entity.entityType})
             </span>
           </div>
           {entity.description && (
             <div className="pt-1">
-              <span className="text-slate-500">描述</span>
+              <span className="text-slate-500">{t("ontology.designer.description")}</span>
               <p className="text-white mt-0.5 text-[10px] leading-relaxed">
                 {entity.description}
               </p>
@@ -740,7 +767,7 @@ function PropertyEditorPanel({
           )}
           {entity.createdAt && (
             <div className="flex justify-between">
-              <span className="text-slate-500">创建时间</span>
+              <span className="text-slate-500">{t("ontology.designer.createdAt")}</span>
               <span className="text-white text-[10px]">{entity.createdAt}</span>
             </div>
           )}
@@ -748,24 +775,24 @@ function PropertyEditorPanel({
       </div>
 
       {/* 关联关系 */}
-      <div className="px-4 py-3 border-b border-[#1E293B]">
+      <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
             <GitBranch size={11} className="text-slate-500" />
-            关联关系 ({relationships.length})
+            {t('ontology.designer.relationshipsCount', { count: relationships.length })}
           </h4>
           {allEntities.length > 1 && (
             <button
               onClick={() => onCreateRelation(entity.id)}
               className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
             >
-              <Plus size={10} /> 添加
+              <Plus size={10} /> {t("ontology.designer.add")}
             </button>
           )}
         </div>
 
         {relationships.length === 0 ? (
-          <p className="text-[10px] text-slate-600 text-center py-3">暂无关系</p>
+          <p className="text-[10px] text-slate-600 text-center py-3">{t("ontology.designer.noRelationships")}</p>
         ) : (
           <div className="space-y-1">
             {relationships.map((rel) => {
@@ -776,7 +803,7 @@ function PropertyEditorPanel({
               return (
                 <div
                   key={rel.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/[0.03] text-[10px]"
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded hover:${styles.cardBg}/[0.03] text-[10px]`}
                 >
                   <span className={isSource ? 'text-emerald-400' : 'text-blue-400'}>
                     {isSource ? '→' : '←'}
@@ -793,22 +820,22 @@ function PropertyEditorPanel({
       </div>
 
       {/* 属性列表 (Sprint 3 占位) */}
-      <div className="px-4 py-3 border-b border-[#1E293B]">
+      <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
             <List size={11} className="text-slate-500" />
-            属性列表
+            {t("ontology.designer.propertyList")}
           </h4>
-          <span className="text-[9px] text-slate-600">Sprint 3 实现</span>
+          <span className="text-[9px] text-slate-600">{t("ontology.designer.sprint3Impl")}</span>
         </div>
         <div className="text-center py-4">
           <SlidersHorizontal size={20} className="mx-auto mb-1 opacity-20 text-slate-500" />
-          <p className="text-[10px] text-slate-600">属性编辑功能将在这个区域展示</p>
+          <p className="text-[10px] text-slate-600">{t("ontology.designer.propertyEditHere")}</p>
         </div>
       </div>
 
       {/* 底部操作 */}
-      <div className="px-4 py-3 mt-auto border-t border-[#1E293B]">
+      <div className={`px-4 py-3 mt-auto border-t ${styles.cardBorder}`}>
         <div className="flex gap-2">
           <button
             className="flex-1 py-1.5 rounded-lg text-[10px] font-medium
@@ -816,7 +843,7 @@ function PropertyEditorPanel({
               hover:bg-red-500/20 transition flex items-center justify-center gap-1"
           >
             <Trash2 size={10} />
-            删除实体
+            {t("ontology.designer.deleteEntity")}
           </button>
         </div>
       </div>

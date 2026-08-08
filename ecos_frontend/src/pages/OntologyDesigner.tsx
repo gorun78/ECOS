@@ -28,7 +28,7 @@ import {
 
 export default function OntologyDesigner() {
   const { t } = useLanguage();
-  useTheme();
+  const { styles } = useTheme();
   const [entities, setEntities] = useState<OntologyEntity[]>([]);
   const [properties, setProperties] = useState<Record<string, OntologyProperty[]>>({});
   const [relationships, setRelationships] = useState<OntologyRelationship[]>([]);
@@ -161,14 +161,14 @@ export default function OntologyDesigner() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
+      <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}>
         <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-full bg-slate-50 font-sans text-slate-800">
+    <div className={`flex flex-col lg:flex-row h-full ${styles.appBg} font-sans text-slate-800`}>
       {toast && (
         <div className={`absolute top-4 right-4 z-50 px-4 py-2.5 rounded-lg text-xs font-semibold shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 ${
           toast.type === "ok" ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"
@@ -179,8 +179,8 @@ export default function OntologyDesigner() {
       )}
 
       {/* Left: Entity List */}
-      <div className="w-full lg:w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col max-h-48 lg:max-h-full">
-        <div className="p-3 border-b border-slate-200 flex items-center justify-between">
+      <div className={`w-full lg:w-64 shrink-0 border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col max-h-48 lg:max-h-full`}>
+        <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
           <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
             <Box className="w-3.5 h-3.5 text-indigo-500" /> 实体列表 ({entities.length})
           </h3>
@@ -192,7 +192,7 @@ export default function OntologyDesigner() {
           {entities.map(e => (
             <div key={e.id} onClick={() => setSelectedEntityId(e.id)}
               className={`px-3 py-2.5 border-b border-slate-100 cursor-pointer transition flex items-center gap-2.5 ${
-                selectedEntityId === e.id ? "bg-indigo-50 border-l-2 border-l-indigo-500" : "hover:bg-slate-50"
+                selectedEntityId === e.id ? "bg-indigo-50 border-l-2 border-l-indigo-500" : "hover:${styles.appBg}"
               }`}>
               <Database className={`w-3.5 h-3.5 ${e.entityType === "MASTER" ? "text-amber-500" : "text-blue-500"} shrink-0`} />
               <div className="min-w-0 flex-1">
@@ -229,7 +229,7 @@ export default function OntologyDesigner() {
       </div>
 
       {/* Right: Detail Editor */}
-      <div className="w-full lg:w-96 shrink-0 bg-white border-l border-slate-200 flex flex-col overflow-y-auto">
+      <div className={`w-full lg:w-96 shrink-0 ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col overflow-y-auto`}>
         {!selectedEntity ? (
           <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
             <div className="text-center">
@@ -240,14 +240,14 @@ export default function OntologyDesigner() {
         ) : (
           <>
             {/* Entity Header */}
-            <div className="p-4 border-b border-slate-200">
+            <div className={`p-4 border-b ${styles.cardBorder}`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                   <Database className={`w-4 h-4 ${selectedEntity!.entityType === "MASTER" ? "text-amber-500" : "text-blue-500"}`} />
                   {selectedEntity!.code}
                 </h3>
                 <div className="flex gap-1">
-                  <button onClick={() => setEditEntity({ ...selectedEntity! })} className="p-1.5 hover:bg-slate-100 rounded text-slate-500 transition" title="编辑实体">
+                  <button onClick={() => setEditEntity({ ...selectedEntity! })} className={`p-1.5 hover:${styles.sidebarBg} rounded text-slate-500 transition`} title="编辑实体">
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => handleDeleteEntity(selectedEntity!.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400 transition" title="删除实体">
@@ -257,15 +257,15 @@ export default function OntologyDesigner() {
               </div>
 
               {editEntity && editEntity.id === selectedEntityId ? (
-                <div className="space-y-2 bg-slate-50 rounded-lg p-3">
+                <div className={`space-y-2 ${styles.appBg} rounded-lg p-3`}>
                   <input value={editEntity.code || ""} onChange={e => setEditEntity(prev => ({ ...prev, code: e.target.value }))}
-                    className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs" placeholder="编码" />
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder="编码" />
                   <input value={editEntity.name || ""} onChange={e => setEditEntity(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs" placeholder="名称" />
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder="名称" />
                   <textarea value={editEntity.description || ""} onChange={e => setEditEntity(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs" placeholder="描述" rows={2} />
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`} placeholder="描述" rows={2} />
                   <select value={editEntity.entityType || "MASTER"} onChange={e => setEditEntity(prev => ({ ...prev, entityType: e.target.value }))}
-                    className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs">
+                    className={`w-full border ${styles.cardBorder} rounded px-2.5 py-1.5 text-xs`}>
                     <option value="MASTER">主数据 (MASTER)</option>
                     <option value="TRANSACTION">事务 (TRANSACTION)</option>
                   </select>
@@ -284,7 +284,7 @@ export default function OntologyDesigner() {
             </div>
 
             {/* Properties Section */}
-            <div className="p-4 border-b border-slate-200">
+            <div className={`p-4 border-b ${styles.cardBorder}`}>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                   <List className="w-3 h-3" /> 属性 ({selectedProps.length})
@@ -327,7 +327,7 @@ export default function OntologyDesigner() {
 
               <div className="space-y-1">
                 {selectedProps.map(prop => (
-                  <div key={prop.id} className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50">
+                  <div key={prop.id} className={`group flex items-center gap-2 px-2 py-1.5 rounded hover:${styles.appBg}`}>
                     {editingProp?.id === prop.id ? (
                       <div className="flex-1 space-y-1">
                         <input value={editingProp.code || ""} onChange={e => setEditingProp(p => ({...p, code: e.target.value}))} className="w-full border rounded px-2 py-1 text-[10px]" />
@@ -340,7 +340,7 @@ export default function OntologyDesigner() {
                       <>
                         <span className="text-[10px] font-mono font-semibold text-slate-600 w-20 truncate">{prop.code}</span>
                         <span className="text-[10px] text-slate-400 flex-1 truncate">{prop.name || prop.code}</span>
-                        <span className="text-[9px] font-mono text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{prop.propertyType === "FUNCTION" ? `${prop.propertyType}:${prop.functionType || "?"}` : prop.propertyType}</span>
+                        <span className={`text-[9px] font-mono text-slate-400 ${styles.sidebarBg} rounded px-1.5 py-0.5`}>{prop.propertyType === "FUNCTION" ? `${prop.propertyType}:${prop.functionType || "?"}` : prop.propertyType}</span>
                         {prop.requiredFlag === 1 && <span className="text-[9px] text-red-400 font-bold">*</span>}
                         <button onClick={() => setEditingProp({...prop})} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-200 rounded text-slate-400"><Edit3 className="w-3 h-3" /></button>
                         <button onClick={() => handleDeleteProp(prop.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-100 rounded text-red-400"><Trash2 className="w-3 h-3" /></button>
@@ -391,7 +391,7 @@ export default function OntologyDesigner() {
                   const otherId = isSource ? rel.targetEntityId : rel.sourceEntityId;
                   const otherEntity = entities.find(e => e.id === otherId);
                   return (
-                    <div key={rel.id} className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50">
+                    <div key={rel.id} className={`group flex items-center gap-2 px-2 py-1.5 rounded hover:${styles.appBg}`}>
                       <div className={`p-1 rounded ${isSource ? "bg-green-100" : "bg-blue-100"}`}>
                         {isSource ? <ArrowRight className="w-2.5 h-2.5 text-green-600" /> : <ArrowRight className="w-2.5 h-2.5 text-blue-600 rotate-180" />}
                       </div>

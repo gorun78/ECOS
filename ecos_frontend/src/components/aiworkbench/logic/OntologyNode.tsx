@@ -5,10 +5,12 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { Database } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 import type { LogicNodeData, LogicOntologyConfig } from '../../../types/aiworkbench';
 
 function OntologyNode({ data, selected }: NodeProps<LogicNodeData>) {
   const config = data.config as LogicOntologyConfig;
+  const { styles } = useTheme();
   const statusColor = {
     idle: 'bg-gray-400',
     running: 'bg-blue-500 animate-pulse',
@@ -18,7 +20,7 @@ function OntologyNode({ data, selected }: NodeProps<LogicNodeData>) {
 
   return (
     <div
-      className={`group min-w-[220px] rounded-xl border-2 bg-white shadow-md transition-shadow ${
+      className={`group min-w-[220px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
         selected ? 'border-blue-500 shadow-lg ring-2 ring-blue-200' : 'border-cyan-200 hover:border-cyan-300'
       }`}
     >

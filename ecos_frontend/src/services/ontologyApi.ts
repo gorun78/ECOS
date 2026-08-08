@@ -760,3 +760,84 @@ export const ontologyApi = {
   parseLineage,
   fetchLineageImpact,
 };
+
+// ================================================================
+// 自动发现 (Auto Discover) — T1
+// ================================================================
+
+/** 自动发现 — 预览候选实体请求参数 */
+export interface AutoDiscoverPreviewParams {
+  datasourceId: string;
+  resourceNames?: string[];
+}
+
+/** 自动发现 — 候选实体预览项 */
+export interface AutoDiscoverEntityPreview {
+  resourceName: string;
+  resourceType: string;
+  fieldCount: number;
+  confidence: number;
+  schemaName?: string;
+}
+
+/** 自动发现 — 生成请求参数 */
+export interface AutoDiscoverParams {
+  datasourceId: string;
+  resourceNames: string[];
+}
+
+/** 自动发现 — 生成结果 */
+export interface AutoDiscoverResult {
+  entityCount: number;
+  propertyCount: number;
+  mappingCount: number;
+}
+
+/**
+ * 预览候选实体
+ * POST /api/v1/ecos/domains/{domainCode}/auto-discover/preview
+ */
+export async function previewEntities(
+  domainCode: string,
+  params: AutoDiscoverPreviewParams
+): Promise<AutoDiscoverEntityPreview[]> {
+  return apiFetchData<AutoDiscoverEntityPreview[]>(
+    `${BASE}/domains/${domainCode}/auto-discover/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    }
+  );
+}
+
+/**
+ * 执行自动发现生成
+ * POST /api/v1/ecos/domains/{domainCode}/auto-discover
+ */
+export async function autoDiscover(
+  domainCode: string,
+  params: AutoDiscoverParams
+): Promise<AutoDiscoverResult> {
+  return apiFetchData<AutoDiscoverResult>(
+    `${BASE}/domains/${domainCode}/auto-discover`,
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    }
+  );
+}
+
+/**
+ * 获取数据源列表（用于自动发现数据源选择）
+ * GET /api/v1/ontology/sources
+ */
+export async function fetchOntologySources(): Promise<
+  Array<{
+    datasourceId: string;
+    datasourceName: string;
+    datasourceType: string;
+    schemas?: string[];
+  }>
+> {
+  return apiFetchData(`${BASE}/ontology/sources`);
+}

@@ -47,6 +47,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { apiFetchData } from "../../api";
+import { useTheme } from "../../components/ThemeContext";
 import type { OntologyDomain, ObjectType } from "../../types/ontology";
 
 // ──────────────────────────────────────────────────────────────
@@ -172,6 +173,7 @@ export default function OntologyWorkbenchSidebar({
   showStats = true,
   className = "",
 }: OntologyWorkbenchSidebarProps) {
+  const { styles } = useTheme();
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [objects, setObjects] = useState<ObjectType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -253,10 +255,10 @@ export default function OntologyWorkbenchSidebar({
 
   return (
     <div
-      className={`flex flex-col h-full bg-[#141924] text-slate-200 ${className}`}
+      className={`flex flex-col h-full ${styles.cardBg} text-slate-200 ${className}`}
     >
       {/* ── 标题栏 ── */}
-      <div className="px-3 py-3 border-b border-[#1E293B] flex items-center justify-between shrink-0">
+      <div className={`px-3 py-3 border-b ${styles.cardBorder} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-2">
           <Network className="w-4 h-4 text-indigo-400" />
           <div>
@@ -279,7 +281,7 @@ export default function OntologyWorkbenchSidebar({
       </div>
 
       {/* ── 搜索框 ── */}
-      <div className="px-3 py-2.5 border-b border-[#1E293B] shrink-0">
+      <div className={`px-3 py-2.5 border-b ${styles.cardBorder} shrink-0`}>
         <div className="relative">
           <Search
             size={12}
@@ -289,9 +291,9 @@ export default function OntologyWorkbenchSidebar({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索域或对象类型..."
-            className="w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg pl-7 pr-7 py-1.5
+            className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg pl-7 pr-7 py-1.5
               text-xs text-white placeholder:text-slate-600
-              focus:outline-none focus:border-indigo-500/40 transition"
+              focus:outline-none focus:border-indigo-500/40 transition`}
           />
           {search && (
             <button
@@ -347,7 +349,7 @@ export default function OntologyWorkbenchSidebar({
                   <button
                     onClick={() => handleDomainClick(d)}
                     className={`w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition group ${
-                      isSel ? "bg-indigo-500/10" : "hover:bg-white/[0.03]"
+                      isSel ? "bg-indigo-500/10" : `hover:${styles.cardBg}/[0.03]`
                     }`}
                   >
                     {col ? (
@@ -372,14 +374,14 @@ export default function OntologyWorkbenchSidebar({
                         {d.id}
                       </div>
                     </div>
-                    <span className="text-[9px] text-slate-500 bg-[#1a2030] px-1.5 py-0.5 rounded-full shrink-0">
+                    <span className={`text-[9px] text-slate-500 ${styles.inputBg} px-1.5 py-0.5 rounded-full shrink-0`}>
                       {objs.length}
                     </span>
                   </button>
 
                   {/* 对象类型列表 */}
                   {!col && objs.length > 0 && (
-                    <div className="ml-4 pl-3 border-l border-[#1E293B]">
+                    <div className={`ml-4 pl-3 border-l ${styles.cardBorder}`}>
                       {objs.map((o) => {
                         const Icon = resolveIcon(o.icon);
                         const sel = selectedObjectTypeId === o.id;
@@ -392,7 +394,7 @@ export default function OntologyWorkbenchSidebar({
                             className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition border-l-2 ${
                               sel
                                 ? "bg-indigo-500/10 border-l-indigo-500"
-                                : "border-l-transparent hover:bg-white/[0.03]"
+                                : `border-l-transparent hover:${styles.cardBg}/[0.03]`
                             }`}
                           >
                             <span
@@ -437,7 +439,7 @@ export default function OntologyWorkbenchSidebar({
                 <div className="text-[9px] text-slate-600 font-mono uppercase tracking-wider mb-1">
                   未分组
                 </div>
-                <div className="ml-1 pl-3 border-l border-[#1E293B]">
+                <div className={`ml-1 pl-3 border-l ${styles.cardBorder}`}>
                   {objectsByDomain[UNASSIGNED_KEY].map((o) => {
                     const Icon = resolveIcon(o.icon);
                     const sel = selectedObjectTypeId === o.id;
@@ -448,7 +450,7 @@ export default function OntologyWorkbenchSidebar({
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition border-l-2 ${
                           sel
                             ? "bg-indigo-500/10 border-l-indigo-500"
-                            : "border-l-transparent hover:bg-white/[0.03]"
+                            : `border-l-transparent hover:${styles.cardBg}/[0.03]`
                         }`}
                       >
                         <span className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-slate-500/15 text-slate-400">
@@ -474,7 +476,7 @@ export default function OntologyWorkbenchSidebar({
 
       {/* ── 底部统计 ── */}
       {showStats && (
-        <div className="shrink-0 border-t border-[#1E293B] px-3 py-2 flex items-center justify-between text-[9px] text-slate-500 font-mono">
+        <div className={`shrink-0 border-t ${styles.cardBorder} px-3 py-2 flex items-center justify-between text-[9px] text-slate-500 font-mono`}>
           <span className="flex items-center gap-1">
             <Database size={10} /> {domains.length} 域
           </span>
