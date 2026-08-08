@@ -2,3 +2,5 @@ docs\*
 dist\*
 node_modules\*
 *archive*
+.aider*
+*.m2*

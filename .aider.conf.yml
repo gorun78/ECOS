@@ -1,8 +1,23 @@
-## Aider config for ECOS Frontend
+## Aider config for ECOS (Frontend + Backend)
 ## API key loaded from ~/.bashrc (sourced before interactive guard)
+## Run from ECOS root: aider --message "..."
 model: openai/deepseek-chat
 openai-api-base: https://api.deepseek.com/v1
 edit-format: whole
 no-git: true
 yes-always: true
 dark-mode: true
+
+## 工程上下文 — .aider.md提供全栈规范+铁律速查+目录索引
+## ARCHITECTURE-RULES.md是ECOS开发宪法，所有PMO强制执行
+read:
+  - .aider.md
+  - docs/ARCHITECTURE-RULES.md
+
+## .aiderignore排除docs/docker/build产物等噪音
+## repo-map只扫描ecos_frontend/ + ecos_backend/核心源码
+subtree-only: ecos_frontend
+
+## 大文件分块编辑（>800行文件启用）
+auto-commits: false
+map-tokens: 4096
