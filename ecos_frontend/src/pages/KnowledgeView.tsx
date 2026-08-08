@@ -25,8 +25,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   Database, Tag, Brain, Zap, Sparkles, ShieldCheck, Shield,
 };
 
-const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
+const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType<any>> = {
   closed_loop: ClosedLoopTab,
+  extraction: KnowledgeExtractionTab,
   sync: SyncTab,
   lineage: LineageTab,
   ontology: OntologyTab,
@@ -40,19 +41,40 @@ const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
   compliance_check: KnowledgeComplianceCheckTab,
 };
 
-export default function KnowledgeView() {
+interface KnowledgeViewProps {
+  showCopilot?: boolean;
+  showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
+}
+
+export default function KnowledgeView({ showCopilot: initialShowCopilot = false, showToast: externalShowToast }: KnowledgeViewProps) {
   const { locale } = useLanguage();
   const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<KnowledgeTabId>('closed_loop');
-  const [showCopilot, setShowCopilot] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(initialShowCopilot);
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
 
   const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+    if (externalShowToast) {
+      externalShowToast(type, msg);
+    } else {
+      setToast({ type, msg });
+      setTimeout(() => setToast(null), 3500);
+    }
+  }, [externalShowToast]);
 
-  const ActiveComponent = TAB_COMPONENTS[activeTab];
+  const ActiveComponent = TAB_COMPONENTS[activeTab] as React.ComponentType<{ showToast?: typeof showToast }> | undefined;
+
+  const renderTabContent = () => {
+    if (!ActiveComponent) {
+      return <div className="p-6 text-slate-400">{locale === 'zh' ? '模块开发中...' : 'Module under development...'}</div>;
+    }
+    // Pass showToast to tabs that need it (sync, lineage, ontology, index, rag)
+    const tabIdsNeedingToast = ['sync', 'lineage', 'ontology', 'index', 'rag'];
+    if (tabIdsNeedingToast.includes(activeTab)) {
+      return <ActiveComponent showToast={showToast} />;
+    }
+    return <ActiveComponent />;
+  };
 
   return (
     <div className="flex h-full select-none text-xs overflow-hidden relative">
@@ -63,7 +85,7 @@ export default function KnowledgeView() {
 
         {KNOWLEDGE_TAB_GROUPS.map(group => (
           <React.Fragment key={group.id}>
-            <div className={`px-2 pt-3 pb-1 text-[9px] font-bold ${styles.muted} uppercase tracking-wider`}>
+            <div className={`px-2 pt-3 pb-1 text-[9px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
               {locale === 'zh' ? group.labelZh : group.label}
             </div>
             {group.tabs.map(tab => {
@@ -110,10 +132,10 @@ export default function KnowledgeView() {
       </div>
 
       <div className={`flex-1 ${styles.appBg} p-6 overflow-y-auto h-full`}>
-        {ActiveComponent && <ActiveComponent />}
+        {renderTabContent()}
       </div>
 
-      {toast && (
+      {toast && !externalShowToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
           <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2
             ${toast.type === 'success' ? 'bg-emerald-600 text-white' : ''}

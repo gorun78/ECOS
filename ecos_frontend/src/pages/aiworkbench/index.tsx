@@ -15,7 +15,7 @@ import AgentStudioView from './AgentStudioView';
 import ChatbotStudioView from './ChatbotStudioView';
 import ModelCatalogView from './ModelCatalogView';
 import GuardrailsView from './GuardrailsView';
-import KnowledgeView from './KnowledgeView';
+import KnowledgeView from '../KnowledgeView';
 import * as Icons from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 
