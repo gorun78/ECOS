@@ -1,6 +1,6 @@
 /**
- * LineageMapView — shared types
- * Extracted from LineageMapView.tsx
+ * DataLineage — shared types
+ * Extracted from DataLineage.tsx
  * @license Apache-2.0
  */
 

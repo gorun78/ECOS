@@ -1,6 +1,6 @@
 /**
- * LineageMapView — custom ReactFlow nodes
- * Extracted from LineageMapView.tsx
+ * DataLineage — custom ReactFlow nodes
+ * Extracted from DataLineage.tsx
  * @license Apache-2.0
  */
 

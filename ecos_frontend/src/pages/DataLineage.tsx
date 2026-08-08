@@ -24,36 +24,39 @@ export default function DataLineage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
+  const [datasourceId, setDatasourceId] = useState("1");
+  const [tableName, setTableName] = useState("");
+  const [selectedEdge, setSelectedEdge] = useState<any>(null);
+
+  const fetchLineage = () => {
     setLoading(true);
-    fetchDatasets()
-      .then((items: any[]) => {
-        if (items.length === 0) {
-          const mockNodes = buildMockLineage();
-          setNodes(mockNodes.nodes);
-          setLinks(mockNodes.links);
-          return;
-        }
-        const dsNames = items.slice(0, 8).map((d: any) => d.name || d.tablename || `tbl_${Math.random().toString(36).slice(2,6)}`);
-        const graphNodes = dsNames.map((name: string, i: number) => ({
-          id: name,
-          type: i === 0 ? "source" : i === dsNames.length - 1 ? "target" : "dataset",
-          label: name,
-          status: "active",
-          owner: "data-team",
-          updatedAt: new Date().toISOString().slice(0, 10),
-        }));
-        const graphLinks = [];
-        for (let i = 0; i < graphNodes.length - 1; i++) {
-          graphLinks.push({
-            id: `edge_${i}`,
-            source: graphNodes[i].id,
-            target: graphNodes[i + 1].id,
+    const url = tableName
+      ? `/api/v1/engine/data/lineage?datasourceId=${datasourceId}&tableName=${encodeURIComponent(tableName)}`
+      : `/api/v1/engine/data/lineage?datasourceId=${datasourceId}`;
+
+    apiFetchData(url)
+      .then((data: any) => {
+        if (data?.nodes?.length > 0) {
+          const graphNodes = data.nodes.map((n: any) => ({
+            id: n.id || n.table,
+            type: n.type || "table",
+            label: n.table || n.id,
+            status: "active",
+            fields: n.fields || [],
+          }));
+          const graphLinks = (data.edges || []).map((e: any, i: number) => ({
+            id: e.id || `edge_${i}`,
+            source: e.source,
+            target: e.target,
+            transform: e.transform || "",
             animated: i % 2 === 0,
-          });
+          }));
+          setNodes(graphNodes);
+          setLinks(graphLinks);
+          setError(null);
+        } else {
+          throw new Error("No lineage data");
         }
-        setNodes(graphNodes);
-        setLinks(graphLinks);
       })
       .catch(() => {
         const mock = buildMockLineage();
@@ -62,7 +65,9 @@ export default function DataLineage() {
         setError("Backend unavailable — showing mock lineage");
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchLineage(); }, []);
 
   const buildMockLineage = () => {
     const mockNodes = [
@@ -110,6 +115,14 @@ export default function DataLineage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <input type="text"
+            className={`bg-transparent outline-none text-[11px] border rounded px-2 py-0.5 w-16 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+            placeholder={tl("表名", "table")}
+            value={tableName} onChange={e => setTableName(e.target.value)} />
+          <button onClick={fetchLineage}
+            className="p-1.5 rounded hover:bg-slate-100 text-slate-500 text-[10px]">
+            {tl("查询", "Query")}
+          </button>
           <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 border ${styles.inputBg} ${styles.inputBorder}`}>
             <Search className={`w-3 h-3 ${styles.muted}`} />
             <input type="text"
@@ -151,10 +164,10 @@ export default function DataLineage() {
 
         {/* Property Panel */}
         {selectedNode && (
-          <div className={`w-[280px] ${styles.cardBg} border-l ${styles.cardBorder} p-4 overflow-y-auto shrink-0 shadow-lg`}>
+          <div className={`w-[300px] ${styles.cardBg} border-l ${styles.cardBorder} p-4 overflow-y-auto shrink-0 shadow-lg`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-sm font-bold ${styles.cardText}`}>
-                {tl("节点属性", "Node Properties")}
+                {tl("节点详情", "Node Detail")}
               </h3>
               <button onClick={() => setSelectedNodeId(null)}
                 className={`text-[11px] ${styles.muted} hover:text-slate-600`}>
@@ -167,50 +180,65 @@ export default function DataLineage() {
                 <span className="font-mono text-slate-700">{selectedNode.id}</span>
               </div>
               <div>
-                <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>{tl("名称", "Name")}</span>
+                <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>{tl("表名", "Table")}</span>
                 <span className={`font-semibold ${styles.cardText}`}>{selectedNode.label}</span>
               </div>
               <div>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>{tl("类型", "Type")}</span>
                 <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-semibold">{selectedNode.type}</span>
               </div>
-              {selectedNode.owner && (
-                <div>
-                  <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>{tl("负责人", "Owner")}</span>
-                  <span className="text-slate-600">{selectedNode.owner}</span>
-                </div>
-              )}
-              {selectedNode.updatedAt && (
-                <div>
-                  <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>{tl("更新时间", "Updated")}</span>
-                  <span className="text-slate-600">{selectedNode.updatedAt}</span>
+
+              {/* 字段列表 */}
+              {selectedNode.fields?.length > 0 && (
+                <div className="pt-2 border-t border-slate-100">
+                  <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block mb-2`}>
+                    {tl("字段列表", "Fields")} ({selectedNode.fields.length})
+                  </span>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {selectedNode.fields.map((f: any, i: number) => (
+                      <div key={i} className="flex justify-between text-[10px]">
+                        <span className="font-mono text-slate-600">{f.name || f}</span>
+                        {f.type && <span className={styles.muted}>{f.type}</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Related edges */}
+              {/* 关联关系 */}
               <div className="pt-3 border-t border-slate-100">
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block mb-2`}>
-                  {tl("关联关系", "Related Edges")}
+                  {tl("上下游关系", "Up/Downstream")}
                 </span>
-                <div className="space-y-1">
-                  {links.filter(l => l.source === selectedNode.id || l.target === selectedNode.id).map(l => (
-                    <div key={l.id} className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-                      {l.source === selectedNode.id ? "→" : "←"} {l.source === selectedNode.id ? l.target : l.source}
-                    </div>
-                  ))}
+                <div className="space-y-1.5">
+                  {links.filter(l => l.source === selectedNode.id || l.target === selectedNode.id).map(l => {
+                    const isSource = l.source === selectedNode.id;
+                    return (
+                      <div key={l.id} onClick={() => setSelectedEdge(l)}
+                        className={`cursor-pointer rounded px-1.5 py-1 text-[10px] ${l.transform ? 'hover:bg-blue-50' : ''}`}>
+                        <div className="flex items-center gap-1 text-slate-500 font-mono">
+                          {isSource ? "→" : "←"} {isSource ? l.target : l.source}
+                        </div>
+                        {l.transform && (
+                          <div className="text-[9px] text-blue-500 font-mono mt-0.5 truncate" title={l.transform}>
+                            SQL: {l.transform.substring(0, 40)}{l.transform.length > 40 ? "..." : ""}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 查看数据集详情 */}
-              {selectedNode.type === "dataset" && (
-                <div className="pt-3 border-t border-slate-100">
-                  <button
-                    onClick={() => navigate(`/dataset_explorer/${selectedNode.id}`)}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-medium rounded transition"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    {tl("查看数据集详情", "View Dataset Details")}
-                  </button>
+              {/* 选中边SQL详情 */}
+              {selectedEdge?.transform && (
+                <div className="pt-3 border-t border-blue-100">
+                  <span className={`text-[10px] text-blue-600 uppercase tracking-wider block mb-1`}>
+                    SQL变换
+                  </span>
+                  <pre className="text-[10px] text-slate-600 bg-slate-50 rounded p-2 whitespace-pre-wrap break-all font-mono">
+                    {selectedEdge.transform}
+                  </pre>
                 </div>
               )}
 
