@@ -12,20 +12,20 @@
 
     <update id="updateUser">
         UPDATE TD_USER SET
-            USERNAME = #[username],
-            EMAIL = #[email],
-            MOBILE_TEL1 = #[phone],
-            STATUS = #[status],
-            LOCKED = #[locked],
-            LOCK_TIME = #[lockTime],
-            LAST_LOGIN_TIME = #[lastLoginTime],
-            UPDATED_TIME = #[updatedTime],
-            UPDATED_BY = #[updatedBy]
+            "USERNAME" = #[username],
+            "EMAIL" = #[email],
+            "MOBILE_TEL1" = #[phone],
+            "STATUS" = #[status],
+            "LOCKED" = #[locked],
+            "LOCK_TIME" = #[lockTime],
+            "LAST_LOGIN_TIME" = #[lastLoginTime],
+            "UPDATED_TIME" = #[updatedTime],
+            "UPDATED_BY" = #[updatedBy]
         WHERE "USER_ID" = #[userId]
     </update>
 
     <delete id="deleteUser">
-        UPDATE TD_USER SET STATUS = 'DELETED', UPDATED_TIME = now()
+        UPDATE TD_USER SET "STATUS" = 'DELETED', "UPDATED_TIME" = now()
         WHERE "USER_ID" = #[userId]
     </delete>
 
