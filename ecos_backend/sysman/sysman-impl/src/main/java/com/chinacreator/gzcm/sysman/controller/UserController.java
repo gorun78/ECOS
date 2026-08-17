@@ -34,10 +34,10 @@ public class UserController {
             @RequestParam(defaultValue = "20") int pageSize) {
         try {
             StringBuilder sql = new StringBuilder(
-                "SELECT \"USER_ID\" as user_id, \"USERNAME\" as username, \"REAL_NAME\" as real_name, " +
+                "SELECT \"USER_ID\" as \"userId\", \"USERNAME\" as username, \"REAL_NAME\" as \"realName\", " +
                 "\"EMAIL\" as email, \"MOBILE_TEL1\" as phone, \"STATUS\" as status, " +
-                "\"LOCKED\" as locked, \"LAST_LOGIN_TIME\" as last_login_time, " +
-                "\"CREATED_TIME\" as created_time " +
+                "\"LOCKED\" as locked, \"LAST_LOGIN_TIME\" as \"lastLoginTime\", " +
+                "\"CREATED_TIME\" as \"createdTime\" " +
                 "FROM TD_USER WHERE 1=1 ");
             List<Object> params = new ArrayList<>();
             if (keyword != null && !keyword.isEmpty()) {

@@ -535,9 +535,10 @@ export default function UserManagement() {
 
   const handleDeleteUser = useCallback(async () => {
     if (!confirmAction?.id) return;
+    const userId = confirmAction.id;
     setConfirmAction(null);
     try {
-      await deleteUser(confirmAction.id);
+      await deleteUser(userId);
       showToast("success", isZh ? "用户已删除" : "User deleted");
       loadUsers();
     } catch (e: any) { showToast("error", e.message); }
@@ -752,10 +753,10 @@ export default function UserManagement() {
           message={isZh ? `确定要删除「${confirmAction.name}」吗？此操作不可撤销。` : `Delete "${confirmAction.name}"? This cannot be undone.`}
           confirmLabel={isZh ? "删除" : "Delete"}
           onConfirm={() => {
-            if (confirmAction.tab === "users") handleDeleteUser();
-            else if (confirmAction.tab === "roles") handleDeleteRole();
-            else if (confirmAction.tab === "orgs") handleDeleteOrg();
-            else if (confirmAction.tab === "permissions") handleDeletePerm();
+            if (confirmAction?.tab === "users") handleDeleteUser();
+            else if (confirmAction?.tab === "roles") handleDeleteRole();
+            else if (confirmAction?.tab === "orgs") handleDeleteOrg();
+            else if (confirmAction?.tab === "permissions") handleDeletePerm();
           }}
           onCancel={() => setConfirmAction(null)}
         />
