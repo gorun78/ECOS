@@ -926,9 +926,24 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
     }
     
     /**
-     * 从实体对象中提取参数值
+     * 从实体对象中提取参数值。
+     * <p>
+     * 当 params 是一个"简单值"（基本类型/包装类/String/数字/日期/其它非实体非 Map 对象）
+     * 且通过 getter/字段均无法按 paramName 取到值时，直接返回 params 本身作为参数值。
+     * 这对应 iBATIS 的语义：调用方传入单个原始参数（如 {@code findById(String userId)}）
+     * 时，该值会被绑定到 SQL 中唯一的命名占位符上，而不是因为 String 没有 getUserId()
+     * 方法而返回 null，导致参数被绑成 NULL、查询查不到记录。
      */
     private Object extractParamValue(Object entity, String paramName) {
+        if (entity == null) {
+            return null;
+        }
+        // Map 直接按 key 取
+        if (entity instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) entity;
+            return map.get(paramName);
+        }
         try {
             // 尝试通过 getter 方法获取
             String getterName = "get" + capitalize(paramName);
@@ -943,19 +958,49 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             } catch (Exception ex) {
                 // 尝试下划线转驼峰
                 String camelName = underscoreToCamel(paramName);
-                try {
-                    String getterName = "get" + capitalize(camelName);
-                    java.lang.reflect.Method getter = entity.getClass().getMethod(getterName);
-                    return getter.invoke(entity);
-                } catch (Exception ex2) {
-                    logger.warn("Failed to extract parameter value: " + paramName, ex2);
-                    return null;
+                if (!camelName.equals(paramName)) {
+                    try {
+                        String getterName = "get" + capitalize(camelName);
+                        java.lang.reflect.Method getter = entity.getClass().getMethod(getterName);
+                        return getter.invoke(entity);
+                    } catch (Exception ignored) {
+                        // 继续到下面的回退逻辑
+                    }
+                    try {
+                        java.lang.reflect.Field field = entity.getClass().getDeclaredField(camelName);
+                        field.setAccessible(true);
+                        return field.get(entity);
+                    } catch (Exception ignored) {
+                        // 继续到下面的回退逻辑
+                    }
                 }
+                // 回退：对于简单值（原始参数），直接返回该值本身，
+                // 这样 findById(userId) 这类调用能把 String userId 绑定到 #[userId] 占位符。
+                if (isSimpleValueType(entity.getClass())) {
+                    return entity;
+                }
+                logger.warn("Failed to extract parameter value: " + paramName);
+                return null;
             }
         } catch (Exception e) {
             logger.warn("Failed to extract parameter value: " + paramName, e);
             return null;
         }
+    }
+
+    /**
+     * 判断类型是否为"简单值"（非实体、非集合、非数组），用于决定是否把对象本身作为参数值回退。
+     */
+    private boolean isSimpleValueType(Class<?> clazz) {
+        if (clazz.isPrimitive()) return true;
+        if (clazz == String.class) return true;
+        if (Number.class.isAssignableFrom(clazz)) return true;
+        if (clazz == Boolean.class) return true;
+        if (clazz == Character.class) return true;
+        if (java.util.Date.class.isAssignableFrom(clazz)) return true;
+        if (java.time.temporal.Temporal.class.isAssignableFrom(clazz)) return true;
+        if (Enum.class.isAssignableFrom(clazz)) return true;
+        return false;
     }
     
     /**
@@ -1021,6 +1066,12 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
                         String upperName = underscoreName.toUpperCase();
                         if (map.containsKey(upperName)) {
                             value = map.get(upperName);
+                        } else {
+                            // 4. 尝试小写匹配（PostgreSQL JDBC returns lowercase column names）
+                            String lowerName = underscoreName.toLowerCase();
+                            if (map.containsKey(lowerName)) {
+                                value = map.get(lowerName);
+                            }
                         }
                     }
                 }
@@ -1110,6 +1161,24 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
                     return new java.util.Date(((java.sql.Date) value).getTime());
                 } else if (value instanceof Long) {
                     return new java.util.Date((Long) value);
+                }
+            } else if (targetType == java.time.LocalDateTime.class) {
+                if (value instanceof java.time.LocalDateTime) {
+                    return value;
+                } else if (value instanceof java.sql.Timestamp) {
+                    return ((java.sql.Timestamp) value).toLocalDateTime();
+                } else if (value instanceof java.util.Date) {
+                    return java.time.LocalDateTime.ofInstant(((java.util.Date) value).toInstant(), java.time.ZoneId.systemDefault());
+                }
+            } else if (targetType == java.time.LocalDate.class) {
+                if (value instanceof java.time.LocalDate) {
+                    return value;
+                } else if (value instanceof java.sql.Date) {
+                    return ((java.sql.Date) value).toLocalDate();
+                } else if (value instanceof java.sql.Timestamp) {
+                    return ((java.sql.Timestamp) value).toLocalDateTime().toLocalDate();
+                } else if (value instanceof java.util.Date) {
+                    return java.time.LocalDateTime.ofInstant(((java.util.Date) value).toInstant(), java.time.ZoneId.systemDefault()).toLocalDate();
                 }
             }
         } catch (Exception e) {

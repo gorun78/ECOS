@@ -74,10 +74,14 @@ public class OrganizationController {
             String orgName = (String) body.get("orgName");
             String orgCode = (String) body.get("orgCode");
             if (orgName == null || orgName.isEmpty()) return ApiResponse.badRequest("机构名称不能为空");
+            // Generate unique orgCode if not provided (ORG_CODE has unique constraint)
+            if (orgCode == null || orgCode.isEmpty()) {
+                orgCode = "ORG_" + System.currentTimeMillis();
+            }
 
             Organization org = orgService.createOrganization(
                 orgName,
-                orgCode != null ? orgCode : "",
+                orgCode,
                 (String) body.get("parentOrgId"),
                 (String) body.getOrDefault("orgType", "DEPARTMENT"),
                 (String) body.get("description"),
