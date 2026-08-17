@@ -99,7 +99,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/ontology/functions")
                 || path.startsWith("/api/v1/engine")
                 || path.startsWith("/api/v1/cognitive")
-                || path.startsWith("/api/v1/kb/")) {
+                || path.startsWith("/api/v1/knowledge/")) {
             return true;
         }
 

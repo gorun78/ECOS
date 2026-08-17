@@ -5,7 +5,7 @@
  * token 认证和响应格式解析。100% 复用现有后端端点，零后端变更。
  *
  * 现有后端端点:
- *   GET    /api/v1/ecos/knowledge-graph              → 知识图谱总览
+ *   GET    /api/v1/knowledge/ecos-graph              → 知识图谱总览
  *   GET    /api/v1/ecos/ontologies/{id}/entities     → 实体列表
  *   POST   /api/v1/ecos/ontologies/{id}/entities     → 创建实体
  *   PUT    /api/v1/ecos/ontologies/{id}/entities/{e} → 更新实体
@@ -74,7 +74,7 @@ const ontPath = (ontologyId: string, path: string) =>
 
 /**
  * 获取全局知识图谱数据
- * GET /api/v1/ecos/knowledge-graph
+ * GET /api/v1/knowledge/ecos-graph
  */
 export async function fetchKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
   return apiFetchData<KnowledgeGraphResponse>(`${BASE}/knowledge-graph`);

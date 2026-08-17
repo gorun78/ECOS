@@ -18,7 +18,7 @@ import java.util.Map;
  * @since 2026-08-08
  */
 @RestController
-@RequestMapping("/api/v1/kb/extraction")
+@RequestMapping("/api/v1/knowledge/extract")
 public class ExtractionController {
 
     private static final Logger log = LoggerFactory.getLogger(ExtractionController.class);

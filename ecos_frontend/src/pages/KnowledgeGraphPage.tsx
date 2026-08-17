@@ -1,6 +1,6 @@
 /**
  * 企业知识图谱 — 本体实体关系可视化
- * Connected to /api/v1/ecos/knowledge-graph
+ * Connected to /api/v1/knowledge/ecos-graph
  */
 import React, { useState, useEffect } from "react";
 import { Network, Loader2, AlertCircle, Building2, GitBranch } from "lucide-react";

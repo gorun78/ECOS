@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/ecos/knowledge-graph")
+@RequestMapping("/api/v1/knowledge/ecos-graph")
 public class EcosKnowledgeGraphController {
 
     private static final Logger log = LoggerFactory.getLogger(EcosKnowledgeGraphController.class);

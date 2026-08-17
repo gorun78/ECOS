@@ -3,7 +3,7 @@
  *
  * Features:
  * - 左侧法规层级树: 法规→章节→条款三级
- * - GET /api/v1/kb/rules?groupBy=regulation → 前端groupBy构建树
+ * - GET /api/v1/knowledge/rules?groupBy=regulation → 前端groupBy构建树
  * - 点击章节→展开条款→右侧规则列表联动过滤
  * - 关联本体对象可点击跳转(navigate到本体工作台)
  *
@@ -71,7 +71,7 @@ export default function KnowledgeRuleRepositoryTab() {
 
   const loadRules = () => {
     setLoading(true);
-    apiFetchData('/api/v1/kb/rules?groupBy=regulation')
+    apiFetchData('/api/v1/knowledge/rules?groupBy=regulation')
       .then((data: any) => {
         const list = data?.list || data?.data || data || [];
         setRules(Array.isArray(list) ? list : []);

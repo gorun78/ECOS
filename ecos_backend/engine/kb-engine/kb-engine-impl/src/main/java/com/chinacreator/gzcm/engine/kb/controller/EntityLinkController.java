@@ -15,7 +15,7 @@ import java.util.Map;
  * @since 2026-08-08
  */
 @RestController
-@RequestMapping("/api/v1/kb")
+@RequestMapping("/api/v1/knowledge/entity-link")
 public class EntityLinkController {
 
     private static final Logger log = LoggerFactory.getLogger(EntityLinkController.class);

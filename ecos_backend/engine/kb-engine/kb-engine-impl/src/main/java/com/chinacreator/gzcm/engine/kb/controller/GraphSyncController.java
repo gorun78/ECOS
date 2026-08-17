@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/knowledge")
+@RequestMapping("/api/v1/knowledge/sync")
 public class GraphSyncController {
 
     private static final Logger log = LoggerFactory.getLogger(GraphSyncController.class);
@@ -18,7 +18,7 @@ public class GraphSyncController {
     @Autowired
     private KgSyncService kgSyncService;
 
-    @GetMapping("/sync/status")
+    @GetMapping("/status")
     public ApiResponse<Map<String, Object>> getSyncStatus() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("objectTypes", kgSyncService.getSyncStatus());
@@ -26,7 +26,7 @@ public class GraphSyncController {
         return ApiResponse.success(result);
     }
 
-    @PostMapping("/sync/trigger")
+    @PostMapping("/trigger")
     public ApiResponse<Map<String, Object>> triggerFullSync() {
         String syncId = "sync-" + System.currentTimeMillis();
         kgSyncService.triggerFullSync(syncId);
@@ -36,7 +36,7 @@ public class GraphSyncController {
         return ApiResponse.success(result);
     }
 
-    @PostMapping("/sync/object/{objectType}")
+    @PostMapping("/object/{objectType}")
     public ApiResponse<Map<String, Object>> triggerObjectSync(@PathVariable String objectType) {
         String syncId = "sync-" + System.currentTimeMillis();
         kgSyncService.triggerObjectSync(syncId, objectType);
@@ -47,7 +47,7 @@ public class GraphSyncController {
         return ApiResponse.success(result);
     }
 
-    @GetMapping("/sync/logs")
+    @GetMapping("/logs")
     public ApiResponse<List<Map<String, Object>>> getSyncLogs() {
         return ApiResponse.success(kgSyncService.getSyncLogs(10));
     }

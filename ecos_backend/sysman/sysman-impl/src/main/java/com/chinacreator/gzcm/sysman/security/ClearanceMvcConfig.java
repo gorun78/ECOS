@@ -20,6 +20,6 @@ public class ClearanceMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(clearanceInterceptor)
                 .addPathPatterns("/api/v1/**")
-                .excludePathPatterns("/api/v1/auth/**", "/api/v1/engine/**", "/api/v1/kb/extraction/**", "/api/health", "/health");
+                .excludePathPatterns("/api/v1/auth/**", "/api/v1/engine/**", "/api/v1/knowledge/extract/**", "/api/health", "/health");
     }
 }

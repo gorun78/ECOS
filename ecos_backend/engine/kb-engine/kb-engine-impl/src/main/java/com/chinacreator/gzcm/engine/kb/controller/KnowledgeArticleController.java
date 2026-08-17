@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/kb/articles")
+@RequestMapping("/api/v1/knowledge/articles")
 public class KnowledgeArticleController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeArticleController.class);

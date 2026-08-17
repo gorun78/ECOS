@@ -2,10 +2,10 @@
  * KnowledgeExtractionTab — 知识抽取上传+审查面板
  *
  * Features:
- * - 拖拽/点击上传 PDF/Word/TXT → POST /api/v1/kb/extraction/upload
- * - 轮询 GET /api/v1/kb/extraction/tasks/{id} → 进度条
+ * - 拖拽/点击上传 PDF/Word/TXT → POST /api/v1/knowledge/extract/upload
+ * - 轮询 GET /api/v1/knowledge/extract/tasks/{id} → 进度条
  * - 抽取完成后转入 ExtractionReviewPanel 审核
- * - 抽取历史 GET /api/v1/kb/extraction/history
+ * - 抽取历史 GET /api/v1/knowledge/extract/history
  *
  * @license Apache-2.0
  */
@@ -100,7 +100,7 @@ export default function KnowledgeExtractionTab() {
       const token = localStorage.getItem('token') || '';
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch('/api/v1/kb/extraction/upload', { method:'POST', headers, body: formData });
+      const res = await fetch('/api/v1/knowledge/extract/upload', { method:'POST', headers, body: formData });
       if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
       const json = await res.json();
       const data = json.data || json;
@@ -131,7 +131,7 @@ export default function KnowledgeExtractionTab() {
     pollRef.current = setInterval(async () => {
       try {
         const token = localStorage.getItem('token') || '';
-        const res = await fetch(`/api/v1/kb/extraction/tasks/${id}`, { headers: token ? {Authorization:`Bearer ${token}`} : {} });
+        const res = await fetch(`/api/v1/knowledge/extract/tasks/${id}`, { headers: token ? {Authorization:`Bearer ${token}`} : {} });
         if (!res.ok) throw new Error('Poll failed');
         const json = await res.json();
         const data = json.data || json;
@@ -171,7 +171,7 @@ export default function KnowledgeExtractionTab() {
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const data = await apiFetchData<HistoryItem[]>('/api/v1/kb/extraction/history');
+      const data = await apiFetchData<HistoryItem[]>('/api/v1/knowledge/extract/history');
       setHistory(Array.isArray(data) ? data : []);
     } catch {
       setHistory(DEMO_HISTORY);

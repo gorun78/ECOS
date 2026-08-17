@@ -73,8 +73,7 @@ public class SecurityConfig {
                     "/api/v1/cognitive/**",
                     "/api/v1/engine/**",
                     // ── Cases
-                    "/api/v1/kb/**",
-                    "/api/v1/rules/**",
+                    "/api/v1/knowledge/**",
                     "/cases/**",
                     // ── Alerts + WebSocket
                     "/api/v1/alerts/**",

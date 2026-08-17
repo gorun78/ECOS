@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/rules")
+@RequestMapping("/api/v1/knowledge/compliance-rules")
 public class ComplianceRuleController {
 
     private static final Logger log = LoggerFactory.getLogger(ComplianceRuleController.class);

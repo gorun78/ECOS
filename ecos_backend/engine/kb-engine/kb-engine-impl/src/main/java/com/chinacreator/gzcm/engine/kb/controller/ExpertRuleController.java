@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/kb/rules")
+@RequestMapping("/api/v1/knowledge/rules")
 public class ExpertRuleController {
 
     private static final Logger log = LoggerFactory.getLogger(ExpertRuleController.class);

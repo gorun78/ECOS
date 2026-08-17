@@ -2174,7 +2174,7 @@ export async function fetchGoalTracking(goalId?: number): Promise<any> {
 
 // ── ECOS Knowledge Graph ─────────────────────────────────
 export async function fetchEcosKnowledgeGraph(): Promise<any> {
-  return apiFetchData('/api/v1/ecos/knowledge-graph');
+  return apiFetchData('/api/v1/knowledge/ecos-graph');
 }
 
 // ── Diagnostic Agent ──────────────────────────────────────

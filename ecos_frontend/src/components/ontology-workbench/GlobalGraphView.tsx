@@ -45,7 +45,7 @@ export default function GlobalGraphView() {
     const t = localStorage.getItem('token') || '';
     const headers: Record<string,string> = {};
     if (t) headers['Authorization'] = 'Bearer ' + t;
-    fetch('/api/v1/ecos/knowledge-graph', { headers })
+    fetch('/api/v1/knowledge/ecos-graph', { headers })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then((data: any) => setKgData(data?.data ?? data))
       .catch((e: any) => setError(e.message))

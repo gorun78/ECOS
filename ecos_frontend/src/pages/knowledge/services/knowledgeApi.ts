@@ -15,7 +15,7 @@ const GRAPH_BASE = '/api/knowledge';
 const GLOSSARY_BASE = '/api/glossary';
 const CATALOG_BASE = '/api/catalog';
 const COGNITIVE_BASE = '/api/v1/cognitive';
-const RULES_BASE = '/api/v1/rules';
+const RULES_BASE = '/api/v1/knowledge/compliance-rules';
 
 export async function fetchGraph(domain?: string) {
   const q = domain ? `?domain=${encodeURIComponent(domain)}` : '';
@@ -36,11 +36,11 @@ export async function findPath(source: string, target: string) {
 
 // ── PMO-26 T1: Graph full-text search & path ──
 export async function graphSearch(query: string) {
-  return apiFetchData(`/api/v1/kb/graph/search?q=${encodeURIComponent(query)}`);
+  return apiFetchData(`/api/v1/knowledge/graph/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function graphPath(source: string, target: string) {
-  return apiFetchData('/api/v1/kb/graph/path', {
+  return apiFetchData('/api/v1/knowledge/graph/path', {
     method: 'POST',
     body: JSON.stringify({ source, target }),
   });

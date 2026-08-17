@@ -40,7 +40,7 @@ export interface Domain {
 // 知识图谱响应
 // ================================================================
 
-/** 知识图谱节点（来自 GET /api/v1/ecos/knowledge-graph） */
+/** 知识图谱节点（来自 GET /api/v1/knowledge/ecos-graph） */
 export interface KGNode {
   id: string;
   label?: string;
@@ -62,7 +62,7 @@ export interface KGNode {
   properties?: Record<string, any>;
 }
 
-/** 知识图谱边（来自 GET /api/v1/ecos/knowledge-graph） */
+/** 知识图谱边（来自 GET /api/v1/knowledge/ecos-graph） */
 export interface KGEdge {
   id: string;
   source: string;
