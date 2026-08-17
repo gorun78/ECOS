@@ -4,7 +4,7 @@
  * Backend returns ApiResponse<T>: { code: 0 (success), message, data }
  */
 
-const API_BASE = '/api/glossary';
+const API_BASE = '/api/v1/ontology/glossary';
 
 export interface GlossaryTerm {
   id: string;

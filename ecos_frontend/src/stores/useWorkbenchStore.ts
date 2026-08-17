@@ -709,7 +709,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           if (filters?.status) params.set("status", filters.status);
 
           const resp = await fetch(
-            `/api/v1/glossary/terms?${params.toString()}`
+            `/api/v1/ontology/glossary/terms?${params.toString()}`
           );
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();

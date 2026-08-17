@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.engine.ai.controller;
+package com.chinacreator.gzcm.engine.ontology.controller;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -18,16 +18,16 @@ import com.chinacreator.gzcm.dccheng.glossary.GlossaryRepository;
  * 术语库 (Glossary) REST API — JdbcTemplate 持久化版本。
  *
  * <ul>
- *   <li>GET    /api/glossary/terms          — 术语列表（?domain=&status=）</li>
- *   <li>POST   /api/glossary/terms          — 创建术语</li>
- *   <li>PUT    /api/glossary/terms/{id}     — 更新术语（含状态流转）</li>
- *   <li>DELETE /api/glossary/terms/{id}     — 删除术语</li>
+ *   <li>GET    /api/v1/ontology/glossary/terms          — 术语列表（?domain=&status=）</li>
+ *   <li>POST   /api/v1/ontology/glossary/terms          — 创建术语</li>
+ *   <li>PUT    /api/v1/ontology/glossary/terms/{id}     — 更新术语（含状态流转）</li>
+ *   <li>DELETE /api/v1/ontology/glossary/terms/{id}     — 删除术语</li>
  * </ul>
  *
  * 状态流转: DRAFT → REVIEW → PUBLISHED → DEPRECATED
  */
 @RestController
-@RequestMapping("/api/v1/glossary")
+@RequestMapping("/api/v1/ontology/glossary")
 public class GlossaryController {
 
     private static final Logger log = LoggerFactory.getLogger(GlossaryController.class);
@@ -43,8 +43,8 @@ public class GlossaryController {
     @GetMapping
     public ApiResponse<Map<String, Object>> root() {
         Map<String, Object> info = new LinkedHashMap<>();
-        info.put("endpoint", "/api/glossary");
-        info.put("terms", "/api/glossary/terms");
+        info.put("endpoint", "/api/v1/ontology/glossary");
+        info.put("terms", "/api/v1/ontology/glossary/terms");
         info.put("description", "术语库管理 API");
         return ApiResponse.success(info);
     }

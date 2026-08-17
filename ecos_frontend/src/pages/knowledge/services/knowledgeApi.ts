@@ -12,7 +12,7 @@ import type {
 
 const KNOWLEDGE_BASE = '/api/knowledge';
 const GRAPH_BASE = '/api/knowledge';
-const GLOSSARY_BASE = '/api/glossary';
+const GLOSSARY_BASE = '/api/v1/ontology/glossary';
 const CATALOG_BASE = '/api/catalog';
 const COGNITIVE_BASE = '/api/v1/cognitive';
 const RULES_BASE = '/api/v1/knowledge/compliance-rules';

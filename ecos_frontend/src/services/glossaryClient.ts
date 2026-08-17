@@ -10,7 +10,7 @@
 import { apiFetchData } from "../api";
 import type { GlossaryTerm, GlossaryFilter } from "../types/workbench";
 
-const GLOSSARY_BASE = "/api/glossary";
+const GLOSSARY_BASE = "/api/v1/ontology/glossary";
 
 /**
  * 获取术语库术语列表
