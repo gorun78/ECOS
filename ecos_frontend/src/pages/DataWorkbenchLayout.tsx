@@ -20,7 +20,7 @@ import CodeWorkbooksTab from './data-workbench/tabs/CodeWorkbooksTab';
 import ContourTab from './data-workbench/tabs/ContourTab';
 import SqlQueryTab from './data-workbench/tabs/SqlQueryTab';
 import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
-import GuideTab from './data-workbench/GuideTab';
+import GuideTab from "./data-workbench/InteractiveStepGuide";
 import { AddConnectionModal, AddSyncModal, AddHealthCheckModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
 import { CopilotPanel } from '../components/CopilotPanel';
 

@@ -15,20 +15,28 @@
 | enterprise | PostgreSQL + Neo4j | 中型企业，因果链>3层启用图谱 |
 | ultimate/flagship | PostgreSQL + Neo4j + Doris | 大型企业，单表>100万行启用列存 |
 
-### DIKW 分层与 DIKW×PDCA 方法论
+### DIKCW 分层与 DIKCW×PDCA 方法论
 
 产品方法论：业务目标 → 情景建模 → 本体设计 → 对象落地 → 质量管控 → 持续监控 (PDCA迭代)
 
-DIKW 四层对应四个工作台+四个引擎：
+DIKCW 五层对应四个工作台+五个引擎：
 
-| 层 | 模块 | 工作台 | 引擎 |
-|----|------|--------|------|
-| **D** 数据 | datanet | 数据工作台 | data-engine |
-| **I** 信息 | buszhi | 本体工作台 | ontology-engine |
-| **K** 知识 | dccheng | 知识工作台 | cognitive-engine |
-| **W** 智能 | aimod | AI工作台 | cognitive-engine (共享) |
+| 层 | 模块 | 工作台 | 引擎 | 职责 |
+|----|------|--------|------|------|
+| **D** 数据 | datanet | 数据工作台 | data-engine | 数据源/管道/目录/血缘/质量/调度 |
+| **I** 信息 | buszhi | 本体工作台 | ontology-engine | 本体/版本/实体/工作流/领域/术语表 |
+| **K** 知识 | dccheng | 知识工作台 | kb-engine | 知识库全生命周期：KG/RAG/规则/抽取/SubGraph |
+| **C** 认知 | dccheng | 知识工作台(共享) | cognitive-engine | 知识理解/推理/因果链/影响分析/场景模拟/预测 |
+| **W** 智能 | aimod | AI工作台 | ai-engine | Agent/Loop/Tool/Session/Delegation/AIP/Guardrails/Mesh |
 
 子系统缩写：sysman(系统管理) / g(数据·datanet) / zhi(本体·buszhi) / cheng(知识·dccheng) / ming(AI·aimod)
+
+**引擎职责边界铁律（2026-08-17 融合后）**：
+- ai-engine **不得**包含知识库管理类Controller（KnowledgeGraph/GraphSync/KnowledgeApi/KnowledgeSettings/EcosKnowledgeGraph）
+- ai-engine **不得**包含知识抽取（已迁入kb-engine）
+- ai-engine **不得**包含术语表（已迁入ontology-engine）
+- kb-engine 统一使用 `/api/v1/knowledge/*` 前缀
+- cognitive-engine 使用 `/api/v1/cognitive/*` 前缀，不与kb-engine路径重叠
 
 ## Architecture
 
@@ -41,19 +49,21 @@ D/I (datanet, dccheng) ← K (buszhi, aimod) ← W (worldmodel, cognitive)
 ```
 下层不能依赖上层。跨模块调用必须通过 `PipelineEvent`（在 `common-api`），禁止直接 import 其他模块的 Service。
 
-### 四引擎架构 (建设中)
+### 五引擎架构 (DIKCW)
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                  Gateway (:8080)                        │
-│  路由转发 | 认证拦截 | 安全过滤链 | 统一入口            │
-├──────────┬──────────┬──────────┬──────────────────────┤
-│安全引擎   │数据引擎   │本体引擎   │认知引擎               │
-│认证/授权  │数据源管理  │实体建模   │Agent/Mesh            │
-│审计/合规  │管道/目录   │关系/版本   │知识图谱/RAG          │
-│加密/脱敏  │质量/血缘   │提案/审批   │模型/NLQ              │
-│ABAC/PBAC │调度/采集   │工作流/DQ  │分类/术语              │
-└──────────┴──────────┴──────────┴───────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Gateway (:8080)                            │
+│  路由转发 | 认证拦截 | 安全过滤链 | 统一入口                      │
+├─────────┬─────────┬─────────┬─────────┬─────────────────────────┤
+│D 数据    │I 信息    │K 知识    │C 认知    │W 智能                   │
+│data-eng │ont-eng  │kb-eng   │cogn-eng │ai-engine                │
+│数据源    │本体模型  │KG/RAG   │混合推理  │Agent/Loop              │
+│管道/目录 │版本/实体 │规则/抽取 │因果链    │Tool/Session            │
+│血缘/质量 │工作流    │SubGraph │影响分析  │Delegation              │
+│调度      │领域/术语 │生命周期  │场景模拟  │AIP/Guardrails/Mesh     │
+│:18082   │:18083   │:18086   │:18089   │:18084                  │
+└─────────┴─────────┴─────────┴─────────┴─────────────────────────┘
 ```
 
 每个引擎有 api/impl/boot 三个子模块，boot 可独立启动（开发测试用），生产环境仅用 gateway。
