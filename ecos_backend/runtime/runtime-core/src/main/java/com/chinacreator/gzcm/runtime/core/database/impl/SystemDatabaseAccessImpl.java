@@ -386,13 +386,13 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             if (sql == null) {
                 throw new DatabaseAccessException("SQL not found in config: " + sqlConfigPath + "#" + sqlName);
             }
-            
+
             // 处理动态 SQL 和参数替换
             sql = processDynamicSql(sql, params);
-            sql = replaceParams(sql, params);
-            
-            // 解析参数并执行查询
+
+            // 必须在 replaceParams 把 #param# / #[param] 替换成 ? 之前提取参数（见 executeInsertFromConfig）
             Object[] sqlParams = extractParamsForSql(sql, params);
+            sql = replaceParams(sql, params);
             return executeQuery(sql, sqlParams);
         } catch (Exception e) {
             logger.error("Failed to execute query from config: " + sqlConfigPath + "#" + sqlName, e);
@@ -408,13 +408,13 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             if (sql == null) {
                 throw new DatabaseAccessException("SQL not found in config: " + sqlConfigPath + "#" + sqlName);
             }
-            
+
             // 处理动态 SQL 和参数替换
             sql = processDynamicSql(sql, params);
-            sql = replaceParams(sql, params);
-            
-            // 解析参数并执行更新
+
+            // 必须在 replaceParams 把 #param# / #[param] 替换成 ? 之前提取参数（见 executeInsertFromConfig）
             Object[] sqlParams = extractParamsForSql(sql, params);
+            sql = replaceParams(sql, params);
             return executeUpdate(sql, sqlParams);
         } catch (Exception e) {
             logger.error("Failed to execute update from config: " + sqlConfigPath + "#" + sqlName, e);
@@ -430,13 +430,15 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             if (sql == null) {
                 throw new DatabaseAccessException("SQL not found in config: " + sqlConfigPath + "#" + sqlName);
             }
-            
+
             // 处理动态 SQL
             sql = processDynamicSql(sql, entity);
-            sql = replaceParams(sql, entity);
-            
-            // 从实体对象提取参数
+
+            // 必须在 replaceParams 把 #param# / #[param] 替换成 ? 之前提取参数，
+            // 否则 extractParamsForSql 找不到命名占位符，会回退到把整个 entity 当作单个 SQL 参数，
+            // 导致 "Can't infer the SQL type to use for an instance of ..." 错误。
             Object[] sqlParams = extractParamsForSql(sql, entity);
+            sql = replaceParams(sql, entity);
             executeUpdate(sql, sqlParams);
         } catch (Exception e) {
             logger.error("Failed to execute insert from config: " + sqlConfigPath + "#" + sqlName, e);
@@ -452,13 +454,13 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             if (sql == null) {
                 throw new DatabaseAccessException("SQL not found in config: " + sqlConfigPath + "#" + sqlName);
             }
-            
+
             // 处理动态 SQL
             sql = processDynamicSql(sql, entity);
-            sql = replaceParams(sql, entity);
-            
-            // 从实体对象提取参数
+
+            // 必须在 replaceParams 把 #param# / #[param] 替换成 ? 之前提取参数（同 executeInsertFromConfig）
             Object[] sqlParams = extractParamsForSql(sql, entity);
+            sql = replaceParams(sql, entity);
             executeUpdate(sql, sqlParams);
         } catch (Exception e) {
             logger.error("Failed to execute update from config: " + sqlConfigPath + "#" + sqlName, e);
@@ -613,6 +615,18 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             List<Object> values = new ArrayList<>();
             for (String paramName : paramNames) {
                 Object value = extractParamValue(params, paramName);
+                // Convert java.util.Date to java.sql.Timestamp for JDBC compatibility
+                if (value instanceof java.util.Date && !(value instanceof java.sql.Date) && !(value instanceof java.sql.Timestamp)) {
+                    value = new java.sql.Timestamp(((java.util.Date) value).getTime());
+                }
+                // Convert java.time.LocalDateTime to java.sql.Timestamp for JDBC compatibility
+                if (value instanceof java.time.LocalDateTime) {
+                    value = java.sql.Timestamp.valueOf((java.time.LocalDateTime) value);
+                }
+                // Convert java.time.LocalDate to java.sql.Date for JDBC compatibility
+                if (value instanceof java.time.LocalDate) {
+                    value = java.sql.Date.valueOf((java.time.LocalDate) value);
+                }
                 values.add(value);
             }
             return values.toArray();

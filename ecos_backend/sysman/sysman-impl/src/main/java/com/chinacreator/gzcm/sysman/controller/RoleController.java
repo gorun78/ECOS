@@ -65,8 +65,8 @@ public class RoleController {
         try {
             Role role = new Role();
             role.setRoleId(UUID.randomUUID().toString().replace("-", ""));
-            role.setRoleName((String) body.get("name"));
-            role.setRoleCode((String) body.get("code"));
+            role.setRoleName((String) (body.get("roleName") != null ? body.get("roleName") : body.get("name")));
+            role.setRoleCode((String) (body.get("roleCode") != null ? body.get("roleCode") : body.get("code")));
             role.setDescription((String) body.get("description"));
             role.setRoleType((String) body.getOrDefault("roleType", "CUSTOM"));
             role.setStatus("ACTIVE");
