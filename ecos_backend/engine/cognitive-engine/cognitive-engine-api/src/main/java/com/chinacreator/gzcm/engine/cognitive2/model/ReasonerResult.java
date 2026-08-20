@@ -26,6 +26,9 @@ public class ReasonerResult {
     /** 推理链（可选）：ruleId → condition → facts → conclusion → source */
     private List<Map<String, String>> reasoningChain;
 
+    /** PMO-35: 结构化推理路径（逐步可解释） */
+    private ReasoningPath reasoningPath;
+
     /** 来源标注列表 */
     private List<Map<String, Object>> sources;
 
@@ -53,6 +56,9 @@ public class ReasonerResult {
 
     public List<Map<String, String>> getReasoningChain() { return reasoningChain; }
     public void setReasoningChain(List<Map<String, String>> reasoningChain) { this.reasoningChain = reasoningChain; }
+
+    public ReasoningPath getReasoningPath() { return reasoningPath; }
+    public void setReasoningPath(ReasoningPath reasoningPath) { this.reasoningPath = reasoningPath; }
 
     public List<Map<String, Object>> getSources() { return sources; }
     public void setSources(List<Map<String, Object>> sources) { this.sources = sources; }

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
 import com.chinacreator.gzcm.engine.cognitive2.model.ReasonerResult;
+import com.chinacreator.gzcm.engine.cognitive2.model.ReasoningStep;
 import com.chinacreator.gzcm.engine.cognitive2.model.SubQuery;
 import com.chinacreator.gzcm.engine.cognitive2.model.SubQuery.SubQueryType;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
@@ -51,13 +52,19 @@ public class KnowledgeReasonerService {
     private final ComplianceRuleMapper ruleMapper;
     private final KnowledgeRetrievalService retrievalService;
     private final KnowledgeGraphService graphService;
+    private final SpelConditionEvaluator spelEvaluator;
+    private final ReasoningPathBuilder reasoningPathBuilder;
 
     public KnowledgeReasonerService(ComplianceRuleMapper ruleMapper,
                                     KnowledgeRetrievalService retrievalService,
-                                    KnowledgeGraphService graphService) {
+                                    KnowledgeGraphService graphService,
+                                    SpelConditionEvaluator spelEvaluator,
+                                    ReasoningPathBuilder reasoningPathBuilder) {
         this.ruleMapper = ruleMapper;
         this.retrievalService = retrievalService;
         this.graphService = graphService;
+        this.spelEvaluator = spelEvaluator;
+        this.reasoningPathBuilder = reasoningPathBuilder;
     }
 
     /**
@@ -173,14 +180,17 @@ public class KnowledgeReasonerService {
                 .filter(ComplianceRule::isEnabled)
                 .collect(Collectors.toList());
 
-        // 2. 逐条规则检查 condition 是否满足
+        // 2. 逐条规则检查 condition 是否满足（PMO-35: SpEL 评估）
         List<Map<String, String>> reasoningChain = new ArrayList<>();
         List<String> matchedRuleNames = new ArrayList<>();
         List<String> subQueries = new ArrayList<>();
+        List<ReasoningStep> reasoningSteps = new ArrayList<>();
 
+        int stepIdx = 0;
         for (ComplianceRule rule : candidateRules) {
             subQueries.add("Check rule: " + rule.getName());
-            boolean satisfied = evaluateCondition(rule, facts);
+            SpelConditionEvaluator.EvalResult evalResult = evaluateCondition(rule, facts);
+            boolean satisfied = evalResult.isSatisfied();
 
             Map<String, String> step = new LinkedHashMap<>();
             step.put("ruleId", rule.getId());
@@ -190,6 +200,13 @@ public class KnowledgeReasonerService {
             step.put("domain", rule.getDomain());
             step.put("satisfied", String.valueOf(satisfied));
             reasoningChain.add(step);
+
+            // PMO-35: 构建结构化推理步骤
+            ReasoningStep rStep = reasoningPathBuilder.buildStep(
+                rule.getId(), rule.getName(), rule.getCondition(),
+                rule.getAction(), facts, evalResult, stepIdx++
+            );
+            reasoningSteps.add(rStep);
 
             if (satisfied) {
                 matchedRuleNames.add(rule.getName());
@@ -243,34 +260,26 @@ public class KnowledgeReasonerService {
         result.setConfidence(confidence);
         result.setReasoningChain(reasoningChain);
         result.setSources(sources);
+        // PMO-35: 结构化推理路径
+        result.setReasoningPath(reasoningPathBuilder.buildPath(reasoningSteps, answer));
         return result;
     }
 
     /**
      * 评估单条规则的条件是否满足。
-     * 当前实现：简单字符串匹配；后续可升级为 SpEL 表达式引擎。
+     * PMO-35: 用 SpEL 替换字符串 contains 匹配，旧格式自动降级。
      */
-    private boolean evaluateCondition(ComplianceRule rule, Map<String, Object> facts) {
+    private SpelConditionEvaluator.EvalResult evaluateCondition(ComplianceRule rule, Map<String, Object> facts) {
         String condition = rule.getCondition();
         if (condition == null || condition.isEmpty()) {
             // 无条件 → 默认适用
-            return true;
+            return new SpelConditionEvaluator.EvalResult(true, "No condition, default applicable", Collections.emptyMap());
         }
         if (facts == null || facts.isEmpty()) {
             // 无事实上下文 → 无法判定，默认不适用
-            return false;
+            return new SpelConditionEvaluator.EvalResult(false, "No facts provided", Collections.emptyMap());
         }
-
-        // 简单匹配：检查 condition 中的 key 是否在 facts 中出现
-        for (String key : facts.keySet()) {
-            if (condition.contains(key)) {
-                Object factValue = facts.get(key);
-                if (factValue != null && condition.contains(String.valueOf(factValue))) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return spelEvaluator.evaluate(condition, facts);
     }
 
     // ──────────── VECTOR_RAG ────────────
