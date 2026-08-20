@@ -919,7 +919,11 @@ export default function UserManagement() {
           roles={roles}
           orgMap={orgMap}
           onEdit={async (u) => { if (!orgTree.length) await loadOrgs(); setUserForm({ mode: "edit", user: u }); }}
-          onDelete={(u) => setConfirmAction({ type: "delete", tab: "users", id: u.userId, name: u.username })}
+          onDelete={(u) => {
+            console.log('[DELETE BTN] user object:', JSON.stringify(u));
+            console.log('[DELETE BTN] u.userId:', u.userId, 'u.user_id:', (u as any).user_id);
+            setConfirmAction({ type: "delete", tab: "users", id: u.userId || (u as any).user_id || (u as any).id, name: u.username });
+          }}
           onForceLogout={(u) => handleForceLogout(u.userId)}
           onRowClick={(u) => setDetailUser(u)}
           onToggleStatus={handleToggleStatus}
