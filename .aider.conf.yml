@@ -14,9 +14,8 @@ read:
   - .aider.md
   - docs/ARCHITECTURE-RULES.md
 
-## .aiderignore排除docs/docker/build产物等噪音
-## repo-map只扫描ecos_frontend/ + ecos_backend/核心源码
-subtree-only: ecos_frontend
+## .aiderignore排除docs/docker/build产物等噪音，repo-map扫描范围由它控制
+## 注意：--subtree-only是布尔开关(不接受路径值)且依赖git仓库，与no-git:true冲突，勿再配置
 
 ## 大文件分块编辑（>800行文件启用）
 auto-commits: false
