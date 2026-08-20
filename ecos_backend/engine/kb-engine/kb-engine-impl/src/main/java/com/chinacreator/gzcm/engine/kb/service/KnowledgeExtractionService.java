@@ -50,13 +50,16 @@ public class KnowledgeExtractionService {
     private final RestTemplate restTemplate;
     private final ComplianceRuleMapper ruleMapper;
     private final KGWriterService kgWriter;
+    private final DocumentParserService documentParserService;
 
     public KnowledgeExtractionService(JdbcTemplate jdbc,
                                       ComplianceRuleMapper ruleMapper,
-                                      KGWriterService kgWriter) {
+                                      KGWriterService kgWriter,
+                                      DocumentParserService documentParserService) {
         this.jdbc = jdbc;
         this.ruleMapper = ruleMapper;
         this.kgWriter = kgWriter;
+        this.documentParserService = documentParserService;
         this.restTemplate = new RestTemplate();
     }
 
@@ -112,12 +115,19 @@ public class KnowledgeExtractionService {
     // ── 解析 + 抽取 ──────────────────────────────────
 
     private void parseAndExtract(String id, Path filePath) {
-        // Step 1: 解析文本
+        // Step 1: 解析文本 (PMO-34: Tika 解析 + 元数据)
         updateStatus(id, "PARSING");
         String text;
         try {
-            text = parseFile(filePath);
-            jdbc.update("UPDATE extraction_drafts SET parsed_text = ?, status = 'EXTRACTING' WHERE id = ?", text, id);
+            DocumentParserService.ParseResult parseResult = documentParserService.parse(filePath);
+            text = parseResult.getText();
+            // 写入解析元数据
+            jdbc.update(
+                "UPDATE extraction_drafts SET parsed_text = ?, status = 'EXTRACTING', " +
+                "file_type = ?, page_count = ?, char_count = ? WHERE id = ?",
+                text, parseResult.getFileType(), parseResult.getPageCount(),
+                parseResult.getCharCount(), id
+            );
         } catch (Exception e) {
             handleError(id, "解析失败: " + e.getMessage(), "PARSING");
             return;
@@ -152,17 +162,9 @@ public class KnowledgeExtractionService {
     }
 
     private String parseFile(Path filePath) throws Exception {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<String> future = executor.submit(() ->
-            new String(Files.readAllBytes(filePath), java.nio.charset.StandardCharsets.UTF_8));
-        try {
-            return future.get(PARSE_TIMEOUT_SEC, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            future.cancel(true);
-            throw new RuntimeException("文件解析超时(" + PARSE_TIMEOUT_SEC + "s)");
-        } finally {
-            executor.shutdownNow();
-        }
+        // PMO-34: Tika 解析替换 UTF-8 直读，支持 pdf/docx/xlsx/pptx/html/txt
+        DocumentParserService.ParseResult result = documentParserService.parse(filePath);
+        return result.getText();
     }
 
     /**
