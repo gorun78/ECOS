@@ -23,6 +23,7 @@
         <module>runtime-crypto</module>
         <module>runtime-task</module>
         <module>llm-gateway</module>
+            <module>runtime-access</module>
     </modules>
 
 </project>
