@@ -1,9 +1,0 @@
-﻿dir : Cannot find path '\\wsl$\Ubuntu\home\guorongxiao\ECOS\%USERPROFILE%' because it does not exist.
-At C:\Users\guoro\AppData\Local\Temp\trae-agent-toolhost\jobs\job-0930d703c4ff4cbcb699b4ee22cca5d9\command.ps1:15 char:
-6690
-+ ...  findstr /i "codebase"; echo "---"; dir "%USERPROFILE%" 2>nul | finds ...
-+                                         ~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : ObjectNotFound: (\\wsl$\Ubuntu\h...S\%USERPROFILE%:String) [Get-ChildItem], ItemNotFound 
-   Exception
-    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetChildItemCommand
- 
