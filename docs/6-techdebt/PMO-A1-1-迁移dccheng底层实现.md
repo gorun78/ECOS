@@ -9,7 +9,7 @@
 
 dccheng 模块把"引擎层对象管理"（ontology 的 Service/Repository/领域模型）和"服务层转化职责"混在一起。ontology-engine 的 18 个 Controller 反向 import dccheng 的底层类，形成跨模块反向依赖。
 
-本指令把 dccheng 的 ontology 底层实现**迁移**到 ontology-engine（金·信息本体），把 Neo4jConfig 迁移到 kb-engine（水·知识）。**只迁不删**——dccheng 目录和 Controller 在 A1-3 指令处理。
+本指令把 dccheng 的 ontology 底层实现**迁移**到 ontology-engine（金·信息本体），把 Neo4jConfig 迁移到新建的 runtime-access（器·基础设施访问）。**只迁不删**——dccheng 目录和 Controller 在 A1-3 指令处理。
 
 ## §迁移清单（22 个类）
 
@@ -36,7 +36,7 @@ dccheng 模块把"引擎层对象管理"（ontology 的 Service/Repository/领�
 | FunctionEvaluator | dccheng.ontology | engine.ontology.engine | 555 |
 | GlossaryEntity | dccheng.glossary（api） | engine.ontology.glossary | — |
 | GlossaryRepository | dccheng.glossary（impl） | engine.ontology.glossary | 104 |
-| Neo4jConfig | dccheng.knowledgegraph | engine.kb.config | 47 |
+| Neo4jConfig | dccheng.knowledgegraph | runtime.access.config（新建 runtime-access 模块） | 47 |
 
 ## §Task
 
@@ -46,7 +46,46 @@ dccheng 模块把"引擎层对象管理"（ontology 的 Service/Repository/领�
 | T2 | 6 个 Repository + GlossaryEntity + GlossaryRepository | 迁移到 `engine/ontology/.../repository/` 和 `glossary/`，改 package + import | 同上 |
 | T3 | 5 个 Service | 迁移到 `engine/ontology/.../service/`，改 package + import（含内部对 Repository/Model 的 import） | 同上 |
 | T4 | ActionHookExecutor + FunctionEvaluator | 迁移到 `engine/ontology/.../engine/`，改 package + import | 同上 |
-| T5 | Neo4jConfig | 迁移到 `engine/kb-engine/kb-engine-impl/.../engine/kb/config/`，改 package + import | 同上 |
+| T5 | Neo4jConfig | **新建 `runtime/runtime-access` 模块**（见下方「T5 建模块明细」），迁到 `runtime/runtime-access/src/main/java/com/chinacreator/gzcm/runtime/access/config/Neo4jConfig.java`，改 package 声明 | runtime-access 独立编译通过 + gateway 启动加载 neo4jDriver Bean |
+
+### T5 建模块明细（runtime-access）
+
+新建 `runtime/runtime-access/` 模块，`pom.xml`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>runtime</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>runtime-access</artifactId>
+    <name>Runtime Access</name>
+    <description>Runtime Access — 基础设施访问（PG/Neo4j/MinIO/Doris/Git 统一 Driver/Client 封装）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.neo4j.driver</groupId>
+            <artifactId>neo4j-java-driver</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+配套改动三处：
+1. `runtime/pom.xml` 的 `<modules>` 加 `<module>runtime-access</module>`
+2. `gateway/pom.xml` 的 `<dependencies>` 加 runtime-access（参照已有 runtime-core 依赖写法：groupId=`com.chinacreator.gzcm`，artifactId=`runtime-access`，version=`1.0.0-SNAPSHOT`）
+3. `Neo4jConfig.java` 从 dccheng 移到 runtime-access，package 改 `com.chinacreator.gzcm.runtime.access.config`，**其余代码零改动**（@Configuration/@Bean/方法体/注解全不变）
 
 **迁移后必须改写的 import 消费方（关键）**：
 - `engine/ontology-engine/.../controller/` 下 18 个 Controller（GlossaryController、LineageController、OntologyDataController、OntologyActionController、OntologyActionApiController、OntologyController、OntologyDomainController、OntologyDomainApiController、OntologyExportController、OntologyMappingController、OntologyPropertyController、OntologyProposalController、OntologyRelationshipController、OntologyRuleController、OntologyVersionController、OntologyVersionSimpleController 等）
@@ -59,7 +98,7 @@ dccheng 模块把"引擎层对象管理"（ontology 的 Service/Repository/领�
 2. ❌ 不改任何方法体、不改任何 SQL、不改任何业务逻辑——纯 package + import 移动
 3. ❌ 不改类名、不改注解、不改构造器签名
 4. ❌ 不改 ontology-engine 已有代码（FunctionSandboxEngine 等 2,950 行新能力），只追加迁移的类
-5. ❌ 不碰 kb-engine/cognitive-engine 的其他文件（除 Neo4jConfig 迁移目标包外）
+5. ❌ 不碰 kb-engine/cognitive-engine 的任何文件
 6. ❌ 不用 `mvn compile` 替代 `mvn install`（.m2 旧 JAR 不覆盖）
 
 ## §验证门禁
@@ -79,7 +118,7 @@ grep -r "import com.chinacreator.gzcm.dccheng" engine/ workspace/ services/ \
 
 # V3: 迁移后的类存在且 package 正确
 ls engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/model/OntologyEntity.java
-ls engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/config/Neo4jConfig.java
+ls runtime/runtime-access/src/main/java/com/chinacreator/gzcm/runtime/access/config/Neo4jConfig.java
 # 期望: 均存在
 ```
 
@@ -90,5 +129,5 @@ T1-T5 每个 0.5-1 天，共 3-4 天（含 import 改写的反复编译调错）
 ## §风险
 
 - **迁移顺序必须 Model → Repository → Service → 执行器**（下层先迁），否则中间态编译失败。
-- **Neo4jConfig 的 `neo4jDriver` Bean 被 4 模块消费**（kb-engine/runtime/workspace/ontology-engine），迁到 kb-engine 后必须确认 @Bean 仍被 ComponentScan 扫到（kb-engine-impl 已被 gateway 扫描，理论无影响，但需 V1 编译 + 启动验证）。
+- **Neo4jConfig 的 `neo4jDriver` Bean 被 4 模块消费**（kb-engine/runtime/workspace/ontology-engine，均通过 `@Autowired Driver` 按类型注入，**不 import Neo4jConfig 类本身**，故消费方零改动）。迁到 runtime-access 后 package 为 `com.chinacreator.gzcm.runtime.access.config`，落入 gateway ComponentScan 的 `com.chinacreator.gzcm.runtime` basePackage 范围，扫描无忧；但需 V1 编译 + 启动验证 Bean 正常装配（日志 `Neo4j Driver created`）。
 - **workspace 反向依赖**：workspace import ActionHookExecutor/FunctionEvaluator，迁到 ontology-engine 后 workspace 需依赖 ontology-engine-api。若 workspace pom 未引入 ontology-engine-api，需补依赖（这是允许的跨模块依赖，方向正确）。

@@ -30,10 +30,10 @@ public class SecurityConfig {
                     // ── Auth (public)
                     "/auth/**",
                     "/api/v1/auth/**",
-                    "/api/security/**",
+                    // ── P0-1: /api/security/** 已移出 permitAll（需认证）
+                    // ── P2-1: /api/v1/security/** 新路径别名也需认证
                     // ── Public read-only domains
                     "/api/v1/ecos/**",
-                    "/api/v1/security/**",
                     "/api/v1/marketplace/**",
                     "/api/v1/agent/**",
                     "/api/v1/agent-loop/**",
@@ -44,10 +44,7 @@ public class SecurityConfig {
                     "/api/v1/oag/**",
                     // ── System management
                     "/api/v1/system/**",
-                    "/api/v1/audit/**",
-                    "/api/v1/data-masking/**",
                     "/api/v1/dict/**",
-                    "/api/v1/policy-engine/**",
                     "/api/v1/pipeline/**",
                     "/api/v1/dq/**",
                     "/api/v1/query/**",
@@ -62,8 +59,6 @@ public class SecurityConfig {
                     "/api/v1/guardrails/**",
                     "/api/v1/aip/**",
                     "/api/v1/agents/**",
-                    "/api/v1/abac/**",
-                    "/api/v1/data-permission/**",
                     "/api/v1/mfa/**",
                     "/api/v1/privacy/**",
                     "/api/v1/world-model/**",
@@ -72,8 +67,11 @@ public class SecurityConfig {
                     "/api/v1/evolution/**",
                     "/api/v1/cognitive/**",
                     "/api/v1/engine/**",
+                    // ── P0-1: 安全端点移出 permitAll（需认证）
+                    // /api/v1/abac/**, /api/v1/audit/**, /api/v1/data-masking/**,
+                    // /api/v1/policy-engine/**, /api/v1/data-permission/**,
+                    // /api/security/**, /api/v1/security/** — 全部需认证
                     // ── Cases
-                    "/api/v1/knowledge/**",
                     "/cases/**",
                     // ── Alerts + WebSocket
                     "/api/v1/alerts/**",
