@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.dto.PipelineEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
@@ -18,9 +19,11 @@ public class SecuritySandboxService {
 
     private final List<Map<String, Object>> auditLogs = new CopyOnWriteArrayList<>();
     private final ApplicationEventPublisher eventPublisher;
+    private final JdbcTemplate jdbc;  // SEC-P0-5: 用于查询用户角色
 
-    public SecuritySandboxService(ApplicationEventPublisher eventPublisher) {
+    public SecuritySandboxService(ApplicationEventPublisher eventPublisher, JdbcTemplate jdbc) {
         this.eventPublisher = eventPublisher;
+        this.jdbc = jdbc;
         seedAuditLogs();
     }
 
@@ -108,10 +111,12 @@ public class SecuritySandboxService {
 
         boolean success;
         String verdict;
-        if ("admin_guorong".equals(userId) || "superadmin".equals(userId)) {
+        // SEC-P0-5: 删除硬编码后门，改基于角色配置的超级管理员判断
+        boolean isSuperAdmin = isSuperAdminRole(userId);
+        if (isSuperAdmin) {
             success = true;
-            verdict = "GRANTED: 超级管理员完全解密权限";
-            traces.add("[3] 超管豁免: 绕过所有 DAC/MAC 门禁");
+            verdict = "GRANTED: 超级管理员权限（角色验证通过）";
+            traces.add("[3] 超管授权: 通过数据库角色验证，非硬编码豁免");
         } else if (orgId.contains("blocked") || orgId.contains("external")) {
             success = false;
             verdict = "DENIED: 外部组织无解密权限 (物理隔离)";
@@ -199,7 +204,7 @@ public class SecuritySandboxService {
 
     private void seedAuditLogs() {
         String[][] seeds = {
-            {"LOGIN", "SUCCESS", "admin_guorong logged in from 10.0.1.25"},
+            {"LOGIN", "SUCCESS", "admin logged in from 10.0.1.25"},
             {"DATA_MASK", "SUCCESS", "Masked passenger PII (SHA256)"},
             {"POLICY_EVAL", "GRANTED", "Rhai rule: admin role → grant"},
             {"DECRYPT", "GRANTED", "Dataset ds_ticket_sales → org_aviation_hq"},
@@ -216,6 +221,23 @@ public class SecuritySandboxService {
             entry.put("status", seeds[i][1]);
             entry.put("detail", seeds[i][2]);
             auditLogs.add(entry);
+        }
+    }
+
+    /** SEC-P0-5: 基于数据库角色判断超级管理员，替代硬编码用户名 */
+    private boolean isSuperAdminRole(String userId) {
+        if (userId == null || userId.isBlank()) return false;
+        // 通过 JdbcTemplate 查询用户角色（注入由 Spring 管理）
+        try {
+            Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM td_user_security_profile usp " +
+                "JOIN td_role_security_profile rsp ON usp.profile_id = rsp.profile_id " +
+                "WHERE usp.user_id = ? AND rsp.role_name = 'ROLE_SUPER_ADMIN'",
+                Integer.class, userId);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            log.warn("超级管理员角色查询失败, userId={}, error={}", userId, e.getMessage());
+            return false;
         }
     }
 }

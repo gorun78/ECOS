@@ -46,7 +46,7 @@ auth:
       - "/api/v1/auth/**"
       - "/error"
       - "/api/v1/ecos/**"
-      - "/api/v1/security/**"
+      - "/api/v1/security/health"          # 仅健康检查放行
       - "/api/v1/marketplace/**"
       - "/api/v1/agent/**"
       - "/api/v1/agent-loop/**"
@@ -61,8 +61,6 @@ auth:
       - "/api/v1/ontology/**"
       - "/api/v1/task/**"
       - "/api/v1/lineage/**"
-      - "/api/v1/abac/**"
-      - "/api/v1/data-permission/**"
       - "/api/v1/mfa/**"
       - "/api/v1/privacy/**"
       - "/api/v1/world-model/**"
@@ -83,9 +81,6 @@ auth:
       - "/api/v1/guardrails/**"
       - "/api/v1/aip/**"
       - "/api/v1/agents/**"
-      - "/api/v1/policy-engine/**"
-      - "/api/v1/audit/**"
-      - "/api/v1/data-masking/**"
       - "/api/v1/cron-jobs/**"
       - "/api/v1/skills/**"
       - "/api/alerts/**"
@@ -144,38 +139,9 @@ management:
       exposure:
         include: health,beans,mappings
 
-# JWT RS256 Test Keys (auto-generated, PEM format)
+# JWT RS256 Keys — SEC-P0-2: 私钥从环境变量读取，不提交到 Git
 jwt:
-  private-key: |
-
-    -----BEGIN PRIVATE KEY-----
-    MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCjBlznp15VNag/
-    f8nRyynAhPrQYzSpBu3X9J4SJ9xsiZivwH4ia9Qx87maVtr+H1kJYkl2WyBfqour
-    1M0owKhzw/csNnuMOKRU5gcPjSeN1cdi76cznLdccsMPeo2Xz6qvsZ+8KfpqxfHq
-    s6Y7rpVQneHXMLM+cZvJ8p86ZqGcwDaXtZwKvODUfBtI+imdpCsw+M8Yup7MAJI6
-    /Tbz2YqJEDBLB+17T5J/dhlx3gduo2fia5Ifldjz4kpgDHCNn6W7DjBkVqTnTZbu
-    iZU2J7fkQ+G5jjNowMbWfr6TPkGIH7vNsi4QJSCwN0DlXsv+cAnA7XSnC4cgNvjm
-    Na7juGcFAgMBAAECggEAJz11F9pwqZx2gMBS1RFsnZc0ovu6FXRiRBCwiqi3FRYC
-    n007XzAqvZJPis+cuz3S6eATVC6HipdrsqLQdh53fZP+FxGPJ/eLUJckvHDKxEhg
-    i5cpXRI8DX/fJUbntZKqIEumKf3FtbUrL4Xp/aQecy7piSlC/8ULTW79tio1fNvh
-    6sjCTYniR4MJak+GPyo4XWVxoGUi1CyPlCFdHGypaK5fRw2BX1cHqj7moHsoquj8
-    o423TcJgf0NLBDYOvRtOMR5bDngZqciXgkLVa3L9Aj95zKPRCwO67teZsFLaORZe
-    aMZ1mDOgelC/3LbGA2/9bG0slA6+bgXe1rM73A5UYQKBgQDUuSH1Umq6YnahCUG1
-    2DNoGX8CAJGHpe5jNG/vRrqHoTdEiQmFFvRNC7xWhIrQUeGAKW0p8W9gA/0zP92U
-    LwDmQ+6WQLtQRCR0jGgGI8xv+YxrU8Xe/Uxaxt56AsFStHEY9cs0AYfcto1YD7Kp
-    yDr2LU28Gb6s6I2S9L++wujsIQKBgQDEMOJ6x9k39i9ZIQuu3C5f/7En9MQZ4do3
-    OdnaqTGH3jcafzq1vUk6rhP8VDy/pTZFRV5JfAo4/I52Wai1ggSKSS8W3q+cKHgm
-    aAQ3AeTvfgKxXaukmnCa74/moqF6ieoIR/dL72lX/GLrVJOpVrV2TcuYMEolglYQ
-    L9FBLjt+ZQKBgDWp4pQ1z3DnqA+l+yq5uPY5AF5r8EqtJH9oWhid2i6fEAc9Huax
-    TL4nCMM2uqIlFeM0EDL1kmhBeV21bduVI//zATxsZhSwrBWu2gs6ereA19i3kIJZ
-    miqIYtWa3lRT6vgmAbZD8JdQgkXF6AeG2MED2slqIT0TiauaDMk9+G6hAoGBAIKW
-    H0mmWDldjip/Sm17dQrFAMAdtaGcqUj1IsLet28+Q+NJKGTrtyBt2jOsRjsx1qvI
-    /ndfLta7lH/GMfuOrUL2b3eDhdQlQ8QcnCGZCy816sjwFl2bxrP6HQhg26bawYH9
-    lOdgVfgQsC7/vsGKS4KRSaDlE5Vf6bUgfuIpycPZAoGBALevafodBmb1a5tcmgQf
-    ehcG08+V4Bsp43HnZJJSIeNMUqsfTgDwN4Lu+3HrTcA5jNvJMu/O+lNXNXs7dDkb
-    VZugNKHhlpibKDd9/S3DLdL+gbFw0iMkd+QyZ1kuc/6C4PzqNzrYxaFvR8PjC1i/
-    iNHO3XqUc546lq6+UzSomip/
-    -----END PRIVATE KEY-----
+  private-key: ${JWT_PRIVATE_KEY:}  # 从环境变量注入，格式: PEM (含换行符用\n表示)
   public-key: |
     -----BEGIN PUBLIC KEY-----
     MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowZc56deVTWoP3/J0csp

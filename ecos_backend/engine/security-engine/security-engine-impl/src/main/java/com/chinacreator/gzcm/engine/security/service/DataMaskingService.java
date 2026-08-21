@@ -48,10 +48,10 @@ public class DataMaskingService {
             String rule = singleRule ? rules.get(0) : rules.get(i);
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("index", i);
-            item.put("raw", raw);
+            // SEC-P0-4: 不返回原始明文，仅返回脱敏结果
             MaskFunction fn = maskFunctions.get(rule);
             if (fn == null) {
-                item.put("masked", raw);
+                item.put("masked", "***");  // 未知规则也不回传原文
                 item.put("rule", rule);
                 item.put("error", "不支持的脱敏规则: " + rule);
             } else {
@@ -112,7 +112,8 @@ public class DataMaskingService {
     private Map<String, Object> buildSample(String rule, String raw, String masked) {
         Map<String, Object> sample = new LinkedHashMap<>();
         sample.put("rule", rule);
-        sample.put("raw", raw);
+        // SEC-P0-4: demo 样例也移除明文原始值
+        sample.put("input", "****");
         sample.put("masked", masked);
         return sample;
     }
