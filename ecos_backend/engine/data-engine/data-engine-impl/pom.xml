@@ -90,6 +90,12 @@
             <artifactId>jsqlparser</artifactId>
             <version>4.9</version>
         </dependency>
+        <!-- A+4: git services migrated to runtime-access -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>

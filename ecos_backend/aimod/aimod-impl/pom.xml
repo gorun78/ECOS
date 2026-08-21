@@ -40,6 +40,7 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
+        <!-- A+3: keep slf4j, aimod-impl still uses runtime.core.agent.mesh (stays in runtime) -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>

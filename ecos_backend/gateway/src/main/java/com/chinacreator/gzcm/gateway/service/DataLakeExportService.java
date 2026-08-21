@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.service;
 
 import com.chinacreator.gzcm.common.service.IObjectStorageService;
+import com.chinacreator.gzcm.gateway.service.DuckDBQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;

@@ -3,9 +3,6 @@ package com.chinacreator.gzcm.runtime.core.agent;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import com.chinacreator.gzcm.runtime.core.agent.llm.LLMClient;
-import com.chinacreator.gzcm.runtime.core.agent.llm.LLMConfig;
-import com.chinacreator.gzcm.runtime.core.agent.tool.ToolRegistry;
 
 /**
  * Agent 运行时主接口
@@ -80,23 +77,27 @@ public interface AgentRuntime {
 
     /**
      * 获取 LLM 客户端
+     * @deprecated A+5: LLMClient 已迁 ai-engine，此 stub 避免破坏现有接口契约
      */
-    LLMClient getLLMClient();
+    default Object getLLMClient() { return null; }
 
     /**
      * 更新 LLM 配置（热切换模型）
+     * @deprecated A+5: LLMClient 已迁 ai-engine，此 stub 避免破坏现有接口契约
      */
-    void updateLLMConfig(LLMConfig config);
+    default void updateLLMConfig(Object config) {}
 
     /**
      * 获取工具注册表
+     * @deprecated A+5: ToolRegistry 已迁 ai-engine，此 stub 避免破坏现有接口契约
      */
-    ToolRegistry getToolRegistry();
+    default Object getToolRegistry() { return null; }
 
     /**
      * 获取当前 LLM 配置
+     * @deprecated A+5: LLMConfig 已迁 ai-engine，此 stub 避免破坏现有接口契约
      */
-    LLMConfig getLLMConfig();
+    default Object getLLMConfig() { return null; }
 
     // ── 状态与统计 ──────────────────────────────
 

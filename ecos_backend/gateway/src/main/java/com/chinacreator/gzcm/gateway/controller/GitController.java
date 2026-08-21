@@ -13,9 +13,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.runtime.core.git.GitService;
-import com.chinacreator.gzcm.runtime.core.git.GitRepositoryService;
-import com.chinacreator.gzcm.runtime.core.git.entity.GitRepository;
+import com.chinacreator.gzcm.runtime.access.git.GitService;
+import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
+import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
 
 /**
  * ECOS 数据工作台 — Git 版本管理 API (v2 PMO spec)。

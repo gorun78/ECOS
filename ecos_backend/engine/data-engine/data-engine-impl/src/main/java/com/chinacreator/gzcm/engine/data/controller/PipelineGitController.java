@@ -2,7 +2,7 @@ package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.data.service.PipelineGitService;
-import com.chinacreator.gzcm.runtime.core.git.GitService.GitException;
+import com.chinacreator.gzcm.runtime.access.git.GitService.GitException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;

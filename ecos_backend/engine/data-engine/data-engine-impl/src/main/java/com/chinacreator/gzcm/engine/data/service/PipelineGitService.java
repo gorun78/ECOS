@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.runtime.core.git.GitService;
-import com.chinacreator.gzcm.runtime.core.git.GitService.GitException;
+import com.chinacreator.gzcm.runtime.access.git.GitService;
+import com.chinacreator.gzcm.runtime.access.git.GitService.GitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;

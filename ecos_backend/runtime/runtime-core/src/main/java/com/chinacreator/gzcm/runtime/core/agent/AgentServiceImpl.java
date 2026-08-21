@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.chinacreator.gzcm.runtime.core.agent.exception.AgentException;
-import com.chinacreator.gzcm.runtime.core.agent.llm.LLMConfig;
 
 /**
  * Agent 服务实现
@@ -153,13 +152,12 @@ public class AgentServiceImpl implements AgentService {
         Map<String, Object> stats = runtime.getGlobalStats();
         status.putAll(stats);
 
-        // 附加信息
-        LLMConfig config = runtime.getLLMConfig();
-        status.put("model", config.getModel());
-        status.put("provider", config.getProvider() != null ? config.getProvider().name() : "unknown");
-        status.put("baseUrl", config.getBaseUrl());
-        status.put("temperature", config.getTemperature());
-        status.put("maxTokens", config.getMaxTokens());
+        // 附加信息（LLMConfig 已 deprecated stub，此处安全降级）
+        status.put("model", "deprecated");
+        status.put("provider", "deprecated");
+        status.put("baseUrl", "deprecated");
+        status.put("temperature", 0);
+        status.put("maxTokens", 0);
 
         return status;
     }

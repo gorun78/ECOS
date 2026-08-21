@@ -45,11 +45,23 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.services.agent.runtime",
     "com.chinacreator.gzcm.services.agent.model",
 }, excludeFilters = {
-    // A+3: 排除旧包 runtime.core.agent.mesh（已迁入 ai-engine）
-    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.agent\\.mesh\\..*"),
+    // A+3: 排除旧包 runtime.core.agent（已迁入 ai-engine）
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.agent\\..*"),
+    // A+4: 排除迁出后的 runtime.core 旧包
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.git\\..*"),
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.datapermission\\..*"),
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.compliance\\..*"),
+    // A+5: 排除同名 ConfigDao（runtime-core 和 sysman 版本不兼容）
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.(runtime\\.core\\.config\\.dao|sysman\\.config\\.dao).+\\.class"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.aimod\\.controller\\..*"),
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
+        // A+4: 排除旧实现（已迁 runtime-access 的同名类）
+        com.chinacreator.gzcm.gateway.service.MinioStorageService.class,
+        com.chinacreator.gzcm.workspace.service.MinioObjectStorageService.class,
+        // A+5: 排除旧配置 DAO（ConfigDao 在 runtime-coreJAR 和 sysman 版本冲突）
+        com.chinacreator.gzcm.runtime.core.config.dao.ConfigDao.class,
+        com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
         // 安全引擎已接管（阶段1），排除sysman侧副本
         com.chinacreator.gzcm.sysman.controller.AbacController.class,

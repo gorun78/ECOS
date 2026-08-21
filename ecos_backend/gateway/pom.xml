@@ -264,6 +264,12 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- A+4: infrastructure access (git/minio/logging/i18n/alert migrated from runtime-core) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>
