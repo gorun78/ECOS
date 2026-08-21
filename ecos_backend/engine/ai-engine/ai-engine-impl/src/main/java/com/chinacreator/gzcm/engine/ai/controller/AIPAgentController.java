@@ -23,8 +23,8 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.AgentTestResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentTemplateService;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**

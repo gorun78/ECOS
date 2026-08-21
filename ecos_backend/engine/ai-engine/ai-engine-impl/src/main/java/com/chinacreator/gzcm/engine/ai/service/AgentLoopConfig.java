@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;

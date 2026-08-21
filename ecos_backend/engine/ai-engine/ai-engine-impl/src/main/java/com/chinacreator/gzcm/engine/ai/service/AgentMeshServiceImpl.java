@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.engine.ai.AgentMeshService;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

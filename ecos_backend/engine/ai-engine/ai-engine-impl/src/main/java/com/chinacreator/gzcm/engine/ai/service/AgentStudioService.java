@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
 
 /**

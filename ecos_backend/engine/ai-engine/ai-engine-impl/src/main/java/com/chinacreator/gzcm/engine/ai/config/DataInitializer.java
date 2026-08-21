@@ -18,8 +18,8 @@ import com.chinacreator.gzcm.engine.ai.entity.CronJobEntity;
 import com.chinacreator.gzcm.engine.ai.repository.CronJobExecutionRepository;
 import com.chinacreator.gzcm.engine.ai.repository.CronJobRepository;
 import com.chinacreator.gzcm.engine.ai.repository.SkillRepository;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**

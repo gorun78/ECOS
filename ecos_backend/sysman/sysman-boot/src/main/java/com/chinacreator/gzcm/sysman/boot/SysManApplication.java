@@ -28,8 +28,8 @@ import org.mybatis.spring.annotation.MapperScan;
     "com.chinacreator.gzcm.sysman.**.mapper",
     "com.chinacreator.gzcm.runtime.**.mapper",
     "com.chinacreator.gzcm.runtime.llm.repository",
-    "com.chinacreator.gzcm.runtime.core.agent.mesh.repository",
-    "com.chinacreator.gzcm.runtime.core.agent.mesh.knowledge.repository"
+    "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
+    "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository"
 })
 public class SysManApplication {
     public static void main(String[] args) {

@@ -45,6 +45,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.services.agent.runtime",
     "com.chinacreator.gzcm.services.agent.model",
 }, excludeFilters = {
+    // A+3: 排除旧包 runtime.core.agent.mesh（已迁入 ai-engine）
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.agent\\.mesh\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.aimod\\.controller\\..*"),
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
@@ -71,6 +73,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
         // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
         // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
+        // A+3: 排除旧包 runtime.core.agent.mesh.*（ai-engine 版本接管）
+        // agent.mesh 14 类迁入 ai-engine，gateway classpath 仍有 runtime-core JAR，需排除旧 Bean
         com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
         // DataLakeController 留在gateway (依赖gateway内部service: DuckDB/DataLakeExport/Minio)
@@ -94,15 +98,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.worldmodel.service.OntologyKgSyncService.class,
         com.chinacreator.gzcm.worldmodel.service.PgGraphService.class,
         com.chinacreator.gzcm.worldmodel.service.Neo4jGraphService.class,
-        // Gateway瘦身: 业务Controller移回引擎 (阶段6)
+        // A+3: 排除旧包 runtime.core.agent.mesh（agent.mesh 已迁入 ai-engine）
     })
 })
 @MapperScan({
     "com.chinacreator.gzcm.sysman.**.mapper",
     "com.chinacreator.gzcm.runtime.**.mapper",
     "com.chinacreator.gzcm.runtime.llm.repository",
-    "com.chinacreator.gzcm.runtime.core.agent.mesh.repository",
-    "com.chinacreator.gzcm.runtime.core.agent.mesh.knowledge.repository",
+    "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
+    "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository",
     "com.chinacreator.gzcm.datanet.repository",
     "com.chinacreator.gzcm.engine.kb.repository"
 })

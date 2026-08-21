@@ -15,8 +15,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**

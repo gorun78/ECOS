@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.AgentMeshService;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.AgentRegistryEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.MissionEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.entity.MissionTaskEntity;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.AgentRegistryRepository;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.MissionRepository;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.repository.MissionTaskRepository;
-import com.chinacreator.gzcm.runtime.core.agent.mesh.MissionExecutionEngine;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.MissionEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.MissionTaskEntity;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.MissionRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.MissionTaskRepository;
+import com.chinacreator.gzcm.engine.ai.agent.mesh.MissionExecutionEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
