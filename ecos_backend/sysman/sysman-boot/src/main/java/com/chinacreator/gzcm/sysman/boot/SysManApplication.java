@@ -14,7 +14,6 @@ import org.mybatis.spring.annotation.MapperScan;
     "com.chinacreator.gzcm.sysman",
     "com.chinacreator.gzcm.runtime",
     "com.chinacreator.gzcm.common",
-    "com.chinacreator.gzcm.dccheng",
     "com.chinacreator.gzcm.buszhi",
     "com.chinacreator.gzcm.aimod",
     "com.chinacreator.gzcm.market",

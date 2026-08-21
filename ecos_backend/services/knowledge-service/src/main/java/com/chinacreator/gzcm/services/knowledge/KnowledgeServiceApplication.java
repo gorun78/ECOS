@@ -14,7 +14,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @ComponentScan(basePackages = {
         "com.chinacreator.gzcm.services.knowledge",
-        "com.chinacreator.gzcm.dccheng",
         "com.chinacreator.gzcm.runtime"
 })
 public class KnowledgeServiceApplication {

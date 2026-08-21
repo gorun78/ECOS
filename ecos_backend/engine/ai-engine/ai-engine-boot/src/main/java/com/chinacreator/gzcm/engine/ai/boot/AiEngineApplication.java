@@ -15,7 +15,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @ComponentScan(basePackages = {
     "com.chinacreator.gzcm.engine.ai",
         "com.chinacreator.gzcm.aimod",
-        "com.chinacreator.gzcm.dccheng",
         "com.chinacreator.gzcm.cognitive",
         "com.chinacreator.gzcm.runtime"
 })

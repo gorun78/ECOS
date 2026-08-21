@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
-import com.chinacreator.gzcm.dccheng.ontology.ActionHookExecutor;
+import com.chinacreator.gzcm.engine.ontology.engine.ActionHookExecutor;
 
 /**
  * 对象 Action 执行 Controller — 对对象实例触发 Ontology Action。

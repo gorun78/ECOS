@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
 import com.chinacreator.gzcm.common.engine.StateMachineEngine;
-import com.chinacreator.gzcm.dccheng.ontology.FunctionEvaluator;
+import com.chinacreator.gzcm.engine.ontology.engine.FunctionEvaluator;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import com.chinacreator.gzcm.workspace.service.ObjectKgSyncService;
