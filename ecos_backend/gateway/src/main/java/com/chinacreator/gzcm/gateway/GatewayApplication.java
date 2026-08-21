@@ -67,10 +67,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
         // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除
         com.chinacreator.gzcm.gateway.controller.DiagnosticAgentController.class,
-        com.chinacreator.gzcm.engine.ai.controller.AgentChatController.class,
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
-        // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + cognitive/CognitiveController 都映射 /api/v1/cognitive/health
+        // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
+        // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
         com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
         // DataLakeController 留在gateway (依赖gateway内部service: DuckDB/DataLakeExport/Minio)
