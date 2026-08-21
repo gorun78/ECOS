@@ -70,10 +70,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.engine.ai.controller.AgentChatController.class,
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
+        // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + cognitive/CognitiveController 都映射 /api/v1/cognitive/health
+        com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
         // DataLakeController 留在gateway (依赖gateway内部service: DuckDB/DataLakeExport/Minio)
         com.chinacreator.gzcm.gateway.controller.EcosKnowledgeGraphController.class,
         com.chinacreator.gzcm.gateway.controller.SecurityController.class,
+        // 安全引擎: security-engine-impl 的 abac.dao 与 runtime-crypto JAR 冲突，exclude 源码版本
+        com.chinacreator.gzcm.engine.security.abac.dao.impl.AbacPolicyDaoImpl.class,
         // 模块吸收: portal→workspace (阶段5.1)
         com.chinacreator.gzcm.portal.controller.BizDashboardController.class,
         com.chinacreator.gzcm.portal.controller.ContractStatsController.class,
