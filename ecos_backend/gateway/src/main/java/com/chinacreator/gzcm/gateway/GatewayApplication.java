@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>接管原 sysman-boot 的所有职责：
  * <ul>
- *   <li>导入全部业务模块（sysman/runtime/buszhi/dccheng/datanet/aimod/portal/market/worldmodel/workspace）</li>
+ *   <li>导入全部业务模块（sysman/runtime/buszhi/datanet/aimod/portal/market/worldmodel/workspace）</li>
  *   <li>暴露 /api/* REST 端点（无 /sys-man 前缀）</li>
  *   <li>健康检查 /actuator/health</li>
  *   <li>OpenAPI 3.0 文档 /v3/api-docs</li>
@@ -33,7 +33,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.common",
     "com.chinacreator.gzcm.sysman",
     "com.chinacreator.gzcm.runtime",
-    "com.chinacreator.gzcm.dccheng",
     "com.chinacreator.gzcm.buszhi",
     "com.chinacreator.gzcm.aimod",
     "com.chinacreator.gzcm.market",
@@ -64,34 +63,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.datanet.controller.MetadataController.class,
         com.chinacreator.gzcm.datanet.controller.CategoryController.class,
         com.chinacreator.gzcm.datanet.controller.DatanetHealthController.class,
-        // 本体引擎已接管（阶段3），排除dccheng/buszhi侧副本
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyActionController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyActionApiController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyPropertyController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyRelationshipController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyDomainController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyDomainApiController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyVersionController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyVersionSimpleController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyRuleController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyProposalController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyMappingController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyExportController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.OntologyDataController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.CeosCompatController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.AutoDiscoverController.class,
-        com.chinacreator.gzcm.dccheng.ontology.controller.LineageController.class,
+        // 本体引擎已接管（阶段3），排除buszhi侧副本
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
         // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除
-        com.chinacreator.gzcm.dccheng.knowledgegraph.controller.KnowledgeGraphController.class,
-        com.chinacreator.gzcm.dccheng.knowledgegraph.controller.GraphSyncController.class,
-        com.chinacreator.gzcm.dccheng.knowledge.KnowledgeApiController.class,
-        com.chinacreator.gzcm.dccheng.knowledge.KnowledgeSettingsController.class,
-        com.chinacreator.gzcm.dccheng.guardrails.GuardrailsApiController.class,
-        com.chinacreator.gzcm.dccheng.glossary.controller.GlossaryController.class,
-        com.chinacreator.gzcm.dccheng.classification.controller.ClassificationController.class,
-        com.chinacreator.gzcm.cognitive.impl.CognitiveController.class,
         com.chinacreator.gzcm.gateway.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.AgentChatController.class,
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,

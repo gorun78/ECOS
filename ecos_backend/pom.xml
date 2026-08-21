@@ -410,7 +410,6 @@
         <module>sysman</module>
         <module>datanet</module>
         <module>buszhi</module>
-        <module>dccheng</module>
         <module>aimod</module>
         <module>workspace</module>
         <!-- Sprint 1: Microservice boot modules -->
@@ -450,8 +449,6 @@
                 <module>runtime</module>
                 <module>sysman</module>
                 <module>datanet</module>
-                <module>buszhi</module>
-                <module>dccheng</module>
                 <module>aimod</module>
                 <module>workspace</module>
                 <!-- Sprint 1: Microservice modules -->
@@ -479,8 +476,6 @@
                 <module>runtime</module>
                 <module>sysman</module>
                 <module>datanet</module>
-                <module>buszhi</module>
-                <module>dccheng</module>
                 <module>aimod</module>
                 <module>workspace</module>
                 <module>services/api-gateway</module>
@@ -507,8 +502,6 @@
                 <module>runtime</module>
                 <module>sysman</module>
                 <module>datanet</module>
-                <module>buszhi</module>
-                <module>dccheng</module>
                 <module>aimod</module>
                 <module>workspace</module>
                 <module>services/api-gateway</module>
