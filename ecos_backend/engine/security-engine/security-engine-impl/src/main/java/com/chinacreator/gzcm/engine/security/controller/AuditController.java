@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.audit.model.AuditEvent;
 import com.chinacreator.gzcm.sysman.audit.service.IAuditLogService;
+import com.chinacreator.gzcm.engine.security.service.AuditHashChainService;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,9 @@ public class AuditController {
 
     @Autowired(required = false)
     private IAuditLogService auditLogService;
+
+    @Autowired(required = false)
+    private AuditHashChainService hashChainService;  // P1-3: 哈希链验证
 
     @GetMapping("/logs")
     public ApiResponse<Map<String, Object>> list(
@@ -67,6 +71,26 @@ public class AuditController {
         } catch (Exception e) {
             log.error("查询审计日志详情失败", e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * P1-3: 验证审计日志哈希链完整性
+     * 检测审计日志是否被篡改
+     */
+    @GetMapping("/verify-integrity")
+    public ApiResponse<Map<String, Object>> verifyIntegrity() {
+        try {
+            if (hashChainService == null) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("valid", false);
+                m.put("error", "哈希链服务未就绪");
+                return ApiResponse.success(m);
+            }
+            return ApiResponse.success(hashChainService.verifyHashChain());
+        } catch (Exception e) {
+            log.error("审计哈希链验证失败", e);
+            return ApiResponse.internalError("验证失败: " + e.getMessage());
         }
     }
 }

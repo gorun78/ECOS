@@ -19,6 +19,10 @@ public class AbacController {
     @Autowired(required = false)
     private IAbacPolicyService policyService;
 
+    // P1-2: 策略变更时触发缓存清除
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.engine.security.service.OpaPolicyService opaPolicyService;
+
     @GetMapping("/policies")
     public ApiResponse<Map<String, Object>> list(
             @RequestParam(required = false) String keyword,
@@ -77,6 +81,7 @@ public class AbacController {
             if (policyService == null) return ApiResponse.internalError("ABAC策略服务未就绪");
             policy.setPolicyId(UUID.randomUUID().toString().replace("-", ""));
             AbacPolicy created = policyService.createPolicy(policy);
+            evictDecisionCache();  // P1-2: 策略变更后清除决策缓存
             return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建ABAC策略失败", e);
@@ -91,6 +96,7 @@ public class AbacController {
             if (policyService == null) return ApiResponse.internalError("ABAC策略服务未就绪");
             policy.setPolicyId(id);
             AbacPolicy updated = policyService.updatePolicy(policy);
+            evictDecisionCache();  // P1-2: 策略变更后清除决策缓存
             return ApiResponse.success(updated);
         } catch (Exception e) {
             log.error("更新ABAC策略失败", e);
@@ -104,12 +110,25 @@ public class AbacController {
         try {
             if (policyService == null) return ApiResponse.internalError("ABAC策略服务未就绪");
             policyService.deletePolicy(id);
+            evictDecisionCache();  // P1-2: 策略变更后清除决策缓存
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("success", true);
             return ApiResponse.success(m);
         } catch (Exception e) {
             log.error("删除ABAC策略失败", e);
             return ApiResponse.internalError("删除失败: " + e.getMessage());
+        }
+    }
+
+    /** P1-2: 策略变更后触发 OPA 策略重新加载，清除缓存决策 */
+    private void evictDecisionCache() {
+        if (opaPolicyService != null) {
+            try {
+                opaPolicyService.invalidateCache();
+                log.info("ABAC策略变更, OPA缓存已失效");
+            } catch (Exception e) {
+                log.warn("OPA缓存清除失败: {}", e.getMessage());
+            }
         }
     }
 }

@@ -7,16 +7,29 @@ import java.util.stream.Collectors;
 import com.chinacreator.gzcm.sysman.abac.model.AbacPolicy;
 import com.chinacreator.gzcm.sysman.abac.service.IAbacPolicyService;
 import com.chinacreator.gzcm.sysman.policy.pap.PolicyAdministrationPoint;
+import com.chinacreator.gzcm.runtime.core.security.policy.cache.DecisionCacheService;
 
 /**
  * 策略管理点实现：从ABAC策略服务加载策略
+ * P1-2: 策略变更时主动清除决策缓存
  */
 public class PolicyAdministrationPointImpl implements PolicyAdministrationPoint {
 
     private final IAbacPolicyService abacPolicyService;
+    private final DecisionCacheService decisionCache;
 
-    public PolicyAdministrationPointImpl(IAbacPolicyService abacPolicyService) {
+    public PolicyAdministrationPointImpl(IAbacPolicyService abacPolicyService, DecisionCacheService decisionCache) {
         this.abacPolicyService = abacPolicyService;
+        this.decisionCache = decisionCache;
+    }
+
+    /**
+     * P1-2: 策略变更后清除全部决策缓存，防止已撤销权限仍然生效
+     */
+    public void onPolicyChanged() {
+        if (decisionCache != null) {
+            decisionCache.evictAll();
+        }
     }
 
     @Override
