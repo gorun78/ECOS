@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/abac")
+@RequestMapping({"/api/v1/abac", "/api/v1/security/abac"})
 public class AbacController {
     private static final Logger log = LoggerFactory.getLogger(AbacController.class);
 

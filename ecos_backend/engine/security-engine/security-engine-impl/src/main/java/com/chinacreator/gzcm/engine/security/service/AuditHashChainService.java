@@ -77,7 +77,7 @@ public class AuditHashChainService {
         try {
             var rows = jdbc.queryForList(
                 "SELECT id, username, operation, entity_type, entity_id, created_at::text as created_at, " +
-                "prev_hash, curr_hash FROM ecos_audit_log ORDER BY id ASC");
+                "prev_hash, curr_hash FROM ecos_audit_log ORDER BY created_at ASC, id ASC");
 
             for (Map<String, Object> row : rows) {
                 totalChecked++;

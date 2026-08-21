@@ -196,8 +196,10 @@ public class ParallelPolicyEvaluator<T, C, R> {
     }
     
     /**
-     * 关闭线程池
+     * 关闭资源
+     * P2-4: 添加 @PreDestroy 确保 Spring 容器关闭时线程池被正确回收
      */
+    @jakarta.annotation.PreDestroy
     public void shutdown() {
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdown();

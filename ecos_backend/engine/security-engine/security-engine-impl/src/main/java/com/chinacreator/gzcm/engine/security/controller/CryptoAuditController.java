@@ -15,7 +15,7 @@ import java.util.*;
  * GET /logs   → 审计日志查询
  */
 @RestController
-@RequestMapping("/api/v1/audit/crypto")
+@RequestMapping({"/api/v1/audit/crypto", "/api/v1/security/audit/crypto"})
 public class CryptoAuditController {
     private static final Logger log = LoggerFactory.getLogger(CryptoAuditController.class);
     private final CryptoAuditService service;

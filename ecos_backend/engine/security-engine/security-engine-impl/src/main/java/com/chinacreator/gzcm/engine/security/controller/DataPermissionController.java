@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/data-permission")
+@RequestMapping({"/api/v1/data-permission", "/api/v1/security/permission"})
 public class DataPermissionController {
     private static final Logger log = LoggerFactory.getLogger(DataPermissionController.class);
     @Autowired(required = false)

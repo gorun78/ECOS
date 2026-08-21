@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/security/policy")
+@RequestMapping({"/api/security/policy", "/api/v1/security/policy"})
 public class SecurityPolicyController {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityPolicyController.class);

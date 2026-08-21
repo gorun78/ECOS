@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/security/cls")
+@RequestMapping({"/api/security/cls", "/api/v1/security/cls"})
 public class ClsController {
 
     private static final Logger log = LoggerFactory.getLogger(ClsController.class);

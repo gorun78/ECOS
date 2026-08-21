@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/data-masking")
+@RequestMapping({"/api/v1/data-masking", "/api/v1/security/masking"})
 public class DataMaskingController {
 
     private static final Logger log = LoggerFactory.getLogger(DataMaskingController.class);
