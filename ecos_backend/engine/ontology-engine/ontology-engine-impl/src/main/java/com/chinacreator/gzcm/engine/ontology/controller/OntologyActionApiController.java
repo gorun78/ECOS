@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyActionService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyActionService;
 
 /**
  * 动作设计器 Agent REST API — Action 执行与提案查询（Agent 行动执行端点）。

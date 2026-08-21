@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
  * 本体设计器 REST API — 实体/属性/关系 CRUD（PostgreSQL 持久化）。

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
  * 本体导出 REST API — 将本体（实体/属性/关系）导出为 JSON / CSV / DDL 等格式。

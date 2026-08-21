@@ -11,8 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.glossary.GlossaryEntity;
-import com.chinacreator.gzcm.dccheng.glossary.GlossaryRepository;
+import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryEntity;
+import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryRepository;
 
 /**
  * 术语库 (Glossary) REST API — JdbcTemplate 持久化版本。

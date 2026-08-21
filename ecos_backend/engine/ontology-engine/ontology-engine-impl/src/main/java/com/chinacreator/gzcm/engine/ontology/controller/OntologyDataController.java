@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
  * 本体数据实例 Controller — 管理对象类型（ObjectType）下的数据记录。

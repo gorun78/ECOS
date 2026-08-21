@@ -8,8 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyDomainService;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyRepository;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyDomainService;
+import com.chinacreator.gzcm.engine.ontology.repository.OntologyRepository;
 
 /**
  * Domain Controller — 领域管理 CRUD + 生命周期

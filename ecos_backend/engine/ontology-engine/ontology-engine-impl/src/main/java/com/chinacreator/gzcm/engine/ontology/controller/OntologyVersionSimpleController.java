@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyVersionService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
 
 /**
  * 简化版本端点 — 不依赖 ontologyId 的快捷版本操作

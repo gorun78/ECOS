@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyRuleService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyRuleService;
 
 /**
  * Rule Controller — 规则设计器（四种规则类型 CRUD + 测试 + 批量评估）

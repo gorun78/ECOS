@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
  * 数据血缘 REST API — 记录与查询本体对象之间的数据流向（上游 → 下游）。

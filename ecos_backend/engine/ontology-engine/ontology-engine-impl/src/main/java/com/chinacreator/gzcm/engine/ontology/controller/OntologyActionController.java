@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyActionService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyActionService;
 
 /**
  * 动作设计器 REST API — 动作 CRUD（PostgreSQL 持久化）。

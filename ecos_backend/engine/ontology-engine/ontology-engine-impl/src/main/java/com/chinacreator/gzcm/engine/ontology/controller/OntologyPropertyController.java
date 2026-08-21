@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.dccheng.ontology.OntologyService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
  * Property Controller — 属性设计器增强（枚举/默认值/校验/扩展类型）
