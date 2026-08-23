@@ -6,7 +6,6 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -19,14 +18,14 @@ import java.util.*;
  * <h3>更新历史</h3>
  * <ul>
  *   <li>PMO-E1 (2026-08-24): 删除旧 DIKW 分层断言（铁律1/2，已被 D1 六引擎 ArchitectureTest 取代），
- *       更新 modules 清单到五引擎现状，compose 基线指向 ecos-docker/，铁律5 @Disabled 挂起（下沉见 PMO-E2）</li>
+ *       更新 modules 清单到五引擎现状，compose 基线指向 ecos-docker/，铁律5 已启用（PMO-E2 完成 33 Controller JdbcTemplate 下沉）</li>
  * </ul>
  *
  * <h3>当前守护的铁律</h3>
  * <ol>
  *   <li>铁律3: 禁止新增 Maven 模块（基线 11）</li>
  *   <li>铁律4: 禁止新增 Docker 容器（基线按 ecos-docker/ 三版本）</li>
- *   <li>铁律5: Controller 必须通过 Service 访问数据库（@Disabled，158 处 JdbcTemplate 违规，下沉见 PMO-E2）</li>
+ *   <li>铁律5: Controller 必须通过 Service 访问数据库（PMO-E2 已完成 33 Controller JdbcTemplate 下沉）</li>
  * </ol>
  *
  * <p>引擎间依赖边界、包结构、命名规范由 D1 六引擎 ArchitectureTest 独立守护。
@@ -236,9 +235,8 @@ public class ArchitectureTest {
 
     // ================================================================
     // 铁律 5: Controller必须通过Service访问数据库，不能直接JdbcTemplate
-    // PMO-E1: @Disabled — 158处JdbcTemplate违规(33 Controller)，下沉见 PMO-E2
+    // PMO-E2: @Disabled 已移除 — 33 Controller JdbcTemplate 已全部下沉到 Service 层
     // ================================================================
-    @Disabled("158处JdbcTemplate违规(33 Controller)，下沉见 PMO-E2")
     @Test
     public void Controller必须通过Service访问数据库_不能直接JdbcTemplate() {
         noClasses()
