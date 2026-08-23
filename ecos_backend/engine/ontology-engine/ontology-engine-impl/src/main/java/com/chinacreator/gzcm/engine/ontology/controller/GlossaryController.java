@@ -15,7 +15,7 @@ import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryEntity;
 import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryRepository;
 
 /**
- * 术语库 (Glossary) REST API — JdbcTemplate 持久化版本。
+ * 术语库 (Glossary) REST API — GlossaryRepository 持久化版本。
  *
  * <ul>
  *   <li>GET    /api/v1/ontology/glossary/terms          — 术语列表（?domain=&status=）</li>

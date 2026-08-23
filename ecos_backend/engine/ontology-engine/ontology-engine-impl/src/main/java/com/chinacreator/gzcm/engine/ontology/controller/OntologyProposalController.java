@@ -9,6 +9,7 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -334,7 +335,7 @@ public class OntologyProposalController {
             String id, String expectedFrom, String target, Map<String, Object> body) {
         Map<String, Object> existing;
         try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+            existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         } catch (EmptyResultDataAccessException e) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
@@ -368,9 +369,9 @@ public class OntologyProposalController {
         sql.append(" WHERE id=?::bigint");
         params.add(id);
 
-        jdbc.update(sql.toString(), params.toArray());
+        proposalService.update(sql.toString(), params.toArray());
 
-        Map<String, Object> updated = jdbc.queryForMap(
+        Map<String, Object> updated = proposalService.queryForMap(
                 "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         log.info("Ontology proposal {} transition: {} → {}", id, expectedFrom, target);
         return ApiResponse.success(updated);
@@ -385,7 +386,7 @@ public class OntologyProposalController {
     public ApiResponse<Map<String, Object>> verifyProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+            existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         } catch (EmptyResultDataAccessException e) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
@@ -440,12 +441,12 @@ public class OntologyProposalController {
 
         // 更新提案状态为 verified / rejected
         String newStatus = valid ? "verified" : STATUS_REJECTED;
-        jdbc.update("UPDATE ecos_ontology_proposals SET status=? WHERE id=?::bigint", newStatus, id);
+        proposalService.update("UPDATE ecos_ontology_proposals SET status=? WHERE id=?::bigint", newStatus, id);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valid", valid);
         result.put("issues", issues);
-        result.put("proposal", jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id));
+        result.put("proposal", proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id));
         log.info("Proposal {} verified: valid={}", id, valid);
         return ApiResponse.success(result);
     }
@@ -457,7 +458,7 @@ public class OntologyProposalController {
     public ApiResponse<Map<String, Object>> executeProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+            existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         } catch (EmptyResultDataAccessException e) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
@@ -469,10 +470,10 @@ public class OntologyProposalController {
                     "ONT-004: Proposal must be verified/approved/pending to execute, current: " + status);
         }
 
-        jdbc.update("UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
+        proposalService.update("UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
                 "executed", id);
 
-        Map<String, Object> updated = jdbc.queryForMap(
+        Map<String, Object> updated = proposalService.queryForMap(
                 "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         log.info("Proposal {} executed", id);
         return ApiResponse.success(updated);

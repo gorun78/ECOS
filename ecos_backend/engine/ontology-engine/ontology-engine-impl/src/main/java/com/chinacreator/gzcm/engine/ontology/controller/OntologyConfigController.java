@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -35,7 +34,7 @@ public class OntologyConfigController {
 
     private final SysConfigService sysConfigService;
 
-    public OntologyConfigController(SysConfigService sysConfigService, JdbcTemplate jdbc) {
+    public OntologyConfigController(SysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 

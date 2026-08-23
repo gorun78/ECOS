@@ -140,4 +140,18 @@ public class OntologyProposalService {
                 "UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
                 status, id);
     }
+
+    /**
+     * 原始查询 — 供 Controller 委托调用（PMO-E2 下沉）。
+     */
+    public Map<String, Object> queryForMap(String sql, Object... args) {
+        return jdbc.queryForMap(sql, args);
+    }
+
+    /**
+     * 原始更新 — 供 Controller 委托调用（PMO-E2 下沉）。
+     */
+    public int update(String sql, Object... args) {
+        return jdbc.update(sql, args);
+    }
 }
