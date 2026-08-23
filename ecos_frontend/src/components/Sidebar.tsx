@@ -7,7 +7,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import TaskPanel from "./TaskPanel";
-import AsyncTaskCenterView from "./AsyncTaskCenterView";
+import AsyncTaskCenterView from "../pages/AsyncTaskCenterView";
 import {
   Shield,
   LayoutDashboard,
