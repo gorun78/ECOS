@@ -3,7 +3,7 @@ package com.chinacreator.gzcm.gateway.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.service.IObjectStorageService;
 import com.chinacreator.gzcm.gateway.service.DataLakeExportService;
-import com.chinacreator.gzcm.gateway.service.DuckDBQueryService;
+import com.chinacreator.gzcm.runtime.access.olap.DuckDBQueryService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

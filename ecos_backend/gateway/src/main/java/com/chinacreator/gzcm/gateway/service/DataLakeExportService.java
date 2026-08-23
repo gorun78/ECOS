@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.gateway.service;
 
-import com.chinacreator.gzcm.gateway.service.DuckDBQueryService;
-import com.chinacreator.gzcm.gateway.service.MinioStorageService;
+import com.chinacreator.gzcm.runtime.access.olap.DuckDBQueryService;
+import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;

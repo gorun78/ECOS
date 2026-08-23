@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
-import com.chinacreator.gzcm.runtime.core.alert.service.impl.AlertServiceImpl;
+import com.chinacreator.gzcm.runtime.access.util.alert.IAlertService;
+import com.chinacreator.gzcm.runtime.access.util.alert.service.impl.AlertServiceImpl;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.persistence.ITaskPersistenceService;
 import com.chinacreator.gzcm.runtime.core.task.persistence.impl.TaskPersistenceServiceImpl;

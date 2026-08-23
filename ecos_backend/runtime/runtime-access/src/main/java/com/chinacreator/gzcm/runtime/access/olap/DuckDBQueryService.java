@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.gateway.service;
+package com.chinacreator.gzcm.runtime.access.olap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

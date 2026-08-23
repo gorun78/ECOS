@@ -13,8 +13,8 @@ import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
 import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess.DatabaseAccessException;
-import com.chinacreator.gzcm.runtime.core.logging.ILoggingService;
-import com.chinacreator.gzcm.runtime.core.logging.LogQueryCondition;
+import com.chinacreator.gzcm.runtime.access.util.logging.ILoggingService;
+import com.chinacreator.gzcm.runtime.access.util.logging.LogQueryCondition;
 import com.chinacreator.gzcm.sysman.log.IUserOperationLogService;
 
 /**
@@ -238,12 +238,12 @@ public class UserOperationLogServiceImpl implements IUserOperationLogService {
             }
             
             // 从Runtime日志框架查询
-            List<com.chinacreator.gzcm.runtime.core.logging.LogEntry> logEntries = 
+            List<com.chinacreator.gzcm.runtime.access.util.logging.LogEntry> logEntries = 
                 loggingService.query(logCondition);
             
             // 转换为UserOperationLogEntry
             List<UserOperationLogEntry> entries = new ArrayList<>();
-            for (com.chinacreator.gzcm.runtime.core.logging.LogEntry logEntry : logEntries) {
+            for (com.chinacreator.gzcm.runtime.access.util.logging.LogEntry logEntry : logEntries) {
                 UserOperationLogEntry entry = convertToUserOperationLogEntry(logEntry);
                 if (entry != null) {
                     entries.add(entry);
@@ -261,7 +261,7 @@ public class UserOperationLogServiceImpl implements IUserOperationLogService {
      * 将LogEntry转换为UserOperationLogEntry
      */
     private UserOperationLogEntry convertToUserOperationLogEntry(
-            com.chinacreator.gzcm.runtime.core.logging.LogEntry logEntry) {
+            com.chinacreator.gzcm.runtime.access.util.logging.LogEntry logEntry) {
         if (logEntry == null || logEntry.getContext() == null) {
             return null;
         }
