@@ -29,11 +29,6 @@
         </dependency>
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>aimod-impl</artifactId>
-            <version>${databridge.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>dccheng-impl</artifactId>
             <version>${databridge.version}</version>
         </dependency>

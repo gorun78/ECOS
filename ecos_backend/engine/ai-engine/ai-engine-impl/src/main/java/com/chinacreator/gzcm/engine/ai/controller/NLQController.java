@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
-import com.chinacreator.gzcm.aimod.SemanticQueryService;
-import com.chinacreator.gzcm.aimod.ObjectQLParser;
+import com.chinacreator.gzcm.engine.ai.nlq.SemanticQueryService;
+import com.chinacreator.gzcm.engine.ai.nlq.ObjectQLParser;
 
 /**
  * 自然语言查询 (NLQ) 控制器 — 将中文业务短语翻译为 ObjectQL 并执行。

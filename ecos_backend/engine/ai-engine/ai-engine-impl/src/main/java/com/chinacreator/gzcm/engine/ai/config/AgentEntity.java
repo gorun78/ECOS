@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.aimod;
+package com.chinacreator.gzcm.engine.ai.config;
 
 import java.time.LocalDateTime;
 

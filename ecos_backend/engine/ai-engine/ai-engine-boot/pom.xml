@@ -22,11 +22,6 @@
         </dependency>
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>aimod-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>dccheng-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>

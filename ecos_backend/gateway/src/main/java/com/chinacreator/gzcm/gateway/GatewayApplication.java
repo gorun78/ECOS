@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>接管原 sysman-boot 的所有职责：
  * <ul>
- *   <li>导入全部业务模块（sysman/runtime/buszhi/aimod/portal/market/worldmodel/workspace）</li>
+ *   <li>导入全部业务模块（sysman/runtime/buszhi/portal/market/worldmodel/workspace）</li>
  *   <li>暴露 /api/* REST 端点（无 /sys-man 前缀）</li>
  *   <li>健康检查 /actuator/health</li>
  *   <li>OpenAPI 3.0 文档 /v3/api-docs</li>
@@ -34,7 +34,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.sysman",
     "com.chinacreator.gzcm.runtime",
     "com.chinacreator.gzcm.buszhi",
-    "com.chinacreator.gzcm.aimod",
     "com.chinacreator.gzcm.market",
     "com.chinacreator.gzcm.worldmodel",
     "com.chinacreator.gzcm.workspace",
@@ -44,7 +43,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.services.agent.runtime",
     "com.chinacreator.gzcm.services.agent.model",
 }, excludeFilters = {
-    // A+3: 排除旧包 runtime.core.agent（已迁入 ai-engine）
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.agent\\..*"),
     // A+4: 排除迁出后的 runtime.core 旧包
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.git\\..*"),
@@ -53,7 +51,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     // A+5: 排除 runtime.access.storage（gateway有自己的MinioStorageService实现）
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.access\\.storage\\..*"),
     // A+5: runtime.core.config.dao.ConfigDao 源码已删（sysman版本保留，无冲突）
-    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.aimod\\.controller\\..*"),
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.access.util.mybatis.config.MyBatisConfig.class,
         // A+4: 排除旧实现（runtime-access 有同名类，gateway版本保留供 DataLakeExportService 使用）
@@ -64,16 +61,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 数据引擎已接管，旧 datanet 模块已删除（A+7c）
         // 本体引擎已接管（阶段3），排除buszhi侧副本
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
-        // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
         // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
         // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
-        // A+3: 排除旧包 runtime.core.agent.mesh.*（ai-engine 版本接管）
-        // agent.mesh 14 类迁入 ai-engine，gateway classpath 仍有 runtime-core JAR，需排除旧 Bean
         com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
-        // DataLakeController 留在gateway (依赖gateway内部service: DuckDB/DataLakeExport/Minio)
         com.chinacreator.gzcm.gateway.controller.EcosKnowledgeGraphController.class,
         com.chinacreator.gzcm.gateway.controller.SecurityController.class,
         // 安全引擎: security-engine-impl 的 abac.dao 与 runtime-crypto JAR 冲突，exclude 源码版本
@@ -94,7 +87,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.worldmodel.service.OntologyKgSyncService.class,
         com.chinacreator.gzcm.worldmodel.service.PgGraphService.class,
         com.chinacreator.gzcm.worldmodel.service.Neo4jGraphService.class,
-        // A+3: 排除旧包 runtime.core.agent.mesh（agent.mesh 已迁入 ai-engine）
     })
 })
 @MapperScan({

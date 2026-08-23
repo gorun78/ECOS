@@ -9,8 +9,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.chinacreator.gzcm.runtime.core.agent.AgentResult;
-import com.chinacreator.gzcm.runtime.core.agent.AgentRuntime;
+import com.chinacreator.gzcm.engine.ai.agent.AgentResult;
+import com.chinacreator.gzcm.engine.ai.agent.AgentRuntime;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.MissionEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.MissionTaskEntity;

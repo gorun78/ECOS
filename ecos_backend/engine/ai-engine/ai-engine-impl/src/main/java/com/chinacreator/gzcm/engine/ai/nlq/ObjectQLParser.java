@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.aimod;
+package com.chinacreator.gzcm.engine.ai.nlq;
 
 import java.util.*;
 import java.util.regex.Pattern;

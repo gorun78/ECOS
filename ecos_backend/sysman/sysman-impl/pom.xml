@@ -145,11 +145,6 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <!-- AIMod (智能模块) — Agent Mesh/Studio/LLM -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>aimod-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
         <!-- Portal (门户) — FrontendBridge/Menu -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>

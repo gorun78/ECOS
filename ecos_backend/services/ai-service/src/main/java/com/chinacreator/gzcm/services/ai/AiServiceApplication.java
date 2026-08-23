@@ -14,7 +14,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @ComponentScan(basePackages = {
         "com.chinacreator.gzcm.services.ai",
-        "com.chinacreator.gzcm.aimod",
         "com.chinacreator.gzcm.runtime"
 })
 public class AiServiceApplication {

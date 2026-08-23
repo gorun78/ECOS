@@ -102,11 +102,6 @@
             <artifactId>buszhi-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>aimod-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
         <!-- 阶段5吸收: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng
              源代码已复制到目标模块, 以下为旧JAR兼容依赖(构建时跳过, 运行时从.m2取) -->
         <dependency>

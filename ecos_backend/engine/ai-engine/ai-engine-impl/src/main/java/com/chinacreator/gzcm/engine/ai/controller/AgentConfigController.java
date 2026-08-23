@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.aimod.AgentConfigService;
+import com.chinacreator.gzcm.engine.ai.config.AgentConfigService;
 
 /**
  * Agent Builder REST API — Agent 配置 CRUD + 工具/知识库绑定 + 测试

@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.aimod;
+package com.chinacreator.gzcm.engine.ai.config;
 
 import java.util.List;
 import java.util.Optional;

@@ -410,7 +410,7 @@
         <module>sysman</module>
 
         <module>buszhi</module>
-        <module>aimod</module>
+        
         <module>workspace</module>
         <!-- Sprint 1: Microservice boot modules -->
         <module>services/api-gateway</module>
@@ -449,7 +449,7 @@
                 <module>runtime</module>
                 <module>sysman</module>
         
-                <module>aimod</module>
+                
                 <module>workspace</module>
                 <!-- Sprint 1: Microservice modules -->
                 <module>services/api-gateway</module>
@@ -476,7 +476,7 @@
                 <module>runtime</module>
                 <module>sysman</module>
         
-                <module>aimod</module>
+                
                 <module>workspace</module>
                 <module>services/api-gateway</module>
                 <module>services/identity-service</module>
@@ -502,7 +502,7 @@
                 <module>runtime</module>
                 <module>sysman</module>
         
-                <module>aimod</module>
+                
                 <module>workspace</module>
                 <module>services/api-gateway</module>
                 <module>services/identity-service</module>
