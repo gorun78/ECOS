@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.chinacreator.gzcm.runtime.core.monitor.interfaces.IMonitorDataService;
 import com.chinacreator.gzcm.runtime.core.monitor.monitordata.bean.DatabaseBasicMonitorBean;
 import com.chinacreator.gzcm.runtime.core.monitor.monitordata.bean.MonitorDataBean;
-import com.chinacreator.gzcm.runtime.core.common.util.PageInfo;
+import com.chinacreator.gzcm.runtime.access.util.PageInfo;
 
 /**
  * 监控数据服务实现

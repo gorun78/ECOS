@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.runtime.core.monitor.interfaces;
 
 import com.chinacreator.gzcm.runtime.core.monitor.warn.bean.WarnLogBean;
-import com.chinacreator.gzcm.runtime.core.common.util.PageInfo;
+import com.chinacreator.gzcm.runtime.access.util.PageInfo;
 
 public interface IWarnLogService {
 

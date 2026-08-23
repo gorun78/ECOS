@@ -595,8 +595,8 @@ public class TaskManagementServiceImpl implements ITaskManagementService {
     private void recordTaskExecution(String taskId, TaskStatus status, String result) {
         try {
             // 使用 SystemDatabaseAccess 记录执行记录
-            com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess databaseAccess = 
-                new com.chinacreator.gzcm.runtime.core.database.impl.SystemDatabaseAccessImpl();
+            com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess databaseAccess = 
+                new com.chinacreator.gzcm.runtime.access.database.impl.SystemDatabaseAccessImpl();
             
             String executionId = UUID.randomUUID().toString();
             String sql = "INSERT INTO TD_RUNTIME_TASK_EXECUTION (" +

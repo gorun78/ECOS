@@ -12,8 +12,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess.DatabaseAccessException;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess.DatabaseAccessException;
 import com.chinacreator.gzcm.runtime.access.util.logging.datachange.DataChangeLogEntry;
 import com.chinacreator.gzcm.runtime.access.util.logging.datachange.DataChangeQueryCondition;
 import com.chinacreator.gzcm.runtime.access.util.logging.datachange.IDataChangeLogService;

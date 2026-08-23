@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.common.util;
+package com.chinacreator.gzcm.runtime.access.util;
 
 import java.util.List;
 

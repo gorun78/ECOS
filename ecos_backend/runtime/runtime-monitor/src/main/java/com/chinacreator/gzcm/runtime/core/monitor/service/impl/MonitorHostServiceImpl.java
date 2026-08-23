@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.chinacreator.gzcm.runtime.core.monitor.interfaces.IMonitorHostService;
 import com.chinacreator.gzcm.runtime.core.monitor.monitorhost.bean.MonitorInfoBean;
-import com.chinacreator.gzcm.runtime.core.common.util.PageInfo;
+import com.chinacreator.gzcm.runtime.access.util.PageInfo;
 
 /**
  * 监控主机服务实现

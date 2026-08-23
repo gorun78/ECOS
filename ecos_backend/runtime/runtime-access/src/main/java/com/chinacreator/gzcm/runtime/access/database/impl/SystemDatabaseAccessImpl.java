@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.database.impl;
+package com.chinacreator.gzcm.runtime.access.database.impl;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -31,7 +31,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
 
 /**
  * 系统数据库访问实现

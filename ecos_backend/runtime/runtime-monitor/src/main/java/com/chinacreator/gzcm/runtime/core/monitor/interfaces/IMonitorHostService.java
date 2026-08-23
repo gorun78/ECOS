@@ -3,7 +3,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.chinacreator.gzcm.runtime.core.monitor.monitorhost.bean.MonitorInfoBean;
-import com.chinacreator.gzcm.runtime.core.common.util.PageInfo;
+import com.chinacreator.gzcm.runtime.access.util.PageInfo;
 
 public interface IMonitorHostService {
 

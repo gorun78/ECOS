@@ -11,8 +11,8 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess.DatabaseAccessException;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess.DatabaseAccessException;
 import com.chinacreator.gzcm.runtime.access.util.logging.ILoggingService;
 import com.chinacreator.gzcm.runtime.access.util.logging.LogQueryCondition;
 import com.chinacreator.gzcm.sysman.log.IUserOperationLogService;

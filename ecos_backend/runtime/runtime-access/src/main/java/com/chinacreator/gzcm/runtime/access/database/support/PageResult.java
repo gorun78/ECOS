@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.database.support;
+package com.chinacreator.gzcm.runtime.access.database.support;
 
 import java.util.List;
 

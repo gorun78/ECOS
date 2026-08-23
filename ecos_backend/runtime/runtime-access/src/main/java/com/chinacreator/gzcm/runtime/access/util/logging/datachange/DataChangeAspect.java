@@ -25,7 +25,7 @@ public class DataChangeAspect {
     
     /**
      * 拦截插入操作
-     * 切点表达式示例：@Pointcut("execution(* com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess.insert(..))")
+     * 切点表达式示例：@Pointcut("execution(* com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess.insert(..))")
      */
     public void interceptInsert(String tableName, Object entity) {
         try {
@@ -44,7 +44,7 @@ public class DataChangeAspect {
     
     /**
      * 拦截更新操作
-     * 切点表达式示例：@Pointcut("execution(* com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess.update(..))")
+     * 切点表达式示例：@Pointcut("execution(* com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess.update(..))")
      */
     public void interceptUpdate(String tableName, Object entity) {
         try {
@@ -66,7 +66,7 @@ public class DataChangeAspect {
     
     /**
      * 拦截删除操作
-     * 切点表达式示例：@Pointcut("execution(* com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess.delete(..))")
+     * 切点表达式示例：@Pointcut("execution(* com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess.delete(..))")
      */
     public void interceptDelete(String tableName, String primaryKey) {
         try {

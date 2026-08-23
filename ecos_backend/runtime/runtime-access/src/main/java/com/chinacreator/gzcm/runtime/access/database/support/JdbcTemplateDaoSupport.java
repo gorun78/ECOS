@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.database.support;
+package com.chinacreator.gzcm.runtime.access.database.support;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;

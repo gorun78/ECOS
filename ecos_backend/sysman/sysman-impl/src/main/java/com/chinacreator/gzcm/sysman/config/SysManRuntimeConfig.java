@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.sysman.config;
 
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
-import com.chinacreator.gzcm.runtime.core.database.impl.SystemDatabaseAccessImpl;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.access.database.impl.SystemDatabaseAccessImpl;
 import com.chinacreator.gzcm.runtime.access.util.logging.ILoggingService;
 import com.chinacreator.gzcm.runtime.access.util.logging.config.LoggingServiceConfig;
 

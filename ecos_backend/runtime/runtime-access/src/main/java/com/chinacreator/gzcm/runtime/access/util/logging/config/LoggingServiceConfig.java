@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.runtime.access.util.logging.config;
 
-import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
 import com.chinacreator.gzcm.runtime.access.util.logging.ILogArchiveService;
 import com.chinacreator.gzcm.runtime.access.util.logging.ILoggingService;
 import com.chinacreator.gzcm.runtime.access.util.logging.ILogStorage;

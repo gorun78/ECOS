@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.chinacreator.gzcm.runtime.core.monitor.warn.bean.MonitorWarnContact;
 import com.chinacreator.gzcm.runtime.core.monitor.warn.common.bean.WarnTypeBean;
-import com.chinacreator.gzcm.runtime.core.common.util.PageInfo;
+import com.chinacreator.gzcm.runtime.access.util.PageInfo;
 
 /**
  * com.chinacreator.warn.server.tddxmonitorwarncontact.service.

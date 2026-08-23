@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.database;
+package com.chinacreator.gzcm.runtime.access.database;
 
 import java.util.List;
 import java.util.Map;

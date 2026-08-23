@@ -1,7 +1,7 @@
-package com.chinacreator.gzcm.runtime.core.common.util;
+package com.chinacreator.gzcm.runtime.access.util;
 
 import java.util.List;
-import com.chinacreator.gzcm.runtime.core.common.util.LegacyListInfo;
+import com.chinacreator.gzcm.runtime.access.util.LegacyListInfo;
 
 /**
  * Page - 鍒嗛〉缁撴灉绫伙紙鍏煎鏃т唬鐮侊級
