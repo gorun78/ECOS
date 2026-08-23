@@ -2,7 +2,7 @@ package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.sysman.controller.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;

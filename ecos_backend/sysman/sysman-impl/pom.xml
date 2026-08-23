@@ -29,12 +29,6 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- Runtime 子模块 (crypto/monitor/task 从 runtime-core 拆出) -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>runtime-crypto</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>runtime-monitor</artifactId>

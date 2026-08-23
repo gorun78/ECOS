@@ -3,7 +3,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.security.service.SecurityConfigService;
-import com.chinacreator.gzcm.sysman.controller.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

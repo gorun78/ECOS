@@ -28,16 +28,6 @@
             <version>${databridge.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>runtime-security</artifactId>
-            <version>${databridge.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>runtime-crypto</artifactId>
-            <version>${databridge.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

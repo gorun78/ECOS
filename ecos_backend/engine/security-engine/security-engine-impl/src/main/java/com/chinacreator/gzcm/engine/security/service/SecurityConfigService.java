@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
-import com.chinacreator.gzcm.sysman.controller.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;

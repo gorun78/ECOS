@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.sysman.controller.model;
+package com.chinacreator.gzcm.sysman.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
