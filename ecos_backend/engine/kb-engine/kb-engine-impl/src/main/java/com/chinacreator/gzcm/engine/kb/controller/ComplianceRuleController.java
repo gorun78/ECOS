@@ -3,13 +3,10 @@ package com.chinacreator.gzcm.engine.kb.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.chinacreator.gzcm.engine.kb.service.ComplianceRuleVersionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -24,10 +21,7 @@ public class ComplianceRuleController {
     private ComplianceRuleMapper complianceRuleMapper;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule());
+    private ComplianceRuleVersionService complianceRuleVersionService;
 
     // ── GET / — 查询所有规则 ──────────────────────
 
@@ -79,20 +73,9 @@ public class ComplianceRuleController {
 
         // 版本快照：将当前版本写入 sys_rule_version
         int newVersion = existing.getVersion() + 1;
-        String versionId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
 
-        jdbcTemplate.update(
-            "INSERT INTO sys_rule_version (id, rule_id, version_number, snapshot, changed_by, changed_at, change_note) " +
-            "VALUES (?, ?, ?, ?::jsonb, ?, ?, ?)",
-            versionId,
-            existing.getId(),
-            existing.getVersion(),
-            toJson(existing),
-            incoming.getApprovedBy(),
-            now,
-            "Updated to version " + newVersion
-        );
+        complianceRuleVersionService.snapshotVersion(existing, incoming.getApprovedBy(), now, newVersion);
 
         // 更新规则字段
         existing.setName(incoming.getName());
@@ -138,22 +121,7 @@ public class ComplianceRuleController {
         if (rule == null) {
             return ApiResponse.notFound("Rule " + id + " not found");
         }
-        List<Map<String, Object>> versions = jdbcTemplate.queryForList(
-            "SELECT id, rule_id, version_number, snapshot, changed_by, changed_at, change_note " +
-            "FROM sys_rule_version WHERE rule_id = ? ORDER BY version_number DESC",
-            id
-        );
+        List<Map<String, Object>> versions = complianceRuleVersionService.getVersions(id);
         return ApiResponse.success(versions);
-    }
-
-    // ── 简易JSON序列化 ────────────────────────────
-
-    private String toJson(ComplianceRule rule) {
-        try {
-            return MAPPER.writeValueAsString(rule);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize ComplianceRule to JSON: id={}", rule.getId(), e);
-            return "{}";
-        }
     }
 }
