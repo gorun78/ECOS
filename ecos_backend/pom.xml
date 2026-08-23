@@ -415,14 +415,8 @@
         <!-- Sprint 1: Microservice boot modules -->
         <module>services/api-gateway</module>
         <module>services/identity-service</module>
-        <module>services/catalog-service</module>
         <module>services/ontology-service</module>
-        <module>services/object-service</module>
-        <module>services/workflow-service</module>
         <module>services/agent-service</module>
-        <module>services/knowledge-service</module>
-        <module>services/ai-service</module>
-        <module>services/cognitive-service</module>
         <!-- Legacy gateway (kept for backward compatibility during migration) -->
         <module>gateway</module>
         <!-- 阶段5模块吸收: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng -->
@@ -454,14 +448,8 @@
                 <!-- Sprint 1: Microservice modules -->
                 <module>services/api-gateway</module>
                 <module>services/identity-service</module>
-                <module>services/catalog-service</module>
                 <module>services/ontology-service</module>
-                <module>services/object-service</module>
-                <module>services/workflow-service</module>
                 <module>services/agent-service</module>
-                <module>services/knowledge-service</module>
-                <module>services/ai-service</module>
-                <module>services/cognitive-service</module>
                 <module>gateway</module>
             </modules>
             <properties>
@@ -480,14 +468,8 @@
                 <module>workspace</module>
                 <module>services/api-gateway</module>
                 <module>services/identity-service</module>
-                <module>services/catalog-service</module>
                 <module>services/ontology-service</module>
-                <module>services/object-service</module>
-                <module>services/workflow-service</module>
                 <module>services/agent-service</module>
-                <module>services/knowledge-service</module>
-                <module>services/ai-service</module>
-                <module>services/cognitive-service</module>
                 <module>gateway</module>
             </modules>
             <properties>
@@ -507,14 +489,8 @@
                 <module>workspace</module>
                 <module>services/api-gateway</module>
                 <module>services/identity-service</module>
-                <module>services/catalog-service</module>
                 <module>services/ontology-service</module>
-                <module>services/object-service</module>
-                <module>services/workflow-service</module>
                 <module>services/agent-service</module>
-                <module>services/knowledge-service</module>
-                <module>services/ai-service</module>
-                <module>services/cognitive-service</module>
                 <module>gateway</module>
             </modules>
             <properties>
