@@ -33,4 +33,11 @@ public class NLQService {
         }
         return jdbc.queryForList(sql, params.toArray());
     }
+
+    public List<Map<String, Object>> queryForList(String sql) {
+        return jdbc.queryForList(sql);
+    }
+    public List<Map<String, Object>> queryForList(String sql, Object[] params) {
+        return jdbc.queryForList(sql, params);
+    }
 }

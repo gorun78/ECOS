@@ -103,4 +103,12 @@ public class SysConfigQueryService {
         String sql = "SELECT config_key, config_group, config_label, description FROM sys_config ORDER BY config_group, sort_order";
         return jdbcTemplate.queryForList(sql);
     }
+
+    // ── PMO-E2 通用委托方法（供 Controller 调用）──
+    public List<Map<String, Object>> queryForList(String sql, Object... args) {
+        return jdbcTemplate.queryForList(sql, args);
+    }
+    public int update(String sql, Object... args) {
+        return jdbcTemplate.update(sql, args);
+    }
 }

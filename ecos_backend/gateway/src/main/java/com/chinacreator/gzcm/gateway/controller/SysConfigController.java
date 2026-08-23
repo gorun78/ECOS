@@ -6,30 +6,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
 import java.util.*;
+import com.chinacreator.gzcm.gateway.service.GatewaySysConfigService;
 
 /**
  * 系统配置 API — 全字段操作 sys_config 表。
- * 网关层 Controller，通过 JdbcTemplate 直连数据库。
+ * 网关层 Controller，通过 GatewaySysConfigService 访问数据库。
  */
 @RestController
 @RequestMapping("/api/v1/system/config")
 public class SysConfigController {
 
     private static final Logger log = LoggerFactory.getLogger(SysConfigController.class);
-
-    private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ecos.edition:all}")
     private String currentEdition;
+    private final GatewaySysConfigService gatewaySysConfigService;
 
-    public SysConfigController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SysConfigController(GatewaySysConfigService gatewaySysConfigService) {
+        this.gatewaySysConfigService = gatewaySysConfigService;
     }
 
     // ── 已知被代码消费的配置参数映射 (config_key → consumed_by) ──
@@ -76,7 +75,7 @@ public class SysConfigController {
 
             sqlBuilder.append(" ORDER BY config_group, sort_order");
 
-            List<Map<String, Object>> rows = jdbc.queryForList(
+            List<Map<String, Object>> rows = gatewaySysConfigService.queryForList(
                     sqlBuilder.toString(), params.toArray());
 
             // Post-process: parse config_options JSON → List
@@ -117,7 +116,7 @@ public class SysConfigController {
             String sql = "SELECT config_key, config_label, config_value, " +
                          "is_consumed, consumed_by, consumed_at " +
                          "FROM sys_config ORDER BY config_group, sort_order";
-            List<Map<String, Object>> rows = jdbc.queryForList(sql);
+            List<Map<String, Object>> rows = gatewaySysConfigService.queryForList(sql);
 
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> row : rows) {
@@ -184,7 +183,7 @@ public class SysConfigController {
                 return ApiResponse.badRequest("缺少 value/configValue 字段");
             }
 
-            int rows = jdbc.update(
+            int rows = gatewaySysConfigService.update(
                     "UPDATE sys_config SET config_value=?, updated_at=NOW() WHERE config_key=?",
                     val, configKey);
             if (rows == 0) {

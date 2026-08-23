@@ -185,4 +185,18 @@ public class TenantService {
                 "SELECT quota_type, daily_limit, monthly_limit " +
                 "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
     }
+
+    // ── PMO-E2 通用委托方法（供 Controller 调用）──
+    public List<Map<String, Object>> queryForList(String sql, Object... args) {
+        return jdbc.queryForList(sql, args);
+    }
+    public Map<String, Object> queryForMap(String sql, Object... args) {
+        return jdbc.queryForMap(sql, args);
+    }
+    public <T> T queryForObject(String sql, Class<T> type, Object... args) {
+        return jdbc.queryForObject(sql, type, args);
+    }
+    public int update(String sql, Object... args) {
+        return jdbc.update(sql, args);
+    }
 }

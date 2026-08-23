@@ -8,10 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import com.chinacreator.gzcm.sysman.service.SysConfigQueryService;
 
 /**
  * 系统配置 API — 读写 sys_config 表。
@@ -24,7 +24,7 @@ public class SysConfigController {
     private static final Logger log = LoggerFactory.getLogger(SysConfigController.class);
 
     @Autowired(required = false)
-    private JdbcTemplate jdbcTemplate;
+    private SysConfigQueryService sysConfigQueryService;
 
     /** 当前版本标识，来自 Maven profile (standard / enterprise / ultimate) */
     @Value("${ecos.edition:all}")
@@ -50,7 +50,7 @@ public class SysConfigController {
             @RequestParam(defaultValue = "") String group,
             @RequestParam(defaultValue = "") String edition) {
         try {
-            if (jdbcTemplate == null) {
+            if (sysConfigQueryService == null) {
                 return ApiResponse.success(Map.of("data", List.of(), "total", 0));
             }
 
@@ -80,7 +80,7 @@ public class SysConfigController {
                 sqlBuilder.append(" ORDER BY config_group, sort_order");
             }
 
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            List<Map<String, Object>> rows = sysConfigQueryService.queryForList(
                     sqlBuilder.toString(), params.toArray());
 
             // Post-process: parse config_options JSONB → List
@@ -113,7 +113,7 @@ public class SysConfigController {
     @PutMapping("/{configKey}")
     public ApiResponse<?> update(@PathVariable String configKey, @RequestBody Map<String, String> body) {
         try {
-            if (jdbcTemplate == null) return ApiResponse.internalError("数据源不可用");
+            if (sysConfigQueryService == null) return ApiResponse.internalError("数据源不可用");
 
             // 兼容多种 body 字段名: value > configValue > config_value
             String val = body.get("value");
@@ -121,7 +121,7 @@ public class SysConfigController {
             if (val == null) val = body.get("config_value");
             if (val == null) return ApiResponse.badRequest("缺少 value/configValue");
 
-            int rows = jdbcTemplate.update(
+            int rows = sysConfigQueryService.update(
                     "UPDATE sys_config SET config_value=?, updated_at=NOW() WHERE config_key=?",
                     val, configKey);
             if (rows == 0) return ApiResponse.notFound("配置项不存在: " + configKey);
@@ -145,7 +145,7 @@ public class SysConfigController {
     @GetMapping("/metadata")
     public ApiResponse<List<Map<String, Object>>> metadata() {
         try {
-            if (jdbcTemplate == null) {
+            if (sysConfigQueryService == null) {
                 return ApiResponse.success(List.of());
             }
 
@@ -153,7 +153,7 @@ public class SysConfigController {
                          "config_label, config_label_en, description, impact_scope, edition " +
                          "FROM sys_config ORDER BY config_group, sort_order";
 
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            List<Map<String, Object>> rows = sysConfigQueryService.queryForList(sql);
             List<Map<String, Object>> result = new ArrayList<>();
 
             for (Map<String, Object> row : rows) {
@@ -190,12 +190,12 @@ public class SysConfigController {
     @GetMapping("/audit")
     public ApiResponse<Map<String, Object>> audit() {
         try {
-            if (jdbcTemplate == null) {
+            if (sysConfigQueryService == null) {
                 return ApiResponse.success(Map.of("total", 0, "consumed", 0, "unconsumed", 0, "items", List.of()));
             }
 
             String sql = "SELECT config_key, config_group, config_label, description FROM sys_config ORDER BY config_group, sort_order";
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            List<Map<String, Object>> rows = sysConfigQueryService.queryForList(sql);
             List<Map<String, Object>> result = new ArrayList<>();
 
             for (Map<String, Object> row : rows) {

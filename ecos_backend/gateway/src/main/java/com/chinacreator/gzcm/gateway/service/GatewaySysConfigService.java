@@ -38,4 +38,15 @@ public class GatewaySysConfigService {
                 "UPDATE sys_config SET config_value=?, updated_at=NOW() WHERE config_key=?",
                 val, configKey);
     }
+
+    // ── PMO-E2 通用委托方法 ──
+    public List<Map<String, Object>> queryForList(String sql) {
+        return jdbc.queryForList(sql);
+    }
+    public List<Map<String, Object>> queryForList(String sql, Object[] params) {
+        return jdbc.queryForList(sql, params);
+    }
+    public int update(String sql, Object... args) {
+        return jdbc.update(sql, args);
+    }
 }

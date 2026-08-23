@@ -5,11 +5,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import com.chinacreator.gzcm.sysman.service.EntityTableMappingQueryService;
 
 /**
  * Entity-Table Mapping Controller — 管理本体实体与物理数据表的映射关系。
@@ -26,13 +26,12 @@ import java.util.*;
 @RequestMapping("/api/v1/ecos/entity-table-mappings")
 public class EntityTableMappingController {
 
+    private final EntityTableMappingQueryService entityTableMappingQueryService;
     private static final Logger log = LoggerFactory.getLogger(EntityTableMappingController.class);
-
-    private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public EntityTableMappingController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public EntityTableMappingController(EntityTableMappingQueryService entityTableMappingQueryService) {
+        this.entityTableMappingQueryService = entityTableMappingQueryService;
     }
 
     // ────────────────────────────────────────────────
@@ -55,7 +54,7 @@ public class EntityTableMappingController {
                 sql = "SELECT * FROM ecos_entity_table_mapping ORDER BY created_at DESC";
                 params = new Object[]{};
             }
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, params);
+            List<Map<String, Object>> rows = entityTableMappingQueryService.queryForList(sql, params);
             return ApiResponse.success(rows);
         } catch (Exception e) {
             log.error("查询实体表映射失败: entityCode={}", entityCode, e);
@@ -92,7 +91,7 @@ public class EntityTableMappingController {
             }
 
             // Check if mapping already exists
-            Integer existing = jdbc.queryForObject(
+            Integer existing = entityTableMappingQueryService.queryForObject(
                 "SELECT COUNT(*) FROM ecos_entity_table_mapping WHERE entity_code=? AND datasource_id=? AND resource_name=?",
                 Integer.class, entityCode, datasourceId, resourceName);
             if (existing != null && existing > 0) {
@@ -114,12 +113,12 @@ public class EntityTableMappingController {
             // Generate ID
             String id = UUID.randomUUID().toString().replace("-", "");
 
-            jdbc.update(
+            entityTableMappingQueryService.update(
                 "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, created_at, updated_at) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())",
                 id, entityCode, entityName, domainCode, datasourceId, resourceName, tableSchema, fieldMappingsJson);
 
-            Map<String, Object> created = jdbc.queryForMap(
+            Map<String, Object> created = entityTableMappingQueryService.queryForMap(
                 "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
 
             log.info("创建实体表映射成功: entityCode={}, datasourceId={}, resourceName={}",
@@ -143,14 +142,14 @@ public class EntityTableMappingController {
     public ApiResponse<Map<String, Object>> deleteMapping(@PathVariable String id) {
         try {
             // Check existence
-            Integer count = jdbc.queryForObject(
+            Integer count = entityTableMappingQueryService.queryForObject(
                 "SELECT COUNT(*) FROM ecos_entity_table_mapping WHERE id=?",
                 Integer.class, id);
             if (count == null || count == 0) {
                 return ApiResponse.notFound("Mapping not found: " + id);
             }
 
-            jdbc.update("DELETE FROM ecos_entity_table_mapping WHERE id=?", id);
+            entityTableMappingQueryService.update("DELETE FROM ecos_entity_table_mapping WHERE id=?", id);
 
             log.info("删除实体表映射成功: id={}", id);
 
@@ -185,7 +184,7 @@ public class EntityTableMappingController {
                 WHERE r.status = 'ACTIVE'
                 ORDER BY d.datasource_name, r.resource_name
                 """;
-            List<Map<String, Object>> allResources = jdbc.queryForList(resourcesSql);
+            List<Map<String, Object>> allResources = entityTableMappingQueryService.queryForList(resourcesSql);
 
             // Get already-mapped resource names for this entity
             String mappedSql = """
@@ -193,7 +192,7 @@ public class EntityTableMappingController {
                 FROM ecos_entity_table_mapping
                 WHERE entity_code = ?
                 """;
-            List<Map<String, Object>> mappedRows = jdbc.queryForList(mappedSql, entityCode);
+            List<Map<String, Object>> mappedRows = entityTableMappingQueryService.queryForList(mappedSql, entityCode);
 
             // Build set of mapped keys: "datasource_id|resource_name"
             Set<String> mappedKeys = new HashSet<>();

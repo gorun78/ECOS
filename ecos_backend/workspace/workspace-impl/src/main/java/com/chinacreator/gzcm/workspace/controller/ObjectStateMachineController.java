@@ -4,11 +4,11 @@ import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.engine.StateMachineEngine;
+import com.chinacreator.gzcm.workspace.service.ObjectStateMachineService;
 
 /**
  * 对象状态机 Controller — 状态转换查询与执行。
@@ -32,12 +32,11 @@ public class ObjectStateMachineController {
         "Supplier", "demo_supplier",
         "Invoice",  "demo_invoice"
     );
-
-    private final JdbcTemplate jdbc;
     private final StateMachineEngine engine;
+    private final ObjectStateMachineService objectStateMachineService;
 
-    public ObjectStateMachineController(JdbcTemplate jdbc, StateMachineEngine engine) {
-        this.jdbc = jdbc;
+    public ObjectStateMachineController(ObjectStateMachineService objectStateMachineService, StateMachineEngine engine) {
+        this.objectStateMachineService = objectStateMachineService;
         this.engine = engine;
     }
 
@@ -177,7 +176,7 @@ public class ObjectStateMachineController {
         if (table == null) return null;
 
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
+            List<Map<String, Object>> rows = objectStateMachineService.queryForList(
                 "SELECT status FROM " + table + " WHERE id = ?", objectId);
             if (rows.isEmpty()) return null;
 

@@ -10,7 +10,6 @@ import javax.script.ScriptEngineManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
 import com.chinacreator.gzcm.engine.ontology.engine.ActionHookExecutor;
+import com.chinacreator.gzcm.workspace.service.ObjectActionService;
 
 /**
  * 对象 Action 执行 Controller — 对对象实例触发 Ontology Action。
@@ -39,14 +39,13 @@ import com.chinacreator.gzcm.engine.ontology.engine.ActionHookExecutor;
 public class ObjectActionController {
 
     private static final Logger log = LoggerFactory.getLogger(ObjectActionController.class);
-
-    private final JdbcTemplate jdbc;
     private final ObjectRuntimeService runtimeService;
     private final ActionHookExecutor hookExecutor;
+    private final ObjectActionService objectActionService;
 
-    public ObjectActionController(JdbcTemplate jdbc, ObjectRuntimeService runtimeService,
+    public ObjectActionController(ObjectActionService objectActionService, ObjectRuntimeService runtimeService,
                                    ActionHookExecutor hookExecutor) {
-        this.jdbc = jdbc;
+        this.objectActionService = objectActionService;
         this.runtimeService = runtimeService;
         this.hookExecutor = hookExecutor;
     }
@@ -103,7 +102,7 @@ public class ObjectActionController {
         String table = ObjectRuntimeService.ENTITY_TABLE.get(entityCode);
         if (table != null) {
             try {
-                List<Map<String, Object>> obj = jdbc.queryForList(
+                List<Map<String, Object>> obj = objectActionService.queryForList(
                     "SELECT id FROM " + table + " WHERE id = ?", id);
                 if (obj.isEmpty()) {
                     return ApiResponse.notFound("OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
@@ -281,7 +280,7 @@ public class ObjectActionController {
             @PathVariable String id) {
         try {
             // Query actions by entity matching entityCode
-            List<Map<String, Object>> actions = jdbc.queryForList(
+            List<Map<String, Object>> actions = objectActionService.queryForList(
                 """
                 SELECT a.id, a.entity_id, a.name, a.action_type, a.strategy, a.status, a.created_at
                 FROM ecos_ontology_action a
@@ -318,7 +317,7 @@ public class ObjectActionController {
      */
     private List<Map<String, Object>> findActionByCode(String actionCode) {
         try {
-            return jdbc.queryForList(
+            return objectActionService.queryForList(
                 "SELECT * FROM ecos_ontology_action WHERE name = ? OR id = ? LIMIT 1",
                 actionCode, actionCode);
         } catch (Exception e) {

@@ -4,7 +4,6 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -12,6 +11,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import com.chinacreator.gzcm.sysman.service.TenantService;
 
 /**
  * P0-1 统一租户控制器。
@@ -23,13 +23,12 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/system/tenants")
 public class TenantController {
 
+    private final TenantService tenantService;
     private static final Logger log = LoggerFactory.getLogger(TenantController.class);
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    private final JdbcTemplate jdbc;
-
-    public TenantController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public TenantController(TenantService tenantService) {
+        this.tenantService = tenantService;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -54,7 +53,7 @@ public class TenantController {
 
             // Count
             String countSql = "SELECT COUNT(*) FROM ecos_tenant" + where;
-            int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
+            int total = tenantService.queryForObject(countSql, Integer.class, params.toArray());
 
             // Paginate
             String sql = "SELECT id, tenant_name, tenant_code, status, max_users, " +
@@ -66,7 +65,7 @@ public class TenantController {
             pagedParams.add(size);
             pagedParams.add((page - 1) * size);
 
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, pagedParams.toArray());
+            List<Map<String, Object>> rows = tenantService.queryForList(sql, pagedParams.toArray());
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("page", page);
@@ -89,7 +88,7 @@ public class TenantController {
                     "max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
                     "created_at, updated_at " +
                     "FROM ecos_tenant WHERE id = ?";
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, id);
+            List<Map<String, Object>> rows = tenantService.queryForList(sql, id);
             if (rows.isEmpty()) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
@@ -124,7 +123,7 @@ public class TenantController {
                     "max_users, max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
                     "created_at, updated_at) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-            jdbc.update(sql, id, tenantName, tenantCode, status,
+            tenantService.update(sql, id, tenantName, tenantCode, status,
                     maxUsers, maxStorageMb, maxApiPerDay, isolationMode, schemaName, databaseUrl);
 
             Map<String, Object> result = new LinkedHashMap<>();
@@ -146,7 +145,7 @@ public class TenantController {
                                                     @RequestBody Map<String, Object> body) {
         try {
             String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = jdbc.queryForObject(checkSql, Integer.class, id);
+            int count = tenantService.queryForObject(checkSql, Integer.class, id);
             if (count == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
@@ -199,7 +198,7 @@ public class TenantController {
             params.add(id);
 
             String sql = "UPDATE ecos_tenant SET " + set + " WHERE id = ?";
-            jdbc.update(sql, params.toArray());
+            tenantService.update(sql, params.toArray());
 
             return get(id);
         } catch (Exception e) {
@@ -214,7 +213,7 @@ public class TenantController {
     public ApiResponse<Map<String, Object>> delete(@PathVariable String id) {
         try {
             String sql = "UPDATE ecos_tenant SET status = 'DELETED', updated_at = NOW() WHERE id = ?";
-            int rows = jdbc.update(sql, id);
+            int rows = tenantService.update(sql, id);
             if (rows == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
@@ -236,12 +235,12 @@ public class TenantController {
         try {
             // Verify tenant exists
             String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = jdbc.queryForObject(checkSql, Integer.class, id);
+            int count = tenantService.queryForObject(checkSql, Integer.class, id);
             if (count == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
 
-            List<Map<String, Object>> quotas = jdbc.queryForList(
+            List<Map<String, Object>> quotas = tenantService.queryForList(
                     "SELECT id, tenant_id, quota_type, daily_limit, monthly_limit, created_at, updated_at " +
                     "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
 
@@ -253,7 +252,7 @@ public class TenantController {
             try {
                 String usageSql = "SELECT quota_type, MAX(used_count) AS used_count " +
                         "FROM ecos_tenant_usage WHERE tenant_id = ? GROUP BY quota_type";
-                List<Map<String, Object>> usageRows = jdbc.queryForList(usageSql, id);
+                List<Map<String, Object>> usageRows = tenantService.queryForList(usageSql, id);
                 result.put("usage", usageRows);
             } catch (Exception ex) {
                 result.put("usage", Collections.emptyList());
@@ -275,7 +274,7 @@ public class TenantController {
         try {
             // Verify tenant exists
             String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = jdbc.queryForObject(checkSql, Integer.class, id);
+            int count = tenantService.queryForObject(checkSql, Integer.class, id);
             if (count == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
@@ -288,14 +287,14 @@ public class TenantController {
                 return ApiResponse.badRequest("quota_type 为必填项");
             }
 
-            List<Map<String, Object>> existing = jdbc.queryForList(
+            List<Map<String, Object>> existing = tenantService.queryForList(
                     "SELECT id FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?",
                     id, quotaType);
 
             if (existing.isEmpty()) {
                 long dailyLimit = dailyLimitObj != null ? ((Number) dailyLimitObj).longValue() : 0L;
                 long monthlyLimit = monthlyLimitObj != null ? ((Number) monthlyLimitObj).longValue() : 0L;
-                jdbc.update(
+                tenantService.update(
                         "INSERT INTO ecos_tenant_quota (tenant_id, quota_type, daily_limit, monthly_limit) " +
                         "VALUES (?, ?, ?, ?)", id, quotaType, dailyLimit, monthlyLimit);
             } else {
@@ -315,10 +314,10 @@ public class TenantController {
                 params.add(id);
                 params.add(quotaType);
 
-                jdbc.update(sql.toString(), params.toArray());
+                tenantService.update(sql.toString(), params.toArray());
             }
 
-            Map<String, Object> updated = jdbc.queryForMap(
+            Map<String, Object> updated = tenantService.queryForMap(
                     "SELECT id, tenant_id, quota_type, daily_limit, monthly_limit, created_at, updated_at " +
                     "FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?", id, quotaType);
 
@@ -339,7 +338,7 @@ public class TenantController {
         try {
             // Verify tenant exists
             String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = jdbc.queryForObject(checkSql, Integer.class, id);
+            int count = tenantService.queryForObject(checkSql, Integer.class, id);
             if (count == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
@@ -351,7 +350,7 @@ public class TenantController {
 
             LocalDate startDate = LocalDate.now().minusDays(days - 1);
 
-            List<Map<String, Object>> dailyUsage = jdbc.queryForList(
+            List<Map<String, Object>> dailyUsage = tenantService.queryForList(
                     "SELECT usage_date, quota_type, used_count " +
                     "FROM ecos_tenant_usage " +
                     "WHERE tenant_id = ? AND usage_date >= ? " +
@@ -387,7 +386,7 @@ public class TenantController {
         try {
             // Verify tenant exists
             String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = jdbc.queryForObject(checkSql, Integer.class, id);
+            int count = tenantService.queryForObject(checkSql, Integer.class, id);
             if (count == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
@@ -402,14 +401,14 @@ public class TenantController {
             LocalDate start = ym.atDay(1);
             LocalDate end = ym.atEndOfMonth();
 
-            List<Map<String, Object>> monthlyUsage = jdbc.queryForList(
+            List<Map<String, Object>> monthlyUsage = tenantService.queryForList(
                     "SELECT quota_type, SUM(used_count) AS total_used " +
                     "FROM ecos_tenant_usage " +
                     "WHERE tenant_id = ? AND usage_date BETWEEN ? AND ? " +
                     "GROUP BY quota_type",
                     id, start, end);
 
-            List<Map<String, Object>> quotas = jdbc.queryForList(
+            List<Map<String, Object>> quotas = tenantService.queryForList(
                     "SELECT quota_type, daily_limit, monthly_limit " +
                     "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
 

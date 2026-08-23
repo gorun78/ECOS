@@ -44,7 +44,18 @@ public class ObjectQLService {
     /**
      * 带参查询（params 非空时使用）。
      */
-    public List<Map<String, Object>> queryForList(String sql, Object[] params) {
-        return jdbc.queryForList(sql, params);
+    public List<Map<String, Object>> queryForList(String sql, Object... args) {
+        return jdbc.queryForList(sql, args);
+    }
+
+    // ── PMO-E2 通用委托方法 ──
+    public <T> T queryForObject(String sql, Class<T> type, Object... args) {
+        return jdbc.queryForObject(sql, type, args);
+    }
+    public Map<String, Object> queryForMap(String sql, Object... args) {
+        return jdbc.queryForMap(sql, args);
+    }
+    public int update(String sql, Object... args) {
+        return jdbc.update(sql, args);
     }
 }

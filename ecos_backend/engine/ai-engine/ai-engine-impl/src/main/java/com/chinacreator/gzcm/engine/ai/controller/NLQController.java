@@ -4,7 +4,6 @@ import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
@@ -12,6 +11,7 @@ import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 import com.chinacreator.gzcm.engine.ai.nlq.SemanticQueryService;
 import com.chinacreator.gzcm.engine.ai.nlq.ObjectQLParser;
+import com.chinacreator.gzcm.engine.ai.service.NLQService;
 
 /**
  * 自然语言查询 (NLQ) 控制器 — 将中文业务短语翻译为 ObjectQL 并执行。
@@ -42,14 +42,13 @@ import com.chinacreator.gzcm.engine.ai.nlq.ObjectQLParser;
 @RequestMapping("/api/v1/query")
 public class NLQController {
 
+    private final NLQService nlqService;
     private static final Logger log = LoggerFactory.getLogger(NLQController.class);
-
-    private final JdbcTemplate jdbc;
     private final SemanticQueryService semanticQueryService;
     private final LLMGatewayService llmGatewayService;
 
-    public NLQController(JdbcTemplate jdbc, LLMGatewayService llmGatewayService) {
-        this.jdbc = jdbc;
+    public NLQController(NLQService nlqService, LLMGatewayService llmGatewayService) {
+        this.nlqService = nlqService;
         this.llmGatewayService = llmGatewayService;
         this.semanticQueryService = new SemanticQueryService();
     }
@@ -116,9 +115,9 @@ public class NLQController {
             List<Map<String, Object>> rows;
             try {
                 if (pq.getParams().isEmpty()) {
-                    rows = jdbc.queryForList(pq.getSql());
+                    rows = nlqService.queryForList(pq.getSql());
                 } else {
-                    rows = jdbc.queryForList(pq.getSql(), pq.getParamsArray());
+                    rows = nlqService.queryForList(pq.getSql(), pq.getParamsArray());
                 }
             } catch (Exception ex) {
                 // 表不存在等场景优雅降级

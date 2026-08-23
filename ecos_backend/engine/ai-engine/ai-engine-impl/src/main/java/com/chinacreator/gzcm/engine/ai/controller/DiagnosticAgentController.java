@@ -3,11 +3,11 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+import com.chinacreator.gzcm.engine.ai.service.DiagnosticAgentService;
 
 /**
  * CEO场景 — Agent诊断工具 + 经营诊断Agent 控制器
@@ -24,11 +24,12 @@ import java.util.*;
 public class DiagnosticAgentController {
 
     private static final Logger log = LoggerFactory.getLogger(DiagnosticAgentController.class);
-    private final JdbcTemplate jdbc;
     private final RestTemplate restTemplate = new RestTemplate();
+    private final DiagnosticAgentService diagnosticAgentService;
 
-    public DiagnosticAgentController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+
+    public DiagnosticAgentController(DiagnosticAgentService diagnosticAgentService) {
+        this.diagnosticAgentService = diagnosticAgentService;
     }
 
     // ═══════════════ 工具列表 ═══════════════════
@@ -48,7 +49,7 @@ public class DiagnosticAgentController {
             }
             sql += " ORDER BY code";
 
-            List<Map<String, Object>> tools = jdbc.query(sql.toString(), (rs, _i) -> {
+            List<Map<String, Object>> tools = diagnosticAgentService.query(sql.toString(), (rs, _i) -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", rs.getString("id"));
                 m.put("code", rs.getString("code"));
@@ -145,7 +146,7 @@ public class DiagnosticAgentController {
     public ApiResponse<Map<String, Object>> getAgentConfig(@PathVariable String agentId) {
         try {
             // 先从ecos_agent查
-            List<Map<String, Object>> agents = jdbc.query(
+            List<Map<String, Object>> agents = diagnosticAgentService.query(
                 "SELECT id, name, model_provider, model_name, system_prompt, tools " +
                 "FROM ecos_agent WHERE id = ?",
                 (rs, _i) -> {
@@ -343,7 +344,7 @@ public class DiagnosticAgentController {
 
     private List<Map<String, Object>> queryGoalDeviations() {
         try {
-            return jdbc.query(
+            return diagnosticAgentService.query(
                 "SELECT name, target_value, current_value, status, " +
                 "CASE WHEN target_value > 0 " +
                 "  THEN ROUND(((target_value - current_value) / target_value * 100)::numeric, 1) " +
@@ -373,7 +374,7 @@ public class DiagnosticAgentController {
 
     private List<Map<String, Object>> queryCausalChains() {
         try {
-            return jdbc.query(
+            return diagnosticAgentService.query(
                 "SELECT sg.name AS source_name, tg.name AS target_name, cl.relationship_type, cl.description " +
                 "FROM ecos_wm_causal_link cl " +
                 "JOIN ecos_wm_goal sg ON cl.source_goal_id = sg.id " +
@@ -399,7 +400,7 @@ public class DiagnosticAgentController {
 
     private List<Map<String, Object>> queryScenarios() {
         try {
-            return jdbc.query(
+            return diagnosticAgentService.query(
                 "SELECT id, name, description, config_json, status FROM ecos_wm_scenario ORDER BY id",
                 (rs, _i) -> {
                     Map<String, Object> m = new LinkedHashMap<>();

@@ -5,10 +5,10 @@ import com.chinacreator.gzcm.workspace.QueryHistoryService;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import com.chinacreator.gzcm.workspace.service.ObjectQLService;
 
 /**
  * ObjectQL 查询控制器 — 接受 JSON DSL 查询，解析后执行 SQL 并返回结果。
@@ -25,13 +25,13 @@ import java.util.*;
 public class ObjectQLController {
 
     private static final Logger log = LoggerFactory.getLogger(ObjectQLController.class);
-    private final JdbcTemplate jdbc;
     private final QueryHistoryService historyService;
     private final AbacQueryFilter abacFilter;
+    private final ObjectQLService objectQLService;
 
-    public ObjectQLController(JdbcTemplate jdbc, QueryHistoryService historyService,
+    public ObjectQLController(ObjectQLService objectQLService, QueryHistoryService historyService,
                                AbacQueryFilter abacFilter) {
-        this.jdbc = jdbc;
+        this.objectQLService = objectQLService;
         this.historyService = historyService;
         this.abacFilter = abacFilter;
     }
@@ -55,7 +55,7 @@ public class ObjectQLController {
             // 1b. 安全校验：links 中的 target entity 必须在 ecos_ontology_entity 表中存在
             List<String> linkEntities = ObjectQLParser.extractLinkEntities(queryJson);
             for (String linkEntity : linkEntities) {
-                Integer count = jdbc.queryForObject(
+                Integer count = objectQLService.queryForObject(
                     "SELECT COUNT(*) FROM ecos_ontology_entity WHERE code = ?",
                     Integer.class, linkEntity);
                 if (count == null || count == 0) {
@@ -80,9 +80,9 @@ public class ObjectQLController {
             // 3. 执行
             List<Map<String, Object>> rows;
             if (pq.getParams().isEmpty()) {
-                rows = jdbc.queryForList(pq.getSql());
+                rows = objectQLService.queryForList(pq.getSql());
             } else {
-                rows = jdbc.queryForList(pq.getSql(), pq.getParamsArray());
+                rows = objectQLService.queryForList(pq.getSql(), pq.getParamsArray());
             }
 
             // ★ ABAC 列裁剪

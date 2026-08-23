@@ -130,4 +130,12 @@ public class DiagnosticAgentService {
                 return m;
             });
     }
+
+    public <T> List<T> query(String sql, org.springframework.jdbc.core.RowMapper<T> rowMapper, Object... args) {
+        return jdbc.query(sql, rowMapper, args);
+    }
+    public <T> List<T> queryList(String sql, org.springframework.jdbc.core.RowMapper<T> rowMapper, Object... args) {
+        return jdbc.query(sql, rowMapper, args);
+    }
+
 }
