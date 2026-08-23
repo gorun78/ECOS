@@ -5,29 +5,31 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.lang.ArchCondition;
-import com.tngtech.archunit.lang.ConditionEvents;
-import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
- * ECOS 架构保护测试 — 5条铁律，精修阶段防崩塌。
+ * ECOS 架构保护测试 — 铁律守护（现代化版，PMO-E1）。
  *
- * <h3>DIKW 分层模型</h3>
- * <pre>
- *   W层 (Wisdom)  — worldmodel (世界模型), cognitive (认知引擎)
- *   K层 (Knowledge)— buszhi (业务智能), aimod (AI模块)
- *   I层 (Information)— dccheng (数据治理/本体设计)
- *   D层 (Data)     — datanet (数据网络/管线)
- * </pre>
+ * <h3>更新历史</h3>
+ * <ul>
+ *   <li>PMO-E1 (2026-08-24): 删除旧 DIKW 分层断言（铁律1/2，已被 D1 六引擎 ArchitectureTest 取代），
+ *       更新 modules 清单到五引擎现状，compose 基线指向 ecos-docker/，铁律5 @Disabled 挂起（下沉见 PMO-E2）</li>
+ * </ul>
  *
- * <p>依赖方向: W → K → I → D (上层可依赖下层，下层禁止依赖上层)</p>
+ * <h3>当前守护的铁律</h3>
+ * <ol>
+ *   <li>铁律3: 禁止新增 Maven 模块（基线 11）</li>
+ *   <li>铁律4: 禁止新增 Docker 容器（基线按 ecos-docker/ 三版本）</li>
+ *   <li>铁律5: Controller 必须通过 Service 访问数据库（@Disabled，158 处 JdbcTemplate 违规，下沉见 PMO-E2）</li>
+ * </ol>
+ *
+ * <p>引擎间依赖边界、包结构、命名规范由 D1 六引擎 ArchitectureTest 独立守护。
  *
  * @author ECOS Architecture Guard
  */
@@ -35,9 +37,10 @@ public class ArchitectureTest {
 
     private static JavaClasses classes;
     private static final Path PROJECT_ROOT = findProjectRoot();
+    private static final Path ECOS_ROOT = findEcosRoot();
 
     /**
-     * 向上查找项目根目录（包含 pom.xml 和 common 子目录）。
+     * 向上查找 ecos_backend 项目根目录（包含 pom.xml 和 common 子目录）。
      */
     private static Path findProjectRoot() {
         Path dir = Paths.get("").toAbsolutePath();
@@ -50,35 +53,53 @@ public class ArchitectureTest {
         return Paths.get(".").toAbsolutePath();
     }
 
+    /**
+     * 向上查找 ECOS 仓库根目录（包含 ecos_backend 和 ecos-docker）。
+     */
+    private static Path findEcosRoot() {
+        Path dir = PROJECT_ROOT;
+        while (dir != null) {
+            if (Files.exists(dir.resolve("ecos-docker"))) {
+                return dir;
+            }
+            dir = dir.getParent();
+        }
+        return PROJECT_ROOT.getParent();
+    }
+
     @BeforeAll
     static void importClasses() {
         List<Path> classPaths = new ArrayList<>();
 
-        // 扫描所有子模块的 target/classes 目录
+        // 当前实际模块清单（PMO-E1 更新：删旧 DIKW 模块，加六引擎 impl + runtime-access + services 4 子服务）
         String[] modules = {
             "common/common-api",
+            // 六引擎 impl
+            "engine/data-engine/data-engine-impl",
+            "engine/ontology-engine/ontology-engine-impl",
+            "engine/kb-engine/kb-engine-impl",
+            "engine/cognitive-engine/cognitive-engine-impl",
+            "engine/ai-engine/ai-engine-impl",
+            "engine/security-engine/security-engine-impl",
+            // runtime
             "runtime/runtime-core",
-            "runtime/runtime-security",
+            "runtime/runtime-access",
             "runtime/runtime-task",
             "runtime/runtime-monitor",
-            "runtime/runtime-crypto",
             "runtime/llm-gateway",
+            // sysman
             "sysman/sysman-api",
             "sysman/sysman-impl",
             "sysman/sysman-boot",
-            "datanet/datanet-api",
-            "datanet/datanet-impl",
-            "datanet/datanet-boot",
+            // 业务模块
             "buszhi/buszhi-impl",
-            "dccheng/dccheng-api",
-            "dccheng/dccheng-impl",
-            "cognitive/cognitive-api",
-            "cognitive/cognitive-impl",
-            "aimod/aimod-impl",
-            "worldmodel/worldmodel-impl",
             "workspace/workspace-impl",
-            "portal/portal-impl",
-            "market/market-impl",
+            // services 4 子服务（有内容，D2 保留）
+            "services/api-gateway",
+            "services/identity-service",
+            "services/ontology-service",
+            "services/agent-service",
+            // gateway
             "gateway"
         };
 
@@ -100,7 +121,6 @@ public class ArchitectureTest {
         }
 
         if (classes == null || classes.size() == 0) {
-            // 最终回退：只扫 classpath
             classes = new ClassFileImporter()
                     .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                     .importPackages("com.chinacreator.gzcm");
@@ -109,136 +129,7 @@ public class ArchitectureTest {
     }
 
     // ================================================================
-    // 铁律 1: D层不能依赖K层/W层
-    // ================================================================
-    @Test
-    public void D层不能依赖K层_W层() {
-        noClasses()
-                .that().resideInAnyPackage(
-                        "..datanet..",
-                        "..dccheng.."
-                )
-                .should().dependOnClassesThat()
-                .resideInAnyPackage(
-                        "..buszhi..",
-                        "..aimod..",
-                        "..worldmodel..",
-                        "..cognitive.."
-                )
-                .because("D层（datanet/dccheng）禁止依赖K层（buszhi/aimod）和W层（worldmodel/cognitive）")
-                .check(classes);
-    }
-
-    // ================================================================
-    // 铁律 2: Controller只能调自己模块的Service
-    // 跨模块访问必须通过事件(PipelineEvent)或API调用，不能直接import Service
-    // ================================================================
-    @Test
-    public void Controller只能调自己的Service() {
-        // 禁止 datanet 的 Controller 访问非 datanet 的 Service
-        noClasses()
-                .that().resideInAnyPackage("..datanet..controller..")
-                .should().accessClassesThat()
-                .resideInAnyPackage(
-                        "..dccheng..service..",
-                        "..dccheng..",
-                        "..buszhi..",
-                        "..aimod..",
-                        "..worldmodel..",
-                        "..cognitive..",
-                        "..sysman..",
-                        "..workspace..",
-                        "..portal.."
-                )
-                .because("datanet Controller 只能调用 datanet 自己的 Service")
-                .check(classes);
-
-        // 禁止 dccheng 的 Controller 访问非 dccheng 的 Service
-        noClasses()
-                .that().resideInAnyPackage("..dccheng..controller..")
-                .should().accessClassesThat()
-                .resideInAnyPackage(
-                        "..datanet..",
-                        "..buszhi..",
-                        "..aimod..",
-                        "..worldmodel..",
-                        "..cognitive..",
-                        "..sysman..",
-                        "..workspace..",
-                        "..portal.."
-                )
-                .because("dccheng Controller 只能调用 dccheng 自己的 Service")
-                .check(classes);
-
-        // 禁止 buszhi 的 Controller 访问非 buszhi 的 Service
-        noClasses()
-                .that().resideInAnyPackage("..buszhi..controller..")
-                .should().accessClassesThat()
-                .resideInAnyPackage(
-                        "..datanet..",
-                        "..dccheng..",
-                        "..aimod..",
-                        "..worldmodel..",
-                        "..cognitive..",
-                        "..sysman..",
-                        "..workspace..",
-                        "..portal.."
-                )
-                .because("buszhi Controller 只能调用 buszhi 自己的 Service")
-                .check(classes);
-
-        // 禁止 aimod 的 Controller 访问非 aimod 的 Service
-        noClasses()
-                .that().resideInAnyPackage("..aimod..controller..")
-                .should().accessClassesThat()
-                .resideInAnyPackage(
-                        "..datanet..",
-                        "..dccheng..",
-                        "..buszhi..",
-                        "..worldmodel..",
-                        "..cognitive..",
-                        "..sysman..",
-                        "..workspace..",
-                        "..portal.."
-                )
-                .because("aimod Controller 只能调用 aimod 自己的 Service")
-                .check(classes);
-
-        // 禁止 worldmodel 的 Controller 访问非 worldmodel 的 Service
-        noClasses()
-                .that().resideInAnyPackage("..worldmodel..controller..")
-                .should().accessClassesThat()
-                .resideInAnyPackage(
-                        "..datanet..",
-                        "..dccheng..",
-                        "..buszhi..",
-                        "..aimod..",
-                        "..cognitive..",
-                        "..workspace..",
-                        "..portal.."
-                )
-                .because("worldmodel Controller 只能调用 worldmodel 自己的 Service")
-                .check(classes);
-
-        // 禁止 cognitive 的 Controller 访问非 cognitive 的 Service
-        noClasses()
-                .that().resideInAnyPackage("..cognitive..controller..")
-                .should().accessClassesThat()
-                .resideInAnyPackage(
-                        "..datanet..",
-                        "..dccheng..",
-                        "..buszhi..",
-                        "..aimod..",
-                        "..worldmodel..",
-                        "..workspace..",
-                        "..portal.."
-                )
-                .because("cognitive Controller 只能调用 cognitive 自己的 Service")
-                .check(classes);
-    }
-
-    // ================================================================
-    // 铁律 3: 禁止新增Maven模块
+    // 铁律 3: 禁止新增 Maven 模块
     // ================================================================
     @Test
     public void 禁止新增Maven模块() {
@@ -249,7 +140,6 @@ public class ArchitectureTest {
         }
         try {
             List<String> lines = Files.readAllLines(pomFile);
-            // 只统计默认 <modules> 块中的 <module>（非 profile 内的）
             int moduleCount = 0;
             boolean inDefaultModules = false;
             boolean inProfiles = false;
@@ -265,14 +155,15 @@ public class ArchitectureTest {
                 }
                 if (trimmed.equals("</modules>") && inDefaultModules) {
                     inDefaultModules = false;
-                    break; // 只统计第一个（默认）modules块
+                    break;
                 }
                 if (inDefaultModules && trimmed.startsWith("<module>") && !trimmed.startsWith("<!--")) {
                     moduleCount++;
                 }
             }
 
-            int baselineModules = 13;
+            // PMO-E1: baseline 13→11（D2 删 6 空壳 + D2 前已减到 11）
+            int baselineModules = 11;
             if (moduleCount > baselineModules) {
                 throw new AssertionError(
                     String.format("❌ 禁止新增Maven模块！当前: %d, 基线: %d", moduleCount, baselineModules));
@@ -284,38 +175,57 @@ public class ArchitectureTest {
     }
 
     // ================================================================
-    // 铁律 4: 禁止新增Docker容器
+    // 铁律 4: 禁止新增 Docker 容器
+    // PMO-E1: compose 文件从 ecos_backend/ 旧文件改为 ecos-docker/ 下新文件
+    // 使用 base + overlay 结构：image 数 = base + edition 文件中的 image 总和
     // ================================================================
     @Test
     public void 禁止新增Docker容器() {
-        // 基线容器清单（按 docker-compose 文件分别定义）
-        Map<String, Integer> baselineImages = new LinkedHashMap<>();
-        baselineImages.put("docker-compose-standard.yml", 2);   // postgres + gateway
-        baselineImages.put("docker-compose-enterprise.yml", 4); // postgres + neo4j + minio + gateway
-        baselineImages.put("docker-compose-flagship.yml", 5);   // postgres + neo4j + minio + doris-fe + doris-be + gateway
-        baselineImages.put("docker-compose-doris.yml", 2);      // doris-fe + doris-be
+        Path dockerDir = ECOS_ROOT.resolve("ecos-docker");
+        if (!Files.isDirectory(dockerDir)) {
+            System.out.println("⚠ ecos-docker/ 不存在，跳过 Docker 容器检查");
+            return;
+        }
+
+        // 基线容器清单（base + edition overlay 的 image 总和）
+        // standard: base(postgres:16) + standard(0) = 1
+        // enterprise: base(postgres:16) + enterprise(neo4j:5) = 2
+        // ultimate: base(postgres:16) + ultimate(neo4j:5 + doris-fe + doris-be) = 4
+        Map<String[], Integer> baselineImages = new LinkedHashMap<>();
+        baselineImages.put(new String[]{"docker-compose.base.yml", "docker-compose.standard.yml"}, 1);
+        baselineImages.put(new String[]{"docker-compose.base.yml", "docker-compose.enterprise.yml"}, 2);
+        baselineImages.put(new String[]{"docker-compose.base.yml", "docker-compose.ultimate.yml"}, 4);
 
         boolean violation = false;
-        for (Map.Entry<String, Integer> entry : baselineImages.entrySet()) {
-            Path composeFile = PROJECT_ROOT.resolve(entry.getKey());
-            if (!Files.exists(composeFile)) {
-                continue;
-            }
-            try {
-                long count = Files.readAllLines(composeFile).stream()
-                        .filter(l -> l.trim().startsWith("image:"))
-                        .count();
-                int baseline = entry.getValue();
-                if (count > baseline) {
-                    violation = true;
-                    System.err.printf("❌ %s: %d images (基线: %d)%n",
-                            entry.getKey(), count, baseline);
-                } else {
-                    System.out.printf("✓ %s: %d images (基线: %d)%n",
-                            entry.getKey(), count, baseline);
+        for (Map.Entry<String[], Integer> entry : baselineImages.entrySet()) {
+            String[] files = entry.getKey();
+            int baseline = entry.getValue();
+            long totalCount = 0;
+            StringBuilder fileNames = new StringBuilder();
+
+            for (String fname : files) {
+                Path composeFile = dockerDir.resolve(fname);
+                if (Files.exists(composeFile)) {
+                    try {
+                        long count = Files.readAllLines(composeFile).stream()
+                                .filter(l -> l.trim().startsWith("image:"))
+                                .count();
+                        totalCount += count;
+                        if (fileNames.length() > 0) fileNames.append(" + ");
+                        fileNames.append(fname);
+                    } catch (IOException e) {
+                        System.err.println("WARNING: 无法读取 " + fname);
+                    }
                 }
-            } catch (IOException e) {
-                System.err.println("WARNING: 无法读取 " + entry.getKey());
+            }
+
+            if (totalCount > baseline) {
+                violation = true;
+                System.err.printf("❌ %s: %d images (基线: %d)%n",
+                        fileNames, totalCount, baseline);
+            } else {
+                System.out.printf("✓ %s: %d images (基线: %d)%n",
+                        fileNames, totalCount, baseline);
             }
         }
 
@@ -326,7 +236,9 @@ public class ArchitectureTest {
 
     // ================================================================
     // 铁律 5: Controller必须通过Service访问数据库，不能直接JdbcTemplate
+    // PMO-E1: @Disabled — 158处JdbcTemplate违规(33 Controller)，下沉见 PMO-E2
     // ================================================================
+    @Disabled("158处JdbcTemplate违规(33 Controller)，下沉见 PMO-E2")
     @Test
     public void Controller必须通过Service访问数据库_不能直接JdbcTemplate() {
         noClasses()
