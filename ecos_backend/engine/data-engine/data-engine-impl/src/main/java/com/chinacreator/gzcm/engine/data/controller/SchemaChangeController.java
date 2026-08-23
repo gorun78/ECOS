@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.engine.data.service.SchemaChangeService;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -18,10 +18,10 @@ import java.util.Map;
 @RequestMapping("/api/v1/engine/data/schema")
 public class SchemaChangeController {
 
-    private final JdbcTemplate jdbc;
+    private final SchemaChangeService schemaChangeService;
 
-    public SchemaChangeController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SchemaChangeController(SchemaChangeService schemaChangeService) {
+        this.schemaChangeService = schemaChangeService;
     }
 
     /**
@@ -36,15 +36,7 @@ public class SchemaChangeController {
     public ApiResponse<List<Map<String, Object>>> listChanges(
             @RequestParam(defaultValue = "false") boolean acknowledged) {
 
-        String sql = """
-            SELECT id, datasource_id, table_name, change_type,
-                   detail_json, detected_at, acknowledged
-            FROM schema_changes
-            WHERE acknowledged = ?
-            ORDER BY detected_at DESC
-            """;
-
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, acknowledged);
+        List<Map<String, Object>> rows = schemaChangeService.listChanges(acknowledged);
         return ApiResponse.success(rows);
     }
 
@@ -58,10 +50,7 @@ public class SchemaChangeController {
      */
     @PostMapping("/changes/{id}/acknowledge")
     public ApiResponse<Map<String, Object>> acknowledge(@PathVariable Long id) {
-        int updated = jdbc.update(
-            "UPDATE schema_changes SET acknowledged = TRUE WHERE id = ? AND acknowledged = FALSE",
-            id
-        );
+        int updated = schemaChangeService.acknowledge(id);
 
         if (updated == 0) {
             return ApiResponse.notFound("变更记录不存在或已确认: id=" + id);
