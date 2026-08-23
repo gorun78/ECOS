@@ -3,32 +3,31 @@ package com.chinacreator.gzcm.sysman.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import com.chinacreator.gzcm.sysman.service.CausalQueryService;
 
 @RestController("sysmanCausalController")
 @RequestMapping("/api/v1/causal")
 public class CausalController {
 
-    private static final Logger log = LoggerFactory.getLogger(CausalController.class);
-
-    private final JdbcTemplate jdbc;
+        private final CausalQueryService causalQueryService;
+private static final Logger log = LoggerFactory.getLogger(CausalController.class);
 
     private final ConcurrentHashMap<String, Map<String, Object>> nodeStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Map<String, Object>> edgeStore = new ConcurrentHashMap<>();
 
-    public CausalController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public CausalController(CausalQueryService causalQueryService) {
+        this.causalQueryService = causalQueryService;
         initSeedData();
     }
 
     private boolean dbAvailable() {
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            causalQueryService.queryForObject("SELECT 1", Integer.class);
             return true;
         } catch (Exception e) {
             return false;
@@ -87,7 +86,7 @@ public class CausalController {
             List<Map<String, Object>> edges;
 
             if (dbAvailable()) {
-                nodes = jdbc.query(
+                nodes = causalQueryService.query(
                         "SELECT id, name, type, domain_group FROM ecos_causal_node ORDER BY id",
                         (rs, rowNum) -> {
                             Map<String, Object> n = new LinkedHashMap<>();
@@ -97,7 +96,7 @@ public class CausalController {
                             n.put("group", rs.getString("domain_group"));
                             return n;
                         });
-                edges = jdbc.query(
+                edges = causalQueryService.query(
                         "SELECT id, source_node_id, target_node_id, weight, edge_type FROM ecos_causal_edge ORDER BY id",
                         (rs, rowNum) -> {
                             Map<String, Object> e = new LinkedHashMap<>();

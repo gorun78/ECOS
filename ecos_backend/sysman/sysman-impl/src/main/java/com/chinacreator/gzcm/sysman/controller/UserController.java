@@ -7,23 +7,23 @@ import com.chinacreator.gzcm.sysman.iam.service.IUserService;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import com.chinacreator.gzcm.sysman.service.UserQueryService;
 
 @RestController
 @RequestMapping("/api/v1/system/users")
 public class UserController {
 
-    private static final Logger log = LoggerFactory.getLogger(UserController.class);
+        private final UserQueryService userQueryService;
+private static final Logger log = LoggerFactory.getLogger(UserController.class);
     private final IUserService userService;
-    private final JdbcTemplate jdbc;
 
-    public UserController(IUserService userService, JdbcTemplate jdbc) {
+    public UserController(IUserService userService, UserQueryService userQueryService) {
         this.userService = userService;
-        this.jdbc = jdbc;
+        this.userQueryService = userQueryService;
     }
 
     @GetMapping
@@ -53,14 +53,14 @@ public class UserController {
             
             // Count total
             String countSql = "SELECT COUNT(*) FROM (" + sql.toString() + ") t";
-            int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
+            int total = userQueryService.queryForObject(countSql, Integer.class, params.toArray());
             
             // Paginate
             int offset = (page - 1) * pageSize;
             sql.append("LIMIT ? OFFSET ?");
             params.add(pageSize); params.add(offset);
             
-            List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), params.toArray());
+            List<Map<String, Object>> rows = userQueryService.queryForList(sql.toString(), params.toArray());
             
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("page", page);
@@ -98,7 +98,7 @@ public class UserController {
             // 密码长度策略校验（从 sys_config 读取 password_min_length，默认8）
             int minPasswordLength = 8;
             try {
-                String configValue = jdbc.queryForObject(
+                String configValue = userQueryService.queryForObject(
                     "SELECT config_value FROM sys_config WHERE config_key = ? AND status = 'active'",
                     String.class, "password_min_length");
                 if (configValue != null && !configValue.isEmpty()) {
@@ -116,10 +116,10 @@ public class UserController {
             String tenantId = TenantContextHolder.getTenantId();
             if (tenantId != null && !tenantId.isBlank()) {
                 try {
-                    Integer maxUsers = jdbc.queryForObject(
+                    Integer maxUsers = userQueryService.queryForObject(
                         "SELECT max_users FROM ecos_tenant WHERE id = ?", Integer.class, tenantId);
                     if (maxUsers != null && maxUsers > 0) {
-                        Integer currentCount = jdbc.queryForObject(
+                        Integer currentCount = userQueryService.queryForObject(
                             "SELECT COUNT(*) FROM TD_USER", Integer.class);
                         if (currentCount != null && currentCount >= maxUsers) {
                             return ApiResponse.error(400, "用户数已达租户配额上限");
@@ -217,7 +217,7 @@ public class UserController {
         try {
             String sql = "SELECT r.role_id, r.role_name, r.role_code FROM TD_ROLE r " +
                          "INNER JOIN TD_USER_ROLE ur ON r.role_id = ur.role_id WHERE ur.user_id = ?";
-            List<Map<String, Object>> roles = jdbc.queryForList(sql, id);
+            List<Map<String, Object>> roles = userQueryService.queryForList(sql, id);
             return ApiResponse.success(roles);
         } catch (Exception e) {
             log.error("查询用户角色失败", e);
@@ -235,9 +235,9 @@ public class UserController {
                 return ApiResponse.badRequest("roleIds 不能为空");
             }
 
-            jdbc.update("DELETE FROM TD_USER_ROLE WHERE user_id = ?", id);
+            userQueryService.update("DELETE FROM TD_USER_ROLE WHERE user_id = ?", id);
             for (String roleId : roleIds) {
-                jdbc.update("INSERT INTO TD_USER_ROLE (user_id, role_id) VALUES (?, ?)", id, roleId);
+                userQueryService.update("INSERT INTO TD_USER_ROLE (user_id, role_id) VALUES (?, ?)", id, roleId);
             }
             return ApiResponse.success();
         } catch (Exception e) {

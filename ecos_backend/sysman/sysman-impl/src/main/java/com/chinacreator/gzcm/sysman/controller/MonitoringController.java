@@ -17,7 +17,7 @@ import java.util.*;
 @RequestMapping("/api/v1/ecos/monitoring")
 public class MonitoringController {
 
-    private static final Logger log = LoggerFactory.getLogger(MonitoringController.class);
+private static final Logger log = LoggerFactory.getLogger(MonitoringController.class);
 
     @GetMapping("/dashboard")
     public ApiResponse<Map<String, Object>> dashboard() {
@@ -191,7 +191,7 @@ public class MonitoringController {
     private Map<String, Object> diagnoseDatabase() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("name", "数据库连接");
-        // 数据库连接可用性通过JdbcTemplate检查，此处返回静态通过结果
+        // 数据库连接可用性通过MonitoringQueryService检查，此处返回静态通过结果
         result.put("status", "PASS");
         result.put("detail", "PostgreSQL 14 响应正常 (15ms)");
         return result;

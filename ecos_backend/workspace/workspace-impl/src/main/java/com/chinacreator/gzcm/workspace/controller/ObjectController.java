@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
@@ -15,6 +14,7 @@ import com.chinacreator.gzcm.engine.ontology.engine.FunctionEvaluator;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import com.chinacreator.gzcm.workspace.service.ObjectKgSyncService;
+import com.chinacreator.gzcm.workspace.service.ObjectQueryService;
 
 /**
  * Object Runtime REST API — 对象 CRUD + 动态 Schema。
@@ -35,8 +35,8 @@ import com.chinacreator.gzcm.workspace.service.ObjectKgSyncService;
 @RequestMapping("/api/v1/ecos/objects")
 public class ObjectController {
 
-    private static final Logger log = LoggerFactory.getLogger(ObjectController.class);
-    private final JdbcTemplate jdbc;
+        private final ObjectQueryService objectQueryService;
+private static final Logger log = LoggerFactory.getLogger(ObjectController.class);
     private final ObjectRuntimeService runtimeService;
     private final StateMachineEngine stateMachineEngine;
     private final FunctionEvaluator functionEvaluator;
@@ -49,10 +49,10 @@ public class ObjectController {
     /** 列名缓存 — 表名 → 允许的列名集合（懒加载，从 information_schema 查询） */
     private static final Map<String, Set<String>> COLUMNS_CACHE = new ConcurrentHashMap<>();
 
-    public ObjectController(JdbcTemplate jdbc, ObjectRuntimeService runtimeService,
+    public ObjectController(ObjectQueryService objectQueryService, ObjectRuntimeService runtimeService,
                              StateMachineEngine stateMachineEngine, FunctionEvaluator functionEvaluator,
                              AbacQueryFilter abacFilter, ObjectKgSyncService kgSyncService) {
-        this.jdbc = jdbc;
+        this.objectQueryService = objectQueryService;
         this.runtimeService = runtimeService;
         this.stateMachineEngine = stateMachineEngine;
         this.functionEvaluator = functionEvaluator;
@@ -70,7 +70,7 @@ public class ObjectController {
     private Map<String, String> loadEntityTable() {
         Map<String, String> map = new LinkedHashMap<>();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
+            List<Map<String, Object>> rows = objectQueryService.queryForList(
                 "SELECT entity_code, table_name FROM ecos_ontology_entity WHERE status = 'published'");
             for (Map<String, Object> row : rows) {
                 String entityCode = (String) row.get("entity_code");
@@ -119,28 +119,28 @@ public class ObjectController {
 
         if (keyword.isEmpty()) {
             if (abacRowFilter.isEmpty()) {
-                rows = jdbc.queryForList(
+                rows = objectQueryService.queryForList(
                     "SELECT * FROM " + table + " ORDER BY id LIMIT ? OFFSET ?", size, offset);
-                total = jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
+                total = objectQueryService.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
             } else {
-                rows = jdbc.queryForList(
+                rows = objectQueryService.queryForList(
                     "SELECT * FROM " + table + " WHERE " + abacRowFilter + " ORDER BY id LIMIT ? OFFSET ?", size, offset);
-                total = jdbc.queryForObject(
+                total = objectQueryService.queryForObject(
                     "SELECT COUNT(*) FROM " + table + " WHERE " + abacRowFilter, Long.class);
             }
         } else {
             if (abacRowFilter.isEmpty()) {
-                rows = jdbc.queryForList(
+                rows = objectQueryService.queryForList(
                     "SELECT * FROM " + table + " WHERE CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ? ORDER BY id LIMIT ? OFFSET ?",
                     "%" + keyword + "%", "%" + keyword + "%", size, offset);
-                total = jdbc.queryForObject(
+                total = objectQueryService.queryForObject(
                     "SELECT COUNT(*) FROM " + table + " WHERE CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?",
                     Long.class, "%" + keyword + "%", "%" + keyword + "%");
             } else {
-                rows = jdbc.queryForList(
+                rows = objectQueryService.queryForList(
                     "SELECT * FROM " + table + " WHERE (CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?) AND " + abacRowFilter + " ORDER BY id LIMIT ? OFFSET ?",
                     "%" + keyword + "%", "%" + keyword + "%", size, offset);
-                total = jdbc.queryForObject(
+                total = objectQueryService.queryForObject(
                     "SELECT COUNT(*) FROM " + table + " WHERE (CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?) AND " + abacRowFilter,
                     Long.class, "%" + keyword + "%", "%" + keyword + "%");
             }
@@ -174,10 +174,10 @@ public class ObjectController {
 
         List<Map<String, Object>> rows;
         if (abacRowFilter.isEmpty()) {
-            rows = jdbc.queryForList(
+            rows = objectQueryService.queryForList(
                 "SELECT * FROM " + table + " WHERE id = ?", id);
         } else {
-            rows = jdbc.queryForList(
+            rows = objectQueryService.queryForList(
                 "SELECT * FROM " + table + " WHERE id = ? AND " + abacRowFilter, id);
         }
         if (rows.isEmpty()) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
@@ -209,7 +209,7 @@ public class ObjectController {
             "WHERE r.source_entity_id = ? OR r.target_entity_id = ? " +
             "ORDER BY r.created_at DESC";
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, objectId, objectId);
+            List<Map<String, Object>> rows = objectQueryService.queryForList(sql, objectId, objectId);
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> rel = new LinkedHashMap<>();
@@ -247,7 +247,7 @@ public class ObjectController {
     private List<Map<String, Object>> loadTimeline(String entityCode, String objectId) {
         // ★ Primary: structured timeline from ecos_object_timeline
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
+            List<Map<String, Object>> rows = objectQueryService.queryForList(
                 "SELECT id, object_id, entity_code, event_type, event_summary, actor, details, created_at " +
                 "FROM ecos_object_timeline " +
                 "WHERE object_id = ? " +
@@ -275,7 +275,7 @@ public class ObjectController {
             "WHERE resource LIKE ? " +
             "ORDER BY timestamp DESC LIMIT 200";
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, "%" + objectId + "%");
+            List<Map<String, Object>> rows = objectQueryService.queryForList(sql, "%" + objectId + "%");
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> entry = new LinkedHashMap<>();
@@ -302,7 +302,7 @@ public class ObjectController {
         String table = ENTITY_TABLE.get(entityCode);
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
-        List<Map<String, Object>> columns = jdbc.queryForList(
+        List<Map<String, Object>> columns = objectQueryService.queryForList(
             "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
             table);
 
@@ -341,12 +341,12 @@ public class ObjectController {
                 String abacRowFilter = abacFilter.buildRowFilterCondition(entityCode);
                 List<Map<String, Object>> rows;
                 if (abacRowFilter.isEmpty()) {
-                    rows = jdbc.queryForList(
+                    rows = objectQueryService.queryForList(
                         "SELECT *, '" + table + "' AS _entity FROM " + table
                         + " WHERE CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ? LIMIT ?",
                         "%" + q + "%", "%" + q + "%", size);
                 } else {
-                    rows = jdbc.queryForList(
+                    rows = objectQueryService.queryForList(
                         "SELECT *, '" + table + "' AS _entity FROM " + table
                         + " WHERE (CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?) AND " + abacRowFilter + " LIMIT ?",
                         "%" + q + "%", "%" + q + "%", size);
@@ -382,14 +382,14 @@ public class ObjectController {
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
         // 配额检查：max_storage_mb（admin操作跳过）
-        // TenantAwareJdbcTemplate 自动对 ecos_object_data 追加 tenant_id 过滤
+        // TenantAwareQueryService 自动对 ecos_object_data 追加 tenant_id 过滤
         String tenantId = TenantContextHolder.getTenantId();
         if (tenantId != null && !tenantId.isBlank()) {
             try {
-                Long maxStorageMb = jdbc.queryForObject(
+                Long maxStorageMb = objectQueryService.queryForObject(
                     "SELECT max_storage_mb FROM ecos_tenant WHERE id = ?", Long.class, tenantId);
                 if (maxStorageMb != null && maxStorageMb > 0) {
-                    Integer objectCount = jdbc.queryForObject(
+                    Integer objectCount = objectQueryService.queryForObject(
                         "SELECT COUNT(*) FROM ecos_object_data", Integer.class);
                     if (objectCount != null && objectCount.longValue() >= maxStorageMb) {
                         return ApiResponse.error(400, "存储量已达租户配额上限");
@@ -423,13 +423,13 @@ public class ObjectController {
         }
         sql.append(")");
         vals.append(")");
-        jdbc.update(sql.toString() + vals.toString(), params.toArray());
+        objectQueryService.update(sql.toString() + vals.toString(), params.toArray());
 
         // Return created object (fetch by id if id was in body)
         Object idObj = body.get("id");
         if (idObj != null) {
             String objectId = idObj.toString();
-            List<Map<String, Object>> rows = jdbc.queryForList(
+            List<Map<String, Object>> rows = objectQueryService.queryForList(
                 "SELECT * FROM " + table + " WHERE id = ?", objectId);
             if (!rows.isEmpty()) {
                 Map<String, Object> created = rows.get(0);
@@ -464,7 +464,7 @@ public class ObjectController {
         String table = ENTITY_TABLE.get(entityCode);
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
-        List<Map<String, Object>> existing = jdbc.queryForList(
+        List<Map<String, Object>> existing = objectQueryService.queryForList(
             "SELECT * FROM " + table + " WHERE id = ?", id);
         if (existing.isEmpty()) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
 
@@ -496,10 +496,10 @@ public class ObjectController {
         params.add(id);
 
         if (!params.isEmpty() && params.size() > 1) { // has SET clauses beyond id
-            jdbc.update(sql.toString(), params.toArray());
+            objectQueryService.update(sql.toString(), params.toArray());
         }
 
-        List<Map<String, Object>> updated = jdbc.queryForList(
+        List<Map<String, Object>> updated = objectQueryService.queryForList(
             "SELECT * FROM " + table + " WHERE id = ?", id);
         Map<String, Object> result = updated.get(0);
 
@@ -548,7 +548,7 @@ public class ObjectController {
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
         // Get current object
-        List<Map<String, Object>> existing = jdbc.queryForList(
+        List<Map<String, Object>> existing = objectQueryService.queryForList(
             "SELECT * FROM " + table + " WHERE id = ?", id);
         if (existing.isEmpty()) return ApiResponse.notFound("OBJ-001: " + entityCode + " " + id + " 不存在");
 
@@ -571,7 +571,7 @@ public class ObjectController {
                 entityCode, id, currentStatus, transitionCode, actor, comment);
 
             // Fetch updated object
-            List<Map<String, Object>> updated = jdbc.queryForList(
+            List<Map<String, Object>> updated = objectQueryService.queryForList(
                 "SELECT * FROM " + table + " WHERE id = ?", id);
             Map<String, Object> result = updated.isEmpty() ? new LinkedHashMap<>() : new LinkedHashMap<>(updated.get(0));
             result.put("previousStatus", transitionResult.get("previousStatus"));
@@ -596,7 +596,7 @@ public class ObjectController {
         String table = ENTITY_TABLE.get(entityCode);
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
-        int rows = jdbc.update("DELETE FROM " + table + " WHERE id = ?", id);
+        int rows = objectQueryService.update("DELETE FROM " + table + " WHERE id = ?", id);
         if (rows == 0) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
 
         // ★ Timeline: record deletion
@@ -622,7 +622,7 @@ public class ObjectController {
     public ApiResponse<Map<String, Object>> syncAllToNeo4j() {
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(
+            rows = objectQueryService.queryForList(
                 "SELECT id, entity_code, object_data FROM ecos_object_data ORDER BY entity_code, id");
         } catch (Exception e) {
             log.error("查询 ecos_object_data 失败: {}", e.getMessage());
@@ -684,7 +684,7 @@ public class ObjectController {
      */
     private Set<String> getAllowedColumns(String table) {
         return COLUMNS_CACHE.computeIfAbsent(table, t -> {
-            List<Map<String, Object>> rows = jdbc.queryForList(
+            List<Map<String, Object>> rows = objectQueryService.queryForList(
                 "SELECT column_name FROM information_schema.columns " +
                 "WHERE table_name = ? ORDER BY ordinal_position", t);
             Set<String> columns = new LinkedHashSet<>();

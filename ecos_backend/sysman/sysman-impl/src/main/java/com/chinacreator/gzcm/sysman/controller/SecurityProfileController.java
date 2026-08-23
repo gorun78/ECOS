@@ -8,12 +8,12 @@ import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
 import java.util.*;
+import com.chinacreator.gzcm.sysman.service.SecurityProfileQueryService;
 
 /**
  * ECOS 安全Profile控制器 — 用户/角色级安全Profile绑定。
@@ -29,14 +29,13 @@ import java.util.*;
 @MinimumClearance(level = 2)
 public class SecurityProfileController {
 
-    private static final Logger log = LoggerFactory.getLogger(SecurityProfileController.class);
+        private final SecurityProfileQueryService securityProfileQueryService;
+private static final Logger log = LoggerFactory.getLogger(SecurityProfileController.class);
 
     private static final String[] LEVEL_NAMES = {"L0公开", "L1内部", "L2保密", "L3机密", "L4绝密"};
 
-    private final JdbcTemplate jdbc;
-
-    public SecurityProfileController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SecurityProfileController(SecurityProfileQueryService securityProfileQueryService) {
+        this.securityProfileQueryService = securityProfileQueryService;
     }
 
     // ────────────────────────────────────────────────
@@ -240,7 +239,7 @@ public class SecurityProfileController {
                     """,
                     targetTable, idColumn, idColumn, targetTable, targetTable, targetTable, targetTable, targetTable, targetTable, targetTable);
 
-            int rows = jdbc.update(upsertSql,
+            int rows = securityProfileQueryService.update(upsertSql,
                     idValue,
                     clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isGlobal, scopeType, bodyTenantId, orgId,
                     // ON CONFLICT UPDATE 参数
@@ -327,7 +326,7 @@ public class SecurityProfileController {
                         updated_at = NOW()
                     """;
 
-            jdbc.update(upsertSql,
+            securityProfileQueryService.update(upsertSql,
                     userId,
                     clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId,
                     clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId);
@@ -397,7 +396,7 @@ public class SecurityProfileController {
                         updated_at = NOW()
                     """;
 
-            jdbc.update(upsertSql,
+            securityProfileQueryService.update(upsertSql,
                     roleId,
                     clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId,
                     clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId);
@@ -456,7 +455,7 @@ public class SecurityProfileController {
                 sql = "SELECT * FROM td_user_security_profile WHERE user_id = ? LIMIT 1";
                 params = new Object[]{userId};
             }
-            List<SecurityProfile> list = jdbc.query(sql, USER_PROFILE_MAPPER, params);
+            List<SecurityProfile> list = securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
             return list.isEmpty() ? null : list.get(0);
         } catch (Exception e) {
             log.warn("查询用户安全配置异常: userId={}, {}", userId, e.getMessage());
@@ -476,7 +475,7 @@ public class SecurityProfileController {
                 sql = "SELECT * FROM td_role_security_profile WHERE role_id = ? LIMIT 1";
                 params = new Object[]{roleId};
             }
-            List<SecurityProfile> list = jdbc.query(sql, ROLE_PROFILE_MAPPER, params);
+            List<SecurityProfile> list = securityProfileQueryService.query(sql, ROLE_PROFILE_MAPPER, params);
             return list.isEmpty() ? null : list.get(0);
         } catch (Exception e) {
             log.warn("查询角色安全配置异常: roleId={}, {}", roleId, e.getMessage());
@@ -508,7 +507,7 @@ public class SecurityProfileController {
                         """;
                 params = new Object[]{userId};
             }
-            List<SecurityProfile> list = jdbc.query(sql, ROLE_PROFILE_MAPPER, params);
+            List<SecurityProfile> list = securityProfileQueryService.query(sql, ROLE_PROFILE_MAPPER, params);
             return list.isEmpty() ? null : list.get(0);
         } catch (Exception e) {
             log.warn("查询用户最高角色安全配置异常: userId={}, {}", userId, e.getMessage());
@@ -528,7 +527,7 @@ public class SecurityProfileController {
                 sql = "SELECT * FROM td_user_security_profile WHERE is_default = TRUE LIMIT 1";
                 params = new Object[]{};
             }
-            List<SecurityProfile> list = jdbc.query(sql, USER_PROFILE_MAPPER, params);
+            List<SecurityProfile> list = securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
             return list.isEmpty() ? null : list.get(0);
         } catch (Exception e) {
             log.warn("查询全局默认安全配置异常: {}", e.getMessage());
@@ -548,7 +547,7 @@ public class SecurityProfileController {
                 sql = "SELECT * FROM td_user_security_profile ORDER BY updated_at DESC";
                 params = new Object[]{};
             }
-            return jdbc.query(sql, USER_PROFILE_MAPPER, params);
+            return securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
         } catch (Exception e) {
             log.warn("查询所有用户安全配置异常: {}", e.getMessage());
             return Collections.emptyList();
@@ -567,7 +566,7 @@ public class SecurityProfileController {
                 sql = "SELECT * FROM td_role_security_profile ORDER BY clearance_level DESC";
                 params = new Object[]{};
             }
-            return jdbc.query(sql, ROLE_PROFILE_MAPPER, params);
+            return securityProfileQueryService.query(sql, ROLE_PROFILE_MAPPER, params);
         } catch (Exception e) {
             log.warn("查询所有角色安全配置异常: {}", e.getMessage());
             return Collections.emptyList();
@@ -598,7 +597,7 @@ public class SecurityProfileController {
                     log.debug("未知作用域类型: {}", scopeType);
                     return null;
             }
-            List<SecurityProfile> list = jdbc.query(sql, USER_PROFILE_MAPPER, params);
+            List<SecurityProfile> list = securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
             return list.isEmpty() ? null : list.get(0);
         } catch (Exception e) {
             log.warn("按作用域查询安全配置异常: scopeType={}, scopeId={}, {}", scopeType, scopeId, e.getMessage());

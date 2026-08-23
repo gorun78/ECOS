@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.sysman.controller.model.CausalLinkEntity;
 import com.chinacreator.gzcm.sysman.controller.model.GoalEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -16,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import com.chinacreator.gzcm.sysman.service.WorldModelGraphQueryService;
 
 /**
  * World Model — 目标与因果链控制器。
@@ -38,24 +38,24 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/ecos/world-model-graph")
 public class WorldModelGraphController {
 
-    private static final Logger log = LoggerFactory.getLogger(WorldModelGraphController.class);
+        private final WorldModelGraphQueryService worldModelGraphQueryService;
+private static final Logger log = LoggerFactory.getLogger(WorldModelGraphController.class);
 
     /** 内存存储 (fallback) */
     private final ConcurrentHashMap<String, GoalEntity> goalStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CausalLinkEntity> linkStore = new ConcurrentHashMap<>();
 
-    /** JdbcTemplate — 构造函数注入 (optional, falls back to memory) */
-    private final JdbcTemplate jdbc;
+    /** WorldModelGraphQueryService — 构造函数注入 (optional, falls back to memory) */
 
-    public WorldModelGraphController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public WorldModelGraphController(WorldModelGraphQueryService worldModelGraphQueryService) {
+        this.worldModelGraphQueryService = worldModelGraphQueryService;
         initFallbackData();
     }
 
     /** 数据库是否可用 */
     private boolean dbAvailable() {
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            worldModelGraphQueryService.queryForObject("SELECT 1", Integer.class);
             return true;
         } catch (Exception e) {
             return false;
@@ -164,7 +164,7 @@ public class WorldModelGraphController {
             FROM ecos_wm_goal
             ORDER BY id
             """;
-        return jdbc.query(sql, (rs, rowNum) -> {
+        return worldModelGraphQueryService.query(sql, (rs, rowNum) -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", rs.getLong("id"));
             m.put("name", rs.getString("name"));
@@ -342,7 +342,7 @@ public class WorldModelGraphController {
             List<Map<String, Object>> nodes;
             List<Map<String, Object>> edges;
             if (dbAvailable()) {
-                nodes = jdbc.query(
+                nodes = worldModelGraphQueryService.query(
                     "SELECT id, name, description, status, goal_type FROM ecos_wm_goal ORDER BY id",
                     (rs, rowNum) -> {
                         Map<String, Object> n = new LinkedHashMap<>();
@@ -353,7 +353,7 @@ public class WorldModelGraphController {
                         n.put("type", rs.getString("goal_type"));
                         return n;
                     });
-                edges = jdbc.query(
+                edges = worldModelGraphQueryService.query(
                     "SELECT id, source_goal_id, target_goal_id, relationship_type, description FROM ecos_wm_causal_link",
                     (rs, rowNum) -> {
                         Map<String, Object> e = new LinkedHashMap<>();

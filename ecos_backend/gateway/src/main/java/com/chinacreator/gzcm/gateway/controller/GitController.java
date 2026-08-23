@@ -9,13 +9,13 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
+import com.chinacreator.gzcm.gateway.service.GitQueryService;
 
 /**
  * ECOS 数据工作台 — Git 版本管理 API (v2 PMO spec)。
@@ -42,7 +42,7 @@ import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
 @RequestMapping("/api/v1/ecos/git")
 public class GitController {
 
-    private static final Logger log = LoggerFactory.getLogger(GitController.class);
+private static final Logger log = LoggerFactory.getLogger(GitController.class);
 
     @Autowired
     private GitService gitService;
@@ -51,7 +51,8 @@ public class GitController {
     private GitRepositoryService gitRepositoryService;
 
     @Autowired
-    private JdbcTemplate jdbc;
+    private GitQueryService gitQueryService;
+
 
     /** 仓库根路径，从 sys_config 读取，默认 /home/guorongxiao/ecos-git-repos */
     private String repoRoot = "/home/guorongxiao/ecos-git-repos";
@@ -62,7 +63,7 @@ public class GitController {
     @PostConstruct
     public void init() {
         try {
-            String configValue = jdbc.queryForObject(
+            String configValue = gitQueryService.queryForObject(
                 "SELECT config_value FROM sys_config WHERE config_key = ?",
                 String.class,
                 "ecos_git_repo_root"
@@ -134,14 +135,14 @@ public class GitController {
             String repoIdPath = repoPath(repoId);
 
             String countSql = "SELECT count(*) FROM td_git_repository WHERE local_path = ?";
-            int total = jdbc.queryForObject(countSql, Integer.class, repoIdPath);
+            int total = gitQueryService.queryForObject(countSql, Integer.class, repoIdPath);
 
             String sql = "SELECT id, commit_id, message, author, branch, "
                        + "committed_at, created_at "
                        + "FROM td_git_repository "
                        + "WHERE local_path = ? "
                        + "ORDER BY committed_at DESC LIMIT ? OFFSET ?";
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, repoIdPath, limit, offset);
+            List<Map<String, Object>> rows = gitQueryService.queryForList(sql, repoIdPath, limit, offset);
 
             List<Map<String, Object>> items = rows.stream()
                 .map(row -> {

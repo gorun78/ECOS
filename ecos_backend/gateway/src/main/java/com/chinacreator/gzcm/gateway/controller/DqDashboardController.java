@@ -3,11 +3,11 @@ package com.chinacreator.gzcm.gateway.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
 import java.util.*;
+import com.chinacreator.gzcm.gateway.service.DqDashboardService;
 
 /**
  * Data Quality Dashboard API — 数据质量规则 + 质量问题 CRUD。
@@ -24,11 +24,11 @@ import java.util.*;
 @RequestMapping("/api/dq")
 public class DqDashboardController {
 
-    private static final Logger log = LoggerFactory.getLogger(DqDashboardController.class);
-    private final JdbcTemplate jdbc;
+        private final DqDashboardService dqDashboardService;
+private static final Logger log = LoggerFactory.getLogger(DqDashboardController.class);
 
-    public DqDashboardController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public DqDashboardController(DqDashboardService dqDashboardService) {
+        this.dqDashboardService = dqDashboardService;
     }
 
     // ═══════════════ 查询 — 规则 ═══════════════════
@@ -53,7 +53,7 @@ public class DqDashboardController {
         }
         sql.append(" ORDER BY created_at DESC");
 
-        List<Map<String, Object>> data = jdbc.query(sql.toString(), (rs, _i) -> {
+        List<Map<String, Object>> data = dqDashboardService.query(sql.toString(), (rs, _i) -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", rs.getString("id"));
             m.put("code", rs.getString("code"));
@@ -103,7 +103,7 @@ public class DqDashboardController {
         sql.append(" ORDER BY detected_at DESC LIMIT ?");
         params.add(Math.min(limit, 1000));
 
-        List<Map<String, Object>> data = jdbc.query(sql.toString(), (rs, _i) -> {
+        List<Map<String, Object>> data = dqDashboardService.query(sql.toString(), (rs, _i) -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", rs.getString("id"));
             m.put("rule_id", rs.getString("rule_id"));
@@ -137,27 +137,27 @@ public class DqDashboardController {
         Map<String, Object> d = new LinkedHashMap<>();
 
         // 规则统计
-        Integer totalRules = jdbc.queryForObject("SELECT count(*) FROM ecos_dq_rule", Integer.class);
-        Integer activeRules = jdbc.queryForObject(
+        Integer totalRules = dqDashboardService.queryForObject("SELECT count(*) FROM ecos_dq_rule", Integer.class);
+        Integer activeRules = dqDashboardService.queryForObject(
             "SELECT count(*) FROM ecos_dq_rule WHERE status = 'ACTIVE'", Integer.class);
         d.put("total_rules", totalRules != null ? totalRules : 0);
         d.put("active_rules", activeRules != null ? activeRules : 0);
 
         // 问题统计
-        Integer totalIssues = jdbc.queryForObject("SELECT count(*) FROM ecos_dq_issue", Integer.class);
-        Integer openIssues = jdbc.queryForObject(
+        Integer totalIssues = dqDashboardService.queryForObject("SELECT count(*) FROM ecos_dq_issue", Integer.class);
+        Integer openIssues = dqDashboardService.queryForObject(
             "SELECT count(*) FROM ecos_dq_issue WHERE status = 'OPEN'", Integer.class);
         d.put("total_issues", totalIssues != null ? totalIssues : 0);
         d.put("open_issues", openIssues != null ? openIssues : 0);
 
         // 按严重级别分布
-        List<Map<String, Object>> bySeverity = jdbc.query(
+        List<Map<String, Object>> bySeverity = dqDashboardService.query(
             "SELECT severity, count(*) as cnt FROM ecos_dq_issue GROUP BY severity ORDER BY cnt DESC",
             (rs, _i) -> Map.of("severity", (Object) rs.getString("severity"), "count", rs.getLong("cnt")));
         d.put("by_severity", bySeverity);
 
         // 按问题类型分布
-        List<Map<String, Object>> byType = jdbc.query(
+        List<Map<String, Object>> byType = dqDashboardService.query(
             "SELECT issue_type, count(*) as cnt FROM ecos_dq_issue GROUP BY issue_type ORDER BY cnt DESC",
             (rs, _i) -> Map.of("issue_type", (Object) rs.getString("issue_type"), "count", rs.getLong("cnt")));
         d.put("by_type", byType);
@@ -174,7 +174,7 @@ public class DqDashboardController {
                      "target_field, rule_expression, severity, status, params, created_at, updated_at) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), NOW(), NOW())";
         try {
-            jdbc.update(sql,
+            dqDashboardService.update(sql,
                 id,
                 body.getOrDefault("code", id),
                 body.get("name"),
@@ -205,7 +205,7 @@ public class DqDashboardController {
         String newStatus = (String) body.get("status");
         String note = (String) body.getOrDefault("resolution_note", "");
         String resolvedAt = "RESOLVED".equals(newStatus) ? ", resolved_at = NOW()" : "";
-        int rows = jdbc.update(
+        int rows = dqDashboardService.update(
             "UPDATE ecos_dq_issue SET status = ?, resolution_note = ?" + resolvedAt + " WHERE id = ?",
             newStatus, note, id);
         if (rows == 0) return ApiResponse.notFound("DQ问题 " + id + " 不存在");
@@ -221,7 +221,7 @@ public class DqDashboardController {
     public ApiResponse<Map<String, Object>> executeRule(@PathVariable String ruleId) {
         try {
             // 1. 查询规则
-            List<Map<String, Object>> rules = jdbc.query(
+            List<Map<String, Object>> rules = dqDashboardService.query(
                 "SELECT id, code, name, rule_type, target_entity, target_field, rule_expression " +
                 "FROM ecos_dq_rule WHERE id = ?", (rs, _i) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
@@ -254,7 +254,7 @@ public class DqDashboardController {
     @PostMapping("/execute-all")
     public ApiResponse<Map<String, Object>> executeAll() {
         try {
-            List<Map<String, Object>> activeRules = jdbc.query(
+            List<Map<String, Object>> activeRules = dqDashboardService.query(
                 "SELECT id, code, name, rule_type, target_entity, target_field, rule_expression " +
                 "FROM ecos_dq_rule WHERE status = 'ACTIVE' ORDER BY created_at",
                 (rs, _i) -> {
@@ -333,7 +333,7 @@ public class DqDashboardController {
         sql.append(" ORDER BY r.executed_at DESC LIMIT ?");
         params.add(Math.min(limit, 1000));
 
-        List<Map<String, Object>> data = jdbc.query(sql.toString(), (rs, _i) -> {
+        List<Map<String, Object>> data = dqDashboardService.query(sql.toString(), (rs, _i) -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", rs.getString("id"));
             m.put("rule_id", rs.getString("rule_id"));
@@ -373,7 +373,7 @@ public class DqDashboardController {
 
         try {
             // 总行数
-            totalRows = jdbc.queryForObject(
+            totalRows = dqDashboardService.queryForObject(
                 "SELECT COUNT(*) FROM " + targetEntity, Integer.class);
 
             if (totalRows == 0) {
@@ -396,12 +396,12 @@ public class DqDashboardController {
                     // 聚合表达式（如 COUNT(DISTINCT code) = COUNT(*)）
                     // 检测是否违反：查询聚合结果，不满足即失败
                     String countSql = "SELECT " + ruleExpression + " AS check_result FROM " + targetEntity;
-                    Boolean checkPassed = jdbc.queryForObject(countSql, Boolean.class);
+                    Boolean checkPassed = dqDashboardService.queryForObject(countSql, Boolean.class);
                     passed = Boolean.TRUE.equals(checkPassed);
                     failedRows = passed ? 0 : 1;
                     // 聚合检查通过后直接返回
                     String execId = UUID.randomUUID().toString().substring(0, 16);
-                    jdbc.update(
+                    dqDashboardService.update(
                         "INSERT INTO ecos_dq_execution_result (id, rule_id, passed, total_rows, failed_rows, error_details, executed_at) " +
                         "VALUES (?, ?, ?, ?, ?, ?, NOW())",
                         execId, id, passed, totalRows, failedRows, errorDetails);
@@ -417,12 +417,12 @@ public class DqDashboardController {
                     // 简化：执行 EXISTS 的反向查询
                     String notExistsSql = "SELECT COUNT(*) FROM " + targetEntity +
                         " WHERE NOT (" + ruleExpression + ")";
-                    failedRows = jdbc.queryForObject(notExistsSql, Integer.class);
+                    failedRows = dqDashboardService.queryForObject(notExistsSql, Integer.class);
                 } else {
                     // 通用 WHERE 表达式：不满足条件的行数
                     checkSql = "SELECT COUNT(*) FROM " + targetEntity +
                                " WHERE NOT (" + ruleExpression + ")";
-                    failedRows = jdbc.queryForObject(checkSql, Integer.class);
+                    failedRows = dqDashboardService.queryForObject(checkSql, Integer.class);
                 }
 
                 passed = (failedRows == 0);
@@ -432,7 +432,7 @@ public class DqDashboardController {
                     try {
                         String sampleSql = "SELECT * FROM " + targetEntity +
                             " WHERE NOT (" + ruleExpression + ") LIMIT 10";
-                        List<Map<String, Object>> samples = jdbc.query(sampleSql,
+                        List<Map<String, Object>> samples = dqDashboardService.query(sampleSql,
                             (rs2, _i2) -> {
                                 Map<String, Object> row = new LinkedHashMap<>();
                                 if (targetField.isBlank()) {
@@ -456,7 +456,7 @@ public class DqDashboardController {
 
         // 写入执行结果表
         String execId = UUID.randomUUID().toString().substring(0, 16);
-        jdbc.update(
+        dqDashboardService.update(
             "INSERT INTO ecos_dq_execution_result (id, rule_id, passed, total_rows, failed_rows, error_details, executed_at) " +
             "VALUES (?, ?, ?, ?, ?, ?, NOW())",
             execId, id, passed, totalRows, failedRows, errorDetails);
@@ -517,7 +517,7 @@ public class DqDashboardController {
             }
 
             // 2. 查询WM目标偏差
-            List<Map<String, Object>> goals = jdbc.query(
+            List<Map<String, Object>> goals = dqDashboardService.query(
                 "SELECT id, name, target_value, current_value, status, " +
                 "CASE WHEN target_value > 0 " +
                 "  THEN ROUND(((target_value - current_value) / target_value * 100)::numeric, 1) " +
@@ -538,7 +538,7 @@ public class DqDashboardController {
             result.put("goalDeviations", goals);
 
             // 3. 查因果链
-            List<Map<String, Object>> links = jdbc.query(
+            List<Map<String, Object>> links = dqDashboardService.query(
                 "SELECT cl.id, cl.relationship_type, cl.description, " +
                 "sg.name AS source_name, sg.target_value AS source_target, sg.current_value AS source_actual, " +
                 "tg.name AS target_name, tg.target_value AS target_target, tg.current_value AS target_actual " +
@@ -649,7 +649,7 @@ public class DqDashboardController {
                 params = new Object[]{};
             }
 
-            List<Map<String, Object>> tracking = jdbc.query(sql, (rs, _i) -> {
+            List<Map<String, Object>> tracking = dqDashboardService.query(sql, (rs, _i) -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", rs.getString("id"));
                 m.put("goalId", rs.getLong("goal_id"));
