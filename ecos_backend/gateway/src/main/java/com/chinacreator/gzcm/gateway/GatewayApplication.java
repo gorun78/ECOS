@@ -79,7 +79,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 本体引擎已接管（阶段3），排除buszhi侧副本
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
         // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除
-        com.chinacreator.gzcm.gateway.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
         // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
