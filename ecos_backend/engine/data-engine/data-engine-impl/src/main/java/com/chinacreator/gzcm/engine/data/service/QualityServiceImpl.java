@@ -2,9 +2,9 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
 import com.chinacreator.gzcm.engine.data.QualityService;
-import com.chinacreator.gzcm.runtime.core.quality.QualityResult;
-import com.chinacreator.gzcm.runtime.core.quality.QualityRule;
-import com.chinacreator.gzcm.runtime.core.quality.spi.QualityRuleProvider;
+import com.chinacreator.gzcm.engine.data.quality.QualityResult;
+import com.chinacreator.gzcm.engine.data.quality.QualityRule;
+import com.chinacreator.gzcm.engine.data.quality.spi.QualityRuleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;

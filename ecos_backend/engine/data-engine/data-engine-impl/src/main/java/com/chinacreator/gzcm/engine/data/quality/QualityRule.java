@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.quality;
+package com.chinacreator.gzcm.engine.data.quality;
 
 import java.util.Collections;
 import java.util.Map;

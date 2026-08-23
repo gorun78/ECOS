@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.quality;
+package com.chinacreator.gzcm.engine.data.quality;
 
 import java.time.Instant;
 import java.util.Collections;

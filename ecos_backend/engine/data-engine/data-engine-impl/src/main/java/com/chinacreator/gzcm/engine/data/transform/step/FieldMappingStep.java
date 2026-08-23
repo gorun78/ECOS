@@ -1,13 +1,14 @@
-package com.chinacreator.gzcm.runtime.core.transform.step;
+// TODO D4: 归位 ge-service（格）
+package com.chinacreator.gzcm.engine.data.transform.step;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.chinacreator.gzcm.runtime.core.transform.TransformException;
-import com.chinacreator.gzcm.runtime.core.transform.TransformStep;
-import com.chinacreator.gzcm.runtime.core.transform.model.DataFrame;
+import com.chinacreator.gzcm.engine.data.transform.TransformException;
+import com.chinacreator.gzcm.engine.data.transform.TransformStep;
+import com.chinacreator.gzcm.engine.data.transform.model.DataFrame;
 
 /**
  * 字段映射转换步骤

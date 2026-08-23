@@ -234,7 +234,7 @@ public class UdfServiceImpl implements UdfService {
             // Auto-generated UDF from SQL
             // SQL: %s
             
-            import com.chinacreator.gzcm.runtime.core.transform.TransformStep;
+            import com.chinacreator.gzcm.engine.data.transform.TransformStep;
             
             public class %sTransform implements TransformStep {
                 @Override

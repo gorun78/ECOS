@@ -1,13 +1,13 @@
-package com.chinacreator.gzcm.runtime.core.quality.spi;
+package com.chinacreator.gzcm.engine.data.quality.spi;
 
-import com.chinacreator.gzcm.runtime.core.quality.QualityRule;
+import com.chinacreator.gzcm.engine.data.quality.QualityRule;
 
 import java.util.List;
 
 /**
  * 质量规则提供者 SPI — 由上层 BUS-ZHI 模块实现。
  *
- * <p>内核 {@link com.chinacreator.gzcm.runtime.core.quality.QualityEvaluator}
+ * <p>内核 {@link com.chinacreator.gzcm.engine.data.quality.QualityEvaluator}
  * 通过此 SPI 获取适用于指定数据集的规则列表。
  *
  * <p>BUS-ZHI 模块负责：规则定义、规则生命周期管理、规则版本控制、
@@ -30,5 +30,5 @@ public interface QualityRuleProvider {
      * @param results   评估结果
      */
     void onEvaluationComplete(String datasetId,
-                               List<com.chinacreator.gzcm.runtime.core.quality.QualityResult> results);
+                               List<com.chinacreator.gzcm.engine.data.quality.QualityResult> results);
 }

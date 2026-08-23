@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.quality;
+package com.chinacreator.gzcm.engine.data.quality;
 
 import java.util.List;
 
@@ -6,7 +6,7 @@ import java.util.List;
  * 数据质量评估器 — 内核质量门禁。
  *
  * <p>在任何数据落盘操作（INSERT / UPDATE / 批量导入）前调用此接口，
- * 根据上层 BUS-ZHI 模块通过 {@link com.chinacreator.gzcm.runtime.core.quality.spi.QualityRuleProvider}
+ * 根据上层 BUS-ZHI 模块通过 {@link com.chinacreator.gzcm.engine.data.quality.spi.QualityRuleProvider}
  * 注册的规则集，对数据执行校验。
  *
  * <p>使用方式：
@@ -21,7 +21,7 @@ import java.util.List;
  *
  * <p>上层 BUS-ZHI 模块负责规则定义、评分体系和质量报告。
  *
- * @see com.chinacreator.gzcm.runtime.core.quality.spi.QualityRuleProvider
+ * @see com.chinacreator.gzcm.engine.data.quality.spi.QualityRuleProvider
  */
 public interface QualityEvaluator {
 

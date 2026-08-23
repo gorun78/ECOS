@@ -1,4 +1,5 @@
-package com.chinacreator.gzcm.runtime.core.transform.model;
+// TODO D4: 归位 ge-service（格）
+package com.chinacreator.gzcm.engine.data.transform.model;
 
 /**
  * 字段映射模型
