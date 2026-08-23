@@ -61,7 +61,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // MinioStorageService (gateway.service) 保留：DataLakeExportService 依赖它，不要排除
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
-        // 数据引擎已接管（A+7b: datanet 退出构建，A+7c 删目录）
+        // 数据引擎已接管，旧 datanet 模块已删除（A+7c）
         // 本体引擎已接管（阶段3），排除buszhi侧副本
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
         // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除

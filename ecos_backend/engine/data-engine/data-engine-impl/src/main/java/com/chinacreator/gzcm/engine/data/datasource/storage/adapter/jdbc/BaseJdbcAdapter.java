@@ -18,11 +18,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.FilterCondition;
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.Pagination;
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.QueryRequest;
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.QueryResult;
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.SortCondition;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.FilterCondition;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.Pagination;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.QueryRequest;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.QueryResult;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.SortCondition;
 import com.chinacreator.gzcm.engine.data.datasource.storage.IStorageAdapter;
 import com.chinacreator.gzcm.engine.data.datasource.storage.model.StorageConfig;
 import com.chinacreator.gzcm.engine.data.datasource.storage.model.WriteRequest;

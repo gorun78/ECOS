@@ -3,8 +3,8 @@ package com.chinacreator.gzcm.engine.data.datasource.storage;
 import java.util.List;
 import java.util.Map;
 
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.QueryRequest;
-import com.chinacreator.gzcm.runtime.core.dataaccess.model.QueryResult;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.QueryRequest;
+import com.chinacreator.gzcm.engine.data.datasource.storage.model.QueryResult;
 import com.chinacreator.gzcm.engine.data.datasource.storage.model.StorageConfig;
 import com.chinacreator.gzcm.engine.data.datasource.storage.model.WriteRequest;
 import com.chinacreator.gzcm.engine.data.datadescription.model.DataSchema;

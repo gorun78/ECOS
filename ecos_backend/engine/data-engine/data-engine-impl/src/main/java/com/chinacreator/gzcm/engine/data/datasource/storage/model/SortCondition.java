@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.dataaccess.model;
+package com.chinacreator.gzcm.engine.data.datasource.storage.model;
 
 /**
  * 鎺掑簭鏉′欢妯″瀷

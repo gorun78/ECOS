@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.dataaccess.model;
+package com.chinacreator.gzcm.engine.data.datasource.storage.model;
 
 import java.util.List;
 import java.util.Map;
