@@ -62,14 +62,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // MinioStorageService (gateway.service) 保留：DataLakeExportService 依赖它，不要排除
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
-        // 安全引擎已接管（阶段1），排除sysman侧副本
-        com.chinacreator.gzcm.sysman.controller.AbacController.class,
-        com.chinacreator.gzcm.sysman.controller.AuditController.class,
-        com.chinacreator.gzcm.sysman.controller.CryptoAuditController.class,
-        com.chinacreator.gzcm.sysman.controller.DataMaskingController.class,
-        com.chinacreator.gzcm.sysman.controller.DataPermissionController.class,
-        com.chinacreator.gzcm.sysman.controller.PolicyEngineController.class,
-        com.chinacreator.gzcm.sysman.controller.SecurityConfigController.class,
         // 数据引擎已接管（阶段2），排除datanet侧副本
         com.chinacreator.gzcm.datanet.controller.CatalogController.class,
         com.chinacreator.gzcm.datanet.controller.DataSourceController.class,
