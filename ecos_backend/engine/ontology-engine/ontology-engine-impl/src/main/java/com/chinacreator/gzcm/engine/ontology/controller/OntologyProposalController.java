@@ -9,8 +9,6 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -30,7 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * 本体变更提案 Controller — 管理本体结构的变更提案与审批流转。
  *
- * <p>使用 {@link JdbcTemplate} 持久化至 PostgreSQL 表 ecos_ontology_proposals。
+ * <p>持久化委托至 {@link OntologyProposalService}（PostgreSQL 表 ecos_ontology_proposals）。
  * 提案状态机：{@code DRAFT → PENDING → (APPROVED | REJECTED) → EXECUTED}，终态不可回退。</p>
  *
  * <h3>端点：</h3>
@@ -66,14 +65,14 @@ public class OntologyProposalController {
     /** 终态集合：不可再变更 */
     private static final Set<String> TERMINAL_STATUSES = Set.of(STATUS_APPROVED, STATUS_REJECTED, STATUS_EXECUTED);
 
-    private final JdbcTemplate jdbc;
+    private final OntologyProposalService proposalService;
     private final OntologyVersionService versionService;
     private final OntologyService ontologyService;
 
-    public OntologyProposalController(JdbcTemplate jdbc,
+    public OntologyProposalController(OntologyProposalService proposalService,
                                        OntologyVersionService versionService,
                                        OntologyService ontologyService) {
-        this.jdbc = jdbc;
+        this.proposalService = proposalService;
         this.versionService = versionService;
         this.ontologyService = ontologyService;
     }
@@ -90,20 +89,7 @@ public class OntologyProposalController {
     public ApiResponse<List<Map<String, Object>>> listProposals(
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "type", required = false) String proposalType) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ecos_ontology_proposals WHERE 1=1");
-        List<Object> params = new ArrayList<>();
-
-        if (status != null && !status.isBlank()) {
-            sql.append(" AND status=?");
-            params.add(status);
-        }
-        if (proposalType != null && !proposalType.isBlank()) {
-            sql.append(" AND proposal_type=?");
-            params.add(proposalType);
-        }
-        sql.append(" ORDER BY created_at DESC");
-
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), params.toArray());
+        List<Map<String, Object>> rows = proposalService.listProposals(status, proposalType);
         return ApiResponse.success(rows);
     }
 
@@ -112,13 +98,11 @@ public class OntologyProposalController {
      */
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> getProposal(@PathVariable String id) {
-        try {
-            Map<String, Object> p = jdbc.queryForMap(
-                    "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
-            return ApiResponse.success(p);
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> p = proposalService.findProposalById(id);
+        if (p == null) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
+        return ApiResponse.success(p);
     }
 
     /**
@@ -194,14 +178,11 @@ public class OntologyProposalController {
             }
         }
 
-        jdbc.update(
-                "INSERT INTO ecos_ontology_proposals (domain_code, proposal_type, target_entity, payload, snapshot, status, author, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, NOW(), NOW())",
-                domainCode, proposalType, targetEntity, payloadJson, snapshotJson, STATUS_DRAFT, author);
+        proposalService.insertProposal(domainCode, proposalType, targetEntity, payloadJson,
+                snapshotJson, STATUS_DRAFT, author);
 
         // 查询刚插入的记录获取自增ID
-        Map<String, Object> created = jdbc.queryForMap(
-                "SELECT * FROM ecos_ontology_proposals WHERE id=currval('ecos_ontology_proposals_id_seq')");
+        Map<String, Object> created = proposalService.findCreatedProposal();
 
         log.info("Ontology proposal created: {} [{}] proposalType={}", created.get("id"), proposalType, proposalType);
         return ApiResponse.success(created);
@@ -215,10 +196,8 @@ public class OntologyProposalController {
     public ApiResponse<Map<String, Object>> updateProposal(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
-        Map<String, Object> existing;
-        try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> existing = proposalService.findProposalById(id);
+        if (existing == null) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
 
@@ -281,10 +260,7 @@ public class OntologyProposalController {
         sql.append(" WHERE id=?::bigint");
         params.add(id);
 
-        jdbc.update(sql.toString(), params.toArray());
-
-        Map<String, Object> updated = jdbc.queryForMap(
-                "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+        Map<String, Object> updated = proposalService.updateProposal(id, sql, params);
         log.info("Ontology proposal updated: {}", id);
         return ApiResponse.success(updated);
     }
@@ -295,10 +271,8 @@ public class OntologyProposalController {
      */
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteProposal(@PathVariable String id) {
-        Map<String, Object> existing;
-        try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> existing = proposalService.findProposalById(id);
+        if (existing == null) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
 
@@ -309,7 +283,7 @@ public class OntologyProposalController {
                             + ", only DRAFT proposals can be deleted");
         }
 
-        jdbc.update("DELETE FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+        proposalService.deleteProposal(id);
         log.info("Ontology proposal deleted: {}", id);
         return ApiResponse.success("Proposal '" + id + "' deleted");
     }
@@ -525,10 +499,8 @@ public class OntologyProposalController {
             @PathVariable String id,
             @RequestBody(required = false) Map<String, Object> body) {
         // 1. 查询提案
-        Map<String, Object> proposal;
-        try {
-            proposal = jdbc.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> proposal = proposalService.findProposalById(id);
+        if (proposal == null) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
 
@@ -543,14 +515,11 @@ public class OntologyProposalController {
         String reviewer = body != null ? String.valueOf(body.getOrDefault("reviewer", "")) : "";
         String reviewerComment = body != null ? String.valueOf(body.getOrDefault("reviewComment", "")) : "";
 
-        jdbc.update(
-                "UPDATE ecos_ontology_proposals SET status=?, reviewer=?, reviewer_comment=?, updated_at=NOW() WHERE id=?::bigint",
-                STATUS_APPROVED, reviewer, reviewerComment, id);
+        proposalService.approve(id, STATUS_APPROVED, reviewer, reviewerComment);
 
         String domainCode = String.valueOf(proposal.getOrDefault("domain_code", "default"));
         String proposalType = String.valueOf(proposal.getOrDefault("proposal_type", ""));
-        Map<String, Object> updatedProposal = jdbc.queryForMap(
-                "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+        Map<String, Object> updatedProposal = proposalService.findProposalById(id);
 
         // 3. 创建版本（使用 domain_code 作为 ontologyId）
         Long versionIdLong = null;
@@ -581,13 +550,9 @@ public class OntologyProposalController {
 
             // 6. 更新提案为 EXECUTED，回填 version_id
             if (versionIdLong != null) {
-                jdbc.update(
-                        "UPDATE ecos_ontology_proposals SET status=?, version_id=?, updated_at=NOW() WHERE id=?::bigint",
-                        STATUS_EXECUTED, versionIdLong, id);
+                proposalService.markExecutedWithVersion(id, STATUS_EXECUTED, versionIdLong);
             } else {
-                jdbc.update(
-                        "UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
-                        STATUS_EXECUTED, id);
+                proposalService.markExecuted(id, STATUS_EXECUTED);
             }
 
             log.info("Proposal {} approve-and-publish complete: versionId={}", id, versionIdStr);
@@ -597,8 +562,7 @@ public class OntologyProposalController {
         }
 
         // 7. 返回结果
-        Map<String, Object> finalProposal = jdbc.queryForMap(
-                "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+        Map<String, Object> finalProposal = proposalService.findProposalById(id);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", STATUS_EXECUTED);

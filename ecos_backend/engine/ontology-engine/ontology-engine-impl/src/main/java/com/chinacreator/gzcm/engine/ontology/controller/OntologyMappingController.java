@@ -165,11 +165,7 @@ public class OntologyMappingController {
             return ApiResponse.badRequest("ONT-MAP-003: Failed to serialize field mappings: " + e.getMessage());
         }
 
-        jdbc.update(
-                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())",
-                id, objectId, sourceName, sourceType, "",
-                sourceName, sourceUri, fieldMappingsJson);
+        mappingService.insertMapping(id, objectId, sourceName, sourceType, sourceUri, fieldMappingsJson);
 
         // 同步到 OntologyMappingStore 供 OntologyService.entityToMap() 读取
         Map<String, Object> apiMap = buildApiMap(id, objectId, sourceType, sourceName, sourceUri,
@@ -177,8 +173,7 @@ public class OntologyMappingController {
         mappingStoreRef.store.put(id, apiMap);
         mappingStoreRef.store.put(objectId, apiMap);
 
-        Map<String, Object> created = jdbc.queryForMap(
-                "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+        Map<String, Object> created = mappingService.findMappingById(id);
         log.info("Ontology mapping created: {} objectTypeId={} datasetId={}", id, objectId, datasetId);
         return ApiResponse.success(rowToApiMap(created));
     }
@@ -190,10 +185,8 @@ public class OntologyMappingController {
     public ApiResponse<Map<String, Object>> updateMapping(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
-        Map<String, Object> existing;
-        try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> existing = mappingService.findMappingById(id);
+        if (existing == null) {
             return ApiResponse.notFound("映射 " + id + " 不存在");
         }
 
@@ -238,10 +231,8 @@ public class OntologyMappingController {
 
         sql.append(" WHERE id=?");
         params.add(id);
-        jdbc.update(sql.toString(), params.toArray());
 
-        Map<String, Object> updated = jdbc.queryForMap(
-                "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+        Map<String, Object> updated = mappingService.updateMapping(id, sql, params);
         log.info("Ontology mapping updated: {}", id);
         return ApiResponse.success(rowToApiMap(updated));
     }
@@ -251,14 +242,11 @@ public class OntologyMappingController {
      */
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteMapping(@PathVariable String id) {
-        Map<String, Object> existing;
-        try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> existing = mappingService.deleteMapping(id);
+        if (existing == null) {
             return ApiResponse.notFound("映射 " + id + " 不存在");
         }
 
-        jdbc.update("DELETE FROM ecos_entity_table_mapping WHERE id=?", id);
         mappingStoreRef.store.remove(id);
 
         log.info("Ontology mapping deleted: {}", id);
