@@ -12,7 +12,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.buszhi.workflow.DqService;
 
 /**
- * Data Quality REST API — 数据质量规则/问题/仪表盘（JdbcTemplate 持久化）
+ * Data Quality REST API — 数据质量规则/问题/仪表盘（委托 DqService 持久化）
  *
  * <pre>
  * GET    /api/v1/ecos/dq/rules              — 规则列表
