@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.chinacreator.gzcm.runtime.core.monitor.bean.MonitorObjectBean;
 import com.chinacreator.gzcm.runtime.core.monitor.monitorobject.bean.MonitorObjectParams;
-import com.chinacreator.gzcm.runtime.access.util.LegacyListInfo;
+import com.chinacreator.gzcm.runtime.core.util.LegacyListInfo;
 
 public interface IMonitorObjectDao {
 

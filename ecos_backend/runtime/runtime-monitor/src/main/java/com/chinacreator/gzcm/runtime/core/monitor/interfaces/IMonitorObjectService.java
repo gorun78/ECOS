@@ -4,7 +4,7 @@ import java.util.Map;
 
 import com.chinacreator.gzcm.runtime.core.monitor.monitordata.bean.NodeProcessBean;
 import com.chinacreator.gzcm.runtime.core.monitor.bean.MonitorObjectBean;
-import com.chinacreator.gzcm.runtime.access.util.PageInfo;
+import com.chinacreator.gzcm.runtime.core.util.PageInfo;
 public interface IMonitorObjectService {
 
 	public PageInfo<MonitorObjectBean> queryMonitorObjectByPage(Integer offset, Integer pageSize, MonitorObjectBean condition)throws Exception;

@@ -3,7 +3,7 @@ package com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao;
 import java.util.Map;
 
 import com.chinacreator.gzcm.runtime.core.monitor.warn.bean.WarnLogBean;
-import com.chinacreator.gzcm.runtime.access.util.LegacyListInfo;
+import com.chinacreator.gzcm.runtime.core.util.LegacyListInfo;
 
 public interface IWarnLogDao {
 

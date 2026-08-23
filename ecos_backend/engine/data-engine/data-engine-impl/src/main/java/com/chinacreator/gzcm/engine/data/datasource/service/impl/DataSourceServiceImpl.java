@@ -16,8 +16,8 @@ import com.chinacreator.gzcm.engine.data.datasource.storage.model.StorageConfig;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.datasource.IDataSourceService;
 import com.chinacreator.gzcm.engine.data.datasource.dao.impl.DataSourceDaoImpl;
-import com.chinacreator.gzcm.runtime.access.util.i18n.I18nUtils;
-import com.chinacreator.gzcm.runtime.access.util.i18n.LocaleResolver;
+import com.chinacreator.gzcm.runtime.core.i18n.I18nUtils;
+import com.chinacreator.gzcm.runtime.core.i18n.LocaleResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**

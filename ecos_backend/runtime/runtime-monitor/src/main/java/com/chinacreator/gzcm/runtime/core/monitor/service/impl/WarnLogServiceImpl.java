@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 
 import com.chinacreator.gzcm.runtime.core.monitor.interfaces.IWarnLogService;
 import com.chinacreator.gzcm.runtime.core.monitor.warn.bean.WarnLogBean;
-import com.chinacreator.gzcm.runtime.access.util.PageInfo;
+import com.chinacreator.gzcm.runtime.core.util.PageInfo;
 
 /**
  * 告警日志服务实现

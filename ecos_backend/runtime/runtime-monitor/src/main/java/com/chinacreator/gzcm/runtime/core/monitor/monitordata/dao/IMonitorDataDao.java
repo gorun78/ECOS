@@ -5,7 +5,7 @@ import java.util.List;
 
 import com.chinacreator.gzcm.runtime.core.monitor.monitordata.bean.DatabaseBasicMonitorBean;
 import com.chinacreator.gzcm.runtime.core.monitor.monitordata.bean.MonitorDataBean;
-import com.chinacreator.gzcm.runtime.access.util.LegacyListInfo;
+import com.chinacreator.gzcm.runtime.core.util.LegacyListInfo;
 
 /**
  * IMonitorDataDao - 鐩戞帶鏁版嵁DAO鎺ュ彛

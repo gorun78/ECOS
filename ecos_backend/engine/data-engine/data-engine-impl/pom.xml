@@ -21,7 +21,12 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- DataNet API + Impl (for existing service implementations) -->
+                <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+<!-- DataNet API + Impl (for existing service implementations) -->
 
         <!-- Spring Boot Web -->
         <dependency>

@@ -6,7 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
-import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
 import com.chinacreator.gzcm.sysman.compliance.dao.DataResidencyDao;
 import com.chinacreator.gzcm.sysman.compliance.entity.DataResidency;
 

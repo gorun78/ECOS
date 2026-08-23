@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.persistence.ITaskPersistenceService;

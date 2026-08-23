@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.chinacreator.gzcm.runtime.access.database.ISystemDatabaseAccess;
+import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 
 /**

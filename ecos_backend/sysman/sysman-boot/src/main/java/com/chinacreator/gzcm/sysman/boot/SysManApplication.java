@@ -20,7 +20,7 @@ import org.mybatis.spring.annotation.MapperScan;
     "com.chinacreator.gzcm.workspace",
     "com.chinacreator.gzcm.portal",
 }, excludeFilters = {
-    @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {com.chinacreator.gzcm.runtime.access.util.mybatis.config.MyBatisConfig.class})
+    @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class})
 })
 @MapperScan({
     "com.chinacreator.gzcm.sysman.**.mapper",
