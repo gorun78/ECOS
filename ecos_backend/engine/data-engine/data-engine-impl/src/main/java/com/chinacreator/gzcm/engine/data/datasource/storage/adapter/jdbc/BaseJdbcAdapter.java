@@ -661,7 +661,21 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
      * 构建WHERE子句
      */
     private String buildWhereClause(FilterCondition filter, List<Object> params) {
+        return buildWhereClause(filter, params, 0);
+    }
+
+    /**
+     * 递归构建 WHERE 子句，带最大深度保护防止 StackOverflow
+     * @param depth 当前递归深度，超过 MAX_DEPTH 返回 null
+     */
+    private static final int MAX_FILTER_DEPTH = 20;
+
+    private String buildWhereClause(FilterCondition filter, List<Object> params, int depth) {
         if (filter == null) {
+            return null;
+        }
+        if (depth > MAX_FILTER_DEPTH) {
+            logger.warn("Filter condition depth exceeded {} , ignoring deep conditions", MAX_FILTER_DEPTH);
             return null;
         }
         
@@ -736,7 +750,7 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
                 if (filter.getConditions() != null && !filter.getConditions().isEmpty()) {
                     for (int i = 0; i < filter.getConditions().size(); i++) {
                         if (i > 0) sql.append(" AND ");
-                        sql.append("(").append(buildWhereClause(filter.getConditions().get(i), params)).append(")");
+                        sql.append("(").append(buildWhereClause(filter.getConditions().get(i), params, depth + 1)).append(")");
                     }
                 }
                 break;
@@ -744,13 +758,13 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
                 if (filter.getConditions() != null && !filter.getConditions().isEmpty()) {
                     for (int i = 0; i < filter.getConditions().size(); i++) {
                         if (i > 0) sql.append(" OR ");
-                        sql.append("(").append(buildWhereClause(filter.getConditions().get(i), params)).append(")");
+                        sql.append("(").append(buildWhereClause(filter.getConditions().get(i), params, depth + 1)).append(")");
                     }
                 }
                 break;
             case NOT:
                 if (filter.getConditions() != null && !filter.getConditions().isEmpty()) {
-                    sql.append("NOT (").append(buildWhereClause(filter.getConditions().get(0), params)).append(")");
+                    sql.append("NOT (").append(buildWhereClause(filter.getConditions().get(0), params, depth + 1)).append(")");
                 }
                 break;
             default:
