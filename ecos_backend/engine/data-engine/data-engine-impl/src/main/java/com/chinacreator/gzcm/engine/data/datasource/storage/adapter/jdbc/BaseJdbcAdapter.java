@@ -30,8 +30,8 @@ import com.chinacreator.gzcm.engine.data.datasource.storage.model.WriteRequest.W
 import com.chinacreator.gzcm.engine.data.datadescription.model.DataSchema;
 import com.chinacreator.gzcm.engine.data.datadescription.model.impl.DataSchemaImpl;
 import com.chinacreator.gzcm.engine.data.datadescription.model.impl.DataSchemaImpl.SchemaField;
-import com.chinacreator.gzcm.runtime.core.i18n.I18nUtils;
-import com.chinacreator.gzcm.runtime.core.i18n.LocaleResolver;
+import com.chinacreator.gzcm.runtime.access.util.i18n.I18nUtils;
+import com.chinacreator.gzcm.runtime.access.util.i18n.LocaleResolver;
 
 /**
  * JDBC存储适配器基类

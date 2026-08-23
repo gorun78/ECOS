@@ -6,10 +6,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.support.ReloadableResourceBundleMessageSource;
 
-import com.chinacreator.gzcm.runtime.core.i18n.I18nMessageSource;
-import com.chinacreator.gzcm.runtime.core.i18n.I18nUtils;
-// import com.chinacreator.gzcm.runtime.core.i18n.impl.I18nMessageSourceImpl; // 位于 runtime-impl，对 api 模块不可见
-import com.chinacreator.gzcm.runtime.core.i18n.impl.SpringMessageSourceImpl; // 位于 runtime-api，作为替代
+import com.chinacreator.gzcm.runtime.access.util.i18n.I18nMessageSource;
+import com.chinacreator.gzcm.runtime.access.util.i18n.I18nUtils;
+// import com.chinacreator.gzcm.runtime.access.util.i18n.impl.I18nMessageSourceImpl; // 位于 runtime-impl，对 api 模块不可见
+import com.chinacreator.gzcm.runtime.access.util.i18n.impl.SpringMessageSourceImpl; // 位于 runtime-api，作为替代
 
 /**
  * Sys-Man子系统国际化配置
