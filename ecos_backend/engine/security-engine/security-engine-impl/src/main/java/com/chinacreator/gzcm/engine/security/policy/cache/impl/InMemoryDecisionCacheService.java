@@ -1,138 +1,97 @@
 package com.chinacreator.gzcm.engine.security.policy.cache.impl;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.chinacreator.gzcm.engine.security.policy.cache.DecisionCacheService;
 import com.chinacreator.gzcm.sysman.policy.model.PolicyDecision;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
  * 基于内存的决策结果缓存实现
- * 使用 ConcurrentHashMap 存储，支持 TTL 和自动清理
+ * 使用 Caffeine 存储，支持 TTL 和自动清理，无需手写 ScheduledExecutorService
  */
 public class InMemoryDecisionCacheService implements DecisionCacheService {
-    
-    private static class CacheEntry {
-        final PolicyDecision decision;
-        final long expireAt;
-        
-        CacheEntry(PolicyDecision decision, long expireAt) {
-            this.decision = decision;
-            this.expireAt = expireAt;
-        }
-        
-        boolean isExpired() {
-            return System.currentTimeMillis() > expireAt;
-        }
-    }
-    
-    private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
+
+    private final Cache<String, PolicyDecision> cache;
     private final long defaultTtlMillis;
-    private final ScheduledExecutorService cleaner;
-    
+
     public InMemoryDecisionCacheService() {
         this(resolveDefaultTtlMillis());
     }
-    
+
     public InMemoryDecisionCacheService(long defaultTtlMillis) {
         long resolved = defaultTtlMillis > 0 ? defaultTtlMillis : resolveDefaultTtlMillis();
         // TTL 限制在 1~10 分钟之间
         long min = TimeUnit.MINUTES.toMillis(1);
         long max = TimeUnit.MINUTES.toMillis(10);
         this.defaultTtlMillis = Math.min(Math.max(resolved, min), max);
-        
-        this.cleaner = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "decision-cache-cleaner");
-            t.setDaemon(true);
-            return t;
-        });
-        
-        // 定时清理过期条目，默认每 1 分钟检查一次
-        this.cleaner.scheduleAtFixedRate(
-            this::evictExpiredEntries, 
-            this.defaultTtlMillis, 
-            TimeUnit.MINUTES.toMillis(1), 
-            TimeUnit.MILLISECONDS
-        );
+
+        this.cache = Caffeine.newBuilder()
+            .maximumSize(10000)
+            .expireAfterWrite(this.defaultTtlMillis, TimeUnit.MILLISECONDS)
+            .build();
     }
-    
+
     @Override
     public PolicyDecision get(String cacheKey) {
         if (cacheKey == null) {
             return null;
         }
-        
-        CacheEntry entry = cache.get(cacheKey);
-        if (entry == null) {
-            return null;
-        }
-        
-        if (entry.isExpired()) {
-            cache.remove(cacheKey);
-            return null;
-        }
-        
-        return entry.decision;
+        return cache.getIfPresent(cacheKey);
     }
-    
+
     @Override
     public void put(String cacheKey, PolicyDecision decision, long ttlMillis) {
         if (cacheKey == null || decision == null) {
             return;
         }
-        
-        long ttl = ttlMillis > 0 ? ttlMillis : defaultTtlMillis;
-        long expireAt = System.currentTimeMillis() + ttl;
-        cache.put(cacheKey, new CacheEntry(decision, expireAt));
+        cache.put(cacheKey, decision);
     }
-    
+
     @Override
     public void evict(String cacheKey) {
         if (cacheKey == null) {
             return;
         }
-        
+
         // 支持通配符匹配（如 userId:*）
         if (cacheKey.endsWith("*")) {
             String prefix = cacheKey.substring(0, cacheKey.length() - 1);
             Pattern pattern = Pattern.compile("^" + Pattern.quote(prefix) + ".*");
-            cache.entrySet().removeIf(entry -> pattern.matcher(entry.getKey()).matches());
+            cache.asMap().keySet().removeIf(key -> pattern.matcher(key).matches());
         } else {
-            cache.remove(cacheKey);
+            cache.invalidate(cacheKey);
         }
     }
-    
+
     @Override
     public void evictAll() {
-        cache.clear();
+        cache.invalidateAll();
     }
-    
+
     /**
-     * 清理过期条目
+     * 清理过期条目（Caffeine 自动管理，此方法仅用于显式触发）
      */
-    private void evictExpiredEntries() {
-        long now = System.currentTimeMillis();
-        cache.entrySet().removeIf(entry -> entry.getValue().expireAt < now);
+    public void cleanUp() {
+        cache.cleanUp();
     }
-    
+
     /**
-     * 关闭资源
+     * 关闭资源（Caffeine 无需关闭资源，保留方法兼容调用方）
      */
     public void shutdown() {
-        if (cleaner != null && !cleaner.isShutdown()) {
-            cleaner.shutdown();
-        }
+        cache.invalidateAll();
+        cache.cleanUp();
     }
-    
+
     private static long resolveDefaultTtlMillis() {
         String sysProp = System.getProperty("security.policy.decision.cache.ttl-ms");
         String envProp = System.getenv("SECURITY_POLICY_DECISION_CACHE_TTL_MS");
         return parseLongOrDefault(sysProp, parseLongOrDefault(envProp, TimeUnit.MINUTES.toMillis(5)));
     }
-    
+
     private static long parseLongOrDefault(String source, long defaultValue) {
         if (source == null || source.trim().isEmpty()) {
             return defaultValue;

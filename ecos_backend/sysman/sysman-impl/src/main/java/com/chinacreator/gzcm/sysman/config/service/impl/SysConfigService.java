@@ -5,15 +5,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import jakarta.annotation.PostConstruct;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 系统配置服务 — JdbcTemplate + 内存缓存实现。
  * <p>
- * 启动时自动从 sys_config 表加载所有配置到 ConcurrentHashMap，
+ * 启动时自动从 sys_config 表加载所有配置到 Caffeine 缓存，
  * 提供 getString / getInt / getLong / getBoolean 便捷取值方法。
+ * 配置常驻不设过期，靠 refreshCache() 主动失效。
  */
 @Service
 public class SysConfigService {
@@ -22,8 +25,10 @@ public class SysConfigService {
 
     private final JdbcTemplate jdbcTemplate;
 
-    /** 内存缓存：configKey → config_value (字符串) */
-    private final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
+    /** 内存缓存：configKey → config_value (Caffeine，配置常驻不设过期) */
+    private final Cache<String, String> cache = Caffeine.newBuilder()
+        .maximumSize(1000)
+        .build();
 
     public SysConfigService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -36,7 +41,7 @@ public class SysConfigService {
         ensureSchema();
         ensureDefaultConfigs();
         refreshCache();
-        log.info("SysConfigService 初始化完成，已加载 {} 条配置", cache.size());
+        log.info("SysConfigService 初始化完成，已加载 {} 条配置", cache.estimatedSize());
     }
 
     /** 确保 sys_config 表有新字段 (config_group, description, config_type) */
@@ -140,7 +145,7 @@ public class SysConfigService {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT config_key, config_value FROM sys_config WHERE status = 'active'"
             );
-            cache.clear();
+            cache.invalidateAll();
             for (Map<String, Object> row : rows) {
                 String key = (String) row.get("config_key");
                 String value = (String) row.get("config_value");
@@ -148,7 +153,7 @@ public class SysConfigService {
                     cache.put(key, value);
                 }
             }
-            log.info("缓存刷新完成，当前 {} 条配置", cache.size());
+            log.info("缓存刷新完成，当前 {} 条配置", cache.estimatedSize());
         } catch (Exception e) {
             log.error("刷新 sys_config 缓存失败", e);
         }
@@ -158,12 +163,12 @@ public class SysConfigService {
 
     /** 获取字符串值 */
     public String getString(String key) {
-        return cache.get(key);
+        return cache.getIfPresent(key);
     }
 
     /** 获取字符串值（带默认值） */
     public String getString(String key, String defaultValue) {
-        String val = cache.get(key);
+        String val = cache.getIfPresent(key);
         return val != null ? val : defaultValue;
     }
 
@@ -174,7 +179,7 @@ public class SysConfigService {
 
     /** 获取整数值（带默认值） */
     public int getInt(String key, int defaultValue) {
-        String val = cache.get(key);
+        String val = cache.getIfPresent(key);
         if (val == null) return defaultValue;
         try {
             return Integer.parseInt(val);
@@ -190,7 +195,7 @@ public class SysConfigService {
 
     /** 获取长整数值（带默认值） */
     public long getLong(String key, long defaultValue) {
-        String val = cache.get(key);
+        String val = cache.getIfPresent(key);
         if (val == null) return defaultValue;
         try {
             return Long.parseLong(val);
@@ -206,7 +211,7 @@ public class SysConfigService {
 
     /** 获取布尔值（带默认值） */
     public boolean getBoolean(String key, boolean defaultValue) {
-        String val = cache.get(key);
+        String val = cache.getIfPresent(key);
         if (val == null) return defaultValue;
         return "true".equalsIgnoreCase(val) || "1".equals(val) || "yes".equalsIgnoreCase(val);
     }
@@ -215,7 +220,7 @@ public class SysConfigService {
 
     /** 获取全部缓存（快照） */
     public Map<String, String> getAll() {
-        return new HashMap<>(cache);
+        return new HashMap<>(cache.asMap());
     }
 
     /** 按分组查询配置列表 */
@@ -275,7 +280,7 @@ public class SysConfigService {
 
     /** 获取缓存大小 */
     public int cacheSize() {
-        return cache.size();
+        return (int) cache.estimatedSize();
     }
 
     // ── 数据工作台配置方法 ────────────────────────────

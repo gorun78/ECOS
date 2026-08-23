@@ -8,16 +8,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 数据字典服务实现
- * 使用 JdbcTemplate 进行数据库访问，ConcurrentHashMap 作为内存缓存
+ * 使用 JdbcTemplate 进行数据库访问，Caffeine 作为内存缓存
  */
 @Service
 public class DictService implements IDictService {
@@ -27,9 +29,11 @@ public class DictService implements IDictService {
     private final JdbcTemplate jdbc;
 
     /**
-     * 内存缓存: dict_type -> List<SysDict>
+     * 内存缓存: dict_type -> List<SysDict>（Caffeine，字典常驻不设过期，靠 refreshCache 主动失效）
      */
-    private final ConcurrentHashMap<String, List<SysDict>> cache = new ConcurrentHashMap<>();
+    private final Cache<String, List<SysDict>> cache = Caffeine.newBuilder()
+        .maximumSize(100)
+        .build();
 
     /**
      * 缓存所有字典类型的集合（用于快速获取类型列表）
@@ -63,7 +67,7 @@ public class DictService implements IDictService {
 
     @Override
     public List<SysDict> getDictItems(String dictType) {
-        List<SysDict> items = cache.get(dictType);
+        List<SysDict> items = cache.getIfPresent(dictType);
         if (items == null) {
             // 缓存未命中，从数据库加载
             items = loadFromDb(dictType);
@@ -140,7 +144,7 @@ public class DictService implements IDictService {
     @Override
     public Map<String, Object> refreshCache() {
         long start = System.currentTimeMillis();
-        cache.clear();
+        cache.invalidateAll();
 
         List<SysDict> allItems = jdbc.query(
             "SELECT id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at " +
@@ -152,7 +156,9 @@ public class DictService implements IDictService {
         for (SysDict item : allItems) {
             grouped.computeIfAbsent(item.getDictType(), k -> new ArrayList<>()).add(item);
         }
-        cache.putAll(grouped);
+        for (Map.Entry<String, List<SysDict>> entry : grouped.entrySet()) {
+            cache.put(entry.getKey(), entry.getValue());
+        }
         cachedTypes = new LinkedHashSet<>(grouped.keySet());
 
         long elapsed = System.currentTimeMillis() - start;
@@ -230,7 +236,7 @@ public class DictService implements IDictService {
         if (items != null && !items.isEmpty()) {
             cache.put(dictType, items);
         } else {
-            cache.remove(dictType);
+            cache.invalidate(dictType);
         }
         updateCachedTypes();
     }
@@ -249,7 +255,7 @@ public class DictService implements IDictService {
      * 更新缓存的类型集合
      */
     private void updateCachedTypes() {
-        cachedTypes = new LinkedHashSet<>(cache.keySet());
+        cachedTypes = new LinkedHashSet<>(cache.asMap().keySet());
     }
 
     /**

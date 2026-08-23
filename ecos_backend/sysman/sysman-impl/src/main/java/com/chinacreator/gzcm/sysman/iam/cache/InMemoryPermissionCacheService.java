@@ -3,43 +3,37 @@ package com.chinacreator.gzcm.sysman.iam.cache;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.chinacreator.gzcm.sysman.iam.entity.Permission;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
- * 简单基于 ConcurrentHashMap 的本地权限缓存实现。
- * 使用 TTL 做软过期，读取时懒惰清理。
+ * 基于 Caffeine 的本地权限缓存实现。
+ * 自动 TTL + 容量上限，消除手写过期清理和内存泄漏风险。
  */
 public class InMemoryPermissionCacheService implements PermissionCacheService {
 
     private static class Entry {
         final Set<Permission> permissions;
-        final long expireAt;
 
-        Entry(Set<Permission> permissions, long expireAt) {
-            this.permissions = permissions;
-            this.expireAt = expireAt;
+        Entry(Set<Permission> permissions) {
+            this.permissions = Collections.unmodifiableSet(permissions);
         }
     }
-    
+
     private static class DecisionEntry {
         final Map<String, Object> decisions;
-        final long expireAt;
-        
-        DecisionEntry(Map<String, Object> decisions, long expireAt) {
+
+        DecisionEntry(Map<String, Object> decisions) {
             this.decisions = Collections.unmodifiableMap(decisions);
-            this.expireAt = expireAt;
         }
     }
 
-    private final Map<String, Entry> cache = new ConcurrentHashMap<>();
-    private final Map<String, DecisionEntry> decisionCache = new ConcurrentHashMap<>();
+    private final Cache<String, Entry> cache;
+    private final Cache<String, DecisionEntry> decisionCache;
     private final long defaultTtlMillis;
-    private final ScheduledExecutorService cleaner;
 
     public InMemoryPermissionCacheService() {
         this(resolveDefaultTtlMillis());
@@ -51,13 +45,16 @@ public class InMemoryPermissionCacheService implements PermissionCacheService {
         long min = TimeUnit.MINUTES.toMillis(5);
         long max = TimeUnit.MINUTES.toMillis(15);
         this.defaultTtlMillis = Math.min(Math.max(resolved, min), max);
-        this.cleaner = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "permission-cache-cleaner");
-            t.setDaemon(true);
-            return t;
-        });
-        // 定时清理过期条目，默认每 1 分钟检查一次
-        this.cleaner.scheduleAtFixedRate(this::evictExpiredEntries, this.defaultTtlMillis, TimeUnit.MINUTES.toMillis(1), TimeUnit.MILLISECONDS);
+
+        this.cache = Caffeine.newBuilder()
+            .maximumSize(5000)
+            .expireAfterWrite(this.defaultTtlMillis, TimeUnit.MILLISECONDS)
+            .build();
+
+        this.decisionCache = Caffeine.newBuilder()
+            .maximumSize(5000)
+            .expireAfterWrite(this.defaultTtlMillis, TimeUnit.MILLISECONDS)
+            .build();
     }
 
     @Override
@@ -65,9 +62,7 @@ public class InMemoryPermissionCacheService implements PermissionCacheService {
         if (userId == null || permissions == null) {
             return;
         }
-        long ttl = ttlMillis > 0 ? ttlMillis : defaultTtlMillis;
-        long expireAt = System.currentTimeMillis() + ttl;
-        cache.put(userId, new Entry(Collections.unmodifiableSet(permissions), expireAt));
+        cache.put(userId, new Entry(permissions));
     }
 
     @Override
@@ -75,12 +70,8 @@ public class InMemoryPermissionCacheService implements PermissionCacheService {
         if (userId == null) {
             return null;
         }
-        Entry e = cache.get(userId);
+        Entry e = cache.getIfPresent(userId);
         if (e == null) {
-            return null;
-        }
-        if (e.expireAt < System.currentTimeMillis()) {
-            cache.remove(userId);
             return null;
         }
         return e.permissions;
@@ -91,22 +82,16 @@ public class InMemoryPermissionCacheService implements PermissionCacheService {
         if (userId == null || decisions == null) {
             return;
         }
-        long ttl = ttlMillis > 0 ? ttlMillis : defaultTtlMillis;
-        long expireAt = System.currentTimeMillis() + ttl;
-        decisionCache.put(userId, new DecisionEntry(decisions, expireAt));
+        decisionCache.put(userId, new DecisionEntry(decisions));
     }
-    
+
     @Override
     public Map<String, Object> getUserPermissionDecisions(String userId) {
         if (userId == null) {
             return null;
         }
-        DecisionEntry e = decisionCache.get(userId);
+        DecisionEntry e = decisionCache.getIfPresent(userId);
         if (e == null) {
-            return null;
-        }
-        if (e.expireAt < System.currentTimeMillis()) {
-            decisionCache.remove(userId);
             return null;
         }
         return e.decisions;
@@ -115,21 +100,15 @@ public class InMemoryPermissionCacheService implements PermissionCacheService {
     @Override
     public void evictUser(String userId) {
         if (userId != null) {
-            cache.remove(userId);
-            decisionCache.remove(userId);
+            cache.invalidate(userId);
+            decisionCache.invalidate(userId);
         }
     }
 
     @Override
     public void evictAll() {
-        cache.clear();
-        decisionCache.clear();
-    }
-
-    private void evictExpiredEntries() {
-        long now = System.currentTimeMillis();
-        cache.entrySet().removeIf(entry -> entry.getValue().expireAt < now);
-        decisionCache.entrySet().removeIf(entry -> entry.getValue().expireAt < now);
+        cache.invalidateAll();
+        decisionCache.invalidateAll();
     }
 
     private static long resolveDefaultTtlMillis() {
@@ -149,5 +128,3 @@ public class InMemoryPermissionCacheService implements PermissionCacheService {
         }
     }
 }
-
-
