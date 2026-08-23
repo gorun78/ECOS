@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
+import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.engine.data.QualityService;
 import com.chinacreator.gzcm.engine.data.quality.QualityResult;
 import com.chinacreator.gzcm.engine.data.quality.QualityRule;

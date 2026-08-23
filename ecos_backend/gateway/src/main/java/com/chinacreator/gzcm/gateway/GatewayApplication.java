@@ -39,7 +39,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.worldmodel",
     "com.chinacreator.gzcm.workspace",
     "com.chinacreator.gzcm.portal",
-    "com.chinacreator.gzcm.datanet",
     "com.chinacreator.gzcm.cognitive",
     "com.chinacreator.gzcm.engine",
     "com.chinacreator.gzcm.services.agent.runtime",
@@ -62,12 +61,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // MinioStorageService (gateway.service) 保留：DataLakeExportService 依赖它，不要排除
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
-        // 数据引擎已接管（阶段2），排除datanet侧副本
-        com.chinacreator.gzcm.datanet.controller.CatalogController.class,
-        com.chinacreator.gzcm.datanet.controller.DataSourceController.class,
-        com.chinacreator.gzcm.datanet.controller.MetadataController.class,
-        com.chinacreator.gzcm.datanet.controller.CategoryController.class,
-        com.chinacreator.gzcm.datanet.controller.DatanetHealthController.class,
+        // 数据引擎已接管（A+7b: datanet 退出构建，A+7c 删目录）
         // 本体引擎已接管（阶段3），排除buszhi侧副本
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
         // 认知引擎已接管（阶段4），aimod.controller包已由REGEX过滤器整体排除
@@ -111,7 +105,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.runtime.llm.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository",
-    "com.chinacreator.gzcm.datanet.repository",
+    "com.chinacreator.gzcm.engine.data.repository",
     "com.chinacreator.gzcm.engine.kb.repository"
 })
 public class GatewayApplication {

@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.data;
 
-import com.chinacreator.gzcm.datanet.pipeline.PipelineDefinition;
+import com.chinacreator.gzcm.engine.data.pipeline.PipelineDefinition;
 
 import java.util.List;
 import java.util.Map;

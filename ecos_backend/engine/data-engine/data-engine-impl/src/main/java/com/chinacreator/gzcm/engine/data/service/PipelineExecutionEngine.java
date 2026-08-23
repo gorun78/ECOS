@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
+import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.common.data.model.DataLayer;
 import com.chinacreator.gzcm.engine.data.transform.TransformChain;
 import com.chinacreator.gzcm.engine.data.transform.TransformStep;

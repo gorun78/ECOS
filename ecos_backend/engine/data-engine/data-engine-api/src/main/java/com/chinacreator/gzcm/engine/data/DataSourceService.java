@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data;
 
 import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
-import com.chinacreator.gzcm.runtime.core.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 
 import java.util.List;
 

@@ -408,7 +408,7 @@
         <module>engine</module>
         <module>runtime</module>
         <module>sysman</module>
-        <module>datanet</module>
+        <!-- <module>datanet</module> A+7b: datanet 退出构建，A+7c 删目录 -->
         <module>buszhi</module>
         <module>aimod</module>
         <module>workspace</module>
@@ -448,7 +448,7 @@
                 <module>common</module>
                 <module>runtime</module>
                 <module>sysman</module>
-                <module>datanet</module>
+                <!-- <module>datanet</module> A+7b: datanet 退出构建，A+7c 删目录 -->
                 <module>aimod</module>
                 <module>workspace</module>
                 <!-- Sprint 1: Microservice modules -->
@@ -475,7 +475,7 @@
                 <module>common</module>
                 <module>runtime</module>
                 <module>sysman</module>
-                <module>datanet</module>
+                <!-- <module>datanet</module> A+7b: datanet 退出构建，A+7c 删目录 -->
                 <module>aimod</module>
                 <module>workspace</module>
                 <module>services/api-gateway</module>
@@ -501,7 +501,7 @@
                 <module>common</module>
                 <module>runtime</module>
                 <module>sysman</module>
-                <module>datanet</module>
+                <!-- <module>datanet</module> A+7b: datanet 退出构建，A+7c 删目录 -->
                 <module>aimod</module>
                 <module>workspace</module>
                 <module>services/api-gateway</module>
