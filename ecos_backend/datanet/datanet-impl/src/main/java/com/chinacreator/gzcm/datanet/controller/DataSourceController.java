@@ -3,7 +3,7 @@ package com.chinacreator.gzcm.datanet.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.datanet.connector.Connector;
 import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
-import com.chinacreator.gzcm.datanet.dto.DataSourceDTO;
+import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
 import com.chinacreator.gzcm.datanet.service.DataSourceService;
 import com.chinacreator.gzcm.runtime.core.datasource.entity.DataSourceEntity;
 import com.github.benmanes.caffeine.cache.Cache;

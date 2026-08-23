@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.datanet.dto.CatalogQueryDTO;
-import com.chinacreator.gzcm.datanet.model.CatalogItem;
-import com.chinacreator.gzcm.datanet.model.DataResource;
-import com.chinacreator.gzcm.datanet.service.CatalogService;
+import com.chinacreator.gzcm.common.data.dto.CatalogQueryDTO;
+import com.chinacreator.gzcm.common.data.model.CatalogItem;
+import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.engine.data.CatalogService;
 import com.chinacreator.gzcm.engine.data.service.CatalogDashboardService;
 import org.springframework.web.bind.annotation.*;
 

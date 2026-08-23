@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.datanet.connector;
 
-import com.chinacreator.gzcm.datanet.model.DataResource;
+import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

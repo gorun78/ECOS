@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.datanet.repository;
+package com.chinacreator.gzcm.engine.data.repository;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import org.apache.ibatis.annotations.Mapper;

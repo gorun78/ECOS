@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.datanet.model.DataField;
-import com.chinacreator.gzcm.datanet.service.MetadataService;
+import com.chinacreator.gzcm.common.data.model.DataField;
+import com.chinacreator.gzcm.engine.data.MetadataService;
 import com.chinacreator.gzcm.engine.data.service.MetadataCollectionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

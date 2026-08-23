@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.datanet.connector;
 
-import com.chinacreator.gzcm.datanet.model.DataResource;
+import com.chinacreator.gzcm.common.data.model.DataResource;
 
 import java.util.List;
 import java.util.Map;

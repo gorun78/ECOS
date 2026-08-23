@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.datanet.dto;
+package com.chinacreator.gzcm.common.data.dto;
 
 /**
  * 目录查询参数 DTO。

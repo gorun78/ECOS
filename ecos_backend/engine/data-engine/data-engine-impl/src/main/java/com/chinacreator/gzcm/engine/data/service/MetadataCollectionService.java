@@ -2,10 +2,10 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.datanet.connector.Connector;
 import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
-import com.chinacreator.gzcm.datanet.model.DataResource;
-import com.chinacreator.gzcm.datanet.repository.DataResourceRepository;
-import com.chinacreator.gzcm.datanet.repository.DataSourceRepository;
-import com.chinacreator.gzcm.datanet.service.MetadataService;
+import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
+import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
+import com.chinacreator.gzcm.engine.data.MetadataService;
 import com.chinacreator.gzcm.runtime.core.datasource.entity.DataSourceEntity;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;

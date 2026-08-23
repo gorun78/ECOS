@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.datanet.service;
 
-import com.chinacreator.gzcm.datanet.dto.CatalogQueryDTO;
-import com.chinacreator.gzcm.datanet.model.CatalogItem;
-import com.chinacreator.gzcm.datanet.model.DataResource;
+import com.chinacreator.gzcm.common.data.dto.CatalogQueryDTO;
+import com.chinacreator.gzcm.common.data.model.CatalogItem;
+import com.chinacreator.gzcm.common.data.model.DataResource;
 
 import java.util.List;
 

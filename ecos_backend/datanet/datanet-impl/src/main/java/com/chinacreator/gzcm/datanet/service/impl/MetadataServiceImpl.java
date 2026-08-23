@@ -2,8 +2,8 @@ package com.chinacreator.gzcm.datanet.service.impl;
 
 import com.chinacreator.gzcm.datanet.connector.Connector;
 import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
-import com.chinacreator.gzcm.datanet.model.DataField;
-import com.chinacreator.gzcm.datanet.model.DataResource;
+import com.chinacreator.gzcm.common.data.model.DataField;
+import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.datanet.repository.DataFieldRepository;
 import com.chinacreator.gzcm.datanet.repository.DataSourceRepository;
 import com.chinacreator.gzcm.datanet.service.CatalogService;

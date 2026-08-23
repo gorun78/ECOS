@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.datanet.service;
 
-import com.chinacreator.gzcm.datanet.model.DataField;
+import com.chinacreator.gzcm.common.data.model.DataField;
 
 import java.util.List;
 

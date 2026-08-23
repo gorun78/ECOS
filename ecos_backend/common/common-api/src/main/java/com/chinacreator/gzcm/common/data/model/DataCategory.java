@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.datanet.model;
+package com.chinacreator.gzcm.common.data.model;
 
 import java.time.LocalDateTime;
 import java.util.List;

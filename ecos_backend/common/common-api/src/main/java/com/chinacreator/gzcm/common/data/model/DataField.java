@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.datanet.model;
+package com.chinacreator.gzcm.common.data.model;
 
 /**
  * 数据字段 — 描述数据资源中的一个字段/列。

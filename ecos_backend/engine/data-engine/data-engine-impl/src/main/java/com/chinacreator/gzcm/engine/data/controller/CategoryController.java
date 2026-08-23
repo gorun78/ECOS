@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.datanet.model.DataCategory;
-import com.chinacreator.gzcm.datanet.service.CategoryService;
+import com.chinacreator.gzcm.common.data.model.DataCategory;
+import com.chinacreator.gzcm.engine.data.CategoryService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.datanet.service;
 
-import com.chinacreator.gzcm.datanet.model.DataCategory;
+import com.chinacreator.gzcm.common.data.model.DataCategory;
 
 import java.util.List;
 

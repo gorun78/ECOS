@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.datanet.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.datanet.model.DataCategory;
+import com.chinacreator.gzcm.common.data.model.DataCategory;
 import com.chinacreator.gzcm.datanet.service.CategoryService;
 import org.springframework.web.bind.annotation.*;
 

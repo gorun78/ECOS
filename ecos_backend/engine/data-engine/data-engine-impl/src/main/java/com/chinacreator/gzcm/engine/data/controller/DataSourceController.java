@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.datanet.dto.DataSourceDTO;
+import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
 import com.chinacreator.gzcm.engine.data.service.DataSourceRegistryService;
 import com.chinacreator.gzcm.runtime.core.datasource.entity.DataSourceEntity;
 import org.springframework.web.bind.annotation.*;

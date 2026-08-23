@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.datanet.dto.CatalogQueryDTO;
-import com.chinacreator.gzcm.datanet.model.CatalogItem;
-import com.chinacreator.gzcm.datanet.service.CatalogService;
+import com.chinacreator.gzcm.common.data.dto.CatalogQueryDTO;
+import com.chinacreator.gzcm.common.data.model.CatalogItem;
+import com.chinacreator.gzcm.engine.data.CatalogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;

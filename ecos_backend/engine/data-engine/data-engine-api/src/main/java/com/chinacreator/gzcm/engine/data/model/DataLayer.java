@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.engine.data.model;
+package com.chinacreator.gzcm.common.data.model;
 
 public enum DataLayer {
     SOURCE,

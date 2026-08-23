@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.datanet.repository;
 
-import com.chinacreator.gzcm.datanet.model.DataCategory;
+import com.chinacreator.gzcm.common.data.model.DataCategory;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

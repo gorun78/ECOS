@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.datanet.service.impl;
 
-import com.chinacreator.gzcm.datanet.model.DataCategory;
+import com.chinacreator.gzcm.common.data.model.DataCategory;
 import com.chinacreator.gzcm.datanet.repository.CategoryRepository;
 import com.chinacreator.gzcm.datanet.service.CategoryService;
 import org.slf4j.Logger;

@@ -2,7 +2,7 @@ package com.chinacreator.gzcm.datanet.service.impl;
 
 import com.chinacreator.gzcm.datanet.connector.Connector;
 import com.chinacreator.gzcm.datanet.connector.ConnectorFactory;
-import com.chinacreator.gzcm.datanet.dto.DataSourceDTO;
+import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
 import com.chinacreator.gzcm.datanet.repository.DataSourceRepository;
 import com.chinacreator.gzcm.datanet.service.DataSourceService;
 import com.chinacreator.gzcm.runtime.core.datasource.entity.DataSourceEntity;
