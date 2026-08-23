@@ -45,8 +45,7 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/v1/portal/",       "/api/portal/"),
         Map.entry("/api/v1/agent-call/",   "/api/agent-call/"),
         Map.entry("/api/v1/glossary/",     "/api/glossary/"),
-        Map.entry("/api/v1/marketplace/",   "/api/marketplace/"),
-        Map.entry("/api/v1/datanet/",      "/datanet/")
+        Map.entry("/api/v1/marketplace/",   "/api/marketplace/")
     );
 
     /**

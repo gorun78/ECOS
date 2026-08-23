@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>接管原 sysman-boot 的所有职责：
  * <ul>
- *   <li>导入全部业务模块（sysman/runtime/buszhi/datanet/aimod/portal/market/worldmodel/workspace）</li>
+ *   <li>导入全部业务模块（sysman/runtime/buszhi/aimod/portal/market/worldmodel/workspace）</li>
  *   <li>暴露 /api/* REST 端点（无 /sys-man 前缀）</li>
  *   <li>健康检查 /actuator/health</li>
  *   <li>OpenAPI 3.0 文档 /v3/api-docs</li>

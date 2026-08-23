@@ -14,7 +14,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @ComponentScan(basePackages = {
         "com.chinacreator.gzcm.services.catalog",
-        "com.chinacreator.gzcm.datanet",
         "com.chinacreator.gzcm.engine.data",
         "com.chinacreator.gzcm.runtime"
 })
