@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.gateway.service;
 
-import com.chinacreator.gzcm.common.service.IObjectStorageService;
 import com.chinacreator.gzcm.gateway.service.DuckDBQueryService;
+import com.chinacreator.gzcm.gateway.service.MinioStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,15 +27,12 @@ public class DataLakeExportService {
     private final JdbcTemplate pgJdbc;
     private final DuckDBQueryService duckDB;
     private final MinioStorageService minioStorage;
-    private final IObjectStorageService objectStorage;
 
     public DataLakeExportService(JdbcTemplate pgJdbc, DuckDBQueryService duckDB,
-                                  MinioStorageService minioStorage,
-                                  @Qualifier("minioObjectStorageService") IObjectStorageService objectStorage) {
+                                  MinioStorageService minioStorage) {
         this.pgJdbc = pgJdbc;
         this.duckDB = duckDB;
         this.minioStorage = minioStorage;
-        this.objectStorage = objectStorage;
     }
 
     /**

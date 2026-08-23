@@ -11,7 +11,7 @@ import com.chinacreator.gzcm.engine.security.crypto.entity.SecretShare;
  * 
  * @author CDRC Runtime Team
  */
-public interface SecretDao {
+public interface SecuritySecretDao {
     
     /**
      * 鍒涘缓鏈哄瘑

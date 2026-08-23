@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
-import com.chinacreator.gzcm.runtime.core.config.dao.ConfigDao;
+import com.chinacreator.gzcm.runtime.core.config.dao.RuntimeConfigDao;
 import com.chinacreator.gzcm.runtime.core.config.entity.ConfigEntity;
 import com.chinacreator.gzcm.runtime.core.config.entity.ConfigVersionEntity;
 import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
@@ -20,8 +20,8 @@ import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
  *
  * @author CDRC Runtime Team
  */
-@Repository("runtimeConfigDao")
-public class ConfigDaoImpl implements ConfigDao {
+@Repository("runtimeConfigDaoImpl")
+public class ConfigDaoImpl implements RuntimeConfigDao {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigDaoImpl.class);
 

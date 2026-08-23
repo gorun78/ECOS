@@ -11,7 +11,7 @@ import com.chinacreator.gzcm.runtime.core.config.entity.ConfigVersionEntity;
  *
  * @author CDRC Runtime Team
  */
-public interface ConfigDao {
+public interface RuntimeConfigDao {
 
     /**
      * 保存配置

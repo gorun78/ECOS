@@ -10,7 +10,7 @@ import com.chinacreator.gzcm.engine.security.crypto.model.KeyMetadata;
  * 
  * @author CDRC Runtime Team
  */
-public interface CryptoKeyDao {
+public interface SecurityCryptoKeyDao {
     
     /**
      * 鎻掑叆瀵嗛挜鍏冩暟鎹?

@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 
 import com.chinacreator.gzcm.engine.security.crypto.IKeyManagementService;
 import com.chinacreator.gzcm.engine.security.crypto.IDataEncryptionService;
-import com.chinacreator.gzcm.engine.security.crypto.dao.SecretDao;
-import com.chinacreator.gzcm.engine.security.crypto.dao.impl.SecretDaoImpl;
+import com.chinacreator.gzcm.engine.security.crypto.dao.SecuritySecretDao;
+import com.chinacreator.gzcm.engine.security.crypto.dao.impl.SecuritySecretDaoImpl;
 import com.chinacreator.gzcm.engine.security.crypto.entity.Secret;
 import com.chinacreator.gzcm.engine.security.crypto.entity.SecretAccessLog;
 import com.chinacreator.gzcm.engine.security.crypto.entity.SecretShare;
@@ -29,12 +29,12 @@ public class SecretServiceImpl implements ISecretService {
     private final Map<String, SecretShare> shares = new ConcurrentHashMap<>();
     private final IKeyManagementService keyService;
     private final IDataEncryptionService encryptionService;
-    private final SecretDao secretDao;
+    private final SecuritySecretDao secretDao;
 
     public SecretServiceImpl(IKeyManagementService keyService, IDataEncryptionService encryptionService) {
         this.keyService = keyService;
         this.encryptionService = encryptionService;
-        this.secretDao = new SecretDaoImpl();
+        this.secretDao = new SecuritySecretDaoImpl();
     }
     
     /**

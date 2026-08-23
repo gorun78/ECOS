@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import com.chinacreator.gzcm.runtime.core.config.ConfigException;
 import com.chinacreator.gzcm.runtime.core.config.ConfigListener;
 import com.chinacreator.gzcm.runtime.core.config.IConfigService;
-import com.chinacreator.gzcm.runtime.core.config.dao.ConfigDao;
+import com.chinacreator.gzcm.runtime.core.config.dao.RuntimeConfigDao;
 import com.chinacreator.gzcm.runtime.core.config.entity.ConfigEntity;
 import com.chinacreator.gzcm.runtime.core.config.entity.ConfigVersionEntity;
 
@@ -35,18 +35,18 @@ public class DatabaseConfigServiceImpl implements IConfigService {
     private static final String DEFAULT_CONFIG_TYPE = "runtime";
     private static final String DEFAULT_ENVIRONMENT = "default";
 
-    private final ConfigDao configDao;
+    private final RuntimeConfigDao configDao;
     private final CopyOnWriteArrayList<ConfigListener> listeners = new CopyOnWriteArrayList<>();
     private final Map<String, String> memoryCache = new ConcurrentHashMap<>();
     private String environment = DEFAULT_ENVIRONMENT;
     private boolean cacheEnabled = true;
 
     @Autowired
-    public DatabaseConfigServiceImpl(@Qualifier("runtimeConfigDao") ConfigDao configDao) {
+    public DatabaseConfigServiceImpl(@Qualifier("runtimeConfigDao") RuntimeConfigDao configDao) {
         this.configDao = configDao;
     }
 
-    public DatabaseConfigServiceImpl(ConfigDao configDao, boolean cacheEnabled) {
+    public DatabaseConfigServiceImpl(RuntimeConfigDao configDao, boolean cacheEnabled) {
         this.configDao = configDao;
         this.cacheEnabled = cacheEnabled;
     }

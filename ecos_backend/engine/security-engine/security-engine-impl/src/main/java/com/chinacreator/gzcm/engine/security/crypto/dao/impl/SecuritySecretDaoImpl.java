@@ -1,12 +1,14 @@
 package com.chinacreator.gzcm.engine.security.crypto.dao.impl;
 
+import org.springframework.stereotype.Repository;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import com.chinacreator.gzcm.engine.security.crypto.dao.SecretDao;
+import com.chinacreator.gzcm.engine.security.crypto.dao.SecuritySecretDao;
 import com.chinacreator.gzcm.engine.security.crypto.entity.Secret;
 import com.chinacreator.gzcm.engine.security.crypto.entity.SecretAccessLog;
 import com.chinacreator.gzcm.engine.security.crypto.entity.SecretShare;
@@ -16,7 +18,8 @@ import com.chinacreator.gzcm.engine.security.crypto.entity.SecretShare;
  * 
  * @author CDRC Runtime Team
  */
-public class SecretDaoImpl implements SecretDao {
+@Repository("securitySecretDaoImpl")
+public class SecuritySecretDaoImpl implements SecuritySecretDao {
     
     private final Map<String, Secret> secrets = new ConcurrentHashMap<>();
     private final Map<String, SecretShare> shares = new ConcurrentHashMap<>();

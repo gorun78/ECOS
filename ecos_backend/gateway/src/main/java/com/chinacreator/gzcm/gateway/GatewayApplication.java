@@ -51,16 +51,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.git\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.datapermission\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.compliance\\..*"),
-    // A+5: 排除同名 ConfigDao（runtime-core 和 sysman 版本不兼容）
-    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.(runtime\\.core\\.config\\.dao|sysman\\.config\\.dao).+\\.class"),
+    // A+5: 排除 runtime.access.storage（gateway有自己的MinioStorageService实现）
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.access\\.storage\\..*"),
+    // A+5: runtime.core.config.dao.ConfigDao 源码已删（sysman版本保留，无冲突）
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.aimod\\.controller\\..*"),
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
-        // A+4: 排除旧实现（已迁 runtime-access 的同名类）
-        com.chinacreator.gzcm.gateway.service.MinioStorageService.class,
+        // A+4: 排除旧实现（runtime-access 有同名类，gateway版本保留供 DataLakeExportService 使用）
         com.chinacreator.gzcm.workspace.service.MinioObjectStorageService.class,
-        // A+5: 排除旧配置 DAO（ConfigDao 在 runtime-coreJAR 和 sysman 版本冲突）
-        com.chinacreator.gzcm.runtime.core.config.dao.ConfigDao.class,
+        // MinioStorageService (gateway.service) 保留：DataLakeExportService 依赖它，不要排除
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
         // 安全引擎已接管（阶段1），排除sysman侧副本
@@ -115,6 +114,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 })
 @MapperScan({
     "com.chinacreator.gzcm.sysman.**.mapper",
+    // runtime.core.config.dao.ConfigDao 与 sysman 版本冲突，exclude runtime 包中的副本
+    "com.chinacreator.gzcm.runtime.core.config.dao!",
     "com.chinacreator.gzcm.runtime.**.mapper",
     "com.chinacreator.gzcm.runtime.llm.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",

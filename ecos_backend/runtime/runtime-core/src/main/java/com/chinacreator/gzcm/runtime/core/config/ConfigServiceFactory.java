@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.runtime.core.config;
 
-import com.chinacreator.gzcm.runtime.core.config.dao.ConfigDao;
+import com.chinacreator.gzcm.runtime.core.config.dao.RuntimeConfigDao;
 import com.chinacreator.gzcm.runtime.core.config.dao.impl.ConfigDaoImpl;
 import com.chinacreator.gzcm.runtime.core.config.impl.DatabaseConfigServiceImpl;
 import com.chinacreator.gzcm.runtime.core.database.ISystemDatabaseAccess;
@@ -30,7 +30,7 @@ public class ConfigServiceFactory {
      * @return 数据库配置服务
      */
     public static IConfigService createDatabaseConfigService(ISystemDatabaseAccess databaseAccess) {
-        ConfigDao configDao = new ConfigDaoImpl(databaseAccess);
+        RuntimeConfigDao configDao = new ConfigDaoImpl(databaseAccess);
         return new DatabaseConfigServiceImpl(configDao);
     }
 
@@ -42,7 +42,7 @@ public class ConfigServiceFactory {
      * @return 数据库配置服务
      */
     public static IConfigService createDatabaseConfigService(ISystemDatabaseAccess databaseAccess, boolean cacheEnabled) {
-        ConfigDao configDao = new ConfigDaoImpl(databaseAccess);
+        RuntimeConfigDao configDao = new ConfigDaoImpl(databaseAccess);
         return new DatabaseConfigServiceImpl(configDao, cacheEnabled);
     }
 
@@ -53,7 +53,7 @@ public class ConfigServiceFactory {
      */
     public static IConfigService createDefaultDatabaseConfigService() {
         ISystemDatabaseAccess databaseAccess = new SystemDatabaseAccessImpl();
-        ConfigDao configDao = new ConfigDaoImpl(databaseAccess);
+        RuntimeConfigDao configDao = new ConfigDaoImpl(databaseAccess);
         return new DatabaseConfigServiceImpl(configDao);
     }
 

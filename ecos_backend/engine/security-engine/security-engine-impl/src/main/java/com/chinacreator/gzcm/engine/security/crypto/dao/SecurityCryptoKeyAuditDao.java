@@ -5,7 +5,7 @@ package com.chinacreator.gzcm.engine.security.crypto.dao;
  * 
  * @author CDRC Runtime Team
  */
-public interface CryptoKeyAuditDao {
+public interface SecurityCryptoKeyAuditDao {
     
     /**
      * 记录操作日志
