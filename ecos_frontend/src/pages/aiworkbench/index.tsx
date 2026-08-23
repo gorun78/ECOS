@@ -14,7 +14,7 @@ import LogicView from './LogicView';
 import AgentStudioView from './AgentStudioView';
 import ChatbotStudioView from './ChatbotStudioView';
 import ModelCatalogView from './ModelCatalogView';
-import GuardrailsView from './GuardrailsView';
+import AiGuardrailsView from './AiGuardrailsView';
 import KnowledgeView from '../KnowledgeView';
 import * as Icons from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
@@ -209,7 +209,7 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
           )}
 
           {currentTab === 'guardrails' && (
-            <GuardrailsView
+            <AiGuardrailsView
               guardrails={guardrails}
               onUpdateGuardrails={setGuardrails}
               showToast={showToast}

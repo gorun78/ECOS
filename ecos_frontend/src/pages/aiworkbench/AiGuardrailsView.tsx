@@ -58,7 +58,7 @@ interface PhysicalPilot {
   licence_rating: string;
 }
 
-export default function GuardrailsView({
+export default function AiGuardrailsView({
   guardrails,
   onUpdateGuardrails,
   showToast,
