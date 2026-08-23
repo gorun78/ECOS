@@ -73,7 +73,7 @@ interface FilterQuery {
   value: string;
 }
 
-export default function ObjectExplorerView({
+export default function BusinessObjectExplorer({
   objectTypes: propObjectTypes,
   linkTypes,
   actionTypes,

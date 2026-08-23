@@ -31,7 +31,7 @@ import LinkTypeView from './LinkTypeView';
 import ActionTypeView from './ActionTypeView';
 import FunctionTypeView from './FunctionTypeView';
 import { InterfaceView, SharedPropertyView, DatasetView } from './OtherViews';
-import ObjectExplorerView from './ObjectExplorerView';
+import BusinessObjectExplorer from './BusinessObjectExplorer';
 
 type ViewMode = 'ontology' | 'explorer';
 type SelectedCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
@@ -363,7 +363,7 @@ export default function BusinessWorkbenchLayout({
       <div className="flex-1 flex overflow-hidden">
         {viewMode === 'explorer' ? (
           <div className="flex-1 flex overflow-hidden">
-            <ObjectExplorerView
+            <BusinessObjectExplorer
               objectTypes={objectTypes}
               linkTypes={linkTypes}
               actionTypes={actionTypes}
@@ -432,7 +432,7 @@ export default function BusinessWorkbenchLayout({
               )}
 
               {selectedCategory === 'explorer' && (
-                <ObjectExplorerView
+                <BusinessObjectExplorer
                   objectTypes={objectTypes}
                   linkTypes={linkTypes}
                   actionTypes={actionTypes}
