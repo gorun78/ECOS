@@ -47,6 +47,9 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
     protected StorageConfig config;
     protected boolean connected = false;
     protected boolean inTransaction = false;
+
+    /** WHERE子句构建器（PMO-C3 P1-2 策略模式） */
+    private final WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder(this);
     
     /**
      * 获取JDBC驱动类名（子类实现）
@@ -658,120 +661,10 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
     // ========== 辅助方法 ==========
     
     /**
-     * 构建WHERE子句
+     * 构建WHERE子句 — 委托给 WhereClauseBuilder（PMO-C3 P1-2 策略模式拆分）
      */
     private String buildWhereClause(FilterCondition filter, List<Object> params) {
-        return buildWhereClause(filter, params, 0);
-    }
-
-    /**
-     * 递归构建 WHERE 子句，带最大深度保护防止 StackOverflow
-     * @param depth 当前递归深度，超过 MAX_DEPTH 返回 null
-     */
-    private static final int MAX_FILTER_DEPTH = 20;
-
-    private String buildWhereClause(FilterCondition filter, List<Object> params, int depth) {
-        if (filter == null) {
-            return null;
-        }
-        if (depth > MAX_FILTER_DEPTH) {
-            logger.warn("Filter condition depth exceeded {} , ignoring deep conditions", MAX_FILTER_DEPTH);
-            return null;
-        }
-        
-        StringBuilder sql = new StringBuilder();
-        FilterCondition.ConditionType type = filter.getType();
-        
-        switch (type) {
-            case EQUALS:
-                sql.append(escapeIdentifier(filter.getField())).append(" = ?");
-                params.add(filter.getValue());
-                break;
-            case NOT_EQUALS:
-                sql.append(escapeIdentifier(filter.getField())).append(" != ?");
-                params.add(filter.getValue());
-                break;
-            case GREATER_THAN:
-                sql.append(escapeIdentifier(filter.getField())).append(" > ?");
-                params.add(filter.getValue());
-                break;
-            case GREATER_THAN_OR_EQUAL:
-                sql.append(escapeIdentifier(filter.getField())).append(" >= ?");
-                params.add(filter.getValue());
-                break;
-            case LESS_THAN:
-                sql.append(escapeIdentifier(filter.getField())).append(" < ?");
-                params.add(filter.getValue());
-                break;
-            case LESS_THAN_OR_EQUAL:
-                sql.append(escapeIdentifier(filter.getField())).append(" <= ?");
-                params.add(filter.getValue());
-                break;
-            case IN:
-                sql.append(escapeIdentifier(filter.getField())).append(" IN (");
-                List<Object> values = filter.getValues();
-                for (int i = 0; i < values.size(); i++) {
-                if (i > 0) sql.append(", ");
-                    sql.append("?");
-                    params.add(values.get(i));
-                }
-                sql.append(")");
-                break;
-            case NOT_IN:
-                sql.append(escapeIdentifier(filter.getField())).append(" NOT IN (");
-                values = filter.getValues();
-                for (int i = 0; i < values.size(); i++) {
-                if (i > 0) sql.append(", ");
-                    sql.append("?");
-                    params.add(values.get(i));
-                }
-                sql.append(")");
-                break;
-            case LIKE:
-                sql.append(escapeIdentifier(filter.getField())).append(" LIKE ?");
-                params.add(filter.getValue());
-                break;
-            case NOT_LIKE:
-                sql.append(escapeIdentifier(filter.getField())).append(" NOT LIKE ?");
-                params.add(filter.getValue());
-                break;
-            case IS_NULL:
-                sql.append(escapeIdentifier(filter.getField())).append(" IS NULL");
-                break;
-            case IS_NOT_NULL:
-                sql.append(escapeIdentifier(filter.getField())).append(" IS NOT NULL");
-                break;
-            case BETWEEN:
-                sql.append(escapeIdentifier(filter.getField())).append(" BETWEEN ? AND ?");
-                params.add(filter.getStartValue());
-                params.add(filter.getEndValue());
-                break;
-            case AND:
-                if (filter.getConditions() != null && !filter.getConditions().isEmpty()) {
-                    for (int i = 0; i < filter.getConditions().size(); i++) {
-                        if (i > 0) sql.append(" AND ");
-                        sql.append("(").append(buildWhereClause(filter.getConditions().get(i), params, depth + 1)).append(")");
-                    }
-                }
-                break;
-            case OR:
-                if (filter.getConditions() != null && !filter.getConditions().isEmpty()) {
-                    for (int i = 0; i < filter.getConditions().size(); i++) {
-                        if (i > 0) sql.append(" OR ");
-                        sql.append("(").append(buildWhereClause(filter.getConditions().get(i), params, depth + 1)).append(")");
-                    }
-                }
-                break;
-            case NOT:
-                if (filter.getConditions() != null && !filter.getConditions().isEmpty()) {
-                    sql.append("NOT (").append(buildWhereClause(filter.getConditions().get(0), params, depth + 1)).append(")");
-                }
-                break;
-            default:
-                return null;
-        }
-
-        return sql.toString();
+        return whereClauseBuilder.build(filter, params, 0);
     }
     
     /**
