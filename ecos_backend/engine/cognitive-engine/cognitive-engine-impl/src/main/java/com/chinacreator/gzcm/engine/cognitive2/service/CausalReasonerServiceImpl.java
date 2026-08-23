@@ -7,19 +7,11 @@ import com.chinacreator.gzcm.engine.cognitive2.model.CausalEdge;
 import com.chinacreator.gzcm.engine.cognitive2.model.DiagnosisRequest;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
-import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 因果推理服务实现 — KG路径遍历 + LLM推理补充，构建≥3层因果链。
@@ -31,6 +23,13 @@ import java.util.stream.Collectors;
  *   <li>定位根因节点，生成改进建议和受影响指标列表</li>
  * </ol>
  *
+ * <p>职责拆分（PMO-C3）：
+ * <ul>
+ *   <li>{@link CausalDetector} — KG因果链遍历</li>
+ *   <li>{@link SuggestionBuilder} — LLM推理 + 提示词构建 + 响应解析</li>
+ *   <li>{@link RootCauseAnalyzer} — 根因定位 + 建议生成 + 规则引擎兜底</li>
+ * </ul>
+ *
  * <p>依赖：仅依赖 kb-engine-api 接口（KnowledgeGraphService），不直接 import kb-engine-impl。
  */
 @Service
@@ -38,39 +37,27 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
 
     private static final Logger log = LoggerFactory.getLogger(CausalReasonerServiceImpl.class);
 
-    /** KG路径遍历的关系类型 — 因果相关 */
-    private static final List<String> CAUSAL_RELATION_TYPES = List.of("CAUSES", "AFFECTS", "CORRELATES");
-
-    /** KG路径置信度基准 */
-    private static final double KG_CONFIDENCE_BASE = 0.80;
-    /** 每层深度衰减系数 */
-    private static final double DEPTH_DECAY = 0.05;
-
-    /** LLM推理置信度范围 */
-    private static final double LLM_CONFIDENCE_MIN = 0.50;
-    private static final double LLM_CONFIDENCE_MAX = 0.70;
-
-    /** ai-engine Agent Loop 端点 */
-    private static final String AGENT_LOOP_URL = "http://localhost:8080/api/v1/agent-loop/chat";
-
     private final KnowledgeGraphService knowledgeGraphService;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
+    private final CausalDetector causalDetector;
+    private final SuggestionBuilder suggestionBuilder;
+    private final RootCauseAnalyzer rootCauseAnalyzer;
 
     /**
      * 构造器注入。
      *
      * @param knowledgeGraphService 知识图谱服务（kb-engine-api 接口）
+     * @param causalDetector        KG因果链遍历器
+     * @param suggestionBuilder     LLM推理构建器
+     * @param rootCauseAnalyzer     根因分析器
      */
-    public CausalReasonerServiceImpl(KnowledgeGraphService knowledgeGraphService) {
+    public CausalReasonerServiceImpl(KnowledgeGraphService knowledgeGraphService,
+                                      CausalDetector causalDetector,
+                                      SuggestionBuilder suggestionBuilder,
+                                      RootCauseAnalyzer rootCauseAnalyzer) {
         this.knowledgeGraphService = knowledgeGraphService;
-        this.restTemplate = new RestTemplate();
-        // 设置连接超时30s，读取超时120s（LLM推理可能较慢）
-        this.restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-            setConnectTimeout(30_000);
-            setReadTimeout(120_000);
-        }});
-        this.objectMapper = new ObjectMapper();
+        this.causalDetector = causalDetector;
+        this.suggestionBuilder = suggestionBuilder;
+        this.rootCauseAnalyzer = rootCauseAnalyzer;
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -95,14 +82,14 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
 
         // ── KG 路径遍历（从第2层开始） ──
         Set<String> visitedNodeIds = new HashSet<>();
-        int kgLastDepth = traverseKgChain(result, request.getMetric(), request.getDomain(),
+        int kgLastDepth = causalDetector.traverseKgChain(result, request.getMetric(), request.getDomain(),
                 maxDepth, 1, visitedNodeIds);
 
         // ── LLM 补充推理（KG覆盖不足时） ──
         if (kgLastDepth < maxDepth) {
             log.info("KG路径深度={}，不足目标深度={}，启用LLM补充推理", kgLastDepth, maxDepth);
             try {
-                llmSupplementChain(result, request, kgLastDepth, maxDepth);
+                suggestionBuilder.llmSupplementChain(result, request, kgLastDepth, maxDepth);
             } catch (Exception e) {
                 log.warn("LLM补充推理失败: {}", e.getMessage());
             }
@@ -111,11 +98,11 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         // ── 规则引擎兜底（KG+LLM均空时，用领域知识生成因果链） ──
         if (result.getCausalChain().size() < 3) {
             log.info("因果链不足3层(size={})，启用规则引擎兜底", result.getCausalChain().size());
-            ruleBasedExpansion(result, request, maxDepth);
+            rootCauseAnalyzer.ruleBasedExpansion(result, request, maxDepth);
         }
 
         // ── 根因定位与建议生成 ──
-        identifyRootCauseAndSuggestions(result, request);
+        rootCauseAnalyzer.identifyRootCauseAndSuggestions(result, request);
 
         log.info("== 因果诊断完成: 因果链长度={}, 根因={}, 建议数={}",
                 result.getCausalChain().size(),
@@ -135,7 +122,6 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         List<CausalEdge> edges = new ArrayList<>();
 
         try {
-            // 使用 KG 获取该域下的全图数据
             Map<String, Object> graph = knowledgeGraphService.getGraph(domain);
             @SuppressWarnings("unchecked")
             List<KnowledgeEdge> kgEdges = (List<KnowledgeEdge>) graph.get("edges");
@@ -167,25 +153,21 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         log.info("估计因果效应: {} -> {}", source, target);
 
         try {
-            // 通过 KG 路径获取最短路径信息作为效应估计依据
             Map<String, Object> pathResult = knowledgeGraphService.getShortestPath(source, target);
 
             Object lengthObj = pathResult.get("length");
             int pathLength = (lengthObj instanceof Integer) ? (Integer) lengthObj : -1;
 
             if (pathLength > 0) {
-                // 路径越短，因果效应越强；使用衰减公式
                 double effect = 1.0 / (1.0 + pathLength);
                 log.debug("KG路径长度={}, 因果效应={}", pathLength, effect);
                 return effect;
             }
 
             // KG无路径时，尝试通过诊断推理估计
-            // 构建简单诊断请求，分析 source → target 关系
             DiagnosisRequest dr = new DiagnosisRequest(source, 0.0, "", 3);
             CausalChainResult chain = diagnose(dr);
 
-            // 从因果链中提取置信度加权效应
             if (!chain.getCausalChain().isEmpty()) {
                 double avgConfidence = chain.getCausalChain().stream()
                         .mapToDouble(CausalChainNode::getConfidence)
@@ -199,528 +181,5 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         }
 
         return 0.5;
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    //  私有方法：KG路径遍历
-    // ══════════════════════════════════════════════════════════════════
-
-    /**
-     * 沿知识图谱逐层遍历因果链。
-     *
-     * @param result     累积结果（因果链节点追加到 result.causalChain）
-     * @param metric     指标名，用于在KG中搜索起始节点
-     * @param domain     业务域
-     * @param maxDepth   最大深度
-     * @param currentDepth 当前深度（起始为1，即指标自身）
-     * @param visited    已访问节点ID集合（防环）
-     * @return KG遍历覆盖的最大深度（≥currentDepth）
-     */
-    private int traverseKgChain(CausalChainResult result, String metric, String domain,
-                                 int maxDepth, int currentDepth, Set<String> visited) {
-        if (currentDepth >= maxDepth) {
-            return currentDepth;
-        }
-
-        // 搜索KG中匹配的起始节点
-        List<KnowledgeNode> startNodes = knowledgeGraphService.search(metric);
-        if (startNodes.isEmpty()) {
-            log.debug("KG中未搜索到匹配 '{}' 的节点", metric);
-            return currentDepth;
-        }
-
-        // BFS队列：{nodeId, depth, parentNodeDesc}
-        Deque<String[]> queue = new ArrayDeque<>();
-        for (KnowledgeNode node : startNodes) {
-            if (visited.add(node.getId())) {
-                queue.offer(new String[]{node.getId(), String.valueOf(currentDepth + 1),
-                        node.getLabel() != null ? node.getLabel() : metric});
-            }
-        }
-
-        while (!queue.isEmpty() && currentDepth < maxDepth) {
-            String[] entry = queue.poll();
-            String nodeId = entry[0];
-            int depth = Integer.parseInt(entry[1]);
-            String parentDesc = entry[2];
-
-            if (depth > maxDepth) continue;
-
-            // 获取邻接节点
-            Map<String, Object> neighborResult = knowledgeGraphService.getNeighbors(nodeId, 1);
-            @SuppressWarnings("unchecked")
-            List<KnowledgeEdge> neighbors = (List<KnowledgeEdge>) neighborResult.get("neighbors");
-
-            if (neighbors == null || neighbors.isEmpty()) continue;
-
-            for (KnowledgeEdge edge : neighbors) {
-                // 仅处理因果相关的关系类型
-                if (!CAUSAL_RELATION_TYPES.contains(edge.getRelationship().toUpperCase())) {
-                    continue;
-                }
-
-                String targetId = edge.getTargetNodeId();
-                if (!visited.add(targetId)) continue; // 已访问，跳过防环
-
-                // 获取目标节点详情以获取描述
-                String nodeDesc = getNodeDescription(targetId);
-                double confidence = Math.max(0.35, KG_CONFIDENCE_BASE - (depth - 1) * DEPTH_DECAY);
-
-                CausalChainNode chainNode = new CausalChainNode(depth, nodeDesc, confidence, "KG", domain);
-                result.getCausalChain().add(chainNode);
-
-                // 继续向更深层遍历
-                if (depth < maxDepth) {
-                    queue.offer(new String[]{targetId, String.valueOf(depth + 1), nodeDesc});
-                }
-            }
-
-            // 更新 currentDepth 为队列中的最大深度
-            currentDepth = Math.max(currentDepth, depth);
-        }
-
-        return currentDepth;
-    }
-
-    /**
-     * 获取KG节点描述文本。
-     */
-    private String getNodeDescription(String nodeId) {
-        try {
-            Map<String, Object> detail = knowledgeGraphService.getNodeDetail(nodeId);
-            if (detail != null) {
-                KnowledgeNode node = (KnowledgeNode) detail.get("node");
-                if (node != null) {
-                    String desc = node.getDescription();
-                    if (desc != null && !desc.isEmpty()) return desc;
-                    String label = node.getLabel();
-                    if (label != null && !label.isEmpty()) return label;
-                }
-            }
-        } catch (Exception e) {
-            log.debug("获取节点 {} 详情失败: {}", nodeId, e.getMessage());
-        }
-        return "节点-" + nodeId.substring(0, Math.min(8, nodeId.length()));
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    //  私有方法：LLM 推理补充
-    // ══════════════════════════════════════════════════════════════════
-
-    /**
-     * KG路径不足时，调用LLM生成补充因果链。
-     */
-    private void llmSupplementChain(CausalChainResult result, DiagnosisRequest request,
-                                     int currentDepth, int maxDepth) {
-        // 构建LLM提示词
-        String existingChain = buildExistingChainSummary(result);
-        String prompt = buildLlmPrompt(request, existingChain, currentDepth, maxDepth);
-
-        // 调用LLM
-        String llmResponse = callLlm(prompt);
-
-        // 解析LLM响应，提取因果链节点
-        parseLlmCausalChain(llmResponse, result, currentDepth, maxDepth);
-    }
-
-    /**
-     * 构建已有链路的摘要文本，供LLM理解当前推理上下文。
-     */
-    private String buildExistingChainSummary(CausalChainResult result) {
-        return result.getCausalChain().stream()
-                .map(n -> String.format("  [depth=%d, source=%s] %s (confidence=%.2f)",
-                        n.getDepth(), n.getSource(), n.getNode(), n.getConfidence()))
-                .collect(Collectors.joining("\n"));
-    }
-
-    /**
-     * 构建LLM提示词 — 要求输出JSON格式的因果链。
-     */
-    private String buildLlmPrompt(DiagnosisRequest request, String existingChain,
-                                   int currentDepth, int maxDepth) {
-        String direction = request.getDeviation() >= 0 ? "上升" : "下降";
-        return String.format(
-                "你是一名业务因果分析专家。请分析以下指标偏差的深层因果链。\n\n" +
-                "## 当前指标\n" +
-                "- 指标: %s\n" +
-                "- 偏差: %s%.0f%%\n" +
-                "- 业务域: %s\n\n" +
-                "## 已知因果链路（来自知识图谱）\n" +
-                "%s\n\n" +
-                "## 任务\n" +
-                "请补齐从深度%d到深度%d的因果链节点，分析导致该指标变化的根本原因链。\n" +
-                "只输出JSON，格式如下（不要markdown标记）：\n" +
-                "{\n" +
-                "  \"chain\": [\n" +
-                "    {\"depth\": 2, \"node\": \"描述\", \"confidence\": 0.65},\n" +
-                "    {\"depth\": 3, \"node\": \"描述\", \"confidence\": 0.55}\n" +
-                "  ],\n" +
-                "  \"rootCause\": \"最终根因描述\",\n" +
-                "  \"suggestions\": [\"建议1\", \"建议2\", \"建议3\"],\n" +
-                "  \"affectedMetrics\": [\"指标1\", \"指标2\"]\n" +
-                "}\n\n" +
-                "要求：因果链至少%d层，每层节点简洁明确，根因要有业务可操作性。",
-                request.getMetric(), direction, Math.abs(request.getDeviation()),
-                request.getDomain(), existingChain,
-                currentDepth + 1, maxDepth, maxDepth);
-    }
-
-    /**
-     * 调用 ai-engine Agent Loop（经营诊断Agent）进行推理。
-     */
-    private String callLlm(String prompt) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("message", prompt);
-        body.put("systemPrompt", "你是一个企业经营诊断专家。根据输入的因果推理提示，分析指标的深层原因，输出JSON格式的因果链。");
-        body.put("temperature", 0.3);
-        body.put("maxTokens", 2048);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
-        try {
-            String response = restTemplate.postForObject(AGENT_LOOP_URL, request, String.class);
-            if (response != null) {
-                // 解析 ApiResponse 包装
-                try {
-                    Map<String, Object> apiResp = objectMapper.readValue(response,
-                            new TypeReference<Map<String, Object>>() {});
-                    // ApiResponse.success 在顶层
-                    Boolean topSuccess = (Boolean) apiResp.get("success");
-                    if (topSuccess != null && !topSuccess) {
-                        String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
-                        log.warn("ai-engine Agent调用失败: {}", msg);
-                        throw new RuntimeException("Agent调用失败: " + msg);
-                    }
-                    Object data = apiResp.get("data");
-                    if (data instanceof Map) {
-                        Map<?, ?> dataMap = (Map<?, ?>) data;
-                        // Agent Loop 返回的嵌套 success 字段（LLM推理可能失败但HTTP 200）
-                        Boolean dataSuccess = (Boolean) dataMap.get("success");
-                        if (dataSuccess != null && !dataSuccess) {
-                            Object errObj = dataMap.get("errorMsg");
-                            String errMsg = errObj != null ? String.valueOf(errObj) : "Agent推理未完成";
-                            log.warn("ai-engine Agent推理失败: {}", errMsg);
-                            throw new RuntimeException("Agent推理失败: " + errMsg);
-                        }
-                        Object content = dataMap.get("content");
-                        if (content != null && !content.toString().isEmpty()) {
-                            return content.toString();
-                        }
-                    }
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (Exception e) {
-                    log.debug("解析Agent响应失败: {}", e.getMessage());
-                }
-                return response;
-            }
-            return "";
-        } catch (Exception e) {
-            log.warn("ai-engine Agent调用失败: {}", e.getMessage());
-            throw new RuntimeException("ai-engine Agent不可用: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 解析LLM响应，提取因果链节点追加到结果中。
-     */
-    @SuppressWarnings("unchecked")
-    private void parseLlmCausalChain(String llmResponse, CausalChainResult result,
-                                      int currentDepth, int maxDepth) {
-        try {
-            // 尝试JSON解析
-            String json = extractJson(llmResponse);
-            Map<String, Object> parsed = objectMapper.readValue(json,
-                    new TypeReference<Map<String, Object>>() {});
-
-            // 解析因果链
-            List<Map<String, Object>> chainList = (List<Map<String, Object>>) parsed.get("chain");
-            if (chainList != null) {
-                for (Map<String, Object> item : chainList) {
-                    int depth = getIntValue(item, "depth", currentDepth + 1);
-                    String nodeText = (String) item.getOrDefault("node", "未知原因");
-                    double conf = getDoubleValue(item, "confidence", LLM_CONFIDENCE_MIN);
-
-                    // 限制深度范围
-                    if (depth > currentDepth && depth <= maxDepth) {
-                        CausalChainNode chainNode = new CausalChainNode(depth, nodeText,
-                                clampConfidence(conf, LLM_CONFIDENCE_MIN, LLM_CONFIDENCE_MAX),
-                                "LLM");
-                        result.getCausalChain().add(chainNode);
-                    }
-                }
-            }
-
-            // 存储LLM输出到临时字段（最终由 identifyRootCauseAndSuggestions 统一处理）
-            result.setRootCause((String) parsed.getOrDefault("rootCause", null));
-
-            List<String> suggestions = (List<String>) parsed.get("suggestions");
-            if (suggestions != null && result.getSuggestions().isEmpty()) {
-                result.getSuggestions().addAll(suggestions);
-            }
-
-            List<String> affected = (List<String>) parsed.get("affectedMetrics");
-            if (affected != null) {
-                result.getAffectedMetrics().addAll(affected);
-            }
-
-            // 按深度排序因果链
-            result.getCausalChain().sort(Comparator.comparingInt(CausalChainNode::getDepth));
-
-        } catch (Exception e) {
-            log.warn("解析LLM响应失败: {}; 原始响应前200字符: {}",
-                    e.getMessage(),
-                    llmResponse.length() > 200 ? llmResponse.substring(0, 200) : llmResponse);
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    //  私有方法：根因定位与建议
-    // ══════════════════════════════════════════════════════════════════
-
-    /**
-     * 从因果链中定位根因，生成改进建议。
-     */
-    private void identifyRootCauseAndSuggestions(CausalChainResult result, DiagnosisRequest request) {
-        List<CausalChainNode> chain = result.getCausalChain();
-
-        // ── 根因定位：取最深层的KG节点，其次LLM节点 ──
-        if (result.getRootCause() == null || result.getRootCause().isEmpty()) {
-            // 找到最深层的节点作为根因候选
-            Optional<CausalChainNode> deepestKg = chain.stream()
-                    .filter(n -> "KG".equals(n.getSource()))
-                    .max(Comparator.comparingInt(CausalChainNode::getDepth));
-
-            Optional<CausalChainNode> deepestAny = chain.stream()
-                    .max(Comparator.comparingInt(CausalChainNode::getDepth));
-
-            if (deepestKg.isPresent()) {
-                result.setRootCause(deepestKg.get().getNode());
-            } else if (deepestAny.isPresent() && !"metric".equals(deepestAny.get().getSource())) {
-                result.setRootCause(deepestAny.get().getNode());
-            } else {
-                // 因果链不足时，用LLM生成根因
-                tryLlGenerateRootCause(result, request);
-            }
-        }
-
-        // ── 建议生成：优先KG叶子节点推导，否则LLM生成 ──
-        if (result.getSuggestions().isEmpty()) {
-            tryLlGenerateSuggestions(result, request);
-        }
-
-        // ── 受影响指标收集 ──
-        if (result.getAffectedMetrics().isEmpty()) {
-            // 从因果链中提取涉及的业务指标
-            Set<String> metrics = new LinkedHashSet<>();
-            metrics.add(request.getMetric().replaceAll("[^a-zA-Z_]", "").toLowerCase());
-
-            for (CausalChainNode node : chain) {
-                if (!"metric".equals(node.getSource())) {
-                    // 简单启发式：提取节点描述中的指标关键词
-                    String nodeText = node.getNode();
-                    if (nodeText.contains("营收") || nodeText.contains("收入")) metrics.add("revenue");
-                    if (nodeText.contains("成本")) metrics.add("cost");
-                    if (nodeText.contains("利润") || nodeText.contains("毛利")) metrics.add("gross_margin");
-                    if (nodeText.contains("客户")) metrics.add("customer_concentration");
-                    if (nodeText.contains("订单")) metrics.add("order_volume");
-                    if (nodeText.contains("供应") || nodeText.contains("库存")) metrics.add("supply_chain");
-                }
-            }
-
-            result.getAffectedMetrics().addAll(metrics);
-        }
-    }
-
-    /**
-     * 通过LLM生成根因描述。
-     */
-    private void tryLlGenerateRootCause(CausalChainResult result, DiagnosisRequest request) {
-        String chainSummary = result.getCausalChain().stream()
-                .map(n -> "  层" + n.getDepth() + ": " + n.getNode())
-                .collect(Collectors.joining("\n"));
-
-        String prompt = String.format(
-                "基于以下因果链，用一句话概括根本原因：\n\n%s\n\n" +
-                "只输出根因描述（一句话，不要标记）：",
-                chainSummary);
-
-        try {
-            String response = callLlm(prompt);
-            if (response != null && !response.isEmpty()) {
-                result.setRootCause(response.trim());
-            }
-        } catch (Exception e) {
-            // 回退：取最深节点
-            result.getCausalChain().stream()
-                    .max(Comparator.comparingInt(CausalChainNode::getDepth))
-                    .ifPresent(n -> result.setRootCause(n.getNode()));
-        }
-    }
-
-    /**
-     * 通过LLM生成改进建议列表。
-     */
-    private void tryLlGenerateSuggestions(CausalChainResult result, DiagnosisRequest request) {
-        String chainSummary = result.getCausalChain().stream()
-                .map(n -> "  层" + n.getDepth() + ": " + n.getNode())
-                .collect(Collectors.joining("\n"));
-
-        String rootCause = result.getRootCause() != null ? result.getRootCause() : "未知";
-
-        String prompt = String.format(
-                "针对指标「%s」的偏差和根因「%s」，给出3-5条具体改进建议。\n\n" +
-                "因果链:\n%s\n\n" +
-                "只输出JSON数组（不要markdown标记）：\n" +
-                "[\"建议1\", \"建议2\", \"建议3\"]",
-                request.getMetric(), rootCause, chainSummary);
-
-        try {
-            String response = callLlm(prompt);
-            String json = extractJson(response);
-            List<String> suggestions = objectMapper.readValue(json,
-                    new TypeReference<List<String>>() {});
-            if (suggestions != null) {
-                result.getSuggestions().addAll(suggestions);
-            }
-        } catch (Exception e) {
-            log.warn("LLM生成建议失败: {}", e.getMessage());
-            // 默认建议
-            result.getSuggestions().add("深入分析" + request.getMetric() + "的波动原因");
-            result.getSuggestions().add("监控关键相关指标变化趋势");
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    //  工具方法
-    // ══════════════════════════════════════════════════════════════════
-
-    /**
-     * 从字符串中提取JSON内容（去除markdown标记等）。
-     */
-    private String extractJson(String text) {
-        if (text == null || text.isEmpty()) return "{}";
-        String trimmed = text.trim();
-        // 去除 markdown ```json ... ``` 包裹
-        if (trimmed.startsWith("```")) {
-            int start = trimmed.indexOf("\n");
-            int end = trimmed.lastIndexOf("```");
-            if (start > 0 && end > start) {
-                trimmed = trimmed.substring(start, end).trim();
-            }
-        }
-        // 查找第一个 { 或 [
-        int braceIdx = trimmed.indexOf('{');
-        int bracketIdx = trimmed.indexOf('[');
-        int startIdx = (braceIdx >= 0 && (bracketIdx < 0 || braceIdx < bracketIdx))
-                ? braceIdx : bracketIdx;
-        if (startIdx >= 0) {
-            return trimmed.substring(startIdx);
-        }
-        return trimmed;
-    }
-
-    private double clampConfidence(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private int getIntValue(Map<String, Object> map, String key, int defaultValue) {
-        Object val = map.get(key);
-        if (val instanceof Number) return ((Number) val).intValue();
-        return defaultValue;
-    }
-
-    private double getDoubleValue(Map<String, Object> map, String key, double defaultValue) {
-        Object val = map.get(key);
-        if (val instanceof Number) return ((Number) val).doubleValue();
-        return defaultValue;
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // 规则引擎兜底：KG+LLM均无数据时，基于领域知识生成多步因果链
-    // ══════════════════════════════════════════════════════════════════
-
-    /**
-     * 领域知识库 — 常见指标的因果级联关系。
-     */
-    private static final Map<String, String[]> CAUSAL_KNOWLEDGE = Map.of(
-        "毛利率", new String[]{
-            "2: 原材料价格上涨 推动主营成本上升 (confidence=0.75)",
-            "3: 供应链上游大宗商品价格波动 导致原材料涨价 (confidence=0.60)",
-            "4: 地缘政治/供需失衡 引发大宗商品市场波动 (confidence=0.50)"
-        },
-        "利润率", new String[]{
-            "2: 运营费用率增长 压缩利润空间 (confidence=0.70)",
-            "3: 人力成本上升+管理费用增加 推高运营费用 (confidence=0.60)",
-            "4: 行业人才竞争加剧 导致人力成本结构性上涨 (confidence=0.50)"
-        },
-        "应收账款周转率", new String[]{
-            "2: 客户回款周期拉长 降低周转效率 (confidence=0.72)",
-            "3: 下游客户自身现金流紧张 延迟付款 (confidence=0.62)",
-            "4: 宏观经济下行+信贷紧缩 导致下游流动性不足 (confidence=0.52)"
-        },
-        "库存周转率", new String[]{
-            "2: 销售不及预期 导致库存积压 (confidence=0.68)",
-            "3: 市场需求疲软+渠道库存高 制约出货 (confidence=0.58)",
-            "4: 消费信心下滑+竞争加剧 削减终端需求 (confidence=0.48)"
-        },
-        "销售增长率", new String[]{
-            "2: 市场份额被竞品侵蚀 增速放缓 (confidence=0.74)",
-            "3: 产品竞争力下降+渠道拓展不力 导致市占率下降 (confidence=0.64)",
-            "4: 研发投入不足+营销策略失当 削弱产品竞争力 (confidence=0.54)"
-        }
-    );
-
-    /**
-     * 规则引擎扩展因果链 — 从领域知识库生成多步因果节点。
-     */
-    private void ruleBasedExpansion(CausalChainResult result, DiagnosisRequest request, int maxDepth) {
-        String metric = request.getMetric();
-        // 精确匹配或模糊匹配
-        String[] chain = CAUSAL_KNOWLEDGE.get(metric);
-        if (chain == null) {
-            // 模糊匹配
-            for (Map.Entry<String, String[]> entry : CAUSAL_KNOWLEDGE.entrySet()) {
-                if (metric.contains(entry.getKey()) || entry.getKey().contains(metric)) {
-                    chain = entry.getValue();
-                    break;
-                }
-            }
-        }
-        if (chain == null) {
-            // 通用兜底
-            chain = new String[]{
-                "2: 相关业务因素变化 影响" + metric + " (confidence=0.55)",
-                "3: 外部市场环境波动 传导至业务层面 (confidence=0.45)",
-                "4: 宏观政策调整/行业周期 引发市场环境变化 (confidence=0.38)"
-            };
-        }
-
-        int currentSize = result.getCausalChain().size();
-        for (int i = 0; i < chain.length && (currentSize + i) < maxDepth + 1; i++) {
-            String entry = chain[i];
-            // 解析 "depth: description (confidence=X.XX)"
-            int colonIdx = entry.indexOf(":");
-            int parenIdx = entry.lastIndexOf("(confidence=");
-            if (colonIdx < 0 || parenIdx < 0) continue;
-
-            String nodeDesc = entry.substring(colonIdx + 1, parenIdx).trim();
-            double conf = 0.5;
-            try {
-                String confStr = entry.substring(parenIdx + 12, entry.indexOf(")", parenIdx));
-                conf = Double.parseDouble(confStr);
-            } catch (Exception ignored) {}
-
-            CausalChainNode node = new CausalChainNode(
-                currentSize + i + 1, nodeDesc, clampConfidence(conf, 0.3, 0.9), "RULE_ENGINE",
-                request.getDomain());
-            result.getCausalChain().add(node);
-        }
-        log.info("规则引擎兜底完成: 因果链 size={} (新增{}层)",
-                result.getCausalChain().size(), Math.min(chain.length, maxDepth + 1 - currentSize));
     }
 }
