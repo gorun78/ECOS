@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ai.service.AgentMetricsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -25,10 +25,10 @@ public class AgentMetricsController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentMetricsController.class);
 
-    private final JdbcTemplate jdbc;
+    private final AgentMetricsService agentMetricsService;
 
-    public AgentMetricsController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AgentMetricsController(AgentMetricsService agentMetricsService) {
+        this.agentMetricsService = agentMetricsService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -44,26 +44,10 @@ public class AgentMetricsController {
     public ApiResponse<Map<String, Object>> getMetrics(@PathVariable String agentId) {
         try {
             // 总计
-            Map<String, Object> total = jdbc.queryForMap(
-                "SELECT " +
-                "  COUNT(*) AS total_count, " +
-                "  COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0) AS success_count, " +
-                "  COALESCE(SUM(CASE WHEN NOT success THEN 1 ELSE 0 END), 0) AS failure_count, " +
-                "  ROUND(AVG(elapsed_ms)::numeric, 1) AS avg_elapsed_ms, " +
-                "  COALESCE(SUM(tokens_in), 0) AS total_tokens_in, " +
-                "  COALESCE(SUM(tokens_out), 0) AS total_tokens_out " +
-                "FROM ecos_agent_metrics WHERE agent_id = ?",
-                agentId
-            );
+            Map<String, Object> total = agentMetricsService.queryTotal(agentId);
 
             // P50 / P99 — 需要单独查询
-            Map<String, Object> pct = jdbc.queryForMap(
-                "SELECT " +
-                "  COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY elapsed_ms), 0)::bigint AS p50_ms, " +
-                "  COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY elapsed_ms), 0)::bigint AS p99_ms " +
-                "FROM ecos_agent_metrics WHERE agent_id = ?",
-                agentId
-            );
+            Map<String, Object> pct = agentMetricsService.queryPercentiles(agentId);
 
             // 成功率
             long totalCount = ((Number) total.getOrDefault("total_count", 0L)).longValue();
@@ -105,14 +89,7 @@ public class AgentMetricsController {
             @PathVariable String agentId,
             @RequestParam(defaultValue = "50") int limit) {
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, trace_id AS \"traceId\", agent_id AS \"agentId\", " +
-                "alert_type AS \"alertType\", message, " +
-                "created_at AS \"createdAt\" " +
-                "FROM ecos_agent_alert WHERE agent_id = ? " +
-                "ORDER BY created_at DESC LIMIT ?",
-                agentId, limit
-            );
+            List<Map<String, Object>> rows = agentMetricsService.queryErrors(agentId, limit);
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("agentId", agentId);

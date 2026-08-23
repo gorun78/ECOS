@@ -1,15 +1,14 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.gateway.service.MonitorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.OperatingSystemMXBean;
-import java.sql.Timestamp;
 import java.util.*;
 
 /**
@@ -26,10 +25,10 @@ import java.util.*;
 public class MonitorController {
 
     private static final Logger log = LoggerFactory.getLogger(MonitorController.class);
-    private final JdbcTemplate jdbc;
+    private final MonitorService monitorService;
 
-    public MonitorController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public MonitorController(MonitorService monitorService) {
+        this.monitorService = monitorService;
     }
 
     @GetMapping
@@ -47,33 +46,17 @@ public class MonitorController {
         d.put("system", system);
 
         // 告警统计
-        Integer activeAlerts = jdbc.queryForObject(
-            "SELECT count(*) FROM ecos_alert_history WHERE status = 'OPEN'", Integer.class);
-        Integer totalToday = jdbc.queryForObject(
-            "SELECT count(*) FROM ecos_alert_history WHERE created_at >= CURRENT_DATE", Integer.class);
+        Integer activeAlerts = monitorService.countActiveAlerts();
+        Integer totalToday = monitorService.countAlertsToday();
         d.put("active_alerts", activeAlerts != null ? activeAlerts : 0);
         d.put("alerts_today", totalToday != null ? totalToday : 0);
 
         // 最近告警
-        List<Map<String, Object>> recentAlerts = jdbc.query(
-            "SELECT id, rule_name, level, message, status, created_at " +
-            "FROM ecos_alert_history ORDER BY created_at DESC LIMIT 10",
-            (rs, _i) -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", rs.getLong("id"));
-                m.put("rule_name", rs.getString("rule_name"));
-                m.put("level", rs.getString("level"));
-                m.put("message", rs.getString("message"));
-                m.put("status", rs.getString("status"));
-                Timestamp ts = rs.getTimestamp("created_at");
-                m.put("created_at", ts != null ? ts.toLocalDateTime().toString() : null);
-                return m;
-            });
+        List<Map<String, Object>> recentAlerts = monitorService.queryRecentAlerts();
         d.put("recent_alerts", recentAlerts);
 
         // DQ 问题趋势
-        Integer openDqIssues = jdbc.queryForObject(
-            "SELECT count(*) FROM ecos_dq_issue WHERE status = 'OPEN'", Integer.class);
+        Integer openDqIssues = monitorService.countOpenDqIssues();
         d.put("open_dq_issues", openDqIssues != null ? openDqIssues : 0);
 
         // chartData: 时间序列 mock 数据 (最近12个5分钟间隔点)
@@ -123,8 +106,11 @@ public class MonitorController {
         Map<String, Object> db = new LinkedHashMap<>();
 
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
-            db.put("status", "UP");
+            if (monitorService.isDbUp()) {
+                db.put("status", "UP");
+            } else {
+                db.put("status", "DOWN");
+            }
         } catch (Exception e) {
             db.put("status", "DOWN");
             db.put("error", e.getMessage());
@@ -145,16 +131,12 @@ public class MonitorController {
         Map<String, Object> stats = new LinkedHashMap<>();
 
         // 按级别统计
-        List<Map<String, Object>> byLevel = jdbc.query(
-            "SELECT level, count(*) as cnt FROM ecos_alert_history WHERE created_at >= CURRENT_DATE " +
-            "GROUP BY level ORDER BY cnt DESC",
-            (rs, _i) -> Map.of("level", (Object) rs.getString("level"), "count", rs.getLong("cnt")));
+        List<Map<String, Object>> byLevel = monitorService.queryAlertsTodayByLevel();
         stats.put("today_by_level", byLevel);
 
         // 总览
-        Integer total = jdbc.queryForObject("SELECT count(*) FROM ecos_alert_history", Integer.class);
-        Integer open = jdbc.queryForObject(
-            "SELECT count(*) FROM ecos_alert_history WHERE status = 'OPEN'", Integer.class);
+        Integer total = monitorService.countTotalAlerts();
+        Integer open = monitorService.countActiveAlerts();
         stats.put("total", total != null ? total : 0);
         stats.put("open", open != null ? open : 0);
 

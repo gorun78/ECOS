@@ -9,8 +9,6 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyMappingService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -31,7 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * 本体映射管理 REST API — 将本体对象（实体/属性）映射到外部数据源（表、列、接口等）。
  *
- * <p>使用 {@link JdbcTemplate} 持久化至 PostgreSQL 表 ecos_entity_table_mapping。
+ * <p>持久化委托至 {@link OntologyMappingService}（PostgreSQL 表 ecos_entity_table_mapping）。
  * 映射主键由 UUID 生成。保留原有端点签名不变。</p>
  *
  * <h3>端点：</h3>
@@ -59,14 +58,14 @@ public class OntologyMappingController {
 
     private final OntologyService ontologyService;
 
-    private final JdbcTemplate jdbc;
+    private final OntologyMappingService mappingService;
 
     public OntologyMappingController(OntologyService ontologyService,
                                       OntologyMappingStore mappingStoreRef,
-                                      JdbcTemplate jdbc) {
+                                      OntologyMappingService mappingService) {
         this.ontologyService = ontologyService;
         this.mappingStoreRef = mappingStoreRef;
-        this.jdbc = jdbc;
+        this.mappingService = mappingService;
     }
 
     // ═══════════════ 列表与详情 ═══════════════════
@@ -81,20 +80,8 @@ public class OntologyMappingController {
     public ApiResponse<List<Map<String, Object>>> listMappings(
             @RequestParam(required = false) String objectId,
             @RequestParam(required = false) String sourceType) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ecos_entity_table_mapping WHERE 1=1");
-        List<Object> params = new ArrayList<>();
 
-        if (objectId != null && !objectId.isBlank()) {
-            sql.append(" AND entity_code=?");
-            params.add(objectId);
-        }
-        if (sourceType != null && !sourceType.isBlank()) {
-            sql.append(" AND domain_code=?");
-            params.add(sourceType);
-        }
-        sql.append(" ORDER BY created_at DESC");
-
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), params.toArray());
+        List<Map<String, Object>> rows = mappingService.listMappings(objectId, sourceType);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             result.add(rowToApiMap(row));
@@ -107,13 +94,11 @@ public class OntologyMappingController {
      */
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> getMapping(@PathVariable String id) {
-        try {
-            Map<String, Object> row = jdbc.queryForMap(
-                    "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
-            return ApiResponse.success(rowToApiMap(row));
-        } catch (EmptyResultDataAccessException e) {
+        Map<String, Object> row = mappingService.findMappingById(id);
+        if (row == null) {
             return ApiResponse.notFound("映射 " + id + " 不存在");
         }
+        return ApiResponse.success(rowToApiMap(row));
     }
 
     // ═══════════════ CRUD ═══════════════════

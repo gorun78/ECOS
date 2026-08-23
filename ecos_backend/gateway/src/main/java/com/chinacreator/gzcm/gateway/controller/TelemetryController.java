@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.gateway.service.TelemetryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -21,10 +21,10 @@ public class TelemetryController {
 
     private static final Logger log = LoggerFactory.getLogger(TelemetryController.class);
 
-    private final JdbcTemplate jdbc;
+    private final TelemetryService telemetryService;
 
-    public TelemetryController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public TelemetryController(TelemetryService telemetryService) {
+        this.telemetryService = telemetryService;
     }
 
     @Operation(summary = "遥测系统状态", description = "检查遥测系统的数据库连接和数据存储状态")
@@ -36,12 +36,9 @@ public class TelemetryController {
         status.put("timestamp", Instant.now().toString());
 
         try {
-            Long spanCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_spans", Long.class);
-            Long tokenCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_token_usage", Long.class);
-            status.put("spans_stored", spanCount != null ? spanCount : 0L);
-            status.put("token_records", tokenCount != null ? tokenCount : 0L);
+            Map<String, Object> counts = telemetryService.queryHealthCounts();
+            status.put("spans_stored", counts.get("spans_stored"));
+            status.put("token_records", counts.get("token_records"));
             status.put("db", "connected");
         } catch (Exception e) {
             status.put("db", "error: " + e.getMessage());
@@ -56,19 +53,7 @@ public class TelemetryController {
             @RequestParam(defaultValue = "10") int limit) {
         limit = Math.min(limit, 100);
         try {
-            List<Map<String, Object>> traces = jdbc.queryForList(
-                "SELECT DISTINCT ON (trace_id) " +
-                "  trace_id, " +
-                "  MIN(operation_name) AS first_operation, " +
-                "  COUNT(*) AS span_count, " +
-                "  MAX(http_status) AS max_status, " +
-                "  SUM(duration_ms) AS total_duration_ms, " +
-                "  MIN(start_time) AS first_start, " +
-                "  MAX(end_time) AS last_end " +
-                "FROM ecos_spans " +
-                "GROUP BY trace_id " +
-                "ORDER BY trace_id DESC " +
-                "LIMIT ?", limit);
+            List<Map<String, Object>> traces = telemetryService.queryTraces(limit);
             return ApiResponse.success(traces);
         } catch (Exception e) {
             log.warn("Failed to query traces: {}", e.getMessage());
@@ -81,13 +66,7 @@ public class TelemetryController {
     public ApiResponse<List<Map<String, Object>>> getTraceDetail(
             @PathVariable String traceId) {
         try {
-            List<Map<String, Object>> spans = jdbc.queryForList(
-                "SELECT span_id, trace_id, parent_span_id, operation_name, " +
-                "       service_name, http_method, http_path, http_status, " +
-                "       start_time, end_time, duration_ms, status, attributes " +
-                "FROM ecos_spans " +
-                "WHERE trace_id = ? " +
-                "ORDER BY start_time ASC", traceId);
+            List<Map<String, Object>> spans = telemetryService.queryTraceDetail(traceId);
             return ApiResponse.success(spans);
         } catch (Exception e) {
             log.warn("Failed to query trace detail: {}", e.getMessage());
@@ -108,36 +87,13 @@ public class TelemetryController {
                 days = Integer.parseInt(range.replace("d", ""));
             }
 
-            Map<String, Object> totals = jdbc.queryForMap(
-                "SELECT " +
-                "  COALESCE(SUM(prompt_tokens), 0) AS total_prompt, " +
-                "  COALESCE(SUM(completion_tokens), 0) AS total_completion, " +
-                "  COALESCE(SUM(total_tokens), 0) AS grand_total, " +
-                "  COUNT(*) AS record_count " +
-                "FROM ecos_token_usage " +
-                "WHERE created_at >= NOW() - (? || ' days')::INTERVAL", days);
+            Map<String, Object> totals = telemetryService.queryTokenSummaryTotals(days);
             summary.put("totals", totals);
 
-            List<Map<String, Object>> byModel = jdbc.queryForList(
-                "SELECT model, " +
-                "  SUM(prompt_tokens) AS prompt, " +
-                "  SUM(completion_tokens) AS completion, " +
-                "  SUM(total_tokens) AS total, " +
-                "  COUNT(*) AS calls " +
-                "FROM ecos_token_usage " +
-                "WHERE created_at >= NOW() - (? || ' days')::INTERVAL " +
-                "GROUP BY model " +
-                "ORDER BY total DESC", days);
+            List<Map<String, Object>> byModel = telemetryService.queryTokenSummaryByModel(days);
             summary.put("by_model", byModel);
 
-            List<Map<String, Object>> byOperation = jdbc.queryForList(
-                "SELECT operation, " +
-                "  SUM(total_tokens) AS total, " +
-                "  COUNT(*) AS calls " +
-                "FROM ecos_token_usage " +
-                "WHERE created_at >= NOW() - (? || ' days')::INTERVAL " +
-                "GROUP BY operation " +
-                "ORDER BY total DESC", days);
+            List<Map<String, Object>> byOperation = telemetryService.queryTokenSummaryByOperation(days);
             summary.put("by_operation", byOperation);
 
         } catch (Exception e) {

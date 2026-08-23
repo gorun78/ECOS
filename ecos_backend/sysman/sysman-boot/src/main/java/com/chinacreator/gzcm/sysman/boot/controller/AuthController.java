@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.sysman.boot.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.boot.service.AuthService;
 import com.chinacreator.gzcm.sysman.dto.ChangePasswordRequest;
 import com.chinacreator.gzcm.sysman.dto.LoginRequest;
 import com.chinacreator.gzcm.sysman.dto.LoginResponse;
@@ -16,7 +17,6 @@ import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,7 +41,7 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final JdbcTemplate jdbcTemplate;
+    private final AuthService authService;
     private final SysConfigService sysConfigService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -50,10 +50,10 @@ public class AuthController {
     private static final Map<String, String> refreshTokens = new ConcurrentHashMap<>();
 
     public AuthController(JwtTokenProvider jwtTokenProvider,
-                          JdbcTemplate jdbcTemplate,
+                          AuthService authService,
                           SysConfigService sysConfigService) {
         this.jwtTokenProvider = jwtTokenProvider;
-        this.jdbcTemplate = jdbcTemplate;
+        this.authService = authService;
         this.sysConfigService = sysConfigService;
     }
 
@@ -75,12 +75,7 @@ public class AuthController {
         String password = request.password();
 
         // 查询用户（含安全字段）
-        List<Map<String, Object>> users = jdbcTemplate.queryForList(
-                "SELECT id, username, password_hash, display_name, roles, "
-                        + "failed_attempts, locked_until, password_change_required, "
-                        + "last_password_change, password_history "
-                        + "FROM users WHERE username = ? AND enabled = true",
-                username);
+        List<Map<String, Object>> users = authService.findUserForLogin(username);
 
         if (users.isEmpty()) {
             log.warn("Login failed — user not found: {}", username);
@@ -112,17 +107,13 @@ public class AuthController {
 
             if (failedAttempts >= maxLoginAttempts) {
                 // 锁定账户
-                jdbcTemplate.update(
-                        "UPDATE users SET failed_attempts = ?, locked_until = NOW() + (? * INTERVAL '1 minute') WHERE username = ?",
-                        failedAttempts, lockoutDurationMinutes, username);
+                authService.lockAccount(failedAttempts, lockoutDurationMinutes, username);
                 log.warn("Account locked — {} failed attempts for user: {}", failedAttempts, username);
                 return ResponseEntity.status(423)
                         .body(ApiResponse.error(423, "ACCOUNT_LOCKED",
                                 "账户已锁定" + lockoutDurationMinutes + "分钟，请稍后再试"));
             } else {
-                jdbcTemplate.update(
-                        "UPDATE users SET failed_attempts = ? WHERE username = ?",
-                        failedAttempts, username);
+                authService.updateFailedAttempts(failedAttempts, username);
                 log.warn("Login failed — wrong password for user: {} (attempt {}/{})",
                         username, failedAttempts, maxLoginAttempts);
                 return ResponseEntity.status(401)
@@ -139,9 +130,7 @@ public class AuthController {
         if (Boolean.TRUE.equals(passwordChangeRequired)) {
             String changeToken = jwtTokenProvider.createChangeToken(userId);
             // 重置失败计数（密码正确但需换密）
-            jdbcTemplate.update(
-                    "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
-                    userId);
+            authService.resetFailedAttempts(userId);
             log.info("User {} (id={}) password change required, changeToken issued", username, userId);
             Map<String, String> data = Map.of("changeToken", changeToken,
                     "message", "首次登录需修改密码");
@@ -160,9 +149,7 @@ public class AuthController {
                             username, userId, lastPasswordChange);
                     // 颁发 changeToken 让用户能修改密码
                     String changeToken = jwtTokenProvider.createChangeToken(userId);
-                    jdbcTemplate.update(
-                            "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
-                            userId);
+                    authService.resetFailedAttempts(userId);
                     Map<String, String> data = Map.of("changeToken", changeToken,
                             "message", "密码已过期，请修改密码");
                     return ResponseEntity.status(200)
@@ -172,9 +159,7 @@ public class AuthController {
         }
 
         // ── 正常登录：重置失败计数 ──
-        jdbcTemplate.update(
-                "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
-                userId);
+        authService.resetFailedAttempts(userId);
 
         // 提取用户信息
         List<String> roles = parseRoles((String) user.get("roles"));
@@ -182,8 +167,7 @@ public class AuthController {
         // 查询租户ID
         Map<String, Object> extraClaims = new java.util.HashMap<>();
         try {
-            List<Map<String, Object>> tenantRows = jdbcTemplate.queryForList(
-                    "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+            List<Map<String, Object>> tenantRows = authService.findTenantByUsername(username);
             if (tenantRows != null && !tenantRows.isEmpty()) {
                 Object tid = tenantRows.get(0).get("TENANT_ID");
                 if (tid != null && !tid.toString().isBlank()) {
@@ -231,9 +215,7 @@ public class AuthController {
             String userId = claims.getSubject();
 
             // 从数据库查询用户信息
-            List<Map<String, Object>> users = jdbcTemplate.queryForList(
-                    "SELECT username, display_name, roles FROM users WHERE id = ? AND enabled = true",
-                    userId);
+            List<Map<String, Object>> users = authService.findUserById(userId);
 
             String username;
             List<String> roles;
@@ -294,9 +276,7 @@ public class AuthController {
         }
 
         // 查询用户（需要 password_hash 和 password_history）
-        List<Map<String, Object>> users = jdbcTemplate.queryForList(
-                "SELECT id, username, password_hash, password_history FROM users WHERE id = ? AND enabled = true",
-                userId);
+        List<Map<String, Object>> users = authService.findUserForPasswordChange(userId);
 
         if (users.isEmpty()) {
             return ResponseEntity.status(404).body(ApiResponse.notFound("用户不存在"));
@@ -356,10 +336,7 @@ public class AuthController {
             updatedHistoryJson = "[]";
         }
 
-        jdbcTemplate.update(
-                "UPDATE users SET password_hash = ?, password_change_required = FALSE, "
-                        + "last_password_change = NOW(), password_history = CAST(? AS jsonb) WHERE id = ?",
-                newPasswordHash, updatedHistoryJson, userId);
+        authService.updatePassword(newPasswordHash, updatedHistoryJson, userId);
 
         log.info("Password changed successfully for userId: {}", userId);
 

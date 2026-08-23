@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.services.identity.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.services.identity.service.MfaService;
 import org.springframework.web.bind.annotation.*;
 
 import javax.crypto.Mac;
@@ -14,11 +14,11 @@ import java.util.*;
 @RequestMapping("/api/v1/mfa")
 public class MfaController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final MfaService mfaService;
     private final SecureRandom random = new SecureRandom();
 
-    public MfaController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public MfaController(MfaService mfaService) {
+        this.mfaService = mfaService;
     }
 
     @PostMapping("/totp/setup")
@@ -32,10 +32,7 @@ public class MfaController {
             userId, base32Secret
         );
 
-        jdbcTemplate.update(
-            "UPDATE ecos_identity.td_user SET mfa_secret = ?, mfa_type = 'TOTP', mfa_enabled = false WHERE id = ?",
-            base32Secret, UUID.fromString(userId)
-        );
+        mfaService.saveTotpSecret(userId, base32Secret);
 
         Map<String, String> result = new HashMap<>();
         result.put("secret", base32Secret);
@@ -45,10 +42,7 @@ public class MfaController {
 
     @PostMapping("/totp/verify")
     public ApiResponse verifyTotp(@RequestParam String userId, @RequestParam String code) {
-        Map<String, Object> user = jdbcTemplate.queryForMap(
-            "SELECT mfa_secret, mfa_enabled FROM ecos_identity.td_user WHERE id = ?",
-            UUID.fromString(userId)
-        );
+        Map<String, Object> user = mfaService.getUserMfaInfo(userId);
 
         String secret = (String) user.get("mfa_secret");
         if (secret == null) {
@@ -58,10 +52,7 @@ public class MfaController {
         boolean valid = verifyTotpCode(secret, code);
         if (valid) {
             if (!Boolean.TRUE.equals(user.get("mfa_enabled"))) {
-                jdbcTemplate.update(
-                    "UPDATE ecos_identity.td_user SET mfa_enabled = true WHERE id = ?",
-                    UUID.fromString(userId)
-                );
+                mfaService.enableMfa(userId);
             }
             return ApiResponse.success("MFA verification successful");
         }
@@ -70,19 +61,13 @@ public class MfaController {
 
     @PostMapping("/disable")
     public ApiResponse disableMfa(@RequestParam String userId, @RequestParam String code) {
-        Map<String, Object> user = jdbcTemplate.queryForMap(
-            "SELECT mfa_secret, mfa_enabled FROM ecos_identity.td_user WHERE id = ?",
-            UUID.fromString(userId)
-        );
+        Map<String, Object> user = mfaService.getUserMfaInfo(userId);
 
         String secret = (String) user.get("mfa_secret");
         if (secret == null) return ApiResponse.badRequest("MFA not set up");
 
         if (verifyTotpCode(secret, code)) {
-            jdbcTemplate.update(
-                "UPDATE ecos_identity.td_user SET mfa_secret = NULL, mfa_type = NULL, mfa_enabled = false WHERE id = ?",
-                UUID.fromString(userId)
-            );
+            mfaService.disableMfa(userId);
             return ApiResponse.success("MFA disabled");
         }
         return ApiResponse.badRequest("Invalid TOTP code");
