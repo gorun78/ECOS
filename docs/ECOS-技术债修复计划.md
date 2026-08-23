@@ -87,35 +87,47 @@ runtime 现状 515 文件（7 子模块），是历史大本营。按「器」�
 
 ### 阶段 B：内存与稳定性（P1，2-4 周）
 
+> 差距分析（2026-08-23）：5 个 Task 全部成立。位置已因 A/A+ 迁移更新——TokenServiceImpl / InMemoryPermissionCacheService / DictService / SysConfigService 仍在 sysman；InMemoryDecisionCacheService 已迁 security-engine（R1）；BaseJdbcAdapter 已迁 data-engine（A+7b）；AgentSessionService 已迁 ai-engine（A+9c）。
+> 依赖现状：Caffeine 已在 data-engine-impl / gateway / workspace-impl / catalog-service 引入，Redis 在主 pom dependencyManagement；**但 sysman-impl 无 Caffeine**（B1/B2/B3 的 4 个类全在 sysman），需先给 sysman-impl 加 caffeine 依赖。
+> 原计划 B4 的 IFieldMappingDao.addMappingRefs、B5 的 synthesizeFromArray 内层已核实：前者已不存在（作废），后者现位于 ai-engine/ClassificationController。
+
 | Task | 内容 | 验收 |
 |------|------|------|
-| B1 | TokenServiceImpl.blacklist → Caffeine（standard）+ Redis TTL（enterprise/ultimate） | 重启后黑名单仍生效 |
-| B2 | InMemoryPermissionCacheService / InMemoryDecisionCacheService → Caffeine | 多实例一致 |
-| B3 | DictService.cache / SysConfigService.cache → Caffeine + 启动预热 | 首次查询不冷启动 |
-| B4 | 修复 21 个无保护递归（重点 IFieldMappingDao.addMappingRefs、AgentSessionService.compressHistory、AbacPepService.evaluate、BaseJdbcAdapter.query） | 补 base case，单测覆盖 |
-| B5 | 消除隐藏 O(n²)：synthesizeFromArray 内层 List→Map，CausalReasonerServiceImpl 预聚合 | 复杂度降 O(n log n) |
+| B1 | TokenServiceImpl.blacklist（sysman，现 ConcurrentHashMap 无 TTL）→ Caffeine（standard）+ Redis TTL（enterprise/ultimate） | 重启后黑名单仍生效 |
+| B2 | InMemoryPermissionCacheService（sysman）/ InMemoryDecisionCacheService（security-engine）→ Caffeine | 多实例一致 |
+| B3 | DictService.cache / SysConfigService.cache（sysman，现 ConcurrentHashMap）→ Caffeine + 启动预热 | 首次查询不冷启动 |
+| B4 | 修复无保护递归：~~IFieldMappingDao.addMappingRefs~~（已删）；AbacPepService.evaluate / BaseJdbcAdapter.query / AgentSessionService.compressHistory 已逐个读方法体核实为普通循环/重载（非自递归）→ **降级为「核实残余递归点」** | 补 base case，单测覆盖 |
+| B5 | 消除隐藏 O(n²)：~~synthesizeFromArray 内层 List→Map~~（已核实为单层循环）；CausalReasonerServiceImpl BFS 遍历为 O(V+E) → **降级为「核实残余 O(n²) 点」** | 复杂度降 O(n log n) |
 
 **B 阶段决策点（已确认）**：
 - **D3** ✅ Redis 引入范围：standard 不引（PG-only），enterprise/ultimate 才加
 
 ### 阶段 C：拆分与可维护性（P1-P2，4-8 周）
 
+> 差距分析（2026-08-23）：C3 ScheduleBean 已删（死代码，A+9a）→ **作废**。
+> 新发现前端 2 对重复文件，拆分前须先判定权威版本（同 A5 去重逻辑）：
+> GuardrailsView（pages/aiworkbench/ 1,464 行 vs pages/ 1,161 行）、ObjectExplorerView（pages/ 1,304 行 vs business-workbench/ 1,553 行）。
+
 | Task | 内容 | 验收 |
 |------|------|------|
-| C1 | WorkshopView.tsx 1,951 行 → WorkshopView + WidgetRenderer + VariableManager + PageTabs | 单文件 < 400 行，UI 零退化 |
-| C2 | GuardrailsView 1,404 / ObjectExplorerView 1,478 / DictManager 1,390 同理拆分 | 同上 |
-| C3 | ScheduleBean 814 行/155 方法 → ScheduleTrigger/ScheduleAction/ScheduleStatus | 编译通过 + curl |
-| C4 | CausalReasonerServiceImpl 691 行 → CausalDetector + RootCauseAnalyzer + SuggestionBuilder | 同上 |
-| C5 | buildWhereClause complexity 30 → 策略模式拆 ≤10 | ArchUnit + 单测 |
+| C1 | WorkshopView.tsx 2,243 行（src/pages/）→ WorkshopView + WidgetRenderer + VariableManager + PageTabs | 单文件 < 400 行，UI 零退化 |
+| C2 | GuardrailsView / ObjectExplorerView / DictManager（1,606 行）同理拆分；**先判定 2 对重复文件权威版本再拆** | 同上 |
+| C3 | ~~ScheduleBean 814 行~~ **作废**（死代码已删） | — |
+| C4 | CausalReasonerServiceImpl 726 行（cognitive2/service/）→ CausalDetector + RootCauseAnalyzer + SuggestionBuilder | 同上 |
+| C5 | buildWhereClause complexity 30 → 策略模式拆 ≤10（现位于 data-engine/BaseJdbcAdapter） | ArchUnit + 单测 |
 
 ### 阶段 D：架构守护（P3，持续）
 
+> 差距分析（2026-08-23）：D2 ComponentFactory（A+8）、D3 previewRestfulData（A+9a）均已在死代码清理中删除 → **两者作废**。
+> D1 已有 5 个 ArchUnit 测试基础：sysman/ArchitectureTest、runtime-core/ArchitectureTest、gateway/DcchengRemovalGuardTest、common-api/ArchitectureGuardTest + ArchitectureTest。
+> D4 services 层现状为 10 个子服务（agent/ai/api-gateway/catalog/cognitive/identity/knowledge/object/ontology/workflow），非原计划的 12 个。
+
 | Task | 内容 | 验收 |
 |------|------|------|
-| D1 | ArchUnit 扩展到 engine/sysman/gateway 模块 | 断言：engine 不依赖 dccheng、Controller 跨模块不重复、API 路径不重复 |
-| D2 | ComponentFactory 迪米特法则修复（max_access_depth=7）→ Spring @Autowired | 编译 + 启动 |
-| D3 | previewRestfulData 12 参数 → PreviewRequest record | 编译 + curl |
-| D4 | **services 层收敛为四转化服务**：ge-service（D→I）、zhi-service（I→K）、cheng-service（K→C）、ming-service（K→W），替换散乱的 12 个子服务 | 每转化服务有独立 Controller + curl 验收 |
+| D1 | ArchUnit 扩展到 engine/sysman/gateway 模块（已有 5 测试基础，增量补断言） | 断言：engine 不依赖 dccheng、Controller 跨模块不重复、API 路径不重复 |
+| D2 | ~~ComponentFactory 迪米特法则~~ **作废**（死代码已删） | — |
+| D3 | ~~previewRestfulData 12 参数~~ **作废**（已删） | — |
+| D4 | **services 层收敛为四转化服务**：ge-service（D→I）、zhi-service（I→K）、cheng-service（K→C）、ming-service（K→W），替换散乱的 10 个子服务 | 每转化服务有独立 Controller + curl 验收 |
 
 ---
 

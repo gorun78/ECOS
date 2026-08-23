@@ -492,6 +492,7 @@
             </modules>
             <properties>
                 <ecos.edition>enterprise</ecos.edition>
+                <ecos.redis>true</ecos.redis>
             </properties>
         </profile>
 
@@ -518,6 +519,7 @@
             </modules>
             <properties>
                 <ecos.edition>ultimate</ecos.edition>
+                <ecos.redis>true</ecos.redis>
             </properties>
         </profile>
     </profiles>
