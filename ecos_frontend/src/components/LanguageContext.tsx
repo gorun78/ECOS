@@ -22,7 +22,7 @@ export type Locale = "zh" | "en";
 interface LanguageContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const TRANSLATIONS: Record<Locale, Record<string, string>> = {
@@ -44,13 +44,18 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem("ecos_locale", newLocale);
   };
 
-  const t = (key: string): string => {
-    const translation = TRANSLATIONS[locale][key];
-    if (translation !== undefined) {
-      return translation;
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let translation = TRANSLATIONS[locale][key];
+    if (translation === undefined) {
+      // Fallback to English if missing, then to key itself
+      translation = TRANSLATIONS["en"][key] ?? key;
     }
-    // Fallback to English if missing, then to key itself
-    return TRANSLATIONS["en"][key] ?? key;
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        translation = translation.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      }
+    }
+    return translation;
   };
 
   return (

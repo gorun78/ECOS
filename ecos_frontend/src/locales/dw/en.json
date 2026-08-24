@@ -24,6 +24,12 @@
   "databench.layout.toast.syncFormIncomplete": "Please complete task name and target table",
   "databench.layout.toast.syncRunning": "Running sync task in background...",
   "databench.layout.toast.syncSuccess": "Task [{name}] completed!",
+  "databench.pb.toast.pipelineUpdated": "Pipeline [{name}] updated",
+  "databench.pb.toast.pipelineCreated": "Pipeline [{name}] created",
+  "databench.pb.toast.saveFailed": "Save failed: {error}",
+  "databench.pb.toast.executeSuccess": "Pipeline execution succeeded",
+  "databench.pb.toast.executeTriggered": "Pipeline execution triggered",
+  "databench.pb.toast.executeFailed": "Execution failed: {error}",
   "databench.pbFunctions.abs": "Calculate absolute value",
   "databench.pbFunctions.acos": "Arccosine",
   "databench.pbFunctions.add_months": "Add n months",
@@ -566,5 +572,11 @@
   "wf.title": "Workflow Designer",
   "wf.toast.created": "Workflow created",
   "wf.toast.published": "Published",
-  "wf.toast.saved": "Saved"
+  "wf.toast.saved": "Saved",
+  "pipeline.updated": "Pipeline [{{name}}] updated",
+  "pipeline.created": "Pipeline [{{name}}] created",
+  "pipeline.saveFailed": "Save failed: {{error}}",
+  "pipeline.executeSuccess": "Pipeline executed successfully",
+  "pipeline.executeTriggered": "Pipeline execution triggered",
+  "pipeline.executeFailed": "Execution failed: {{error}}"
 }

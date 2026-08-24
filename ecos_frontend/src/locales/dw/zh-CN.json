@@ -24,6 +24,12 @@
   "databench.layout.toast.syncFormIncomplete": "请完整输入任务名称与目标表名",
   "databench.layout.toast.syncRunning": "正在后台调度集群执行拉取任务...",
   "databench.layout.toast.syncSuccess": "任务 [{name}] 执行成功！",
+  "databench.pb.toast.pipelineUpdated": "管道 [{name}] 已更新",
+  "databench.pb.toast.pipelineCreated": "管道 [{name}] 已创建",
+  "databench.pb.toast.saveFailed": "保存失败: {error}",
+  "databench.pb.toast.executeSuccess": "管道执行成功",
+  "databench.pb.toast.executeTriggered": "管道执行已触发",
+  "databench.pb.toast.executeFailed": "执行失败: {error}",
   "databench.pbFunctions.abs": "计算绝对值",
   "databench.pbFunctions.acos": "反余弦",
   "databench.pbFunctions.add_months": "加 n 个月",
@@ -566,5 +572,11 @@
   "wf.title": "流程设计器",
   "wf.toast.created": "流程已创建",
   "wf.toast.published": "已发布",
-  "wf.toast.saved": "保存成功"
+  "wf.toast.saved": "保存成功",
+  "pipeline.updated": "管道 [{{name}}] 已更新",
+  "pipeline.created": "管道 [{{name}}] 已创建",
+  "pipeline.saveFailed": "保存失败: {{error}}",
+  "pipeline.executeSuccess": "管道执行成功",
+  "pipeline.executeTriggered": "管道执行已触发",
+  "pipeline.executeFailed": "执行失败: {{error}}"
 }

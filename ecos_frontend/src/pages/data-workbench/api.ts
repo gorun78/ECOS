@@ -339,3 +339,141 @@ export async function fetchSyncTasksFromPipeline(): Promise<DataSyncTask[]> {
     return [];
   }
 }
+
+// ─── 写入路径（POST）─────────────────────────────────────
+
+async function post<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${url} → ${res.status}`);
+  const json = await res.json();
+  return (json.data ?? json) as T;
+}
+
+/** ConnectionConfig builder — 前端表单 → connectionConfig JSON string */
+function buildConnectionConfig(c: {
+  type: string; host: string; port: number; username: string;
+  database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
+}): string {
+  const cfg: Record<string, unknown> = { username: c.username };
+  const isJdbc = ['postgresql', 'mysql', 'doris'].includes(c.type);
+  if (isJdbc) {
+    const driver = c.type === 'mysql' ? 'mysql' : c.type === 'doris' ? 'mysql' : 'postgresql';
+    const db = c.database || c.schema || '';
+    cfg.jdbcUrl = `jdbc:${driver}://${c.host || 'localhost'}:${c.port || 5432}/${db}`;
+  } else if (c.type === 's3' || c.type === 'oss') {
+    cfg.endpointUrl = c.endpointUrl || c.host;
+    cfg.bucket = c.bucket;
+    cfg.role = c.role;
+  } else {
+    cfg.host = c.host;
+    cfg.port = c.port;
+    if (c.database) cfg.database = c.database;
+  }
+  return JSON.stringify(cfg);
+}
+
+/** 创建数据源 → DataSourceController POST /datanet/datasource */
+export async function createDataSource(payload: {
+  name: string; type: string; host: string; port: number; username: string;
+  database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
+  description?: string; tags?: string;
+}): Promise<DataConnection | null> {
+  try {
+    const dto = {
+      datasourceName: payload.name,
+      datasourceType: payload.type.toUpperCase(),
+      connectionConfig: buildConnectionConfig(payload),
+      description: payload.description || '',
+      tags: payload.tags || '',
+    };
+    const entity = await post<Record<string, unknown>>(DATANET_DS, dto);
+    return mapDsToConn(entity);
+  } catch (e) {
+    console.warn('[data-workbench] createDataSource failed:', e);
+    return null;
+  }
+}
+
+/** 测试数据源连接 → POST /datanet/datasource/{id}/test */
+export async function testDataSource(id: string): Promise<{ success: boolean; datasourceId: string } | null> {
+  try {
+    return await post<{ success: boolean; datasourceId: string }>(`${DATANET_DS}/${id}/test`, {});
+  } catch (e) {
+    console.warn('[data-workbench] testDataSource failed:', e);
+    return null;
+  }
+}
+
+/** 创建同步任务 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks (taskType=SYNC) */
+export async function createSyncTask(payload: {
+  name: string; sourceConnectionId: string; sourceTable?: string;
+  targetTable?: string; syncMode?: string; schedule?: string; description?: string;
+}): Promise<DataSyncTask | null> {
+  try {
+    const body = {
+      name: payload.name,
+      task_type: 'SYNC',
+      status: 'DRAFT',
+      description: payload.description || '',
+      cron_expression: payload.schedule || '',
+      config_json: JSON.stringify({
+        sourceConnectionId: payload.sourceConnectionId,
+        sourceTable: payload.sourceTable || '',
+        targetTable: payload.targetTable || '',
+        syncMode: payload.syncMode || 'snapshot',
+      }),
+    };
+    const result = await post<Record<string, unknown>>('/api/v1/engine/data/pipeline/tasks', body);
+    return mapSyncTask(result);
+  } catch (e) {
+    console.warn('[data-workbench] createSyncTask failed:', e);
+    return null;
+  }
+}
+
+/** 创建健康检查规则 → DqController POST /api/v1/ecos/dq/rules */
+export async function createHealthCheck(payload: {
+  name: string; ruleType: string; severity?: string;
+  targetEntity?: string; ruleExpression?: string; description?: string;
+}): Promise<DataHealthCheck | null> {
+  try {
+    const body = {
+      name: payload.name,
+      ruleType: payload.ruleType,
+      severity: payload.severity || 'MEDIUM',
+      targetEntity: payload.targetEntity || '',
+      ruleExpression: payload.ruleExpression || '',
+      description: payload.description || '',
+      enabled: true,
+    };
+    const rule = await post<Record<string, unknown>>(DQ_RULES, body);
+    return mapDqRule(rule);
+  } catch (e) {
+    console.warn('[data-workbench] createHealthCheck failed:', e);
+    return null;
+  }
+}
+
+/** 触发同步任务执行 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks/{id}/run */
+export async function triggerSyncRun(taskId: string): Promise<{ status?: string; runId?: string } | null> {
+  try {
+    return await post<{ status?: string; runId?: string }>(`/api/v1/engine/data/pipeline/tasks/${taskId}/run`, {});
+  } catch (e) {
+    console.warn('[data-workbench] triggerSyncRun failed:', e);
+    return null;
+  }
+}
+
+/** 执行健康检查 → DqController POST /api/v1/ecos/dq/check */
+export async function runHealthCheck(): Promise<Record<string, unknown> | null> {
+  try {
+    return await post<Record<string, unknown>>('/api/v1/ecos/dq/check', {});
+  } catch (e) {
+    console.warn('[data-workbench] runHealthCheck failed:', e);
+    return null;
+  }
+}

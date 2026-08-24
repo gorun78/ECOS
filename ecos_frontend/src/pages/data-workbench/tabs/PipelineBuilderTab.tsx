@@ -1,5 +1,6 @@
 /* Extracted from DataWorkbenchLayout.tsx */
 import React from 'react';
+import { useLanguage } from '../../../components/LanguageContext';
 import type { DataConnection, DataPipeline } from '../types';
 import PipelineFlowEditor from '../PipelineFlowEditor';
 
@@ -16,8 +17,10 @@ interface PipelineBuilderTabProps {
 const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
   connections, pipelines, computeEngine, setComputeEngine, showToast,
   pipelineBuilderOutput, setPipelineBuilderOutput
-}) => (
-<div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+}) => {
+  const { t } = useLanguage();
+  return (
+  <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
   <PipelineFlowEditor
     connections={connections}
     pipelines={pipelines}
@@ -29,26 +32,27 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
         const { createPipeline, updatePipeline } = await import('../api');
         if (pipeline.id) {
           await updatePipeline(pipeline.id, { name: pipeline.name, description: pipeline.description });
-          showToast('success', `管道 [${pipeline.name}] 已更新`);
+          showToast('success', t('dw.pipeline.updated', { name: pipeline.name }));
         } else {
           await createPipeline(pipeline.name, pipeline.description);
-          showToast('success', `管道 [${pipeline.name}] 已创建`);
+          showToast('success', t('dw.pipeline.created', { name: pipeline.name }));
         }
       } catch (e: any) {
-        showToast('error', `保存失败: ${e.message}`);
+        showToast('error', t('dw.pipeline.saveFailed', { error: e.message }));
       }
     }}
     onExecute={async (pipelineId: string) => {
       try {
         const { executePipeline } = await import('../api');
         const result = await executePipeline(pipelineId);
-        showToast('success', result?.status === 'success' ? `管道执行成功` : `管道执行已触发`);
+        showToast('success', result?.status === 'success' ? t('dw.pipeline.executeSuccess') : t('dw.pipeline.executeTriggered'));
       } catch (e: any) {
-        showToast('error', `执行失败: ${e.message}`);
+        showToast('error', t('dw.pipeline.executeFailed', { error: e.message }));
       }
     }}
   />
-</div>
-);
+  </div>
+  );
+};
 
 export default PipelineBuilderTab;

@@ -76,9 +76,9 @@ export default function DataWorkbenchLayout({
   const [showExtIfaces, setShowExtIfaces] = useState(false);
 
   // ── Selected IDs ──
-  const [selConnId, setSelConnId] = useState<string>('postgres_prod_db');
-  const [selTaskId, setSelTaskId] = useState<string>('sync_flights_schedule');
-  const [selCheckId, setSelCheckId] = useState<string>('check_flights_freshness');
+  const [selConnId, setSelConnId] = useState<string>('');
+  const [selTaskId, setSelTaskId] = useState<string>('');
+  const [selCheckId, setSelCheckId] = useState<string>('');
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
   const [computeEngine, setComputeEngine] = useState<'memory' | 'doris'>('memory');
 
@@ -115,70 +115,136 @@ export default function DataWorkbenchLayout({
   const [nhThr, setNhThr] = useState('1000');
 
   // ── Handlers ──
-  const testConnection = (connId: string) => {
+  const testConnection = async (connId: string) => {
     setTestingConnId(connId); setTestingLogs([]);
     const conn = connections.find(c => c.id === connId);
     if (!conn) return;
-    const addLog = (msg: string, d: number) => setTimeout(() => setTestingLogs(p => [...p, msg]), d);
-    addLog(`${t('databench.layout.testLog.initDriver')}[${conn.type.toUpperCase()}]`, 100);
-    addLog(t('databench.layout.testLog.connecting'), 400);
-    setTimeout(() => {
-      if (connId === 'crew_schedules_sftp') {
-        setTestingLogs(p => [...p, t('databench.layout.testLog.sshFailed'), t('databench.layout.testLog.testFailed')]);
-        setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'error' as const } : c));
-        showToast('error', t('databench.layout.toast.connTestFailed', { name: conn.name }));
-      } else {
+    const addLog = (msg: string) => setTestingLogs(p => [...p, msg]);
+    addLog(`${t('databench.layout.testLog.initDriver')}[${conn.type.toUpperCase()}]`);
+    addLog(t('databench.layout.testLog.connecting'));
+    try {
+      const { testDataSource } = await import('./data-workbench/api');
+      const result = await testDataSource(connId);
+      if (result?.success) {
         const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-        setTestingLogs(p => [...p, t('databench.layout.testLog.connected'), t('databench.layout.testLog.metadataOk')]);
+        addLog(t('databench.layout.testLog.connected'));
+        addLog(t('databench.layout.testLog.metadataOk'));
         setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'connected' as const, config: { ...c.config, lastTested: tn } } : c));
         showToast('success', t('databench.layout.toast.connTestPassed', { name: conn.name }));
+      } else {
+        addLog(t('databench.layout.testLog.sshFailed'));
+        addLog(t('databench.layout.testLog.testFailed'));
+        setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'error' as const } : c));
+        showToast('error', t('databench.layout.toast.connTestFailed', { name: conn.name }));
       }
+    } catch (e: any) {
+      addLog(t('databench.layout.testLog.testFailed'));
+      setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'error' as const } : c));
+      showToast('error', t('databench.layout.toast.connTestFailed', { name: conn.name }));
+    } finally {
       setTestingConnId(null);
-    }, 1800);
+    }
   };
 
-  const createConnection = () => {
+  const createConnection = async () => {
     if (!ncName.trim()) { showToast('error', t('databench.layout.toast.connNameRequired')); return; }
-    const id = `conn_${Date.now().toString().slice(-4)}`;
-    const c: DataConnection = { id, name: ncName, type: ncType, status: 'testing', config: { host: ncHost || 'localhost', port: ncPort, username: ncUser || 'anonymous' }, tablesAvailable: [{ name: 'raw_imported_table_1', rowCount: 25000, columns: [{ name: 'id', type: 'integer' }, { name: 'record_payload', type: 'string' }, { name: 'sync_timestamp', type: 'timestamp' }] }] };
-    setConnections([...connections, c]); setSelConnId(id); setShowAddConn(false);
-    showToast('success', t('databench.layout.toast.connCreated', { name: ncName }));
-    setTimeout(() => testConnection(id), 500);
+    try {
+      const { createDataSource } = await import('./data-workbench/api');
+      const conn = await createDataSource({
+        name: ncName, type: ncType, host: ncHost || 'localhost', port: ncPort,
+        username: ncUser || 'anonymous',
+      });
+      if (conn) {
+        setConnections(p => [...p, conn]); setSelConnId(conn.id); setShowAddConn(false);
+        showToast('success', t('databench.layout.toast.connCreated', { name: ncName }));
+        setTimeout(() => testConnection(conn.id), 500);
+      } else {
+        showToast('error', t('databench.layout.toast.connTestFailed', { name: ncName }));
+      }
+    } catch (e: any) {
+      showToast('error', t('databench.layout.toast.connTestFailed', { name: ncName }));
+    }
   };
 
-  const triggerSync = (taskId: string) => {
-    setSyncTasks(p => p.map(t => t.id === taskId ? { ...t, status: 'running' as const } : t));
+  const triggerSync = async (taskId: string) => {
+    setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'running' as const } : tk));
     showToast('info', t('databench.layout.toast.syncRunning'));
-    setTimeout(() => {
-      const task = syncTasks.find(t => t.id === taskId);
+    try {
+      const { triggerSyncRun } = await import('./data-workbench/api');
+      const result = await triggerSyncRun(taskId);
       const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      if (taskId !== 'sync_sap_costs') {
-        setSyncTasks(p => p.map(t => t.id === taskId ? { ...t, status: 'success' as const, lastRunTime: tn, recordsSynced: (t.recordsSynced || 0) + Math.floor(Math.random() * 200) + 5, errorMessage: undefined } : t));
+      if (result && result.status !== 'failed') {
+        setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'success' as const, lastRunTime: tn, errorMessage: undefined } : tk));
+        const task = syncTasks.find(tk => tk.id === taskId);
         showToast('success', t('databench.layout.toast.syncSuccess', { name: task?.name }));
       } else {
-        setSyncTasks(p => p.map(t => t.id === taskId ? { ...t, status: 'failed' as const, lastRunTime: tn, errorMessage: '[SAP RFC ERROR] Gateway timed out.' } : t));
+        setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: tn, errorMessage: 'Execution failed' } : tk));
+        const task = syncTasks.find(tk => tk.id === taskId);
         showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
       }
-    }, 1500);
+    } catch (e: any) {
+      const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: tn, errorMessage: e.message } : tk));
+      const task = syncTasks.find(tk => tk.id === taskId);
+      showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
+    }
   };
 
-  const createSync = () => {
+  const createSync = async () => {
     if (!nsName.trim() || !nsTable.trim()) { showToast('error', t('databench.layout.toast.syncFormIncomplete')); return; }
-    const t: DataSyncTask = { id: `sync_${Date.now().toString().slice(-4)}`, name: nsName, sourceConnectionId: nsConn || (connections[0]?.id || ''), sourceTable: nsTable, targetDatasetId: `ds_raw_${nsTable.toLowerCase()}`, syncMode: nsMode, schedule: nsSched, status: 'paused', recordsSynced: 0 };
-    setSyncTasks([...syncTasks, t]); setSelTaskId(t.id); setShowAddSync(false);
-    showToast('success', t('databench.layout.toast.syncCreated', { name: nsName }));
+    try {
+      const { createSyncTask } = await import('./data-workbench/api');
+      const task = await createSyncTask({
+        name: nsName,
+        sourceConnectionId: nsConn || (connections[0]?.id || ''),
+        sourceTable: nsTable,
+        targetTable: nsTable,
+        syncMode: nsMode,
+        schedule: nsSched === 'cron' ? '' : nsSched,
+      });
+      if (task) {
+        setSyncTasks(p => [...p, task]); setSelTaskId(task.id); setShowAddSync(false);
+        showToast('success', t('databench.layout.toast.syncCreated', { name: nsName }));
+      } else {
+        showToast('error', t('databench.layout.toast.syncFormIncomplete'));
+      }
+    } catch (e: any) {
+      showToast('error', t('databench.layout.toast.syncFormIncomplete'));
+    }
   };
 
-  const createHealth = () => {
+  const createHealth = async () => {
     if (!nhName.trim()) { showToast('error', t('databench.layout.toast.healthNameRequired')); return; }
-    const c: DataHealthCheck = { id: `check_${Date.now().toString().slice(-4)}`, datasetId: nhDs || 'ds_flights_clean', name: nhName, checkType: nhType, config: { minRows: nhType === 'row_count' ? parseInt(nhThr) : undefined, maxNullPercentage: nhType === 'null_check' ? parseFloat(nhThr) : undefined, maxDelayMinutes: nhType === 'freshness' ? parseInt(nhThr) : undefined, targetColumn: 'pilot_id' }, status: 'pending', lastChecked: t('databench.layout.health.none'), message: t('databench.layout.health.notRun') };
-    setHealthChecks([...healthChecks, c]); setSelCheckId(c.id); setShowAddCheck(false);
-    showToast('success', t('databench.layout.toast.healthCreated', { name: nhName }));
+    try {
+      const { createHealthCheck } = await import('./data-workbench/api');
+      const ruleType = nhType === 'row_count' ? 'COMPLETENESS'
+        : nhType === 'null_check' ? 'COMPLETENESS'
+        : nhType === 'freshness' ? 'TIMELINESS'
+        : nhType === 'schema_check' ? 'VALIDITY'
+        : 'ACCURACY';
+      const check = await createHealthCheck({
+        name: nhName,
+        ruleType,
+        targetEntity: nhDs,
+        ruleExpression: nhThr,
+        description: `${nhType} threshold: ${nhThr}`,
+      });
+      if (check) {
+        setHealthChecks(p => [...p, check]); setSelCheckId(check.id); setShowAddCheck(false);
+        showToast('success', t('databench.layout.toast.healthCreated', { name: nhName }));
+      } else {
+        showToast('error', t('databench.layout.toast.healthNameRequired'));
+      }
+    } catch (e: any) {
+      showToast('error', t('databench.layout.toast.healthNameRequired'));
+    }
   };
 
-  const runCheck = (checkId: string) => {
+  const runCheck = async (checkId: string) => {
     setHealthChecks(p => p.map(c => c.id === checkId ? { ...c, status: 'pending' as const, message: computeEngine === 'doris' ? t('databench.layout.health.dorisCheck') : t('databench.layout.health.memoryCheck') } : c));
-    setTimeout(() => {
+    try {
+      const { runHealthCheck } = await import('./data-workbench/api');
+      await runHealthCheck();
       const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
       setHealthChecks(p => p.map(c => {
         if (c.id !== checkId) return c;
@@ -187,7 +253,11 @@ export default function DataWorkbenchLayout({
         return { ...c, status: finalStatus, lastChecked: tn, message: msg };
       }));
       showToast('success', t('databench.layout.toast.healthCheckComplete'));
-    }, 1000);
+    } catch (e: any) {
+      const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      setHealthChecks(p => p.map(c => c.id === checkId ? { ...c, status: 'failed' as const, lastChecked: tn, message: e.message } : c));
+      showToast('error', t('databench.layout.toast.healthCheckComplete'));
+    }
   };
 
   // ── Render ──
