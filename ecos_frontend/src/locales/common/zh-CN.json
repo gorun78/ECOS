@@ -201,6 +201,8 @@
   "user.security.workstation": "绑定物理工作站",
   "user.security.workstation.placeholder": "如 WS-COSMOS-09",
   "user.security.auditmode": "双写审计力度",
+  "user.security.auditmode.basic": "基础（仅关键操作）",
+  "user.security.auditmode.detailed": "详细（含请求参数）",
   "user.security.auditmode.full": "全量双写（密码学签名）",
   "user.security.auditmode.standard": "标准（控制台记录）",
   "user.security.sandbox": "强制启动高危指令智能体沙盒审查",

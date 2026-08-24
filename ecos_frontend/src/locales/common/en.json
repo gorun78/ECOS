@@ -201,6 +201,8 @@
   "user.security.workstation": "Linked Physical Workstation",
   "user.security.workstation.placeholder": "e.g. WS-COSMOS-09",
   "user.security.auditmode": "Dual-Write Audit Mode",
+  "user.security.auditmode.basic": "Basic (critical ops only)",
+  "user.security.auditmode.detailed": "Detailed (with request params)",
   "user.security.auditmode.full": "Full Cryptographic ABAC Chain Signature",
   "user.security.auditmode.standard": "Standard Ledger Audit Records Only",
   "user.security.sandbox": "Mandatory High-Risk Command Agent Sandbox Review",

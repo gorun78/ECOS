@@ -401,6 +401,8 @@ export default function UserEditModal({
                         onChange={(e) => setSecProfile(p => ({ ...p!, auditMode: e.target.value }))}
                         className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       >
+                        <option value="basic">{t("user.security.auditmode.basic")}</option>
+                        <option value="detailed">{t("user.security.auditmode.detailed")}</option>
                         <option value="full">{t("user.security.auditmode.full")}</option>
                         <option value="standard">{t("user.security.auditmode.standard")}</option>
                       </select>

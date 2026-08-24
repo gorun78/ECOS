@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -70,7 +71,8 @@ public class AuthController {
     // ── 登录 ──────────────────────────────────────────────
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<?>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<?>> login(@RequestBody LoginRequest request,
+                                                HttpServletRequest httpRequest) {
         String username = request.username();
         String password = request.password();
 
@@ -122,8 +124,23 @@ public class AuthController {
             }
         }
 
-        // ── 密码正确 ──
+        // ── R1.1: 工作站登录校验（密码正确后、签发 token 前） ──
         String userId = (String) user.get("id");
+        String linkedWorkstation = authService.findLinkedWorkstation(userId);
+        if (linkedWorkstation != null && !linkedWorkstation.isBlank()) {
+            String clientIp = extractClientIp(httpRequest);
+            if (!workstationMatches(linkedWorkstation, clientIp)) {
+                log.warn("R1.1 工作站校验失败 — user={}, linkedWs={}, clientIp={}",
+                        username, linkedWorkstation, clientIp);
+                // 写审计日志到 ecos_audit_log（action=workstation_mismatch, result=FAILURE）
+                authService.writeWorkstationMismatchAudit(username, userId, linkedWorkstation, clientIp);
+                return ResponseEntity.status(403)
+                        .body(ApiResponse.forbidden("工作站校验失败：当前IP未绑定到该账户"));
+            }
+            log.debug("R1.1 工作站校验通过 — user={}, clientIp={}", username, clientIp);
+        }
+
+        // ── 密码正确 ──
 
         // ── T1-3a: 检查是否需要强制修改密码 ──
         Boolean passwordChangeRequired = (Boolean) user.get("password_change_required");
@@ -439,5 +456,54 @@ public class AuthController {
             log.warn("Failed to parse roles JSON: {}", rolesJson, e);
             return Collections.emptyList();
         }
+    }
+
+    // ── R1.1 工作站校验辅助方法 ──────────────────────────
+
+    /**
+     * R1.1: 从 HttpServletRequest 提取客户端真实 IP。
+     * 优先 X-Forwarded-For / X-Real-IP，回退到 remoteAddr。
+     */
+    private String extractClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // X-Forwarded-For 可能含逗号分隔的多个 IP，取第一个
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
+    }
+
+    /**
+     * R1.1: 判断客户端 IP 是否匹配绑定的工作站。
+     * <p>linked_workstation 可配置为单个 IP，或逗号/分号分隔的多个 IP。
+     * 匹配规则：大小写不敏感，去除空白后精确匹配任一配置项。
+     * 配置为 "*" 表示不限制（放行）。
+     */
+    private boolean workstationMatches(String linkedWorkstation, String clientIp) {
+        if (linkedWorkstation == null || linkedWorkstation.isBlank()) {
+            return true; // 无绑定 → 放行
+        }
+        if (clientIp == null || clientIp.isBlank()) {
+            return false; // 有绑定但无法获取客户端IP → 拒绝
+        }
+        String[] allowed = linkedWorkstation.split("[,;]");
+        String ip = clientIp.trim();
+        for (String entry : allowed) {
+            String e = entry.trim();
+            if (e.isEmpty()) continue;
+            if ("*".equals(e) || e.equalsIgnoreCase(ip)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

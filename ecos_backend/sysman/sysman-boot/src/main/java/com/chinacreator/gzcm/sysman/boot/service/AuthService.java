@@ -105,4 +105,64 @@ public class AuthService {
                         + "last_password_change = NOW(), password_history = CAST(? AS jsonb) WHERE id = ?",
                 newPasswordHash, updatedHistoryJson, userId);
     }
+
+    // ── R1.1 工作站登录校验 ──────────────────────────────────────────
+
+    /**
+     * R1.1: 查询用户绑定的固定工作站 IP（td_user_security_profile.linked_workstation）。
+     *
+     * @param userId 用户ID
+     * @return 绑定的工作站 IP/标识，未配置或查询异常返回 null（视为无绑定，放行）
+     */
+    public String findLinkedWorkstation(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT linked_workstation FROM td_user_security_profile " +
+                    "WHERE scope_type = 'user' AND user_id = ? LIMIT 1",
+                    userId);
+            if (rows.isEmpty() || rows.get(0).get("linked_workstation") == null) {
+                return null;
+            }
+            String ws = rows.get(0).get("linked_workstation").toString().trim();
+            return ws.isBlank() ? null : ws;
+        } catch (Exception e) {
+            log.warn("R1.1 查询用户工作站绑定失败 userId={}, error={}", userId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * R1.1: 写入工作站不匹配审计日志到 ecos_audit_log（哈希链表）。
+     *
+     * @param username     用户名
+     * @param userId       用户ID
+     * @param linkedWs     绑定的工作站
+     * @param clientIp     实际客户端IP
+     * @return 新插入的审计日志 id（long），失败返回 -1
+     */
+    public long writeWorkstationMismatchAudit(String username, String userId, String linkedWs, String clientIp) {
+        try {
+            String changesJson = String.format(
+                    "{\"userId\":\"%s\",\"linkedWorkstation\":\"%s\",\"clientIp\":\"%s\"}",
+                    userId != null ? userId : "", linkedWs != null ? linkedWs : "", clientIp != null ? clientIp : "");
+            // ecos_audit_log 列: id(serial), username, operation, entity_type, entity_id, changes, ip_address, created_at, category
+            return jdbcTemplate.queryForObject(
+                    "INSERT INTO ecos_audit_log (username, operation, entity_type, entity_id, changes, ip_address, created_at, category) " +
+                    "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, NOW(), ?) RETURNING id",
+                    Long.class,
+                    username != null ? username : userId,
+                    "WORKSTATION_MISMATCH",
+                    "AUTH",
+                    userId,
+                    changesJson,
+                    clientIp,
+                    "security");
+        } catch (Exception e) {
+            log.error("R1.1 工作站不匹配审计日志写入失败 user={}, error={}", username, e.getMessage());
+            return -1L;
+        }
+    }
 }
