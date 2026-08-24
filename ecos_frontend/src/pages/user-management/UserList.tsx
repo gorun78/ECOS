@@ -225,7 +225,7 @@ export default function UserList({
               <td className={td}><span className="font-medium">{u.username}</span></td>
               <td className={td}>{u.realName || "-"}</td>
               <td className={td}><span className="text-xs opacity-70">{u.email || "-"}</span></td>
-              <td className={td}><span className="text-xs">{orgMap[u.orgId || ""] || u.orgId || "-"}</span></td>
+              <td className={td}><span className="text-xs">{orgMap[u.orgId || ""] || (u as any).orgName || u.orgId || "-"}</span></td>
               <td className={td}><RoleTags userId={u.userId} roles={roles} /></td>
               <td className={td} onClick={e => e.stopPropagation()}>
                 <button onClick={() => onToggleStatus(u.userId, u.status)}

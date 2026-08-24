@@ -1760,7 +1760,14 @@ export async function deletePermission(id:string) {
 
 // User-Role assignments
 export async function fetchUserRoles(userId:string): Promise<string[]> {
-  try { return await apiFetchData<string[]>(`/api/v1/system/users/${userId}/roles`); }
+  try {
+    const data = await apiFetchData<any[]>(`/api/v1/system/users/${userId}/roles`);
+    // API returns [{roleId, roleName, roleCode}], extract roleId strings
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
+      return data.map(r => r.roleId).filter(Boolean);
+    }
+    return data as string[];
+  }
   catch (e) { console.warn("fetchUserRoles failed", e); return []; }
 }
 export async function assignUserRoles(userId:string, roleIds:string[]): Promise<void> {

@@ -329,7 +329,7 @@ function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout, onResetPasswo
                 [isZh ? "真实姓名" : "Real Name", user.realName || "-"],
                 [isZh ? "邮箱" : "Email", user.email || "-"],
                 [isZh ? "手机" : "Phone", user.phone || "-"],
-                [isZh ? "组织" : "Organization", orgMap[user.orgId || ""] || user.orgId || "-"],
+                [isZh ? "组织" : "Organization", orgMap[user.orgId || ""] || (user as any).orgName || user.orgId || "-"],
                 [isZh ? "状态" : "Status", user.status === "ACTIVE" ? (isZh ? "正常" : "Active") : (isZh ? "锁定" : "Locked")],
                 [isZh ? "锁定" : "Locked", user.locked === "1" ? (isZh ? "是" : "Yes") : (isZh ? "否" : "No")],
                 [isZh ? "最后登录" : "Last Login", user.lastLoginTime || "-"],
@@ -920,7 +920,7 @@ export default function UserManagement() {
           loading={loading}
           roles={roles}
           orgMap={orgMap}
-          onEdit={async (u) => { if (!orgTree.length) await loadOrgs(); setUserForm({ mode: "edit", user: u }); }}
+          onEdit={async (u) => { if (!orgTree.length) await loadOrgs(); if (!roles.length) await loadRoles(); setUserForm({ mode: "edit", user: u }); }}
           onDelete={(u) => {
             console.log('[DELETE BTN] user object:', JSON.stringify(u));
             console.log('[DELETE BTN] u.userId:', u.userId, 'u.user_id:', (u as any).user_id);

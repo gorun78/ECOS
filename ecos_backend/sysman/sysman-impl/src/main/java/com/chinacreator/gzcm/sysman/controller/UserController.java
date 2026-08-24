@@ -34,24 +34,28 @@ private static final Logger log = LoggerFactory.getLogger(UserController.class);
             @RequestParam(defaultValue = "20") int pageSize) {
         try {
             StringBuilder sql = new StringBuilder(
-                "SELECT \"USER_ID\" as \"userId\", \"USERNAME\" as username, \"REAL_NAME\" as \"realName\", " +
-                "\"EMAIL\" as email, \"MOBILE_TEL1\" as phone, \"STATUS\" as status, " +
-                "\"LOCKED\" as locked, \"LAST_LOGIN_TIME\" as \"lastLoginTime\", " +
-                "\"CREATED_TIME\" as \"createdTime\" " +
-                "FROM TD_USER WHERE 1=1 ");
+                "SELECT u.\"USER_ID\" as \"userId\", u.\"USERNAME\" as username, u.\"REAL_NAME\" as \"realName\", " +
+                "u.\"EMAIL\" as email, u.\"MOBILE_TEL1\" as phone, u.\"STATUS\" as status, " +
+                "u.\"LOCKED\" as locked, u.\"LAST_LOGIN_TIME\" as \"lastLoginTime\", " +
+                "u.\"CREATED_TIME\" as \"createdTime\", " +
+                "o.\"ORG_ID\" as \"orgId\", o.\"ORG_NAME\" as \"orgName\" " +
+                "FROM TD_USER u " +
+                "LEFT JOIN td_user_organization uo ON u.\"USER_ID\" = uo.\"USER_ID\" AND uo.\"IS_PRIMARY\" = '1' " +
+                "LEFT JOIN td_organization o ON uo.\"ORG_ID\" = o.\"ORG_ID\" " +
+                "WHERE 1=1 ");
             List<Object> params = new ArrayList<>();
             if (keyword != null && !keyword.isEmpty()) {
-                sql.append("AND (\"USERNAME\" ILIKE ? OR \"EMAIL\" ILIKE ?) ");
+                sql.append("AND (u.\"USERNAME\" ILIKE ? OR u.\"EMAIL\" ILIKE ?) ");
                 String kw = "%" + keyword + "%";
                 params.add(kw); params.add(kw);
             }
             if (status != null && !status.isEmpty()) {
-                sql.append("AND \"STATUS\" = ? ");
+                sql.append("AND u.\"STATUS\" = ? ");
                 params.add(status);
             } else {
-                sql.append("AND \"STATUS\" != 'DELETED' ");
+                sql.append("AND u.\"STATUS\" != 'DELETED' ");
             }
-            sql.append("ORDER BY \"CREATED_TIME\" DESC ");
+            sql.append("ORDER BY u.\"CREATED_TIME\" DESC ");
             
             // Count total
             String countSql = "SELECT COUNT(*) FROM (" + sql.toString() + ") t";
@@ -220,8 +224,8 @@ private static final Logger log = LoggerFactory.getLogger(UserController.class);
     @RequirePermission(permission = "system:user:query")
     public ApiResponse<List<Map<String, Object>>> getRoles(@PathVariable String id) {
         try {
-            String sql = "SELECT r.role_id, r.role_name, r.role_code FROM TD_ROLE r " +
-                         "INNER JOIN TD_USER_ROLE ur ON r.role_id = ur.role_id WHERE ur.user_id = ?";
+            String sql = "SELECT r.\"ROLE_ID\" as \"roleId\", r.\"ROLE_NAME\" as \"roleName\", r.\"ROLE_CODE\" as \"roleCode\" FROM TD_ROLE r " +
+                         "INNER JOIN TD_USER_ROLE ur ON r.\"ROLE_ID\" = ur.\"ROLE_ID\" WHERE ur.\"USER_ID\" = ?";
             List<Map<String, Object>> roles = userQueryService.queryForList(sql, id);
             return ApiResponse.success(roles);
         } catch (Exception e) {
@@ -240,9 +244,9 @@ private static final Logger log = LoggerFactory.getLogger(UserController.class);
                 return ApiResponse.badRequest("roleIds 不能为空");
             }
 
-            userQueryService.update("DELETE FROM TD_USER_ROLE WHERE user_id = ?", id);
+            userQueryService.update("DELETE FROM TD_USER_ROLE WHERE \"USER_ID\" = ?", id);
             for (String roleId : roleIds) {
-                userQueryService.update("INSERT INTO TD_USER_ROLE (user_id, role_id) VALUES (?, ?)", id, roleId);
+                userQueryService.update("INSERT INTO TD_USER_ROLE (\"USER_ID\", \"ROLE_ID\") VALUES (?, ?)", id, roleId);
             }
             return ApiResponse.success();
         } catch (Exception e) {
