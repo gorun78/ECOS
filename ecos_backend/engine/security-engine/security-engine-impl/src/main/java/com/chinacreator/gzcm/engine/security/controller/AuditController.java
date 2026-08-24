@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
@@ -153,5 +156,59 @@ public class AuditController {
             log.error("审计哈希链验证失败", e);
             return ApiResponse.internalError("验证失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 写入审计日志端点 — 异步落库，不阻塞调用方。
+     * 请求体: {userId, action, resource, result, detail}
+     */
+    @PostMapping("/log")
+    public ApiResponse<Map<String, Object>> writeLog(@RequestBody Map<String, Object> body,
+                                                     HttpServletRequest request) {
+        try {
+            if (auditLogService == null) {
+                return ApiResponse.internalError("审计服务未就绪");
+            }
+
+            // 构造审计事件
+            AuditEvent event = new AuditEvent();
+            event.setEventId(UUID.randomUUID().toString());
+            event.setTimestamp(LocalDateTime.now());
+            event.setUserId(asString(body.get("userId")));
+            event.setAction(asString(body.get("action")));
+            event.setResource(asString(body.get("resource")));
+            event.setResult(asString(body.get("result")));
+            event.setEventType(asString(body.get("action")));  // action 复用为 eventType
+            event.setIpAddress(request != null ? request.getRemoteAddr() : null);
+            event.setUserAgent(request != null ? request.getHeader("User-Agent") : null);
+
+            // detail 放入 details Map
+            Object detail = body.get("detail");
+            if (detail != null) {
+                Map<String, Object> details = new LinkedHashMap<>();
+                details.put("detail", detail);
+                // 透传调用方提供的额外字段
+                for (Map.Entry<String, Object> e : body.entrySet()) {
+                    String k = e.getKey();
+                    if (!"userId".equals(k) && !"action".equals(k) && !"resource".equals(k)
+                            && !"result".equals(k) && !"detail".equals(k)) {
+                        details.put(k, e.getValue());
+                    }
+                }
+                event.setDetails(details);
+            }
+
+            // 异步写入（IAuditLogService.log 内部已用 CompletableFuture.runAsync 异步落库）
+            auditLogService.log(event);
+
+            return ApiResponse.success(Map.of("status", "accepted"));
+        } catch (Exception e) {
+            log.error("写入审计日志失败", e);
+            return ApiResponse.internalError("写入失败: " + e.getMessage());
+        }
+    }
+
+    private static String asString(Object o) {
+        return o == null ? null : String.valueOf(o);
     }
 }

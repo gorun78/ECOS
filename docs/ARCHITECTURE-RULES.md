@@ -169,6 +169,33 @@ DataBridgeException(RuntimeException)
 - 新增端点后追加到对应引擎的`AGENTS.md`端点清单
 - 如涉及定时/周期执行→委托`runtime-task`全局调度，不自建`ScheduledExecutorService`
 
+### 2.4 安全接入铁律（🔴强制，所有引擎数据访问必须过 security-engine 裁决）
+
+security-engine 是「护」，所有引擎的数据访问与操作必须经它裁决，**禁止在引擎内重复实现安全逻辑**。违反以下任一条 = 验收失败：
+
+1. **行级过滤**：data-engine 查询前调 `POST /api/security/rls/apply` 注入 RLS WHERE 条件，不得绕过
+2. **列级过滤**：查询结果返回前调 `POST /api/security/cls/columns` 过滤敏感列，不得裸返全列
+3. **脱敏**：敏感字段（手机/邮箱/身份证/金额/密码）返回前调 `POST /api/security/mask` 脱敏
+4. **操作授权**：Agent 工具调用 / Function 执行等操作前调 `POST /api/v1/security/policy-engine/evaluate`（OPA）做 ABAC 裁决
+5. **审计**：所有写操作异步调 `POST /api/v1/security/audit/log` 写审计，不阻塞主流程
+6. **默认 DENY**：security-engine 不可用时默认拒绝（宁可误拒不可误放），不得降级为放行
+7. **禁止重复实现**：各引擎禁止在自身代码实现权限/脱敏/审计逻辑，统一走 security-engine REST
+
+> 完整调用格式、请求/响应示例见 `docs/7-integration/02-security/05-安全能力操作手册.md`
+
+### 2.5 runtime 公共基础库铁律（🔴强制，各子系统复用公共底座，禁止重复造轮子）
+
+runtime 是「器」（横切底座），提供全局基础设施能力，各引擎/服务层**必须复用，禁止重复实现**：
+
+1. **基础设施访问**：PG/Neo4j/MinIO/Doris/Git 的 Driver/Client 封装统一走 `runtime-access`，禁止各引擎 new Driver 或重复封装
+2. **LLM 调用**：所有 LLM 调用统一走 `llm-gateway`（LLMGatewayService），禁止各引擎直接调 LLM Provider API
+3. **任务调度**：定时/周期任务统一委托 `runtime-task` 全局调度，禁止自建 `ScheduledExecutorService`
+4. **监控告警**：监控/告警统一走 `runtime-monitor`，禁止各引擎自建监控
+5. **基础工具**：日志/国际化/告警/分页等基础工具统一走 runtime 工具类，禁止各引擎重复实现
+6. **补强而非自建**：发现公共能力缺失时，先向 runtime 补充，不在引擎内自建（引擎内自建 = 验收失败）
+
+> 归属判断：类定义了什么 Bean——`@Configuration` 定义 Driver/Client = 基础设施访问（归 runtime-access）；任务调度/监控/LLM 同理归对应 runtime 子模块。不看被谁 import。
+
 ---
 
 ## 三、数据层铁律
