@@ -457,6 +457,31 @@ export async function updateSecurityProfile(
   return json.data;
 }
 
+// ── Per-User Security Profile (td_user_security_profile) ─────
+
+/** Fetch a specific user's security profile — GET /api/v1/security-profiles/user/{userId} */
+export async function fetchUserSecurityProfile(userId: string): Promise<SecurityProfile & { levelName?: string; isDefault?: boolean }> {
+  try {
+    return await apiFetchData<SecurityProfile & { levelName?: string; isDefault?: boolean }>(
+      `/api/v1/security-profiles/user/${userId}`
+    );
+  } catch (e) {
+    console.warn("fetchUserSecurityProfile: backend unavailable", e);
+    return { clearanceLevel: 0, linkedWorkstation: "", auditMode: "standard", sandboxMandatory: false };
+  }
+}
+
+/** Update a specific user's security profile — PUT /api/v1/security-profiles/user/{userId} */
+export async function updateUserSecurityProfile(
+  userId: string,
+  body: Partial<SecurityProfile>
+): Promise<SecurityProfile & { levelName?: string }> {
+  return apiFetchData<SecurityProfile & { levelName?: string }>(
+    `/api/v1/security-profiles/user/${userId}`,
+    { method: "PUT", body: JSON.stringify(body) }
+  );
+}
+
 // ── Audit Logs ──────────────────────────────────────────
 // 对接 AuditController (/api/v1/audit/logs)
 export async function fetchAuditLogs(

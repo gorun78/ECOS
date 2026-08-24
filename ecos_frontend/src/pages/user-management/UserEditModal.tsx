@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../../components/LanguageContext";
 import { useTheme } from "../../components/ThemeContext";
-import { fetchUserRoles } from "../../api";
-import type { IamUser, IamRole, IamOrg } from "../../api";
+import { fetchUserRoles, fetchUserSecurityProfile, updateUserSecurityProfile } from "../../api";
+import type { IamUser, IamRole, IamOrg, SecurityProfile } from "../../api";
 import UserRoleBinding from "./UserRoleBinding";
 
 type EditTab = "basic" | "roles" | "security";
@@ -62,6 +62,12 @@ export default function UserEditModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Security profile state (edit mode only)
+  const [secProfile, setSecProfile] = useState<SecurityProfile | null>(null);
+  const [secLoading, setSecLoading] = useState(false);
+  const [secSaving, setSecSaving] = useState(false);
+  const [secToast, setSecToast] = useState<string | null>(null);
+
   // Load user's existing roles for edit mode
   useEffect(() => {
     if (mode === "edit" && user?.userId) {
@@ -70,6 +76,39 @@ export default function UserEditModal({
         .catch(() => setSelectedRoleIds([]));
     }
   }, [mode, user]);
+
+  // Load user's security profile when security tab is opened
+  useEffect(() => {
+    if (mode === "edit" && tab === "security" && user?.userId && !secProfile && !secLoading) {
+      setSecLoading(true);
+      fetchUserSecurityProfile(user.userId)
+        .then((p) => setSecProfile(p))
+        .catch(() => setSecProfile({ clearanceLevel: 0, linkedWorkstation: "", auditMode: "standard", sandboxMandatory: false }))
+        .finally(() => setSecLoading(false));
+    }
+  }, [mode, tab, user, secProfile, secLoading]);
+
+  // Save security profile
+  async function handleSaveSecurity() {
+    if (!user?.userId || !secProfile) return;
+    setSecSaving(true);
+    setSecToast(null);
+    try {
+      const updated = await updateUserSecurityProfile(user.userId, {
+        clearanceLevel: secProfile.clearanceLevel,
+        linkedWorkstation: secProfile.linkedWorkstation,
+        auditMode: secProfile.auditMode,
+        sandboxMandatory: secProfile.sandboxMandatory,
+      });
+      setSecProfile(updated);
+      setSecToast(t("user.security.save.success"));
+      setTimeout(() => setSecToast(null), 4000);
+    } catch (e: any) {
+      setError(t("user.security.save.fail") + ": " + (e.message || ""));
+    } finally {
+      setSecSaving(false);
+    }
+  }
 
   function update(k: string, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -309,6 +348,95 @@ export default function UserEditModal({
           {/* Security Tab (edit only) */}
           {tab === "security" && mode === "edit" && user && (
             <div className="space-y-4">
+              {/* Security Configuration Form */}
+              <div className={`p-4 rounded-lg border space-y-4 ${styles.cardBorder}`}>
+                <div className={`text-xs font-semibold ${styles.cardText}`}>
+                  {t("topbar.user.settings")}
+                </div>
+
+                {secLoading ? (
+                  <div className={`text-xs ${styles.cardTextMuted}`}>{t("user.security.loading")}</div>
+                ) : secProfile ? (
+                  <>
+                    {/* Clearance Level */}
+                    <div>
+                      <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
+                        {t("user.security.clearance")}
+                      </label>
+                      <select
+                        value={secProfile.clearanceLevel ?? 0}
+                        onChange={(e) => setSecProfile(p => ({ ...p!, clearanceLevel: parseInt(e.target.value) }))}
+                        className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                      >
+                        <option value={0}>{t("user.security.clearance.l0")}</option>
+                        <option value={1}>{t("user.security.clearance.l1")}</option>
+                        <option value={2}>{t("user.security.clearance.l2")}</option>
+                        <option value={3}>{t("user.security.clearance.l3")}</option>
+                        <option value={4}>{t("user.security.clearance.l4")}</option>
+                      </select>
+                    </div>
+
+                    {/* Linked Workstation */}
+                    <div>
+                      <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
+                        {t("user.security.workstation")}
+                      </label>
+                      <input
+                        type="text"
+                        value={secProfile.linkedWorkstation ?? ""}
+                        onChange={(e) => setSecProfile(p => ({ ...p!, linkedWorkstation: e.target.value }))}
+                        className={`w-full px-3 py-2 rounded text-sm border font-mono ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                        placeholder={t("user.security.workstation.placeholder")}
+                      />
+                    </div>
+
+                    {/* Audit Mode */}
+                    <div>
+                      <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
+                        {t("user.security.auditmode")}
+                      </label>
+                      <select
+                        value={secProfile.auditMode ?? "standard"}
+                        onChange={(e) => setSecProfile(p => ({ ...p!, auditMode: e.target.value }))}
+                        className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                      >
+                        <option value="full">{t("user.security.auditmode.full")}</option>
+                        <option value="standard">{t("user.security.auditmode.standard")}</option>
+                      </select>
+                    </div>
+
+                    {/* Sandbox Mandatory */}
+                    <label className="flex items-start gap-2.5 cursor-pointer py-1 select-none">
+                      <input
+                        type="checkbox"
+                        checked={secProfile.sandboxMandatory ?? false}
+                        onChange={(e) => setSecProfile(p => ({ ...p!, sandboxMandatory: e.target.checked }))}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 h-4 w-4"
+                      />
+                      <span className={`text-xs leading-normal ${styles.cardText}`}>
+                        {t("user.security.sandbox")}
+                      </span>
+                    </label>
+
+                    {/* Save button + toast */}
+                    <div className="flex items-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveSecurity}
+                        disabled={secSaving}
+                        className={`px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}
+                      >
+                        {secSaving ? (isZh ? "保存中…" : "Saving…") : (isZh ? "保存安全配置" : "Save Security")}
+                      </button>
+                      {secToast && (
+                        <span className="text-xs text-emerald-500">{secToast}</span>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Account Status (existing) */}
               <div className={`p-4 rounded-lg border ${styles.cardBorder}`}>
                 <div className="flex items-center justify-between">
                   <div>
@@ -347,7 +475,7 @@ export default function UserEditModal({
                 </div>
               </div>
 
-              <div className={`p-4 rounded-lg border ${styles.cardBorder} space-y-3`}>
+              <div className={`p-4 rounded-lg border space-y-3`}>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="opacity-50">{isZh ? "用户ID" : "User ID"}:</span>

@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, ChevronRight, Palette, Settings, Menu } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme, ThemeId } from "./ThemeContext";
+import { fetchUserSecurityProfile, updateUserSecurityProfile } from "../api";
 
 interface Tab {
   id: string;
@@ -34,7 +35,7 @@ export default function Topbar({
   const { locale, setLocale, t } = useLanguage();
   const { activeTheme, setActiveTheme, styles } = useTheme();
 
-  // Settings values loading from localStorage or default
+  // Settings values loading from localStorage (cache) or default
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [email, setEmail] = useState(() => localStorage.getItem("ecos_user_email") || "guorongxiao@gmail.com");
   const [clearance, setClearance] = useState(() => localStorage.getItem("ecos_user_clearance") || "");
@@ -46,34 +47,90 @@ export default function Topbar({
   });
   const [toast, setToast] = useState<string | null>(null);
 
+  // Load security profile from backend on mount (sync with td_user_security_profile)
+  useEffect(() => {
+    const userId = localStorage.getItem("ecos_user_id") || "";
+    if (!userId) return;
+    fetchUserSecurityProfile(userId).then((p) => {
+      if (p.clearanceLevel !== undefined) {
+        const levelStr = String(p.clearanceLevel);
+        setClearance(levelStr);
+        localStorage.setItem("ecos_user_clearance", levelStr);
+      }
+      if (p.linkedWorkstation) {
+        setWorkstation(p.linkedWorkstation);
+        localStorage.setItem("ecos_user_workstation", p.linkedWorkstation);
+      }
+      if (p.auditMode) {
+        setAuditMode(p.auditMode);
+        localStorage.setItem("ecos_user_audit", p.auditMode);
+      }
+      if (p.sandboxMandatory !== undefined) {
+        setSandbox(p.sandboxMandatory);
+        localStorage.setItem("ecos_user_sandbox", String(p.sandboxMandatory));
+      }
+    }).catch(() => {/* fallback to localStorage values */});
+  }, []);
+
   const displayClearance = clearance || (locale === "zh" ? "4级高阶授权专家" : "Commander Level 4");
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
+    // Save to localStorage (cache)
     localStorage.setItem("ecos_user_email", email);
     localStorage.setItem("ecos_user_clearance", clearance);
     localStorage.setItem("ecos_user_workstation", workstation);
     localStorage.setItem("ecos_user_audit", auditMode);
     localStorage.setItem("ecos_user_sandbox", String(sandbox));
-    
+
+    // Sync to backend
+    const userId = localStorage.getItem("ecos_user_id") || "";
+    if (userId) {
+      try {
+        await updateUserSecurityProfile(userId, {
+          clearanceLevel: parseInt(clearance) || 0,
+          linkedWorkstation: workstation,
+          auditMode: auditMode,
+          sandboxMandatory: sandbox,
+        });
+      } catch (e) {
+        console.warn("Topbar: failed to sync security profile to backend", e);
+      }
+    }
+
     setToast(t("topbar.user.save.success"));
     setTimeout(() => {
       setToast(null);
     }, 4000);
   };
 
-  const handleResetCache = () => {
+  const handleResetCache = async () => {
     localStorage.removeItem("ecos_user_email");
     localStorage.removeItem("ecos_user_clearance");
     localStorage.removeItem("ecos_user_workstation");
     localStorage.removeItem("ecos_user_audit");
     localStorage.removeItem("ecos_user_sandbox");
-    
+
     setEmail("guorongxiao@gmail.com");
     setClearance("");
     setWorkstation("WS-COSMOS-09");
     setAuditMode("full");
     setSandbox(true);
-    
+
+    // Reset backend profile too
+    const userId = localStorage.getItem("ecos_user_id") || "";
+    if (userId) {
+      try {
+        await updateUserSecurityProfile(userId, {
+          clearanceLevel: 0,
+          linkedWorkstation: "WS-COSMOS-09",
+          auditMode: "full",
+          sandboxMandatory: true,
+        });
+      } catch (e) {
+        console.warn("Topbar: failed to reset security profile on backend", e);
+      }
+    }
+
     setToast(t("topbar.user.reset.success"));
     setTimeout(() => {
       setToast(null);

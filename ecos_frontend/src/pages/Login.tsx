@@ -50,6 +50,17 @@ export default function Login() {
       if (data.roles)
         localStorage.setItem("roles", JSON.stringify(data.roles));
 
+      // Fetch and persist userId for security profile API
+      try {
+        const meResp = await fetch("/api/v1/auth/me", {
+          headers: { Authorization: `Bearer ${data.accessToken}` },
+        });
+        const meJson = await meResp.json();
+        if (meJson?.data?.userId) {
+          localStorage.setItem("ecos_user_id", meJson.data.userId);
+        }
+      } catch { /* non-critical */ }
+
       navigate(from, { replace: true });
     } catch (err: any) {
       if (err.message === "Failed to fetch" || err.name === "TypeError") {
