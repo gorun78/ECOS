@@ -15,16 +15,13 @@ import PipelinesTab from './data-workbench/tabs/PipelinesTab';
 import HealthTab from './data-workbench/tabs/HealthTab';
 import DataLineageTab from './data-workbench/tabs/DataLineageTab';
 import PipelineBuilderTab from './data-workbench/tabs/PipelineBuilderTab';
-import CodeReposTab from './data-workbench/tabs/CodeReposTab';
-import CodeWorkbooksTab from './data-workbench/tabs/CodeWorkbooksTab';
-import ContourTab from './data-workbench/tabs/ContourTab';
 import SqlQueryTab from './data-workbench/tabs/SqlQueryTab';
 import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
 import GuideTab from "./data-workbench/InteractiveStepGuide";
 import { AddConnectionModal, AddSyncModal, AddHealthCheckModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
 import { CopilotPanel } from '../components/CopilotPanel';
 
-type TabName = 'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'code-repositories' | 'code-workbooks' | 'contour' | 'guide' | 'sql-query' | 'engine-config';
+type TabName = 'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'guide' | 'sql-query' | 'engine-config';
 
 interface DataWorkbenchLayoutProps {
   objectTypes?: ObjectType[];
@@ -43,9 +40,6 @@ const TAB_CONFIG: { id: TabName; icon: string; i18nKey: string }[] = [
   { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
   { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
-  { id: 'code-repositories', icon: 'FileCode', i18nKey: 'dw.tab.code_repositories' },
-  { id: 'code-workbooks', icon: 'BookOpen', i18nKey: 'dw.tab.code_workbooks' },
-  { id: 'contour', icon: 'Layers', i18nKey: 'dw.tab.contour' },
   { id: 'sql-query', icon: 'Search', i18nKey: 'dw.tab.sql_query' },
   { id: 'engine-config', icon: 'Settings', i18nKey: 'dw.tab.engine_config' },
 ];
@@ -207,7 +201,7 @@ export default function DataWorkbenchLayout({
             {TAB_CONFIG.map((tab, idx) => {
               const prevGrp = idx > 0 ? TAB_CONFIG[idx - 1].i18nKey.split('.')[2] : '';
               const thisGrp = tab.i18nKey.split('.')[2];
-              const divider = idx === 6 || idx === 10; // divider before dev group and tools group
+              const divider = idx === 6; // divider before tools group (sql-query, engine-config)
               return (
                 <React.Fragment key={tab.id}>
                   {divider && <div className={`my-2 border-t ${styles.cardBorder}`} />}
@@ -245,9 +239,6 @@ export default function DataWorkbenchLayout({
           {activeTab === 'health' && <HealthTab healthChecks={healthChecks} setHealthChecks={setHealthChecks} showToast={showToast} showAddCheck={showAddCheck} setShowAddCheck={setShowAddCheck} newCheckName={nhName} setNewCheckName={setNhName} newCheckDs={nhDs} setNewCheckDs={setNhDs} checkType={nhType} setCheckType={setNhType as any} newCheck={{}} t={t} />}
           {activeTab === 'lineage' && <DataLineageTab />}
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={connections} pipelines={pipelines} computeEngine={computeEngine} setComputeEngine={setComputeEngine} showToast={showToast} pipelineBuilderOutput={pbOutput} setPipelineBuilderOutput={setPbOutput} />}
-          {activeTab === 'code-repositories' && <CodeReposTab />}
-          {activeTab === 'code-workbooks' && <CodeWorkbooksTab />}
-          {activeTab === 'contour' && <ContourTab />}
           {activeTab === 'sql-query' && <SqlQueryTab showToast={showToast} />}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>
