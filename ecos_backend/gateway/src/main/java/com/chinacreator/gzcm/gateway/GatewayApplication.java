@@ -86,6 +86,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.gateway.service.PgObjectStorageService.class,
         // E3: sysman-boot GlobalExceptionHandler与gateway版本冲突,排除sysman-boot副本
         com.chinacreator.gzcm.sysman.boot.handler.GlobalExceptionHandler.class,
+        // E3: 排除SysManApplication——它有自己的@ComponentScan会注册冲突bean
+        com.chinacreator.gzcm.sysman.boot.SysManApplication.class,
     })
 })
 @MapperScan({
