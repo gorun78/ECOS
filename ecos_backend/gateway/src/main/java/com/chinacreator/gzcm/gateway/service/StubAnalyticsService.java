@@ -3,12 +3,10 @@ package com.chinacreator.gzcm.gateway.service;
 import com.chinacreator.gzcm.common.service.IAnalyticsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import java.util.*;
 
-@Service
-@Profile("!enterprise & !flagship")
+@Service("pgAnalyticsService")
 public class StubAnalyticsService implements IAnalyticsService {
     private static final Logger log = LoggerFactory.getLogger(StubAnalyticsService.class);
     
