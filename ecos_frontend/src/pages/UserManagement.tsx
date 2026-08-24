@@ -801,8 +801,10 @@ export default function UserManagement() {
         <RoleFormModal
           mode={roleForm.mode}
           role={roleForm.role}
+          allPermissions={permissions}
           onSave={roleForm.mode === "create" ? handleCreateRole : handleUpdateRole}
           onClose={() => setRoleForm(null)}
+          onManagePermissions={() => { if (roleForm.role) { setRoleForm(null); setPermPanelRole(roleForm.role); } }}
         />
       )}
 
@@ -966,7 +968,7 @@ export default function UserManagement() {
                   <td className={td}><span className="text-xs opacity-60 max-w-[200px] truncate block">{r.description || "-"}</span></td>
                   <td className={td} onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
-                      <button onClick={() => setRoleForm({ mode: "edit", role: r })} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
+                      <button onClick={() => { if (permissions.length === 0) loadPermissions(); setRoleForm({ mode: "edit", role: r }); }} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
                       <button onClick={() => setConfirmAction({ type: "delete", tab: "roles", id: r.roleId, name: r.roleName })}
                         className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14} /></button>
                     </div>
@@ -1058,13 +1060,29 @@ export default function UserManagement() {
 
 // ── Role Form Modal (inline) ──────────────────────────────────
 
-function RoleFormModal({ mode, role, onSave, onClose }: {
+function RoleFormModal({ mode, role, allPermissions, onSave, onClose, onManagePermissions }: {
   mode: "create" | "edit"; role?: IamRole | null;
+  allPermissions: IamPermission[];
   onSave: (d: Record<string, any>) => Promise<void>; onClose: () => void;
+  onManagePermissions?: () => void;
 }) {
   const { locale } = useLanguage(); const { styles } = useTheme(); const isZh = locale === "zh";
   const [f, setF] = useState({ roleName: role?.roleName ?? "", roleCode: role?.roleCode ?? "", roleType: role?.roleType ?? "SYSTEM", description: role?.description ?? "" });
   const [saving, setSaving] = useState(false); const [err, setErr] = useState("");
+  const [assignedPerms, setAssignedPerms] = useState<IamPermission[]>([]);
+  const [loadingPerms, setLoadingPerms] = useState(false);
+
+  // 编辑模式下加载已分配权限
+  useEffect(() => {
+    if (mode === "edit" && role?.roleId) {
+      setLoadingPerms(true);
+      fetchRolePermissions(role.roleId).then(permIds => {
+        const idSet = new Set(permIds);
+        setAssignedPerms(allPermissions.filter(p => idSet.has(p.permissionId)));
+      }).catch(() => {}).finally(() => setLoadingPerms(false));
+    }
+  }, [mode, role?.roleId, allPermissions]);
+
   async function save() {
     if (!f.roleName?.trim()) { setErr(isZh ? "角色名不能为空" : "Role name required"); return; }
     if (!f.roleCode?.trim()) { setErr(isZh ? "角色编码不能为空" : "Role code required"); return; }
@@ -1072,7 +1090,7 @@ function RoleFormModal({ mode, role, onSave, onClose }: {
   }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className={`rounded-lg border p-6 w-full max-w-md ${styles.cardBg} ${styles.cardBorder}`}>
+      <div className={`rounded-lg border p-6 w-full max-w-md max-h-[85vh] overflow-y-auto ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             {mode === "create" ? (isZh ? "新建角色" : "Create Role") : (isZh ? "编辑角色" : "Edit Role")}
@@ -1094,6 +1112,37 @@ function RoleFormModal({ mode, role, onSave, onClose }: {
           <div><label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>{isZh ? "描述" : "Description"}</label>
             <textarea value={f.description} onChange={e => setF(p => ({...p, description: e.target.value}))} rows={2}
               className={`w-full px-3 py-2 rounded text-sm border resize-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`} /></div>
+
+          {/* 编辑模式：显示已分配权限 */}
+          {mode === "edit" && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className={`block text-xs ${styles.cardTextMuted}`}>
+                  {isZh ? `已分配权限 (${assignedPerms.length})` : `Assigned Permissions (${assignedPerms.length})`}
+                </label>
+                {onManagePermissions && (
+                  <button type="button" onClick={onManagePermissions}
+                    className={`text-xs text-indigo-500 hover:text-indigo-700 ${styles.cardTextMuted}`}>
+                    {isZh ? "管理权限 →" : "Manage →"}
+                  </button>
+                )}
+              </div>
+              <div className={`rounded border p-2 max-h-32 overflow-y-auto text-xs space-y-1 ${styles.inputBg} ${styles.inputBorder}`}>
+                {loadingPerms ? (
+                  <div className={`${styles.cardTextMuted}`}>{isZh ? "加载中…" : "Loading…"}</div>
+                ) : assignedPerms.length === 0 ? (
+                  <div className={`${styles.cardTextMuted}`}>{isZh ? "暂无已分配权限" : "No permissions assigned"}</div>
+                ) : (
+                  assignedPerms.map(p => (
+                    <div key={p.permissionId} className="flex items-center gap-1.5">
+                      <span className={`font-mono text-[10px] px-1 rounded ${styles.cardBorder}`}>{p.resource}:{p.action}</span>
+                      <span className={`truncate ${styles.cardTextMuted}`}>{p.description || ""}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <button onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>{isZh ? "取消" : "Cancel"}</button>
