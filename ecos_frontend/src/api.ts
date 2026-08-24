@@ -1917,19 +1917,20 @@ export async function updateTenantQuota(
 // ── Security Policies (RLS / CLS / ABAC Evaluate / Masking) ────────────────────────
 
 export interface RlsPolicy {
-  id?: number;
+  id?: string | number;
   policyName: string;
   tableName: string;
   filterExpression: string;
   roles: string[];
   status: string;
   description?: string;
+  priority?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface ClsPolicy {
-  id?: number;
+  id?: string | number;
   policyName: string;
   tableName: string;
   visibleColumns: string[];
@@ -1937,6 +1938,7 @@ export interface ClsPolicy {
   roles: string[];
   status: string;
   description?: string;
+  priority?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1964,6 +1966,72 @@ export interface MaskResponse {
   maskType: string;
 }
 
+/** Map backend RLS snake_case → frontend camelCase */
+function mapRlsPolicy(raw: any): RlsPolicy {
+  return {
+    id: raw.id,
+    policyName: raw.policy_name || raw.policyName || '',
+    tableName: raw.table_name || raw.tableName || '',
+    filterExpression: raw.filter_expr || raw.filterExpression || '',
+    roles: raw.role_id ? [raw.role_id] : (raw.roles || []),
+    status: raw.enabled === false ? 'INACTIVE' : 'ACTIVE',
+    description: raw.description || '',
+    priority: raw.priority ?? 0,
+    createdAt: raw.created_at || raw.createdAt,
+    updatedAt: raw.updated_at || raw.updatedAt,
+  };
+}
+
+/** Map frontend RLS → backend request body */
+function mapToRlsBackend(p: Partial<RlsPolicy>): Record<string, any> {
+  return {
+    policyName: p.policyName,
+    tableName: p.tableName,
+    filterExpression: p.filterExpression,
+    roleId: (p.roles || [])[0] || null,
+    status: p.status || 'ACTIVE',
+    description: p.description || '',
+    priority: p.priority ?? 0,
+  };
+}
+
+/** Map backend CLS snake_case → frontend camelCase */
+function mapClsPolicy(raw: any): ClsPolicy {
+  let visibleCols: string[] = [];
+  let blockedCols: string[] = [];
+  try {
+    visibleCols = typeof raw.visible_cols === 'string' ? JSON.parse(raw.visible_cols) : (raw.visible_cols || raw.visibleColumns || []);
+    blockedCols = typeof raw.blocked_cols === 'string' ? JSON.parse(raw.blocked_cols) : (raw.blocked_cols || raw.blockedColumns || []);
+  } catch { /* ignore parse error */ }
+  return {
+    id: raw.id,
+    policyName: raw.policy_name || raw.policyName || '',
+    tableName: raw.table_name || raw.tableName || '',
+    visibleColumns: visibleCols,
+    blockedColumns: blockedCols,
+    roles: raw.role_id ? [raw.role_id] : (raw.roles || []),
+    status: raw.enabled === false ? 'INACTIVE' : 'ACTIVE',
+    description: raw.description || '',
+    priority: raw.priority ?? 0,
+    createdAt: raw.created_at || raw.createdAt,
+    updatedAt: raw.updated_at || raw.updatedAt,
+  };
+}
+
+/** Map frontend CLS → backend request body */
+function mapToClsBackend(p: Partial<ClsPolicy>): Record<string, any> {
+  return {
+    policyName: p.policyName,
+    tableName: p.tableName,
+    visibleColumns: p.visibleColumns || [],
+    blockedColumns: p.blockedColumns || [],
+    roleId: (p.roles || [])[0] || null,
+    status: p.status || 'ACTIVE',
+    description: p.description || '',
+    priority: p.priority ?? 0,
+  };
+}
+
 /** GET /api/v1/security/rls/policies — 列表RLS策略 */
 export async function fetchRlsPolicies(params?: {
   tableName?: string; page?: number; pageSize?: number;
@@ -1973,7 +2041,9 @@ export async function fetchRlsPolicies(params?: {
     if (params?.tableName) sp.set('tableName', params.tableName);
     sp.set('page', String(params?.page || 1));
     sp.set('pageSize', String(params?.pageSize || 50));
-    return await apiFetchData(`/api/v1/security/rls/policies?${sp.toString()}`);
+    const raw = await apiFetchData<any[]>(`/api/v1/security/rls/policies?${sp.toString()}`);
+    const list = Array.isArray(raw) ? raw.map(mapRlsPolicy) : [];
+    return { data: list, total: list.length };
   } catch (e) {
     console.warn('fetchRlsPolicies: backend unavailable', e);
     return { data: [], total: 0 };
@@ -1982,22 +2052,24 @@ export async function fetchRlsPolicies(params?: {
 
 /** POST /api/v1/security/rls/policies — 创建RLS策略 */
 export async function createRlsPolicy(data: Partial<RlsPolicy>): Promise<RlsPolicy> {
-  return apiFetchData('/api/v1/security/rls/policies', {
+  const res = await apiFetchData<any>('/api/v1/security/rls/policies', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(mapToRlsBackend(data)),
   });
+  return mapRlsPolicy(res);
 }
 
 /** PUT /api/v1/security/rls/policies/{id} — 更新RLS策略 */
-export async function updateRlsPolicy(id: number, data: Partial<RlsPolicy>): Promise<RlsPolicy> {
-  return apiFetchData(`/api/v1/security/rls/policies/${id}`, {
+export async function updateRlsPolicy(id: string | number, data: Partial<RlsPolicy>): Promise<RlsPolicy> {
+  const res = await apiFetchData<any>(`/api/v1/security/rls/policies/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(data),
+    body: JSON.stringify(mapToRlsBackend(data)),
   });
+  return mapRlsPolicy(res);
 }
 
 /** DELETE /api/v1/security/rls/policies/{id} — 删除RLS策略 */
-export async function deleteRlsPolicy(id: number): Promise<void> {
+export async function deleteRlsPolicy(id: string | number): Promise<void> {
   await apiFetchData(`/api/v1/security/rls/policies/${id}`, { method: 'DELETE' });
 }
 
@@ -2010,7 +2082,9 @@ export async function fetchClsPolicies(params?: {
     if (params?.tableName) sp.set('tableName', params.tableName);
     sp.set('page', String(params?.page || 1));
     sp.set('pageSize', String(params?.pageSize || 50));
-    return await apiFetchData(`/api/v1/security/cls/policies?${sp.toString()}`);
+    const raw = await apiFetchData<any[]>(`/api/v1/security/cls/policies?${sp.toString()}`);
+    const list = Array.isArray(raw) ? raw.map(mapClsPolicy) : [];
+    return { data: list, total: list.length };
   } catch (e) {
     console.warn('fetchClsPolicies: backend unavailable', e);
     return { data: [], total: 0 };
@@ -2019,28 +2093,62 @@ export async function fetchClsPolicies(params?: {
 
 /** POST /api/v1/security/cls/policies — 创建CLS策略 */
 export async function createClsPolicy(data: Partial<ClsPolicy>): Promise<ClsPolicy> {
-  return apiFetchData('/api/v1/security/cls/policies', {
+  const res = await apiFetchData<any>('/api/v1/security/cls/policies', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(mapToClsBackend(data)),
   });
+  return mapClsPolicy(res);
+}
+
+/** PUT /api/v1/security/cls/policies/{id} — 更新CLS策略 */
+export async function updateClsPolicy(id: string | number, data: Partial<ClsPolicy>): Promise<ClsPolicy> {
+  const res = await apiFetchData<any>(`/api/v1/security/cls/policies/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(mapToClsBackend(data)),
+  });
+  return mapClsPolicy(res);
+}
+
+/** DELETE /api/v1/security/cls/policies/{id} — 删除CLS策略 */
+export async function deleteClsPolicy(id: string | number): Promise<void> {
+  await apiFetchData(`/api/v1/security/cls/policies/${id}`, { method: 'DELETE' });
 }
 
 /** POST /api/v1/security/policy/evaluate — ABAC策略评估 */
 export async function evaluateAbacPolicy(
   data: AbacEvaluateRequest
 ): Promise<AbacEvaluateResponse> {
-  return apiFetchData('/api/v1/security/policy/evaluate', {
+  const raw = await apiFetchData<any>('/api/v1/security/policy/evaluate', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  // 后端返回 {input, result: {allow, policy, opaStatus, source}}
+  const result = raw?.result || raw;
+  return {
+    allowed: result.allow ?? result.allowed ?? false,
+    message: result.source ? `来源: ${result.source}, OPA状态: ${result.opaStatus ?? 'N/A'}` : undefined,
+    details: result,
+  };
 }
 
-/** POST /api/security/mask — 数据脱敏 */
+/** POST /api/v1/data-masking/apply — 数据脱敏 */
 export async function maskData(data: MaskRequest): Promise<MaskResponse> {
-  return apiFetchData('/api/security/mask', {
+  // 后端规则名: email, phone, idCard (小写); 前端: SHA256/PHONE/EMAIL/ID_CARD/AMOUNT
+  const ruleMap: Record<string, string> = {
+    PHONE: 'phone', EMAIL: 'email', ID_CARD: 'idCard',
+    SHA256: 'phone', AMOUNT: 'phone', // 不支持的类型降级到phone
+  };
+  const rule = ruleMap[data.maskType] || data.maskType.toLowerCase();
+  const raw = await apiFetchData<any>('/api/v1/data-masking/apply', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ data: [data.input], rules: [rule] }),
   });
+  // 后端返回 {total, results: [{original, masked, rule, error?}]}
+  const firstResult = raw?.results?.[0] || {};
+  return {
+    masked: firstResult.masked || '',
+    maskType: firstResult.rule || data.maskType,
+  };
 }
 
 // ── ABAC Policy Manager (P1-1.4) ────────────────────────

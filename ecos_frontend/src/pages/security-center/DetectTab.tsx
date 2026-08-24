@@ -13,7 +13,7 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import {
   fetchRlsPolicies, createRlsPolicy, updateRlsPolicy, deleteRlsPolicy,
-  fetchClsPolicies, createClsPolicy,
+  fetchClsPolicies, createClsPolicy, updateClsPolicy, deleteClsPolicy,
   evaluateAbacPolicy, maskData,
   type RlsPolicy, type ClsPolicy,
 } from '../../api';
@@ -484,8 +484,12 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<ClsPolicy | null>(null);
   const [form, setForm] = useState({ policyName: '', tableName: '', visibleColumns: '', blockedColumns: '', roles: '', status: 'ACTIVE', description: '' });
   const [saving, setSaving] = useState(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<ClsPolicy | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -509,7 +513,22 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
   };
 
   const openCreate = () => {
+    setEditing(null);
     setForm({ policyName: '', tableName: '', visibleColumns: '', blockedColumns: '', roles: '', status: 'ACTIVE', description: '' });
+    setModalOpen(true);
+  };
+
+  const openEdit = (p: ClsPolicy) => {
+    setEditing(p);
+    setForm({
+      policyName: p.policyName || '',
+      tableName: p.tableName || '',
+      visibleColumns: (p.visibleColumns || []).join(', '),
+      blockedColumns: (p.blockedColumns || []).join(', '),
+      roles: (p.roles || []).join(', '),
+      status: p.status || 'ACTIVE',
+      description: p.description || '',
+    });
     setModalOpen(true);
   };
 
@@ -519,7 +538,7 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
       const visibleList = form.visibleColumns.split(',').map(c => c.trim()).filter(Boolean);
       const blockedList = form.blockedColumns.split(',').map(c => c.trim()).filter(Boolean);
       const roleList = form.roles.split(',').map(r => r.trim()).filter(Boolean);
-      await createClsPolicy({
+      const data = {
         policyName: form.policyName,
         tableName: form.tableName,
         visibleColumns: visibleList,
@@ -527,13 +546,29 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
         roles: roleList,
         status: form.status,
         description: form.description,
-      });
+      };
+      if (editing && editing.id) {
+        await updateClsPolicy(editing.id, data);
+      } else {
+        await createClsPolicy(data);
+      }
       setModalOpen(false);
       load();
     } catch (e: any) {
       setError(e.message || 'Save failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget?.id) return;
+    try {
+      await deleteClsPolicy(deleteTarget.id);
+      setDeleteTarget(null);
+      load();
+    } catch (e: any) {
+      setError(e.message || 'Delete failed');
     }
   };
 
@@ -585,6 +620,7 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
                 <th className={`text-left px-4 py-3 font-medium text-xs ${styles.muted}`}>{t('sec.cls.col.blocked')}</th>
                 <th className={`text-left px-4 py-3 font-medium text-xs ${styles.muted}`}>{t('sec.cls.col.roles')}</th>
                 <th className={`text-left px-4 py-3 font-medium text-xs ${styles.muted}`}>{t('sec.cls.col.status')}</th>
+                <th className={`text-left px-4 py-3 font-medium text-xs ${styles.muted}`}>{t('sec.rls.col.action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -606,6 +642,16 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
                       {p.status === 'ACTIVE' ? t('sec.rls.status.active') : t('sec.rls.status.inactive')}
                     </span>
                   </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => openEdit(p)} className={`p-1.5 rounded hover:${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}>
+                        <Edit3 size={14} />
+                      </button>
+                      <button onClick={() => setDeleteTarget(p)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -613,12 +659,12 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
         </div>
       )}
 
-      {/* Create Modal */}
+      {/* Create/Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setModalOpen(false)}>
           <div className={`w-full max-w-lg mx-4 rounded-xl ${styles.cardBg} border ${styles.cardBorder} shadow-xl`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-5 py-4 border-b ${styles.cardBorder}`}>
-              <h3 className={`font-bold ${styles.cardText}`}>{t('sec.cls.create')}</h3>
+              <h3 className={`font-bold ${styles.cardText}`}>{editing ? t('sec.cls.edit') : t('sec.cls.create')}</h3>
               <button onClick={() => setModalOpen(false)} className={`${styles.muted} hover:${styles.cardText} cursor-pointer`}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
@@ -663,6 +709,25 @@ function ClsPolicyManager({ t, locale, styles }: { t: (k: string) => string; loc
               <button onClick={handleSave} disabled={saving || !form.policyName || !form.tableName} className={btnPrimary(styles)}>
                 {saving ? <Loader2 size={14} className="animate-spin" /> : t('common.save')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeleteTarget(null)}>
+          <div className={`w-full max-w-sm mx-4 rounded-xl ${styles.cardBg} border ${styles.cardBorder} shadow-xl p-6`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-950/40"><AlertTriangle size={20} className="text-red-600" /></div>
+              <div>
+                <h4 className={`font-bold ${styles.cardText}`}>{t('common.delete')}</h4>
+                <p className={`text-sm ${styles.muted}`}>{t('sec.cls.delete.confirm').replace('{name}', deleteTarget.policyName)}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteTarget(null)} className={btnSecondary(styles)}>{t('common.cancel')}</button>
+              <button onClick={handleDelete} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer">{t('common.delete')}</button>
             </div>
           </div>
         </div>

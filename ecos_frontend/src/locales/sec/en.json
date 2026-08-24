@@ -66,6 +66,7 @@
   "sec.cls.col.visible": "Visible Columns",
   "sec.cls.create": "Create CLS Policy",
   "sec.cls.edit": "Edit CLS Policy",
+  "sec.cls.delete.confirm": "Delete CLS policy \"{name}\"? This action cannot be undone.",
   "sec.cls.empty": "No CLS policies",
   "sec.cls.policyName": "Policy Name",
   "sec.cls.roles": "Roles",

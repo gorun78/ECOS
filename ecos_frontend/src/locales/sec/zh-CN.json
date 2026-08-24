@@ -66,6 +66,7 @@
   "sec.cls.col.visible": "可见列",
   "sec.cls.create": "新建CLS策略",
   "sec.cls.edit": "编辑CLS策略",
+  "sec.cls.delete.confirm": "确定删除CLS策略「{name}」？此操作不可撤销。",
   "sec.cls.empty": "暂无CLS策略",
   "sec.cls.policyName": "策略名称",
   "sec.cls.roles": "适用角色",
