@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.buszhi.workflow.controller;
+package com.chinacreator.gzcm.engine.data.quality.controller;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.buszhi.workflow.DqService;
+import com.chinacreator.gzcm.engine.data.quality.service.DqService;
 
 /**
  * Data Quality REST API — 数据质量规则/问题/仪表盘（委托 DqService 持久化）

@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.buszhi.workflow;
+package com.chinacreator.gzcm.engine.data.quality.entity;
 
 import java.time.LocalDateTime;
 

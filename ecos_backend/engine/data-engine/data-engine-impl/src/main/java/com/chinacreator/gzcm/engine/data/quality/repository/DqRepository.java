@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.buszhi.workflow;
+package com.chinacreator.gzcm.engine.data.quality.repository;
 
 import java.util.List;
 import java.util.Map;
@@ -14,6 +14,9 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+
+import com.chinacreator.gzcm.engine.data.quality.entity.DqRuleEntity;
+import com.chinacreator.gzcm.engine.data.quality.entity.DqIssueEntity;
 
 /**
  * JdbcTemplate 仓库 — 数据质量规则 & 问题持久化 CRUD
