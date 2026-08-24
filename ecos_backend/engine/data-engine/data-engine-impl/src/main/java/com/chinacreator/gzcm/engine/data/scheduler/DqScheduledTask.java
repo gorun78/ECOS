@@ -70,47 +70,41 @@ public class DqScheduledTask {
         log.info("DQ定时巡检开始");
         long startTime = System.currentTimeMillis();
 
-        List<Map<String, Object>> rules;
+        // B1 fix: 查真实表 ecos_quality_rule（字段: rule_id/rule_name/rule_type/parameters/enabled）
+        Integer enabledCount;
         try {
-            rules = jdbc.queryForList(
-                    "SELECT id, name, rule_type, config_json FROM dq_rules WHERE status = 'ENABLED'");
+            enabledCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ecos_quality_rule WHERE enabled = true", Integer.class);
         } catch (Exception e) {
-            log.warn("查询DQ规则失败(表可能不存在): {}", e.getMessage());
+            log.warn("查询DQ规则失败(表ecos_quality_rule可能不存在): {}", e.getMessage());
             return;
         }
 
-        if (rules.isEmpty()) {
+        if (enabledCount == null || enabledCount == 0) {
             log.info("无启用的DQ规则，跳过巡检");
             return;
         }
 
-        log.info("开始巡检 {} 条DQ规则", rules.size());
+        log.info("开始巡检 {} 条DQ规则", enabledCount);
+
+        // B2 fix: 只调一次 evaluateAll()（内部已遍历全部 enabled 规则），不再 per-rule 循环
         int successCount = 0;
         int failCount = 0;
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        for (Map<String, Object> rule : rules) {
-            String ruleId = String.valueOf(rule.get("id"));
-            String ruleName = String.valueOf(rule.get("name"));
-
-            Future<Map<String, Object>> future = executor.submit(() -> qualityService.evaluateAll());
-            try {
-                future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                successCount++;
-            } catch (TimeoutException e) {
-                future.cancel(true);
-                failCount++;
-                log.error("规则评估超时({}s): {} ({}), FAILED", TIMEOUT_SECONDS, ruleName, ruleId);
-            } catch (Exception e) {
-                failCount++;
-                log.error("规则评估失败: {} ({}): {}", ruleName, ruleId, e.getMessage());
-            }
+        try {
+            Map<String, Object> result = qualityService.evaluateAll();
+            Object evaluated = result.get("total");
+            int total = evaluated instanceof Number ? ((Number) evaluated).intValue() : enabledCount;
+            Object failed = result.get("failed");
+            failCount = failed instanceof Number ? ((Number) failed).intValue() : 0;
+            successCount = total - failCount;
+            log.info("DQ巡检完成: 共{}条规则, 成功{}条, 失败{}条", total, successCount, failCount);
+        } catch (Exception e) {
+            failCount = enabledCount;
+            log.error("DQ巡检执行失败: {}", e.getMessage(), e);
         }
-
-        executor.shutdownNow();
         long elapsed = System.currentTimeMillis() - startTime;
         log.info("DQ巡检完成: 成功={}, 失败={}, 总计={}, 耗时={}ms",
-                successCount, failCount, rules.size(), elapsed);
+                successCount, failCount, enabledCount, elapsed);
 
         updateLastRunTime();
     }

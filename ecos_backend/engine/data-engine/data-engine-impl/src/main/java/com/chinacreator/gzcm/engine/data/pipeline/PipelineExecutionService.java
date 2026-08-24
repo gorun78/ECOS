@@ -136,7 +136,7 @@ public class PipelineExecutionService {
     }
 
     /**
-     * TRANSFORM_SQL: 用 JdbcTemplate 执行 config.sql。
+     * TRANSFORM_SQL: 用 JdbcTemplate 执行 config.sql，返回真实影响行数。
      */
     private long executeTransformSql(Map<String, Object> config) {
         String sql = (String) config.get("sql");
@@ -144,8 +144,8 @@ public class PipelineExecutionService {
             throw new IllegalArgumentException("TRANSFORM_SQL: sql 不能为空");
         }
 
-        jdbc.execute(sql);
-        return jdbc.update("SELECT 1"); // 返回影响行数占位
+        // B8 fix: 返回真实影响行数，不再用 jdbc.update("SELECT 1") 占位
+        return jdbc.update(sql);
     }
 
     /**

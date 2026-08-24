@@ -12,7 +12,7 @@ import java.util.Map;
  * 健康检查 Controller。
  */
 @RestController
-@RequestMapping("/datanet")
+@RequestMapping({"/api/v1/datanet", "/datanet"})
 public class DatanetHealthController {
 
     @GetMapping("/api/health")

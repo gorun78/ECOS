@@ -271,16 +271,38 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
         long failedRows = 0;
         List<String> sampleFailures = new ArrayList<>();
 
-        for (Map<String, Object> row : rows) {
+        // B7 fix: UNIQUE 规则在行级做去重检测——统计每个值出现次数，重复值=失败
+        if ("UNIQUE".equalsIgnoreCase(rule.getRuleType())) {
             String[] parts = rule.getTarget().split("\\.");
             String fieldName = parts.length > 1 ? parts[parts.length - 1] : rule.getTarget();
-            Object value = row.get(fieldName);
+            // 统计每个值出现次数
+            Map<Object, Integer> valueCounts = new java.util.HashMap<>();
+            for (Map<String, Object> row : rows) {
+                Object value = row.get(fieldName);
+                valueCounts.merge(value, 1, Integer::sum);
+            }
+            for (Map<String, Object> row : rows) {
+                Object value = row.get(fieldName);
+                int count = valueCounts.getOrDefault(value, 1);
+                if (count > 1) {
+                    failedRows++;
+                    if (sampleFailures.size() < 10) {
+                        sampleFailures.add(fieldName + "=" + value + " (出现" + count + "次, UNIQUE违规)");
+                    }
+                }
+            }
+        } else {
+            for (Map<String, Object> row : rows) {
+                String[] parts = rule.getTarget().split("\\.");
+                String fieldName = parts.length > 1 ? parts[parts.length - 1] : rule.getTarget();
+                Object value = row.get(fieldName);
 
-            boolean passed = evaluateValue(rule, value);
-            if (!passed) {
-                failedRows++;
-                if (sampleFailures.size() < 10) {
-                    sampleFailures.add(fieldName + "=" + value + " (rule: " + rule.getRuleType() + ")");
+                boolean passed = evaluateValue(rule, value);
+                if (!passed) {
+                    failedRows++;
+                    if (sampleFailures.size() < 10) {
+                        sampleFailures.add(fieldName + "=" + value + " (rule: " + rule.getRuleType() + ")");
+                    }
                 }
             }
         }
@@ -323,8 +345,15 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
                 if (pattern == null) return true;
                 return Pattern.matches(pattern, value.toString());
             }
-            case "UNIQUE":
-                return true;
+            case "UNIQUE": {
+                // B7 fix: UNIQUE 规则——值在样本数据中应唯一，重复值=失败
+                if (value == null) return true;
+                // 样本内去重检测：如果当前值在 rows 中出现 >1 次，则非唯一
+                // 注意：evaluateValue 逐行调用，这里用 value 本身做简单判断
+                // 完整 UNIQUE 检测在 evaluateRuleInternal 层用 GROUP BY 更准确
+                // 这里做 sample-level 去重：空值或非空都视为通过（完整检测靠 SQL 层）
+                return true; // sample-level 无法做精确 UNIQUE，SQL-level 由调用方保证
+            }
             case "LENGTH": {
                 if (value == null) return true;
                 int len = value.toString().length();
@@ -332,8 +361,44 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
                 int maxLen = params.containsKey("max_length") ? Integer.parseInt(params.get("max_length")) : Integer.MAX_VALUE;
                 return len >= minLen && len <= maxLen;
             }
-            case "CUSTOM":
-                return true;
+            case "CUSTOM": {
+                // B7 fix: CUSTOM 规则——从 parameters 里取 expression 做表达式评估
+                if (value == null) return true;
+                String expression = params.get("expression");
+                if (expression == null || expression.isEmpty()) return true;
+                // 简单表达式评估：支持 == != > < >= <= contains startsWith endsWith
+                String val = value.toString();
+                if (expression.contains("==")) {
+                    String[] parts = expression.split("==", 2);
+                    return val.equals(parts[1].trim());
+                } else if (expression.contains("!=")) {
+                    String[] parts = expression.split("!=", 2);
+                    return !val.equals(parts[1].trim());
+                } else if (expression.contains("contains:")) {
+                    String substring = expression.substring(expression.indexOf("contains:") + 9).trim();
+                    return val.contains(substring);
+                } else if (expression.contains("startsWith:")) {
+                    String prefix = expression.substring(expression.indexOf("startsWith:") + 11).trim();
+                    return val.startsWith(prefix);
+                } else if (expression.contains("endsWith:")) {
+                    String suffix = expression.substring(expression.indexOf("endsWith:") + 9).trim();
+                    return val.endsWith(suffix);
+                }
+                // 数值比较
+                try {
+                    double num = Double.parseDouble(val);
+                    if (expression.contains(">=")) {
+                        return num >= Double.parseDouble(expression.split(">=")[1].trim());
+                    } else if (expression.contains("<=")) {
+                        return num <= Double.parseDouble(expression.split("<=")[1].trim());
+                    } else if (expression.contains(">")) {
+                        return num > Double.parseDouble(expression.split(">")[1].trim());
+                    } else if (expression.contains("<")) {
+                        return num < Double.parseDouble(expression.split("<")[1].trim());
+                    }
+                } catch (NumberFormatException ignored) {}
+                return true; // 无法解析的表达式，默认通过
+            }
             default:
                 return true;
         }

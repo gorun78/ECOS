@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/datanet/catalog")
+@RequestMapping({"/api/v1/datanet/catalog", "/datanet/catalog"})
 public class CatalogController {
 
     private final CatalogService catalogService;

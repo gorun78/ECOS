@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/datanet/metadata")
+@RequestMapping({"/api/v1/datanet/metadata", "/datanet/metadata"})
 public class MetadataController {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataController.class);

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/datanet/datasource")
+@RequestMapping({"/api/v1/datanet/datasource", "/datanet/datasource"})
 public class DataSourceController {
 
     private final DataSourceRegistryService service;

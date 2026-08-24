@@ -13,7 +13,7 @@ import java.util.List;
  * @author DataBridge Datanet Team
  */
 @RestController
-@RequestMapping("/datanet/category")
+@RequestMapping({"/api/v1/datanet/category", "/datanet/category"})
 public class CategoryController {
 
     private final CategoryService categoryService;
