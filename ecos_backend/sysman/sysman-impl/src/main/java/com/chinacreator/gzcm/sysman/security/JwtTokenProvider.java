@@ -51,10 +51,20 @@ public class JwtTokenProvider {
     private final long refreshTokenExpiration = 30 * 24 * 60 * 60 * 1000L;
 
     public JwtTokenProvider(
-            @Value("${jwt.private-key}") String privateKeyPemOrBase64,
-            @Value("${jwt.public-key}") String publicKeyPemOrBase64) throws Exception {
-        this.privateKey = loadPrivateKey(privateKeyPemOrBase64);
-        this.publicKey = loadPublicKey(publicKeyPemOrBase64);
+            @Value("${jwt.private-key:}") String privateKeyPemOrBase64,
+            @Value("${jwt.public-key:}") String publicKeyPemOrBase64) throws Exception {
+        if (privateKeyPemOrBase64 == null || privateKeyPemOrBase64.isBlank()) {
+            // 开发环境兜底：未配置 JWT 密钥时生成临时 RSA 密钥对（每次启动不持久化）
+            log.warn("jwt.private-key 未配置，生成临时 RSA 密钥对（仅限开发环境，重启后 token 失效）");
+            java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            java.security.KeyPair kp = kpg.generateKeyPair();
+            this.privateKey = kp.getPrivate();
+            this.publicKey = kp.getPublic();
+        } else {
+            this.privateKey = loadPrivateKey(privateKeyPemOrBase64);
+            this.publicKey = loadPublicKey(publicKeyPemOrBase64);
+        }
         log.info("JwtTokenProvider initialized with RS256 keys");
     }
 
