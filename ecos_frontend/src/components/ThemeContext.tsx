@@ -33,6 +33,21 @@ export interface ThemeStyles {
   muted: string;
   /** Alias for sidebarBorder — used as generic border */
   appBorder: string;
+  /** Semantic colors — theme-aware success/warning/danger/info */
+  successBg: string;
+  successText: string;
+  successBorder: string;
+  warningBg: string;
+  warningText: string;
+  warningBorder: string;
+  dangerBg: string;
+  dangerText: string;
+  dangerBorder: string;
+  infoBg: string;
+  infoText: string;
+  infoBorder: string;
+  /** Overlay backdrop for modals/drawers */
+  overlayBg: string;
 }
 
 interface ThemeContextType {
@@ -65,7 +80,20 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputText: "text-slate-800",
     inputBorder: "border-[#E2E8F0]",
     muted: "text-slate-500",
-    appBorder: "border-[#E2E8F0]"
+    appBorder: "border-[#E2E8F0]",
+    successBg: "bg-emerald-50",
+    successText: "text-emerald-700",
+    successBorder: "border-emerald-200",
+    warningBg: "bg-amber-50",
+    warningText: "text-amber-700",
+    warningBorder: "border-amber-200",
+    dangerBg: "bg-red-50",
+    dangerText: "text-red-700",
+    dangerBorder: "border-red-200",
+    infoBg: "bg-blue-50",
+    infoText: "text-blue-700",
+    infoBorder: "border-blue-200",
+    overlayBg: "bg-slate-900/40"
   },
   "deep-space": {
     appBg: "bg-[#0B0F19]",
@@ -90,7 +118,20 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputText: "text-slate-100",
     inputBorder: "border-[#2D3748]",
     muted: "text-slate-400",
-    appBorder: "border-[#1E293B]"
+    appBorder: "border-[#1E293B]",
+    successBg: "bg-emerald-500/10",
+    successText: "text-emerald-400",
+    successBorder: "border-emerald-500/30",
+    warningBg: "bg-amber-500/10",
+    warningText: "text-amber-400",
+    warningBorder: "border-amber-500/30",
+    dangerBg: "bg-red-500/10",
+    dangerText: "text-red-400",
+    dangerBorder: "border-red-500/30",
+    infoBg: "bg-blue-500/10",
+    infoText: "text-blue-400",
+    infoBorder: "border-blue-500/30",
+    overlayBg: "bg-slate-950/50"
   },
   "cyber-terminal": {
     appBg: "bg-[#020202]",
@@ -115,7 +156,20 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputText: "text-emerald-400",
     inputBorder: "border-emerald-600/40",
     muted: "text-emerald-650",
-    appBorder: "border-emerald-650/50"
+    appBorder: "border-emerald-650/50",
+    successBg: "bg-emerald-500/10",
+    successText: "text-emerald-400",
+    successBorder: "border-emerald-500/40",
+    warningBg: "bg-amber-500/10",
+    warningText: "text-amber-400",
+    warningBorder: "border-amber-500/40",
+    dangerBg: "bg-red-500/10",
+    dangerText: "text-red-400",
+    dangerBorder: "border-red-500/40",
+    infoBg: "bg-cyan-500/10",
+    infoText: "text-cyan-400",
+    infoBorder: "border-cyan-500/40",
+    overlayBg: "bg-black/60"
   },
   "royal-purple": {
     appBg: "bg-[#0F0C1B]",
@@ -140,7 +194,20 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputText: "text-purple-200",
     inputBorder: "border-purple-800/40",
     muted: "text-purple-400",
-    appBorder: "border-purple-900/40"
+    appBorder: "border-purple-900/40",
+    successBg: "bg-emerald-500/10",
+    successText: "text-emerald-400",
+    successBorder: "border-emerald-500/30",
+    warningBg: "bg-amber-500/10",
+    warningText: "text-amber-400",
+    warningBorder: "border-amber-500/30",
+    dangerBg: "bg-red-500/10",
+    dangerText: "text-red-400",
+    dangerBorder: "border-red-500/30",
+    infoBg: "bg-blue-500/10",
+    infoText: "text-blue-400",
+    infoBorder: "border-blue-500/30",
+    overlayBg: "bg-purple-950/50"
   }
 };
 
