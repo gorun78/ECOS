@@ -48,6 +48,8 @@ private static final Logger log = LoggerFactory.getLogger(UserController.class);
             if (status != null && !status.isEmpty()) {
                 sql.append("AND \"STATUS\" = ? ");
                 params.add(status);
+            } else {
+                sql.append("AND \"STATUS\" != 'DELETED' ");
             }
             sql.append("ORDER BY \"CREATED_TIME\" DESC ");
             
