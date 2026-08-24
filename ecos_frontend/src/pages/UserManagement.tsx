@@ -502,7 +502,7 @@ export default function UserManagement() {
   const loadData = useCallback(async () => {
     switch (tab) {
       case "users": await loadUsers(); break;
-      case "roles": await loadRoles(); break;
+      case "roles": await loadRoles(); if (permissions.length === 0) await loadPermissions(); break;
       case "orgs": await loadOrgs(); break;
       case "permissions": await loadPermissions(); break;
     }
@@ -959,7 +959,7 @@ export default function UserManagement() {
             </tr></thead>
             <tbody>
               {roles.map(r => (
-                <tr key={r.roleId} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 cursor-pointer" onClick={() => setPermPanelRole(r)}>
+                <tr key={r.roleId} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 cursor-pointer" onClick={() => { if (permissions.length === 0) loadPermissions(); setPermPanelRole(r); }}>
                   <td className={td}><span className="font-medium text-indigo-600 dark:text-indigo-400">{r.roleName}</span></td>
                   <td className={td}><code className="text-[11px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{r.roleCode}</code></td>
                   <td className={td}><span className={`text-xs px-1.5 py-0.5 rounded ${r.roleType === "SYSTEM" ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"}`}>{r.roleType}</span></td>
