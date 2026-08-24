@@ -84,6 +84,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.worldmodel.service.Neo4jGraphService.class,
         // E3-T2: gateway PgObjectStorageService是stub, workspace版是权威(@Profile("standard")), 删gateway副本避免Bean名冲突
         com.chinacreator.gzcm.gateway.service.PgObjectStorageService.class,
+        // E3: sysman-boot GlobalExceptionHandler与gateway版本冲突,排除sysman-boot副本
+        com.chinacreator.gzcm.sysman.boot.handler.GlobalExceptionHandler.class,
     })
 })
 @MapperScan({
