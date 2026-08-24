@@ -5,7 +5,7 @@ import {
   ChevronDown, FolderTree,
 } from "lucide-react";
 import { STATUS_OPTIONS, STATUS_META, G1_G5_LABELS } from "./constants";
-import type { DictTable, DictColumn } from "../../../services/dict";
+import type { DictTable, DictColumn } from "../../services/dict";
 import type { DictType } from "../../../api";
 
 export interface DictLeftPanelProps {

@@ -4,7 +4,7 @@ import {
   updateDictTable, deleteDictTable,
   createDictColumn, updateDictColumn, deleteDictColumn,
   type DictTable, type DictColumn,
-} from "../../../services/dict";
+} from "../../services/dict";
 import { STATUS_META, emptyColumnForm, type ColumnFormState } from "./constants";
 
 export function useTableMode(showToast: (type: "success" | "error", msg: string) => void) {

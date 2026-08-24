@@ -1,7 +1,7 @@
 import React from "react";
 import { Database, RotateCw, Trash2 } from "lucide-react";
 import { STATUS_META, SOURCE_OPTIONS } from "./constants";
-import type { DictTable } from "../../../services/dict";
+import type { DictTable } from "../../services/dict";
 
 export interface TableModePanelProps {
   tableMode: "view" | "create" | "edit";

@@ -2,7 +2,7 @@ import React from "react";
 import { Columns3, Plus, RotateCw, Key, Edit3, Trash2, Hash, Layers, HardDrive, User, Calendar, Tag } from "lucide-react";
 import { ColumnTypeSelect } from "./SharedComponents";
 import { typeBadge, type ColumnFormState } from "./constants";
-import type { DictTable, DictColumn } from "../../../services/dict";
+import type { DictTable, DictColumn } from "../../services/dict";
 
 export interface ColumnSectionProps {
   selectedTable: DictTable;
