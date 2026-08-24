@@ -51,7 +51,7 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
               const result = await executePipeline(pipelineId);
               showToast('success', result?.status === 'success' ? t("dw.pipelineExecSuccess") : t("dw.pipelineExecTriggered"));
             } catch (e: any) {
-              showToast('error', `执行失败: ${e.message}`);
+              showToast('error', t("dw.execFailedMsg").replace('{msg}', e.message));
             }
           }}
         />

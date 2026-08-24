@@ -225,7 +225,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             </div>
           )}
 
-          {/* ═══ SQL 查询控制台 ═══ */}
+          {/* SQL Query Console */}
           <InlineSqlConsole datasourceId={conn.id} />
         </div>
       </div>
@@ -235,7 +235,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   );
 };
 
-// ═══ Inline SQL Query Console (嵌入式，复用数据源 ID) ═══
+// Inline SQL Query Console (embedded, reuses datasource ID)
 function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
   const { styles } = useTheme();
   const { t } = useLanguage();
@@ -276,7 +276,7 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
       </div>
       {!collapsed && (
         <div className={`${styles.cardBg} p-3 space-y-3`}>
-          {/* SQL 编辑器 + 执行按钮 */}
+          {/* SQL editor + run button */}
           <div className="flex gap-2">
             <textarea value={sql} onChange={e => setSql(e.target.value)}
               className={`flex-1 p-2 border ${styles.inputBorder} rounded text-xs font-mono resize-none outline-none focus:${styles.accentBorder} h-16 ${styles.inputBg} ${styles.inputText}`}
@@ -286,7 +286,7 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
               {loading ? t("dw.executing") : t("dw.runExec")}
             </button>
           </div>
-          {/* 结果 */}
+          {/* Result */}
           {error && <div className={`text-rose-500 text-xs ${styles.appBg} p-2 rounded`}>⚠ {error}</div>}
           {result && !error && (
             <div>
