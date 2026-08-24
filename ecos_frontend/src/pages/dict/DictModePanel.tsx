@@ -1,6 +1,6 @@
 import React from "react";
 import { BookOpen, FolderTree, Plus, Search, RotateCw, Edit3, Trash2 } from "lucide-react";
-import type { DictType, DictItem } from "../../../api";
+import type { DictType, DictItem } from "../../api";
 
 export interface DictModePanelProps {
   selectedDictType: string | null;

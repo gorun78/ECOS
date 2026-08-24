@@ -3,7 +3,7 @@ import {
   listDictTypes, getDictItems, createDictItem,
   updateDictItem, deleteDictItem, fetchDictSubsystems,
   type DictType, type DictItem,
-} from "../../../api";
+} from "../../api";
 
 export function useDictMode(showToast: (type: "success" | "error", msg: string) => void) {
   const [viewMode, setViewMode] = useState<"table" | "dict">("dict");
