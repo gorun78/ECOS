@@ -75,6 +75,67 @@ public class AuditController {
     }
 
     /**
+     * 审计统计 — 供前端安全审计页统计卡片使用
+     * 返回: {todayCount, failureCount, activeUsers, anomalyIps, totalCount, successCount}
+     */
+    @GetMapping("/stats")
+    public ApiResponse<Map<String, Object>> stats() {
+        try {
+            Map<String, Object> result = new LinkedHashMap<>();
+            if (auditLogService == null) {
+                result.put("todayCount", 0);
+                result.put("failureCount", 0);
+                result.put("activeUsers", 0);
+                result.put("anomalyIps", 0);
+                result.put("totalCount", 0);
+                result.put("successCount", 0);
+                return ApiResponse.success(result);
+            }
+            // Query all logs for stats (page 1, large page size)
+            IAuditLogService.AuditQueryCondition cond = new IAuditLogService.AuditQueryCondition();
+            cond.setPage(1);
+            cond.setPageSize(1000);
+            List<AuditEvent> allLogs = auditLogService.query(cond);
+
+            // Today count
+            java.time.LocalDate today = java.time.LocalDate.now();
+            long todayCount = allLogs.stream()
+                .filter(l -> l.getTimestamp() != null && l.getTimestamp().toLocalDate().equals(today))
+                .count();
+
+            // Failure count
+            long failureCount = allLogs.stream()
+                .filter(l -> "FAILURE".equals(l.getResult()) || "FAILED".equals(l.getResult()))
+                .count();
+
+            // Active users (distinct userIds)
+            long activeUsers = allLogs.stream()
+                .map(AuditEvent::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+
+            // Anomaly IPs (IPs with >3 failure events)
+            Map<String, Long> ipFailureCount = allLogs.stream()
+                .filter(l -> "FAILURE".equals(l.getResult()) || "FAILED".equals(l.getResult()))
+                .filter(l -> l.getIpAddress() != null)
+                .collect(java.util.stream.Collectors.groupingBy(AuditEvent::getIpAddress, java.util.stream.Collectors.counting()));
+            long anomalyIps = ipFailureCount.values().stream().filter(c -> c > 3).count();
+
+            result.put("todayCount", todayCount);
+            result.put("failureCount", failureCount);
+            result.put("activeUsers", activeUsers);
+            result.put("anomalyIps", anomalyIps);
+            result.put("totalCount", (long) allLogs.size());
+            result.put("successCount", allLogs.stream().filter(l -> "SUCCESS".equals(l.getResult())).count());
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("审计统计失败", e);
+            return ApiResponse.internalError("统计失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * P1-3: 验证审计日志哈希链完整性
      * 检测审计日志是否被篡改
      */
