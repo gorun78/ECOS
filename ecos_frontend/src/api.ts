@@ -2151,6 +2151,39 @@ export async function maskData(data: MaskRequest): Promise<MaskResponse> {
   };
 }
 
+// ── Data Catalog (table list for RLS/CLS table reference) ────────────────────────
+
+export interface CatalogTable {
+  catalogId: string;
+  resourceId: string;
+  resourceName: string;
+  resourceType: string;
+  orgName?: string;
+  description?: string;
+}
+
+/** GET /datanet/catalog/search — 从数据目录获取表/视图列表 */
+export async function fetchCatalogTables(keyword?: string): Promise<CatalogTable[]> {
+  try {
+    const sp = new URLSearchParams();
+    sp.set('page', '1');
+    sp.set('pageSize', '200');
+    if (keyword) sp.set('keyword', keyword);
+    const data = await apiFetchData<any[]>(`/datanet/catalog/search?${sp.toString()}`);
+    return Array.isArray(data) ? data.map(d => ({
+      catalogId: d.catalogId || d.catalog_id || '',
+      resourceId: d.resourceId || d.resource_id || '',
+      resourceName: d.resourceName || d.resource_name || '',
+      resourceType: d.resourceType || d.resource_type || 'TABLE',
+      orgName: d.orgName || d.org_name,
+      description: d.description,
+    })) : [];
+  } catch (e) {
+    console.warn('fetchCatalogTables: backend unavailable', e);
+    return [];
+  }
+}
+
 // ── ABAC Policy Manager (P1-1.4) ────────────────────────
 export interface AbacPolicy {
   id: string | number;

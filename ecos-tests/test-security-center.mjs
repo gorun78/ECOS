@@ -25,6 +25,14 @@ try {
   await detectTab.first().click({ timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(1500);
 
+  // ── Test 1: ABAC CRUD ──
+  console.log('=== Test 0: ABAC CRUD ===');
+  // First sub-tab should be ABAC策略管理 (abac-crud)
+  const abacCrudRows = await page.locator('table tbody tr').count();
+  const abacCrudText = abacCrudRows > 0 ? await page.locator('table tbody tr').first().textContent() : '(empty)';
+  console.log(`  ABAC CRUD rows: ${abacCrudRows}, first: ${abacCrudText?.substring(0, 80)}`);
+  const hasAbacCrud = abacCrudRows > 0;
+
   // ── Test 1: RLS Policy data displays ──
   console.log('=== Test 1: RLS Policy ===');
   const rlsTab = page.locator('button:has-text("RLS"), button:has-text("行级")').first();
@@ -59,7 +67,7 @@ try {
 
   // ── Test 3: ABAC Evaluate ──
   console.log('\n=== Test 3: ABAC Evaluate ===');
-  const abacTab = page.locator('button:has-text("ABAC")').first();
+  const abacTab = page.locator('button:has-text("ABAC策略评估器"), button:has-text("ABAC Evaluator")').first();
   if (await abacTab.count() > 0) {
     await abacTab.click();
     await page.waitForTimeout(1000);
@@ -117,14 +125,15 @@ try {
 
   // ── Summary ──
   console.log('\n=== Summary ===');
+  console.log(`ABAC CRUD: ${hasAbacCrud ? '✅' : '❌'}`);
   console.log(`RLS data: ${rlsHasData ? '✅' : '❌'}`);
   console.log(`CLS data: ${clsHasData ? '✅' : '❌'}`);
   console.log(`CLS edit/delete: ${clsActionIcons >= 2 ? '✅' : '❌'}`);
   console.log(`ABAC evaluate: ${hasAbacResult ? '✅' : '❌'}`);
   console.log(`Masking: ${hasMaskResult ? '✅' : '❌'}`);
 
-  const corePass = rlsHasData && clsHasData && clsActionIcons >= 2;
-  console.log(`\n${corePass ? '✅ CORE PASS (RLS+CLS data+edit/delete)' : '❌ CORE FAIL'}`);
+  const corePass = hasAbacCrud && rlsHasData && clsHasData && clsActionIcons >= 2;
+  console.log(`\n${corePass ? '✅ CORE PASS' : '❌ CORE FAIL'}`);
 
   if (consoleErrors.length > 0) {
     console.log('\nConsole errors:', consoleErrors.slice(0, 3));
