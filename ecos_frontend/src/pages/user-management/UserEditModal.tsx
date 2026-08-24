@@ -51,6 +51,7 @@ export default function UserEditModal({
 
   // Form state
   const [form, setForm] = useState<Record<string, string>>({
+    userId: user?.userId ?? "",
     username: user?.username ?? "",
     realName: user?.realName ?? "",
     email: user?.email ?? "",

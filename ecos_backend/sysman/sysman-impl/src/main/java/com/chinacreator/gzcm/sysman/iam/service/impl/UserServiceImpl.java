@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
@@ -28,15 +29,17 @@ public class UserServiceImpl implements IUserService {
     private static final int DEFAULT_MIN_PASSWORD_LENGTH = 6;
     private final UserDao userDao;
     private final SysConfigService sysConfigService;
+    private final JdbcTemplate jdbcTemplate;
     private final PasswordHasher passwordHasher = new PasswordHasher();
 
     // 简单失败计数（可替换为Redis）
     private final Map<String, Integer> failedAttempts = new HashMap<>();
 
     @Autowired
-    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService) {
+    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService, JdbcTemplate jdbcTemplate) {
         this.userDao = userDao;
         this.sysConfigService = sysConfigService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -75,16 +78,32 @@ public class UserServiceImpl implements IUserService {
             if (existing == null) {
                 throw new UserException("用户不存在");
             }
-            if (user.getPassword() != null) {
+            if (user.getPassword() != null && !user.getPassword().isEmpty()) {
                 validatePasswordPolicy(user.getPassword());
                 existing.setPassword(passwordHasher.hash(user.getPassword()));
             }
+            if (user.getRealName() != null) existing.setRealName(user.getRealName());
             if (user.getEmail() != null) existing.setEmail(user.getEmail());
             if (user.getPhone() != null) existing.setPhone(user.getPhone());
             if (user.getStatus() != null) existing.setStatus(user.getStatus());
+            if (user.getOrgId() != null) existing.setOrgId(user.getOrgId());
             existing.setUpdatedBy(operator);
             existing.setUpdatedTime(LocalDateTime.now());
             userDao.update(existing);
+
+            // 更新用户-组织关联（td_user_organization）
+            if (user.getOrgId() != null) {
+                try {
+                    jdbcTemplate.update("DELETE FROM td_user_organization WHERE \"USER_ID\" = ?", existing.getUserId());
+                    if (!user.getOrgId().isEmpty()) {
+                        jdbcTemplate.update("INSERT INTO td_user_organization (\"USER_ID\", \"ORG_ID\", \"IS_PRIMARY\", \"CREATED_TIME\", \"CREATED_BY\") VALUES (?, ?, '1', now(), ?)",
+                            existing.getUserId(), user.getOrgId(), operator);
+                    }
+                } catch (Exception orgEx) {
+                    // 组织关联更新失败不影响用户更新主流程
+                    System.err.println("Failed to update user organization mapping: " + orgEx.getMessage());
+                }
+            }
             return userDao.findById(existing.getUserId());
         } catch (UserException e) {
             throw e;

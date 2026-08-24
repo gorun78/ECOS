@@ -13,6 +13,7 @@
     <update id="updateUser">
         UPDATE TD_USER SET
             "USERNAME" = #[username],
+            "REAL_NAME" = #[realName],
             "EMAIL" = #[email],
             "MOBILE_TEL1" = #[phone],
             "STATUS" = #[status],

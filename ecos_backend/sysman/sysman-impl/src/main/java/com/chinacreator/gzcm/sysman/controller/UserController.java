@@ -162,6 +162,9 @@ private static final Logger log = LoggerFactory.getLogger(UserController.class);
             if (body.containsKey("phone")) existing.setPhone((String) body.get("phone"));
             if (body.containsKey("orgId")) existing.setOrgId((String) body.get("orgId"));
 
+            // 不更新密码时清空，避免 updateUser 对已哈希的密码重复校验
+            existing.setPassword(null);
+
             UserAccount updated = userService.updateUser(existing, "admin");
             return ApiResponse.success(toMap(updated));
         } catch (Exception e) {
