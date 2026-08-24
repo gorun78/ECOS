@@ -13,8 +13,14 @@ const DQ_RULES      = '/api/v1/ecos/dq/rules';         // DqController (camelCas
 const LINEAGE_NODES = '/api/v1/engine/data/lineage/nodes';
 const LINEAGE_EDGES = '/api/v1/engine/data/lineage/edges';
 
+// ─── Auth helper ────────────────────────────────────────
+function authHeaders(): Record<string, string> {
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('accessToken') || '') : '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
   const json = await res.json();
   // ApiResponse<T> 包裹: { code, message, data }
@@ -228,7 +234,7 @@ export async function createPipeline(name: string, description?: string): Promis
   try {
     const res = await fetch(PIPELINE_DEFS, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ name, description: description || '' }),
     });
     if (!res.ok) throw new Error(`${res.status}`);
@@ -245,7 +251,7 @@ export async function updatePipeline(id: string, data: { name?: string; descript
   try {
     const res = await fetch(`${PIPELINE_DEFS}/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(`${res.status}`);
@@ -260,7 +266,7 @@ export async function updatePipeline(id: string, data: { name?: string; descript
 /** Pipeline CRUD — 删除（软删除 → ARCHIVED） */
 export async function deletePipeline(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${PIPELINE_DEFS}/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${PIPELINE_DEFS}/${id}`, { method: 'DELETE', headers: { ...authHeaders() } });
     return res.ok;
   } catch (e) {
     console.warn('[data-workbench] deletePipeline failed:', e);
@@ -271,7 +277,7 @@ export async function deletePipeline(id: string): Promise<boolean> {
 /** Pipeline CRUD — 执行 */
 export async function executePipeline(id: string): Promise<{ executionId?: string; status?: string } | null> {
   try {
-    const res = await fetch(`${PIPELINE_DEFS}/${id}/execute`, { method: 'POST' });
+    const res = await fetch(`${PIPELINE_DEFS}/${id}/execute`, { method: 'POST', headers: { ...authHeaders() } });
     if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
     return json.data as Record<string, unknown> ?? null;
@@ -320,7 +326,7 @@ export async function fetchLineageEdges(): Promise<unknown[]> {
 /** Data Lineage — trigger build from pipeline execution records */
 export async function buildLineage(): Promise<boolean> {
   try {
-    const res = await fetch('/api/v1/engine/data/lineage/build', { method: 'POST' });
+    const res = await fetch('/api/v1/engine/data/lineage/build', { method: 'POST', headers: { ...authHeaders() } });
     return res.ok;
   } catch (e) {
     console.warn('[data-workbench] buildLineage failed:', e);
@@ -345,7 +351,7 @@ export async function fetchSyncTasksFromPipeline(): Promise<DataSyncTask[]> {
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
