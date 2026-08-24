@@ -4,16 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.Pattern;
 
 /**
  * 工具执行器 — 从 ecos_tool_definition 表加载工具 schema
@@ -35,6 +40,15 @@ public class ToolExecutorService {
     private JdbcTemplate jdbcTemplate;
     private final RestTemplate restTemplate;
     private final Map<String, ToolDefinitionEntry> fallbackTools = new ConcurrentHashMap<>();
+
+    // R1.3: SecuritySandboxService 位于 security-engine-impl（编译期不可见），
+    // 通过 ApplicationContext + 反射调用，不可用时降级为放行（但记录警告日志）
+    @Autowired(required = false)
+    private ApplicationContext applicationContext;
+
+    /** R1.3: 高危指令正则 — DELETE/DROP/TRUNCATE/ALTER TABLE/EXEC/RM/MV/批量UPDATE/GRANT/REVOKE */
+    private static final Pattern HIGH_RISK_PATTERN = Pattern.compile(
+            "(?i).*(DELETE|DROP|TRUNCATE|ALTER\\s+TABLE|EXEC|RM\\s|MV\\s|UPDATE\\s+.*WHERE|GRANT|REVOKE).*");
 
     @Autowired(required = false)
     public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
@@ -80,6 +94,12 @@ public class ToolExecutorService {
     private ToolResult execute(String toolName, Map<String, Object> arguments, String callId) {
         long startNs = System.nanoTime();
 
+        // ── R1.3: 高危指令沙盒审查 ──
+        ToolResult sandboxBlock = sandboxReview(toolName, arguments, callId, startNs);
+        if (sandboxBlock != null) {
+            return sandboxBlock;
+        }
+
         // 优先走 ToolRegistry（统一工具管理）
         if (toolRegistry != null && toolRegistry.has(toolName)) {
             return toolRegistry.execute(toolName, arguments);
@@ -108,6 +128,210 @@ public class ToolExecutorService {
             log.error("Tool execution failed: tool={}, error={}", toolName, e.getMessage(), e);
             return buildError(callId, toolName, "工具执行失败: " + e.getMessage(), elapsedMs);
         }
+    }
+
+    // ── R1.3 高危指令沙盒审查 ────────────────────────────────────────────
+
+    /**
+     * R1.3: 工具执行前沙盒审查。
+     * <ol>
+     *   <li>查询当前用户的 td_user_security_profile.sandbox_mandatory</li>
+     *   <li>sandbox_mandatory=true 时，检查指令是否高危（正则匹配）</li>
+     *   <li>高危指令 → 调 SecuritySandboxService 审查 → 高风险 → 拒绝 + 写审计日志</li>
+     *   <li>非高危或 sandbox_mandatory=false → 放行（返回 null）</li>
+     * </ol>
+     *
+     * @return 拒绝执行的 ToolResult，或 null 表示放行
+     */
+    private ToolResult sandboxReview(String toolName, Map<String, Object> arguments,
+                                     String callId, long startNs) {
+        try {
+            String userId = getCurrentUserId();
+            if (userId == null || jdbcTemplate == null) {
+                return null; // 无用户上下文或无DB → 放行
+            }
+
+            // 1. 查询 sandbox_mandatory
+            Boolean sandboxMandatory = querySandboxMandatory(userId);
+            if (sandboxMandatory == null || !sandboxMandatory) {
+                return null; // 未强制沙盒 → 放行
+            }
+
+            // 2. 拼接待审查的指令文本（工具名 + 参数，尤其 sql/command 字段）
+            String instruction = buildInstructionText(toolName, arguments);
+            if (instruction == null || instruction.isBlank()) {
+                return null;
+            }
+
+            // 3. 检查是否高危
+            if (!HIGH_RISK_PATTERN.matcher(instruction).matches()) {
+                return null; // 非高危 → 放行
+            }
+
+            // 4. 高危指令 → 调 SecuritySandboxService 审查
+            Boolean highRisk = reviewBySandboxService(instruction, userId);
+            if (highRisk == null) {
+                // SecuritySandboxService 不可用 → 降级放行，但记录警告日志
+                log.warn("R1.3 SecuritySandboxService 不可用，高危指令降级放行: tool={}, user={}, instruction={}",
+                        toolName, userId, truncate(instruction, 200));
+                return null;
+            }
+
+            if (highRisk) {
+                // 高风险 → 拒绝执行 + 写审计日志
+                log.warn("R1.3 沙盒拦截高危指令: tool={}, user={}, instruction={}",
+                        toolName, userId, truncate(instruction, 200));
+                writeSandboxBlockAudit(userId, toolName, instruction);
+                long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+                return ToolResult.fail(callId, toolName,
+                        "高危指令被沙盒拦截（sandbox_block）：指令包含敏感操作，需管理员审批", elapsedMs);
+            }
+
+            // 审查通过 → 放行
+            return null;
+        } catch (Exception e) {
+            log.warn("R1.3 沙盒审查异常，降级放行: tool={}, error={}", toolName, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * R1.3: 从 SecurityContext 获取当前用户 ID。
+     */
+    private String getCurrentUserId() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated()) {
+                Object principal = auth.getPrincipal();
+                if (principal instanceof String s) return s;
+                if (principal != null) return principal.toString();
+            }
+        } catch (Exception e) {
+            log.debug("R1.3 获取当前用户失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * R1.3: 查询用户的 sandbox_mandatory 配置。
+     *
+     * @return true=强制沙盒, false=不强制, null=查询失败/无配置
+     */
+    private Boolean querySandboxMandatory(String userId) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT sandbox_mandatory FROM td_user_security_profile " +
+                    "WHERE scope_type = 'user' AND user_id = ? LIMIT 1",
+                    userId);
+            if (rows.isEmpty() || rows.get(0).get("sandbox_mandatory") == null) {
+                return false;
+            }
+            return ((Boolean) rows.get(0).get("sandbox_mandatory"));
+        } catch (Exception e) {
+            log.debug("R1.3 查询 sandbox_mandatory 失败 user={}: {}", userId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * R1.3: 拼接待审查的指令文本（工具名 + 参数中的 sql/command/query 字段）。
+     */
+    private String buildInstructionText(String toolName, Map<String, Object> arguments) {
+        StringBuilder sb = new StringBuilder(toolName != null ? toolName : "");
+        if (arguments != null) {
+            for (String key : new String[]{"sql", "command", "query", "cmd", "statement", "script"}) {
+                Object val = arguments.get(key);
+                if (val != null) {
+                    sb.append(' ').append(val);
+                }
+            }
+            // 若无显式指令字段，拼接全部参数值
+            if (sb.length() <= (toolName != null ? toolName.length() : 0)) {
+                for (Object val : arguments.values()) {
+                    if (val != null) sb.append(' ').append(val);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * R1.3: 调用 SecuritySandboxService 审查指令风险。
+     * <p>SecuritySandboxService 位于 security-engine-impl（编译期不可见），
+     * 通过 ApplicationContext 查找 bean 后反射调用 evaluateFilter，
+     * 返回 allowed=false 即视为高风险。
+     *
+     * @return true=高风险(拒绝), false=低风险(放行), null=服务不可用(降级放行)
+     */
+    @SuppressWarnings("unchecked")
+    private Boolean reviewBySandboxService(String instruction, String userId) {
+        if (applicationContext == null) {
+            return null;
+        }
+        try {
+            Object sandboxService = null;
+            Map<String, ?> beans = applicationContext.getBeansOfType(Object.class);
+            for (Map.Entry<String, ?> entry : beans.entrySet()) {
+                if (entry.getValue().getClass().getName().endsWith("SecuritySandboxService")) {
+                    sandboxService = entry.getValue();
+                    break;
+                }
+            }
+            if (sandboxService == null) {
+                return null; // 服务不可用 → 降级
+            }
+            // 调用 evaluateFilter(String expression, Map rowData, String userRole)
+            // expression 传入高危指令标记，userRole 传 userId，让沙盒策略评估是否允许
+            Method evalMethod = sandboxService.getClass().getMethod(
+                    "evaluateFilter", String.class, Map.class, String.class);
+            Map<String, Object> rowData = Map.of("instruction", instruction, "classification", "RESTRICTED");
+            Object result = evalMethod.invoke(sandboxService, "command contains blocked", rowData, userId);
+            if (result instanceof Map<?, ?> m) {
+                Object allowed = m.get("allowed");
+                if (allowed instanceof Boolean b) {
+                    return !b; // allowed=false → 高风险
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log.debug("R1.3 SecuritySandboxService 审查降级: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * R1.3: 写入沙盒拦截审计日志到 ecos_audit_log。
+     */
+    private void writeSandboxBlockAudit(String userId, String toolName, String instruction) {
+        if (jdbcTemplate == null) return;
+        try {
+            String changesJson = String.format(
+                    "{\"userId\":\"%s\",\"toolName\":\"%s\",\"instruction\":\"%s\",\"action\":\"sandbox_block\",\"result\":\"FAILURE\"}",
+                    userId != null ? userId : "",
+                    toolName != null ? toolName : "",
+                    escapeJson(truncate(instruction, 1000)));
+            jdbcTemplate.update(
+                    "INSERT INTO ecos_audit_log (username, operation, entity_type, entity_id, changes, ip_address, created_at, category) " +
+                    "VALUES (?, ?, ?, ?, CAST(? AS jsonb), NULL, NOW(), ?)",
+                    userId,
+                    "SANDBOX_BLOCK",
+                    "TOOL_EXECUTION",
+                    toolName,
+                    changesJson,
+                    "security");
+        } catch (Exception e) {
+            log.error("R1.3 沙盒拦截审计日志写入失败: {}", e.getMessage());
+        }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() > max ? s.substring(0, max) + "...[truncated]" : s;
+    }
+
+    private static String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
     // ── Tool Loading ──────────────────────────────────────────────────────
