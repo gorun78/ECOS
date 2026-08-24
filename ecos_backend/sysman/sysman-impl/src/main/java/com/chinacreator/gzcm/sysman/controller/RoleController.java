@@ -131,8 +131,14 @@ public class RoleController {
         try {
             @SuppressWarnings("unchecked")
             List<String> permIds = (List<String>) body.get("permissionIds");
-            if (permIds == null || permIds.isEmpty()) return ApiResponse.badRequest("permissionIds 不能为空");
+            if (permIds == null) return ApiResponse.badRequest("permissionIds 不能为空");
 
+            // 先删除该角色的所有现有权限关联，再重新分配（全量替换模式）
+            List<Permission> currentPerms = roleService.getRolePermissions(id);
+            for (Permission p : currentPerms) {
+                roleService.revokePermission(id, p.getPermissionId(), "admin");
+            }
+            // 分配新权限（空列表 = 清空所有权限）
             for (String permId : permIds) {
                 roleService.assignPermission(id, permId, "admin");
             }

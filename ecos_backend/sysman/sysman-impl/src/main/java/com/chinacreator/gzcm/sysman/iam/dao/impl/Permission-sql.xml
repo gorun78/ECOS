@@ -26,18 +26,18 @@
     </delete>
 
     <select id="findById">
-        SELECT "PERMISSION_ID", "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr 
+        SELECT "PERMISSION_ID" as permission_id, "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr 
         FROM TD_PERMISSION WHERE "PERMISSION_ID" = #[permissionId]
     </select>
 
     <select id="findByResourceAction">
-        SELECT "PERMISSION_ID", "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr
+        SELECT "PERMISSION_ID" as permission_id, "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr
         FROM TD_PERMISSION
         WHERE "RESOURCE_ID" = ? AND "ACTION" = ?
     </select>
 
     <select id="listPermissions">
-        SELECT "PERMISSION_ID", "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr
+        SELECT "PERMISSION_ID" as permission_id, "RESOURCE_ID" as resource, "ACTION" as action, "DESCRIPTION" as description, '' as condition_expr
         FROM TD_PERMISSION ORDER BY "RESOURCE_ID", "ACTION"
     </select>
 </sqlMap>

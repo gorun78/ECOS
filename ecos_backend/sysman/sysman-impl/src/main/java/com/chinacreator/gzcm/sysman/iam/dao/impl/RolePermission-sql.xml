@@ -1,23 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<properties>
-    <property name="insertRolePermission">
-        <![CDATA[
-        INSERT INTO TD_ROLE_PERMISSION (role_id, permission_id, created_time, created_by)
+<sqlMap namespace="RolePermission">
+    <insert id="insertRolePermission">
+        INSERT INTO TD_ROLE_PERMISSION ("ROLE_ID", "PERMISSION_ID", "CREATED_TIME", "CREATED_BY")
         VALUES (#[roleId], #[permissionId], now(), 'system')
-        ]]>
-    </property>
+    </insert>
 
-    <property name="deleteRolePermission">
-        <![CDATA[
-        DELETE FROM TD_ROLE_PERMISSION WHERE role_id = ? AND permission_id = ?
-        ]]>
-    </property>
+    <delete id="deleteRolePermission">
+        DELETE FROM TD_ROLE_PERMISSION WHERE "ROLE_ID" = #[roleId] AND "PERMISSION_ID" = #[permissionId]
+    </delete>
 
-    <property name="listRolePermissions">
-        <![CDATA[
-        SELECT role_id, permission_id FROM TD_ROLE_PERMISSION WHERE role_id = #[roleId]
-        ]]>
-    </property>
-</properties>
-
-
+    <select id="listRolePermissions">
+        SELECT "ROLE_ID" as role_id, "PERMISSION_ID" as permission_id FROM TD_ROLE_PERMISSION WHERE "ROLE_ID" = #[roleId]
+    </select>
+</sqlMap>
