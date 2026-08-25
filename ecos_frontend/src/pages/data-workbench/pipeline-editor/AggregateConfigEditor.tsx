@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Plus, X } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 
 interface AggFunction { column: string; function: string; alias: string }
 
@@ -29,26 +30,27 @@ const AggregateConfigEditor: React.FC<AggregateConfigEditorProps> = ({
   onUpdateAgg,
   onRemoveAgg,
 }) => {
+  const { styles } = useTheme();
   return (
     <div className="px-3 pb-3 space-y-3">
       {/* Group By */}
       <div>
-        <label className="text-[11px] text-slate-500 block mb-1">GROUP BY 列</label>
+        <label className={`text-[11px] ${styles.muted} block mb-1`}>GROUP BY 列</label>
         {groupByCols.map((col, idx) => (
           <div key={idx} className="flex gap-1 mb-1">
             <input type="text" value={col}
               onChange={(e) => onUpdateGroupBy(idx, e.target.value)}
               placeholder="列名"
-              className="flex-1 px-1.5 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-orange-400"
+              className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.warningBorder}`}
             />
-            <button onClick={() => onRemoveGroupBy(idx)} className="p-0.5 text-red-400 hover:text-red-600 transition-colors">
+            <button onClick={() => onRemoveGroupBy(idx)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
               <X size={14} />
             </button>
           </div>
         ))}
         <button
           onClick={onAddGroupBy}
-          className="w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] text-orange-600 border border-dashed border-orange-300 rounded hover:bg-orange-50 transition-colors mt-1"
+          className={`w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] ${styles.warningText} border border-dashed ${styles.warningBorder} rounded hover:${styles.warningBg} transition-colors mt-1`}
         >
           <Plus size={12} /> 添加分组列
         </button>
@@ -56,13 +58,13 @@ const AggregateConfigEditor: React.FC<AggregateConfigEditorProps> = ({
 
       {/* Aggregate Functions */}
       <div>
-        <label className="text-[11px] text-slate-500 block mb-1">聚合函数</label>
+        <label className={`text-[11px] ${styles.muted} block mb-1`}>聚合函数</label>
         {aggFunctions.map((func, idx) => (
-          <div key={idx} className="p-2 border border-slate-200 rounded bg-slate-50 space-y-1.5 mb-1">
+          <div key={idx} className={`p-2 border ${styles.cardBorder} rounded ${styles.cardBg} space-y-1.5 mb-1`}>
             <div className="flex gap-1">
               <select value={func.function}
                 onChange={(e) => onUpdateAgg(idx, 'function', e.target.value)}
-                className="flex-1 px-1 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-orange-400"
+                className={`flex-1 px-1 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.warningBorder}`}
               >
                 <option value="COUNT">COUNT</option>
                 <option value="SUM">SUM</option>
@@ -74,17 +76,17 @@ const AggregateConfigEditor: React.FC<AggregateConfigEditorProps> = ({
               <input type="text" value={func.column}
                 onChange={(e) => onUpdateAgg(idx, 'column', e.target.value)}
                 placeholder="列名"
-                className="w-20 px-1.5 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-orange-400"
+                className={`w-20 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.warningBorder}`}
               />
             </div>
             <div className="flex gap-1 items-center">
-              <span className="text-[10px] text-slate-400">别名:</span>
+              <span className={`text-[10px] ${styles.cardTextMuted}`}>别名:</span>
               <input type="text" value={func.alias}
                 onChange={(e) => onUpdateAgg(idx, 'alias', e.target.value)}
                 placeholder="as"
-                className="flex-1 px-1.5 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-orange-400"
+                className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.warningBorder}`}
               />
-              <button onClick={() => onRemoveAgg(idx)} className="p-0.5 text-red-400 hover:text-red-600 transition-colors">
+              <button onClick={() => onRemoveAgg(idx)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
                 <X size={14} />
               </button>
             </div>
@@ -92,7 +94,7 @@ const AggregateConfigEditor: React.FC<AggregateConfigEditorProps> = ({
         ))}
         <button
           onClick={onAddAgg}
-          className="w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] text-orange-600 border border-dashed border-orange-300 rounded hover:bg-orange-50 transition-colors"
+          className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] ${styles.warningText} border border-dashed ${styles.warningBorder} rounded hover:${styles.warningBg} transition-colors`}
         >
           <Plus size={12} /> 添加聚合函数
         </button>

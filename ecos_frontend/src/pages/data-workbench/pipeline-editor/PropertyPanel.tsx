@@ -15,13 +15,14 @@ import type { PBFunctionDef } from './pbFunctions';
 import TransformRulesEditor from './TransformRulesEditor';
 import JoinConditionsEditor from './JoinConditionsEditor';
 import AggregateConfigEditor from './AggregateConfigEditor';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Section collapse toggle ──────────────────────────────
 const SectionToggle: React.FC<{
   collapsed: boolean; onClick: () => void; label: string;
 }> = ({ collapsed, onClick, label }) => (
   <button onClick={onClick}
-    className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+    className={`flex items-center justify-between w-full px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.sidebarBg} transition-colors`}
   >
     <span>{label}</span>
     <ChevronDown size={14} className={`transition-transform duration-200 ${collapsed ? '-rotate-90' : 'rotate-0'}`} />
@@ -46,6 +47,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
     const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
 
     const toggleSection = (key: string) => {
+  const { styles } = useTheme();
       setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
@@ -125,11 +127,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
 
     if (!node) {
       return (
-        <div className="w-72 border-l border-slate-200 ${styles.cardBg} flex flex-col h-full">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">属性面板</span>
+        <div className={`w-72 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col h-full`}>
+          <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg}`}>
+            <span className={`text-xs font-bold ${styles.muted} uppercase tracking-wider`}>属性面板</span>
           </div>
-          <div className="flex-1 flex items-center justify-center text-xs text-slate-400 p-4 text-center">
+          <div className={`flex-1 flex items-center justify-center text-xs ${styles.cardTextMuted} p-4 text-center`}>
             点击画布上的节点<br />以编辑属性
           </div>
         </div>
@@ -137,17 +139,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
     }
 
     return (
-      <div className="w-80 border-l border-slate-200 ${styles.cardBg} flex flex-col h-full overflow-hidden">
+      <div className={`w-80 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col h-full overflow-hidden`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50 shrink-0">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
+          <span className={`text-xs font-bold ${styles.muted} uppercase tracking-wider`}>
             {PALETTE_ITEMS.find((p) => p.type === config.nodeType)?.label || '节点'} 属性
           </span>
           <div className="flex gap-1">
-            <button onClick={() => onDeleteNode(node.id)} className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors" title="删除节点">
+            <button onClick={() => onDeleteNode(node.id)} className={`p-1 hover:${styles.dangerBg} rounded ${styles.dangerText} transition-colors`} title="删除节点">
               <Trash2 size={14} />
             </button>
-            <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors" title="关闭面板">
+            <button onClick={onClose} className={`p-1 hover:${styles.sidebarBg} rounded ${styles.muted} transition-colors`} title="关闭面板">
               <X size={14} />
             </button>
           </div>
@@ -156,22 +158,22 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {/* Basic Info */}
-          <div className="border-b border-slate-100">
+          <div className={`border-b ${styles.cardBorder}`}>
             <SectionToggle collapsed={collapsedSections['basic']} onClick={() => toggleSection('basic')} label="基本信息" />
             {!collapsedSections['basic'] && (
               <div className="px-3 pb-3 space-y-2">
                 <div>
-                  <label className="text-[11px] text-slate-500 block mb-1">节点名称</label>
+                  <label className={`text-[11px] ${styles.muted} block mb-1`}>节点名称</label>
                   <input type="text" value={config.label || ''}
                     onChange={(e) => onUpdateNode(node.id, { label: e.target.value })}
-                    className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none"
+                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
                     placeholder="输入节点名称" />
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-500 block mb-1">节点类型</label>
+                  <label className={`text-[11px] ${styles.muted} block mb-1`}>节点类型</label>
                   <select value={config.nodeType || ''}
                     onChange={(e) => onUpdateNode(node.id, { nodeType: e.target.value })}
-                    className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none"
+                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
                   >
                     {PALETTE_ITEMS.map((item) => (
                       <option key={item.type} value={item.type}>{item.label}</option>
@@ -179,10 +181,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-500 block mb-1">运行状态</label>
+                  <label className={`text-[11px] ${styles.muted} block mb-1`}>运行状态</label>
                   <select value={config.nodeStatus || 'idle'}
                     onChange={(e) => onUpdateNode(node.id, { nodeStatus: e.target.value as NodeStatus })}
-                    className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none"
+                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
                   >
                     <option value="idle">Idle</option>
                     <option value="running">Running</option>
@@ -196,7 +198,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
 
           {/* Source/Sink Table */}
           {(config.nodeType === 'source' || config.nodeType === 'sink') && (
-            <div className="border-b border-slate-100">
+            <div className={`border-b ${styles.cardBorder}`}>
               <SectionToggle collapsed={collapsedSections['table']} onClick={() => toggleSection('table')}
                 label={config.nodeType === 'source' ? '数据源表' : '目标表'} />
               {!collapsedSections['table'] && (
@@ -206,7 +208,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                     onChange={(e) => onUpdateNode(node.id,
                       config.nodeType === 'source' ? { sourceTable: e.target.value } : { targetTable: e.target.value }
                     )}
-                    className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none"
+                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
                   >
                     <option value="">-- 选择表 --</option>
                     {allTables.map(({ connectionName, table }) => (
@@ -222,7 +224,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
 
           {/* Transform Rules (delegated to TransformRulesEditor) */}
           {config.nodeType === 'transform' && (
-            <div className="border-b border-slate-100">
+            <div className={`border-b ${styles.cardBorder}`}>
               <SectionToggle collapsed={collapsedSections['transform']} onClick={() => toggleSection('transform')} label="转换规则" />
               {!collapsedSections['transform'] && (
                 <TransformRulesEditor
@@ -238,7 +240,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
 
           {/* Join Configuration (delegated to JoinConditionsEditor) */}
           {config.nodeType === 'join' && (
-            <div className="border-b border-slate-100">
+            <div className={`border-b ${styles.cardBorder}`}>
               <SectionToggle collapsed={collapsedSections['join']} onClick={() => toggleSection('join')} label="JOIN 配置" />
               {!collapsedSections['join'] && (
                 <JoinConditionsEditor
@@ -255,7 +257,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
 
           {/* Aggregate Configuration (delegated to AggregateConfigEditor) */}
           {config.nodeType === 'aggregate' && (
-            <div className="border-b border-slate-100">
+            <div className={`border-b ${styles.cardBorder}`}>
               <SectionToggle collapsed={collapsedSections['aggregate']} onClick={() => toggleSection('aggregate')} label="聚合配置" />
               {!collapsedSections['aggregate'] && (
                 <AggregateConfigEditor

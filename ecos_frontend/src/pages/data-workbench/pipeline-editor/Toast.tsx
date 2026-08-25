@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Toast notification ───────────────────────────────────
 
@@ -16,15 +17,15 @@ const Toast: React.FC<{
 }> = ({ type, message, onClose }) => {
   const bgColor =
     type === 'success'
-      ? 'bg-emerald-600'
+      ? `${styles.successBg}`
       : type === 'error'
-        ? 'bg-red-600'
-        : 'bg-blue-600';
+        ? `${styles.dangerBg}`
+        : `${styles.accentBg}`;
 
   return (
     <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2">
       <div
-        className={`flex items-center gap-2 px-4 py-2.5 ${bgColor} text-white text-sm rounded-lg shadow-lg`}
+        className={`flex items-center gap-2 px-4 py-2.5 ${bgColor} ${styles.cardText} text-sm rounded-lg shadow-lg`}
       >
         {type === 'success' && <CheckCircle size={16} />}
         {type === 'error' && <AlertCircle size={16} />}
@@ -40,3 +41,5 @@ const Toast: React.FC<{
 
 
 export default Toast;
+
+// TODO: useTheme insertion needed

@@ -139,20 +139,20 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
   return (
     <div className={`flex flex-col h-full ${styles.cardBg} ${className}`}>
       {/* Header */}
-      <div className={`flex items-center justify-between px-3 py-2.5 border-b ${styles.cardBorder} bg-slate-50 shrink-0`}>
+      <div className={`flex items-center justify-between px-3 py-2.5 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
         <div className="flex items-center gap-2">
-          <Sparkles size={15} className="text-purple-600" />
+          <Sparkles size={15} className={`${styles.infoText}`} />
           <span className={`text-xs font-bold ${styles.cardText} uppercase tracking-wider`}>
             Copilot
           </span>
-          <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">
+          <span className={`text-[9px] px-1 py-0.5 rounded ${styles.infoBg} ${styles.infoText} font-medium`}>
             AI
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleClear}
-            className={`p-1 rounded hover:bg-slate-200 ${styles.cardTextMuted} hover:text-slate-600 transition-colors`}
+            className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} hover:${styles.cardTextMuted} transition-colors`}
             title="清空对话"
           >
             <Trash2 size={13} />
@@ -160,7 +160,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
           {onClose && (
             <button
               onClick={onClose}
-              className={`p-1 rounded hover:bg-slate-200 ${styles.cardTextMuted} transition-colors`}
+              className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
             >
               <X size={13} />
             </button>
@@ -184,7 +184,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
             <button
               key={i}
               onClick={() => handleSend(action.prompt)}
-              className={`text-[10px] px-2 py-1 rounded-full border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600 whitespace-nowrap transition-colors`}
+              className={`text-[10px] px-2 py-1 rounded-full border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.infoBg} hover:${styles.infoBorder} hover:${styles.infoText} whitespace-nowrap transition-colors`}
             >
               {action.label}
             </button>
@@ -193,7 +193,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
       </div>
 
       {/* Input */}
-      <div className={`px-3 py-2 border-t ${styles.cardBorder} bg-slate-50 shrink-0`}>
+      <div className={`px-3 py-2 border-t ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
         <div className="flex gap-2">
           <textarea
             ref={inputRef}
@@ -202,13 +202,13 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
             onKeyDown={handleKeyDown}
             placeholder="输入问题，如: 帮我写一个过滤活跃用户的 Pipeline..."
             rows={2}
-            className={`flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg resize-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 outline-none transition-colors ${styles.cardBg} ${styles.cardText}`}
+            className={`flex-1 px-3 py-1.5 text-xs border ${styles.cardBorder} rounded-lg resize-none focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none transition-colors ${styles.cardBg} ${styles.cardText}`}
             disabled={loading}
           />
           <button
             onClick={() => handleSend()}
             disabled={!inputValue.trim() || loading}
-            className="shrink-0 flex items-center justify-center w-9 h-9 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 self-end"
+            className={`shrink-0 flex items-center justify-center w-9 h-9 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg transition-colors disabled:opacity-50 self-end`}
           >
             {loading ? (
               <Loader2 size={15} className="animate-spin" />

@@ -8,6 +8,7 @@ import Editor, { type OnMount, type BeforeMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { PB_FUNCTIONS, type PBFunctionDef, CATEGORY_LABELS } from './pbFunctions';
 import { FunctionSquare } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Props ────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
   showOperatorButton = false,
   onOperatorButtonClick,
 }) => {
+  const { styles } = useTheme();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Store available columns globally for completion provider
@@ -265,7 +267,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
         <button
           type="button"
           onClick={onOperatorButtonClick}
-          className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-0.5 rounded hover:bg-purple-100 text-purple-500 transition-colors"
+          className={`absolute left-1 top-1/2 -translate-y-1/2 z-10 p-0.5 rounded hover:${styles.infoBg} ${styles.infoText} transition-colors`}
           title="函数库"
           disabled={disabled}
         >
@@ -273,7 +275,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
         </button>
       )}
       <div
-        className={`border border-slate-200 rounded focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-200 transition-all overflow-hidden ${
+        className={`border ${styles.cardBorder} rounded focus-within:${styles.infoBorder} focus-within:ring-1 focus-within:${styles.accentBorder} transition-all overflow-hidden ${
           disabled ? 'opacity-50' : ''
         } ${showOperatorButton ? 'pl-7' : ''}`}
         style={{ height: 32 }}
@@ -321,7 +323,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
             stickyScroll: { enabled: false },
           }}
           loading={
-            <div className="flex items-center justify-center h-full bg-slate-50 text-[11px] text-slate-400">
+            <div className={`flex items-center justify-center h-full ${styles.cardBg} text-[11px] ${styles.cardTextMuted}`}>
               <FunctionSquare size={12} className="mr-1 animate-pulse" />
               Loading...
             </div>

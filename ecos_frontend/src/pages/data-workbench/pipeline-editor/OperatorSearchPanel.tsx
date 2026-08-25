@@ -15,6 +15,7 @@ import {
   CATEGORY_LABELS,
 } from './pbFunctions';
 import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Props ────────────────────────────────────────────
 
@@ -38,14 +39,14 @@ const CATEGORY_ICONS: Record<PBFunctionCategory, string> = {
 };
 
 const CATEGORY_COLORS: Record<PBFunctionCategory, string> = {
-  string: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-  numeric: 'text-blue-600 bg-blue-50 border-blue-200',
-  date_time: 'text-purple-600 bg-purple-50 border-purple-200',
-  conditional: 'text-orange-600 bg-orange-50 border-orange-200',
-  array: 'text-pink-600 bg-pink-50 border-pink-200',
-  window: 'text-cyan-600 bg-cyan-50 border-cyan-200',
-  casting: 'text-amber-600 bg-amber-50 border-amber-200',
-  hash: 'text-slate-600 bg-slate-50 border-slate-200',
+  string: `${styles.successText} ${styles.successBg} ${styles.successBorder}`,
+  numeric: `${styles.accentText} ${styles.infoBg} ${styles.accentBorder}`,
+  date_time: `${styles.infoText} ${styles.infoBg} ${styles.infoBorder}`,
+  conditional: `${styles.warningText} ${styles.warningBg} ${styles.warningBorder}`,
+  array: `${styles.infoText} ${styles.infoBg} ${styles.infoBorder}`,
+  window: `${styles.infoText} ${styles.infoBg} ${styles.infoBorder}`,
+  casting: `${styles.warningText} ${styles.warningBg} ${styles.warningBorder}`,
+  hash: `${styles.cardTextMuted} ${styles.cardBg} ${styles.cardBorder}`,
 };
 
 // ─── Component ────────────────────────────────────────
@@ -56,6 +57,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
   className = '',
 }) => {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [copiedFn, setCopiedFn] = useState<string | null>(null);
@@ -109,20 +111,20 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
   );
 
   return (
-    <div className={`flex flex-col ${styles.cardBg} border border-slate-200 rounded-lg shadow-xl overflow-hidden ${className}`}>
+    <div className={`flex flex-col ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-xl overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0">
-        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+      <div className={`flex items-center justify-between px-3 py-2.5 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
+        <h3 className={`text-xs font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
           {t('databench.pipeline.functionLibrary')}
         </h3>
         <div className="flex items-center gap-1">
-          <span className="text-[10px] text-slate-400">
+          <span className={`text-[10px] ${styles.cardTextMuted}`}>
             {t('databench.pipeline.functionCount', { count: PB_FUNCTIONS.length })}
           </span>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-0.5 rounded hover:bg-slate-200 text-slate-400 transition-colors"
+              className={`p-0.5 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
             >
               <X size={14} />
             </button>
@@ -133,14 +135,14 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
       {/* Search */}
       <div className="px-3 py-2 shrink-0">
         <div className="relative">
-          <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={13} className={`absolute left-2 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
           <input
             ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('databench.pipeline.searchPlaceholder')}
-            className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-md ${styles.cardBg} text-slate-700 placeholder:text-slate-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 outline-none transition-colors"
+            className={`w-full pl-7 pr-3 py-1.5 text-xs border ${styles.cardBorder} rounded-md ${styles.cardBg} ${styles.cardTextMuted} placeholder:${styles.cardTextMuted} focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none transition-colors`}
           />
         </div>
       </div>
@@ -148,7 +150,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
       {/* Function list by category */}
       <div className="flex-1 overflow-y-auto">
         {Object.keys(groupedFunctions).length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+          <div className={`flex flex-col items-center justify-center py-8 ${styles.cardTextMuted}`}>
             <Search size={24} className="mb-2" />
             <span className="text-xs">{t('databench.pipeline.noFunctionsFound')}</span>
           </div>
@@ -157,26 +159,26 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
             const isCollapsed = collapsedCategories.has(category);
             const catKey = category as PBFunctionCategory;
             return (
-              <div key={category} className="border-b border-slate-50 last:border-b-0">
+              <div key={category} className={`border-b ${styles.cardBorder} last:border-b-0`}>
                 {/* Category header */}
                 <button
                   onClick={() => toggleCategory(category)}
-                  className={`flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors sticky top-0 ${styles.cardBg} z-10`}
+                  className={`flex items-center gap-2 w-full px-3 py-2 text-left hover:${styles.cardBg} transition-colors sticky top-0 ${styles.cardBg} z-10`}
                 >
                   {isCollapsed ? (
-                    <ChevronRight size={12} className="text-slate-400" />
+                    <ChevronRight size={12} className={`${styles.cardTextMuted}`} />
                   ) : (
-                    <ChevronDown size={12} className="text-slate-400" />
+                    <ChevronDown size={12} className={`${styles.cardTextMuted}`} />
                   )}
                   <span
                     className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${CATEGORY_COLORS[catKey]}`}
                   >
                     {CATEGORY_ICONS[catKey]}
                   </span>
-                  <span className="text-xs font-semibold text-slate-700 flex-1">
+                  <span className={`text-xs font-semibold ${styles.cardTextMuted} flex-1`}>
                     {t(CATEGORY_LABELS[catKey])}
                   </span>
-                  <span className="text-[10px] text-slate-400 tabular-nums">
+                  <span className={`text-[10px] ${styles.cardTextMuted} tabular-nums`}>
                     {functions.length}
                   </span>
                 </button>
@@ -187,22 +189,22 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                     {functions.map((fn) => (
                       <div
                         key={fn.name}
-                        className="flex items-start gap-2 px-3 py-1.5 hover:bg-purple-50 transition-colors group cursor-pointer"
+                        className={`flex items-start gap-2 px-3 py-1.5 hover:${styles.infoBg} transition-colors group cursor-pointer`}
                         onClick={() => handleSelect(fn)}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <code className="text-[11px] font-bold text-purple-700 bg-purple-100 px-1 rounded">
+                            <code className={`text-[11px] font-bold ${styles.infoText} ${styles.infoBg} px-1 rounded`}>
                               {fn.name}
                             </code>
-                            <span className="text-[10px] text-slate-400 truncate">
+                            <span className={`text-[10px] ${styles.cardTextMuted} truncate`}>
                               {fn.signature}
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          <div className={`text-[10px] ${styles.muted} mt-0.5 truncate`}>
                             {t(fn.description)}
                           </div>
-                          <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">
+                          <div className={`text-[9px] ${styles.cardTextMuted} font-mono mt-0.5 truncate`}>
                             {fn.example}
                           </div>
                         </div>
@@ -212,11 +214,11 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                               e.stopPropagation();
                               handleCopyExample(fn);
                             }}
-                            className="p-0.5 rounded hover:bg-purple-200 text-slate-400 hover:text-purple-600 transition-colors"
+                            className={`p-0.5 rounded hover:${styles.infoBg} ${styles.cardTextMuted} hover:${styles.infoText} transition-colors`}
                             title={t('databench.pipeline.copyExample')}
                           >
                             {copiedFn === fn.name ? (
-                              <Check size={12} className="text-green-500" />
+                              <Check size={12} className={`${styles.successText}`} />
                             ) : (
                               <Copy size={12} />
                             )}
@@ -226,7 +228,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                               e.stopPropagation();
                               handleSelect(fn);
                             }}
-                            className="p-0.5 rounded hover:bg-purple-200 text-slate-400 hover:text-purple-600 transition-colors"
+                            className={`p-0.5 rounded hover:${styles.infoBg} ${styles.cardTextMuted} hover:${styles.infoText} transition-colors`}
                             title={t('databench.pipeline.insertFunction')}
                           >
                             <Info size={12} />

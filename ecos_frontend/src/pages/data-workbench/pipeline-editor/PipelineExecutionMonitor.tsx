@@ -111,7 +111,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
         {/* Header */}
         <div className={`flex items-center justify-between px-3 py-2.5 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <div className="flex items-center gap-2">
-            <Play size={14} className="text-blue-600" />
+            <Play size={14} className={`${styles.accentText}`} />
             <span className={`text-xs font-bold ${styles.cardText} uppercase tracking-wider`}>
               执行监控
             </span>
@@ -124,7 +124,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
             )}
           </div>
           {onClose && (
-            <button onClick={onClose} className={`p-0.5 rounded hover:bg-slate-200 ${styles.cardTextMuted} transition-colors`}>
+            <button onClick={onClose} className={`p-0.5 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}>
               <X size={14} />
             </button>
           )}
@@ -140,9 +140,9 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
             <div className={`w-full h-1.5 ${styles.cardBg} rounded-full overflow-hidden`}>
               <div
                 className={`h-full transition-all duration-500 rounded-full ${
-                  runInfo.status === 'failed' ? 'bg-red-500' :
-                  runInfo.status === 'succeeded' ? 'bg-emerald-500' :
-                  'bg-blue-500'
+                  runInfo.status === 'failed' ? styles.dangerBg :
+                  runInfo.status === 'succeeded' ? styles.successBg :
+                  styles.infoBg
                 }`}
                 style={{
                   width: `${runInfo.totalSteps > 0 ? (runInfo.completedSteps / runInfo.totalSteps) * 100 : 0}%`
@@ -159,8 +159,8 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
             return (
               <div
                 key={step.id}
-                className={`flex items-center gap-2 px-3 py-2 border-b ${styles.cardBorder} last:border-b-0 hover:bg-slate-50 transition-colors cursor-pointer ${
-                  selectedStep?.id === step.id ? 'bg-blue-50' : ''
+                className={`flex items-center gap-2 px-3 py-2 border-b ${styles.cardBorder} last:border-b-0 hover:${styles.cardBg} transition-colors cursor-pointer ${
+                  selectedStep?.id === step.id ? styles.infoBg : ''
                 }`}
                 onClick={() => setSelectedStep(step)}
               >
@@ -227,10 +227,10 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
           <div
             className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${
               toast.type === 'success'
-                ? 'bg-emerald-600 text-white'
+                ? `${styles.successBg} ${styles.cardText}`
                 : toast.type === 'error'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-blue-600 text-white'
+                  ? `${styles.dangerBg} ${styles.cardText}`
+                  : `${styles.accentBg} ${styles.cardText}`
             }`}
           >
             {toast.type === 'success' && <CheckCircle size={16} />}

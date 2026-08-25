@@ -9,6 +9,7 @@ import {
   Loader2, X, Check, ChevronDown, Plus,
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Types ────────────────────────────────────────────
 
@@ -33,11 +34,11 @@ interface GitCommitDialogProps {
 // ─── Status config ────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  modified: { label: 'M', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  added: { label: 'A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  deleted: { label: 'D', color: 'text-rose-400', bg: 'bg-rose-500/10' },
-  untracked: { label: 'U', color: 'text-slate-400', bg: 'bg-slate-500/10' },
-  renamed: { label: 'R', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+  modified: { label: 'M', color: `${styles.warningText}`, bg: `${styles.warningBg}` },
+  added: { label: 'A', color: `${styles.successText}`, bg: `${styles.successBg}` },
+  deleted: { label: 'D', color: `${styles.dangerText}`, bg: `${styles.dangerBg}` },
+  untracked: { label: 'U', color: `${styles.cardTextMuted}`, bg: `${styles.sidebarBg}` },
+  renamed: { label: 'R', color: `${styles.infoText}`, bg: `${styles.infoBg}` },
 };
 
 // ─── Component ────────────────────────────────────────
@@ -49,6 +50,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
   onSuccess,
   showToast,
 }) => {
+  const { styles } = useTheme();
   const [commitMessage, setCommitMessage] = useState(`feat(pipeline): update ${pipelineName}`);
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
@@ -153,14 +155,14 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
       {/* Dialog */}
       <div className="relative z-10 ${styles.cardBg} rounded-xl shadow-2xl w-[520px] max-h-[600px] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
+        <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <div className="flex items-center gap-2">
-            <GitCommit size={16} className="text-indigo-600" />
-            <span className="text-sm font-bold text-slate-800">保存 Pipeline</span>
+            <GitCommit size={16} className={`${styles.accentText}`} />
+            <span className={`text-sm font-bold ${styles.cardText}`}>保存 Pipeline</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+            className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} hover:${styles.cardTextMuted} transition-colors`}
           >
             <X size={16} />
           </button>
@@ -170,18 +172,18 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Pipeline name display */}
           <div>
-            <label className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1">
+            <label className={`text-[11px] ${styles.muted} uppercase tracking-wider block mb-1`}>
               Pipeline
             </label>
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <FileText size={14} className="text-blue-600" />
-              <span className="text-xs font-semibold text-blue-800">{pipelineName}</span>
+            <div className={`flex items-center gap-2 px-3 py-2 ${styles.infoBg} border ${styles.accentBorder} rounded-lg`}>
+              <FileText size={14} className={`${styles.accentText}`} />
+              <span className={`text-xs font-semibold ${styles.accentText}`}>{pipelineName}</span>
             </div>
           </div>
 
           {/* Commit message */}
           <div>
-            <label className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1">
+            <label className={`text-[11px] ${styles.muted} uppercase tracking-wider block mb-1`}>
               Commit Message
             </label>
             <textarea
@@ -189,31 +191,31 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
               onChange={(e) => setCommitMessage(e.target.value)}
               placeholder="描述你的变更..."
               rows={3}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg font-mono resize-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-colors"
+              className={`w-full px-3 py-2 text-xs border ${styles.cardBorder} rounded-lg font-mono resize-none focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none transition-colors`}
             />
           </div>
 
           {/* Branch selection */}
           <div>
-            <label className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1">
+            <label className={`text-[11px] ${styles.muted} uppercase tracking-wider block mb-1`}>
               分支
             </label>
             {showNewBranch ? (
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <GitBranch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <GitBranch size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
                   <input
                     type="text"
                     value={newBranchName}
                     onChange={(e) => setNewBranchName(e.target.value)}
                     placeholder="新分支名，如 feature/transform-v2"
-                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none transition-colors"
+                    className={`w-full pl-8 pr-3 py-1.5 text-xs border ${styles.cardBorder} rounded-lg focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none transition-colors`}
                     autoFocus
                   />
                 </div>
                 <button
                   onClick={() => setShowNewBranch(false)}
-                  className="px-2 py-1 text-[10px] text-slate-500 hover:text-slate-700 transition-colors"
+                  className={`px-2 py-1 text-[10px] ${styles.muted} hover:${styles.cardTextMuted} transition-colors`}
                 >
                   <X size={14} />
                 </button>
@@ -224,7 +226,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg appearance-none ${styles.cardBg} focus:border-indigo-400 outline-none transition-colors"
+                    className={`w-full pl-8 pr-3 py-1.5 text-xs border ${styles.cardBorder} rounded-lg appearance-none ${styles.cardBg} focus:${styles.infoBorder} outline-none transition-colors`}
                   >
                     {branches.map((b) => (
                       <option key={b.name} value={b.name}>
@@ -232,12 +234,12 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                       </option>
                     ))}
                   </select>
-                  <GitBranch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <GitBranch size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
+                  <ChevronDown size={13} className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted} pointer-events-none`} />
                 </div>
                 <button
                   onClick={() => { setShowNewBranch(true); setNewBranchName(''); }}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  className={`flex items-center gap-1 px-2 py-1 text-[10px] ${styles.accentText} hover:${styles.infoBg} rounded-lg transition-colors`}
                 >
                   <Plus size={12} />
                   新分支
@@ -248,22 +250,22 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
 
           {/* Changed files list */}
           <div>
-            <label className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1">
+            <label className={`text-[11px] ${styles.muted} uppercase tracking-wider block mb-1`}>
               变更文件
               {loading ? (
                 <Loader2 size={10} className="inline ml-1 animate-spin" />
               ) : (
-                <span className="text-slate-400 ml-1">({files.length})</span>
+                <span className={`${styles.cardTextMuted} ml-1`}>({files.length})</span>
               )}
             </label>
-            <div className="border border-slate-200 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
+            <div className={`border ${styles.cardBorder} rounded-lg overflow-hidden max-h-32 overflow-y-auto`}>
               {loading ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 size={14} className="text-slate-400 animate-spin" />
+                  <Loader2 size={14} className={`${styles.cardTextMuted} animate-spin`} />
                 </div>
               ) : files.length === 0 ? (
-                <div className="flex items-center gap-1.5 px-3 py-3 text-[10px] text-slate-400">
-                  <Check size={12} className="text-green-400" />
+                <div className={`flex items-center gap-1.5 px-3 py-3 text-[10px] ${styles.cardTextMuted}`}>
+                  <Check size={12} className={`${styles.successText}`} />
                   无文件变更
                 </div>
               ) : (
@@ -272,13 +274,13 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                   return (
                     <div
                       key={`${f.path}-${i}`}
-                      className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-50 last:border-b-0 hover:bg-slate-50 transition-colors"
+                      className={`flex items-center gap-2 px-3 py-1.5 border-b ${styles.cardBorder} last:border-b-0 hover:${styles.cardBg} transition-colors`}
                     >
                       <span className={`w-4 h-4 flex items-center justify-center rounded text-[9px] font-bold shrink-0 ${cfg?.bg || ''} ${cfg?.color || ''}`}>
                         {cfg?.label || '?'}
                       </span>
-                      <FileText size={12} className="text-slate-400 shrink-0" />
-                      <span className="text-[10px] text-slate-600 truncate font-mono">{f.path}</span>
+                      <FileText size={12} className={`${styles.cardTextMuted} shrink-0`} />
+                      <span className={`text-[10px] ${styles.cardTextMuted} truncate font-mono`}>{f.path}</span>
                     </div>
                   );
                 })
@@ -288,17 +290,17 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
 
           {/* Error display */}
           {error && (
-            <div className="px-3 py-2 border border-red-200 bg-red-50 rounded-lg text-[11px] text-red-600">
+            <div className={`px-3 py-2 border ${styles.dangerBorder} ${styles.dangerBg} rounded-lg text-[11px] ${styles.dangerText}`}>
               {error}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-slate-200 bg-slate-50 shrink-0">
+        <div className={`flex items-center justify-between gap-2 px-4 py-3 border-t ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+            className={`px-3 py-1.5 text-xs ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg transition-colors`}
           >
             取消
           </button>
@@ -306,7 +308,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
             <button
               onClick={handleSaveOnly}
               disabled={savingOnly || committing}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-xs border ${styles.inputBorder} ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg transition-colors disabled:opacity-50`}
             >
               {savingOnly ? <Loader2 size={12} className="animate-spin" /> : null}
               仅保存
@@ -314,7 +316,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
             <button
               onClick={handleCommit}
               disabled={committing || savingOnly}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 shadow-sm"
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-xs ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg font-medium transition-colors disabled:opacity-50 shadow-sm`}
             >
               {committing ? (
                 <Loader2 size={12} className="animate-spin" />

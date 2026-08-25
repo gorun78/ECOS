@@ -6,6 +6,7 @@
 import React from 'react';
 import { Plus, X } from 'lucide-react';
 import type { JoinCondition } from './types';
+import { useTheme } from '../../../components/ThemeContext';
 
 interface JoinConditionsEditorProps {
   joinType: string;
@@ -24,14 +25,15 @@ const JoinConditionsEditor: React.FC<JoinConditionsEditorProps> = ({
   onUpdate,
   onRemove,
 }) => {
+  const { styles } = useTheme();
   return (
     <div className="px-3 pb-3 space-y-2">
       <div>
-        <label className="text-[11px] text-slate-500 block mb-1">JOIN 类型</label>
+        <label className={`text-[11px] ${styles.muted} block mb-1`}>JOIN 类型</label>
         <select
           value={joinType}
           onChange={(e) => onJoinTypeChange(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:border-purple-400 focus:ring-1 focus:ring-purple-200 outline-none"
+          className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none`}
         >
           <option value="INNER">INNER JOIN</option>
           <option value="LEFT">LEFT JOIN</option>
@@ -41,18 +43,18 @@ const JoinConditionsEditor: React.FC<JoinConditionsEditorProps> = ({
         </select>
       </div>
       {conditions.map((cond) => (
-        <div key={cond.id} className="p-2 border border-slate-200 rounded bg-slate-50 space-y-1.5">
+        <div key={cond.id} className={`p-2 border ${styles.cardBorder} rounded ${styles.cardBg} space-y-1.5`}>
           <div className="flex gap-1">
             <input
               type="text" value={cond.leftColumn}
               onChange={(e) => onUpdate(cond.id, 'leftColumn', e.target.value)}
               placeholder="左表列"
-              className="flex-1 px-1.5 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-purple-400"
+              className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.infoBorder}`}
             />
             <select
               value={cond.operator}
               onChange={(e) => onUpdate(cond.id, 'operator', e.target.value)}
-              className="w-14 px-1 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-purple-400"
+              className={`w-14 px-1 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.infoBorder}`}
             >
               <option value="=">=</option>
               <option value="!=">!=</option>
@@ -65,9 +67,9 @@ const JoinConditionsEditor: React.FC<JoinConditionsEditorProps> = ({
               type="text" value={cond.rightColumn}
               onChange={(e) => onUpdate(cond.id, 'rightColumn', e.target.value)}
               placeholder="右表列"
-              className="flex-1 px-1.5 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-purple-400"
+              className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.infoBorder}`}
             />
-            <button onClick={() => onRemove(cond.id)} className="p-0.5 text-red-400 hover:text-red-600 transition-colors">
+            <button onClick={() => onRemove(cond.id)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
               <X size={14} />
             </button>
           </div>
@@ -75,7 +77,7 @@ const JoinConditionsEditor: React.FC<JoinConditionsEditorProps> = ({
       ))}
       <button
         onClick={onAdd}
-        className="w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] text-purple-600 border border-dashed border-purple-300 rounded hover:bg-purple-50 transition-colors"
+        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] ${styles.infoText} border border-dashed ${styles.infoBorder} rounded hover:${styles.infoBg} transition-colors`}
       >
         <Plus size={12} /> 添加 JOIN 条件
       </button>

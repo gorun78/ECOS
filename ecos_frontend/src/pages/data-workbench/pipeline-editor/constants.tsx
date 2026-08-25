@@ -5,6 +5,7 @@
  */
 
 import { Database, GitBranch, ArrowLeftRight, BarChart3, HardDrive, Settings } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Node palette definitions ─────────────────────────────
 
@@ -22,41 +23,43 @@ export const PALETTE_ITEMS: PaletteItem[] = [
     type: 'source',
     label: 'Source 源',
     icon: ({ size, className }) => <Database size={size} className={className} />,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-500',
+    color: `${styles.accentText}`,
+    bgColor: `${styles.infoBg}`,
+    borderColor: `${styles.infoBorder}`,
   },
   {
     type: 'transform',
     label: 'Transform 转换',
     icon: ({ size, className }) => <Settings size={size} className={className} />,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-    borderColor: 'border-emerald-500',
+    color: `${styles.successText}`,
+    bgColor: `${styles.successBg}`,
+    borderColor: `${styles.successBorder}`,
   },
   {
     type: 'join',
     label: 'Join 关联',
     icon: ({ size, className }) => <ArrowLeftRight size={size} className={className} />,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-500',
+    color: `${styles.infoText}`,
+    bgColor: `${styles.infoBg}`,
+    borderColor: `${styles.infoBorder}`,
   },
   {
     type: 'aggregate',
     label: 'Aggregate 聚合',
     icon: ({ size, className }) => <BarChart3 size={size} className={className} />,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50',
-    borderColor: 'border-orange-500',
+    color: `${styles.warningText}`,
+    bgColor: `${styles.warningBg}`,
+    borderColor: `${styles.warningBorder}`,
   },
   {
     type: 'sink',
     label: 'Sink 输出',
     icon: ({ size, className }) => <HardDrive size={size} className={className} />,
-    color: 'text-slate-600',
-    bgColor: 'bg-slate-100',
-    borderColor: 'border-slate-400',
+    color: `${styles.cardTextMuted}`,
+    bgColor: `${styles.sidebarBg}`,
+    borderColor: `${styles.inputBorder}`,
   },
 ];
 
+
+// TODO: useTheme insertion needed

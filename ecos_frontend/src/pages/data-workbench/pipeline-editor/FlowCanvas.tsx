@@ -29,32 +29,34 @@ import {
 } from 'lucide-react';
 import type { NodeStatus, NodeConfig } from './types';
 import EmptyCanvas from './EmptyCanvas';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Status badge ─────────────────────────────────────────
 
 const StatusBadge: React.FC<{ status: NodeStatus }> = React.memo(({ status }) => {
+  const { styles } = useTheme();
   switch (status) {
     case 'running':
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">
+        <span className={`inline-flex items-center gap-1 text-[10px] ${styles.accentText} ${styles.infoBg} px-1.5 py-0.5 rounded-full`}>
           <Loader2 size={10} className="animate-spin" /> running
         </span>
       );
     case 'success':
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+        <span className={`inline-flex items-center gap-1 text-[10px] ${styles.successText} ${styles.successBg} px-1.5 py-0.5 rounded-full`}>
           <CheckCircle size={10} /> success
         </span>
       );
     case 'error':
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">
+        <span className={`inline-flex items-center gap-1 text-[10px] ${styles.dangerText} ${styles.dangerBg} px-1.5 py-0.5 rounded-full`}>
           <AlertCircle size={10} /> error
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
+        <span className={`inline-flex items-center gap-1 text-[10px] ${styles.muted} ${styles.sidebarBg} px-1.5 py-0.5 rounded-full`}>
           <CheckCircle size={10} /> idle
         </span>
       );
@@ -64,42 +66,46 @@ const StatusBadge: React.FC<{ status: NodeStatus }> = React.memo(({ status }) =>
 // ─── Custom Handle ────────────────────────────────────────
 
 const NodeHandle: React.FC<HandleProps & { position: Position }> = React.memo(
-  ({ position, ...rest }) => (
+  ({ position, ...rest }) => {
+    const { styles } = useTheme();
+    return (
     <Handle
       {...rest}
       position={position}
-      className="!w-3 !h-3 !border-2 !border-white !bg-slate-400 hover:!bg-blue-500 transition-colors"
+      className={`!w-3 !h-3 !border-2 !${styles.cardBorder} !${styles.sidebarBg} hover:!${styles.infoBg} transition-colors`}
     />
-  )
+    );
+  }
 );
 
 // ─── SourceNode ───────────────────────────────────────────
 
 const SourceNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
+  const { styles } = useTheme();
   const config = (data ?? {}) as unknown as NodeConfig;
   const status: NodeStatus = config.nodeStatus || 'idle';
   return (
     <div
       className={`relative min-w-[180px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
-        selected ? 'border-blue-500 shadow-lg ring-2 ring-blue-200' : 'border-blue-300'
+        selected ? `${styles.infoBorder} shadow-lg ring-2 ${styles.accentBorder}` : styles.infoBorder
       }`}
     >
       <NodeHandle type="target" position={Position.Top} id="top" />
       <NodeHandle type="target" position={Position.Left} id="left" />
-      <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-t-xl border-b border-blue-200">
-        <Database size={16} className="text-blue-600 flex-shrink-0" />
-        <span className="text-xs font-semibold text-blue-800 truncate flex-1">
+      <div className={`flex items-center gap-2 px-3 py-2 ${styles.infoBg} rounded-t-xl border-b ${styles.accentBorder}`}>
+        <Database size={16} className={`${styles.accentText} flex-shrink-0`} />
+        <span className={`text-xs font-semibold ${styles.accentText} truncate flex-1`}>
           {config.label || 'Source'}
         </span>
         <StatusBadge status={status} />
       </div>
-      <div className="px-3 py-2 text-xs text-slate-600">
+      <div className={`px-3 py-2 text-xs ${styles.cardTextMuted}`}>
         {config.sourceTable ? (
           <div className="truncate" title={config.sourceTable}>
-            表: <span className="font-mono text-blue-700">{config.sourceTable}</span>
+            表: <span className={`font-mono ${styles.accentText}`}>{config.sourceTable}</span>
           </div>
         ) : (
-          <div className="italic text-slate-400">选择数据源表...</div>
+          <div className={`italic ${styles.cardTextMuted}`}>选择数据源表...</div>
         )}
       </div>
       <NodeHandle type="source" position={Position.Bottom} id="bottom" />
@@ -111,31 +117,32 @@ const SourceNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
 // ─── TransformNode ────────────────────────────────────────
 
 const TransformNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
+  const { styles } = useTheme();
   const config = (data ?? {}) as unknown as NodeConfig;
   const status: NodeStatus = config.nodeStatus || 'idle';
   const ruleCount = config.transformRules?.length || 0;
   return (
     <div
       className={`relative min-w-[180px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
-        selected ? 'border-emerald-500 shadow-lg ring-2 ring-emerald-200' : 'border-emerald-300'
+        selected ? `${styles.successBorder} shadow-lg ring-2 ${styles.successBorder}` : styles.successBorder
       }`}
     >
       <NodeHandle type="target" position={Position.Top} id="top" />
       <NodeHandle type="target" position={Position.Left} id="left" />
-      <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-t-xl border-b border-emerald-200">
-        <Settings size={16} className="text-emerald-600 flex-shrink-0" />
-        <span className="text-xs font-semibold text-emerald-800 truncate flex-1">
+      <div className={`flex items-center gap-2 px-3 py-2 ${styles.successBg} rounded-t-xl border-b ${styles.successBorder}`}>
+        <Settings size={16} className={`${styles.successText} flex-shrink-0`} />
+        <span className={`text-xs font-semibold ${styles.successText} truncate flex-1`}>
           {config.label || 'Transform'}
         </span>
         <StatusBadge status={status} />
       </div>
-      <div className="px-3 py-2 text-xs text-slate-600">
+      <div className={`px-3 py-2 text-xs ${styles.cardTextMuted}`}>
         {ruleCount > 0 ? (
           <div>
-            转换规则: <span className="font-semibold text-emerald-700">{ruleCount} 条</span>
+            转换规则: <span className={`font-semibold ${styles.successText}`}>{ruleCount} 条</span>
           </div>
         ) : (
-          <div className="italic text-slate-400">配置转换规则...</div>
+          <div className={`italic ${styles.cardTextMuted}`}>配置转换规则...</div>
         )}
       </div>
       <NodeHandle type="source" position={Position.Bottom} id="bottom" />
@@ -147,34 +154,35 @@ const TransformNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
 // ─── JoinNode ─────────────────────────────────────────────
 
 const JoinNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
+  const { styles } = useTheme();
   const config = (data ?? {}) as unknown as NodeConfig;
   const status: NodeStatus = config.nodeStatus || 'idle';
   const condCount = config.joinConditions?.length || 0;
   return (
     <div
       className={`relative min-w-[200px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
-        selected ? 'border-purple-500 shadow-lg ring-2 ring-purple-200' : 'border-purple-300'
+        selected ? `${styles.infoBorder} shadow-lg ring-2 ${styles.infoBorder}` : styles.infoBorder
       }`}
     >
       <NodeHandle type="target" position={Position.Top} id="top" />
       <NodeHandle type="target" position={Position.Left} id="left" />
-      <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-t-xl border-b border-purple-200">
-        <ArrowLeftRight size={16} className="text-purple-600 flex-shrink-0" />
-        <span className="text-xs font-semibold text-purple-800 truncate flex-1">
+      <div className={`flex items-center gap-2 px-3 py-2 ${styles.infoBg} rounded-t-xl border-b ${styles.infoBorder}`}>
+        <ArrowLeftRight size={16} className={`${styles.infoText} flex-shrink-0`} />
+        <span className={`text-xs font-semibold ${styles.infoText} truncate flex-1`}>
           {config.label || 'Join'}
         </span>
         <StatusBadge status={status} />
       </div>
-      <div className="px-3 py-2 text-xs text-slate-600 space-y-1">
+      <div className={`px-3 py-2 text-xs ${styles.cardTextMuted} space-y-1`}>
         <div>
-          类型: <span className="font-semibold text-purple-700">{config.joinType || 'INNER'}</span>
+          类型: <span className={`font-semibold ${styles.infoText}`}>{config.joinType || 'INNER'}</span>
         </div>
         {condCount > 0 ? (
           <div>
-            条件: <span className="font-semibold text-purple-700">{condCount} 条</span>
+            条件: <span className={`font-semibold ${styles.infoText}`}>{condCount} 条</span>
           </div>
         ) : (
-          <div className="italic text-slate-400">配置 JOIN 条件...</div>
+          <div className={`italic ${styles.cardTextMuted}`}>配置 JOIN 条件...</div>
         )}
       </div>
       <NodeHandle type="source" position={Position.Bottom} id="bottom" />
@@ -186,31 +194,32 @@ const JoinNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
 // ─── AggregateNode ────────────────────────────────────────
 
 const AggregateNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
+  const { styles } = useTheme();
   const config = (data ?? {}) as unknown as NodeConfig;
   const status: NodeStatus = config.nodeStatus || 'idle';
   const groupByCols = config.aggregateGroupBy?.length || 0;
   return (
     <div
       className={`relative min-w-[200px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
-        selected ? 'border-orange-500 shadow-lg ring-2 ring-orange-200' : 'border-orange-300'
+        selected ? `${styles.warningBorder} shadow-lg ring-2 ${styles.warningBorder}` : styles.warningBorder
       }`}
     >
       <NodeHandle type="target" position={Position.Top} id="top" />
       <NodeHandle type="target" position={Position.Left} id="left" />
-      <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 rounded-t-xl border-b border-orange-200">
-        <BarChart3 size={16} className="text-orange-600 flex-shrink-0" />
-        <span className="text-xs font-semibold text-orange-800 truncate flex-1">
+      <div className={`flex items-center gap-2 px-3 py-2 ${styles.warningBg} rounded-t-xl border-b ${styles.warningBorder}`}>
+        <BarChart3 size={16} className={`${styles.warningText} flex-shrink-0`} />
+        <span className={`text-xs font-semibold ${styles.warningText} truncate flex-1`}>
           {config.label || 'Aggregate'}
         </span>
         <StatusBadge status={status} />
       </div>
-      <div className="px-3 py-2 text-xs text-slate-600">
+      <div className={`px-3 py-2 text-xs ${styles.cardTextMuted}`}>
         {groupByCols > 0 ? (
           <div>
-            GROUP BY: <span className="font-semibold text-orange-700">{groupByCols} 列</span>
+            GROUP BY: <span className={`font-semibold ${styles.warningText}`}>{groupByCols} 列</span>
           </div>
         ) : (
-          <div className="italic text-slate-400">配置分组列...</div>
+          <div className={`italic ${styles.cardTextMuted}`}>配置分组列...</div>
         )}
       </div>
       <NodeHandle type="source" position={Position.Bottom} id="bottom" />
@@ -222,30 +231,31 @@ const AggregateNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
 // ─── SinkNode ─────────────────────────────────────────────
 
 const SinkNode: React.FC<NodeProps> = React.memo(({ data, selected }) => {
+  const { styles } = useTheme();
   const config = (data ?? {}) as unknown as NodeConfig;
   const status: NodeStatus = config.nodeStatus || 'idle';
   return (
     <div
       className={`relative min-w-[180px] rounded-xl border-2 ${styles.cardBg} shadow-md transition-shadow ${
-        selected ? 'border-slate-500 shadow-lg ring-2 ring-slate-200' : 'border-slate-300'
+        selected ? `${styles.cardBorder} shadow-lg ring-2 ${styles.inputBorder}` : styles.inputBorder
       }`}
     >
       <NodeHandle type="target" position={Position.Top} id="top" />
       <NodeHandle type="target" position={Position.Left} id="left" />
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-t-xl border-b border-slate-200">
-        <HardDrive size={16} className="text-slate-600 flex-shrink-0" />
-        <span className="text-xs font-semibold text-slate-800 truncate flex-1">
+      <div className={`flex items-center gap-2 px-3 py-2 ${styles.cardBg} rounded-t-xl border-b ${styles.cardBorder}`}>
+        <HardDrive size={16} className={`${styles.cardTextMuted} flex-shrink-0`} />
+        <span className={`text-xs font-semibold ${styles.cardText} truncate flex-1`}>
           {config.label || 'Sink'}
         </span>
         <StatusBadge status={status} />
       </div>
-      <div className="px-3 py-2 text-xs text-slate-600">
+      <div className={`px-3 py-2 text-xs ${styles.cardTextMuted}`}>
         {config.targetTable ? (
           <div className="truncate" title={config.targetTable}>
-            目标: <span className="font-mono text-slate-700">{config.targetTable}</span>
+            目标: <span className={`font-mono ${styles.cardTextMuted}`}>{config.targetTable}</span>
           </div>
         ) : (
-          <div className="italic text-slate-400">选择目标表...</div>
+          <div className={`italic ${styles.cardTextMuted}`}>选择目标表...</div>
         )}
       </div>
       <NodeHandle type="source" position={Position.Bottom} id="bottom" />

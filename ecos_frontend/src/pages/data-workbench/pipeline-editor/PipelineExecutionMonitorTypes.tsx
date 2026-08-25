@@ -7,6 +7,7 @@ import React from 'react';
 import {
   Clock, CheckCircle, XCircle, AlertTriangle, Loader2,
 } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Types ────────────────────────────────────────────
 
@@ -53,12 +54,12 @@ export interface PipelineExecutionMonitorProps {
 // ─── Status color map ─────────────────────────────────
 
 export const STATUS_COLORS: Record<StepStatus, { bg: string; text: string; border: string; icon: React.FC<{ size?: number; className?: string }> }> = {
-  idle: { bg: 'bg-slate-100', text: 'text-slate-500', border: 'border-slate-300', icon: ({ size, className }) => <div className={`w-3 h-3 rounded-full bg-slate-400 ${className || ''}`} /> },
-  queued: { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-300', icon: ({ size, className }) => <Clock size={size || 12} className={`text-blue-500 ${className || ''}`} /> },
-  running: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-400', icon: ({ size, className }) => <Loader2 size={size || 12} className={`text-yellow-600 animate-spin ${className || ''}`} /> },
-  succeeded: { bg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-300', icon: ({ size, className }) => <CheckCircle size={size || 12} className={`text-emerald-500 ${className || ''}`} /> },
-  failed: { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-400', icon: ({ size, className }) => <XCircle size={size || 12} className={`text-red-500 ${className || ''}`} /> },
-  cancelled: { bg: 'bg-slate-100', text: 'text-slate-500', border: 'border-slate-300', icon: ({ size, className }) => <AlertTriangle size={size || 12} className={`text-slate-400 ${className || ''}`} /> },
+  idle: { bg: `${styles.sidebarBg}`, text: `${styles.muted}`, border: `${styles.inputBorder}`, icon: ({ size, className }) => <div className={`w-3 h-3 rounded-full ${styles.sidebarBg} ${className || ''}`} /> },
+  queued: { bg: `${styles.infoBg}`, text: `${styles.accentText}`, border: `${styles.infoBorder}`, icon: ({ size, className }) => <Clock size={size || 12} className={`${styles.infoText} ${className || ''}`} /> },
+  running: { bg: `${styles.warningBg}`, text: `${styles.warningText}`, border: `${styles.warningBorder}`, icon: ({ size, className }) => <Loader2 size={size || 12} className={`${styles.warningText} animate-spin ${className || ''}`} /> },
+  succeeded: { bg: `${styles.successBg}`, text: `${styles.successText}`, border: `${styles.successBorder}`, icon: ({ size, className }) => <CheckCircle size={size || 12} className={`${styles.successText} ${className || ''}`} /> },
+  failed: { bg: `${styles.dangerBg}`, text: `${styles.dangerText}`, border: `${styles.dangerBorder}`, icon: ({ size, className }) => <XCircle size={size || 12} className={`${styles.dangerText} ${className || ''}`} /> },
+  cancelled: { bg: `${styles.sidebarBg}`, text: `${styles.muted}`, border: `${styles.inputBorder}`, icon: ({ size, className }) => <AlertTriangle size={size || 12} className={`${styles.cardTextMuted} ${className || ''}`} /> },
 };
 
 export const STATUS_LABELS: Record<StepStatus, string> = {
@@ -74,11 +75,13 @@ export const STATUS_LABELS: Record<StepStatus, string> = {
 
 export const StatusIcon: React.FC<{ status: StepStatus; size?: number }> = React.memo(({ status, size = 12 }) => {
   switch (status) {
-    case 'idle': return <div className="w-3 h-3 rounded-full bg-slate-400" />;
-    case 'queued': return <Clock size={size} className="text-blue-500" />;
-    case 'running': return <Loader2 size={size} className="text-yellow-600 animate-spin" />;
-    case 'succeeded': return <CheckCircle size={size} className="text-emerald-500" />;
-    case 'failed': return <XCircle size={size} className="text-red-500" />;
-    case 'cancelled': return <AlertTriangle size={size} className="text-slate-400" />;
+    case 'idle': return <div className={`w-3 h-3 rounded-full ${styles.sidebarBg}`} />;
+    case 'queued': return <Clock size={size} className={`${styles.infoText}`} />;
+    case 'running': return <Loader2 size={size} className={`${styles.warningText} animate-spin`} />;
+    case 'succeeded': return <CheckCircle size={size} className={`${styles.successText}`} />;
+    case 'failed': return <XCircle size={size} className={`${styles.dangerText}`} />;
+    case 'cancelled': return <AlertTriangle size={size} className={`${styles.cardTextMuted}`} />;
   }
 });
+
+// TODO: useTheme insertion needed

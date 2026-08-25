@@ -9,6 +9,7 @@ import {
   STATUS_COLORS, STATUS_LABELS, StatusIcon,
   type StepRunInfo,
 } from './PipelineExecutionMonitorTypes';
+import { useTheme } from '../../../components/ThemeContext';
 
 interface Props {
   step: StepRunInfo;
@@ -22,19 +23,20 @@ interface Props {
 }
 
 const PipelineExecutionMonitorStepDetail: React.FC<Props> = ({ step, onClose, styles }) => {
+  const { styles } = useTheme();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />
       <div className={`relative z-10 ${styles.cardBg} rounded-xl shadow-2xl w-[480px] max-h-[500px] flex flex-col overflow-hidden`}>
         {/* Header */}
-        <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.cardBorder} bg-slate-50 shrink-0`}>
+        <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <div className="flex items-center gap-2">
-            <BarChart3 size={15} className="text-blue-600" />
+            <BarChart3 size={15} className={`${styles.accentText}`} />
             <span className={`text-sm font-bold ${styles.cardText}`}>步骤详情</span>
           </div>
           <button
             onClick={onClose}
-            className={`p-1 rounded hover:bg-slate-200 ${styles.cardTextMuted} transition-colors`}
+            className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
           >
             <X size={15} />
           </button>
@@ -99,11 +101,11 @@ const PipelineExecutionMonitorStepDetail: React.FC<Props> = ({ step, onClose, st
           {step.errorMsg && (
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <AlertCircle size={12} className="text-red-500" />
-                <span className="text-[11px] font-semibold text-red-600">错误日志</span>
+                <AlertCircle size={12} className={`${styles.dangerText}`} />
+                <span className={`text-[11px] font-semibold ${styles.dangerText}`}>错误日志</span>
               </div>
-              <div className="border border-red-200 bg-red-50 rounded-lg p-3">
-                <pre className="text-[10px] text-red-700 font-mono whitespace-pre-wrap break-all">
+              <div className={`border ${styles.dangerBorder} ${styles.dangerBg} rounded-lg p-3`}>
+                <pre className={`text-[10px] ${styles.dangerText} font-mono whitespace-pre-wrap break-all`}>
                   {step.errorMsg}
                 </pre>
               </div>
@@ -111,10 +113,10 @@ const PipelineExecutionMonitorStepDetail: React.FC<Props> = ({ step, onClose, st
           )}
         </div>
 
-        <div className={`px-4 py-3 border-t ${styles.cardBorder} bg-slate-50 shrink-0`}>
+        <div className={`px-4 py-3 border-t ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <button
             onClick={onClose}
-            className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} ${styles.cardText} hover:bg-slate-100 rounded-lg transition-colors`}
+            className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} ${styles.cardText} hover:${styles.sidebarBg} rounded-lg transition-colors`}
           >
             关闭
           </button>
