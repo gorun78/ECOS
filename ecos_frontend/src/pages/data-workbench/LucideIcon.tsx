@@ -10,14 +10,15 @@ import {
   Workflow, Layers, Lightbulb, Database, Import, Cpu, ShieldAlert,
   Settings, FileCode, BookOpen, Download, Copy, X, Activity,
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
-  GitBranch, Zap, BarChart3, Eye, Link, Unlink, type LucideIcon as LucideIconType,
+  GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
+  type LucideIcon as LucideIconType,
 } from 'lucide-react';
 
 const iconMap: Record<string, LucideIconType> = {
   Workflow, Layers, Lightbulb, Database, Import, Cpu, ShieldAlert,
   Settings, FileCode, BookOpen, Download, Copy, X, Activity,
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
-  GitBranch, Zap, BarChart3, Eye, Link, Unlink,
+  GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
 };
 
 interface Props {
