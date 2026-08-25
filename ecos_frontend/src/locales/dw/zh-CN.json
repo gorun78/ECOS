@@ -599,5 +599,11 @@
   "dw.pb.colDesc": "描述",
   "dw.pb.colStatus": "状态",
   "dw.pb.colLastRun": "最近执行",
-  "dw.pb.colActions": "操作"
+  "dw.pb.colActions": "操作",
+  "pipeline.listTitle": "管道与同步任务",
+  "pipeline.new": "新建",
+  "pipeline.empty": "暂无管道，点击「新建」创建",
+  "pipeline.filter.all": "全部",
+  "pipeline.filter.pipeline": "管道",
+  "pipeline.filter.sync": "同步任务"
 }

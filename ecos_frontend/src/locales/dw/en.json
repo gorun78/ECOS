@@ -599,5 +599,11 @@
   "dw.pb.colDesc": "Description",
   "dw.pb.colStatus": "Status",
   "dw.pb.colLastRun": "Last Run",
-  "dw.pb.colActions": "Actions"
+  "dw.pb.colActions": "Actions",
+  "pipeline.listTitle": "Pipelines & Sync Tasks",
+  "pipeline.new": "New",
+  "pipeline.empty": "No pipelines yet. Click 'New' to create one.",
+  "pipeline.filter.all": "All",
+  "pipeline.filter.pipeline": "Pipelines",
+  "pipeline.filter.sync": "Sync Tasks"
 }

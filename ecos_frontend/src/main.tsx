@@ -10,10 +10,6 @@ import './index.css';
 
 // Pages
 import CognitiveOperatingSystem from './pages/CognitiveOperatingSystem.tsx';
-import DataCatalog from './pages/DataCatalog.tsx';
-import DatasetExplorer from './pages/DatasetExplorer.tsx';
-import PipelineBuilder from './pages/PipelineBuilder.tsx';
-import CodeWorkbook from './pages/CodeWorkbook.tsx';
 import OperationalApps from './pages/OperationalApps.tsx';
 import MonitoringCenter from './pages/MonitoringCenter.tsx';
 import OntologyWorkbenchLayout, { OntologyWorkbenchLayoutStandalone } from './pages/OntologyWorkbenchLayout.tsx';
@@ -26,7 +22,6 @@ import ObjectExplorer from './pages/ObjectExplorer.tsx';
 import WorldModelViewer from './pages/WorldModelViewer.tsx';
 import CaseLibrary from './components/CaseLibraryView.tsx';
 import AlertPanel from './components/AlertPanel.tsx';
-import DataQualityDashboard from './pages/DataQualityDashboard.tsx';
 import GlossaryManager from './pages/GlossaryManager.tsx';
 import MarketplaceBrowser from './pages/MarketplaceBrowser.tsx';
 import UserManagement from './pages/UserManagement.tsx';
@@ -39,9 +34,7 @@ import DataLineage from './pages/DataLineage.tsx';
 import DictManager from './pages/DictManager.tsx';
 import SystemDictionary from './pages/SystemDictionary.tsx';
 import SystemConfigManager from './pages/SystemConfigManager.tsx';
-import DataSourceManager from './pages/DataSourceManager.tsx';
 import SecurityCenter from './pages/security-center/SecurityCenterLayout';
-import DataLake from './pages/DataLake.tsx';
 import TelemetryViewer from './pages/TelemetryViewer.tsx';
 import TokenDashboard from './pages/TokenDashboard.tsx';
 import TenantManager from './pages/TenantManager.tsx';
@@ -81,12 +74,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="ops_apps" element={<OperationalApps />} />
               <Route path="marketplace" element={<MarketplaceBrowser />} />
               {/* D · 数据层 */}
-              <Route path="catalog" element={<Navigate to="/data-workbench" replace />} />
-              <Route path="dataset_explorer/:assetId?" element={<Navigate to="/data-workbench" replace />} />
-              <Route path="lineage" element={<Navigate to="/data-workbench" replace />} />
               <Route path="objects" element={<ObjectExplorer />} />
-              <Route path="dq_dashboard" element={<Navigate to="/data-workbench" replace />} />
-              <Route path="datalake" element={<Navigate to="/data-workbench" replace />} />
               {/* I · 信息层 — 本体工作台（单页，内部分区切换） */}
               <Route path="ontology_workbench" element={<OntologyWorkbenchLayoutStandalone />} />
               <Route path="business-workbench" element={<BusinessWorkbenchLayoutStandalone />} />
@@ -101,14 +89,11 @@ createRoot(document.getElementById('root')!).render(
               <Route path="glossary" element={<Navigate to="/ontology_workbench" replace />} />
               <Route path="dict" element={<DictManager />} />
               <Route path="system-config" element={<SystemConfigManager />} />
-              <Route path="datasources" element={<Navigate to="/data-workbench" replace />} />
               {/* K · 知识层 */}
               <Route path="workflow_designer" element={<WorkshopView />} />
               <Route path="project_workbench" element={<ScenarioManagementView />} />
               <Route path="world_model" element={<WorldModelViewer />} />
               <Route path="knowledge_view" element={<KnowledgeView />} />
-              <Route path="pipeline" element={<Navigate to="/data-workbench" replace />} />
-              <Route path="workbook" element={<Navigate to="/data-workbench" replace />} />
               {/* W · 智能层 */}
               <Route path="agent_studio" element={<Navigate to="/ai-workbench" replace />} />
               <Route path="ai-workbench" element={<AIWorkbench />} />
@@ -127,7 +112,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="telemetry" element={<TelemetryViewer />} />
               <Route path="tokens" element={<TokenDashboard />} />
               <Route path="tenants" element={<TenantManager />} />
-              <Route path="task_center" element={<Navigate to="/data-workbench" replace />} />
               {/* 引擎监控 */}
               <Route path="engine-security" element={<EngineMonitor engine="security" />} />
               <Route path="engine-data" element={<EngineMonitor engine="data" />} />
