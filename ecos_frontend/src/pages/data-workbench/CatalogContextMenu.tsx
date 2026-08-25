@@ -46,7 +46,7 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl w-[90vw] max-w-4xl max-h-[80vh] flex flex-col`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.cardBorder}`}>
           <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
-            <Eye className="w-4 h-4 text-indigo-500" />
+            <Eye className={`w-4 h-4 ${styles.infoText}`} />
             {locale === "zh" ? "预览" : "Preview"}: {resourceName}
           </h3>
           <button onClick={onClose} className="opacity-50 hover:opacity-100 transition"><X className="w-4 h-4" /></button>

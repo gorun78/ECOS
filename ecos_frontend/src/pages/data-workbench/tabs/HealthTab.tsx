@@ -65,7 +65,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
         </div>
         <button
           onClick={() => setShowAddCheck(!showAddCheck)}
-          className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
+          className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
           <span>{t("dw.txt.57eece")}</span>
@@ -87,7 +87,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
             <option value="custom_sql">{t("dw.txt.7b06b8")}</option>
           </select>
           <div className="flex gap-2">
-            <button onClick={handleAddCheck} className={`px-4 py-1.5 ${styles.accentBg} text-white rounded-lg text-xs font-bold cursor-pointer`}>{t("dw.addBtn")}</button>
+            <button onClick={handleAddCheck} className={`px-4 py-1.5 ${styles.accentBg} ${styles.cardText} rounded-lg text-xs font-bold cursor-pointer`}>{t("dw.addBtn")}</button>
             <button onClick={() => setShowAddCheck(false)} className={`px-4 py-1.5 ${styles.appBg} ${styles.cardTextMuted} rounded-lg text-xs cursor-pointer`}>{t("dw.cancelBtn")}</button>
           </div>
         </div>
@@ -107,15 +107,15 @@ const HealthTab: React.FC<HealthTabProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  check.status === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                  check.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                  'bg-rose-50 text-rose-700 border border-rose-200'
+                  check.status === 'ok' ? `${styles.successBg} ${styles.successText} border ${styles.successBorder}` :
+                  check.status === 'pending' ? `${styles.warningBg} ${styles.warningText} border ${styles.warningBorder}` :
+                  `${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder}`
                 }`}>
                   {check.status === 'ok' ? t("dw.txt.d8e14b") : check.status === 'pending' ? t("dw.txt.f1f3b7") : t("dw.txt.1c3a1a")}
                 </span>
                 <button
                   onClick={() => setHealthChecks(prev => prev.filter(c => c.id !== check.id))}
-                  className={`p-1 rounded hover:${styles.appBg} text-rose-400 cursor-pointer`}
+                  className={`p-1 rounded hover:${styles.appBg} ${styles.dangerText} cursor-pointer`}
                 >
                   <LucideIcon name="trash-2" className="w-3.5 h-3.5" />
                 </button>

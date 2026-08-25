@@ -140,7 +140,7 @@ export default function CatalogTree({ onContextMenu }: CatalogTreeProps) {
     if (!q.trim()) return text;
     const idx = text.toLowerCase().indexOf(q.toLowerCase());
     if (idx < 0) return text;
-    return <>{text.slice(0, idx)}<mark className="bg-yellow-200/60 dark:bg-yellow-500/30 rounded px-0.5">{text.slice(idx, idx + q.length)}</mark>{text.slice(idx + q.length)}</>;
+    return <>{text.slice(0, idx)}<mark className={`${styles.warningBg} dark:${styles.warningBg} rounded px-0.5`}>{text.slice(idx, idx + q.length)}</mark>{text.slice(idx + q.length)}</>;
   }
 
   function renderNode(node: TreeNode, depth: number): React.ReactNode {

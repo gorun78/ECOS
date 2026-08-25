@@ -45,7 +45,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
       <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.txt.5da13f")}</h3>
       <button
         onClick={() => setShowAddSync(true)}
-        className={`p-1 rounded ${styles.accentBg} text-white ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
+        className={`p-1 rounded ${styles.accentBg} ${styles.cardText} ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
       >
         <LucideIcon name="Plus" size={12} />
         <span>{t("dw.txt.d85c7b")}</span>
@@ -69,9 +69,9 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
             <div className="flex justify-between items-start">
               <span className={`font-semibold ${styles.cardText} truncate pr-1`}>{task.name}</span>
               <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
-                task.status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                task.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' :
-                task.status === 'running' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' :
+                task.status === 'success' ? `${styles.successBg} ${styles.successText} border ${styles.successBorder}` :
+                task.status === 'failed' ? `${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder}` :
+                task.status === 'running' ? `${styles.infoBg} ${styles.accentText} border ${styles.accentBorder} animate-pulse` :
                 '${styles.sidebarBg} ${styles.cardTextMuted} border ${styles.cardBorder}'
               }`}>
                 {task.status === 'success' ? t("dw.statusSuccess") :
@@ -120,7 +120,7 @@ const SyncsTab: React.FC<SyncsTabProps> = ({
             <button
               onClick={() => triggerSyncTask(task.id)}
               disabled={task.status === 'running'}
-              className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs`}
+              className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs`}
             >
               <LucideIcon name="Play" size={13} />
               <span>{t("dw.txt.a7e407")}</span>

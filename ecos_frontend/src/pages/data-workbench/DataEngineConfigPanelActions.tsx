@@ -6,6 +6,7 @@
 import React from 'react';
 import { RotateCcw, Save, RefreshCw } from 'lucide-react';
 import type { ConfigGroup } from './DataEngineConfigPanel';
+import type { ThemeStyles } from '../../components/ThemeContext';
 
 interface Props {
   groups: ConfigGroup[];
@@ -14,10 +15,7 @@ interface Props {
   onRestoreDefaults: () => void;
   onSaveAll: () => void;
   onRefreshCache: () => void;
-  styles: {
-    cardBorder: string;
-    cardTextMuted: string;
-  };
+  styles: ThemeStyles;
 }
 
 const DataEngineConfigPanelActions: React.FC<Props> = ({
@@ -32,10 +30,10 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
   const modifiedCount = groups.filter(g => g.modified).length;
 
   return (
-    <div className={`flex items-center justify-between px-4 py-2.5 border-t ${styles.cardBorder} bg-slate-50/80 shrink-0`}>
+    <div className={`flex items-center justify-between px-4 py-2.5 border-t ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
       <div className={`text-[10px] ${styles.cardTextMuted}`}>
         {modifiedCount > 0 && (
-          <span className="text-amber-600">
+          <span className={`${styles.warningText}`}>
             {modifiedCount} 个分组有未保存的修改
           </span>
         )}
@@ -44,7 +42,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
         <button
           onClick={onRestoreDefaults}
           disabled={saving || refreshing}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:bg-slate-200 rounded-md transition-colors disabled:opacity-50`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-md transition-colors disabled:opacity-50`}
         >
           <RotateCcw size={13} />
           恢复默认
@@ -52,7 +50,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
         <button
           onClick={onSaveAll}
           disabled={saving || refreshing}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 shadow-sm"
+          className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold ${styles.cardText} ${styles.accentBg} hover:${styles.accentBg} rounded-md transition-colors disabled:opacity-50 shadow-sm`}
         >
           {saving ? (
             <>
@@ -69,7 +67,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
         <button
           onClick={onRefreshCache}
           disabled={saving || refreshing}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:bg-slate-200 rounded-md transition-colors disabled:opacity-50`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-md transition-colors disabled:opacity-50`}
         >
           {refreshing ? (
             <>

@@ -40,6 +40,7 @@ import {
   createTag as gitCreateTag,
 } from '../../services/gitService';
 import { apiFetchData } from '../../api';
+import { useTheme } from '../../components/ThemeContext';
 
 // ── TypeScript 接口 ──────────────────────────────────────────
 
@@ -74,11 +75,11 @@ interface GitCommit {
 // ── 状态标签映射 ────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  modified:  { label: 'M', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  added:     { label: 'A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  deleted:   { label: 'D', color: 'text-rose-400',    bg: 'bg-rose-500/10' },
-  untracked: { label: 'U', color: 'text-slate-400',   bg: 'bg-slate-500/10' },
-  renamed:   { label: 'R', color: 'text-blue-400',    bg: 'bg-blue-500/10' },
+  modified:  { label: 'M', color: `${styles.warningText}`, bg: `${styles.warningBg}` },
+  added:     { label: 'A', color: `${styles.successText}`, bg: `${styles.successBg}` },
+  deleted:   { label: 'D', color: `${styles.dangerText}`,    bg: `${styles.dangerBg}` },
+  untracked: { label: 'U', color: `${styles.cardTextMuted}`,   bg: `${styles.sidebarBg}` },
+  renamed:   { label: 'R', color: `${styles.infoText}`,    bg: `${styles.infoBg}` },
 };
 
 // ── 组件 ────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ interface GitPanelProps {
 }
 
 export default function GitPanel({ repoId }: GitPanelProps) {
+  const { styles } = useTheme();
   // 状态
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('');
@@ -210,18 +212,18 @@ export default function GitPanel({ repoId }: GitPanelProps) {
   // ── 渲染 ────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#141924] text-slate-100 font-sans select-none">
+    <div className={`flex flex-col h-full bg-[#141924] ${styles.cardText} font-sans select-none`}>
       {/* 标题栏 */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#1E293B] shrink-0">
         <div className="flex items-center gap-2">
-          <GitBranch className="w-4 h-4 text-indigo-400" />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+          <GitBranch className={`w-4 h-4 ${styles.infoText}`} />
+          <span className={`text-xs font-bold uppercase tracking-wider ${styles.cardText}`}>
             Git 版本
           </span>
         </div>
         <button
           onClick={refreshAll}
-          className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-slate-200 transition"
+          className={`p-1 rounded hover:${styles.cardBg} ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           title="刷新"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -230,7 +232,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
 
       {/* 错误提示 */}
       {error && (
-        <div className="mx-3 mt-2 px-2.5 py-1.5 rounded border border-rose-500/20 bg-rose-500/10 text-rose-400 text-[10px] flex items-start gap-1.5">
+        <div className={`mx-3 mt-2 px-2.5 py-1.5 rounded border ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText} text-[10px] flex items-start gap-1.5`}>
           <X className="w-3 h-3 mt-px shrink-0" />
           <span className="leading-relaxed">{error}</span>
         </div>
@@ -240,24 +242,24 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         {/* ── 1. BranchSelector ─────────────────────── */}
         <div className="px-3 pt-3 pb-1">
           <div className="relative">
-            <label className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 block">
+            <label className={`text-[10px] uppercase tracking-wider ${styles.muted} mb-1 block`}>
               分支
             </label>
             <button
               onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
               disabled={loadingBranches}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#1E2533] text-xs text-slate-200 hover:border-slate-600 transition disabled:opacity-50"
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#1E2533] text-xs ${styles.cardText} hover:${styles.cardBorder} transition disabled:opacity-50`}
             >
               <span className="flex items-center gap-1.5 truncate">
                 {loadingBranches ? (
-                  <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
+                  <Loader2 className={`w-3 h-3 animate-spin ${styles.muted}`} />
                 ) : (
-                  <GitBranch className="w-3 h-3 text-indigo-400 shrink-0" />
+                  <GitBranch className={`w-3 h-3 ${styles.infoText} shrink-0`} />
                 )}
                 <span className="truncate">{selectedBranch || '—'}</span>
               </span>
               <ChevronDown
-                className={`w-3 h-3 text-slate-500 transition-transform ${
+                className={`w-3 h-3 ${styles.muted} transition-transform ${
                   branchDropdownOpen ? 'rotate-180' : ''
                 }`}
               />
@@ -267,7 +269,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
             {branchDropdownOpen && (
               <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-lg border border-[#1E293B] bg-[#1A1F2E] shadow-xl max-h-48 overflow-y-auto py-1">
                 {branches.length === 0 && !loadingBranches ? (
-                  <div className="px-3 py-2 text-[10px] text-slate-500 text-center">
+                  <div className={`px-3 py-2 text-[10px] ${styles.muted} text-center`}>
                     无分支数据
                   </div>
                 ) : (
@@ -280,14 +282,14 @@ export default function GitPanel({ repoId }: GitPanelProps) {
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition text-left ${
                         b.name === selectedBranch
-                          ? 'bg-indigo-500/10 text-indigo-300'
-                          : 'text-slate-300 hover:bg-white/5'
+                          ? `${styles.infoBg} ${styles.infoText}`
+                          : `${styles.cardTextMuted} hover:bg-white/5`
                       }`}
                     >
                       <GitBranch className="w-3 h-3 shrink-0" />
                       <span className="truncate">{b.name}</span>
                       {b.current && (
-                        <span className="text-[9px] px-1 py-px rounded bg-emerald-500/10 text-emerald-400 ml-auto shrink-0">
+                        <span className={`text-[9px] px-1 py-px rounded ${styles.successBg} ${styles.successText} ml-auto shrink-0`}>
                           current
                         </span>
                       )}
@@ -302,21 +304,21 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         {/* ── Quick Stats ─────────────────────────── */}
         {status && (
           <div className="flex items-center gap-2 px-3 py-1.5">
-            <span className="text-[10px] text-slate-500">
+            <span className={`text-[10px] ${styles.muted}`}>
               {status.ahead > 0 && (
                 <span className="inline-flex items-center gap-0.5 mr-2">
-                  <ArrowUp className="w-2.5 h-2.5 text-emerald-400" />
-                  <span className="text-emerald-400">{status.ahead}</span>
+                  <ArrowUp className={`w-2.5 h-2.5 ${styles.successText}`} />
+                  <span className={`${styles.successText}`}>{status.ahead}</span>
                 </span>
               )}
               {status.behind > 0 && (
                 <span className="inline-flex items-center gap-0.5">
-                  <ArrowDown className="w-2.5 h-2.5 text-amber-400" />
-                  <span className="text-amber-400">{status.behind}</span>
+                  <ArrowDown className={`w-2.5 h-2.5 ${styles.warningText}`} />
+                  <span className={`${styles.warningText}`}>{status.behind}</span>
                 </span>
               )}
               {status.ahead === 0 && status.behind === 0 && (
-                <span className="text-emerald-400/70">
+                <span className={`${styles.successText}`}>
                   <Check className="w-2.5 h-2.5 inline mr-0.5" />
                   已同步
                 </span>
@@ -327,22 +329,22 @@ export default function GitPanel({ repoId }: GitPanelProps) {
 
         {/* ── 2. UncommittedChangesList ────────────── */}
         <div className="px-3 pt-2 pb-1">
-          <h3 className="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+          <h3 className={`text-[10px] uppercase tracking-wider ${styles.muted} mb-1.5 flex items-center justify-between`}>
             <span>未提交变更</span>
             {loadingStatus ? (
-              <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
+              <Loader2 className={`w-3 h-3 animate-spin ${styles.muted}`} />
             ) : (
-              <span className="text-slate-600 tabular-nums">{changeCount}</span>
+              <span className={`${styles.cardTextMuted} tabular-nums`}>{changeCount}</span>
             )}
           </h3>
 
           {loadingStatus ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+              <Loader2 className={`w-4 h-4 ${styles.muted} animate-spin`} />
             </div>
           ) : changeCount === 0 ? (
-            <div className="flex items-center gap-1.5 py-2 text-[10px] text-slate-600">
-              <Check className="w-3 h-3 text-slate-600" />
+            <div className={`flex items-center gap-1.5 py-2 text-[10px] ${styles.cardTextMuted}`}>
+              <Check className={`w-3 h-3 ${styles.cardTextMuted}`} />
               工作区干净
             </div>
           ) : (
@@ -352,15 +354,15 @@ export default function GitPanel({ repoId }: GitPanelProps) {
                 return (
                   <div
                     key={`${f.path}-${i}`}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 transition text-[10px]"
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded hover:${styles.cardBg} transition text-[10px]`}
                   >
                     <span
                       className={`w-4 h-4 flex items-center justify-center rounded text-[9px] font-bold ${cfg.bg} ${cfg.color} shrink-0`}
                     >
                       {cfg.label}
                     </span>
-                    <FileText className="w-3 h-3 text-slate-600 shrink-0" />
-                    <span className="truncate text-slate-300">{f.path}</span>
+                    <FileText className={`w-3 h-3 ${styles.cardTextMuted} shrink-0`} />
+                    <span className={`truncate ${styles.cardTextMuted}`}>{f.path}</span>
                   </div>
                 );
               })}
@@ -370,12 +372,12 @@ export default function GitPanel({ repoId }: GitPanelProps) {
 
         {/* ── 3. CommitHistoryList ─────────────────── */}
         <div className="px-3 pt-2 pb-1">
-          <h3 className="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+          <h3 className={`text-[10px] uppercase tracking-wider ${styles.muted} mb-1.5 flex items-center justify-between`}>
             <span>最近提交</span>
             {loadingCommits ? (
-              <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
+              <Loader2 className={`w-3 h-3 animate-spin ${styles.muted}`} />
             ) : (
-              <span className="text-slate-600 tabular-nums">
+              <span className={`${styles.cardTextMuted} tabular-nums`}>
                 {commits.length}
               </span>
             )}
@@ -383,10 +385,10 @@ export default function GitPanel({ repoId }: GitPanelProps) {
 
           {loadingCommits ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+              <Loader2 className={`w-4 h-4 ${styles.muted} animate-spin`} />
             </div>
           ) : commits.length === 0 ? (
-            <div className="flex items-center gap-1.5 py-2 text-[10px] text-slate-600">
+            <div className={`flex items-center gap-1.5 py-2 text-[10px] ${styles.cardTextMuted}`}>
               <X className="w-3 h-3" />
               无提交记录
             </div>
@@ -395,21 +397,21 @@ export default function GitPanel({ repoId }: GitPanelProps) {
               {commits.map((c) => (
                 <div
                   key={c.hash}
-                  className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-white/5 transition group"
+                  className={`flex items-start gap-2 px-2 py-1.5 rounded hover:${styles.cardBg} transition group`}
                 >
-                  <GitCommit className="w-3 h-3 text-indigo-400 mt-0.5 shrink-0" />
+                  <GitCommit className={`w-3 h-3 ${styles.infoText} mt-0.5 shrink-0`} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[10px] text-slate-200 truncate leading-tight">
+                    <div className={`text-[10px] ${styles.cardText} truncate leading-tight`}>
                       {c.message}
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[9px] text-slate-500 truncate max-w-[120px]">
+                      <span className={`text-[9px] ${styles.muted} truncate max-w-[120px]`}>
                         {c.author}
                       </span>
-                      <span className="text-[9px] text-slate-600">
+                      <span className={`text-[9px] ${styles.cardTextMuted}`}>
                         {formatRelativeTime(c.timestamp)}
                       </span>
-                      <span className="text-[9px] font-mono text-slate-600 ml-auto shrink-0">
+                      <span className={`text-[9px] font-mono ${styles.cardTextMuted} ml-auto shrink-0`}>
                         {c.shortHash}
                       </span>
                     </div>
@@ -456,7 +458,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         <button
           onClick={refreshAll}
           disabled={actionLoading !== null}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#1E293B] text-[10px] text-slate-500 hover:text-slate-300 hover:border-slate-600 transition disabled:opacity-50"
+          className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#1E293B] text-[10px] ${styles.muted} hover:${styles.cardTextMuted} hover:${styles.cardBorder} transition disabled:opacity-50`}
         >
           <RotateCcw className="w-3 h-3" />
           刷新全部
@@ -480,9 +482,9 @@ function ActionButton({ icon, label, loading, onClick, variant = 'default' }: Ac
   const base =
     'flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition disabled:opacity-50';
   const primary =
-    'bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500';
+    `${styles.accentBg} hover:${styles.infoBg} ${styles.cardText} border ${styles.infoBorder}`;
   const defaultStyle =
-    'border border-[#1E293B] text-slate-400 hover:text-slate-200 hover:border-slate-600';
+    `border border-[#1E293B] ${styles.cardTextMuted} hover:${styles.cardText} hover:${styles.cardBorder}`;
 
   return (
     <button

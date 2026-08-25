@@ -81,7 +81,7 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                 showToast('error', t("dw.createFailed").replace('{msg}', e.message));
               }
             }}
-            className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
+            className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
             <span>{t("dw.newPipelineBtn")}</span>
@@ -107,8 +107,8 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                     <td className={`p-3 ${styles.cardTextMuted}`}>{p.description || '-'}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                        p.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                        p.status === 'draft' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                        p.status === 'active' ? `${styles.successBg} ${styles.successText} border ${styles.successBorder}` :
+                        p.status === 'draft' ? `${styles.warningBg} ${styles.warningText} border ${styles.warningBorder}` :
                         '${styles.sidebarBg} ${styles.cardTextMuted}'
                       }`}>
                         {p.status === 'active' ? t("dw.statusActive") : p.status === 'draft' ? t("dw.statusDraft") : p.status}
@@ -151,7 +151,7 @@ const PipelinesTab: React.FC<PipelinesTabProps> = ({ pipelines, editingPipelineI
                               showToast('error', t("dw.deleteFailed").replace('{msg}', e.message));
                             }
                           }}
-                          className={`p-1.5 rounded-md hover:${styles.appBg} text-rose-500 font-bold text-[10px] cursor-pointer`}
+                          className={`p-1.5 rounded-md hover:${styles.appBg} ${styles.dangerText} font-bold text-[10px] cursor-pointer`}
                         >
                           {t("dw.deleteBtn")}
                         </button>

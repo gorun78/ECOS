@@ -215,7 +215,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${styles.cardBg}`}>
       {/* Header */}
-      <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${styles.cardBorder} bg-slate-50/80 shrink-0`}>
+      <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
         <Settings size={16} className={styles.cardTextMuted} />
         <span className={`text-sm font-bold ${styles.cardText}`}>引擎配置</span>
         <span className={`text-[10px] ${styles.cardTextMuted} ml-auto`}>

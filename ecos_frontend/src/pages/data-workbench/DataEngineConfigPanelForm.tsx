@@ -6,6 +6,7 @@
 import React from 'react';
 import { AlertCircle, Shield, Eye, EyeOff } from 'lucide-react';
 import type { ConfigGroup, ConfigValues, DefaultValues } from './DataEngineConfigPanel';
+import type { ThemeStyles } from '../../components/ThemeContext';
 
 interface Props {
   loading: boolean;
@@ -18,12 +19,7 @@ interface Props {
   onValueChange: (key: string, value: string | number | boolean) => void;
   onRetry: () => void;
   onTogglePassword: (key: string) => void;
-  styles: {
-    cardBg: string;
-    cardBorder: string;
-    cardText: string;
-    cardTextMuted: string;
-  };
+  styles: ThemeStyles;
 }
 
 const DataEngineConfigPanelForm: React.FC<Props> = ({
@@ -47,11 +43,11 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
         </div>
       ) : loadError ? (
         <div className="flex flex-col items-center justify-center flex-1 gap-2">
-          <AlertCircle size={24} className="text-amber-500" />
+          <AlertCircle size={24} className={`${styles.warningText}`} />
           <span className={`text-sm ${styles.cardTextMuted}`}>{loadError}</span>
           <button
             onClick={onRetry}
-            className="px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            className={`px-3 py-1 text-xs ${styles.accentText} hover:${styles.infoBg} rounded-md transition-colors`}
           >
             重试
           </button>
@@ -61,14 +57,14 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
           {/* Group Title */}
           <div className={`px-5 py-3 border-b ${styles.cardBorder} ${styles.cardBg} sticky top-0 z-10`}>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">
+              <span className={`${styles.cardTextMuted}`}>
                 {currentGroup.icon}
               </span>
               <h3 className={`text-sm font-bold ${styles.cardText}`}>
                 {currentGroup.label}
               </h3>
               {currentGroup.modified && (
-                <span className="text-amber-500 text-[10px] font-bold">● 已修改</span>
+                <span className={`${styles.warningText} text-[10px] font-bold`}>● 已修改</span>
               )}
             </div>
             <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5 ml-7`}>
@@ -94,10 +90,10 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
                       {item.label}
                     </label>
                     {isPassword && (
-                      <Shield size={11} className="text-amber-500" title="敏感字段" />
+                      <Shield size={11} className={`${styles.warningText}`} title="敏感字段" />
                     )}
                     {isModified && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="已修改" />
+                      <span className={`w-1.5 h-1.5 rounded-full ${styles.warningBg}`} title="已修改" />
                     )}
                   </div>
 
@@ -111,8 +107,8 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
                         onClick={() => onValueChange(item.key, !(displayValue === true || displayValue === 'true'))}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                           displayValue === true || displayValue === 'true'
-                            ? 'bg-blue-600'
-                            : 'bg-slate-300'
+                            ? styles.accentBg
+                            : styles.sidebarBg
                         }`}
                       >
                         <span
@@ -129,7 +125,7 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
                     <select
                       value={String(displayValue)}
                       onChange={e => onValueChange(item.key, e.target.value)}
-                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} ${styles.cardText} focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors`}
+                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border ${styles.inputBorder} rounded-md ${styles.cardBg} ${styles.cardText} focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none transition-colors`}
                     >
                       {item.options.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
@@ -141,13 +137,13 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
                         type={passwordRevealed ? 'text' : 'password'}
                         value={passwordRevealed ? String(displayValue ?? '') : '********'}
                         onChange={e => onValueChange(item.key, e.target.value)}
-                        className={`w-full px-2.5 py-1.5 pr-16 text-xs border border-slate-300 rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none transition-colors`}
+                        className={`w-full px-2.5 py-1.5 pr-16 text-xs border ${styles.inputBorder} rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:${styles.warningBorder} focus:ring-1 focus:${styles.warningBorder} outline-none transition-colors`}
                         placeholder="********"
                       />
                       <button
                         type="button"
                         onClick={() => onTogglePassword(item.key)}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} hover:${styles.cardTextMuted} transition-colors`}
                         title={passwordRevealed ? '隐藏' : '显示'}
                       >
                         {passwordRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -159,7 +155,7 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
                       step="1"
                       value={displayValue as number}
                       onChange={e => onValueChange(item.key, parseInt(e.target.value, 10) || 0)}
-                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors`}
+                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border ${styles.inputBorder} rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none transition-colors`}
                     />
                   ) : item.type === 'float' ? (
                     <input
@@ -169,23 +165,23 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
                       max="1"
                       value={displayValue as number}
                       onChange={e => onValueChange(item.key, parseFloat(e.target.value) || 0)}
-                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors`}
+                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border ${styles.inputBorder} rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none transition-colors`}
                     />
                   ) : (
                     <input
                       type="text"
                       value={String(displayValue ?? '')}
                       onChange={e => onValueChange(item.key, e.target.value)}
-                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border border-slate-300 rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-colors`}
+                      className={`w-full max-w-sm px-2.5 py-1.5 text-xs border ${styles.inputBorder} rounded-md ${styles.cardBg} ${styles.cardText} font-mono focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none transition-colors`}
                     />
                   )}
 
                   {/* Description + Default hint */}
                   <p className={`text-[10px] ${styles.cardTextMuted} flex items-center gap-1`}>
                     {item.description}
-                    <span className="text-slate-300">|</span>
+                    <span className={`${styles.cardTextMuted}`}>|</span>
                     <span>默认: </span>
-                    <code className={`text-[10px] bg-slate-100 px-1 rounded ${styles.cardTextMuted}`}>
+                    <code className={`text-[10px] ${styles.sidebarBg} px-1 rounded ${styles.cardTextMuted}`}>
                       {item.type === 'password' ? '****' : String(defaultValue)}
                     </code>
                   </p>

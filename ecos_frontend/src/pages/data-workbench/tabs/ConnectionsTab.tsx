@@ -42,7 +42,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.txt.64d3b2")}</h3>
       <button
         onClick={() => setShowAddConn(true)}
-        className={`p-1 rounded ${styles.accentBg} text-white ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
+        className={`p-1 rounded ${styles.accentBg} ${styles.cardText} ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
       >
         <LucideIcon name="Plus" size={12} />
         <span>{t("dw.txt.30f7dd")}</span>
@@ -65,8 +65,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             <div className="flex justify-between items-center">
               <span className={`font-semibold ${styles.cardText} truncate pr-2`}>{conn.name}</span>
               <span className={`h-2 w-2 rounded-full ${
-                conn.status === 'connected' ? 'bg-emerald-500' :
-                conn.status === 'error' ? 'bg-red-500' : 'bg-amber-500'
+                conn.status === 'connected' ? styles.successBg :
+                conn.status === 'error' ? styles.dangerBg : styles.warningBg
               }`} title={conn.status} />
             </div>
             <div className={`flex justify-between text-[10px] ${styles.cardTextMuted} font-mono`}>
@@ -106,7 +106,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             <button
               onClick={() => /* testConnection moved to parent */ (conn.id)}
               disabled={testingConnId !== null}
-              className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5`}
+              className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5`}
             >
               <LucideIcon name="Wifi" size={13} />
               <span>{t("dw.txt.f636a1")}</span>
@@ -171,7 +171,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 
               {conn.tablesAvailable.length === 0 ? (
                  <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
-                  <LucideIcon name="AlertTriangle" size={24} className="text-amber-500" />
+                  <LucideIcon name="AlertTriangle" size={24} className={`${styles.warningText}`} />
                   <span>{t("dw.txt.2ce9e0")}</span>
                   <span>{t("dw.txt.44e8b3")}</span>
                 </div>
@@ -215,8 +215,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               </div>
               {testingLogs.map((log, i) => (
                 <div key={i} className={
-                  log.includes('ERROR') || log.includes('❌') ? 'text-red-400' :
-                  log.includes('SUCCESS') || log.includes('✅') ? 'text-emerald-400' :
+                  log.includes('ERROR') || log.includes('❌') ? `${styles.dangerText}` :
+                  log.includes('SUCCESS') || log.includes('✅') ? `${styles.successText}` :
                   log.includes('🔑') ? `${styles.accentText}` : `${styles.cardTextMuted}`
                 }>
                   {log}
@@ -282,12 +282,12 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
               className={`flex-1 p-2 border ${styles.inputBorder} rounded text-xs font-mono resize-none outline-none focus:${styles.accentBorder} h-16 ${styles.inputBg} ${styles.inputText}`}
               placeholder="SELECT * FROM ..." spellCheck={false} />
             <button onClick={execute} disabled={loading}
-              className={`px-4 py-1 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0`}>
+              className={`px-4 py-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0`}>
               {loading ? t("dw.executing") : t("dw.runExec")}
             </button>
           </div>
           {/* Result */}
-          {error && <div className={`text-rose-500 text-xs ${styles.appBg} p-2 rounded`}>⚠ {error}</div>}
+          {error && <div className={`${styles.dangerText} text-xs ${styles.appBg} p-2 rounded`}>⚠ {error}</div>}
           {result && !error && (
             <div>
               <div className={`flex items-center gap-3 text-[10px] ${styles.cardTextMuted} mb-2`}>

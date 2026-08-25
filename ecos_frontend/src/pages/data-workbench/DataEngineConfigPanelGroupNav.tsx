@@ -5,12 +5,13 @@
  */
 import React from 'react';
 import type { ConfigGroup } from './DataEngineConfigPanel';
+import type { ThemeStyles } from '../../components/ThemeContext';
 
 interface Props {
   groups: ConfigGroup[];
   activeGroup: string;
   onSelect: (id: string) => void;
-  styles: { cardBorder: string; cardTextMuted: string; cardBg: string };
+  styles: ThemeStyles;
 }
 
 const DataEngineConfigPanelGroupNav: React.FC<Props> = ({
@@ -27,16 +28,16 @@ const DataEngineConfigPanelGroupNav: React.FC<Props> = ({
           onClick={() => onSelect(g.id)}
           className={`flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-all text-left border-l-2 ${
             activeGroup === g.id
-              ? 'bg-blue-50 text-blue-700 border-l-blue-600'
-              : `${styles.cardTextMuted} hover:bg-slate-100 border-l-transparent`
+              ? `${styles.infoBg} ${styles.accentText} border-l-blue-600`
+              : `${styles.cardTextMuted} hover:${styles.sidebarBg} border-l-transparent`
           }`}
         >
-          <span className={activeGroup === g.id ? 'text-blue-600' : 'text-slate-400'}>
+          <span className={activeGroup === g.id ? `${styles.accentText}` : `${styles.cardTextMuted}`}>
             {g.icon}
           </span>
           <span className="flex-1">{g.label}</span>
           {g.modified && (
-            <span className="text-amber-500 text-[10px] font-bold" title="有未保存的修改">●</span>
+            <span className={`${styles.warningText} text-[10px] font-bold`} title="有未保存的修改">●</span>
           )}
         </button>
       ))}
