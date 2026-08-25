@@ -33,13 +33,13 @@ interface GitCommitDialogProps {
 
 // ─── Status config ────────────────────────────────────
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  modified: { label: 'M', color: `${styles.warningText}`, bg: `${styles.warningBg}` },
-  added: { label: 'A', color: `${styles.successText}`, bg: `${styles.successBg}` },
-  deleted: { label: 'D', color: `${styles.dangerText}`, bg: `${styles.dangerBg}` },
-  untracked: { label: 'U', color: `${styles.cardTextMuted}`, bg: `${styles.sidebarBg}` },
-  renamed: { label: 'R', color: `${styles.infoText}`, bg: `${styles.infoBg}` },
-};
+const statusConfigFn = (styles: Record<string, string>): Record<string, { label: string; color: string; bg: string }> => ({
+  modified: { label: 'M', color: styles.warningText, bg: styles.warningBg },
+  added: { label: 'A', color: styles.successText, bg: styles.successBg },
+  deleted: { label: 'D', color: styles.dangerText, bg: styles.dangerBg },
+  untracked: { label: 'U', color: styles.cardTextMuted, bg: styles.sidebarBg },
+  renamed: { label: 'R', color: styles.infoText, bg: styles.infoBg },
+});
 
 // ─── Component ────────────────────────────────────────
 
@@ -270,7 +270,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                 </div>
               ) : (
                 files.map((f, i) => {
-                  const cfg = STATUS_CONFIG[f.status];
+                  const cfg = statusConfigFn(styles as unknown as Record<string, string>)[f.status];
                   return (
                     <div
                       key={`${f.path}-${i}`}

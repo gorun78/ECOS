@@ -38,7 +38,7 @@ const CATEGORY_ICONS: Record<PBFunctionCategory, string> = {
   hash: '#️⃣',
 };
 
-const CATEGORY_COLORS: Record<PBFunctionCategory, string> = {
+const CATEGORY_COLORS_FN = (styles: Record<string, string>): Record<PBFunctionCategory, string> => ({
   string: `${styles.successText} ${styles.successBg} ${styles.successBorder}`,
   numeric: `${styles.accentText} ${styles.infoBg} ${styles.accentBorder}`,
   date_time: `${styles.infoText} ${styles.infoBg} ${styles.infoBorder}`,
@@ -47,7 +47,7 @@ const CATEGORY_COLORS: Record<PBFunctionCategory, string> = {
   window: `${styles.infoText} ${styles.infoBg} ${styles.infoBorder}`,
   casting: `${styles.warningText} ${styles.warningBg} ${styles.warningBorder}`,
   hash: `${styles.cardTextMuted} ${styles.cardBg} ${styles.cardBorder}`,
-};
+});
 
 // ─── Component ────────────────────────────────────────
 
@@ -171,7 +171,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                     <ChevronDown size={12} className={`${styles.cardTextMuted}`} />
                   )}
                   <span
-                    className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${CATEGORY_COLORS[catKey]}`}
+                    className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${CATEGORY_COLORS_FN(styles as unknown as Record<string, string>)[catKey]}`}
                   >
                     {CATEGORY_ICONS[catKey]}
                   </span>

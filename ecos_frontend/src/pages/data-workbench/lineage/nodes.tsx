@@ -12,7 +12,7 @@ import { useTheme } from '../../../components/ThemeContext';
 
 // ─── 状态徽章 ────────────────────────────────────────────────
 
-const statusColors: Record<string, string> = {
+const statusColorsFn = (styles: Record<string, string>): Record<string, string> => ({
   connected: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
   active: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
   disconnected: `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}`,
@@ -28,7 +28,7 @@ const statusColors: Record<string, string> = {
   ok: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
   warning: `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`,
   passed: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
-};
+});
 
 const statusIcons: Record<string, React.FC<{ size?: number }>> = {
   connected: CheckCircle,
@@ -49,7 +49,7 @@ const statusIcons: Record<string, React.FC<{ size?: number }>> = {
 
 export function StatusBadge({ status }: { status: string }) {
   const { styles } = useTheme();
-  const colors = statusColors[status] || statusColors.disconnected;
+  const colors = statusColorsFn(styles as unknown as Record<string, string>)[status] || statusColorsFn(styles as unknown as Record<string, string>).disconnected;
   const Icon = statusIcons[status];
   return (
     <span
