@@ -3,7 +3,7 @@
  * 对接 databridge-v2 真实后端，含字段映射适配。
  * @license Apache-2.0
  */
-import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck } from './types';
+import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck, TableInfo } from './types';
 
 // ─── API 端点常量 ──────────────────────────────────────────
 const DATANET_DS = '/datanet/datasource';           // DataSourceController
@@ -526,6 +526,27 @@ export async function testDataSourceRaw(payload: {
   } catch (e) {
     console.warn('[data-workbench] testDataSourceRaw failed:', e);
     return null;
+  }
+}
+
+/** 获取数据源的物理表/目录列表 → GET /datanet/metadata/resources/{datasourceId} */
+export async function fetchDataSourceResources(datasourceId: string): Promise<TableInfo[]> {
+  try {
+    const raw = await get<unknown[]>(`/datanet/metadata/resources/${datasourceId}`);
+    if (!Array.isArray(raw)) return [];
+    return raw.map((r: Record<string, unknown>) => ({
+      name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',
+      rowCount: (r.rowCount as number) || (r.rows as number) || 0,
+      columns: Array.isArray(r.columns)
+        ? (r.columns as Record<string, unknown>[]).map(c => ({
+            name: (c.name as string) || (c.columnName as string) || '',
+            type: (c.type as string) || (c.dataType as string) || '',
+          }))
+        : [],
+    }));
+  } catch (e) {
+    console.warn('[data-workbench] fetchDataSourceResources failed:', e);
+    return [];
   }
 }
 

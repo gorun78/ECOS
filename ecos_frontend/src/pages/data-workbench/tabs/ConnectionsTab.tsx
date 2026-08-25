@@ -1,11 +1,11 @@
 /* Extracted from DataWorkbenchLayout.tsx */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LucideIcon from '../LucideIcon';
 import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
-import { deleteDataSource, updateDataSource } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources } from '../api';
 
 
 interface ConnectionsTabProps {
@@ -39,6 +39,21 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const { t: tt } = useLanguage();
   const [editingConn, setEditingConn] = useState<DataConnection | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [loadingTables, setLoadingTables] = useState(false);
+
+  // 选中连接时获取数据表目录
+  useEffect(() => {
+    if (!selectedConnId) return;
+    const conn = connections.find(c => c.id === selectedConnId);
+    if (!conn || conn.tablesAvailable.length > 0) return;
+    setLoadingTables(true);
+    fetchDataSourceResources(selectedConnId).then(tables => {
+      if (tables.length > 0) {
+        setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: tables } : c));
+      }
+      setLoadingTables(false);
+    });
+  }, [selectedConnId, connections, setConnections]);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(tt('dw.conn.deleteConfirm') + ': ' + name)) return;
@@ -223,7 +238,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
               </h4>
 
-              {conn.tablesAvailable.length === 0 ? (
+              {loadingTables ? (
+                 <div className={`p-8 text-center ${styles.cardTextMuted} text-xs`}>{t('dw.loading') || 'Loading...'}</div>
+              ) : conn.tablesAvailable.length === 0 ? (
                  <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
                   <LucideIcon name="AlertTriangle" size={24} className={`${styles.warningText}`} />
                   <span>{t("dw.txt.2ce9e0")}</span>
