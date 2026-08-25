@@ -156,7 +156,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
       }
 
       if (changedItems.length === 0) {
-        showToast?.('info', '没有需要保存的更改');
+        showToast?.('info', t('dw.cfg.toast.noChanges'));
         setSaving(false);
         return;
       }
@@ -168,26 +168,26 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
 
       setOriginalValues({ ...values });
       setGroups(prev => prev.map(g => ({ ...g, modified: false })));
-      showToast?.('success', `已保存 ${changedItems.length} 项配置`);
+      showToast?.('success', t('dw.cfg.toast.saved', { count: changedItems.length }));
     } catch (e: any) {
-      showToast?.('error', `保存失败: ${e?.message || '未知错误'}`);
+      showToast?.('error', t('dw.cfg.toast.saveFailed', { error: e?.message || '' }));
     } finally {
       setSaving(false);
     }
-  }, [values, originalValues, showToast]);
+  }, [values, originalValues, showToast, t]);
 
   // 刷新缓存
   const handleRefreshCache = useCallback(async () => {
     setRefreshing(true);
     try {
       await apiFetchData('/api/v1/engine/data/settings/refresh', { method: 'POST' });
-      showToast?.('success', '缓存已刷新');
+      showToast?.('success', t('dw.cfg.toast.cacheRefreshed'));
     } catch (e: any) {
-      showToast?.('error', `刷新缓存失败: ${e?.message || '未知错误'}`);
+      showToast?.('error', t('dw.cfg.toast.refreshFailed', { error: e?.message || '' }));
     } finally {
       setRefreshing(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   // 切换密码可见性
   const togglePasswordReveal = useCallback((key: string) => {
@@ -220,9 +220,9 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
       {/* Header */}
       <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
         <Settings size={16} className={styles.cardTextMuted} />
-        <span className={`text-sm font-bold ${styles.cardText}`}>引擎配置</span>
+        <span className={`text-sm font-bold ${styles.cardText}`}>{t('dw.cfg.header.title')}</span>
         <span className={`text-[10px] ${styles.cardTextMuted} ml-auto`}>
-          Ctrl+S 保存当前修改
+          {t('dw.cfg.header.shortcut')}
         </span>
       </div>
 

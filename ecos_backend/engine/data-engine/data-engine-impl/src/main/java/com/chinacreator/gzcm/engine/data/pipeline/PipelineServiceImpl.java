@@ -101,6 +101,10 @@ public class PipelineServiceImpl implements PipelineService {
         }
 
         log.info("Created pipeline definition: {} (id={})", name, created.getId());
+
+        // 处理定时调度：body.schedule.cron 非空 → 走 runtime-task (TaskSchedulerService)
+        registerSchedule(created, body);
+
         return created;
     }
 
@@ -147,6 +151,11 @@ public class PipelineServiceImpl implements PipelineService {
             }
         }
 
+        // 处理定时调度：若 body 含 schedule.cron，先取消旧 scheduleId 再注册新的
+        if (body.containsKey("schedule")) {
+            updateSchedule(id, body);
+        }
+
         log.info("Updated pipeline definition: id={}", id);
         return updated;
     }
@@ -157,6 +166,8 @@ public class PipelineServiceImpl implements PipelineService {
         if (!repository.definitionExists(id)) {
             throw new IllegalArgumentException("Pipeline 定义不存在: " + id);
         }
+        // 删除前取消已注册的 runtime-task 调度
+        cancelExistingSchedule(id);
         repository.deleteNodesByDefinitionId(id);
         repository.deleteDefinition(id);
         log.info("Deleted pipeline definition: id={}", id);
@@ -174,5 +185,127 @@ public class PipelineServiceImpl implements PipelineService {
     @Override
     public List<PipelineDefinition> listDefinitions() {
         return repository.findAllDefinitions();
+    }
+
+    // ==================== 定时调度（runtime-task 接入，架构规则 2.3）====================
+
+    /**
+     * 注册定时调度：从 body.schedule.cron 读取 cron 表达式，若非空则通过
+     * TaskSchedulerService.scheduleTask(desc, cron) 注册到 runtime-task，
+     * 并将 scheduleId 持久化到 definition JSONB（repository.updateDefinitionSchedule）。
+     * body.schedule.cron 为空或 taskSchedulerService 不可用时跳过。
+     */
+    @SuppressWarnings("unchecked")
+    private void registerSchedule(PipelineDefinition def, Map<String, Object> body) {
+        if (taskSchedulerService == null) {
+            log.debug("TaskSchedulerService unavailable, skip schedule registration: {}", def.getId());
+            return;
+        }
+        String cron = extractScheduleCron(body);
+        if (cron == null || cron.isEmpty()) {
+            return;
+        }
+        try {
+            TaskDescription desc = buildScheduleTaskDesc(def, cron);
+            String scheduleId = taskSchedulerService.scheduleTask(desc, cron);
+            repository.updateDefinitionSchedule(def.getId(), cron, scheduleId);
+            log.info("Pipeline schedule registered: definitionId={}, cron={}, scheduleId={}",
+                    def.getId(), cron, scheduleId);
+        } catch (Exception e) {
+            log.warn("Failed to register pipeline schedule: definitionId={}, error={}",
+                    def.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 更新定时调度：先取消旧的 scheduleId（若存在），再按 body.schedule.cron 注册新的。
+     * body.schedule.cron 为空字符串时仅取消旧调度（取消调度不重新注册）。
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSchedule(String definitionId, Map<String, Object> body) {
+        // 取消旧调度
+        cancelExistingSchedule(definitionId);
+
+        if (taskSchedulerService == null) {
+            log.debug("TaskSchedulerService unavailable, skip schedule update: {}", definitionId);
+            return;
+        }
+        String cron = extractScheduleCron(body);
+        if (cron == null || cron.isEmpty()) {
+            // 仅清空持久化的 schedule
+            repository.updateDefinitionSchedule(definitionId, null, null);
+            return;
+        }
+        try {
+            PipelineDefinition def = repository.findDefinitionById(definitionId);
+            if (def == null) {
+                return;
+            }
+            TaskDescription desc = buildScheduleTaskDesc(def, cron);
+            String scheduleId = taskSchedulerService.scheduleTask(desc, cron);
+            repository.updateDefinitionSchedule(definitionId, cron, scheduleId);
+            log.info("Pipeline schedule updated: definitionId={}, cron={}, scheduleId={}",
+                    definitionId, cron, scheduleId);
+        } catch (Exception e) {
+            log.warn("Failed to update pipeline schedule: definitionId={}, error={}",
+                    definitionId, e.getMessage());
+        }
+    }
+
+    /**
+     * 取消已注册的调度：从 definition 的 extensions.scheduleId 读取旧 scheduleId，
+     * 调用 TaskSchedulerService.cancelSchedule。
+     */
+    private void cancelExistingSchedule(String definitionId) {
+        if (taskSchedulerService == null) {
+            return;
+        }
+        try {
+            PipelineDefinition def = repository.findDefinitionById(definitionId);
+            if (def == null || def.getExtensions() == null) {
+                return;
+            }
+            Object sid = def.getExtensions().get("scheduleId");
+            if (sid != null && !sid.toString().isEmpty()) {
+                taskSchedulerService.cancelSchedule(sid.toString());
+                log.info("Pipeline schedule cancelled: definitionId={}, scheduleId={}",
+                        definitionId, sid);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to cancel pipeline schedule: definitionId={}, error={}",
+                    definitionId, e.getMessage());
+        }
+    }
+
+    /**
+     * 从 body.schedule（Map 或 {cron: "..."}）提取 cron 字符串。
+     */
+    @SuppressWarnings("unchecked")
+    private String extractScheduleCron(Map<String, Object> body) {
+        if (body == null) return null;
+        Object scheduleObj = body.get("schedule");
+        if (scheduleObj instanceof Map) {
+            Object cron = ((Map<String, Object>) scheduleObj).get("cron");
+            return cron != null ? cron.toString().trim() : null;
+        }
+        // 兼容顶层 scheduleCron / schedule_cron 字段
+        Object direct = body.get("scheduleCron");
+        if (direct == null) direct = body.get("schedule_cron");
+        return direct != null ? direct.toString().trim() : null;
+    }
+
+    /**
+     * 构造 runtime-task 调度任务描述：taskType=PIPELINE，parameters.definitionId 指向本定义。
+     */
+    private TaskDescription buildScheduleTaskDesc(PipelineDefinition def, String cron) {
+        TaskDescription desc = new TaskDescription();
+        desc.setTaskType("PIPELINE");
+        desc.setTaskName("Pipeline-Schedule-" + def.getName());
+        desc.setDescription("Scheduled pipeline: " + def.getName() + " (cron=" + cron + ")");
+        Map<String, Object> params = new HashMap<>();
+        params.put("definitionId", def.getId());
+        desc.setParameters(params);
+        desc.setAsync(true);
+        return desc;
     }
 }
