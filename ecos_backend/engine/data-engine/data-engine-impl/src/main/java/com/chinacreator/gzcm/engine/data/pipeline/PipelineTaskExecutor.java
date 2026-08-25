@@ -68,7 +68,15 @@ public class PipelineTaskExecutor implements ITaskExecutor {
             }
             log.info("PipelineTaskExecutor.execute done: taskId={}, executionId={}, success={}",
                     taskId, exec.getId(), success);
+            if (!success) {
+                // 执行失败（ecos_pipeline_execution 状态非 COMPLETED）→ 抛异常让 runtime-task 标记 FAILED，
+                // 否则 TaskManagementServiceImpl 会无条件设为 SUCCEEDED（只看是否抛异常）。
+                throw new TaskExecutionException("Pipeline execution failed: " + exec.getErrorMessage());
+            }
             return exec.getId();
+        } catch (TaskExecutionException te) {
+            // 已构造的 TaskExecutionException 直接向上抛，不再重复回调
+            throw te;
         } catch (Exception e) {
             if (callback != null) {
                 callback.onTaskComplete(taskId, false, null, e.getMessage());
