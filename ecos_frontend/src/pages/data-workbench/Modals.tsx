@@ -16,12 +16,16 @@ interface AddConnectionModalProps {
   newConnHost: string; setNewConnHost: (v: string) => void;
   newConnPort: number; setNewConnPort: (v: number) => void;
   newConnUser: string; setNewConnUser: (v: string) => void;
+  newConnPassword: string; setNewConnPassword: (v: string) => void;
+  newConnDatabase: string; setNewConnDatabase: (v: string) => void;
   onClose: () => void;
   onCreate: () => void;
+  onTestConnection: () => void;
 }
 
-export function AddConnectionModal({ t, locale, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, onClose, onCreate }: AddConnectionModalProps) {
+export function AddConnectionModal({ t, locale, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, newConnPassword, setNewConnPassword, newConnDatabase, setNewConnDatabase, onClose, onCreate, onTestConnection }: AddConnectionModalProps) {
   const { styles } = useTheme();
+  const isJdbc = ['postgresql', 'mysql', 'doris'].includes(newConnType);
   return (
     <div className={`absolute inset-0 ${styles.overlayBg} backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none`}>
       <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-md w-full overflow-hidden flex flex-col`}>
@@ -32,16 +36,23 @@ export function AddConnectionModal({ t, locale, newConnName, setNewConnName, new
         <div className="p-5 space-y-4 text-xs">
           <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.58314a')}</label><input type="text" placeholder="e.g. 生产派班主库_Read" value={newConnName} onChange={e => setNewConnName(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:${styles.infoBorder} focus:outline-hidden`} /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.fe3609')}</label><select value={newConnType} onChange={e => setNewConnType(e.target.value)} className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.cardBg} font-mono`}><option value="postgresql">PostgreSQL</option><option value="s3">Amazon S3</option><option value="rest_api">REST API</option><option value="sftp">SFTP</option><option value="sap">SAP ERP</option></select></div>
+            <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.fe3609')}</label><select value={newConnType} onChange={e => setNewConnType(e.target.value)} className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.cardBg} font-mono`}><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option><option value="doris">Apache Doris</option><option value="csv">CSV</option><option value="rest_api">REST API</option><option value="s3">Amazon S3</option><option value="oss">Alibaba OSS</option></select></div>
             <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.7adcd8')}</label><input type="number" value={newConnPort} onChange={e => setNewConnPort(parseInt(e.target.value) || 0)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden font-mono`} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.5297f6')}</label><input type="text" placeholder="localhost" value={newConnHost} onChange={e => setNewConnHost(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden`} /></div>
             <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.c00d41')}</label><input type="text" placeholder="readonly_user" value={newConnUser} onChange={e => setNewConnUser(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden`} /></div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.conn.password')}</label><input type="password" placeholder="******" value={newConnPassword} onChange={e => setNewConnPassword(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden font-mono`} /></div>
+            {isJdbc && (
+              <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.conn.database')}</label><input type="text" placeholder="sys_man" value={newConnDatabase} onChange={e => setNewConnDatabase(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden font-mono`} /></div>
+            )}
+          </div>
         </div>
         <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
           <button onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs transition-colors cursor-pointer`}>{locale === 'zh' ? '取消' : 'Cancel'}</button>
+          <button onClick={onTestConnection} className={`px-3.5 py-1.5 border ${styles.cardBorder} ${styles.cardText} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer`}>{t('dw.conn.testConn')}</button>
           <button onClick={onCreate} className={`px-3.5 py-1.5 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} font-semibold rounded text-xs transition-colors cursor-pointer`}>{locale === 'zh' ? '保存并连线' : 'Save & Connect'}</button>
         </div>
       </div>

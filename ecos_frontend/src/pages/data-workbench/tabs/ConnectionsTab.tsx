@@ -30,10 +30,11 @@ interface ConnectionsTabProps {
   setNewConnPort: (v:number)=>void;
   newConnUser: string;
   setNewConnUser: (v:string)=>void;
+  onTestConnection: (connId: string) => void;
   t: (key:string)=>string;
 }
 
-const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, t }) => {
+const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, onTestConnection, t }) => {
   const { styles } = useTheme();
   const { t: tt } = useLanguage();
   const [editingConn, setEditingConn] = useState<DataConnection | null>(null);
@@ -72,7 +73,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   {/* Connections list panel */}
   <div className={`w-72 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col overflow-hidden shrink-0`}>
     <div className={`p-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/40`}>
-      <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.txt.64d3b2")}</h3>
+      <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.conn.title")}</h3>
       <button
         onClick={() => setShowAddConn(true)}
         className={`p-1 rounded ${styles.accentBg} ${styles.cardText} ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
@@ -83,6 +84,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     </div>
 
     <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      {connections.length === 0 && (
+        <div className={`text-center py-8 ${styles.cardTextMuted} text-xs`}>{t("dw.conn.empty")}</div>
+      )}
       {connections.map(conn => {
         const isSelected = selectedConnId === conn.id;
         return (
@@ -154,12 +158,12 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => /* testConnection moved to parent */ (conn.id)}
+              onClick={() => onTestConnection(conn.id)}
               disabled={testingConnId !== null}
               className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5`}
             >
               <LucideIcon name="Wifi" size={13} />
-              <span>{t("dw.txt.f636a1")}</span>
+              <span>{t("dw.conn.testBtn")}</span>
             </button>
           </div>
         </div>
@@ -304,6 +308,7 @@ function EditConnectionModal({ conn, onSave, onCancel }: {
   const [host, setHost] = useState(conn.config.host || '');
   const [port, setPort] = useState(conn.config.port || 5432);
   const [username, setUsername] = useState(conn.config.username || '');
+  const [password, setPassword] = useState('');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
@@ -332,13 +337,18 @@ function EditConnectionModal({ conn, onSave, onCancel }: {
                 className={`w-full p-2 border ${styles.inputBorder} rounded text-xs font-mono ${styles.inputBg} ${styles.inputText}`} />
             </div>
           </div>
+          <div>
+            <label className={`text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>{t('dw.conn.editPassword')}</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="******"
+              className={`w-full p-2 border ${styles.inputBorder} rounded text-xs font-mono ${styles.inputBg} ${styles.inputText}`} />
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onCancel}
             className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardTextMuted} cursor-pointer hover:${styles.appBg}`}>
             {t('dw.conn.cancel')}
           </button>
-          <button onClick={() => onSave({ ...conn, name, config: { ...conn.config, host, port, username } })}
+          <button onClick={() => onSave({ ...conn, name, config: { ...conn.config, host, port, username, password: password || conn.config.password } })}
             className={`px-4 py-1.5 text-xs rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-semibold cursor-pointer`}>
             {t('dw.conn.save')}
           </button>

@@ -32,13 +32,14 @@ export interface TableInfo {
 export interface DataConnection {
   id: string;
   name: string;
-  type: 'postgresql' | 'mysql' | 'doris' | 's3' | 'sftp' | 'sap' | 'rest_api' | 'kafka' | 'mongodb';
+  type: 'postgresql' | 'mysql' | 'doris' | 's3' | 'oss' | 'csv' | 'sftp' | 'sap' | 'rest_api' | 'kafka' | 'mongodb';
   status: 'connected' | 'disconnected' | 'error' | 'pending' | 'testing';
   config: {
     host: string;
     port: number;
     database?: string;
     username?: string;
+    password?: string;
     schema?: string;
     warehouse?: string;
     bucket?: string;

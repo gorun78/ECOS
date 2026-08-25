@@ -424,8 +424,10 @@ async function del<T>(url: string): Promise<T> {
 function buildConnectionConfig(c: {
   type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
+  password?: string;
 }): string {
   const cfg: Record<string, unknown> = { username: c.username };
+  if (c.password) cfg.password = c.password;
   const isJdbc = ['postgresql', 'mysql', 'doris'].includes(c.type);
   if (isJdbc) {
     const driver = c.type === 'mysql' ? 'mysql' : c.type === 'doris' ? 'mysql' : 'postgresql';
@@ -447,7 +449,7 @@ function buildConnectionConfig(c: {
 export async function createDataSource(payload: {
   name: string; type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
-  description?: string; tags?: string;
+  description?: string; tags?: string; password?: string;
 }): Promise<DataConnection | null> {
   try {
     const dto = {
@@ -479,7 +481,7 @@ export async function testDataSource(id: string): Promise<{ success: boolean; da
 export async function updateDataSource(id: string, payload: {
   name: string; type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
-  description?: string; tags?: string;
+  description?: string; tags?: string; password?: string;
 }): Promise<DataConnection | null> {
   try {
     const dto = {
@@ -505,6 +507,25 @@ export async function deleteDataSource(id: string): Promise<boolean> {
   } catch (e) {
     console.warn('[data-workbench] deleteDataSource failed:', e);
     return false;
+  }
+}
+
+/** 测试未保存的数据源连接 → POST /datanet/datasource/test (raw DTO, no id needed) */
+export async function testDataSourceRaw(payload: {
+  name: string; type: string; host: string; port: number; username: string;
+  database?: string; password?: string;
+}): Promise<{ success: boolean; message?: string } | null> {
+  try {
+    const dto = {
+      datasourceName: payload.name,
+      datasourceType: payload.type.toUpperCase(),
+      connectionConfig: buildConnectionConfig(payload),
+    };
+    const result = await post<{ success: boolean; message?: string }>(`${DATANET_DS}/test`, dto);
+    return result;
+  } catch (e) {
+    console.warn('[data-workbench] testDataSourceRaw failed:', e);
+    return null;
   }
 }
 

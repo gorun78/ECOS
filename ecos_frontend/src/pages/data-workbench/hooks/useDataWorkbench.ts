@@ -75,6 +75,8 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   const [nhDs, setNhDs] = useState('');
   const [nhType, setNhType] = useState<'row_count' | 'null_check' | 'schema_check' | 'freshness'>('row_count');
   const [nhThr, setNhThr] = useState('1000');
+  const [ncPassword, setNcPassword] = useState('');
+  const [ncDatabase, setNcDatabase] = useState('');
 
   // ── Handlers ──
   const testConnection = useCallback(async (connId: string) => {
@@ -114,7 +116,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       const { createDataSource } = await import('../api');
       const conn = await createDataSource({
         name: ncName, type: ncType, host: ncHost || 'localhost', port: ncPort,
-        username: ncUser || 'anonymous',
+        username: ncUser || 'anonymous', password: ncPassword, database: ncDatabase,
       });
       if (conn) {
         setConnections(p => [...p, conn]); setSelConnId(conn.id); setShowAddConn(false);
@@ -126,7 +128,25 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     } catch (e: any) {
       showToast('error', t('databench.layout.toast.connTestFailed', { name: ncName }));
     }
-  }, [ncName, ncType, ncHost, ncPort, ncUser, showToast, t, testConnection]);
+  }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, showToast, t, testConnection]);
+
+  const testConnectionRaw = useCallback(async () => {
+    if (!ncName.trim()) { showToast('error', t('databench.layout.toast.connNameRequired')); return; }
+    try {
+      const { testDataSourceRaw } = await import('../api');
+      const result = await testDataSourceRaw({
+        name: ncName, type: ncType, host: ncHost || 'localhost', port: ncPort,
+        username: ncUser || 'anonymous', password: ncPassword, database: ncDatabase,
+      });
+      if (result?.success) {
+        showToast('success', t('dw.conn.testConnSuccess'));
+      } else {
+        showToast('error', t('dw.conn.testConnFailed'));
+      }
+    } catch (e: any) {
+      showToast('error', t('dw.conn.testConnFailed'));
+    }
+  }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, showToast, t]);
 
   const triggerSync = useCallback(async (taskId: string) => {
     setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'running' as const } : tk));
@@ -249,6 +269,9 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     ncHost, setNcHost,
     ncPort, setNcPort,
     ncUser, setNcUser,
+    ncPassword, setNcPassword,
+    ncDatabase, setNcDatabase,
+    testConnectionRaw,
     // sync form
     nsName, setNsName,
     nsConn, setNsConn,
