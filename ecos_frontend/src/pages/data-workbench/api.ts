@@ -229,13 +229,34 @@ export async function fetchDataPipelines(): Promise<DataPipeline[]> {
   }
 }
 
-/** Pipeline CRUD — 创建 */
-export async function createPipeline(name: string, description?: string): Promise<DataPipeline | null> {
+/** Pipeline save payload (PMO-3J T3) — matches backend PipelineController createDefinition. */
+export interface PipelineSavePayload {
+  name: string;
+  description?: string;
+  nodes?: Array<{
+    id: string;
+    nodeId: string;
+    type: string; // P2-01 enumeration value
+    config: Record<string, unknown>;
+    positionX: number;
+    positionY: number;
+  }>;
+  edges?: Array<{ from: string; to: string }>;
+  status?: string;
+}
+
+/** Pipeline CRUD — 创建 (supports full { name, nodes, edges } payload per PMO-3J T3) */
+export async function createPipeline(payload: PipelineSavePayload): Promise<DataPipeline | null> {
   try {
     const res = await fetch(PIPELINE_DEFS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ name, description: description || '' }),
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description || '',
+        nodes: payload.nodes || [],
+        edges: payload.edges || [],
+      }),
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
@@ -246,13 +267,22 @@ export async function createPipeline(name: string, description?: string): Promis
   }
 }
 
-/** Pipeline CRUD — 更新 */
-export async function updatePipeline(id: string, data: { name?: string; description?: string; status?: string }): Promise<DataPipeline | null> {
+/** Pipeline CRUD — 更新 (supports full { name, nodes, edges } payload per PMO-3J T3) */
+export async function updatePipeline(
+  id: string,
+  payload: Partial<PipelineSavePayload>
+): Promise<DataPipeline | null> {
   try {
+    const body: Record<string, unknown> = {};
+    if (payload.name !== undefined) body.name = payload.name;
+    if (payload.description !== undefined) body.description = payload.description;
+    if (payload.status !== undefined) body.status = payload.status;
+    if (payload.nodes !== undefined) body.nodes = payload.nodes;
+    if (payload.edges !== undefined) body.edges = payload.edges;
     const res = await fetch(`${PIPELINE_DEFS}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(data),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
@@ -261,6 +291,19 @@ export async function updatePipeline(id: string, data: { name?: string; descript
     console.warn('[data-workbench] updatePipeline failed:', e);
     return null;
   }
+}
+
+/**
+ * Save a pipeline definition's full graph (nodes + edges) — PMO-3J T3.
+ * Used when an existing pipeline's DAG is edited and must persist
+ * `ecos_pipeline_node` rows. Falls back to updatePipeline if the dedicated
+ * definition endpoint is unavailable.
+ */
+export async function savePipelineDefinition(
+  id: string,
+  payload: PipelineSavePayload
+): Promise<DataPipeline | null> {
+  return updatePipeline(id, payload);
 }
 
 /** Pipeline CRUD — 删除（软删除 → ARCHIVED） */

@@ -5,8 +5,6 @@
  * @license Apache-2.0
  */
 
-import type { Node, Edge } from '@xyflow/react';
-
 /** P2-01 node type enumeration — the only standard for pipeline node types. */
 export type PipelineNodeType =
   | 'SOURCE_JDBC'
@@ -58,12 +56,32 @@ export interface NodeConfig {
   nodeStatus?: NodeStatus;
 }
 
+/**
+ * Save payload sent to the backend via onSave.
+ * `nodes`/`edges` are already in the backend PipelineNode / dependency-edge
+ * shape (PMO-3J T3) — the parent forwards them to api.createPipeline /
+ * api.updatePipeline / api.savePipelineDefinition.
+ */
+export interface PipelineSaveNode {
+  id: string;
+  nodeId: string;
+  type: string; // P2-01 enumeration value
+  config: Record<string, unknown>;
+  positionX: number;
+  positionY: number;
+}
+
+export interface PipelineSaveEdge {
+  from: string;
+  to: string;
+}
+
 export interface PipelineData {
   id?: string;
   name: string;
   description?: string;
-  nodes: Node[];
-  edges: Edge[];
+  nodes: PipelineSaveNode[];
+  edges: PipelineSaveEdge[];
   computeEngine: 'memory' | 'doris';
 }
 

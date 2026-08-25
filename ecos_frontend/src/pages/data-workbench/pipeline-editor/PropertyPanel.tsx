@@ -67,6 +67,22 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
       setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
     }, []);
 
+    // ── Sync headerRows → config.config.headers (SOURCE_REST) ──
+    // Replaces a prior render-phase setState (PMO-3J T2 fix): writing to
+    // config during render is illegal in React. Debounced via useEffect.
+    const nodeId = node?.id;
+    useEffect(() => {
+      if (!nodeId) return;
+      const hdrs: Record<string, string> = {};
+      headerRows.forEach((r) => { if (r.key) hdrs[r.key] = r.value; });
+      const current = (config.config?.headers) || {};
+      if (JSON.stringify(hdrs) !== JSON.stringify(current)) {
+        onUpdateNode(nodeId, { config: { ...config.config, headers: hdrs } } as Partial<NodeConfig>);
+      }
+      // headerRows is the source of truth here; avoid re-triggering on config changes
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [headerRows, nodeId]);
+
     if (!node) {
       return (
         <div className={`w-72 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col h-full`}>
@@ -267,22 +283,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                           </div>
                         ))}
                       </div>
-                      {(() => {
-                        const hdrs: Record<string, string> = {};
-                        headerRows.forEach((r) => { if (r.key) hdrs[r.key] = r.value; });
-                        if (JSON.stringify(hdrs) !== JSON.stringify(nodeConfig.headers || {})) {
-                          setConfigField('headers', hdrs);
-                        }
-                        return null;
-                      })()}
-                      {(() => {
-                        const hdrs: Record<string, string> = {};
-                        headerRows.forEach((r) => { if (r.key) hdrs[r.key] = r.value; });
-                        if (JSON.stringify(hdrs) !== JSON.stringify(nodeConfig.headers || {})) {
-                          setConfigField('headers', hdrs);
-                        }
-                        return null;
-                      })()}
                     </div>
                     <div>
                       <FieldLabel styles={styles}>{t('dw.pipeline.prop.body')}</FieldLabel>

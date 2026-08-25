@@ -123,19 +123,30 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
         <PipelineFlowEditor
           connections={connections}
           pipelines={selectedPipeline ? [selectedPipeline] : pipelines}
+          editingPipeline={selectedPipeline}
           computeEngine={computeEngine}
           onEngineChange={setComputeEngine}
           showToast={showToast}
           onSave={async (pipeline: any) => {
             try {
               const { createPipeline, updatePipeline } = await import('../api');
+              // PMO-3J T3: forward the full { name, nodes, edges } graph so the
+              // backend persists ecos_pipeline_node rows + dependency edges.
+              const payload = {
+                name: pipeline.name,
+                description: pipeline.description,
+                nodes: pipeline.nodes,
+                edges: pipeline.edges,
+              };
               if (pipeline.id) {
-                await updatePipeline(pipeline.id, { name: pipeline.name, description: pipeline.description });
+                await updatePipeline(pipeline.id, payload);
                 showToast('success', t('dw.pipeline.updated', { name: pipeline.name }));
               } else {
-                await createPipeline(pipeline.name, pipeline.description);
+                await createPipeline(payload);
                 showToast('success', t('dw.pipeline.created', { name: pipeline.name }));
               }
+              // Refresh the list so the new/updated pipeline appears.
+              setPipelineBuilderOutput((prev: any) => ({ ...prev, refreshTick: (prev?.refreshTick || 0) + 1 }));
             } catch (e: any) {
               showToast('error', t('dw.pipeline.saveFailed', { error: e.message }));
             }
