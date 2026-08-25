@@ -39,6 +39,15 @@ public interface DataSourceService {
     DataSourceEntity getById(String datasourceId);
 
     /**
+     * 更新已有数据源连接。
+     *
+     * @param datasourceId 数据源 ID
+     * @param dto 数据源配置
+     * @return 更新后的数据源实体
+     */
+    DataSourceEntity updateDataSource(String datasourceId, DataSourceDTO dto);
+
+    /**
      * 删除数据源。
      */
     void remove(String datasourceId);

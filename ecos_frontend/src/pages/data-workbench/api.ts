@@ -402,6 +402,24 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return (json.data ?? json) as T;
 }
 
+async function put<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${url} → ${res.status}`);
+  const json = await res.json();
+  return (json.data ?? json) as T;
+}
+
+async function del<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: 'DELETE', headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error(`${url} → ${res.status}`);
+  const json = await res.json();
+  return (json.data ?? json) as T;
+}
+
 /** ConnectionConfig builder — 前端表单 → connectionConfig JSON string */
 function buildConnectionConfig(c: {
   type: string; host: string; port: number; username: string;
@@ -454,6 +472,39 @@ export async function testDataSource(id: string): Promise<{ success: boolean; da
   } catch (e) {
     console.warn('[data-workbench] testDataSource failed:', e);
     return null;
+  }
+}
+
+/** 更新数据源 → PUT /datanet/datasource/{id} */
+export async function updateDataSource(id: string, payload: {
+  name: string; type: string; host: string; port: number; username: string;
+  database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
+  description?: string; tags?: string;
+}): Promise<DataConnection | null> {
+  try {
+    const dto = {
+      datasourceName: payload.name,
+      datasourceType: payload.type.toUpperCase(),
+      connectionConfig: buildConnectionConfig(payload),
+      description: payload.description || '',
+      tags: payload.tags || '',
+    };
+    const entity = await put<Record<string, unknown>>(`${DATANET_DS}/${id}`, dto);
+    return mapDsToConn(entity);
+  } catch (e) {
+    console.warn('[data-workbench] updateDataSource failed:', e);
+    return null;
+  }
+}
+
+/** 删除数据源 → DELETE /datanet/datasource/{id} */
+export async function deleteDataSource(id: string): Promise<boolean> {
+  try {
+    await del<void>(`${DATANET_DS}/${id}`);
+    return true;
+  } catch (e) {
+    console.warn('[data-workbench] deleteDataSource failed:', e);
+    return false;
   }
 }
 

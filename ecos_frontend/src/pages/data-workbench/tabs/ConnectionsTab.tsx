@@ -1,10 +1,11 @@
 /* Extracted from DataWorkbenchLayout.tsx */
-import React from 'react';
+import React, { useState } from 'react';
 import LucideIcon from '../LucideIcon';
 import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
+import { deleteDataSource, updateDataSource } from '../api';
 
 
 interface ConnectionsTabProps {
@@ -34,6 +35,38 @@ interface ConnectionsTabProps {
 
 const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, t }) => {
   const { styles } = useTheme();
+  const { t: tt } = useLanguage();
+  const [editingConn, setEditingConn] = useState<DataConnection | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(tt('dw.conn.deleteConfirm') + ': ' + name)) return;
+    setDeletingId(id);
+    const ok = await deleteDataSource(id);
+    if (ok) {
+      setConnections(connections.filter(c => c.id !== id));
+      showToast('success', tt('dw.conn.deleteSuccess'));
+      if (selectedConnId === id) setSelectedConnId('');
+    } else {
+      showToast('error', tt('dw.conn.deleteFailed'));
+    }
+    setDeletingId(null);
+  };
+
+  const handleSaveEdit = async (updated: DataConnection) => {
+    const result = await updateDataSource(updated.id, {
+      name: updated.name, type: updated.type, host: updated.config.host || '',
+      port: updated.config.port || 5432, username: updated.config.username || '',
+    });
+    if (result) {
+      setConnections(connections.map(c => c.id === updated.id ? result : c));
+      showToast('success', tt('dw.conn.updateSuccess'));
+      setEditingConn(null);
+    } else {
+      showToast('error', tt('dw.conn.updateFailed'));
+    }
+  };
+
   return (
 <div className="flex-1 flex overflow-hidden">
   {/* Connections list panel */}
@@ -64,10 +97,27 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
           >
             <div className="flex justify-between items-center">
               <span className={`font-semibold ${styles.cardText} truncate pr-2`}>{conn.name}</span>
-              <span className={`h-2 w-2 rounded-full ${
-                conn.status === 'connected' ? styles.successBg :
-                conn.status === 'error' ? styles.dangerBg : styles.warningBg
-              }`} title={conn.status} />
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditingConn(conn); }}
+                  className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer`}
+                  title={tt('dw.conn.edit')}
+                >
+                  <LucideIcon name="Edit3" size={11} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(conn.id, conn.name); }}
+                  disabled={deletingId === conn.id}
+                  className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.dangerText} transition-colors cursor-pointer disabled:opacity-50`}
+                  title={tt('dw.conn.delete')}
+                >
+                  <LucideIcon name="Trash2" size={11} />
+                </button>
+                <span className={`h-2 w-2 rounded-full ${
+                  conn.status === 'connected' ? styles.successBg :
+                  conn.status === 'error' ? styles.dangerBg : styles.warningBg
+                }`} title={conn.status} />
+              </div>
             </div>
             <div className={`flex justify-between text-[10px] ${styles.cardTextMuted} font-mono`}>
               <span>{t("dw.type")} {conn.type.toUpperCase()}</span>
@@ -231,9 +281,72 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       </div>
     );
   })()}
+  {editingConn && (
+    <EditConnectionModal
+      conn={editingConn}
+      onSave={handleSaveEdit}
+      onCancel={() => setEditingConn(null)}
+    />
+  )}
 </div>
   );
 };
+
+// ── Edit Connection Modal ─────────────────────────────────
+function EditConnectionModal({ conn, onSave, onCancel }: {
+  conn: DataConnection;
+  onSave: (conn: DataConnection) => void;
+  onCancel: () => void;
+}) {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  const [name, setName] = useState(conn.name);
+  const [host, setHost] = useState(conn.config.host || '');
+  const [port, setPort] = useState(conn.config.port || 5432);
+  const [username, setUsername] = useState(conn.config.username || '');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className={`w-96 rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl p-6 space-y-4`}>
+        <h3 className={`text-sm font-bold ${styles.cardText}`}>{t('dw.conn.editTitle')}</h3>
+        <div className="space-y-3">
+          <div>
+            <label className={`text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>{t('dw.conn.name')}</label>
+            <input value={name} onChange={e => setName(e.target.value)}
+              className={`w-full p-2 border ${styles.inputBorder} rounded text-xs ${styles.inputBg} ${styles.inputText}`} />
+          </div>
+          <div>
+            <label className={`text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>{t('dw.conn.host')}</label>
+            <input value={host} onChange={e => setHost(e.target.value)}
+              className={`w-full p-2 border ${styles.inputBorder} rounded text-xs font-mono ${styles.inputBg} ${styles.inputText}`} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={`text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>{t('dw.conn.port')}</label>
+              <input type="number" value={port} onChange={e => setPort(Number(e.target.value))}
+                className={`w-full p-2 border ${styles.inputBorder} rounded text-xs font-mono ${styles.inputBg} ${styles.inputText}`} />
+            </div>
+            <div>
+              <label className={`text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>{t('dw.conn.username')}</label>
+              <input value={username} onChange={e => setUsername(e.target.value)}
+                className={`w-full p-2 border ${styles.inputBorder} rounded text-xs font-mono ${styles.inputBg} ${styles.inputText}`} />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onCancel}
+            className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardTextMuted} cursor-pointer hover:${styles.appBg}`}>
+            {t('dw.conn.cancel')}
+          </button>
+          <button onClick={() => onSave({ ...conn, name, config: { ...conn.config, host, port, username } })}
+            className={`px-4 py-1.5 text-xs rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-semibold cursor-pointer`}>
+            {t('dw.conn.save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Inline SQL Query Console (embedded, reuses datasource ID)
 function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {

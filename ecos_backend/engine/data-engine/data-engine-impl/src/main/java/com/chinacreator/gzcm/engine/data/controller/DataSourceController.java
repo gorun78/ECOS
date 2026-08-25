@@ -38,6 +38,16 @@ public class DataSourceController {
         return ApiResponse.success(entity);
     }
 
+    @PutMapping("/{id}")
+    public ApiResponse<DataSourceEntity> update(@PathVariable String id,
+                                                @RequestBody DataSourceDTO dto) {
+        DataSourceEntity updated = service.update(id, dto);
+        if (updated == null) {
+            return ApiResponse.error(404, "数据源不存在: " + id);
+        }
+        return ApiResponse.success(updated);
+    }
+
     @PostMapping("/{id}/test")
     public ApiResponse<Map<String, Object>> testConnection(@PathVariable String id) {
         boolean ok = service.testConnection(id);

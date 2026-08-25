@@ -75,6 +75,24 @@ public class DataSourceServiceImpl implements DataSourceService {
     }
 
     @Override
+    public DataSourceEntity updateDataSource(String datasourceId, DataSourceDTO dto) {
+        DataSourceEntity existing = getById(datasourceId);
+        if (existing == null) {
+            return null;
+        }
+        Timestamp now = new Timestamp(System.currentTimeMillis());
+        jdbc.update(
+            "UPDATE " + TABLE + " SET datasource_name = ?, datasource_type = ?, org_id = ?, " +
+            "description = ?, connection_config = ?, tags = ?, update_time = ? " +
+            "WHERE datasource_id = ?",
+            dto.getDatasourceName(), dto.getDatasourceType(), dto.getOrgId(),
+            dto.getDescription(), dto.getConnectionConfig(), dto.getTags(), now, datasourceId
+        );
+        log.info("Updated datasource: id={}, name={}", datasourceId, dto.getDatasourceName());
+        return getById(datasourceId);
+    }
+
+    @Override
     public void remove(String datasourceId) {
         jdbc.update("DELETE FROM " + TABLE + " WHERE datasource_id = ?", datasourceId);
         log.info("Removed datasource: {}", datasourceId);

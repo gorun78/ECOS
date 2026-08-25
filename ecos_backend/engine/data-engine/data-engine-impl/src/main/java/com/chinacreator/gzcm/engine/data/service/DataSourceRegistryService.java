@@ -46,6 +46,12 @@ public class DataSourceRegistryService {
         return dataSourceService.getById(id);
     }
 
+    public DataSourceEntity update(String id, DataSourceDTO dto) {
+        DataSourceEntity result = dataSourceService.updateDataSource(id, dto);
+        dsListCache.invalidate(CACHE_KEY);
+        return result;
+    }
+
     public boolean testConnection(String datasourceId) {
         return dataSourceService.testConnection(datasourceId);
     }

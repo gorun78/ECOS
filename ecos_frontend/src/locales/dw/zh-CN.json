@@ -827,5 +827,20 @@
   "wf.title": "流程设计器",
   "wf.toast.created": "流程已创建",
   "wf.toast.published": "已发布",
-  "wf.toast.saved": "保存成功"
+  "wf.toast.saved": "保存成功",
+  "dw.conn.edit": "编辑",
+  "dw.conn.delete": "删除",
+  "dw.conn.editTitle": "编辑数据源",
+  "dw.conn.deleteConfirm": "确认删除此数据源？",
+  "dw.conn.deleteSuccess": "数据源已删除",
+  "dw.conn.deleteFailed": "删除失败",
+  "dw.conn.updateSuccess": "数据源已更新",
+  "dw.conn.updateFailed": "更新失败",
+  "dw.conn.name": "名称",
+  "dw.conn.type": "类型",
+  "dw.conn.host": "主机",
+  "dw.conn.port": "端口",
+  "dw.conn.username": "用户名",
+  "dw.conn.save": "保存",
+  "dw.conn.cancel": "取消"
 }

@@ -827,5 +827,20 @@
   "wf.title": "Workflow Designer",
   "wf.toast.created": "Workflow created",
   "wf.toast.published": "Published",
-  "wf.toast.saved": "Saved"
+  "wf.toast.saved": "Saved",
+  "dw.conn.edit": "Edit",
+  "dw.conn.delete": "Delete",
+  "dw.conn.editTitle": "Edit Data Source",
+  "dw.conn.deleteConfirm": "Delete this data source?",
+  "dw.conn.deleteSuccess": "Data source deleted",
+  "dw.conn.deleteFailed": "Delete failed",
+  "dw.conn.updateSuccess": "Data source updated",
+  "dw.conn.updateFailed": "Update failed",
+  "dw.conn.name": "Name",
+  "dw.conn.type": "Type",
+  "dw.conn.host": "Host",
+  "dw.conn.port": "Port",
+  "dw.conn.username": "Username",
+  "dw.conn.save": "Save",
+  "dw.conn.cancel": "Cancel"
 }
