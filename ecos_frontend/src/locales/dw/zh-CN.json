@@ -865,5 +865,10 @@
   "dw.conn.testConnSuccess": "连接测试成功",
   "dw.conn.testConnFailed": "连接测试失败",
   "dw.conn.empty": "暂无数据源，点击右上方连接按钮添加",
-  "dw.conn.editPassword": "密码（留空不修改）"
+  "dw.conn.editPassword": "密码（留空不修改）",
+  "dw.conn.refreshTables": "刷新目录",
+  "dw.conn.pagePrev": "上一页",
+  "dw.conn.pageNext": "下一页",
+  "dw.conn.pageInfo": "第 {page} / {total} 页",
+  "dw.conn.rowsUnknown": "未知"
 }

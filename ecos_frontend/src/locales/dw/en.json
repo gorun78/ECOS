@@ -865,5 +865,10 @@
   "dw.conn.testConnSuccess": "Connection test succeeded",
   "dw.conn.testConnFailed": "Connection test failed",
   "dw.conn.empty": "No data sources yet. Click Connect to add one.",
-  "dw.conn.editPassword": "Password (leave empty to skip)"
+  "dw.conn.editPassword": "Password (leave empty to skip)",
+  "dw.conn.refreshTables": "Refresh",
+  "dw.conn.pagePrev": "Prev",
+  "dw.conn.pageNext": "Next",
+  "dw.conn.pageInfo": "Page {page} / {total}",
+  "dw.conn.rowsUnknown": "Unknown"
 }

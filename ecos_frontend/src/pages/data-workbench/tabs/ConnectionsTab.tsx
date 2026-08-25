@@ -40,9 +40,12 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [editingConn, setEditingConn] = useState<DataConnection | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loadingTables, setLoadingTables] = useState(false);
+  const [tablePage, setTablePage] = useState(1);
+  const TABLE_PAGE_SIZE = 10;
 
   // 选中连接时获取数据表目录
   useEffect(() => {
+    setTablePage(1);
     if (!selectedConnId) return;
     const conn = connections.find(c => c.id === selectedConnId);
     if (!conn || conn.tablesAvailable.length > 0) return;
@@ -235,11 +238,27 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             <div className="col-span-2 space-y-4">
               <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
                 <span>{t("dw.txt.42bc1b")}</span>
-                <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
+                  <button
+                    onClick={() => {
+                      setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: [] } : c));
+                    }}
+                    disabled={loadingTables}
+                    className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}
+                    title={t("dw.conn.refreshTables")}
+                  >
+                    <LucideIcon name="RefreshCw" size={12} className={loadingTables ? 'animate-spin' : ''} />
+                    <span>{t("dw.conn.refreshTables")}</span>
+                  </button>
+                </div>
               </h4>
 
               {loadingTables ? (
-                 <div className={`p-8 text-center ${styles.cardTextMuted} text-xs`}>{t('dw.loading') || 'Loading...'}</div>
+                 <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
+                   <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
+                   {t('dw.loading') || 'Loading...'}
+                 </div>
               ) : conn.tablesAvailable.length === 0 ? (
                  <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
                   <LucideIcon name="AlertTriangle" size={24} className={`${styles.warningText}`} />
@@ -247,8 +266,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                   <span>{t("dw.txt.44e8b3")}</span>
                 </div>
               ) : (
+                <>
                 <div className="space-y-4">
-                  {conn.tablesAvailable.map(tbl => (
+                  {conn.tablesAvailable.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE).map(tbl => (
                     <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50`}>
                       <div className={`${styles.sidebarBg}/70 px-4 py-2 flex justify-between items-center border-b ${styles.cardBorder}`}>
                         <div className="flex items-center gap-2 text-xs">
@@ -256,23 +276,49 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                           <span className={`font-bold font-mono ${styles.cardText}`}>{tbl.name}</span>
                         </div>
                         <span className={`text-[10px] ${styles.cardTextMuted} ${styles.cardBg} border ${styles.cardBorder} px-2 py-0.5 rounded-full font-mono`}>
-                           {t("dw.physicalRows")} {tbl.rowCount.toLocaleString()} {t("dw.rowsUnit")}
+                           {t("dw.physicalRows")} {tbl.rowCount != null && tbl.rowCount > 0 ? tbl.rowCount.toLocaleString() : t("dw.conn.rowsUnknown")} {tbl.rowCount != null && tbl.rowCount > 0 ? t("dw.rowsUnit") : ''}
                         </span>
                       </div>
 
-                      <div className={`p-3 ${styles.cardBg}`}>
-                        <div className="grid grid-cols-4 gap-2 text-[11px]">
-                          {tbl.columns.map(col => (
-                            <div key={col.name} className={`p-1.5 ${styles.appBg} rounded border ${styles.cardBorder} flex flex-col font-mono`}>
-                              <span className={`${styles.cardText} truncate font-semibold`} title={col.name}>{col.name}</span>
-                              <span className={`text-[9px] ${styles.cardTextMuted} mt-0.5`}>{col.type}</span>
-                            </div>
-                          ))}
+                      {tbl.columns.length > 0 && (
+                        <div className={`p-3 ${styles.cardBg}`}>
+                          <div className="grid grid-cols-4 gap-2 text-[11px]">
+                            {tbl.columns.map(col => (
+                              <div key={col.name} className={`p-1.5 ${styles.appBg} rounded border ${styles.cardBorder} flex flex-col font-mono`}>
+                                <span className={`${styles.cardText} truncate font-semibold`} title={col.name}>{col.name}</span>
+                                <span className={`text-[9px] ${styles.cardTextMuted} mt-0.5`}>{col.type}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
+                {conn.tablesAvailable.length > TABLE_PAGE_SIZE && (
+                  <div className={`flex items-center justify-between pt-2 border-t ${styles.cardBorder}`}>
+                    <button
+                      onClick={() => setTablePage(p => Math.max(1, p - 1))}
+                      disabled={tablePage <= 1}
+                      className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}
+                    >
+                      <LucideIcon name="ChevronLeft" size={11} />
+                      {t("dw.conn.pagePrev")}
+                    </button>
+                    <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
+                      {t("dw.conn.pageInfo").replace('{page}', String(tablePage)).replace('{total}', String(Math.ceil(conn.tablesAvailable.length / TABLE_PAGE_SIZE)))}
+                    </span>
+                    <button
+                      onClick={() => setTablePage(p => Math.min(Math.ceil(conn.tablesAvailable.length / TABLE_PAGE_SIZE), p + 1))}
+                      disabled={tablePage >= Math.ceil(conn.tablesAvailable.length / TABLE_PAGE_SIZE)}
+                      className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}
+                    >
+                      {t("dw.conn.pageNext")}
+                      <LucideIcon name="ChevronRight" size={11} />
+                    </button>
+                  </div>
+                )}
+                </>
               )}
             </div>
           </div>

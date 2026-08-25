@@ -11,6 +11,7 @@ import {
   Settings, FileCode, BookOpen, Download, Copy, X, Activity,
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
   GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
+  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Table, Wifi, Terminal,
   type LucideIcon as LucideIconType,
 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ const iconMap: Record<string, LucideIconType> = {
   Settings, FileCode, BookOpen, Download, Copy, X, Activity,
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
   GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
+  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Table, Wifi, Terminal,
 };
 
 interface Props {

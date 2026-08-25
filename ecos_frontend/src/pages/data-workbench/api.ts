@@ -536,7 +536,7 @@ export async function fetchDataSourceResources(datasourceId: string): Promise<Ta
     if (!Array.isArray(raw)) return [];
     return raw.map((r: Record<string, unknown>) => ({
       name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',
-      rowCount: (r.rowCount as number) || (r.rows as number) || 0,
+      rowCount: (r.recordCount as number) || (r.rowCount as number) || (r.rows as number) || 0,
       columns: Array.isArray(r.columns)
         ? (r.columns as Record<string, unknown>[]).map(c => ({
             name: (c.name as string) || (c.columnName as string) || '',
