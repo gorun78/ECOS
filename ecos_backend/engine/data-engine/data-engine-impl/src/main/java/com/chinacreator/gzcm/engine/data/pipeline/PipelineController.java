@@ -13,7 +13,7 @@ import java.util.*;
 /**
  * Pipeline Controller — Pipeline 定义管理与执行。
  * <p>
- * 执行入口走 runtime-task（ITaskManagementService.submitAndExecute），
+ * 执行入口走 runtime-task（ITaskManagementService.submitTask + executeTask 分步调用），
  * 返回 taskId 供前端轮询 getTaskStatus(taskId)。
  *
  * @author DataBridge Datanet Team
@@ -164,7 +164,7 @@ public class PipelineController {
     @PostMapping("/definitions/{id}/execute")
     public ApiResponse<Map<String, Object>> executeDefinition(@PathVariable String id) {
         try {
-            // 构造 runtime-task 任务描述，走 ITaskManagementService.submitAndExecute
+            // 构造 runtime-task 任务描述，分步 submitTask + executeTask（确保 taskId 先返回）
             TaskDescription desc = new TaskDescription();
             desc.setTaskType("PIPELINE");
             desc.setTaskName("Pipeline-" + id);
@@ -173,7 +173,8 @@ public class PipelineController {
             desc.setParameters(params);
             desc.setAsync(false); // 同步执行返回结果，前端可改 true 异步轮询
 
-            String taskId = taskManagementService.submitAndExecute(desc);
+            String taskId = taskManagementService.submitTask(desc);
+            taskManagementService.executeTask(taskId);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("taskId", taskId);

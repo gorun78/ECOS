@@ -38,7 +38,9 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
     private static final Map<String, String> V1_REWRITE_MAP = Map.ofEntries(
         Map.entry("/api/v1/dq/",           "/api/dq/"),
         Map.entry("/api/v1/agent-mesh/",   "/api/agent-mesh/"),
-        Map.entry("/api/v1/pipeline/",     "/api/pipeline/"),
+        // PMO-3J: /api/v1/pipeline/ rewrite removed — new PipelineController
+        // is mapped at /api/v1/pipeline directly (no legacy /api/pipeline controller
+        // exists), so rewriting v1→no-v1 caused 404 on /api/v1/pipeline/definitions.
         // Removed /api/v1/knowledge/ rewrite — new KnowledgeApiController handles /api/v1/knowledge/** directly
         Map.entry("/api/v1/twins/",        "/api/twins/"),
         Map.entry("/api/v1/alerts/",       "/api/alerts/"),

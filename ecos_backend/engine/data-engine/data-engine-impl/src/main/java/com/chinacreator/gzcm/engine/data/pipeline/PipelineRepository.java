@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import jakarta.annotation.PostConstruct;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -22,6 +23,21 @@ public class PipelineRepository {
 
     public PipelineRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    /**
+     * PMO-3J: 确保 ecos_pipeline_node 表有 depends_on 列（jsonb）。
+     * 该列由 PMO-3J T2 引入以存储节点 DAG 依赖，但表由旧初始化逻辑创建，
+     * 缺少此列。遵循 schema 只加不删规则，启动时 ALTER ADD COLUMN IF NOT EXISTS。
+     */
+    @PostConstruct
+    public void ensureDependsOnColumn() {
+        try {
+            jdbc.execute("ALTER TABLE ecos_pipeline_node ADD COLUMN IF NOT EXISTS depends_on jsonb");
+            log.info("PipelineRepository: ensured depends_on column on ecos_pipeline_node");
+        } catch (Exception e) {
+            log.warn("PipelineRepository: failed to ensure depends_on column: {}", e.getMessage());
+        }
     }
 
     // ==================== PipelineDefinition ====================
