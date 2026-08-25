@@ -1,8 +1,11 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,6 +13,8 @@ import java.util.*;
 
 /**
  * Pipeline 定义管理服务实现 — 基于 JdbcTemplate 持久化。
+ * <p>
+ * 定时调度走 runtime-task（TaskSchedulerService），遵循架构规则 2.3。
  *
  * @author DataBridge Datanet Team
  */
@@ -19,6 +24,10 @@ public class PipelineServiceImpl implements PipelineService {
     private static final Logger log = LoggerFactory.getLogger(PipelineServiceImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final PipelineRepository repository;
+
+    /** runtime-task 调度服务（可选注入，无 bean 时跳过调度注册） */
+    @Autowired(required = false)
+    private TaskSchedulerService taskSchedulerService;
 
     public PipelineServiceImpl(PipelineRepository repository) {
         this.repository = repository;

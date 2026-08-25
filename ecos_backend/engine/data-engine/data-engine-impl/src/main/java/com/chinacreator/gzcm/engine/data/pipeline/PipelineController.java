@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +12,9 @@ import java.util.*;
 
 /**
  * Pipeline Controller — Pipeline 定义管理与执行。
+ * <p>
+ * 执行入口走 runtime-task（ITaskManagementService.submitAndExecute），
+ * 返回 taskId 供前端轮询 getTaskStatus(taskId)。
  *
  * @author DataBridge Datanet Team
  */
@@ -18,15 +24,15 @@ public class PipelineController {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineController.class);
     private final PipelineService pipelineService;
-    private final PipelineExecutionService executionService;
     private final PipelineRepository repository;
+    private final ITaskManagementService taskManagementService;
 
     public PipelineController(PipelineService pipelineService,
-                               PipelineExecutionService executionService,
-                               PipelineRepository repository) {
+                               PipelineRepository repository,
+                               ITaskManagementService taskManagementService) {
         this.pipelineService = pipelineService;
-        this.executionService = executionService;
         this.repository = repository;
+        this.taskManagementService = taskManagementService;
     }
 
     // ── 1. 创建 Pipeline 定义 ──────────────────────────
@@ -153,17 +159,37 @@ public class PipelineController {
         }
     }
 
-    // ── 6. 执行 Pipeline ────────────────────────────────
+    // ── 6. 执行 Pipeline（走 runtime-task 全闭环） ──────
 
     @PostMapping("/definitions/{id}/execute")
     public ApiResponse<Map<String, Object>> executeDefinition(@PathVariable String id) {
         try {
-            PipelineExecution exec = executionService.executePipeline(id);
+            // 构造 runtime-task 任务描述，走 ITaskManagementService.submitAndExecute
+            TaskDescription desc = new TaskDescription();
+            desc.setTaskType("PIPELINE");
+            desc.setTaskName("Pipeline-" + id);
+            Map<String, Object> params = new HashMap<>();
+            params.put("definitionId", id);
+            desc.setParameters(params);
+            desc.setAsync(false); // 同步执行返回结果，前端可改 true 异步轮询
+
+            String taskId = taskManagementService.submitAndExecute(desc);
+
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("executionId", exec.getId());
-            result.put("status", exec.getStatus());
-            result.put("startedAt", exec.getStartedAt());
-            return ApiResponse.success("Pipeline 执行已启动", result);
+            result.put("taskId", taskId);
+            // 兼容旧字段：从 runtime-task 状态取最终状态
+            try {
+                TaskStatus status = taskManagementService.getTaskStatus(taskId);
+                if (status != null) {
+                    result.put("status", status.getStatus() != null ? status.getStatus().name() : "UNKNOWN");
+                    result.put("progress", status.getProgress());
+                    result.put("result", status.getResult());
+                    result.put("errorMessage", status.getErrorMessage());
+                }
+            } catch (Exception se) {
+                log.warn("查询 runtime-task 状态失败: taskId={}", taskId, se);
+            }
+            return ApiResponse.success("Pipeline execution submitted via runtime-task", result);
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
@@ -172,7 +198,33 @@ public class PipelineController {
         }
     }
 
-    // ── 7. 查询执行状态 ─────────────────────────────────
+    // ── 7. 查询 runtime-task 状态（前端轮询） ────────────
+
+    @GetMapping("/tasks/{taskId}/status")
+    public ApiResponse<Map<String, Object>> getTaskStatus(@PathVariable String taskId) {
+        try {
+            TaskStatus status = taskManagementService.getTaskStatus(taskId);
+            if (status == null) {
+                return ApiResponse.notFound("任务状态不存在: " + taskId);
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("taskId", status.getTaskId());
+            result.put("status", status.getStatus() != null ? status.getStatus().name() : "UNKNOWN");
+            result.put("statusMessage", status.getStatusMessage());
+            result.put("progress", status.getProgress());
+            result.put("currentStepId", status.getCurrentStepId());
+            result.put("startTime", status.getStartTime());
+            result.put("endTime", status.getEndTime());
+            result.put("result", status.getResult());
+            result.put("errorMessage", status.getErrorMessage());
+            return ApiResponse.success("查询成功", result);
+        } catch (Exception e) {
+            log.error("查询任务状态失败: taskId={}", taskId, e);
+            return ApiResponse.internalError("查询任务状态失败: " + e.getMessage());
+        }
+    }
+
+    // ── 8. 查询执行状态（旧端点，按 executionId 查 ecos_pipeline_execution） ──
 
     @GetMapping("/executions/{id}")
     public ApiResponse<PipelineExecution> getExecution(@PathVariable String id) {

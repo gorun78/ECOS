@@ -21,6 +21,12 @@ public class PipelineDefinition {
     /** 状态: DRAFT / ACTIVE / ARCHIVED */
     private String status;
 
+    /** 定时调度 cron 表达式（来自 P2-01 schedule.cron，为空表示不调度） */
+    private String scheduleCron;
+
+    /** 扩展属性（含 runtime-task 调度 ID 等） */
+    private java.util.Map<String, Object> extensions;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 
@@ -40,6 +46,12 @@ public class PipelineDefinition {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getScheduleCron() { return scheduleCron; }
+    public void setScheduleCron(String scheduleCron) { this.scheduleCron = scheduleCron; }
+
+    public java.util.Map<String, Object> getExtensions() { return extensions; }
+    public void setExtensions(java.util.Map<String, Object> extensions) { this.extensions = extensions; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

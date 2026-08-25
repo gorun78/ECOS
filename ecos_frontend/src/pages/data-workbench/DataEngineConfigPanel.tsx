@@ -11,8 +11,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from 'lucide-react';
 import { apiFetchData } from '../../api';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import {
-  buildConfigGroups,
+  buildConfigGroups, detectEdition, type EcosEdition,
   type ConfigGroup, type ConfigValues, type DefaultValues,
 } from './DataEngineConfigPanelTypes';
 import DataEngineConfigPanelGroupNav from './DataEngineConfigPanelGroupNav';
@@ -28,7 +29,9 @@ interface Props {
 
 export default function DataEngineConfigPanel({ showToast }: Props) {
   const { styles } = useTheme();
-  const allGroups = useRef(buildConfigGroups()).current;
+  const { t } = useLanguage();
+  const edition = useRef<EcosEdition>(detectEdition()).current;
+  const allGroups = useRef(buildConfigGroups(edition)).current;
   const [groups, setGroups] = useState<ConfigGroup[]>(allGroups);
   const [activeGroup, setActiveGroup] = useState<string>('execution');
   const [values, setValues] = useState<ConfigValues>({});
@@ -88,7 +91,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
       setOriginalValues({ ...merged });
     } catch (e: any) {
       console.warn('[EngineConfig] Failed to load config:', e);
-      setLoadError(e?.message || '加载配置失败，使用本地默认值');
+      setLoadError(t('dw.cfg.toast.loadFailed'));
       const fallback: ConfigValues = {};
       allGroups.forEach(g => {
         g.items.forEach(item => {
@@ -101,7 +104,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [flattenConfig, allGroups]);
+  }, [flattenConfig, allGroups, t]);
 
   useEffect(() => {
     loadConfig();
@@ -133,8 +136,8 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
     const restored = { ...defaults };
     setValues(restored);
     updateModifiedFlags(restored);
-    showToast?.('info', '已恢复为默认值，尚未保存');
-  }, [defaults, updateModifiedFlags, showToast]);
+    showToast?.('info', t('dw.cfg.toast.restored'));
+  }, [defaults, updateModifiedFlags, showToast, t]);
 
   // 全部保存
   const handleSaveAll = useCallback(async () => {

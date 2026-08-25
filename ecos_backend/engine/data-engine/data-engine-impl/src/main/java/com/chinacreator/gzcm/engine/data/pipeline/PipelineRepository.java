@@ -28,9 +28,11 @@ public class PipelineRepository {
 
     public PipelineDefinition insertDefinition(PipelineDefinition def) {
         String id = def.getId() != null ? def.getId() : UUID.randomUUID().toString().replace("-", "");
+        String definitionJson = buildDefinitionJson(def);
         String sql = "INSERT INTO ecos_pipeline_definition (id, name, description, definition, status, created_at, updated_at) " +
-                "VALUES (?, ?, ?, '{}'::jsonb, ?, NOW(), NOW())";
+                "VALUES (?, ?, ?, ?::jsonb, ?, NOW(), NOW())";
         jdbc.update(sql, id, def.getName(), def.getDescription(),
+                definitionJson,
                 def.getStatus() != null ? def.getStatus() : "DRAFT");
         return findDefinitionById(id);
     }
@@ -64,13 +66,32 @@ public class PipelineRepository {
         return findDefinitionById(id);
     }
 
+    /**
+     * 更新 Pipeline 定义的 schedule（cron + scheduleId），存入 definition JSONB 列。
+     */
+    public void updateDefinitionSchedule(String id, String scheduleCron, String scheduleId) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            Map<String, Object> schedule = new LinkedHashMap<>();
+            schedule.put("cron", scheduleCron);
+            if (scheduleId != null) schedule.put("scheduleId", scheduleId);
+            Map<String, Object> root = new LinkedHashMap<>();
+            root.put("schedule", schedule);
+            String json = om.writeValueAsString(root);
+            String sql = "UPDATE ecos_pipeline_definition SET definition = ?::jsonb, updated_at = NOW() WHERE id = ?";
+            jdbc.update(sql, json, id);
+        } catch (Exception e) {
+            log.warn("Failed to update schedule for definition {}: {}", id, e.getMessage());
+        }
+    }
+
     public void deleteDefinition(String id) {
         String sql = "UPDATE ecos_pipeline_definition SET status = 'ARCHIVED', updated_at = NOW() WHERE id = ?";
         jdbc.update(sql, id);
     }
 
     public PipelineDefinition findDefinitionById(String id) {
-        String sql = "SELECT id, name, description, status, created_at, updated_at " +
+        String sql = "SELECT id, name, description, definition, status, created_at, updated_at " +
                 "FROM ecos_pipeline_definition WHERE id = ?";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, id);
         if (rows.isEmpty()) return null;
@@ -78,7 +99,7 @@ public class PipelineRepository {
     }
 
     public List<PipelineDefinition> findAllDefinitions() {
-        String sql = "SELECT id, name, description, status, created_at, updated_at " +
+        String sql = "SELECT id, name, description, definition, status, created_at, updated_at " +
                 "FROM ecos_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY created_at DESC";
         List<Map<String, Object>> rows = jdbc.queryForList(sql);
         List<PipelineDefinition> result = new ArrayList<>();
@@ -168,9 +189,64 @@ public class PipelineRepository {
         def.setName((String) row.get("name"));
         def.setDescription((String) row.get("description"));
         def.setStatus((String) row.get("status"));
+        // 解析 definition JSONB：{schedule:{cron,scheduleId}, ...}
+        Object defVal = row.get("definition");
+        if (defVal != null) {
+            parseDefinitionJson(def, defVal.toString());
+        }
         def.setCreatedAt(toLocalDateTime(row.get("created_at")));
         def.setUpdatedAt(toLocalDateTime(row.get("updated_at")));
         return def;
+    }
+
+    /**
+     * 解析 definition JSONB 列，填充 scheduleCron 与 extensions。
+     */
+    @SuppressWarnings("unchecked")
+    private void parseDefinitionJson(PipelineDefinition def, String json) {
+        if (json == null || json.isBlank() || "{}".equals(json)) return;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            Map<String, Object> root = om.readValue(json, Map.class);
+            Object schedule = root.get("schedule");
+            Map<String, Object> extensions = new LinkedHashMap<>(root);
+            if (schedule instanceof Map) {
+                Map<String, Object> sch = (Map<String, Object>) schedule;
+                Object cron = sch.get("cron");
+                if (cron != null) def.setScheduleCron(cron.toString());
+                Object sid = sch.get("scheduleId");
+                if (sid != null) extensions.put("scheduleId", sid);
+            }
+            def.setExtensions(extensions);
+        } catch (Exception e) {
+            log.warn("Failed to parse definition JSON: {}", json, e);
+        }
+    }
+
+    /**
+     * 构造 definition JSONB 列内容，包含 schedule（cron + scheduleId）。
+     */
+    private String buildDefinitionJson(PipelineDefinition def) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            Map<String, Object> root = new LinkedHashMap<>();
+            if (def.getScheduleCron() != null || def.getExtensions() != null) {
+                Map<String, Object> schedule = new LinkedHashMap<>();
+                if (def.getScheduleCron() != null) schedule.put("cron", def.getScheduleCron());
+                if (def.getExtensions() != null && def.getExtensions().get("scheduleId") != null) {
+                    schedule.put("scheduleId", def.getExtensions().get("scheduleId"));
+                }
+                root.put("schedule", schedule);
+            }
+            if (def.getExtensions() != null) {
+                for (Map.Entry<String, Object> e : def.getExtensions().entrySet()) {
+                    if (!"schedule".equals(e.getKey())) root.put(e.getKey(), e.getValue());
+                }
+            }
+            return om.writeValueAsString(root);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     private PipelineNode mapToNode(Map<String, Object> row) {
