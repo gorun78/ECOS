@@ -1,26 +1,26 @@
 /**
  * PropertyPanel — Pipeline node property editor
  * Extracted from PipelineFlowEditor.tsx
+ * Aligned with P2-01 node config schema (PMO-3J T2).
  * @license Apache-2.0
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { Node } from '@xyflow/react';
-import { Settings, Trash2, X, ChevronDown } from 'lucide-react';
-import type { NodeConfig, TransformRule, JoinCondition, NodeStatus } from './types';
-import type { DataConnection, TableInfo } from '../types';
+import { Trash2, X, ChevronDown } from 'lucide-react';
+import type { NodeConfig, NodeStatus, PipelineNodeType } from './types';
+import type { DataConnection } from '../types';
 import { PALETTE_LABELS, buildPaletteItems } from './constants';
-import OperatorSearchPanel from './OperatorSearchPanel';
-import type { PBFunctionDef } from './pbFunctions';
-import TransformRulesEditor from './TransformRulesEditor';
-import JoinConditionsEditor from './JoinConditionsEditor';
-import AggregateConfigEditor from './AggregateConfigEditor';
 import { useTheme } from '../../../components/ThemeContext';
-
+import { useLanguage } from '../../../components/LanguageContext';
 // ─── Section collapse toggle ──────────────────────────────
+
 const SectionToggle: React.FC<{
-  collapsed: boolean; onClick: () => void; label: string;
-}> = ({ collapsed, onClick, label }) => (
+  collapsed: boolean;
+  onClick: () => void;
+  label: string;
+  styles: Record<string, string>;
+}> = ({ collapsed, onClick, label, styles }) => (
   <button onClick={onClick}
     className={`flex items-center justify-between w-full px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.sidebarBg} transition-colors`}
   >
@@ -28,6 +28,15 @@ const SectionToggle: React.FC<{
     <ChevronDown size={14} className={`transition-transform duration-200 ${collapsed ? '-rotate-90' : 'rotate-0'}`} />
   </button>
 );
+
+// ─── Small field primitives ───────────────────────────────
+
+const FieldLabel: React.FC<{ styles: Record<string, string>; children: React.ReactNode }> = ({ styles, children }) => (
+  <label className={`text-[11px] ${styles.muted} block mb-1`}>{children}</label>
+);
+
+const inputCls = (styles: Record<string, string>) =>
+  `w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none ${styles.cardBg} ${styles.cardText}`;
 
 // ─── Property Panel ───────────────────────────────────────
 
@@ -41,115 +50,57 @@ interface PropertyPanelProps {
 
 const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
   ({ node, connections, onUpdateNode, onDeleteNode, onClose }) => {
-    const config: NodeConfig = (node?.data ?? {}) as unknown as NodeConfig;
     const { styles } = useTheme();
+    const { t } = useLanguage();
+    const config: NodeConfig = (node?.data ?? {}) as unknown as NodeConfig;
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-    const [showOperatorPanel, setShowOperatorPanel] = useState(false);
-    const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
-
-    const toggleSection = (key: string) => {
-      setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    const handleSelectFunction = useCallback(
-      (fn: PBFunctionDef) => {
-        if (!node || !activeRuleId) return;
-        const rules = (config.transformRules || []).map((r) =>
-          r.id === activeRuleId ? { ...r, function: fn.name } : r
-        );
-        onUpdateNode(node.id, { transformRules: rules });
-        setShowOperatorPanel(false);
-        setActiveRuleId(null);
-      },
-      [node, activeRuleId, config.transformRules, onUpdateNode]
+    const [headerRows, setHeaderRows] = useState<Array<{ key: string; value: string }>>(
+      () => {
+        const h = config.config?.headers || {};
+        return Object.keys(h).length > 0
+          ? Object.entries(h).map(([key, value]) => ({ key, value: String(value) }))
+          : [{ key: '', value: '' }];
+      }
     );
 
-    const allTables = useMemo(() => {
-      const tables: { connectionName: string; table: TableInfo }[] = [];
-      connections.forEach((conn) => conn.tablesAvailable.forEach((t) => tables.push({ connectionName: conn.name, table: t })));
-      return tables;
-    }, [connections]);
-
-    // ── Transform rules helpers ──
-    const addTransformRule = () => {
-      const rules = [...(config.transformRules || []), { id: `rule-${Date.now()}`, column: '', function: '', params: '' }];
-      onUpdateNode(node!.id, { transformRules: rules });
-    };
-    const updateTransformRule = (ruleId: string, field: keyof TransformRule, value: string) => {
-      const rules = (config.transformRules || []).map((r) => r.id === ruleId ? { ...r, [field]: value } : r);
-      onUpdateNode(node!.id, { transformRules: rules });
-    };
-    const removeTransformRule = (ruleId: string) => {
-      const rules = (config.transformRules || []).filter((r) => r.id !== ruleId);
-      onUpdateNode(node!.id, { transformRules: rules });
-    };
-
-    // ── Join helpers ──
-    const addJoinCondition = () => {
-      const conditions = [...(config.joinConditions || []), { id: `cond-${Date.now()}`, leftColumn: '', rightColumn: '', operator: '=' }];
-      onUpdateNode(node!.id, { joinConditions: conditions });
-    };
-    const updateJoinCondition = (condId: string, field: keyof JoinCondition, value: string) => {
-      const conditions = (config.joinConditions || []).map((c) => c.id === condId ? { ...c, [field]: value } : c);
-      onUpdateNode(node!.id, { joinConditions: conditions });
-    };
-    const removeJoinCondition = (condId: string) => {
-      const conditions = (config.joinConditions || []).filter((c) => c.id !== condId);
-      onUpdateNode(node!.id, { joinConditions: conditions });
-    };
-
-    // ── Aggregate helpers ──
-    const addGroupByColumn = () => {
-      const cols = [...(config.aggregateGroupBy || []), ''];
-      onUpdateNode(node!.id, { aggregateGroupBy: cols });
-    };
-    const updateGroupByColumn = (index: number, value: string) => {
-      const cols = [...(config.aggregateGroupBy || [])]; cols[index] = value;
-      const filtered = cols.filter((c, i) => i !== cols.length - 1 || c !== '');
-      onUpdateNode(node!.id, { aggregateGroupBy: filtered.length > 0 ? filtered : [''] });
-    };
-    const removeGroupByColumn = (index: number) => {
-      const cols = (config.aggregateGroupBy || []).filter((_, i) => i !== index);
-      onUpdateNode(node!.id, { aggregateGroupBy: cols.length > 0 ? cols : [''] });
-    };
-    const addAggFunction = () => {
-      const funcs = [...(config.aggregateFunctions || []), { column: '', function: 'COUNT', alias: '' }];
-      onUpdateNode(node!.id, { aggregateFunctions: funcs });
-    };
-    const updateAggFunction = (index: number, field: 'column' | 'function' | 'alias', value: string) => {
-      const funcs = (config.aggregateFunctions || []).map((f, i) => i === index ? { ...f, [field]: value } : f);
-      onUpdateNode(node!.id, { aggregateFunctions: funcs });
-    };
-    const removeAggFunction = (index: number) => {
-      const funcs = (config.aggregateFunctions || []).filter((_, i) => i !== index);
-      onUpdateNode(node!.id, { aggregateFunctions: funcs });
-    };
+    const toggleSection = useCallback((key: string) => {
+      setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+    }, []);
 
     if (!node) {
       return (
         <div className={`w-72 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col h-full`}>
           <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg}`}>
-            <span className={`text-xs font-bold ${styles.muted} uppercase tracking-wider`}>属性面板</span>
+            <span className={`text-xs font-bold ${styles.muted} uppercase tracking-wider`}>{t('dw.pipeline.prop.title')}</span>
           </div>
           <div className={`flex-1 flex items-center justify-center text-xs ${styles.cardTextMuted} p-4 text-center`}>
-            点击画布上的节点<br />以编辑属性
+            {t('dw.pipeline.prop.emptyHint')}
           </div>
         </div>
       );
     }
+
+    // ── Helpers to read/write the nested `config.config` object ──
+    const nodeConfig = config.config || {};
+    const setConfigField = (field: string, value: unknown) => {
+      onUpdateNode(node.id, { config: { ...nodeConfig, [field]: value } } as Partial<NodeConfig>);
+    };
+
+    const nodeType = (config.nodeType || 'TRANSFORM_SQL') as PipelineNodeType;
+    const paletteLabel = PALETTE_LABELS[nodeType] || PALETTE_LABELS.TRANSFORM_SQL;
 
     return (
       <div className={`w-80 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col h-full overflow-hidden`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <span className={`text-xs font-bold ${styles.muted} uppercase tracking-wider`}>
-            {PALETTE_LABELS[config.nodeType || ''] || '节点'} 属性
+            {paletteLabel} {t('dw.pipeline.prop.properties')}
           </span>
           <div className="flex gap-1">
-            <button onClick={() => onDeleteNode(node.id)} className={`p-1 hover:${styles.dangerBg} rounded ${styles.dangerText} transition-colors`} title="删除节点">
+            <button onClick={() => onDeleteNode(node.id)} className={`p-1 hover:${styles.dangerBg} rounded ${styles.dangerText} transition-colors`} title={t('dw.pipeline.prop.deleteNode')}>
               <Trash2 size={14} />
             </button>
-            <button onClick={onClose} className={`p-1 hover:${styles.sidebarBg} rounded ${styles.muted} transition-colors`} title="关闭面板">
+            <button onClick={onClose} className={`p-1 hover:${styles.sidebarBg} rounded ${styles.muted} transition-colors`} title={t('dw.pipeline.prop.closePanel')}>
               <X size={14} />
             </button>
           </div>
@@ -159,133 +110,255 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
         <div className="flex-1 overflow-y-auto">
           {/* Basic Info */}
           <div className={`border-b ${styles.cardBorder}`}>
-            <SectionToggle collapsed={collapsedSections['basic']} onClick={() => toggleSection('basic')} label="基本信息" />
+            <SectionToggle collapsed={!!collapsedSections['basic']} onClick={() => toggleSection('basic')} label={t('dw.pipeline.prop.basicInfo')} styles={styles} />
             {!collapsedSections['basic'] && (
               <div className="px-3 pb-3 space-y-2">
                 <div>
-                  <label className={`text-[11px] ${styles.muted} block mb-1`}>节点名称</label>
+                  <FieldLabel styles={styles}>{t('dw.pipeline.prop.nodeName')}</FieldLabel>
                   <input type="text" value={config.label || ''}
                     onChange={(e) => onUpdateNode(node.id, { label: e.target.value })}
-                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
-                    placeholder="输入节点名称" />
+                    className={inputCls(styles)}
+                    placeholder={t('dw.pipeline.prop.nodeNamePlaceholder')} />
                 </div>
                 <div>
-                  <label className={`text-[11px] ${styles.muted} block mb-1`}>节点类型</label>
+                  <FieldLabel styles={styles}>{t('dw.pipeline.prop.nodeType')}</FieldLabel>
                   <select value={config.nodeType || ''}
-                    onChange={(e) => onUpdateNode(node.id, { nodeType: e.target.value })}
-                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
+                    onChange={(e) => onUpdateNode(node.id, { nodeType: e.target.value as PipelineNodeType })}
+                    className={inputCls(styles)}
                   >
-                    {buildPaletteItems(styles as unknown as Record<string, string>).map((item) => (
+                    {buildPaletteItems(styles, t).map((item) => (
                       <option key={item.type} value={item.type}>{item.label}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className={`text-[11px] ${styles.muted} block mb-1`}>运行状态</label>
+                  <FieldLabel styles={styles}>{t('dw.pipeline.prop.runStatus')}</FieldLabel>
                   <select value={config.nodeStatus || 'idle'}
                     onChange={(e) => onUpdateNode(node.id, { nodeStatus: e.target.value as NodeStatus })}
-                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
+                    className={inputCls(styles)}
                   >
-                    <option value="idle">Idle</option>
-                    <option value="running">Running</option>
-                    <option value="success">Success</option>
-                    <option value="error">Error</option>
+                    <option value="idle">{t('dw.pipeline.prop.statusIdle')}</option>
+                    <option value="running">{t('dw.pipeline.prop.statusRunning')}</option>
+                    <option value="success">{t('dw.pipeline.prop.statusSuccess')}</option>
+                    <option value="error">{t('dw.pipeline.prop.statusError')}</option>
                   </select>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Source/Sink Table */}
-          {(config.nodeType === 'source' || config.nodeType === 'sink') && (
-            <div className={`border-b ${styles.cardBorder}`}>
-              <SectionToggle collapsed={collapsedSections['table']} onClick={() => toggleSection('table')}
-                label={config.nodeType === 'source' ? '数据源表' : '目标表'} />
-              {!collapsedSections['table'] && (
-                <div className="px-3 pb-3 space-y-2">
-                  <select
-                    value={config.nodeType === 'source' ? config.sourceTable || '' : config.targetTable || ''}
-                    onChange={(e) => onUpdateNode(node.id,
-                      config.nodeType === 'source' ? { sourceTable: e.target.value } : { targetTable: e.target.value }
-                    )}
-                    className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
-                  >
-                    <option value="">-- 选择表 --</option>
-                    {allTables.map(({ connectionName, table }) => (
-                      <option key={`${connectionName}.${table.name}`} value={table.name}>
-                        {connectionName} / {table.name} ({table.rowCount} 行)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
+          {/* ── P2-01 config forms (by nodeType) ── */}
+          <div className={`border-b ${styles.cardBorder}`}>
+            <SectionToggle collapsed={!!collapsedSections['config']} onClick={() => toggleSection('config')} label={t('dw.pipeline.prop.configSection')} styles={styles} />
+            {!collapsedSections['config'] && (
+              <div className="px-3 pb-3 space-y-2">
+                {/* SOURCE_JDBC */}
+                {nodeType === 'SOURCE_JDBC' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.datasourceId')}</FieldLabel>
+                      <select value={nodeConfig.datasourceId || ''}
+                        onChange={(e) => setConfigField('datasourceId', e.target.value)}
+                        className={inputCls(styles)}
+                      >
+                        <option value="">{t('dw.pipeline.prop.selectConnection')}</option>
+                        {connections.map((conn) => (
+                          <option key={conn.id} value={conn.id}>{conn.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sql')}</FieldLabel>
+                      <textarea value={nodeConfig.sql || ''} rows={4}
+                        onChange={(e) => setConfigField('sql', e.target.value)}
+                        className={`${inputCls(styles)} font-mono`}
+                        placeholder="SELECT * FROM ..." />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.fetchSize')}</FieldLabel>
+                      <input type="number" value={nodeConfig.fetchSize ?? 1000}
+                        onChange={(e) => setConfigField('fetchSize', Number(e.target.value))}
+                        className={inputCls(styles)} />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.incrementalColumn')}</FieldLabel>
+                      <input type="text" value={nodeConfig.incrementalColumn || ''}
+                        onChange={(e) => setConfigField('incrementalColumn', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder={t('dw.pipeline.prop.incrementalColumnPlaceholder')} />
+                    </div>
+                  </>
+                )}
 
-          {/* Transform Rules (delegated to TransformRulesEditor) */}
-          {config.nodeType === 'transform' && (
-            <div className={`border-b ${styles.cardBorder}`}>
-              <SectionToggle collapsed={collapsedSections['transform']} onClick={() => toggleSection('transform')} label="转换规则" />
-              {!collapsedSections['transform'] && (
-                <TransformRulesEditor
-                  rules={config.transformRules || []}
-                  onAdd={addTransformRule}
-                  onUpdate={updateTransformRule}
-                  onRemove={removeTransformRule}
-                  onOperatorButtonClick={(ruleId) => { setActiveRuleId(ruleId); setShowOperatorPanel(true); }}
-                />
-              )}
-            </div>
-          )}
+                {/* SOURCE_CSV */}
+                {nodeType === 'SOURCE_CSV' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.filePath')}</FieldLabel>
+                      <input type="text" value={nodeConfig.filePath || ''}
+                        onChange={(e) => setConfigField('filePath', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="/data/orders.csv" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.delimiter')}</FieldLabel>
+                      <input type="text" value={nodeConfig.delimiter ?? ','}
+                        onChange={(e) => setConfigField('delimiter', e.target.value)}
+                        className={inputCls(styles)} />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.header')}</FieldLabel>
+                      <select value={String(nodeConfig.header ?? true)}
+                        onChange={(e) => setConfigField('header', e.target.value === 'true')}
+                        className={inputCls(styles)}
+                      >
+                        <option value="true">{t('dw.pipeline.prop.true')}</option>
+                        <option value="false">{t('dw.pipeline.prop.false')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.encoding')}</FieldLabel>
+                      <input type="text" value={nodeConfig.encoding ?? 'UTF-8'}
+                        onChange={(e) => setConfigField('encoding', e.target.value)}
+                        className={inputCls(styles)} />
+                    </div>
+                  </>
+                )}
 
-          {/* Join Configuration (delegated to JoinConditionsEditor) */}
-          {config.nodeType === 'join' && (
-            <div className={`border-b ${styles.cardBorder}`}>
-              <SectionToggle collapsed={collapsedSections['join']} onClick={() => toggleSection('join')} label="JOIN 配置" />
-              {!collapsedSections['join'] && (
-                <JoinConditionsEditor
-                  joinType={config.joinType || 'INNER'}
-                  conditions={config.joinConditions || []}
-                  onJoinTypeChange={(v) => onUpdateNode(node.id, { joinType: v })}
-                  onAdd={addJoinCondition}
-                  onUpdate={updateJoinCondition}
-                  onRemove={removeJoinCondition}
-                />
-              )}
-            </div>
-          )}
+                {/* SOURCE_REST */}
+                {nodeType === 'SOURCE_REST' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.url')}</FieldLabel>
+                      <input type="text" value={nodeConfig.url || ''}
+                        onChange={(e) => setConfigField('url', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="https://api.example.com/data" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.method')}</FieldLabel>
+                      <select value={nodeConfig.method ?? 'GET'}
+                        onChange={(e) => setConfigField('method', e.target.value)}
+                        className={inputCls(styles)}
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.headers')}</FieldLabel>
+                      <div className="space-y-1">
+                        {headerRows.map((row, idx) => (
+                          <div key={idx} className="flex gap-1">
+                            <input type="text" value={row.key}
+                              onChange={(e) => {
+                                const next = [...headerRows]; next[idx] = { ...next[idx], key: e.target.value };
+                                setHeaderRows(next.length > 0 && next[next.length - 1].key ? [...next, { key: '', value: '' }] : next);
+                              }}
+                              className={`${inputCls(styles)} flex-1`}
+                              placeholder={t('dw.pipeline.prop.headerKey')} />
+                            <input type="text" value={row.value}
+                              onChange={(e) => {
+                                const next = [...headerRows]; next[idx] = { ...next[idx], value: e.target.value };
+                                setHeaderRows(next.length > 0 && next[next.length - 1].key ? [...next, { key: '', value: '' }] : next);
+                              }}
+                              className={`${inputCls(styles)} flex-1`}
+                              placeholder={t('dw.pipeline.prop.headerValue')} />
+                          </div>
+                        ))}
+                      </div>
+                      {(() => {
+                        const hdrs: Record<string, string> = {};
+                        headerRows.forEach((r) => { if (r.key) hdrs[r.key] = r.value; });
+                        if (JSON.stringify(hdrs) !== JSON.stringify(nodeConfig.headers || {})) {
+                          setConfigField('headers', hdrs);
+                        }
+                        return null;
+                      })()}
+                      {(() => {
+                        const hdrs: Record<string, string> = {};
+                        headerRows.forEach((r) => { if (r.key) hdrs[r.key] = r.value; });
+                        if (JSON.stringify(hdrs) !== JSON.stringify(nodeConfig.headers || {})) {
+                          setConfigField('headers', hdrs);
+                        }
+                        return null;
+                      })()}
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.body')}</FieldLabel>
+                      <textarea value={nodeConfig.body || ''} rows={3}
+                        onChange={(e) => setConfigField('body', e.target.value)}
+                        className={`${inputCls(styles)} font-mono`}
+                        placeholder={'{"key": "value"}'} />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.pagination')}</FieldLabel>
+                      <input type="text" value={nodeConfig.pagination || ''}
+                        onChange={(e) => setConfigField('pagination', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder={t('dw.pipeline.prop.paginationPlaceholder')} />
+                    </div>
+                  </>
+                )}
 
-          {/* Aggregate Configuration (delegated to AggregateConfigEditor) */}
-          {config.nodeType === 'aggregate' && (
-            <div className={`border-b ${styles.cardBorder}`}>
-              <SectionToggle collapsed={collapsedSections['aggregate']} onClick={() => toggleSection('aggregate')} label="聚合配置" />
-              {!collapsedSections['aggregate'] && (
-                <AggregateConfigEditor
-                  groupByCols={config.aggregateGroupBy || []}
-                  aggFunctions={config.aggregateFunctions || []}
-                  onAddGroupBy={addGroupByColumn}
-                  onUpdateGroupBy={updateGroupByColumn}
-                  onRemoveGroupBy={removeGroupByColumn}
-                  onAddAgg={addAggFunction}
-                  onUpdateAgg={updateAggFunction}
-                  onRemoveAgg={removeAggFunction}
-                />
-              )}
-            </div>
-          )}
-        </div>
+                {/* SOURCE_CDC — disabled / flagship only */}
+                {nodeType === 'SOURCE_CDC' && (
+                  <div className={`px-2 py-3 rounded text-xs italic ${styles.cardTextMuted} ${styles.sidebarBg}`}>
+                    {t('dw.pipeline.node.cdcFlagshipOnly')}
+                  </div>
+                )}
 
-        {/* OperatorSearchPanel Popup */}
-        {showOperatorPanel && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-            <div className="fixed inset-0 bg-black/20" onClick={() => setShowOperatorPanel(false)} />
-            <OperatorSearchPanel
-              onSelectFunction={handleSelectFunction}
-              onClose={() => setShowOperatorPanel(false)}
-              className="relative z-10 w-[420px] max-h-[520px]"
-            />
+                {/* TRANSFORM_SQL */}
+                {nodeType === 'TRANSFORM_SQL' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.transformSql')}</FieldLabel>
+                      <textarea value={nodeConfig.transformSql || ''} rows={5}
+                        onChange={(e) => setConfigField('transformSql', e.target.value)}
+                        className={`${inputCls(styles)} font-mono`}
+                        placeholder="SELECT id, upper(name) FROM ${input}" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.timeout')}</FieldLabel>
+                      <input type="number" value={nodeConfig.timeout ?? 30}
+                        onChange={(e) => setConfigField('timeout', Number(e.target.value))}
+                        className={inputCls(styles)} />
+                    </div>
+                  </>
+                )}
+
+                {/* OUTPUT_OBJECT */}
+                {nodeType === 'OUTPUT_OBJECT' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.targetTable')}</FieldLabel>
+                      <input type="text" value={nodeConfig.targetTable || ''}
+                        onChange={(e) => setConfigField('targetTable', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="ods_orders" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.mode')}</FieldLabel>
+                      <select value={nodeConfig.mode ?? 'append'}
+                        onChange={(e) => setConfigField('mode', e.target.value as 'append' | 'overwrite')}
+                        className={inputCls(styles)}
+                      >
+                        <option value="append">{t('dw.pipeline.prop.modeAppend')}</option>
+                        <option value="overwrite">{t('dw.pipeline.prop.modeOverwrite')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.batchSize')}</FieldLabel>
+                      <input type="number" value={nodeConfig.batchSize ?? 1000}
+                        onChange={(e) => setConfigField('batchSize', Number(e.target.value))}
+                        className={inputCls(styles)} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   }

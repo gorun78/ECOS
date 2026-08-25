@@ -111,6 +111,59 @@ public class JdbcConnector implements Connector {
         return rows;
     }
 
+    /**
+     * 在外部数据源上执行任意 SQL（SELECT 或 DML），返回结果行。
+     * <p>
+     * 供 Pipeline SOURCE_JDBC 节点使用 —— 通过 connectionConfig 建立到外部数据源的连接，
+     * 执行 config.sql，返回结果行列表（SELECT）或受影响行数（DML 以 rows.size() 体现）。
+     * 这是架构规则 2.5 的落地：Pipeline 节点执行外部数据源 SQL 必须走 Connector，禁系统 JdbcTemplate。
+     *
+     * @param connectionConfig 连接配置 JSON（jdbcUrl/username/password/schema）
+     * @param sql              要执行的 SQL 语句
+     * @param fetchSize        JDBC fetchSize（控制内存占用，&lt;=0 时使用默认值 1000）
+     * @return 结果行列表，每行为 columnName -&gt; value 的 Map
+     */
+    public List<Map<String, Object>> executeSql(String connectionConfig, String sql, int fetchSize) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        Map<String, String> config = parseConfig(connectionConfig);
+
+        try (Connection conn = DriverManager.getConnection(
+                config.get("jdbcUrl"),
+                config.get("username"),
+                config.get("password"));
+             Statement stmt = conn.createStatement()) {
+
+            if (fetchSize > 0) {
+                stmt.setFetchSize(fetchSize);
+            }
+
+            boolean hasResultSet = stmt.execute(sql);
+            if (hasResultSet) {
+                try (ResultSet rs = stmt.getResultSet()) {
+                    ResultSetMetaData rsmd = rs.getMetaData();
+                    int colCount = rsmd.getColumnCount();
+                    while (rs.next()) {
+                        Map<String, Object> row = new java.util.LinkedHashMap<>();
+                        for (int i = 1; i <= colCount; i++) {
+                            row.put(rsmd.getColumnName(i), rs.getObject(i));
+                        }
+                        rows.add(row);
+                    }
+                }
+            } else {
+                int updateCount = stmt.getUpdateCount();
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("affectedRows", updateCount);
+                rows.add(row);
+            }
+            log.info("JdbcConnector.executeSql: rows={}, sql length={}", rows.size(), sql.length());
+        } catch (SQLException e) {
+            log.error("JdbcConnector.executeSql failed: {}", e.getMessage());
+            throw new RuntimeException("External datasource SQL execution failed: " + e.getMessage(), e);
+        }
+        return rows;
+    }
+
     private DataResource buildResource(ResultSet rs, String orgId, String orgName,
                                         String type, String schema) throws SQLException {
         DataResource r = new DataResource();
