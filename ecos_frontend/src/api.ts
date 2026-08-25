@@ -29,9 +29,9 @@ function handleAuthExpired(): never {
   throw new Error('登录已过期，请重新登录');
 }
 
-/** Check response status for auth failure */
+/** Check response status for auth failure — only 401 triggers logout, 403 is a permission issue */
 function checkAuthExpired(status: number): void {
-  if (status === 401 || status === 403) handleAuthExpired();
+  if (status === 401) handleAuthExpired();
 }
 
 /**
@@ -47,7 +47,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     headers,
     ...options,
   });
-  if (res.status === 401 || res.status === 403) handleAuthExpired();
+  if (res.status === 401) handleAuthExpired();
   if (!res.ok) throw new Error(`API ${path} returned ${res.status}`);
   return res.json();
 }
@@ -65,7 +65,7 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
     headers,
     ...options,
   });
-  if (res.status === 401 || res.status === 403) handleAuthExpired();
+  if (res.status === 401) handleAuthExpired();
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
@@ -86,7 +86,7 @@ async function doFetch(url: string, opts: RequestInit = {}): Promise<any> {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   try {
     const r = await fetch(url, { headers, ...opts });
-    if (r.status === 401 || r.status === 403) handleAuthExpired();
+    if (r.status === 401) handleAuthExpired();
     if (!r.ok) throw new Error(`${r.status}`);
     const ct = r.headers.get('content-type');
     return ct && ct.includes('application/json') ? await r.json() : null;
