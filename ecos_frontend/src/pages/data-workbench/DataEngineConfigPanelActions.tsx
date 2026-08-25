@@ -1,12 +1,14 @@
 /**
  * DataEngineConfigPanelActions — 底部操作栏子组件
- * 从 DataEngineConfigPanel 拆分而来，逻辑不变
+ * 从 DataEngineConfigPanel 拆分而来。
+ * PMO-3J-T6: 文案走 i18n (t)。
  * @license Apache-2.0
  */
 import React from 'react';
 import { RotateCcw, Save, RefreshCw } from 'lucide-react';
 import type { ConfigGroup } from './DataEngineConfigPanel';
 import type { ThemeStyles } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 interface Props {
   groups: ConfigGroup[];
@@ -27,6 +29,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
   onRefreshCache,
   styles,
 }) => {
+  const { t } = useLanguage();
   const modifiedCount = groups.filter(g => g.modified).length;
 
   return (
@@ -34,7 +37,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
       <div className={`text-[10px] ${styles.cardTextMuted}`}>
         {modifiedCount > 0 && (
           <span className={`${styles.warningText}`}>
-            {modifiedCount} 个分组有未保存的修改
+            {t('dw.cfg.actions.modifiedGroups', { count: modifiedCount })}
           </span>
         )}
       </div>
@@ -45,7 +48,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-md transition-colors disabled:opacity-50`}
         >
           <RotateCcw size={13} />
-          恢复默认
+          {t('dw.cfg.actions.restoreDefaults')}
         </button>
         <button
           onClick={onSaveAll}
@@ -55,12 +58,12 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
           {saving ? (
             <>
               <RefreshCw size={13} className="animate-spin" />
-              保存中...
+              {t('dw.cfg.actions.saving')}
             </>
           ) : (
             <>
               <Save size={13} />
-              全部保存
+              {t('dw.cfg.actions.saveAll')}
             </>
           )}
         </button>
@@ -72,12 +75,12 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
           {refreshing ? (
             <>
               <RefreshCw size={13} className="animate-spin" />
-              刷新中...
+              {t('dw.cfg.actions.refreshing')}
             </>
           ) : (
             <>
               <RefreshCw size={13} />
-              刷新缓存
+              {t('dw.cfg.actions.refreshCache')}
             </>
           )}
         </button>
