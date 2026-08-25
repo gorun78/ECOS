@@ -126,8 +126,85 @@ public class CsvConnector implements Connector {
 
     @Override
     public List<Map<String, Object>> queryPreview(String connectionConfig, String tableName, int limit) {
-        log.debug("CSV preview not supported for: {}", tableName);
-        return Collections.emptyList();
+        return readRows(connectionConfig, limit);
+    }
+
+    /**
+     * 读取 CSV 文件全部行，返回 List&lt;Map&gt;。
+     * <p>
+     * 供 Pipeline SOURCE_CSV 节点使用 —— 根据 connectionConfig 读取文件，
+     * 解析为行列表（hasHeader=true 时用首行做列名，否则生成 C1/C2...）。
+     *
+     * @param connectionConfig 连接配置 JSON（filePath/delimiter/hasHeader/encoding）
+     * @param limit            最多读取行数（&lt;=0 表示不限制）
+     * @return 行列表，每行为 columnName -&gt; value 的 Map
+     */
+    public List<Map<String, Object>> readRows(String connectionConfig, int limit) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        Map<String, Object> config = parseConfig(connectionConfig);
+
+        String filePath = (String) config.get("filePath");
+        if (filePath == null || filePath.isBlank()) {
+            log.warn("CSV readRows: filePath is empty");
+            return rows;
+        }
+
+        Path path = Path.of(filePath);
+        if (!Files.exists(path) || !Files.isReadable(path)) {
+            log.warn("CSV readRows: file not found or not readable: {}", filePath);
+            return rows;
+        }
+
+        String delimiter = (String) config.getOrDefault("delimiter", ",");
+        boolean hasHeader = Boolean.TRUE.equals(config.get("hasHeader"));
+        String encodingStr = (String) config.getOrDefault("encoding", "UTF-8");
+        java.nio.charset.Charset charset = java.nio.charset.Charset.forName(encodingStr);
+
+        try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
+            String headerLine = reader.readLine();
+            if (headerLine == null || headerLine.isBlank()) {
+                return rows;
+            }
+
+            String[] headers;
+            if (hasHeader) {
+                headers = Arrays.stream(headerLine.split(delimiter, -1))
+                        .map(String::trim)
+                        .toArray(String[]::new);
+            } else {
+                int colCount = headerLine.split(delimiter, -1).length;
+                headers = new String[colCount];
+                for (int i = 0; i < colCount; i++) {
+                    headers[i] = "C" + (i + 1);
+                }
+                // 首行也是数据
+                Map<String, Object> firstRow = parseCsvLine(headerLine, delimiter, headers);
+                rows.add(firstRow);
+            }
+
+            String line;
+            int count = rows.size();
+            while ((line = reader.readLine()) != null) {
+                if (limit > 0 && count >= limit) break;
+                if (line.isBlank()) continue;
+                rows.add(parseCsvLine(line, delimiter, headers));
+                count++;
+            }
+            log.info("CsvConnector.readRows: {} rows from {}", rows.size(), filePath);
+        } catch (IOException e) {
+            log.error("CsvConnector.readRows failed for {}: {}", filePath, e.getMessage());
+            throw new RuntimeException("CSV file read failed: " + e.getMessage(), e);
+        }
+        return rows;
+    }
+
+    private Map<String, Object> parseCsvLine(String line, String delimiter, String[] headers) {
+        String[] values = line.split(delimiter, -1);
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < headers.length && i < values.length; i++) {
+            row.put(headers[i], values[i].trim());
+        }
+        return row;
     }
 
     /**

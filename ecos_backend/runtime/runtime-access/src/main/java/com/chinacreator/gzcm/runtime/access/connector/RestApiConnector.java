@@ -147,6 +147,119 @@ public class RestApiConnector implements Connector {
         return Collections.emptyList();
     }
 
+    /**
+     * 调用 REST API 端点并返回解析后的行数据。
+     * <p>
+     * 供 Pipeline SOURCE_REST 节点使用 —— 根据 config 中的 url/method/headers/body 发起 HTTP 请求，
+     * 将 JSON 响应解析为行列表。响应为数组时每元素一行；响应为对象含 data/items/records 数组时取该数组；
+     * 否则将整个响应当作单行。
+     *
+     * @param config 节点配置（url/method/headers/body/authType/authValue/timeout）
+     * @return 行列表，每行为字段 -&gt; value 的 Map
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> fetchData(Map<String, Object> config) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        String url = (String) config.get("url");
+        if (url == null || url.isBlank()) {
+            log.warn("REST fetchData: url is empty");
+            return rows;
+        }
+
+        String method = (String) config.getOrDefault("method", "GET");
+        int timeout = getTimeout(config);
+
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(timeout));
+
+            // auth
+            String authType = (String) config.getOrDefault("authType", "NONE");
+            String authValue = (String) config.getOrDefault("authValue", "");
+            switch (authType.toUpperCase()) {
+                case "BASIC":
+                    String encoded = Base64.getEncoder().encodeToString(authValue.getBytes());
+                    builder.header("Authorization", "Basic " + encoded);
+                    break;
+                case "TOKEN":
+                    builder.header("Authorization", authValue);
+                    break;
+                default:
+                    break;
+            }
+
+            // custom headers
+            Object headersObj = config.get("headers");
+            if (headersObj instanceof Map) {
+                Map<String, String> headers = (Map<String, String>) headersObj;
+                for (Map.Entry<String, String> e : headers.entrySet()) {
+                    builder.header(e.getKey(), e.getValue());
+                }
+            }
+
+            // body + method
+            String body = (String) config.get("body");
+            if ("POST".equalsIgnoreCase(method) && body != null && !body.isBlank()) {
+                builder.POST(HttpRequest.BodyPublishers.ofString(body));
+                if (builder.build().headers().firstValue("Content-Type").isEmpty()) {
+                    builder.header("Content-Type", "application/json");
+                }
+            } else {
+                builder.GET();
+            }
+
+            HttpResponse<String> response = httpClient.send(
+                    builder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("REST API returned HTTP " + response.statusCode() + ": " + response.body());
+            }
+
+            String respBody = response.body();
+            if (respBody == null || respBody.isBlank()) {
+                return rows;
+            }
+
+            Object parsed = mapper.readValue(respBody, Object.class);
+            if (parsed instanceof List) {
+                List<Object> list = (List<Object>) parsed;
+                for (Object item : list) {
+                    rows.add(toRowMap(item));
+                }
+            } else if (parsed instanceof Map) {
+                Map<String, Object> map = (Map<String, Object>) parsed;
+                Object data = map.getOrDefault("data",
+                        map.getOrDefault("items", map.getOrDefault("records", null)));
+                if (data instanceof List) {
+                    List<Object> list = (List<Object>) data;
+                    for (Object item : list) {
+                        rows.add(toRowMap(item));
+                    }
+                } else {
+                    rows.add(map);
+                }
+            }
+            log.info("RestApiConnector.fetchData: {} rows from {}", rows.size(), url);
+        } catch (Exception e) {
+            log.error("RestApiConnector.fetchData failed for {}: {}", url, e.getMessage());
+            throw new RuntimeException("REST API call failed: " + e.getMessage(), e);
+        }
+        return rows;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toRowMap(Object item) {
+        if (item instanceof Map) {
+            return (Map<String, Object>) item;
+        }
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("value", item);
+        return row;
+    }
+
     @SuppressWarnings("unchecked")
     private void extractResourcesFromResponse(String body, String url, String orgId,
                                                String orgName, List<DataResource> resources, String defaultPath) {
