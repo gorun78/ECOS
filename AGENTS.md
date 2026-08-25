@@ -94,3 +94,30 @@ cd ecos-docker && docker-compose up -d   # PG:5432, Neo4j:7474+7687, MinIO:9000,
 - Don't change existing API paths or signatures — only additive changes
 - Don't bypass `@Autowired` with `new` — always use constructor injection
 - Don't delete columns/tables from the database schema
+
+# 项目概述
+
+
+# 工程环境
+
+.hermes/env.md
+
+
+# 技术栈
+
+- 前端组件：vue3,element-plus
+- 后端组件：springboot3,mybatis
+
+
+# 项目规范
+
+- 前端开发规范：.hermes/rules/前端开发规范.md
+- 后端开发规范：.hermes/rules/后端开发规范.md
+- Git提交规范：.hermes/rules/Git提交规范.md
+
+
+# 工程结构
+
+
+# 其他约束
+

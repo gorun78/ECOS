@@ -1,0 +1,46 @@
+{
+  "projectName" : null,
+  "projectCode" : null,
+  "projectDescription" : null,
+  "serverIp" : "localhost",
+  "frontend" : {
+    "type" : "React",
+    "port" : 8084,
+    "directory" : "frontend",
+    "components" : "vue3,element-plus",
+    "currentPort" : 8084
+  },
+  "backend" : {
+    "type" : "Java",
+    "jdkVersion" : "21",
+    "port" : 8085,
+    "context" : "/",
+    "rootPackage" : "com.chinacreator.app",
+    "logPath" : "backend/logs/app.log",
+    "directory" : "backend",
+    "components" : "springboot3,mybatis",
+    "currentPort" : 8085
+  },
+  "database" : {
+    "jdbcUrl" : "",
+    "username" : "",
+    "password" : "",
+    "components" : null
+  },
+  "git" : null,
+  "standardsText" : null,
+  "standards" : [ {
+    "name" : "前端开发规范",
+    "path" : "前端开发规范.md"
+  }, {
+    "name" : "后端开发规范",
+    "path" : "后端开发规范.md"
+  }, {
+    "name" : "Git提交规范",
+    "path" : "Git提交规范.md"
+  } ],
+  "projectStructure" : "",
+  "testRequirements" : null,
+  "otherConstraints" : "",
+  "configExists" : null
+}
