@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { GripVertical } from 'lucide-react';
-import { PALETTE_ITEMS } from './constants';
+import { buildPaletteItems } from './constants';
 
 interface NodePaletteProps {
   styles: Record<string, string>;
@@ -29,7 +29,7 @@ const NodePalette: React.FC<NodePaletteProps> = ({
         </span>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {PALETTE_ITEMS.map((item) => (
+        {buildPaletteItems(styles).map((item) => (
           <div
             key={item.type}
             draggable

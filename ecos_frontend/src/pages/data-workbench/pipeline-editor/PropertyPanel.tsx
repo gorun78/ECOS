@@ -9,7 +9,7 @@ import type { Node } from '@xyflow/react';
 import { Settings, Trash2, X, ChevronDown } from 'lucide-react';
 import type { NodeConfig, TransformRule, JoinCondition, NodeStatus } from './types';
 import type { DataConnection, TableInfo } from '../types';
-import { PALETTE_ITEMS } from './constants';
+import { PALETTE_LABELS, buildPaletteItems } from './constants';
 import OperatorSearchPanel from './OperatorSearchPanel';
 import type { PBFunctionDef } from './pbFunctions';
 import TransformRulesEditor from './TransformRulesEditor';
@@ -42,12 +42,12 @@ interface PropertyPanelProps {
 const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
   ({ node, connections, onUpdateNode, onDeleteNode, onClose }) => {
     const config: NodeConfig = (node?.data ?? {}) as unknown as NodeConfig;
+    const { styles } = useTheme();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
     const [showOperatorPanel, setShowOperatorPanel] = useState(false);
     const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
 
     const toggleSection = (key: string) => {
-  const { styles } = useTheme();
       setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
@@ -143,7 +143,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
         {/* Header */}
         <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <span className={`text-xs font-bold ${styles.muted} uppercase tracking-wider`}>
-            {PALETTE_ITEMS.find((p) => p.type === config.nodeType)?.label || '节点'} 属性
+            {PALETTE_LABELS[config.nodeType || ''] || '节点'} 属性
           </span>
           <div className="flex gap-1">
             <button onClick={() => onDeleteNode(node.id)} className={`p-1 hover:${styles.dangerBg} rounded ${styles.dangerText} transition-colors`} title="删除节点">
@@ -175,7 +175,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                     onChange={(e) => onUpdateNode(node.id, { nodeType: e.target.value })}
                     className={`w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none`}
                   >
-                    {PALETTE_ITEMS.map((item) => (
+                    {buildPaletteItems(styles as unknown as Record<string, string>).map((item) => (
                       <option key={item.type} value={item.type}>{item.label}</option>
                     ))}
                   </select>
