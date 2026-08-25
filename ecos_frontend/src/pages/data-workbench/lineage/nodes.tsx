@@ -62,8 +62,10 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── 节点颜色主题 ────────────────────────────────────────────
+// NOTE: 必须以函数形式接收 styles, 不能在模块顶层引用 styles (模块作用域无 styles).
+// 与 statusColorsFn(styles) 保持一致的模式.
 
-const nodeThemes = {
+const nodeThemesFn = (styles: Record<string, string>) => ({
   source: {
     border: `${styles.infoBorder}`,
     hoverBorder: `hover:${styles.infoBorder}`,
@@ -104,26 +106,27 @@ const nodeThemes = {
     accentText: `${styles.dangerText}`,
     iconColor: `${styles.dangerText}`,
   },
-} as const;
+} as const);
 
 // ─── 自定义节点：数据源 ──────────────────────────────────────
 
 export function LineageSourceNode({ data, selected }: NodeProps<Node<SourceNodeData>>) {
-  const theme = nodeThemes.source;
+  const { styles } = useTheme();
+  const theme = nodeThemesFn(styles as unknown as Record<string, string>).source;
   return (
     <div
       className={`
-        relative w-[200px] rounded-xl border bg-[#1e293b]
+        relative w-[200px] rounded-xl border ${styles.cardBg}
         ${theme.border} shadow-lg shadow-black/30
         transition-all duration-150 cursor-pointer
         ${theme.hoverBorder}
-        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ring-offset-[#0f172a]` : ''}
+        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ${styles.appBg}` : ''}
       `}
     >
       <Handle
         type="source"
         position={Position.Right}
-        className={`!w-3 !h-3 !${styles.infoBg} !border-2 !border-[#0f172a] !right-[-6px]`}
+        className={`!w-3 !h-3 !${styles.infoBg} !border-2 ${styles.cardBorder} !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -156,26 +159,27 @@ export function LineageSourceNode({ data, selected }: NodeProps<Node<SourceNodeD
 // ─── 自定义节点：同步入湖 ────────────────────────────────────
 
 export function LineageIngestNode({ data, selected }: NodeProps<Node<IngestNodeData>>) {
-  const theme = nodeThemes.ingest;
+  const { styles } = useTheme();
+  const theme = nodeThemesFn(styles as unknown as Record<string, string>).ingest;
   return (
     <div
       className={`
-        relative w-[200px] rounded-xl border bg-[#1e293b]
+        relative w-[200px] rounded-xl border ${styles.cardBg}
         ${theme.border} shadow-lg shadow-black/30
         transition-all duration-150 cursor-pointer
         ${theme.hoverBorder}
-        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ring-offset-[#0f172a]` : ''}
+        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ${styles.appBg}` : ''}
       `}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className={`!w-3 !h-3 !${styles.infoBg} !border-2 !border-[#0f172a] !left-[-6px]`}
+        className={`!w-3 !h-3 !${styles.infoBg} !border-2 ${styles.cardBorder} !left-[-6px]`}
       />
       <Handle
         type="source"
         position={Position.Right}
-        className={`!w-3 !h-3 !${styles.infoBg} !border-2 !border-[#0f172a] !right-[-6px]`}
+        className={`!w-3 !h-3 !${styles.infoBg} !border-2 ${styles.cardBorder} !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -212,26 +216,27 @@ export function LineageIngestNode({ data, selected }: NodeProps<Node<IngestNodeD
 // ─── 自定义节点：ETL管道 ─────────────────────────────────────
 
 export function LineagePipelineNode({ data, selected }: NodeProps<Node<PipelineNodeData>>) {
-  const theme = nodeThemes.pipeline;
+  const { styles } = useTheme();
+  const theme = nodeThemesFn(styles as unknown as Record<string, string>).pipeline;
   return (
     <div
       className={`
-        relative w-[200px] rounded-xl border bg-[#1e293b]
+        relative w-[200px] rounded-xl border ${styles.cardBg}
         ${theme.border} shadow-lg shadow-black/30
         transition-all duration-150 cursor-pointer
         ${theme.hoverBorder}
-        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ring-offset-[#0f172a]` : ''}
+        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ${styles.appBg}` : ''}
       `}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className={`!w-3 !h-3 !${styles.warningBg} !border-2 !border-[#0f172a] !left-[-6px]`}
+        className={`!w-3 !h-3 !${styles.warningBg} !border-2 ${styles.cardBorder} !left-[-6px]`}
       />
       <Handle
         type="source"
         position={Position.Right}
-        className={`!w-3 !h-3 !${styles.warningBg} !border-2 !border-[#0f172a] !right-[-6px]`}
+        className={`!w-3 !h-3 !${styles.warningBg} !border-2 ${styles.cardBorder} !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -262,27 +267,28 @@ export function LineagePipelineNode({ data, selected }: NodeProps<Node<PipelineN
 // ─── 自定义节点：数据集 ──────────────────────────────────────
 
 export function LineageDatasetNode({ data, selected }: NodeProps<Node<DatasetNodeData>>) {
-  const theme = nodeThemes.dataset;
+  const { styles } = useTheme();
+  const theme = nodeThemesFn(styles as unknown as Record<string, string>).dataset;
   const colCount = data.columns?.length || 0;
   return (
     <div
       className={`
-        relative w-[200px] rounded-xl border bg-[#1e293b]
+        relative w-[200px] rounded-xl border ${styles.cardBg}
         ${theme.border} shadow-lg shadow-black/30
         transition-all duration-150 cursor-pointer
         ${theme.hoverBorder}
-        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ring-offset-[#0f172a]` : ''}
+        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ${styles.appBg}` : ''}
       `}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className={`!w-3 !h-3 !${styles.successBg} !border-2 !border-[#0f172a] !left-[-6px]`}
+        className={`!w-3 !h-3 !${styles.successBg} !border-2 ${styles.cardBorder} !left-[-6px]`}
       />
       <Handle
         type="source"
         position={Position.Right}
-        className={`!w-3 !h-3 !${styles.successBg} !border-2 !border-[#0f172a] !right-[-6px]`}
+        className={`!w-3 !h-3 !${styles.successBg} !border-2 ${styles.cardBorder} !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -314,21 +320,22 @@ export function LineageDatasetNode({ data, selected }: NodeProps<Node<DatasetNod
 // ─── 自定义节点：Ontology实体 ────────────────────────────────
 
 export function LineageOntologyNode({ data, selected }: NodeProps<Node<OntologyNodeData>>) {
-  const theme = nodeThemes.ontology;
+  const { styles } = useTheme();
+  const theme = nodeThemesFn(styles as unknown as Record<string, string>).ontology;
   return (
     <div
       className={`
-        relative w-[200px] rounded-xl border bg-[#1e293b]
+        relative w-[200px] rounded-xl border ${styles.cardBg}
         ${theme.border} shadow-lg shadow-black/30
         transition-all duration-150 cursor-pointer
         ${theme.hoverBorder}
-        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ring-offset-[#0f172a]` : ''}
+        ${selected ? `ring-2 ${theme.selectedRing} ring-offset-1 ${styles.appBg}` : ''}
       `}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className={`!w-3 !h-3 !${styles.dangerBg} !border-2 !border-[#0f172a] !left-[-6px]`}
+        className={`!w-3 !h-3 !${styles.dangerBg} !border-2 ${styles.cardBorder} !left-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">

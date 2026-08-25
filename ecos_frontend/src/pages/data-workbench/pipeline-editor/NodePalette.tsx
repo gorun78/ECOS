@@ -42,7 +42,7 @@ const NodePalette: React.FC<NodePaletteProps> = ({
           </div>
         ))}
       </div>
-      <div className={`border-t p-2 ${styles.sidebarBorder}`}>
+      <div className={`p-2 border-t ${styles.sidebarBorder}`}>
         <div className={`text-[10px] leading-tight ${styles.cardTextMuted}`}>
           可用数据源: <span className={`font-semibold ${styles.cardText}`}>{connectionsCount}</span>
         </div>
