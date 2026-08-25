@@ -1,6 +1,11 @@
 /**
  * DataWorkbenchLayout — Shell component
- * Tab navigation + Copilot toggle + conditional rendering of 12 tab modules.
+ * Tab navigation + Copilot toggle + conditional rendering of 6 tab modules.
+ *
+ * PMO-3I (2026-08-25): consolidated 9 tabs → 6 tabs.
+ *   - removed: guide, syncs, pipelines (as separate tabs)
+ *   - merged syncs + pipelines into pipeline-builder (list + editor dual-pane)
+ *   - final tabs: connections / pipeline-builder / health / lineage / sql-query / engine-config
  * @license Apache-2.0
  */
 
@@ -10,19 +15,16 @@ import { useTheme } from '../components/ThemeContext';
 import type { ObjectType, Dataset } from './data-workbench/types';
 import LucideIcon from './data-workbench/LucideIcon';
 import ConnectionsTab from './data-workbench/tabs/ConnectionsTab';
-import SyncsTab from './data-workbench/tabs/SyncsTab';
-import PipelinesTab from './data-workbench/tabs/PipelinesTab';
 import HealthTab from './data-workbench/tabs/HealthTab';
 import DataLineageTab from './data-workbench/tabs/DataLineageTab';
 import PipelineBuilderTab from './data-workbench/tabs/PipelineBuilderTab';
 import SqlQueryTab from './data-workbench/tabs/SqlQueryTab';
 import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
-import GuideTab from "./data-workbench/InteractiveStepGuide";
 import { AddConnectionModal, AddSyncModal, AddHealthCheckModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
 import { CopilotPanel } from '../components/CopilotPanel';
 import { useDataWorkbench } from './data-workbench/hooks/useDataWorkbench';
 
-type TabName = 'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'guide' | 'sql-query' | 'engine-config';
+type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'sql-query' | 'engine-config';
 
 interface DataWorkbenchLayoutProps {
   objectTypes?: ObjectType[];
@@ -34,13 +36,10 @@ interface DataWorkbenchLayoutProps {
 }
 
 const TAB_CONFIG: { id: TabName; icon: string; i18nKey: string }[] = [
-  { id: 'guide', icon: 'Lightbulb', i18nKey: 'dw.tab.guide' },
   { id: 'connections', icon: 'Database', i18nKey: 'dw.tab.connections' },
-  { id: 'syncs', icon: 'Import', i18nKey: 'dw.tab.syncs' },
-  { id: 'pipelines', icon: 'Cpu', i18nKey: 'dw.tab.pipelines' },
+  { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
   { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
-  { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
   { id: 'sql-query', icon: 'Search', i18nKey: 'dw.tab.sql_query' },
   { id: 'engine-config', icon: 'Settings', i18nKey: 'dw.tab.engine_config' },
 ];
@@ -72,9 +71,7 @@ export default function DataWorkbenchLayout({
           <div className="py-3 px-3 space-y-1 overflow-y-auto">
             <div className={`text-xs font-bold ${styles.cardText} px-2.5 mb-3`}>{t('databench.layout.sidebarTitle')}</div>
             {TAB_CONFIG.map((tab, idx) => {
-              const prevGrp = idx > 0 ? TAB_CONFIG[idx - 1].i18nKey.split('.')[2] : '';
-              const thisGrp = tab.i18nKey.split('.')[2];
-              const divider = idx === 6; // divider before tools group (sql-query, engine-config)
+              const divider = idx === 4; // divider before tools group (sql-query, engine-config)
               return (
                 <React.Fragment key={tab.id}>
                   {divider && <div className={`my-2 border-t ${styles.cardBorder}`} />}
@@ -105,13 +102,10 @@ export default function DataWorkbenchLayout({
 
         {/* Body */}
         <div className="flex-1 flex overflow-hidden min-w-0">
-          {activeTab === 'guide' && <GuideTab showToast={showToast} setActiveTab={setActiveTab} />}
           {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} t={t} />}
-          {activeTab === 'syncs' && <SyncsTab syncTasks={dw.syncTasks} setSyncTasks={dw.setSyncTasks} showToast={showToast} showAddSync={dw.showAddSync} setShowAddSync={dw.setShowAddSync} newSyncName={dw.nsName} setNewSyncName={dw.setNsName} newSyncConn={dw.nsConn} setNewSyncConn={dw.setNsConn} newSyncTable={dw.nsTable} setNewSyncTable={dw.setNsTable} newSyncMode={dw.nsMode} setNewSyncMode={dw.setNsMode as any} newSyncSched={dw.nsSched} setNewSyncSched={dw.setNsSched as any} handleCreateSyncTask={dw.createSync} selectedTaskId={dw.selTaskId} setSelectedTaskId={dw.setSelTaskId} connections={dw.connections} triggerSyncTask={dw.triggerSync} t={t} />}
-          {activeTab === 'pipelines' && <PipelinesTab pipelines={dw.pipelines} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} setPipelines={dw.setPipelines} showToast={showToast} connections={dw.connections} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine as any} t={t} />}
+          {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} onPipelinesChange={dw.setPipelines} onSyncTasksChange={dw.setSyncTasks} onTriggerSync={dw.triggerSync} />}
           {activeTab === 'health' && <HealthTab healthChecks={dw.healthChecks} setHealthChecks={dw.setHealthChecks} showToast={showToast} showAddCheck={dw.showAddCheck} setShowAddCheck={dw.setShowAddCheck} newCheckName={dw.nhName} setNewCheckName={dw.setNhName} newCheckDs={dw.nhDs} setNewCheckDs={dw.setNhDs} checkType={dw.nhType} setCheckType={dw.setNhType as any} newCheck={{}} t={t} />}
           {activeTab === 'lineage' && <DataLineageTab />}
-          {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} />}
           {activeTab === 'sql-query' && <SqlQueryTab showToast={showToast} />}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>
