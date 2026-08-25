@@ -208,29 +208,29 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       <div className={`flex items-center justify-between px-4 py-2 border-b shrink-0 ${styles.appBg} ${styles.appText} ${styles.appBorder}`}>
         <div className="flex items-center gap-3">
           {onBack && (
-            <button onClick={onBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-blue-400 transition-colors" title="返回列表">
+            <button onClick={onBack} className={`flex items-center gap-1 text-xs ${styles.cardTextMuted} hover:${styles.infoText} transition-colors`} title="返回列表">
               <ArrowLeft size={14} /> 返回列表
             </button>
           )}
-          <GitBranch size={18} className="text-blue-400" />
+          <GitBranch size={18} className={`${styles.infoText}`} />
           <input
             type="text" value={pipelineName}
             onChange={(e) => setPipelineName(e.target.value)}
-            className="bg-transparent border-b border-slate-600 px-1 py-0.5 text-sm font-medium text-white outline-none focus:border-blue-400 transition-colors w-48"
+            className={`bg-transparent border-b ${styles.cardBorder} px-1 py-0.5 text-sm font-medium ${styles.cardText} outline-none focus:${styles.infoBorder} transition-colors w-48`}
             placeholder="Pipeline 名称"
           />
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-            editingPipeline ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+            editingPipeline ? `${styles.warningBg} ${styles.warningText} border ${styles.warningBorder}` : `${styles.successBg} ${styles.successText} border ${styles.successBorder}`
           }`}>
             {editingPipeline ? '编辑中' : '新建'}
           </span>
           {editingPipeline && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${
-              editingPipeline.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-              editingPipeline.status === 'draft' ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' :
-              editingPipeline.status === 'running' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-              editingPipeline.status === 'error' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-              'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+              editingPipeline.status === 'active' ? `${styles.successBg} ${styles.successText} ${styles.successBorder}` :
+              editingPipeline.status === 'draft' ? `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}` :
+              editingPipeline.status === 'running' ? `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}` :
+              editingPipeline.status === 'error' ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}` :
+              `${styles.successBg} ${styles.successText} ${styles.successBorder}`
             }`}>
               {editingPipeline.status === 'active' && '● 活跃'}
               {editingPipeline.status === 'draft' && '◌ 草稿'}
@@ -243,11 +243,11 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
         <div className="flex items-center gap-2">
           <div className={`flex items-center gap-1.5 rounded-lg p-0.5 ${styles.cardBg}`}>
             <button onClick={() => onEngineChange('memory')}
-              className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${computeEngine === 'memory' ? 'bg-blue-600 text-white shadow' : `${styles.cardTextMuted} hover:${styles.cardText}`}`}>
+              className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${computeEngine === 'memory' ? `${styles.accentBg} ${styles.cardText} shadow` : `${styles.cardTextMuted} hover:${styles.cardText}`}`}>
               <Zap size={12} /> Memory
             </button>
             <button onClick={() => onEngineChange('doris')}
-              className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${computeEngine === 'doris' ? 'bg-blue-600 text-white shadow' : `${styles.cardTextMuted} hover:${styles.cardText}`}`}>
+              className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${computeEngine === 'doris' ? `${styles.accentBg} ${styles.cardText} shadow` : `${styles.cardTextMuted} hover:${styles.cardText}`}`}>
               <Cpu size={12} /> Doris
             </button>
           </div>
@@ -255,10 +255,10 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
           <button onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:${styles.cardText}`} title="清空画布">
             <Trash2 size={13} /> 清空
           </button>
-          <button onClick={handleExecute} className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors">
+          <button onClick={handleExecute} className={`flex items-center gap-1.5 px-3 py-1 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Play size={13} /> 执行
           </button>
-          <button onClick={handleSave} className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors">
+          <button onClick={handleSave} className={`flex items-center gap-1.5 px-3 py-1 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Save size={13} /> 保存
           </button>
         </div>

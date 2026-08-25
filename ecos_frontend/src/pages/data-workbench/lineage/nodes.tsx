@@ -8,25 +8,26 @@ import React from 'react';
 import { CheckCircle, Loader2, XCircle, AlertCircle, Clock, Database, ArrowRightLeft, GitBranch, Table2, Box } from 'lucide-react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import type { SourceNodeData, IngestNodeData, PipelineNodeData, DatasetNodeData, OntologyNodeData } from './types';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── 状态徽章 ────────────────────────────────────────────────
 
 const statusColors: Record<string, string> = {
-  connected: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-  active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-  disconnected: 'bg-slate-500/20 text-slate-400 border-slate-500/40',
-  error: 'bg-red-500/20 text-red-400 border-red-500/40',
-  pending: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
-  testing: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
-  running: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
-  success: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-  completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-  failed: 'bg-red-500/20 text-red-400 border-red-500/40',
-  paused: 'bg-slate-500/20 text-slate-400 border-slate-500/40',
-  draft: 'bg-slate-500/20 text-slate-400 border-slate-500/40',
-  ok: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-  warning: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
-  passed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+  connected: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
+  active: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
+  disconnected: `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}`,
+  error: `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`,
+  pending: `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`,
+  testing: `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`,
+  running: `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`,
+  success: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
+  completed: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
+  failed: `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`,
+  paused: `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}`,
+  draft: `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}`,
+  ok: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
+  warning: `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`,
+  passed: `${styles.successBg} ${styles.successText} ${styles.successBorder}`,
 };
 
 const statusIcons: Record<string, React.FC<{ size?: number }>> = {
@@ -47,6 +48,7 @@ const statusIcons: Record<string, React.FC<{ size?: number }>> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
+  const { styles } = useTheme();
   const colors = statusColors[status] || statusColors.disconnected;
   const Icon = statusIcons[status];
   return (
@@ -63,44 +65,44 @@ export function StatusBadge({ status }: { status: string }) {
 
 const nodeThemes = {
   source: {
-    border: 'border-blue-500/50',
-    hoverBorder: 'hover:border-blue-400',
-    selectedRing: 'ring-blue-500',
-    accentBg: 'bg-blue-500/15',
-    accentText: 'text-blue-400',
-    iconColor: 'text-blue-400',
+    border: `${styles.infoBorder}`,
+    hoverBorder: `hover:${styles.infoBorder}`,
+    selectedRing: `${styles.infoBorder}`,
+    accentBg: `${styles.infoBg}`,
+    accentText: `${styles.infoText}`,
+    iconColor: `${styles.infoText}`,
   },
   ingest: {
-    border: 'border-purple-500/50',
-    hoverBorder: 'hover:border-purple-400',
-    selectedRing: 'ring-purple-500',
-    accentBg: 'bg-purple-500/15',
-    accentText: 'text-purple-400',
-    iconColor: 'text-purple-400',
+    border: `${styles.infoBorder}`,
+    hoverBorder: `hover:${styles.infoBorder}`,
+    selectedRing: `${styles.infoBorder}`,
+    accentBg: `${styles.infoBg}`,
+    accentText: `${styles.infoText}`,
+    iconColor: `${styles.infoText}`,
   },
   pipeline: {
-    border: 'border-amber-500/50',
-    hoverBorder: 'hover:border-amber-400',
-    selectedRing: 'ring-amber-500',
-    accentBg: 'bg-amber-500/15',
-    accentText: 'text-amber-400',
-    iconColor: 'text-amber-400',
+    border: `${styles.warningBorder}`,
+    hoverBorder: `hover:${styles.warningBorder}`,
+    selectedRing: `${styles.warningBorder}`,
+    accentBg: `${styles.warningBg}`,
+    accentText: `${styles.warningText}`,
+    iconColor: `${styles.warningText}`,
   },
   dataset: {
-    border: 'border-emerald-500/50',
-    hoverBorder: 'hover:border-emerald-400',
-    selectedRing: 'ring-emerald-500',
-    accentBg: 'bg-emerald-500/15',
-    accentText: 'text-emerald-400',
-    iconColor: 'text-emerald-400',
+    border: `${styles.successBorder}`,
+    hoverBorder: `hover:${styles.successBorder}`,
+    selectedRing: `${styles.successBorder}`,
+    accentBg: `${styles.successBg}`,
+    accentText: `${styles.successText}`,
+    iconColor: `${styles.successText}`,
   },
   ontology: {
-    border: 'border-rose-500/50',
-    hoverBorder: 'hover:border-rose-400',
-    selectedRing: 'ring-rose-500',
-    accentBg: 'bg-rose-500/15',
-    accentText: 'text-rose-400',
-    iconColor: 'text-rose-400',
+    border: `${styles.dangerBorder}`,
+    hoverBorder: `hover:${styles.dangerBorder}`,
+    selectedRing: `${styles.dangerBorder}`,
+    accentBg: `${styles.dangerBg}`,
+    accentText: `${styles.dangerText}`,
+    iconColor: `${styles.dangerText}`,
   },
 } as const;
 
@@ -121,7 +123,7 @@ export function LineageSourceNode({ data, selected }: NodeProps<Node<SourceNodeD
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-[#0f172a] !right-[-6px]"
+        className={`!w-3 !h-3 !${styles.infoBg} !border-2 !border-[#0f172a] !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -129,10 +131,10 @@ export function LineageSourceNode({ data, selected }: NodeProps<Node<SourceNodeD
             <Database size={14} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-[12px] font-bold text-white truncate leading-tight">
+            <h3 className={`text-[12px] font-bold ${styles.cardText} truncate leading-tight`}>
               {data.label}
             </h3>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">{data.sublabel}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} truncate mt-0.5`}>{data.sublabel}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
@@ -142,8 +144,8 @@ export function LineageSourceNode({ data, selected }: NodeProps<Node<SourceNodeD
           <StatusBadge status={data.status} />
         </div>
         {data.tablesAvailable > 0 && (
-          <div className="mt-2 pt-2 border-t border-slate-700/50">
-            <span className="text-[9px] text-slate-500">{data.tablesAvailable} 张表可用</span>
+          <div className={`mt-2 pt-2 border-t ${styles.cardBorder}`}>
+            <span className={`text-[9px] ${styles.muted}`}>{data.tablesAvailable} 张表可用</span>
           </div>
         )}
       </div>
@@ -168,12 +170,12 @@ export function LineageIngestNode({ data, selected }: NodeProps<Node<IngestNodeD
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-purple-500 !border-2 !border-[#0f172a] !left-[-6px]"
+        className={`!w-3 !h-3 !${styles.infoBg} !border-2 !border-[#0f172a] !left-[-6px]`}
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-purple-500 !border-2 !border-[#0f172a] !right-[-6px]"
+        className={`!w-3 !h-3 !${styles.infoBg} !border-2 !border-[#0f172a] !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -181,10 +183,10 @@ export function LineageIngestNode({ data, selected }: NodeProps<Node<IngestNodeD
             <ArrowRightLeft size={14} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-[12px] font-bold text-white truncate leading-tight">
+            <h3 className={`text-[12px] font-bold ${styles.cardText} truncate leading-tight`}>
               {data.label}
             </h3>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">{data.sublabel}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} truncate mt-0.5`}>{data.sublabel}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
@@ -196,8 +198,8 @@ export function LineageIngestNode({ data, selected }: NodeProps<Node<IngestNodeD
           <StatusBadge status={data.status} />
         </div>
         {data.recordsSynced !== undefined && data.recordsSynced > 0 && (
-          <div className="mt-2 pt-2 border-t border-slate-700/50">
-            <span className="text-[9px] text-slate-500">
+          <div className={`mt-2 pt-2 border-t ${styles.cardBorder}`}>
+            <span className={`text-[9px] ${styles.muted}`}>
               {data.recordsSynced.toLocaleString()} 条已同步
             </span>
           </div>
@@ -224,12 +226,12 @@ export function LineagePipelineNode({ data, selected }: NodeProps<Node<PipelineN
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-amber-500 !border-2 !border-[#0f172a] !left-[-6px]"
+        className={`!w-3 !h-3 !${styles.warningBg} !border-2 !border-[#0f172a] !left-[-6px]`}
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-amber-500 !border-2 !border-[#0f172a] !right-[-6px]"
+        className={`!w-3 !h-3 !${styles.warningBg} !border-2 !border-[#0f172a] !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -237,19 +239,19 @@ export function LineagePipelineNode({ data, selected }: NodeProps<Node<PipelineN
             <GitBranch size={14} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-[12px] font-bold text-white truncate leading-tight">
+            <h3 className={`text-[12px] font-bold ${styles.cardText} truncate leading-tight`}>
               {data.label}
             </h3>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">{data.sublabel}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} truncate mt-0.5`}>{data.sublabel}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <StatusBadge status={data.status} />
         </div>
-        <div className="mt-2 pt-2 border-t border-slate-700/50 flex items-center gap-3">
-          <span className="text-[9px] text-slate-500">{data.nodeCount} 节点</span>
+        <div className={`mt-2 pt-2 border-t ${styles.cardBorder} flex items-center gap-3`}>
+          <span className={`text-[9px] ${styles.muted}`}>{data.nodeCount} 节点</span>
           {(data.expressionsCount ?? 0) > 0 && (
-            <span className="text-[9px] text-slate-500">{data.expressionsCount} 表达式</span>
+            <span className={`text-[9px] ${styles.muted}`}>{data.expressionsCount} 表达式</span>
           )}
         </div>
       </div>
@@ -275,12 +277,12 @@ export function LineageDatasetNode({ data, selected }: NodeProps<Node<DatasetNod
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-emerald-500 !border-2 !border-[#0f172a] !left-[-6px]"
+        className={`!w-3 !h-3 !${styles.successBg} !border-2 !border-[#0f172a] !left-[-6px]`}
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-emerald-500 !border-2 !border-[#0f172a] !right-[-6px]"
+        className={`!w-3 !h-3 !${styles.successBg} !border-2 !border-[#0f172a] !right-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -288,20 +290,20 @@ export function LineageDatasetNode({ data, selected }: NodeProps<Node<DatasetNod
             <Table2 size={14} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-[12px] font-bold text-white truncate leading-tight">
+            <h3 className={`text-[12px] font-bold ${styles.cardText} truncate leading-tight`}>
               {data.label}
             </h3>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">{data.sublabel}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} truncate mt-0.5`}>{data.sublabel}</p>
           </div>
         </div>
-        <div className="mt-2 pt-2 border-t border-slate-700/50 flex items-center gap-3">
+        <div className={`mt-2 pt-2 border-t ${styles.cardBorder} flex items-center gap-3`}>
           {data.rowCount !== undefined && (
-            <span className="text-[9px] text-slate-500">
+            <span className={`text-[9px] ${styles.muted}`}>
               {data.rowCount.toLocaleString()} 行
             </span>
           )}
           {colCount > 0 && (
-            <span className="text-[9px] text-slate-500">{colCount} 列</span>
+            <span className={`text-[9px] ${styles.muted}`}>{colCount} 列</span>
           )}
         </div>
       </div>
@@ -326,7 +328,7 @@ export function LineageOntologyNode({ data, selected }: NodeProps<Node<OntologyN
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-rose-500 !border-2 !border-[#0f172a] !left-[-6px]"
+        className={`!w-3 !h-3 !${styles.dangerBg} !border-2 !border-[#0f172a] !left-[-6px]`}
       />
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -334,10 +336,10 @@ export function LineageOntologyNode({ data, selected }: NodeProps<Node<OntologyN
             <Box size={14} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-[12px] font-bold text-white truncate leading-tight">
+            <h3 className={`text-[12px] font-bold ${styles.cardText} truncate leading-tight`}>
               {data.label}
             </h3>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">{data.sublabel}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} truncate mt-0.5`}>{data.sublabel}</p>
           </div>
         </div>
         <div className="mt-2">
@@ -346,8 +348,8 @@ export function LineageOntologyNode({ data, selected }: NodeProps<Node<OntologyN
           </span>
         </div>
         {data.propertiesCount > 0 && (
-          <div className="mt-2 pt-2 border-t border-slate-700/50">
-            <span className="text-[9px] text-slate-500">{data.propertiesCount} 属性</span>
+          <div className={`mt-2 pt-2 border-t ${styles.cardBorder}`}>
+            <span className={`text-[9px] ${styles.muted}`}>{data.propertiesCount} 属性</span>
           </div>
         )}
       </div>
