@@ -40,10 +40,10 @@ export default function SqlQueryConsole() {
       const res = await apiFetchData<any>('/api/v1/engine/data/query/execute', {
         method: 'POST',
         body: JSON.stringify({
-          datasourceId: selectedDsId,
+          datasource_id: selectedDsId,
           sql: sql.trim(),
-          maxRows: 1000,
-          timeoutSeconds: 30
+          max_rows: 1000,
+          timeout_seconds: 30
         })
       });
       setResult({

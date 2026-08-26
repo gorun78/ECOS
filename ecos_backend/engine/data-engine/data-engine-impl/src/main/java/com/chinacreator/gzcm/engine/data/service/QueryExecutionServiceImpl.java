@@ -54,7 +54,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
 
         String historyId = UUID.randomUUID().toString();
         insertHistoryStart(historyId, datasourceId, sql);
-        runningQueries.put(historyId, null);
+        runningQueries.put(historyId, java.util.concurrent.CompletableFuture.completedFuture(null)); // ConcurrentHashMap 不允许 null value
 
         String resolvedSql = resolveParams(sql, params);
 

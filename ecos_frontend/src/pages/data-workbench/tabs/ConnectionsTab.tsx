@@ -6,6 +6,7 @@ import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
 import { deleteDataSource, updateDataSource, fetchDataSourceResources } from '../api';
+import { apiFetchData } from '../../../api';
 
 
 interface ConnectionsTabProps {
@@ -41,7 +42,19 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loadingTables, setLoadingTables] = useState(false);
   const [tablePage, setTablePage] = useState(1);
-  const TABLE_PAGE_SIZE = 10;
+  const [tablePageSize, setTablePageSize] = useState(20); // 默认20，从引擎配置获取
+
+  // 从引擎配置获取每页行数
+  useEffect(() => {
+    apiFetchData<any>('/api/v1/engine/data/settings')
+      .then((cfg: any) => {
+        const exec = cfg?.execution || cfg?.data?.execution || {};
+        const pageSize = parseInt(exec['catalog.page_size'] || exec['memory.max_rows'] || '20', 10);
+        // memory.max_rows 是查询上限，分页用合理值
+        setTablePageSize(Math.min(pageSize > 0 ? pageSize : 20, 100));
+      })
+      .catch(() => {});
+  }, []);
 
   // 选中连接时获取数据表目录
   useEffect(() => {
@@ -56,7 +69,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       }
       setLoadingTables(false);
     });
-  }, [selectedConnId, connections, setConnections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConnId]);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(tt('dw.conn.deleteConfirm') + ': ' + name)) return;
@@ -268,7 +282,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               ) : (
                 <>
                 <div className="space-y-4">
-                  {conn.tablesAvailable.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE).map(tbl => (
+                  {conn.tablesAvailable.slice((tablePage - 1) * tablePageSize, tablePage * tablePageSize).map(tbl => (
                     <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50`}>
                       <div className={`${styles.sidebarBg}/70 px-4 py-2 flex justify-between items-center border-b ${styles.cardBorder}`}>
                         <div className="flex items-center gap-2 text-xs">
@@ -295,7 +309,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     </div>
                   ))}
                 </div>
-                {conn.tablesAvailable.length > TABLE_PAGE_SIZE && (
+                {conn.tablesAvailable.length > tablePageSize && (
                   <div className={`flex items-center justify-between pt-2 border-t ${styles.cardBorder}`}>
                     <button
                       onClick={() => setTablePage(p => Math.max(1, p - 1))}
@@ -306,11 +320,11 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                       {t("dw.conn.pagePrev")}
                     </button>
                     <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
-                      {t("dw.conn.pageInfo").replace('{page}', String(tablePage)).replace('{total}', String(Math.ceil(conn.tablesAvailable.length / TABLE_PAGE_SIZE)))}
+                      {t("dw.conn.pageInfo").replace('{page}', String(tablePage)).replace('{total}', String(Math.ceil(conn.tablesAvailable.length / tablePageSize)))}
                     </span>
                     <button
-                      onClick={() => setTablePage(p => Math.min(Math.ceil(conn.tablesAvailable.length / TABLE_PAGE_SIZE), p + 1))}
-                      disabled={tablePage >= Math.ceil(conn.tablesAvailable.length / TABLE_PAGE_SIZE)}
+                      onClick={() => setTablePage(p => Math.min(Math.ceil(conn.tablesAvailable.length / tablePageSize), p + 1))}
+                      disabled={tablePage >= Math.ceil(conn.tablesAvailable.length / tablePageSize)}
                       className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}
                     >
                       {t("dw.conn.pageNext")}
@@ -438,7 +452,7 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
       const res = await fetch('/api/v1/engine/data/query/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ datasourceId, sql: sql.trim(), maxRows: 500, timeoutSeconds: 30 })
+        body: JSON.stringify({ datasource_id: datasourceId, sql: sql.trim(), max_rows: 500, timeout_seconds: 30 })
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
