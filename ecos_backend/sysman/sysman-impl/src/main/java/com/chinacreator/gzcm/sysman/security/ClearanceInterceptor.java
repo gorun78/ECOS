@@ -90,6 +90,8 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/datanet")
                 || path.startsWith("/api/security")
                 || path.startsWith("/api/v1/security")
+                || path.startsWith("/api/v1/audit")
+                || path.startsWith("/api/audit")
                 || path.startsWith("/api/twins")
                 || path.startsWith("/api/v1/system/tenants")
                 || path.startsWith("/api/v1/ecos/ontologies")
