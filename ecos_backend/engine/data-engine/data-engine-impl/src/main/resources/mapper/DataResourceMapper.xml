@@ -60,7 +60,7 @@
             r.datasource_id, r.source_path, r.description, r.tags, r.status,
             r.field_count,
             COALESCE(r.record_count, CASE WHEN c.reltuples > 0 THEN c.reltuples::bigint ELSE NULL END) AS record_count,
-            r.last_sync_time, r.create_by, r.create_time, r.update_by, r.update_time, r.layer
+            r.last_sync_time, r.create_by, r.create_time, r.update_by, r.update_time
         FROM td_data_resource r
         LEFT JOIN pg_class c ON c.relname = SPLIT_PART(r.source_path, '.', 2)
         WHERE r.datasource_id = #{datasourceId}
