@@ -5,8 +5,19 @@ import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
-import { deleteDataSource, updateDataSource, fetchDataSourceResources } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect } from '../api';
 import { apiFetchData } from '../../../api';
+
+const STRATEGY_OPTIONS: { value: string; key: string }[] = [
+  { value: 'MANUAL', key: 'dw.strategy.manual' },
+  { value: 'ON_SAVE', key: 'dw.strategy.onSave' },
+  { value: 'ON_SCHEDULE', key: 'dw.strategy.onSchedule' },
+];
+const COUNT_METHOD_OPTIONS: { value: string; key: string }[] = [
+  { value: 'OFF', key: 'dw.strategy.countOff' },
+  { value: 'ESTIMATE', key: 'dw.strategy.countEstimate' },
+  { value: 'EXACT', key: 'dw.strategy.countExact' },
+];
 
 
 interface ConnectionsTabProps {
@@ -43,6 +54,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [loadingTables, setLoadingTables] = useState(false);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(20); // 默认20，从引擎配置获取
+  // PMO-37 元数据获取策略
+  const [collecting, setCollecting] = useState(false);
+  const [lastCollectInfo, setLastCollectInfo] = useState<{ time?: string; countMethod?: string } | null>(null);
 
   // 从引擎配置获取每页行数
   useEffect(() => {
@@ -244,6 +258,57 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <div>
                   <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.165c7b")}</span>
                    <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || t("dw.neverTested")}</span>
+                </div>
+
+                {/* PMO-37 元数据获取策略 */}
+                <hr className={`${styles.cardBorder}`} />
+                <div>
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono mb-2`}>{t("dw.strategy.section")}</span>
+                  <div className="space-y-2">
+                    <div>
+                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.trigger")}</label>
+                      <select
+                        value={conn.strategy?.trigger || 'MANUAL'}
+                        onChange={e => setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: e.target.value as any } } : c))}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+                      >
+                        {STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.count")}</label>
+                      <select
+                        value={conn.strategy?.countMethod || 'OFF'}
+                        onChange={e => setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, countMethod: e.target.value as any } } : c))}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+                      >
+                        {COUNT_METHOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
+                      </select>
+                    </div>
+                    <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("dw.strategy.hint")}</p>
+                    <div className="flex gap-2">
+                      <button
+                        disabled={collecting}
+                        onClick={async () => {
+                          setCollecting(true);
+                          const r = await triggerMetadataCollect(conn.id);
+                          setCollecting(false);
+                          if (r?.taskId) showToast('success', t('dw.strategy.collectStarted').replace('{id}', String(r.taskId)));
+                          else showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
+                        }}
+                        className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
+                      >
+                        <LucideIcon name="RefreshCw" size={11} className={collecting ? 'animate-spin' : ''} />
+                        {collecting ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
+                      </button>
+                    </div>
+                    <div className={`text-[10px] ${styles.cardTextMuted}`}>
+                      {t("dw.strategy.lastCollect")}:{' '}
+                      {conn.metadataConfig?.lastCollectTime
+                        ? new Date(String(conn.metadataConfig.lastCollectTime)).toLocaleString()
+                        : t('dw.strategy.neverCollected')}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
