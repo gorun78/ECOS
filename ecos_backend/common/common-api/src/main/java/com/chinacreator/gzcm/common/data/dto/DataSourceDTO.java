@@ -37,6 +37,8 @@ public class DataSourceDTO {
     private Integer cacheTtlMinutes;
     /** 编辑连接配置后自动触发采集 */
     private Boolean onSourceEdit;
+    /** metadata_config JSONB（FE 一次性发送；扁平字段优先，此字段作 fallback 解析） */
+    private String metadataConfig;
 
     // ===== Getters/Setters =====
 
@@ -78,4 +80,7 @@ public class DataSourceDTO {
 
     public Boolean getOnSourceEdit() { return onSourceEdit; }
     public void setOnSourceEdit(Boolean onSourceEdit) { this.onSourceEdit = onSourceEdit; }
+
+    public String getMetadataConfig() { return metadataConfig; }
+    public void setMetadataConfig(String metadataConfig) { this.metadataConfig = metadataConfig; }
 }
