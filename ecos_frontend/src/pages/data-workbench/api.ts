@@ -57,6 +57,24 @@ function mapDsToConn(e: Record<string, unknown>): DataConnection {
     description: (e.description as string) || '',
     category: (e.tags as string) || '',
     tablesAvailable: [],
+    // PMO-37: 解析 metadataConfig (JSONB string or object)
+    ...(() => {
+      try {
+        const raw = (e.metadataConfig as Record<string, any>) || (e.metadataConfig as string);
+        let mc: Record<string, any> = {};
+        if (typeof raw === 'string' && raw.length > 1) { try { mc = JSON.parse(raw); } catch { mc = {}; } }
+        else if (raw && typeof raw === 'object') mc = raw;
+        let strategy;
+        if (mc && (mc.trigger || mc.countMethod)) {
+          strategy = {
+            trigger: (mc.trigger as string) || 'MANUAL',
+            countMethod: (mc.countMethod as string) || (mc.count_method as string) || 'OFF',
+            scheduleCron: mc.scheduleCron as string,
+          };
+        }
+        return { metadataConfig: mc as Record<string, any>, ...(strategy ? { strategy } : {}) };
+      } catch { return {}; }
+    })(),
   };
 }
 
@@ -445,11 +463,22 @@ function buildConnectionConfig(c: {
   return JSON.stringify(cfg);
 }
 
+/** PMO-37: 策略 → metadataConfig JSON string (td_datasource.metadata_config JSONB) */
+function toMetadataConfigJson(strategy: { trigger?: string; countMethod?: string; scheduleCron?: string }): string {
+  const cfg: Record<string, unknown> = {
+    trigger: strategy.trigger || 'MANUAL',
+    countMethod: strategy.countMethod || 'OFF',
+  };
+  if (strategy.scheduleCron) cfg.scheduleCron = strategy.scheduleCron;
+  return JSON.stringify(cfg);
+}
+
 /** 创建数据源 → DataSourceController POST /datanet/datasource */
 export async function createDataSource(payload: {
   name: string; type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
   description?: string; tags?: string; password?: string;
+  strategy?: { trigger?: string; countMethod?: string; scheduleCron?: string };
 }): Promise<DataConnection | null> {
   try {
     const dto = {
@@ -458,6 +487,7 @@ export async function createDataSource(payload: {
       connectionConfig: buildConnectionConfig(payload),
       description: payload.description || '',
       tags: payload.tags || '',
+      ...(payload.strategy ? { metadataConfig: toMetadataConfigJson(payload.strategy) } : {}),
     };
     const entity = await post<Record<string, unknown>>(DATANET_DS, dto);
     return mapDsToConn(entity);
@@ -482,6 +512,7 @@ export async function updateDataSource(id: string, payload: {
   name: string; type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
   description?: string; tags?: string; password?: string;
+  strategy?: { trigger?: string; countMethod?: string; scheduleCron?: string };
 }): Promise<DataConnection | null> {
   try {
     const dto = {
@@ -490,6 +521,7 @@ export async function updateDataSource(id: string, payload: {
       connectionConfig: buildConnectionConfig(payload),
       description: payload.description || '',
       tags: payload.tags || '',
+      ...(payload.strategy ? { metadataConfig: toMetadataConfigJson(payload.strategy) } : {}),
     };
     const entity = await put<Record<string, unknown>>(`${DATANET_DS}/${id}`, dto);
     return mapDsToConn(entity);
@@ -507,6 +539,22 @@ export async function deleteDataSource(id: string): Promise<boolean> {
   } catch (e) {
     console.warn('[data-workbench] deleteDataSource failed:', e);
     return false;
+  }
+}
+
+/** 立即触发元数据采集 → POST /datanet/metadata/collect-async/{id} (PMO-37) */
+export async function triggerMetadataCollect(datasourceId: string): Promise<{ taskId?: string; message?: string } | null> {
+  try {
+    const res = await fetch(`/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    return (json.data ?? json) as { taskId?: string; message?: string } | null;
+  } catch (e) {
+    console.warn('[data-workbench] triggerMetadataCollect failed:', e);
+    return null;
   }
 }
 

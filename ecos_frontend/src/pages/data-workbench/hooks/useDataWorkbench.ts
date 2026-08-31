@@ -117,6 +117,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       const conn = await createDataSource({
         name: ncName, type: ncType, host: ncHost || 'localhost', port: ncPort,
         username: ncUser || 'anonymous', password: ncPassword, database: ncDatabase,
+        strategy: { trigger: 'ON_SAVE', countMethod: 'ESTIMATE' },
       });
       if (conn) {
         setConnections(p => [...p, conn]); setSelConnId(conn.id); setShowAddConn(false);
