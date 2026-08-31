@@ -24,6 +24,20 @@ public class DataSourceDTO {
 
     private String tags;
 
+    // ===== PMO-37 元数据获取策略 =====
+    /** ON_SAVE / ON_SCHEDULE / MANUAL / ON_DEMAND ；null 表示走默认（MANUAL，向后兼容） */
+    private String metadataStrategy;
+    /** 是否采集行数 */
+    private Boolean includeRowCount;
+    /** EXACT / ESTIMATE / OFF */
+    private String countMethod;
+    /** ON_SCHEDULE 时的 cron（Spring 6 段格式） */
+    private String scheduleCron;
+    /** 元数据缓存 TTL（分钟），默认 5 */
+    private Integer cacheTtlMinutes;
+    /** 编辑连接配置后自动触发采集 */
+    private Boolean onSourceEdit;
+
     // ===== Getters/Setters =====
 
     public String getDatasourceName() { return datasourceName; }
@@ -46,4 +60,22 @@ public class DataSourceDTO {
 
     public String getTags() { return tags; }
     public void setTags(String tags) { this.tags = tags; }
+
+    public String getMetadataStrategy() { return metadataStrategy; }
+    public void setMetadataStrategy(String metadataStrategy) { this.metadataStrategy = metadataStrategy; }
+
+    public Boolean getIncludeRowCount() { return includeRowCount; }
+    public void setIncludeRowCount(Boolean includeRowCount) { this.includeRowCount = includeRowCount; }
+
+    public String getCountMethod() { return countMethod; }
+    public void setCountMethod(String countMethod) { this.countMethod = countMethod; }
+
+    public String getScheduleCron() { return scheduleCron; }
+    public void setScheduleCron(String scheduleCron) { this.scheduleCron = scheduleCron; }
+
+    public Integer getCacheTtlMinutes() { return cacheTtlMinutes; }
+    public void setCacheTtlMinutes(Integer cacheTtlMinutes) { this.cacheTtlMinutes = cacheTtlMinutes; }
+
+    public Boolean getOnSourceEdit() { return onSourceEdit; }
+    public void setOnSourceEdit(Boolean onSourceEdit) { this.onSourceEdit = onSourceEdit; }
 }

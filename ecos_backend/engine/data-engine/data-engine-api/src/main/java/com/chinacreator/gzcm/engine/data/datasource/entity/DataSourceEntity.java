@@ -28,6 +28,10 @@ public class DataSourceEntity {
     private Timestamp updateTime;
     private String tags;
     private String remark;
+    /** PMO-37 元数据获取策略配置（JSONB），如 {"strategy":"ON_SAVE","includeRowCount":true,"countMethod":"ESTIMATE"} */
+    private String metadataConfig;
+    /** PMO-37 最近一次元数据采集完成时间 */
+    private Timestamp lastCollectTime;
     
     public String getDatasourceId() {
         return datasourceId;
@@ -171,6 +175,22 @@ public class DataSourceEntity {
     
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+    
+    public String getMetadataConfig() {
+        return metadataConfig;
+    }
+    
+    public void setMetadataConfig(String metadataConfig) {
+        this.metadataConfig = metadataConfig;
+    }
+    
+    public Timestamp getLastCollectTime() {
+        return lastCollectTime;
+    }
+    
+    public void setLastCollectTime(Timestamp lastCollectTime) {
+        this.lastCollectTime = lastCollectTime;
     }
     
     public static class DataSourceType {
