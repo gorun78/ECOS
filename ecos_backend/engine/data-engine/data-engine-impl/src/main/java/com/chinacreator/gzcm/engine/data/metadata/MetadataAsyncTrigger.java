@@ -80,9 +80,19 @@ public class MetadataAsyncTrigger {
         submitAsync(datasourceId);
     }
 
-    /** 提交采集任务（同步返回 taskId；内部走任务引擎） */
+    /**
+     * 提交采集任务 (BUG-D1 修)。
+     * <p>
+     * 返回任务引擎生成的真实 UUID (不再是执行结果 JSON),
+     * 调用方可直接拼接 /collect-status/{taskId} 轮询。
+     * 执行结果 JSON 存入任务引擎 TaskStatus.result, 走轮询链路回查。
+     *
+     * @param datasourceId 数据源 ID
+     * @return 任务引擎真实 UUID
+     */
     public String submitAsync(String datasourceId) {
-        return taskService.submitCollect(datasourceId, true);
+        // T4: 局限在单线程入口 — 不再依赖 submitCollect 是把 result JSON 当 taskId 返回
+        return taskService.submitOnly(datasourceId);
     }
 
     // ===== 静态工具（供 DataSourceServiceImpl / Scheduler / Publisher 复用） =====
