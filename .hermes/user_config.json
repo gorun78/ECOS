@@ -1,0 +1,39 @@
+{
+  "projectName" : null,
+  "projectCode" : null,
+  "projectDescription" : null,
+  "serverIp" : null,
+  "frontend" : {
+    "type" : "React",
+    "port" : 3000,
+    "directory" : "ecos_frontend",
+    "components" : "react19,typescript,vite6,tailwind4,express-bff,hashrouter,lucide-react",
+    "currentPort" : null
+  },
+  "backend" : {
+    "type" : "Java",
+    "jdkVersion" : "17",
+    "port" : 8080,
+    "context" : "/",
+    "rootPackage" : "com.chinacreator.gzcm",
+    "logPath" : "ecos_backend/logs/gateway.log",
+    "directory" : "ecos_backend",
+    "components" : "springboot3.2,mybatis,fat-jar-gateway,maven-3-editions,archunit",
+    "currentPort" : null
+  },
+  "database" : {
+    "jdbcUrl" : "jdbc:postgresql://localhost:5432/sys_man",
+    "username" : "postgres",
+    "password" : "postgres",
+    "components" : null
+  },
+  "git" : {
+    "url" : "https://github.com/gorun78/ECOS"
+  },
+  "standardsText" : null,
+  "standards" : null,
+  "projectStructure" : null,
+  "testRequirements" : null,
+  "otherConstraints" : null,
+  "configExists" : null
+}

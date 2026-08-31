@@ -185,7 +185,10 @@ public class DataSourceServiceImpl implements DataSourceService {
             Object v = rs.getObject("metadata_config");
             if (v == null) return null;
             String s = v.toString();
-            return s.isEmpty() ? null : (s.trim().equals("{}") ? null : s);
+            if (s == null || s.isBlank()) return null;
+            // PMO-37 修正: "{}" 是合法的空策略对象, 原实现把它转 null 导致
+            // FE 列表接口 items[].metadataConfig 永远空, 现按原样透传.
+            return s;
         } catch (java.sql.SQLException sqlEx) {
             return null; // 缺列回退
         }

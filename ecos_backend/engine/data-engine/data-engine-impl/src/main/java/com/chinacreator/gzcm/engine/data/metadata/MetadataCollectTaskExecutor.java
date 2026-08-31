@@ -102,10 +102,17 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
             boolean includeRowCount = Boolean.TRUE.equals(strategy.getIncludeRowCount());
 
             // 1) 表清单（带 1 次整任务级重试）
+            // PMO-38 T2: 数据源业务类型 (POSTGRESQL 等) 归一化到 pipeline 规范类型 (JDBC),
+            // 防御纵深 — ConnectorFactory.getConnector 内部也做归一化,
+            // 此处显式先归一以让错误信息更友好。
+            final String connectorType =
+                    ConnectorFactory.knownType(ds.getDatasourceType()) != null
+                            ? ConnectorFactory.knownType(ds.getDatasourceType())
+                            : ds.getDatasourceType();
             List<com.chinacreator.gzcm.common.data.model.DataResource> resources = withRetry(
                     () -> {
                         com.chinacreator.gzcm.runtime.access.connector.Connector connector =
-                                connectorFactory.getConnector(ds.getDatasourceType());
+                                connectorFactory.getConnector(connectorType);
                         return connector.listResources(ds.getConnectionConfig(),
                                 ds.getOrgId(), ds.getDatasourceName());
                     });

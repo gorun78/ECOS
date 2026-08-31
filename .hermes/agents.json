@@ -3,21 +3,21 @@
   "boards" : "ECOS-boards",
   "agents" : [ {
     "name" : "pm-default",
-    "code" : "pm-1787553666643"
+    "code" : "ecos-pm"
   }, {
     "name" : "pm-iost",
-    "code" : "pm-1787553698979"
+    "code" : "ecos-pmo"
   }, {
     "name" : "reviewer-yxdn",
-    "code" : "reviewer-1787553987217"
+    "code" : "ecos-fe"
   }, {
     "name" : "fullstack-hplv",
-    "code" : "fullstack-1787553817229"
+    "code" : "ecos-be"
   }, {
     "name" : "arch-ihwh",
-    "code" : "arch-1787553932408"
+    "code" : "ecos-arch"
   }, {
     "name" : "qa-ggbx",
-    "code" : "qa-1787553750225"
+    "code" : "ecos-qa"
   } ]
 }
