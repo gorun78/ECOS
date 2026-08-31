@@ -17,5 +17,7 @@ public interface DataSourceRepository {
 
     List<DataSourceEntity> findAll();
 
+    int updateLastCollectTime(@Param("id") String id);
+
     int deleteById(@Param("id") String id);
 }
