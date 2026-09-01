@@ -42,6 +42,7 @@ export interface QueryHistoryItem {
   status: string;
   rowsReturned: number;
   elapsedMs: number;
-  errorMsg?: string;
   startedAt: string;
+  errorMessage?: string;
+  errorMsg?: string; // 兼容旧 schema（typo 字段，渲染时合并到 errorMessage）
 }

@@ -7,14 +7,13 @@ import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRe
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
 import org.neo4j.driver.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -46,27 +45,24 @@ public class RuleGraphService {
     private static final Logger log = LoggerFactory.getLogger(RuleGraphService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    // ── Neo4j connection config ──
+    // ── Neo4j 连接 (统一收敛 runtime-access) ──
+    // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
+    // 保留 cognitive.neo4j.switch-on-write 配置开关 (业务级: 是否启用 Neo4j 写入).
+    @Value("${cognitive.neo4j.switch-on-write:}")
+    private String neo4jSwitchOnWrite;
 
-    @Value("${neo4j.uri:bolt://localhost:7687}")
-    private String neo4jUri;
-
-    @Value("${neo4j.username:neo4j}")
-    private String neo4jUsername;
-
-    @Value("${neo4j.password:neo4j123}")
-    private String neo4jPassword;
-
+    @Autowired(required = false)
     private Driver driver;
 
     // ── Lifecycle ──
 
     @PostConstruct
     public void init() {
-        driver = GraphDatabase.driver(neo4jUri, AuthTokens.basic(neo4jUsername, neo4jPassword));
-        log.info("Neo4j driver initialized: uri={}", neo4jUri);
-
-        // 创建索引（幂等 — 已存在则跳过）
+        if (driver == null) {
+            log.warn("RuleGraphService init: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), 规则图谱功能禁用");
+            return;
+        }
+        log.info("RuleGraphService init: 使用 runtime-access 统一 Driver, switchOnWrite={}", switchNeo4jEnabled());
         try (Session session = driver.session()) {
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE");
             session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (r:Rule) REQUIRE r.id IS UNIQUE");
@@ -78,9 +74,26 @@ public class RuleGraphService {
 
     @PreDestroy
     public void close() {
-        if (driver != null) {
-            driver.close();
-            log.info("Neo4j driver closed");
+        // Driver 是 runtime-access 管理的 Bean (Neo4jConfig), 不在此 close (生命周期统一)
+        log.info("RuleGraphService close: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
+    }
+
+    /**
+     * Neo4j 写入开关: cognitive.neo4j.switch-on-write (空 / true / false)
+     *
+     * <p>M0 改造 (2026-09) 补全: 此前该方法是 switch statement 直接读配置, 现改写为 instance method。
+     * 同时 {@link #createExtractedEntityGraph(ExtractedSubGraph)} / {@link #createRuleGraph(ComplianceRule)}
+     * 调用处若 driver == null (standard 档) 直接 no-op。</p>
+     */
+    public boolean switchNeo4jEnabled() {
+        String sw = neo4jSwitchOnWrite;
+        if (sw == null || sw.isBlank()) {
+            return true; // 默认启用 (enterprise/flagship 档)
+        }
+        try {
+            return Boolean.parseBoolean(sw.trim());
+        } catch (Exception e) {
+            return true;
         }
     }
 
@@ -100,7 +113,11 @@ public class RuleGraphService {
             log.warn("createExtractedEntityGraph: subGraph is null, nothing to write");
             return new WriteStats(0, 0, 0, 0);
         }
-
+        if (driver == null) {
+            // M0 改造 (2026-09): standard 档 Neo4j 不可用, no-op
+            log.debug("createExtractedEntityGraph: Neo4j Driver 不可用, skip");
+            return new WriteStats(0, 0, 0, 0);
+        }
         int entitiesCreated = 0;
         int entitiesUpdated = 0;
         int relationsCreated = 0;
@@ -166,7 +183,11 @@ public class RuleGraphService {
             log.warn("createRuleGraph: rule or rule.id is null, cannot create graph");
             return;
         }
-
+        if (driver == null) {
+            // M0 改造 (2026-09): standard 档 Neo4j 不可用, no-op
+            log.debug("createRuleGraph: Neo4j Driver 不可用, skip (ruleId={})", rule.getId());
+            return;
+        }
         try (Session session = driver.session()) {
             // 创建/更新规则节点
             session.writeTransaction(tx -> {

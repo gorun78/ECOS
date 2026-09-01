@@ -27,8 +27,24 @@ export default function HistoryPanel({ show, onLoadSql, onClose }: HistoryPanelP
   const load = () => {
     setLoading(true);
     apiFetchData<any>('/api/v1/engine/data/query/history?page=1&pageSize=50')
-      .then((d: any) => setItems(Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : [])))
-      .catch(() => {})
+      .then((d: any) => {
+        const raw: any[] = Array.isArray(d?.data) ? (d as any).data : Array.isArray(d) ? (d as any[]) : [];
+        const normalized: QueryHistoryItem[] = raw.map((r: any) => ({
+          id: String(r.id ?? ''),
+          datasourceId: String(r.dataSourceId ?? r.datasource_id ?? ''),
+          sqlContent: String(r.sqlContent ?? r.sql_content ?? r.sql ?? ''),
+          status: String(r.status ?? 'UNKNOWN'),
+          rowsReturned: Number(r.rowsReturned ?? r.rows_returned ?? 0),
+          elapsedMs: Number(r.elapsedMs ?? r.elapsed_ms ?? 0),
+          startedAt: String(r.startedAt ?? r.started_at ?? ''),
+          errorMessage: r.errorMessage ?? r.error_msg ?? null,
+        }));
+        setItems(normalized);
+      })
+      .catch((e: any) => {
+        setItems([]);
+        console.error('[HistoryPanel] 加载历史失败:', e);
+      })
       .finally(() => setLoading(false));
   };
 

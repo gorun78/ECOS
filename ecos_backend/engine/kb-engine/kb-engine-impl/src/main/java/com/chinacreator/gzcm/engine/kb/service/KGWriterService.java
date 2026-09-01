@@ -11,14 +11,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.neo4j.driver.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * KG 写入服务 — 将 Extractor 产出的 ExtractedEntity / ExtractedRelation
@@ -34,62 +33,52 @@ public class KGWriterService {
     private static final Logger log = LoggerFactory.getLogger(KGWriterService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    // ── Neo4j config ──
-    private static final int MAX_CONNECTION_POOL_SIZE = 10;
+    // ── Neo4j (统一收敛 runtime-access) ──
+    // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
+    // Pool 参数 (MAX_CONNECTION_POOL_SIZE 等) 默认在 Neo4jConfig 内设置为 10 / 30s,
+    // 如需各 Service 不同 Pool 参数, 由 Neo4jConfig 提供 Factory + Bean name 区分 (后续增强)。
+    private static final int MAX_CONNECTION_POOL_SIZE = 10; // 仅用于 log 显示
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long RETRY_DELAY_MS = 1000;
 
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
 
-    // Neo4j driver — nullable for standard edition
+    /**
+     * Neo4j driver — nullable for standard edition
+     * M0 改造 (2026-09): 改用 @Autowired(required=false) 注入 runtime-access 统一 Driver.
+     */
+    @Autowired(required = false)
     private volatile Driver neo4jDriver;
+
     private volatile boolean neo4jAvailable = false;
-
-    @Value("${neo4j.uri:bolt://localhost:7687}")
-    private String neo4jUri;
-
-    @Value("${neo4j.username:neo4j}")
-    private String neo4jUsername;
-
-    @Value("${neo4j.password:neo4j123}")
-    private String neo4jPassword;
 
     public KGWriterService(KnowledgeNodeMapper nodeMapper, KnowledgeEdgeMapper edgeMapper) {
         this.nodeMapper = nodeMapper;
         this.edgeMapper = edgeMapper;
     }
 
-    // ── Neo4j 连接池生命周期 ──
+    // ── Neo4j 生命周期 ──
 
     /**
-     * 初始化 Neo4j 连接池。
-     * 最大连接10, 最小空闲2, 连接存活检测30s。
+     * 初始化 Neo4j 连接池 (现已统一收敛 runtime-access/Neo4jConfig)。
+     * M0 改造 (2026-09): 删除原 GraphDatabase.driver 创建逻辑, 改为消费 runtime-access
+     * 提供的共享 Driver Bean (Pool 参数 10 / 30s / 10s acquisition / 30min lifetime 由 Neo4jConfig 统一定义)。
      */
     @PostConstruct
     public void neo4jPoolInit() {
+        if (neo4jDriver == null) {
+            neo4jAvailable = false;
+            log.warn("⚠️  KGWriterService init: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), KG 写入走 PG fallback");
+            return;
+        }
         try {
-            Config config = Config.builder()
-                    .withMaxConnectionPoolSize(MAX_CONNECTION_POOL_SIZE)
-                    .withConnectionLivenessCheckTimeout(30, TimeUnit.SECONDS)
-                    .withConnectionAcquisitionTimeout(10, TimeUnit.SECONDS)
-                    .withMaxConnectionLifetime(30, TimeUnit.MINUTES)
-                    .build();
-
-            AuthToken auth = neo4jUsername != null && !neo4jUsername.isEmpty()
-                    ? AuthTokens.basic(neo4jUsername, neo4jPassword)
-                    : AuthTokens.none();
-
-            this.neo4jDriver = GraphDatabase.driver(neo4jUri, auth, config);
-
-            // 连接验证
             verifyConnectivity();
             neo4jAvailable = true;
-            log.info("✅ Neo4j connection pool initialized — uri={}, maxPool={}",
-                    neo4jUri, MAX_CONNECTION_POOL_SIZE);
+            log.info("✅ KGWriterService init: 使用 runtime-access 统一 Driver (pool≈{} connections)", MAX_CONNECTION_POOL_SIZE);
         } catch (Exception e) {
             neo4jAvailable = false;
-            log.warn("⚠️  Neo4j connection pool init failed (non-fatal, KG writes use PG fallback): {}", e.getMessage());
+            log.warn("⚠️  KGWriterService init: Neo4j 连接验证失败, 走 PG fallback: {}", e.getMessage());
         }
     }
 
@@ -126,14 +115,8 @@ public class KGWriterService {
 
     @PreDestroy
     public void neo4jPoolDestroy() {
-        if (neo4jDriver != null) {
-            try {
-                neo4jDriver.close();
-                log.info("Neo4j connection pool closed");
-            } catch (Exception e) {
-                log.warn("Error closing Neo4j driver: {}", e.getMessage());
-            }
-        }
+        // M0 改造 (2026-09): Driver 是 runtime-access 管理的 Bean, 不在此 close (生命周期统一)
+        log.info("KGWriterService neo4jPoolDestroy: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
     }
 
     /**

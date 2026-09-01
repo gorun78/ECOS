@@ -1,21 +1,17 @@
 package com.chinacreator.gzcm.workspace.service;
 
-import org.neo4j.driver.AuthTokens;
-import org.neo4j.driver.Config;
 import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
 import org.neo4j.driver.Session;
 import org.neo4j.driver.Values;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A2 — Object 实例 → KG 节点同步引擎。
@@ -28,27 +24,23 @@ public class ObjectKgSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(ObjectKgSyncService.class);
 
-    @Value("${neo4j.uri:bolt://localhost:7687}")
-    private String neo4jUri;
-
-    @Value("${neo4j.username:neo4j}")
-    private String neo4jUser;
-
-    @Value("${neo4j.password:neo4j123}")
-    private String neo4jPass;
-
+    // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
+    @Autowired(required = false)
     private Driver driver;
 
     @PostConstruct
     void init() {
-        driver = GraphDatabase.driver(neo4jUri, AuthTokens.basic(neo4jUser, neo4jPass),
-                Config.builder().withConnectionTimeout(5, TimeUnit.SECONDS).build());
-        log.info("ObjectKgSyncService Neo4j driver initialized: {}", neo4jUri);
+        if (driver == null) {
+            log.warn("ObjectKgSyncService init: Neo4j Driver 不可用, Object→KG 同步禁用 (no-op)");
+            return;
+        }
+        log.info("ObjectKgSyncService init: 使用 runtime-access 统一 Driver");
     }
 
     @PreDestroy
     void close() {
-        if (driver != null) driver.close();
+        // Driver 是 runtime-access 管理的 Bean, 不在此 close
+        log.info("ObjectKgSyncService close: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
     }
 
     /**
@@ -61,6 +53,11 @@ public class ObjectKgSyncService {
      */
     public void syncObjectToNeo4j(String entityCode, String objectId,
                                    Map<String, Object> properties, String operation) {
+        if (driver == null) {
+            // M0 改造 (2026-09): Neo4j Driver 不可用 (standard 档), no-op
+            log.debug("syncObjectToNeo4j: Neo4j Driver 不可用, skip (entityCode={}, op={})", entityCode, operation);
+            return;
+        }
         // 安全校验：Label 名仅允许字母、数字、下划线
         if (entityCode == null || !entityCode.matches("[A-Za-z0-9_]+")) {
             log.debug("Skipping KG sync for unsafe entityCode: {}", entityCode);

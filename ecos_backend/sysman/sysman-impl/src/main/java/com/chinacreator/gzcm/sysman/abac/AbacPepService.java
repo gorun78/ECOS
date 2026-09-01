@@ -5,6 +5,8 @@ import com.chinacreator.gzcm.sysman.abac.model.AbacPolicy;
 import com.chinacreator.gzcm.sysman.abac.service.IAbacPolicyService;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -45,19 +47,27 @@ public class AbacPepService {
     private IAbacPolicyService policyService;
 
     /**
-     * 内存策略缓存：policyId → AbacPolicy。
-     * MVP 阶段避免每次查询数据库；后续可替换为 Redis / Caffeine。
+     * ABAC 策略缓存：policyId → AbacPolicy。
+     * <p>M0 改造 (2026-09): ConcurrentHashMap → Caffeine，上限 10 万 (策略量上限)。
+     * 策略变更调用 {@link #invalidateAllCaches()} 主动失效。TTL 不设 (策略常驻)。
+     * <p>POV: PMO-B2 第 3 项 (AbacPepService 政策缓存)
      */
-    private final Map<String, AbacPolicy> policyCache = new ConcurrentHashMap<>();
+    private final Cache<String, AbacPolicy> policyCache = Caffeine.newBuilder()
+        .maximumSize(100_000)
+        .build();
 
     /**
-     * 评估结果缓存：cacheKey → Boolean。
-     * 简单短期缓存，避免短时间内重复计算。
+     * ABAC 评估结果缓存：cacheKey → Boolean。
+     * <p>M0 改造 (2026-09): ConcurrentHashMap (max 1000) → Caffeine (max 100,000 / TTL 5 min)。
+     * <p>POV: PMO-B2 第 4 项 (AbacPepService 决策缓存)
      */
-    private final Map<String, Boolean> decisionCache = new ConcurrentHashMap<>();
+    private final Cache<String, Boolean> decisionCache = Caffeine.newBuilder()
+        .maximumSize(100_000)
+        .expireAfterWrite(DECISION_CACHE_TTL_MINUTES, TimeUnit.MINUTES)
+        .build();
 
-    /** 决策缓存最大条目数 */
-    private static final int DECISION_CACHE_MAX = 1000;
+    /** 决策缓存 TTL（分钟）：MPV 阶段 5 分钟足够，后续可配到 sys_config 表 */
+    private static final long DECISION_CACHE_TTL_MINUTES = 5;
 
     @Autowired
     public AbacPepService(IPermissionCheckService permissionCheckService) {
@@ -82,7 +92,7 @@ public class AbacPepService {
 
         // 1. 短期缓存命中直接返回
         String cacheKey = subject + "|" + resource + "|" + action;
-        Boolean cached = decisionCache.get(cacheKey);
+        Boolean cached = decisionCache.getIfPresent(cacheKey);
         if (cached != null) {
             log.debug("ABAC 决策缓存命中: key={}, result={}", cacheKey, cached);
             return cached;
@@ -108,11 +118,9 @@ public class AbacPepService {
             permitted = false;
         }
 
-        // 4. 写入决策缓存（简单 LRU-esque: 超过上限则清空重建）
-        if (decisionCache.size() >= DECISION_CACHE_MAX) {
-            decisionCache.clear();
-            log.debug("ABAC 决策缓存已满，执行清空");
-        }
+        // 4. 写入决策缓存 (Caffeine 自动按 LRU/TTL 淘汰, 不需要手动 clear)
+        // M0 改造 (2026-09): Caffeine 已启用 `maximumSize(100_000) + expireAfterWrite(5 min)`,
+        // 原 ConcurrentHashMap 的"超过上限 clear 全部"逻辑不再需要。
         decisionCache.put(cacheKey, permitted);
 
         log.debug("ABAC evaluate: subject={}, resource={}, action={} → {}",
@@ -243,7 +251,8 @@ public class AbacPepService {
             return policies;
         } catch (Exception e) {
             log.warn("加载ABAC策略失败，使用内存缓存: {}", e.getMessage());
-            return List.copyOf(policyCache.values());
+            // M0 改造 (2026-09): Caffeine 没有 values() 直接 API, 用 asMap() 视图
+            return List.copyOf(policyCache.asMap().values());
         }
     }
 
@@ -270,9 +279,10 @@ public class AbacPepService {
 
     /**
      * 清空决策缓存（供策略变更后调用）。
+     * M0 改造 (2026-09): Caffeine Cache 用 invalidateAll() 而非 clear()
      */
     public void invalidateDecisionCache() {
-        decisionCache.clear();
+        decisionCache.invalidateAll();
         log.info("ABAC 决策缓存已清空");
     }
 
@@ -280,8 +290,8 @@ public class AbacPepService {
      * 清空策略 + 决策缓存，强制下次重新加载（供策略 CRUD 后调用）。
      */
     public void invalidateAllCaches() {
-        policyCache.clear();
-        decisionCache.clear();
+        policyCache.invalidateAll();
+        decisionCache.invalidateAll();
         log.info("ABAC 全部缓存已清空");
     }
 }

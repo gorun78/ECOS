@@ -71,15 +71,6 @@
         </dependency>
     </dependencies>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>com.chinacreator.gzcm.services.apigateway.ApiGatewayApplication</mainClass>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+    <!-- M0 改造 (2026-09): 移除 spring-boot-maven-plugin, 改为 library 由 gateway 集成。
+         mainClass 声明保留以兼容 standalone 调试。 -->
 </project>

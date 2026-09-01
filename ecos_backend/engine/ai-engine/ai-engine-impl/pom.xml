@@ -35,16 +35,17 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- Cognitive API + Impl -->
+        <!-- M0-P0 改造 (2026-09-01): 删除 cognitive-api/cognitive-impl 依赖。
+             这是 pre-existing C1 类 (CognitiveService/CognitiveController 引用),
+             已在 13 模块基线删除 (旧 JAR 仍在 ~/.m2 stale 但不项目构建)。
+             真实认知能力走 cognitive-engine (com.chinacreator.gzcm.engine.cognitive2.*),
+             未来 ai-engine 的 v2 Controller 改成依赖 cognitive-engine-api。
+             关联 08/04 C1-Cognitive-重复-impl 跟踪 Wave-2 ai。 -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>cognitive-api</artifactId>
+            <artifactId>cognitive-engine-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>cognitive-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <optional>true</optional> <!-- Wave-2 ai 重写后启用, 当前 stub 不用 -->
         </dependency>
 
         <!-- Spring Boot Web -->

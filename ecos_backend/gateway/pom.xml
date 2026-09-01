@@ -124,12 +124,11 @@
             <artifactId>worldmodel-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>cognitive-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-
+        <!-- M0 改造 (2026-09-01): 删除 cognitive-impl 依赖。
+             这是 pre-existing C1 模块源码已删, 仅存 .m2 stale JAR; ai-engine 的 CognitiveService/
+             CognitiveController 已 stub (引用 0), gateway excludeFilters 已 exclude;
+             真实认知能力在第 54 行 cognitive-engine-impl (cognitive-engine 引擎层)。
+             跟踪 08-产品化重构方案/04 C1-Cognitive-重复-impl (Wave-2 ai 重写)。 -->
         <!-- Flyway DB Migration -->
         <dependency>
             <groupId>org.flywaydb</groupId>

@@ -31,19 +31,22 @@ public class SecurityConfig {
                     "/auth/**",
                     "/api/v1/auth/**",
                     // ── P0-1: /api/security/** 已移出 permitAll（需认证）
-                    // ── P2-1: /api/v1/security/** 新路径别名也需认证
-                    // ── Public read-only domains
+                    // ── Public read-only domains (GET on reference domains only)
+                    // M0 改造 (2026-09-01): 移除 3 条过宽 permitAll (暴露敏感数据 + 违反默认 DENY):
+                    //   - /api/v1/system/**       → Tenant/Roles/Users/Permissions 不可匿名 (QA T2-003/004/005, T4-005, T5-007/008 5 项)
+                    //   - /datanet/** + /api/v1/datanet/**  → 数据源连接池凭据 (username/password) 不可匿名 (QA T3-006)
+                    //   - /api/v1/knowledge/**    → 知识正文含敏感业务, 不可匿名 (QA T5-007)
+                    // 当前 public 范围: ecos 公开元数据 + marketplace 商品目录 + catalog 元数据 + glossary + oag 公开 query.
                     "/api/v1/ecos/**",
                     "/api/v1/marketplace/**",
                     "/api/v1/agent/**",
                     "/api/v1/agent-loop/**",
                     "/api/v1/agent-mesh/**",
-                    "/api/v1/knowledge/**",
+                    // "◄ /api/v1/knowledge/** — 移除 (敏感正文, QA T5-007)"
                     "/api/v1/glossary/**",
                     "/api/v1/catalog/**",
                     "/api/v1/oag/**",
-                    // ── System management
-                    "/api/v1/system/**",
+                    // ── System management (M0 改造 移除 /api/v1/system/**)
                     "/api/v1/dict/**",
                     "/api/v1/pipeline/**",
                     "/api/v1/dq/**",
@@ -82,9 +85,8 @@ public class SecurityConfig {
                     "/health",
                     "/actuator/health",
                     "/error",
-                    // ── Datanet (proxy path, no /api/ prefix)
-                    "/datanet/**",
-                    "/api/v1/datanet/**",
+                    // ── Datanet (M0 改造 移除 permits, 数据源凭据不可匿名)
+                    // "◄ /datanet/**, /api/v1/datanet/** — 移除 (QA T3-006)"
                     // ── Data Lake / Workbook
                     "/api/datalake/**",
                     "/api/workbook/**",

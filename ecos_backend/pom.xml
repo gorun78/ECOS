@@ -615,6 +615,29 @@
                         <phase>verify</phase>
                         <goals><goal>report</goal></goals>
                     </execution>
+                    <!-- M0 改造 (2026-09): 加 <check> execution + 阈值 0.05 (起步, 不阻塞)
+                         后续按 08-产品化重构方案/05 §2.3 节奏递增:
+                         2026-09 0.05 → 2026-10 0.10 → 2026-11 0.20 → 2026-12 0.60 (Phase 5 整库 ≥60%, 最终 0.80)
+                         intake 时运行 mvn verify (跳过用 -Djacoco.skip=true) -->
+                    <execution>
+                        <id>check-bundle</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.05</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>
