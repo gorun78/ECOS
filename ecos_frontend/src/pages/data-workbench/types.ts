@@ -25,7 +25,8 @@ export interface Dataset {
 
 export interface TableInfo {
   name: string;
-  rowCount: number;
+  // B8: 后端 recordCount 可能 -1/ null, 前端用 null 表"未知"，UI 显示"未知"
+  rowCount: number | null;
   columns: { name: string; type: string }[];
 }
 

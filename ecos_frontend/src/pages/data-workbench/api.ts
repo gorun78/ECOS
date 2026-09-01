@@ -542,10 +542,10 @@ export async function deleteDataSource(id: string): Promise<boolean> {
   }
 }
 
-/** 立即触发元数据采集 → POST /datanet/metadata/collect-async/{id} (PMO-37) */
+/** 立即触发元数据采集 → POST /api/v1/datanet/metadata/collect-async/{id} (PMO-37) */
 export async function triggerMetadataCollect(datasourceId: string): Promise<{ taskId?: string; message?: string } | null> {
   try {
-    const res = await fetch(`/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`, {
+    const res = await fetch(`/api/v1/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
     });
@@ -555,6 +555,46 @@ export async function triggerMetadataCollect(datasourceId: string): Promise<{ ta
   } catch (e) {
     console.warn('[data-workbench] triggerMetadataCollect failed:', e);
     return null;
+  }
+}
+
+/** 查询元数据采集任务状态 → GET /api/v1/datanet/metadata/collect-status/{taskId} (P0-3) */
+export async function fetchCollectStatus(taskId: string): Promise<{
+  status?: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | string;
+  progress?: number;
+  message?: string;
+  collectedTables?: number;
+  totalTables?: number;
+} | null> {
+  try {
+    const raw = await get<Record<string, unknown>>(`/api/v1/datanet/metadata/collect-status/${encodeURIComponent(taskId)}`);
+    return (raw ?? {}) as {
+      status?: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | string;
+      progress?: number;
+      message?: string;
+      collectedTables?: number;
+      totalTables?: number;
+    };
+  } catch (e) {
+    console.warn('[data-workbench] fetchCollectStatus failed:', e);
+    return null;
+  }
+}
+
+/** 保存元数据策略配置 → PUT /api/v1/datanet/metadata/strategy/{id} (P0-3) */
+export async function saveMetadataStrategy(datasourceId: string, strategy: string, countMethod: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ trigger: strategy, countMethod }),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    return !!json?.success;
+  } catch (e) {
+    console.warn('[data-workbench] saveMetadataStrategy failed:', e);
+    return false;
   }
 }
 
@@ -577,14 +617,14 @@ export async function testDataSourceRaw(payload: {
   }
 }
 
-/** 获取数据源的物理表/目录列表 → GET /datanet/metadata/resources/{datasourceId} */
+/** 获取数据源的物理表/目录列表 → GET /api/v1/datanet/metadata/resources/{datasourceId} */
 export async function fetchDataSourceResources(datasourceId: string): Promise<TableInfo[]> {
   try {
-    const raw = await get<unknown[]>(`/datanet/metadata/resources/${datasourceId}`);
+    const raw = await get<unknown[]>(`/api/v1/datanet/metadata/resources/${datasourceId}`);
     if (!Array.isArray(raw)) return [];
     return raw.map((r: Record<string, unknown>) => ({
       name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',
-      rowCount: (r.recordCount as number) || (r.rowCount as number) || (r.rows as number) || 0,
+      rowCount: normalizeRowCount(r.recordCount, r.rowCount, r.rows),
       columns: Array.isArray(r.columns)
         ? (r.columns as Record<string, unknown>[]).map(c => ({
             name: (c.name as string) || (c.columnName as string) || '',
@@ -596,6 +636,16 @@ export async function fetchDataSourceResources(datasourceId: string): Promise<Ta
     console.warn('[data-workbench] fetchDataSourceResources failed:', e);
     return [];
   }
+}
+
+// B8: 后端 recordCount 可能为 -1 (countMethod=OFF) / null / 0 / 正数。
+// 归一: -1/null/NaN → null(UI 显示"未知"), 其它数值保留。
+function normalizeRowCount(rc?: unknown, rowCount?: unknown, rows?: unknown): number | null {
+  const v = rc != null ? rc : rowCount != null ? rowCount : rows;
+  if (v == null || (typeof v === 'number' && Number.isNaN(v))) return null;
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
 }
 
 /** 创建同步任务 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks (taskType=SYNC) */

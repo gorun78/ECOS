@@ -51,4 +51,13 @@ public interface DataSourceService {
      * 删除数据源。
      */
     void remove(String datasourceId);
+
+    /**
+     * 更新数据源的元数据策略配置 (metadata_config JSONB)。
+     * P0-3 新增。
+     *
+     * @param datasourceId 数据源 ID
+     * @param json         完整的 MetadataStrategyConfig JSON 串
+     */
+    void updateMetadataConfig(String datasourceId, String json);
 }

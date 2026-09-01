@@ -5,7 +5,7 @@ import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
-import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy } from '../api';
 import { apiFetchData } from '../../../api';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
@@ -269,7 +269,12 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                       <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.trigger")}</label>
                       <select
                         value={conn.strategy?.trigger || 'MANUAL'}
-                        onChange={e => setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: e.target.value as any } } : c))}
+                        onChange={async e => {
+                          const newTrigger = e.target.value;
+                          const newCount = conn.strategy?.countMethod || 'OFF';
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: newTrigger as any } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
+                        }}
                         className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
                       >
                         {STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
@@ -279,7 +284,12 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                       <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.count")}</label>
                       <select
                         value={conn.strategy?.countMethod || 'OFF'}
-                        onChange={e => setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, countMethod: e.target.value as any } } : c))}
+                        onChange={async e => {
+                          const newCount = e.target.value;
+                          const newTrigger = conn.strategy?.trigger || 'MANUAL';
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, countMethod: newCount as any } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
+                        }}
                         className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
                       >
                         {COUNT_METHOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
@@ -320,8 +330,30 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <div className="flex items-center gap-3">
                   <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
                   <button
-                    onClick={() => {
-                      setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: [] } : c));
+                    onClick={async () => {
+                      setLoadingTables(true);
+                      const r = await triggerMetadataCollect(conn.id);
+                      if (r?.taskId) {
+                        // 轮询任务状态，完成后更新目录
+                        let done = false;
+                        for (let i = 0; i < 60 && !done; i++) {
+                          await new Promise(res => setTimeout(res, 1000));
+                          const st = await fetchCollectStatus(r.taskId);
+                          if (st?.status === 'SUCCEEDED' || st?.status === 'FAILED') {
+                            done = true;
+                            if (st.status === 'SUCCEEDED') {
+                              const fresh = await fetchDataSourceResources(conn.id);
+                              setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                            }
+                            break;
+                          }
+                        }
+                      } else {
+                        // fallback: 直接重拉目录
+                        const fresh = await fetchDataSourceResources(conn.id);
+                        setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                      }
+                      setLoadingTables(false);
                     }}
                     disabled={loadingTables}
                     className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}

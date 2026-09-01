@@ -237,6 +237,53 @@ public class MetadataController {
         return r;
     }
 
+    // ===== P0-3 新增：保存数据源元数据策略配置 =====
+
+    @PutMapping("/strategy/{datasourceId}")
+    public Map<String, Object> saveStrategy(@PathVariable String datasourceId,
+                                            @RequestBody Map<String, Object> body) {
+        DataSourceEntity ds = dataSourceService.getById(datasourceId);
+        if (ds == null) {
+            return error("数据源不存在: " + datasourceId);
+        }
+        MetadataStrategyConfig cfg = MetadataStrategyConfig.fromJson(ds.getMetadataConfig());
+        if (body.containsKey("strategy")) {
+            String s = String.valueOf(body.get("strategy"));
+            if (!s.equals(MetadataStrategyConfig.STRATEGY_ON_SAVE)
+                    && !s.equals(MetadataStrategyConfig.STRATEGY_ON_SCHEDULE)
+                    && !s.equals(MetadataStrategyConfig.STRATEGY_MANUAL)
+                    && !s.equals(MetadataStrategyConfig.STRATEGY_ON_DEMAND)) {
+                return error("未知策略: " + s);
+            }
+            cfg.setStrategy(s);
+        }
+        if (body.containsKey("countMethod")) {
+            String cm = String.valueOf(body.get("countMethod"));
+            if (!cm.equals(MetadataStrategyConfig.COUNT_EXACT)
+                    && !cm.equals(MetadataStrategyConfig.COUNT_ESTIMATE)
+                    && !cm.equals(MetadataStrategyConfig.COUNT_OFF)) {
+                return error("未知行数统计方式: " + cm);
+            }
+            cfg.setCountMethod(cm);
+        }
+        if (body.containsKey("scheduleCron")) {
+            cfg.setScheduleCron(body.get("scheduleCron") == null ? null : String.valueOf(body.get("scheduleCron")));
+        }
+        try {
+            String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(cfg);
+            dataSourceService.updateMetadataConfig(datasourceId, json);
+        } catch (Exception e) {
+            log.warn("策略保存失败 datasource={}: {}", datasourceId, e.getMessage());
+            return error("策略保存失败: " + e.getMessage());
+        }
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("code", 0);
+        r.put("message", "ok");
+        r.put("success", true);
+        r.put("datasourceId", datasourceId);
+        return r;
+    }
+
     private Map<String, Object> error(String msg) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("code", -1);

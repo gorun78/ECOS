@@ -142,6 +142,19 @@ public class DataSourceServiceImpl implements DataSourceService {
         log.info("Removed datasource: {}", datasourceId);
     }
 
+    @Override
+    public void updateMetadataConfig(String datasourceId, String json) {
+        Timestamp now = new Timestamp(System.currentTimeMillis());
+        int n = jdbc.update(
+            "UPDATE " + TABLE + " SET metadata_config = ?, update_time = ? WHERE datasource_id = ?",
+            json, now, datasourceId
+        );
+        if (n == 0) {
+            throw new RuntimeException("数据源不存在: " + datasourceId);
+        }
+        log.info("Updated metadataConfig: datasource={}, json={}", datasourceId, json);
+    }
+
     private String buildMetadataConfigJson(DataSourceDTO dto, String fallbackStrategy) {
         try {
             @SuppressWarnings("unchecked")
