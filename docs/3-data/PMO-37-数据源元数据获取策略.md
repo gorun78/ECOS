@@ -316,3 +316,43 @@ CatalogTree fetchResources(datasourceId)
 ## 分支
 
 `feature/pmo-37-metadata-strategy`
+
+## 功能清单
+
+总状态：8 项，P0 已完成，P1/P2 待开发。
+
+### P0 — 三路径修复（✅ 已完成，commit 1c4695b）
+
+| # | 功能 | 优先级 | 状态 | 验收方式 |
+|---|------|--------|------|----------|
+| 1 | 手动刷新采集 — 数据源详情卡 → 刷新按钮 | P0 | ✅ 已修 | 点击触发异步采集 → 轮询 collect-status → 完成后自动回显目录；超时显示 loading |
+| 2 | 立即采集 — 数据源详情卡 → 收集按钮 | P0 | ✅ 已修 | 提交任务引擎返回 taskId（在前端 toast 中展示），任务引擎侧 RUNNING→SUCCEEDED |
+| 3 | 目录回显 — `GET /api/v1/datanet/metadata/resources/{id}` | P0 | ✅ 已修 | 修前裸路径 404；修后返回 200 + 数据（curl 已验证） |
+| 4 | 策略保存 — `PUT /strategy/{datasourceId}` | P0 | ✅ 已修 | 策略下拉框 onChange 调后端，metadata_config JSON 持久化到 td_datasource |
+| 5 | 任务状态查询 — `GET /collect-status/{taskId}` | P0 | ✅ 已修 | 返回 status/progress/errorMessage/result，轮询用 |
+
+### P1 — 定时配置闭环（⏳ 未做）
+
+| # | 功能 | 状态 | 预估 |
+|---|------|------|------|
+| 6.1 | 后端：`td_datasource.metadata_config` 新增字段 `intervalMinutes` / `intervalUnit` / `scheduleEnabled` / `nextFireTime` / `lastFireTime` | ⏳ | 30min |
+| 6.2 | 后端：`AutoCollectScheduler` 从一次性 cron 改为重复 interval 调度（每 5min 扫描一次） | ⏳ | 40min |
+| 6.3 | 前端：数据源编辑界面新增「定时采集」配置区块（启用开关 + 间隔数值 + 单位下拉 + 下次执行预估） | ⏳ | 60min |
+| 6.4 | i18n：`dw.scheduled.*` 翻译键 | ⏳ | 15min |
+
+### P2 — 回显一致性治理（⏳ 未做）
+
+| # | 功能 | 状态 | 预估 |
+|---|------|------|------|
+| 7.1 | `MetadataCollectTaskExecutor` 采集前按 datasourceId 清空 `td_data_resource`，再全量写入（根治行膨胀 531→180） | ⏳ 需确认 | 30min |
+| 7.2 | 前端 fetchDataSourceResources 去重 + 行数与 DB 一致验证 | ⏳ | 20min |
+| 7.3 | 失败态：断开数据源后触发采集，前端显示明确错误（不静默假成功） | ⏳ | 15min |
+
+### 铁律约束
+
+- 不新增 Maven 模块、不新增 Docker 容器
+- 不改动已有 API 路径签名（新增 `/strategy/{id}` 除外）
+- 双白名单同步修改
+- 编译验证：`mvn clean compile -Dmaven.test.skip=true` 0 ERROR 进 QA
+- 不动数据库已有表结构（P1 新增字段需先出方案）
+
