@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "priority": {"type": "string", "enum": ["低", "中", "高", "紧急"]},
+    "status": {"type": "string", "enum": ["待办", "进行中", "已完成", "暂停"]},
+    "strings": {"type": "array", "items": {"type": "string"}},
+    "nullableString": {"type": ["string", "null"]},
+    "nullableInteger": {"type": ["integer", "null"], "minimum": 0},
+    "dependency": {
+      "type": "object",
+      "properties": {
+        "depends_on": {"$ref": "#/$defs/strings"},
+        "blocks": {"$ref": "#/$defs/strings"}
+      },
+      "required": ["depends_on", "blocks"],
+      "additionalProperties": false
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "body": {"type": "string", "minLength": 1},
+        "assignee": {"type": "string", "minLength": 1},
+        "status": {"$ref": "#/$defs/status"},
+        "priority": {"$ref": "#/$defs/priority"},
+        "created_by": {"type": "string", "minLength": 1},
+        "created_at": {"type": "integer", "minimum": 0},
+        "started_at": {"$ref": "#/$defs/nullableInteger"},
+        "completed_at": {"$ref": "#/$defs/nullableInteger"},
+        "result": {"type": ["object", "array", "string", "number", "boolean", "null"]},
+        "skills": {"$ref": "#/$defs/strings"},
+        "max_retries": {"$ref": "#/$defs/nullableInteger"},
+        "session_id": {"$ref": "#/$defs/nullableString"},
+        "workflow_template_id": {"$ref": "#/$defs/nullableString"},
+        "current_step_key": {"$ref": "#/$defs/nullableString"},
+        "workspace_path": {"$ref": "#/$defs/nullableString"},
+        "branch_name": {"$ref": "#/$defs/nullableString"},
+        "project_id": {"$ref": "#/$defs/nullableString"},
+        "tenant": {"$ref": "#/$defs/nullableString"},
+        "workspace_kind": {"type": "string", "minLength": 1},
+        "parents": {"$ref": "#/$defs/strings"},
+        "children": {"$ref": "#/$defs/strings"}
+      },
+      "required": ["id", "title", "body", "assignee", "status", "priority", "created_by", "created_at", "started_at", "completed_at", "result", "skills", "max_retries", "session_id", "workflow_template_id", "current_step_key", "workspace_path", "branch_name", "project_id", "tenant", "workspace_kind", "parents", "children"],
+      "additionalProperties": false
+    },
+    "column": {
+      "type": "object",
+      "properties": {
+        "key": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "sortable": {"type": "boolean"},
+        "filterable": {"type": "boolean"},
+        "visible": {"type": "boolean"},
+        "width": {"type": "integer", "minimum": 1}
+      },
+      "required": ["key", "label", "sortable", "filterable", "visible", "width"],
+      "additionalProperties": false
+    },
+    "assigneeView": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "display_name": {"type": "string", "minLength": 1}
+      },
+      "required": ["id", "display_name"],
+      "additionalProperties": false
+    },
+    "statusView": {
+      "type": "object",
+      "properties": {
+        "value": {"$ref": "#/$defs/status"},
+        "label": {"$ref": "#/$defs/status"},
+        "style": {"type": "string", "minLength": 1}
+      },
+      "required": ["value", "label", "style"],
+      "additionalProperties": false
+    },
+    "priorityView": {
+      "type": "object",
+      "properties": {
+        "value": {"$ref": "#/$defs/priority"},
+        "label": {"$ref": "#/$defs/priority"},
+        "style": {"type": "string", "minLength": 1}
+      },
+      "required": ["value", "label", "style"],
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string", "minLength": 1},
+        "type": {"type": "string", "minLength": 1}
+      },
+      "required": ["label", "type"],
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "assignee": {"$ref": "#/$defs/assigneeView"},
+        "status": {"$ref": "#/$defs/statusView"},
+        "priority": {"$ref": "#/$defs/priorityView"},
+        "dependencies": {"$ref": "#/$defs/strings"},
+        "created_at": {"type": "integer", "minimum": 0},
+        "updated_at": {"type": "integer", "minimum": 0},
+        "actions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/action"}}
+      },
+      "required": ["id", "title", "assignee", "status", "priority", "dependencies", "created_at", "updated_at", "actions"],
+      "additionalProperties": false
+    },
+    "counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+  },
+  "type": "object",
+  "properties": {
+    "project": {"type": "string", "minLength": 1},
+    "workflow_mode": {"type": "string", "minLength": 1},
+    "created_by": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "dispatch_mode": {"type": "string", "minLength": 1},
+    "dependencies": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/dependency"}},
+    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}},
+    "ui_task_list": {
+      "type": "object",
+      "properties": {
+        "columns": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/column"}},
+        "rows": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/row"}}
+      },
+      "required": ["columns", "rows"],
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "mode": {"type": "string", "minLength": 1},
+        "planned_dispatch_method": {"type": "string", "minLength": 1},
+        "dispatched": {"$ref": "#/$defs/strings"},
+        "in_progress": {"$ref": "#/$defs/strings"},
+        "completed": {"$ref": "#/$defs/strings"},
+        "blocked": {"$ref": "#/$defs/strings"},
+        "ready": {"$ref": "#/$defs/strings"},
+        "pending_dispatch": {"$ref": "#/$defs/strings"}
+      },
+      "required": ["mode", "planned_dispatch_method", "dispatched", "in_progress", "completed", "blocked", "ready", "pending_dispatch"],
+      "additionalProperties": false
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "by_status": {"$ref": "#/$defs/counts"},
+        "by_priority": {"$ref": "#/$defs/counts"},
+        "by_assignee": {"$ref": "#/$defs/counts"}
+      },
+      "required": ["total", "by_status", "by_priority", "by_assignee"],
+      "additionalProperties": false
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "dry_run_valid": {"type": "boolean"},
+        "dispatch_result_valid": {"type": "boolean"},
+        "json_valid": {"type": "boolean"},
+        "tasks_length_match": {"type": "boolean"},
+        "ui_task_list_length_match": {"type": "boolean"},
+        "dependencies_direction_valid": {"type": "boolean"},
+        "no_circular_dependency": {"type": "boolean"},
+        "all_required_fields_present": {"type": "boolean"},
+        "assignee_valid": {"type": "boolean"},
+        "all_validations_pass": {"type": "boolean", "const": true}
+      },
+      "required": ["dry_run_valid", "dispatch_result_valid", "json_valid", "tasks_length_match", "ui_task_list_length_match", "dependencies_direction_valid", "no_circular_dependency", "all_required_fields_present", "assignee_valid", "all_validations_pass"],
+      "additionalProperties": false
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "next_steps": {"type": "array", "items": {"type": "string"}},
+    "swarm": {
+      "type": "object",
+      "properties": {
+        "root_id": {"type": "string", "minLength": 1},
+        "worker_ids": {"$ref": "#/$defs/strings"},
+        "verifier_id": {"$ref": "#/$defs/nullableString"},
+        "synthesizer_id": {"$ref": "#/$defs/nullableString"}
+      },
+      "required": ["root_id", "worker_ids", "verifier_id", "synthesizer_id"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["project", "workflow_mode", "created_by", "created_at", "dispatch_mode", "dependencies", "tasks", "ui_task_list", "execution", "statistics", "validation", "warnings", "next_steps", "swarm"],
+  "additionalProperties": false
+}

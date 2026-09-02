@@ -63,9 +63,25 @@ public class OntologyKgSyncService {
      *   <li>从 ecos_ontology_relationship 读取关系 → 记录关系数量</li>
      * </ul>
      *
+     * <p>只在 enterprise / flagship profile 下激活（@Profile 守卫），
+     * 若 driver 为 null（neo4j.uri 未配置或 standard 档），返回 syncedEntities=0/syncedRelationships=-1
+     * 并 log.warn 禁用状态，不抛 NPE。</p>
+     *
      * @return {"syncedEntities": N, "syncedRelationships": M}
      */
     public Map<String, Object> syncOntologyToNeo4j() {
+        // M0 改造 (2026-09): 判空 driver — neo4j.uri 未配置 / standard 档时
+        // @Autowired(required=false) 留 null，调用方无需判空。
+        if (driver == null) {
+            log.warn("OntologyKgSyncService.syncOntologyToNeo4j: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), 同步功能禁用 — 返回 syncedEntities=0/syncedRelationships=-1");
+            Map<String, Object> disabled = new LinkedHashMap<>();
+            disabled.put("syncedEntities", 0);
+            disabled.put("syncedRelationships", -1);
+            disabled.put("disabled", true);
+            disabled.put("reason", "Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置)");
+            return disabled;
+        }
+
         int syncedEntities = 0;
         int syncedRelationships = 0;
 

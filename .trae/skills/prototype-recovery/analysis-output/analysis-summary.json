@@ -1,0 +1,13 @@
+{
+  "prototypeFile": "m:\\code\\dec\\gov-window-assistant\\docs\\01需求分析\\01-政务窗口助手\\02-原型系统\\综合窗口智能收件助手\\index.html",
+  "analysisTime": "2026-07-23T11:22:28.340547",
+  "elementCount": 1616,
+  "cssClassCount": 278,
+  "interactionCount": 215,
+  "functionCount": 232,
+  "outputFiles": [
+    "element-mapping.json",
+    "class-mapping.json",
+    "interaction-flow.md"
+  ]
+}

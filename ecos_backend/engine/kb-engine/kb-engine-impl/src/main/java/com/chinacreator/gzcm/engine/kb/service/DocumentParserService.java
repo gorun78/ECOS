@@ -13,12 +13,59 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/**
+ * 文档解析服务 — Tika + MinerU 双通道路由。
+ *
+ * <p>对齐 ECOS-DESIGN-COG-05 §三：
+ * 按 file_features 路由：
+ * <ul>
+ *   <li>文件 ≥ 5MB → MinerU (OCR + 版面分析)</li>
+ *   <li>文件 &lt; 5MB → Tika (既有通道，不删)</li>
+ * </ul>
+ *
+ * @author ECOS KB Engine Team
+ * @since 2026-08-08 (PMO-34 Tika), 2026-09-02 (Wave-2C MinerU 路由)
+ */
 @Service
 public class DocumentParserService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentParserService.class);
 
+    /** MinerU 路由阈值: 5MB */
+    private static final long MINERU_SIZE_THRESHOLD = 5_242_880L;
+
+    private final MinerUHttpParser mineruParser;
+
+    public DocumentParserService(MinerUHttpParser mineruParser) {
+        this.mineruParser = mineruParser;
+    }
+
+    /**
+     * 解析文件 — 按文件大小路由到 Tika 或 MinerU 通道。
+     *
+     * @param filePath 待解析文件
+     * @return ParseResult
+     * @throws Exception 解析失败
+     */
     public ParseResult parse(Path filePath) throws Exception {
+        // 路由决策：文件大小 > 5MB → MinerU
+        try {
+            long size = Files.size(filePath);
+            if (size > MINERU_SIZE_THRESHOLD) {
+                log.info("DocumentParserService routing to MinerU (file size {} bytes > {} KB threshold)",
+                    size, MINERU_SIZE_THRESHOLD / 1024);
+                return mineruParser.parse(filePath);
+            }
+        } catch (Exception e) {
+            log.warn("File size check failed, falling back to Tika: {}", e.getMessage());
+        }
+        return parseWithTika(filePath);
+    }
+
+    /**
+     * Tika 通道解析（既有逻辑，不修改）。
+     */
+    public ParseResult parseWithTika(Path filePath) throws Exception {
         String text = "";
         String fileType = "";
         int pageCount = 1;
@@ -94,6 +141,10 @@ public class DocumentParserService {
         return 1;
     }
 
+    /**
+     * 解析结果 DTO — text / fileType / pageCount / charCount。
+     * Keep as static inner class for backward compatibility.
+     */
     public static class ParseResult {
         private String text;
         private String fileType;
@@ -110,36 +161,16 @@ public class DocumentParserService {
             this.charCount = charCount;
         }
 
-        public String getText() {
-            return text;
-        }
+        public String getText() { return text; }
+        public void setText(String text) { this.text = text; }
 
-        public void setText(String text) {
-            this.text = text;
-        }
+        public String getFileType() { return fileType; }
+        public void setFileType(String fileType) { this.fileType = fileType; }
 
-        public String getFileType() {
-            return fileType;
-        }
+        public int getPageCount() { return pageCount; }
+        public void setPageCount(int pageCount) { this.pageCount = pageCount; }
 
-        public void setFileType(String fileType) {
-            this.fileType = fileType;
-        }
-
-        public int getPageCount() {
-            return pageCount;
-        }
-
-        public void setPageCount(int pageCount) {
-            this.pageCount = pageCount;
-        }
-
-        public int getCharCount() {
-            return charCount;
-        }
-
-        public void setCharCount(int charCount) {
-            this.charCount = charCount;
-        }
+        public int getCharCount() { return charCount; }
+        public void setCharCount(int charCount) { this.charCount = charCount; }
     }
 }

@@ -1,0 +1,84 @@
+<!--
+  App.vue - Vue 应用根组件
+
+  用法：复制到 src/App.vue
+  这是应用的顶层容器，通常只包含路由出口和全局布局
+-->
+
+<template>
+  <div id="app" class="min-h-screen bg-gray-50">
+    <!-- 路由出口 -->
+    <router-view v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
+  </div>
+</template>
+
+<script setup lang="ts">
+/**
+ * App 根组件
+ *
+ * 职责：
+ * - 提供应用顶层容器
+ * - 管理全局布局
+ * - 路由过渡动画
+ */
+
+// 无需在此组件中编写业务逻辑
+// 业务逻辑应在页面组件或 composables 中处理
+</script>
+
+<style>
+/* 全局样式 */
+#app {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 页面过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>
+
+<!--
+  备选：带有全局 Header 和 Sidebar 的布局
+
+  <template>
+    <div class="app-layout">
+      <AppSidebar />
+      <div class="app-main">
+        <AppHeader />
+        <main class="app-content">
+          <router-view />
+        </main>
+      </div>
+    </div>
+  </template>
+
+  <style scoped>
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-content {
+    flex: 1;
+    padding: 24px;
+  }
+  </style>
+-->

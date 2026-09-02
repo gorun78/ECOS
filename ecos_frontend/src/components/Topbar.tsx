@@ -1,4 +1,7 @@
 /**
+ * Wave-2A T3: Topbar 所有 19 个 breadcrumb + 37 个 translateTabLabel
+ * 全部改为 `topbar.tab.*` / `topbar.group.*` / `topbar.bc.*` / `topbar.lang.*` i18n
+ *
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -23,6 +26,53 @@ interface TopbarProps {
   onTabClose: (tabId: string) => void;
   onMenuToggle?: () => void;
 }
+
+/** Chinese label → i18n key (used to translate existing Chinese tab labels). */
+const TAB_ZH_TO_KEY: Record<string, string> = {
+  "认知蓝图": "topbar.tab.mission_control",
+  "监控中心": "topbar.tab.monitor",
+  "安全中心": "topbar.tab.security_center",
+  "数据市场": "topbar.tab.marketplace",
+  "企业知识图谱": "topbar.tab.knowledge_graph",
+  "知识图谱": "topbar.tab.knowledge_graph",
+  "知识工作台": "topbar.tab.knowledge_view",
+  "运营应用": "topbar.tab.ops_apps",
+  "用户管理": "topbar.tab.iam",
+  "数据字典": "topbar.tab.dict",
+  "系统配置": "topbar.tab.system_config",
+  "租户管理": "topbar.tab.system_config",
+  "项目工作台": "topbar.tab.project_workbench",
+  "AI工作台": "topbar.tab.ai_workbench",
+  "Agent 网格": "topbar.tab.agent_mesh",
+  "Agent网格": "topbar.tab.agent_mesh",
+  "Agent 构建器": "topbar.tab.agent_builder",
+  "Agent构建器": "topbar.tab.agent_builder",
+  "Agent 测试": "topbar.tab.agent_test",
+  "Agent测试": "topbar.tab.agent_test",
+  "本体工作台": "topbar.tab.ontology_workbench",
+  "本体浏览器": "topbar.tab.ontology_explorer",
+  "本体设计器": "topbar.tab.ontology_designer",
+  "业务工作台": "topbar.tab.business_workbench",
+  "数据工作台": "topbar.tab.data_workbench",
+  "数据目录": "topbar.tab.data_workbench",
+  "数据集浏览器": "topbar.tab.dataset_explorer",
+  "管道构建器": "topbar.tab.pipeline_builder",
+  "代码工作簿": "topbar.tab.workbook",
+  "数据血缘": "topbar.tab.lineage",
+  "物理表注册": "topbar.tab.datasources",
+  "工作流设计": "topbar.tab.workflow_design",
+  "数据浏览器": "topbar.tab.objects",
+  "数据质量": "topbar.tab.dq_dashboard",
+  "术语表": "topbar.tab.glossary",
+  "安全护栏": "topbar.tab.guardrails",
+  "信科数据仪表盘": "topbar.tab.biz_dashboard",
+  "项目跟踪": "topbar.tab.project_tracker",
+  "合同管理": "topbar.tab.contract_manager",
+  "产值分配看板": "topbar.tab.ops_dashboard",
+  "项目看板": "topbar.tab.kanban",
+  "任务中心": "topbar.tab.engine_tasks",
+  "战略目标": "topbar.tab.world_model_strategic",
+};
 
 export default function Topbar({
   currentView,
@@ -72,7 +122,7 @@ export default function Topbar({
     }).catch(() => {/* fallback to localStorage values */});
   }, []);
 
-  const displayClearance = clearance || (locale === "zh" ? "4级高阶授权专家" : "Commander Level 4");
+  const displayClearance = clearance || t("topbar.role.default");
 
   const handleSaveSettings = async () => {
     // Save to localStorage (cache)
@@ -138,107 +188,70 @@ export default function Topbar({
   };
 
 
-  const getViewBreadcrumbs = () => {
+  const getViewBreadcrumbs = (): string[] => {
     // 总览组
     if (currentView === "world_model" || currentView === "mission_control")
-      return [locale === "zh" ? "总览" : "Overview", t("nav.item.strategic_goals")];
+      return [t("topbar.group.overview"), t("topbar.bc.mission_control")];
     if (currentView === "monitor")
-      return [locale === "zh" ? "总览" : "Overview", t("nav.item.monitor")];
+      return [t("topbar.group.overview"), t("topbar.tab.monitor")];
     if (currentView === "security-center" || currentView === "security")
-      return [locale === "zh" ? "总览" : "Overview", locale === "zh" ? "安全中心" : "Security Center"];
+      return [t("topbar.group.overview"), t("topbar.tab.security_center")];
     // 资源概览组
     if (currentView === "marketplace")
-      return [locale === "zh" ? "资源概览" : "Resources", locale === "zh" ? "数据市场" : "Marketplace"];
+      return [t("topbar.group.resources"), t("topbar.tab.marketplace")];
     if (currentView === "knowledge_graph")
-      return [locale === "zh" ? "资源概览" : "Resources", locale === "zh" ? "知识图谱" : "Knowledge Graph"];
+      return [t("topbar.group.resources"), t("topbar.tab.knowledge_graph")];
     if (currentView === "ops_apps")
-      return [locale === "zh" ? "资源概览" : "Resources", locale === "zh" ? "运营应用" : "Operational Apps"];
+      return [t("topbar.group.resources"), t("topbar.tab.ops_apps")];
     // 系统管理组
     if (currentView === "iam")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "用户管理" : "IAM User Mgmt"];
+      return [t("topbar.group.system"), t("topbar.bc.iam")];
     if (currentView === "dict")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "数据字典" : "Data Dictionary"];
+      return [t("topbar.group.system"), t("topbar.tab.dict")];
     if (currentView === "system-config")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "系统配置" : "System Config"];
+      return [t("topbar.group.system"), t("topbar.tab.system_config")];
     if (currentView === "tenants")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "租户管理" : "Tenant Mgmt"];
+      return [t("topbar.group.system"), t("topbar.tab.system_config")];
     // 产品功能组
     if (currentView === "project_workbench")
-      return [locale === "zh" ? "产品功能" : "Product", locale === "zh" ? "项目工作台" : "Project Workbench"];
+      return [t("topbar.group.product"), t("topbar.tab.project_workbench")];
     if (currentView === "agent_studio" || currentView === "ai-workbench")
-      return [locale === "zh" ? "产品功能" : "Product", locale === "zh" ? "AI工作台" : "AI Workbench"];
+      return [t("topbar.group.product"), t("topbar.tab.ai_workbench")];
     if (currentView === "knowledge_view")
-      return [locale === "zh" ? "产品功能" : "Product", locale === "zh" ? "知识工作台" : "Knowledge Workbench"];
+      return [t("topbar.group.product"), t("topbar.tab.knowledge_view")];
     if (currentView === "ontology_workbench" || currentView === "ontology" || currentView === "business-workbench")
-      return [locale === "zh" ? "产品功能" : "Product", locale === "zh" ? "本体工作台" : "Ontology Workbench"];
+      return [t("topbar.group.product"), t("topbar.tab.ontology_workbench")];
     if (currentView === "data-workbench" || currentView === "catalog" || currentView === "dataset_explorer" || currentView === "lineage" || currentView === "pipeline" || currentView === "workbook")
-      return [locale === "zh" ? "产品功能" : "Product", locale === "zh" ? "数据工作台" : "Data Workbench"];
+      return [t("topbar.group.product"), t("topbar.tab.data_workbench")];
     // 其他
     if (currentView === "workshop" || currentView === "workflow_designer")
-      return [locale === "zh" ? "产品功能" : "Product", locale === "zh" ? "工作流设计" : "Workshop"];
+      return [t("topbar.group.product"), t("topbar.tab.workflow_design")];
     if (currentView === "biz_dashboard")
-      return [locale === "zh" ? "运营应用" : "Apps", locale === "zh" ? "信科数据仪表盘" : "Biz Dashboard"];
+      return [t("topbar.bc.app_group"), t("topbar.tab.biz_dashboard")];
     if (currentView === "project_tracker")
-      return [locale === "zh" ? "运营应用" : "Apps", locale === "zh" ? "项目跟踪" : "Project Tracker"];
+      return [t("topbar.bc.app_group"), t("topbar.tab.project_tracker")];
     if (currentView === "contract_manager")
-      return [locale === "zh" ? "运营应用" : "Apps", locale === "zh" ? "合同管理" : "Contract Manager"];
+      return [t("topbar.bc.app_group"), t("topbar.tab.contract_manager")];
     if (currentView === "ops_dashboard")
-      return [locale === "zh" ? "运营应用" : "Apps", locale === "zh" ? "产值分配看板" : "Ops Dashboard"];
+      return [t("topbar.bc.app_group"), t("topbar.tab.ops_dashboard")];
     if (currentView === "objects")
-      return [locale === "zh" ? "业务工作台" : "Business", locale === "zh" ? "对象浏览器" : "Object Explorer"];
+      return [t("topbar.group.business"), t("topbar.tab.objects")];
     if (currentView === "glossary")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "术语管理" : "Glossary"];
+      return [t("topbar.group.system"), t("topbar.tab.glossary")];
     if (currentView === "guardrails")
-      return [locale === "zh" ? "安全中心" : "Security", locale === "zh" ? "安全护栏" : "Guardrails"];
+      return [t("topbar.group.security"), t("topbar.tab.guardrails")];
     if (currentView === "kanban")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "项目看板" : "Kanban"];
+      return [t("topbar.group.system"), t("topbar.tab.kanban")];
     if (currentView === "engine-tasks" || currentView === "task_center")
-      return [locale === "zh" ? "系统管理" : "System", locale === "zh" ? "任务中心" : "Task Center"];
-    return [locale === "zh" ? "总览" : "Overview", currentView];
+      return [t("topbar.group.system"), t("topbar.tab.engine_tasks")];
+    return [t("topbar.group.overview"), currentView];
   };
 
-  const translateTabLabel = (label: string) => {
-    // If already in locale language (most labels are Chinese now), return as-is
-    if (label === "认知蓝图") return locale === "zh" ? "认知蓝图" : "Mission Control";
-    if (label === "监控中心") return locale === "zh" ? "监控中心" : "Monitoring Center";
-    if (label === "安全中心") return locale === "zh" ? "安全中心" : "Security Center";
-    if (label === "数据市场") return locale === "zh" ? "数据市场" : "Marketplace";
-    if (label === "企业知识图谱") return locale === "zh" ? "企业知识图谱" : "Knowledge Graph";
-    if (label === "知识工作台") return locale === "zh" ? "知识工作台" : "Knowledge Workbench";
-    if (label === "运营应用") return locale === "zh" ? "运营应用" : "Operational Apps";
-    if (label === "用户管理") return locale === "zh" ? "用户管理" : "IAM";
-    if (label === "数据字典") return locale === "zh" ? "数据字典" : "Data Dictionary";
-    if (label === "系统配置") return locale === "zh" ? "系统配置" : "System Config";
-    if (label === "租户管理") return locale === "zh" ? "租户管理" : "Tenants";
-    if (label === "项目工作台") return locale === "zh" ? "项目工作台" : "Project Workbench";
-    if (label === "AI工作台") return locale === "zh" ? "AI工作台" : "AI Workbench";
-    if (label === "Agent网格") return locale === "zh" ? "Agent网格" : "Agent Mesh";
-    if (label === "Agent构建器") return locale === "zh" ? "Agent构建器" : "Agent Builder";
-    if (label === "Agent测试") return locale === "zh" ? "Agent测试" : "Agent Test";
-    if (label === "本体工作台") return locale === "zh" ? "本体工作台" : "Ontology Workbench";
-    if (label === "本体浏览器") return locale === "zh" ? "本体浏览器" : "Ontology Explorer";
-    if (label === "本体设计器") return locale === "zh" ? "本体设计器" : "Ontology Designer";
-    if (label === "业务工作台") return locale === "zh" ? "业务工作台" : "Business Workbench";
-    if (label === "数据工作台") return locale === "zh" ? "数据工作台" : "Data Workbench";
-    if (label === "数据目录") return locale === "zh" ? "数据目录" : "Data Catalog";
-    if (label === "数据集浏览器") return locale === "zh" ? "数据集浏览器" : "Dataset Explorer";
-    if (label === "管道构建器") return locale === "zh" ? "管道构建器" : "Pipeline Builder";
-    if (label === "代码工作簿") return locale === "zh" ? "代码工作簿" : "Code Workbook";
-    if (label === "数据血缘") return locale === "zh" ? "数据血缘" : "Data Lineage";
-    if (label === "物理表注册") return locale === "zh" ? "物理表注册" : "Data Sources";
-    if (label === "工作流设计") return locale === "zh" ? "工作流设计" : "Workshop";
-    if (label === "数据浏览器") return locale === "zh" ? "数据浏览器" : "Object Explorer";
-    if (label === "数据质量") return locale === "zh" ? "数据质量" : "Data Quality";
-    if (label === "术语表") return locale === "zh" ? "术语表" : "Glossary";
-    if (label === "安全护栏") return locale === "zh" ? "安全护栏" : "Guardrails";
-    if (label === "信科数据仪表盘") return locale === "zh" ? "信科数据仪表盘" : "Biz Dashboard";
-    if (label === "项目跟踪") return locale === "zh" ? "项目跟踪" : "Project Tracker";
-    if (label === "合同管理") return locale === "zh" ? "合同管理" : "Contract Manager";
-    if (label === "产值分配看板") return locale === "zh" ? "产值分配看板" : "Ops Dashboard";
-    if (label === "项目看板") return locale === "zh" ? "项目看板" : "Kanban";
-    if (label === "任务中心") return locale === "zh" ? "任务中心" : "Task Center";
-    if (label === "战略目标") return locale === "zh" ? "战略目标" : "Strategic Goals";
-    // Backward compat: old English labels
+  /** Translate existing tab labels (Chinese labels passed by App.tsx). */
+  const translateTabLabel = (label: string): string => {
+    const key = TAB_ZH_TO_KEY[label];
+    if (key) return t(key);
+    // Backward compat: old English labels return as-is
     return label;
   };
 
@@ -246,14 +259,14 @@ export default function Topbar({
 
   return (
     <header className={`h-[64px] ${styles.cardBg} border-b ${styles.cardBorder} flex items-center justify-between px-6 select-none shrink-0 ${styles.cardText} font-sans shadow-xs transition-colors duration-150`}>
-      
+
       {/* Left Box: Hamburger (mobile) + Breadcrumb mapping */}
       <div className={`flex items-center gap-1.5 text-xs font-mono ${styles.cardTextMuted} shrink-0`}>
         {/* Hamburger menu — visible only on mobile */}
         <button
           onClick={onMenuToggle}
           className={`md:hidden p-1.5 -ml-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${styles.cardText}`}
-          aria-label="Toggle sidebar"
+          aria-label={t("topbar.lang.toggle")}
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -299,7 +312,7 @@ export default function Topbar({
 
       {/* Right Box: Global search trigger & UTC Clock */}
       <div className="flex items-center gap-4 shrink-0">
-        
+
         {/* Theme Selector Switcher */}
         <div className={`flex items-center gap-1.5 ${styles.inputBg} border ${styles.inputBorder} rounded-lg px-2.5 py-1 select-none shrink-0 shadow-3xs transition duration-150`}>
           <Palette className={`w-3.5 h-3.5 ${styles.cardTextMuted}`} />
@@ -326,7 +339,7 @@ export default function Topbar({
                 : "opacity-50 hover:opacity-100"
             }`}
           >
-            中文
+            {t("topbar.lang.switch_zh")}
           </button>
           <button
             onClick={() => setLocale("en")}
@@ -337,13 +350,13 @@ export default function Topbar({
                 : "opacity-50 hover:opacity-100"
             }`}
           >
-            EN
+            {t("topbar.lang.switch_en")}
           </button>
         </div>
 
         {/* User profile identifier circle with initial values */}
         <div className="relative">
-          <div 
+          <div
             id="user-profile-trigger"
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
             className={`flex items-center gap-3 cursor-pointer group select-none p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-150`}
@@ -360,11 +373,11 @@ export default function Topbar({
           {isSettingsOpen && (
             <>
               {/* Overlay background to dismiss */}
-              <div 
+              <div
                 className="fixed inset-0 z-40"
                 onClick={() => setIsSettingsOpen(false)}
               />
-              <div 
+              <div
                 id="user-settings-dropdown"
                 className={`absolute right-0 mt-2 w-80 max-w-sm rounded-xl border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} p-4 shadow-xl z-50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-150`}
               >
@@ -381,7 +394,7 @@ export default function Topbar({
                     <label className={`text-[10px] font-mono font-bold uppercase ${styles.cardTextMuted} block mb-1`}>
                       {t("topbar.user.email")}
                     </label>
-                    <input 
+                    <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -396,19 +409,19 @@ export default function Topbar({
                       <label className={`text-[10px] font-mono font-bold uppercase ${styles.cardTextMuted} block mb-1`}>
                         {t("topbar.user.clearance")}
                       </label>
-                      <input 
+                      <input
                         type="text"
                         value={clearance}
                         onChange={(e) => setClearance(e.target.value)}
                         className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 transition`}
-                        placeholder={locale === "zh" ? "4级高阶授权专家" : "Commander Level 4"}
+                        placeholder={t("topbar.role.default")}
                       />
                     </div>
                     <div>
                       <label className={`text-[10px] font-mono font-bold uppercase ${styles.cardTextMuted} block mb-1`}>
                         {t("topbar.user.workstation")}
                       </label>
-                      <input 
+                      <input
                         type="text"
                         value={workstation}
                         onChange={(e) => setWorkstation(e.target.value)}
@@ -439,7 +452,7 @@ export default function Topbar({
 
                   {/* Sandbox safeguard checklist switch */}
                   <label className="flex items-start gap-2.5 cursor-pointer py-1 select-none">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={sandbox}
                       onChange={(e) => setSandbox(e.target.checked)}
@@ -458,14 +471,14 @@ export default function Topbar({
 
                 {/* Confirm submit and reset buttons */}
                 <div className={`flex gap-2 pt-2 border-t border-dashed ${styles.cardBorder}`}>
-                  <button 
+                  <button
                     type="button"
                     onClick={handleSaveSettings}
                     className="flex-1 py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10.5px] font-bold cursor-pointer transition leading-none h-8"
                   >
                     {t("topbar.user.save")}
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={handleResetCache}
                     className={`py-1.5 px-2 border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-[10.5px] font-semibold cursor-pointer transition leading-none h-8`}
@@ -484,7 +497,7 @@ export default function Topbar({
                   }}
                   className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10.5px] font-bold cursor-pointer transition leading-none h-8 mt-1"
                 >
-                  {locale === "zh" ? "退出登录" : "Logout"}
+                  {t("topbar.logout")}
                 </button>
 
               </div>

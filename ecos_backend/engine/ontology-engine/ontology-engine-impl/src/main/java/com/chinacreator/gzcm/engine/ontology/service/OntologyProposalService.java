@@ -136,9 +136,92 @@ public class OntologyProposalService {
      * approve-and-publish: 更新为 EXECUTED（无 version_id）。
      */
     public void markExecuted(String id, String status) {
-        jdbc.update(
-                "UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
+        jdbc.update("UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
                 status, id);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // PMO-29 §4.2 乐观锁扩展
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * 查询提案当前乐观锁版本号。
+     *
+     * @param id 提案 ID
+     * @return 当前版本号；提案不存在时返回 null
+     */
+    public Integer findOptimisticVersion(String id) {
+        try {
+            return jdbc.queryForObject(
+                    "SELECT optimistic_lock_version FROM ecos_ontology_proposals WHERE id=?::bigint",
+                    Integer.class, id);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 乐观锁更新提案状态（PMO-29 §4.2）。
+     * <p>
+     * SQL: {@code UPDATE ... SET status=?, reviewer=?, reviewer_comment=?, updated_at=NOW(),
+     *      optimistic_lock_version = optimistic_lock_version + 1
+     *      WHERE id=?::bigint AND optimistic_lock_version = ?}
+     * </p>
+     * <p>
+     * 仅当行存在 && currentVersion == expectedVersion 时才更新；否则 affected=0，
+     * 调用方应抛出 IllegalStateException("OPTIMISTIC_LOCK_CONFLICT")。
+     * </p>
+     *
+     * @param id                提案 ID
+     * @param newStatus         新状态
+     * @param reviewer          审批人
+     * @param reviewerComment   审批意见
+     * @param expectedVersion   客户端持有的期望版本号
+     * @return 受影响的行数（0 = 版本号不匹配或提案不存在）
+     */
+    public int optimisticTransition(String id, String newStatus, String reviewer,
+                                    String reviewerComment, Integer expectedVersion) {
+        return jdbc.update("""
+            UPDATE ecos_ontology_proposals SET
+                status = ?,
+                reviewer = ?,
+                reviewer_comment = ?,
+                updated_at = NOW(),
+                optimistic_lock_version = optimistic_lock_version + 1
+            WHERE id = ?::bigint
+              AND optimistic_lock_version = ?
+            """, newStatus, reviewer, reviewerComment, id, expectedVersion);
+    }
+
+    /**
+     * 乐观锁递增版本号（不变更其他字段，仅用于状态变化时的"刷新"）。
+     *
+     * @param id              提案 ID
+     * @param expectedVersion 期望版本号
+     * @param newStatus       新状态（可选，传 null 表示不变）
+     * @return 受影响的行数（0 = 冲突或不存在）
+     */
+    public int optimisticVersionIncrement(String id, Integer expectedVersion, String newStatus) {
+        String sql;
+        if (newStatus == null) {
+            sql = """
+                UPDATE ecos_ontology_proposals SET
+                    updated_at = NOW(),
+                    optimistic_lock_version = optimistic_lock_version + 1
+                WHERE id = ?::bigint
+                  AND optimistic_lock_version = ?
+                """;
+            return jdbc.update(sql, id, expectedVersion);
+        }
+        sql = """
+            UPDATE ecos_ontology_proposals SET
+                status = ?,
+                updated_at = NOW(),
+                optimistic_lock_version = optimistic_lock_version + 1
+            WHERE id = ?::bigint
+              AND optimistic_lock_version = ?
+            """;
+        return jdbc.update(sql, newStatus, id, expectedVersion);
     }
 
     /**

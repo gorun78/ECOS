@@ -53,6 +53,10 @@ public class DiagnosisController {
         response.put("causalChain", result.getCausalChain());
         response.put("suggestions", result.getSuggestions());
         response.put("affectedMetrics", result.getAffectedMetrics());
+        // Wave-3.2 增量：推理路径（含 steps / ruleRefs / precedentRefs / clauses）
+        if (result.getReasoningPath() != null) {
+            response.put("reasoningPath", result.getReasoningPath());
+        }
 
         return ApiResponse.success(response);
     }

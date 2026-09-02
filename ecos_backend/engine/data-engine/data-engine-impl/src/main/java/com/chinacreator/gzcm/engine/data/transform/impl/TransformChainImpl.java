@@ -36,14 +36,21 @@ public class TransformChainImpl implements TransformChain {
     @Override
     public TransformResult execute(DataFrame input) throws TransformException {
         DataFrame current = input;
+        long inputCount = current.size(); // P0-2: rowCount = data.size()
         for (int i = 0; i < steps.size(); i++) {
             TransformStep step = steps.get(i);
             Map<String, Object> params = stepParams.get(i);
             current = step.transform(current, params);
         }
+        long outputCount = current.size();
         TransformResult result = new TransformResult();
         result.setOutput(current);
         result.setSuccess(true);
+        // P0-2 (Wave-4.2): 补齐 statistics 真实值
+        TransformResult.TransformStatistics stats = result.getStatistics();
+        stats.setInputCount(inputCount);
+        stats.setOutputCount(outputCount);
+        stats.setFilteredCount(Math.max(0, inputCount - outputCount));
         return result;
     }
 

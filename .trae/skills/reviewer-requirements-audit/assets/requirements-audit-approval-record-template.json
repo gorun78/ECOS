@@ -1,0 +1,33 @@
+{
+  "artifact": "REQUIREMENTS_AUDIT_REPORT",
+  "name": "{{项目名称}} 需求审查报告",
+  "version": "v{{version}}",
+  "hash": "{{内容哈希}}",
+  "status": "{{APPROVED / REJECTED}}",
+  "workflow_mode": "{{L2 / L3}}",
+  "approvals": [
+    {
+      "role": "reviewer-requirements-audit",
+      "result": "{{APPROVED / REJECTED}}",
+      "timestamp": "{{ISO8601}}",
+      "conditions": []
+    }
+  ],
+  "issue_summary": {
+    "total": 0,
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "p3": 0
+  },
+  "gates": {
+    "AMBIGUITY_GATE": "{{PASS / FAIL}}",
+    "ACCEPTANCE_GATE": "{{PASS / FAIL}}",
+    "TESTABILITY_GATE": "{{PASS / FAIL}}",
+    "COMPLETENESS_GATE": "{{PASS / FAIL}}"
+  },
+  "gates_passed": [],
+  "deliverable_allowed": false,
+  "prd_ref": "PRD@{{hash}}",
+  "timestamp": "{{ISO8601}}"
+}

@@ -1,0 +1,12 @@
+docs/5-cognitive/03-跨引擎推理层设计.md
+docs/5-cognitive/04-推理可解释性规格.md
+docs/5-cognitive/05-非结构化文档解析方案.md
+docs/7-integration/01-sysman/02-测试方案.md
+docs/7-integration/01-sysman/03-测试用例.md
+docs/7-integration/01-sysman/04-测试报告.md
+docs/7-integration/01-sysman/05-RLS验收报告.md
+docs/7-integration/01-sysman/05-RlsCrossTenantTest.mjs
+ecos-tests/lib/security.mjs
+ecos-tests/runner.mjs
+ecos-tests/wave1c-shot.js
+ecos-tests/wave1c-spa-routes.mjs

@@ -102,6 +102,21 @@ public class OntologyDomainService {
         return setStatus(domainCode, "Deprecated");
     }
 
+    /**
+     * 搜索域（按 keyword 模糊匹配 name/code/description）。
+     * <p>PMO E8 端点 {@code GET /api/v1/ecos/domains/search} 后端支撑。</p>
+     *
+     * @param keyword 关键字
+     * @param limit   最大返回条数
+     * @return 命中的域列表
+     */
+    public List<Map<String, Object>> searchDomains(String keyword, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        return repository.searchDomains(keyword, safeLimit).stream()
+            .map(this::toMap)
+            .collect(Collectors.toList());
+    }
+
     private Map<String, Object> setStatus(String domainCode, String status) {
         OntologyDomain dom = repository.findByCode(domainCode)
             .orElseThrow(() -> new IllegalArgumentException("ONT-008: Domain '" + domainCode + "' not found"));

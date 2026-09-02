@@ -1,0 +1,315 @@
+{
+  "project": "vue3-frontend-builder-example",
+  "version": "1.0.0",
+  "description": "Example component style lock file",
+  "components": {
+    "BaseButton": {
+      "description": "基础按钮组件",
+      "styles": {
+        "base": {
+          "display": "inline-flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "gap": "gap-2",
+          "fontWeight": "font-medium",
+          "borderRadius": "rounded-lg",
+          "transitionColors": "transition-colors duration-200"
+        },
+        "sizes": {
+          "sm": "px-3 py-1.5 text-xs",
+          "md": "px-4 py-2 text-sm",
+          "lg": "px-6 py-3 text-base"
+        },
+        "variants": {
+          "primary": {
+            "background": "bg-primary",
+            "text": "text-white",
+            "hover": "hover:bg-primary-hover",
+            "focus": "focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+          },
+          "secondary": {
+            "background": "bg-gray-100",
+            "text": "text-gray-700",
+            "hover": "hover:bg-gray-200",
+            "focus": "focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+          },
+          "ghost": {
+            "background": "bg-transparent",
+            "text": "text-gray-600",
+            "hover": "hover:bg-gray-100",
+            "focus": "focus:ring-2 focus:ring-gray-200"
+          },
+          "danger": {
+            "background": "bg-error",
+            "text": "text-white",
+            "hover": "hover:bg-red-600",
+            "focus": "focus:ring-2 focus:ring-error/50 focus:ring-offset-2"
+          }
+        }
+      },
+      "states": {
+        "disabled": {
+          "opacity": "opacity-50",
+          "cursor": "cursor-not-allowed",
+          "pointerEvents": "pointer-events-none"
+        },
+        "loading": {
+          "opacity": "opacity-70",
+          "cursor": "cursor-wait"
+        }
+      },
+      "typography": {
+        "sm": "text-xs font-medium",
+        "md": "text-sm font-medium",
+        "lg": "text-base font-medium"
+      }
+    },
+    "BaseInput": {
+      "description": "基础输入框组件",
+      "styles": {
+        "base": {
+          "display": "block",
+          "width": "w-full",
+          "padding": "px-3 py-2",
+          "fontSize": "text-sm",
+          "border": "border border-gray-300",
+          "borderRadius": "rounded-lg",
+          "transitionColors": "transition-colors duration-200"
+        },
+        "states": {
+          "default": {
+            "border": "border-gray-300",
+            "background": "bg-white"
+          },
+          "hover": {
+            "border": "hover:border-gray-400"
+          },
+          "focus": {
+            "border": "focus:border-primary",
+            "boxShadow": "focus:ring-2 focus:ring-primary/20 focus:outline-none"
+          },
+          "disabled": {
+            "background": "bg-gray-100",
+            "cursor": "cursor-not-allowed"
+          },
+          "error": {
+            "border": "border-error",
+            "focus": "focus:ring-error/20"
+          }
+        }
+      },
+      "typography": {
+        "placeholder": "text-gray-400",
+        "text": "text-gray-900",
+        "error": "text-error text-xs mt-1"
+      }
+    },
+    "SearchBar": {
+      "description": "搜索栏组件（Input + Button 组合）",
+      "styles": {
+        "container": {
+          "display": "flex",
+          "alignItems": "center",
+          "gap": "gap-2",
+          "padding": "px-3 py-2",
+          "background": "bg-white",
+          "border": "border border-gray-200",
+          "borderRadius": "rounded-lg",
+          "boxShadow": "shadow-sm"
+        }
+      },
+      "subComponents": [
+        {
+          "name": "searchIcon",
+          "type": "atom",
+          "library": "lucide",
+          "iconName": "Search",
+          "size": "w-5 h-5",
+          "color": "text-gray-400"
+        },
+        {
+          "name": "inputField",
+          "type": "native_input",
+          "flex": "flex-1",
+          "placeholder": "placeholder:text-gray-400",
+          "border": "border-none",
+          "outline": "focus:outline-none",
+          "fontSize": "text-sm"
+        },
+        {
+          "name": "clearButton",
+          "type": "atom",
+          "library": "lucide",
+          "iconName": "X",
+          "size": "w-4 h-4",
+          "color": "text-gray-400",
+          "visibility": "hidden when empty"
+        }
+      ]
+    },
+    "DataCard": {
+      "description": "数据卡片组件",
+      "styles": {
+        "container": {
+          "display": "flex",
+          "flexDirection": "flex-col",
+          "background": "bg-white",
+          "borderRadius": "rounded-xl",
+          "padding": "p-6",
+          "boxShadow": "shadow-soft",
+          "gap": "gap-4"
+        },
+        "header": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "justify-between"
+        },
+        "title": {
+          "fontSize": "text-base",
+          "fontWeight": "font-semibold",
+          "color": "text-gray-900"
+        },
+        "description": {
+          "fontSize": "text-sm",
+          "color": "text-gray-500",
+          "lineHeight": "leading-relaxed"
+        },
+        "footer": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "justify-between",
+          "marginTop": "mt-auto"
+        }
+      }
+    },
+    "AppHeader": {
+      "description": "应用头部导航组件",
+      "styles": {
+        "container": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "justify-between",
+          "height": "h-16",
+          "padding": "px-6",
+          "background": "bg-white",
+          "borderBottom": "border-b border-gray-200"
+        },
+        "left": {
+          "display": "flex",
+          "alignItems": "center",
+          "gap": "gap-4"
+        },
+        "logo": {
+          "fontSize": "text-xl",
+          "fontWeight": "font-bold",
+          "color": "text-gray-900"
+        },
+        "nav": {
+          "display": "flex",
+          "alignItems": "center",
+          "gap": "gap-1"
+        },
+        "navItem": {
+          "padding": "px-3 py-2",
+          "fontSize": "text-sm",
+          "fontWeight": "font-medium",
+          "color": "text-gray-600",
+          "borderRadius": "rounded-lg",
+          "hover": "hover:bg-gray-100",
+          "active": "bg-gray-100 text-gray-900"
+        },
+        "right": {
+          "display": "flex",
+          "alignItems": "center",
+          "gap": "gap-3"
+        },
+        "avatar": {
+          "width": "w-8 h-8",
+          "borderRadius": "rounded-full"
+        }
+      }
+    }
+  },
+  "tokens": {
+    "colors": {
+      "primary": "#6366F1",
+      "primaryHover": "#4F46E5",
+      "primaryLight": "#EEF2FF",
+      "secondary": "#8B5CF6",
+      "accent": "#EC4899",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6",
+      "gray50": "#F9FAFB",
+      "gray100": "#F3F4F6",
+      "gray200": "#E5E7EB",
+      "gray300": "#D1D5DB",
+      "gray400": "#9CA3AF",
+      "gray500": "#6B7280",
+      "gray600": "#4B5563",
+      "gray700": "#374151",
+      "gray800": "#1F2937",
+      "gray900": "#111827"
+    },
+    "spacing": {
+      "0": "0",
+      "1": "0.25rem",
+      "2": "0.5rem",
+      "3": "0.75rem",
+      "4": "1rem",
+      "5": "1.25rem",
+      "6": "1.5rem",
+      "8": "2rem",
+      "10": "2.5rem",
+      "12": "3rem",
+      "16": "4rem",
+      "20": "5rem",
+      "24": "6rem"
+    },
+    "fontSize": {
+      "xs": ["0.75rem", { "lineHeight": "1rem" }],
+      "sm": ["0.875rem", { "lineHeight": "1.25rem" }],
+      "base": ["1rem", { "lineHeight": "1.5rem" }],
+      "lg": ["1.125rem", { "lineHeight": "1.75rem" }],
+      "xl": ["1.25rem", { "lineHeight": "1.75rem" }],
+      "2xl": ["1.5rem", { "lineHeight": "2rem" }],
+      "3xl": ["1.875rem", { "lineHeight": "2.25rem" }]
+    },
+    "borderRadius": {
+      "none": "0",
+      "sm": "0.25rem",
+      "DEFAULT": "0.375rem",
+      "md": "0.5rem",
+      "lg": "0.75rem",
+      "xl": "1rem",
+      "2xl": "1.5rem",
+      "full": "9999px"
+    },
+    "boxShadow": {
+      "soft": "0 2px 8px 0 rgba(0, 0, 0, 0.08)",
+      "medium": "0 4px 16px 0 rgba(0, 0, 0, 0.12)",
+      "hard": "0 8px 24px 0 rgba(0, 0, 0, 0.16)"
+    }
+  },
+  "typography": {
+    "h1": { "fontSize": "text-3xl", "fontWeight": "font-bold", "lineHeight": "leading-tight" },
+    "h2": { "fontSize": "text-2xl", "fontWeight": "font-semibold", "lineHeight": "leading-snug" },
+    "h3": { "fontSize": "text-xl", "fontWeight": "font-semibold", "lineHeight": "leading-snug" },
+    "h4": { "fontSize": "text-lg", "fontWeight": "font-semibold", "lineHeight": "leading-normal" },
+    "body": { "fontSize": "text-base", "fontWeight": "font-normal", "lineHeight": "leading-relaxed" },
+    "caption": { "fontSize": "text-sm", "fontWeight": "font-normal", "lineHeight": "leading-normal" },
+    "small": { "fontSize": "text-xs", "fontWeight": "font-normal", "lineHeight": "leading-normal" }
+  },
+  "animation": {
+    "duration": {
+      "fast": "150ms",
+      "normal": "200ms",
+      "slow": "300ms"
+    },
+    "easing": {
+      "default": "ease-in-out",
+      "bounce": "cubic-bezier(0.68, -0.55, 0.265, 1.55)"
+    }
+  }
+}

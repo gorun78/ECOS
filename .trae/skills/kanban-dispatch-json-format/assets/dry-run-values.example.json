@@ -1,0 +1,50 @@
+{
+  "execution": {
+    "mode": "dry-run",
+    "dispatcher_profile": "pm",
+    "verifier": "pm",
+    "synthesizer": "pm",
+    "commands_executed": [],
+    "synthesize_task_id": null
+  },
+  "source": {
+    "feature_name": "用户登录",
+    "requirement_file": null,
+    "generated_at": "2026-07-21T06:00:00Z"
+  },
+  "tasks": [
+    {
+      "id": "t_pre_login_impl",
+      "title": "实现用户登录",
+      "assignee": "pm-1784859477297",
+      "role": "pm",
+      "priority": "P1",
+      "status": "ready",
+      "created_time": "2026-07-21T06:00:00Z",
+      "description": "实现登录接口、页面和认证状态管理",
+      "tags": ["auth", "implementation"],
+      "estimate": null
+    },
+    {
+      "id": "t_pre_login_test",
+      "title": "验证用户登录",
+      "assignee": "arch-1784859543339",
+      "role": "arch",
+      "priority": "P2",
+      "status": "todo",
+      "created_time": "2026-07-21T06:00:01Z",
+      "description": "验证正确登录、错误密码和会话过期场景",
+      "tags": ["auth", "test"],
+      "estimate": null
+    }
+  ],
+  "dependencies": [
+    {
+      "parent": "t_pre_login_impl",
+      "child": "t_pre_login_test",
+      "reason": "完成实现后才能执行验证"
+    }
+  ],
+  "warnings": [],
+  "next_steps": ["确认方案后执行 Hermes swarm"]
+}

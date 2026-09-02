@@ -110,10 +110,10 @@ ECOS（Enterprise Cognitive Operating System）企业认知操作系统。核心
 
 # 项目规范
 
-- 架构铁律：.hermes/rules/架构铁律.md
-- 后端开发规范：.hermes/rules/后端开发规范.md
-- 前端开发规范：.hermes/rules/前端开发规范.md
-- Git提交规范：.hermes/rules/Git提交规范.md
+- 架构铁律：.trae/rules/架构铁律.md
+- 后端开发规范：.trae/rules/后端开发规范.md
+- 前端开发规范：.trae/rules/前端开发规范.md
+- Git提交规范：.trae/rules/Git提交规范.md
 
 # 工程结构
 

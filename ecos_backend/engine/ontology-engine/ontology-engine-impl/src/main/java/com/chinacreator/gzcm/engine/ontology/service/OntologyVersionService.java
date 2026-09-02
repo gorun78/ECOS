@@ -34,11 +34,14 @@ public class OntologyVersionService {
 
     private final OntologyVersionRepository versionRepository;
     private final OntologyRepository ontologyRepository;
+    private final OntologyProposalService proposalService;
 
     public OntologyVersionService(OntologyVersionRepository versionRepository,
-                                   OntologyRepository ontologyRepository) {
+                                   OntologyRepository ontologyRepository,
+                                   OntologyProposalService proposalService) {
         this.versionRepository = versionRepository;
         this.ontologyRepository = ontologyRepository;
+        this.proposalService = proposalService;
     }
 
     private String nextId() { return "ver" + ID_SEQ.incrementAndGet(); }
@@ -184,6 +187,42 @@ public class OntologyVersionService {
         }
         versionRepository.updateStatus(versionId, "Published");
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
+    }
+
+    // ── PMO-28 提案联动: 审批通过→自动创建版本并发布 ─────────
+
+    /**
+     * 提案联动发布（PMO-28 T3）。
+     *
+     * <p>1. 把提案状态改为 APPROVED（乐观锁保护）。</p>
+     * <p>2. 创建新 Draft 版本 — 从当前 ontology 产生完整快照。</p>
+     * <p>3. 自动 publish Draft 版本，回填 proposal.version_id。</p>
+     *
+     * <p>调用方需要先把提案状态从 DRAFT/PENDING → PENDING（如果还不是），
+     * 然后调用本方法审批 + 发布。</p>
+     *
+     * @param ontologyId     本体 ID
+     * @param proposalId     提案 ID
+     * @param expectedVersion 客户端持有的提案乐观锁版本号
+     * @param publisher      发布人（同时作为 reviewer）
+     * @return 含 versionId + versionNo 的发布结果
+     */
+    public Map<String, Object> publishFromProposal(String ontologyId, String proposalId,
+                                                    Integer expectedVersion, String publisher) {
+        // 1. 改提案 APPROVED（乐观锁）
+        int updated = proposalService.optimisticTransition(
+            proposalId, "APPROVED", publisher, null, expectedVersion);
+        if (updated == 0) {
+            throw new IllegalStateException("ONT-409: OPTIMISTIC_LOCK_CONFLICT — proposal version mismatch or not found");
+        }
+        // 2. 创建 Draft 版本
+        java.util.Map<String, Object> newVer = createVersion(ontologyId,
+            java.util.Map.of("changeLog", "auto-published from proposal " + proposalId,
+                    "publisher", publisher));
+        // 3. 发布
+        Map<String, Object> published = publishVersion(ontologyId, newVer.get("id").toString());
+        log.info("Proposal {} linked to version {}", proposalId, newVer.get("id"));
+        return published;
     }
 
     // ── 内部方法 ──────────────────────────────────────

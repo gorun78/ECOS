@@ -618,12 +618,15 @@
                     <!-- M0 改造 (2026-09): 加 <check> execution + 阈值 0.05 (起步, 不阻塞)
                          后续按 08-产品化重构方案/05 §2.3 节奏递增:
                          2026-09 0.05 → 2026-10 0.10 → 2026-11 0.20 → 2026-12 0.60 (Phase 5 整库 ≥60%, 最终 0.80)
-                         intake 时运行 mvn verify (跳过用 -Djacoco.skip=true) -->
+                         intake 时运行 mvn verify (跳过用 -Djacoco.skip=true)
+                         PMO-E4 (2026-09-02): 加 skip 跟随 maven.test.skip, 解决 -DskipTests 自冲突 (P0 阻塞)。
+                         不带 skip 时: 需要 jacoco.exec 文件, mvn verify 则跑 (Phase 5 成功率 Gate)。 -->
                     <execution>
                         <id>check-bundle</id>
                         <phase>verify</phase>
                         <goals><goal>check</goal></goals>
                         <configuration>
+                            <skip>${maven.test.skip}</skip>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>

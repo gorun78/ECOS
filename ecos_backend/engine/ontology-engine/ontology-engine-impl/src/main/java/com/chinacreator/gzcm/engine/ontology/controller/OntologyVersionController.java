@@ -100,4 +100,32 @@ public class OntologyVersionController {
             return ApiResponse.badRequest(e.getMessage());
         }
     }
+
+    // ═══════════════ PMO-28 提案联动端点 ═════════════════
+    // POST /api/v1/ecos/ontologies/{ontologyId}/versions/publish-from-proposal/{proposalId}
+    // Body: { "reviewerComment": "..." }
+    // Query: expectedVersion (乐观锁) — 缺省时尝试读当前值
+    // 效果: 提案→APPROVED + 自动 publish Draft 版本
+
+    @PostMapping("/{ontologyId}/versions/publish-from-proposal/{proposalId}")
+    public ApiResponse<Map<String, Object>> publishFromProposal(
+            @PathVariable String ontologyId,
+            @PathVariable String proposalId,
+            @RequestParam(required = false) Integer expectedVersion,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String publisher = body != null && body.get("publisher") != null
+                ? String.valueOf(body.get("publisher")) : "system";
+        try {
+            Map<String, Object> result = versionService.publishFromProposal(
+                    ontologyId, proposalId, expectedVersion, publisher);
+            return ApiResponse.success(result);
+        } catch (IllegalStateException e) {
+            if (e.getMessage() != null && e.getMessage().startsWith("ONT-409")) {
+                return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, "OPTIMISTIC_LOCK_CONFLICT", e.getMessage());
+            }
+            return ApiResponse.badRequest(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        }
+    }
 }

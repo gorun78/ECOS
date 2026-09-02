@@ -25,6 +25,10 @@ public class CausalChainResult {
     /** 受影响的业务指标列表 */
     private List<String> affectedMetrics;
 
+    // ── 新增字段（Wave-3.2，对齐 04 文档 §四） ──
+    /** 推广到推理路径：可解释的因果链步骤 + RuleRef/PrecedentRef 标记 */
+    private ReasoningPath reasoningPath;
+
     // ── 构造器 ──
     public CausalChainResult() {
         this.nodes = new ArrayList<>();
@@ -61,4 +65,7 @@ public class CausalChainResult {
 
     public List<String> getAffectedMetrics() { return affectedMetrics; }
     public void setAffectedMetrics(List<String> affectedMetrics) { this.affectedMetrics = affectedMetrics; }
+
+    public ReasoningPath getReasoningPath() { return reasoningPath; }
+    public void setReasoningPath(ReasoningPath reasoningPath) { this.reasoningPath = reasoningPath; }
 }
