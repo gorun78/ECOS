@@ -334,24 +334,42 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                       setLoadingTables(true);
                       const r = await triggerMetadataCollect(conn.id);
                       if (r?.taskId) {
-                        // 轮询任务状态，完成后更新目录
                         let done = false;
                         for (let i = 0; i < 60 && !done; i++) {
                           await new Promise(res => setTimeout(res, 1000));
                           const st = await fetchCollectStatus(r.taskId);
-                          if (st?.status === 'SUCCEEDED' || st?.status === 'FAILED') {
+                          if (st?.status === 'SUCCEEDED' || st?.status === 'FAILED' || st?.status === 'error') {
                             done = true;
                             if (st.status === 'SUCCEEDED') {
+                              const fresh = await fetchDataSourceResources(conn.id);
+                              setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                              // 根据采集结果给用户准确反馈
+                              if (st.totalTables === 0 && fresh.length === 0) {
+                                showToast('warning', `${t('dw.conn.refreshTables')} → ${t('dw.conn.noTablesFound') || '采集完成但未发现可用数据表，请检查数据源连接配置'}`);
+                              } else {
+                                showToast('success', `${t('dw.conn.refreshTables')} → ${fresh.length} ${t('dw.tablesUnit') || '张表'}`);
+                              }
+                            } else if (st.status === 'FAILED') {
+                              showToast('error', `${t('dw.conn.refreshTables')} → ${st.errorMessage || t('dw.conn.collectFailed') || '采集任务执行失败'}`);
+                              // 任务失败也尝试重拉目录（可能之前已有数据）
                               const fresh = await fetchDataSourceResources(conn.id);
                               setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
                             }
                             break;
                           }
                         }
+                        // 轮询超时
+                        if (!done) {
+                          const fresh = await fetchDataSourceResources(conn.id);
+                          setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                          showToast('info', t('dw.conn.collectTimeout') || '采集任务超时，已拉取当前可用目录');
+                        }
                       } else {
-                        // fallback: 直接重拉目录
                         const fresh = await fetchDataSourceResources(conn.id);
                         setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                        if (!r) {
+                          showToast('error', t('dw.conn.collectSubmitFailed') || '采集任务提交失败');
+                        }
                       }
                       setLoadingTables(false);
                     }}

@@ -49,7 +49,11 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
 
     @Override
     public List<KnowledgeNode> search(String query) {
-        return nodeMapper.searchByLabel(query);
+        // P0-3 修: 拼 ILIKE 通配符, 避免 PG 扩展协议对 CONCAT('%',?,'%') 推不出参数类型
+        if (query == null || query.isBlank()) {
+            return Collections.emptyList();
+        }
+        return nodeMapper.searchByLabelPattern("%" + query + "%");
     }
 
     @Override

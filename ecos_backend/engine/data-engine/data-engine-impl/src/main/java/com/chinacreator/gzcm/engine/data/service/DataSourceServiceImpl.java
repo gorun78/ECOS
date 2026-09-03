@@ -30,12 +30,15 @@ public class DataSourceServiceImpl implements DataSourceService {
     private static final String TABLE = "td_datasource";
 
     private final JdbcTemplate jdbc;
+    private final com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory connectorFactory;
 
     /** 可选依赖（@Autowired(required=false) 语义：避免测试环境无 Bean 时启动失败） */
     private MetadataAsyncTrigger asyncTrigger;
 
-    public DataSourceServiceImpl(JdbcTemplate jdbc) {
+    public DataSourceServiceImpl(JdbcTemplate jdbc,
+                                 com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory connectorFactory) {
         this.jdbc = jdbc;
+        this.connectorFactory = connectorFactory;
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -71,11 +74,23 @@ public class DataSourceServiceImpl implements DataSourceService {
         DataSourceEntity ds = getById(datasourceId);
         if (ds == null) return false;
         Timestamp now = new Timestamp(System.currentTimeMillis());
-        boolean ok = true; // simplified: actual connection test would parse connectionConfig
+        boolean ok = false;
+        String message;
+        try {
+            // 真实连通性测试：走 runtime-access Connector（POSTGRESQL 等别名内部归一化为 JDBC）
+            com.chinacreator.gzcm.runtime.access.connector.Connector connector =
+                    connectorFactory.getConnector(ds.getDatasourceType());
+            ok = connector.testConnection(ds.getConnectionConfig());
+            message = ok ? "连接成功" : "连接失败: 数据源不可达或认证被拒绝";
+        } catch (Exception e) {
+            message = "连接失败: " + e.getMessage();
+            log.warn("testConnection failed datasource={}: {}", datasourceId, e.getMessage());
+        }
+        String finalMessage = message;
         jdbc.update(
             "UPDATE " + TABLE + " SET last_test_time = ?, last_test_result = ?, " +
             "last_test_message = ?, update_time = ? WHERE datasource_id = ?",
-            now, ok ? "true" : "false", ok ? "连接成功" : "连接失败", now, datasourceId
+            now, ok ? "true" : "false", finalMessage, now, datasourceId
         );
         return ok;
     }

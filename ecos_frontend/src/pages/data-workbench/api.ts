@@ -558,22 +558,42 @@ export async function triggerMetadataCollect(datasourceId: string): Promise<{ ta
   }
 }
 
-/** 查询元数据采集任务状态 → GET /api/v1/datanet/metadata/collect-status/{taskId} (P0-3) */
+/** 查询元数据采集任务状态 → GET /api/v1/datanet/metadata/collect-status/{taskId}
+ *  后端 result 字段是 JSON 字符串（如 {"tablesTotal":0,"tablesOk":0}），
+ *  这里解析后展平到返回类型里，方便 UI 显示采集结果。
+ */
 export async function fetchCollectStatus(taskId: string): Promise<{
   status?: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | string;
   progress?: number;
   message?: string;
   collectedTables?: number;
   totalTables?: number;
+  tablesOk?: number;
+  tablesFailed?: number;
+  errorMessage?: string;
+  elapsedMs?: number;
 } | null> {
   try {
     const raw = await get<Record<string, unknown>>(`/api/v1/datanet/metadata/collect-status/${encodeURIComponent(taskId)}`);
-    return (raw ?? {}) as {
-      status?: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | string;
-      progress?: number;
-      message?: string;
-      collectedTables?: number;
-      totalTables?: number;
+    if (!raw) return null;
+    // 后端 result 是 JSON 字符串，解析后展平
+    let result: Record<string, unknown> = {};
+    const rawResult = raw.result;
+    if (typeof rawResult === 'string') {
+      try { result = JSON.parse(rawResult); } catch { result = {}; }
+    } else if (rawResult && typeof rawResult === 'object') {
+      result = rawResult as Record<string, unknown>;
+    }
+    return {
+      status: raw.status as string,
+      progress: (raw.progress as number) ?? 0,
+      message: raw.message as string | undefined,
+      errorMessage: raw.errorMessage as string | undefined,
+      totalTables: (result.tablesTotal as number) ?? 0,
+      collectedTables: (result.tablesOk as number) ?? 0,
+      tablesOk: (result.tablesOk as number) ?? 0,
+      tablesFailed: (result.tablesFailed as number) ?? 0,
+      elapsedMs: (result.elapsedMs as number) ?? 0,
     };
   } catch (e) {
     console.warn('[data-workbench] fetchCollectStatus failed:', e);
@@ -617,10 +637,21 @@ export async function testDataSourceRaw(payload: {
   }
 }
 
-/** 获取数据源的物理表/目录列表 → GET /api/v1/datanet/metadata/resources/{datasourceId} */
+/** 获取数据源的物理表/目录列表 → GET /api/v1/datanet/metadata/resources/{datasourceId}
+ *  禁缓存：Vite BFF 给 API 响应加 ETag，采集后重拉会拿到 304 空数组缓存，
+ *  加 cache: 'no-store' + _=timestamp 强制后端重新查询。
+ */
 export async function fetchDataSourceResources(datasourceId: string): Promise<TableInfo[]> {
   try {
-    const raw = await get<unknown[]>(`/api/v1/datanet/metadata/resources/${datasourceId}`);
+    // 禁缓存：加 _=Date.now() + cache:'no-store' 双保险
+    const url = `/api/v1/datanet/metadata/resources/${encodeURIComponent(datasourceId)}?_=${Date.now()}`;
+    const res = await fetch(url, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    const raw: unknown[] = (json?.data ?? json);
     if (!Array.isArray(raw)) return [];
     return raw.map((r: Record<string, unknown>) => ({
       name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',

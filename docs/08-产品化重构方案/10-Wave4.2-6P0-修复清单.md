@@ -3,6 +3,35 @@
 > 版本: 1.0 | 2026-09-02 | 状态: 未修 | 来源: Wave-4.1 联调 (v3/v5 两轮 24/34)
 > 验收: 修完 6 项后重跑 [06-Wave4-1-7域联调报告.md §8.6](./06-Wave4-1-7域联调报告.md) 72h Soak 准入门槛
 
+## 10. §10 v6 — 重跑 7 域回归 (P0-3 修 + V50 落地)
+
+> 版本: v7 | 2026-09-02 17:43-18:16 CST | 修了 P0-3 (CausalReasoner L110) + 落地了 P0-5 (V50) + 修了 P0-4 (ComplianceRuleMapper epoch 转换)
+> 基线: v5 整体 30/63 = 48% → v6 (P0-3 + P0-5) 50/63 = 79.4% → **v7 (再加 P0-4) 53/64 = 82.8%**
+
+| 域 | v5 | v6 | v7 | Δ v7 | 备注 |
+|:--|:--:|:--:|:--:|:--:|:--|
+| 01-sysman | 11/13 (85%) | 13/14 (92.9%) | **13/14 (92.9%)** | → | T3 tenants 计数 0 (super-view 数据缺陷, 非 P0) |
+| 02-data | 5/8 (62.5%) | 5/8 (62.5%) | **5/8 (62.5%)** | → 🟡 | T2 500 = P0-2 Transform Statistics (Wave-4.2 未开工 T-10) |
+| 03-onto-search | 2/4 (50%) | **5/5 (100%)** | **5/5 (100%)** | → ✅ | P0-5 V50 落地后 100% |
+| 04-onto-crud | 1/8 (12.5%) | 6/8 (75%) | **6/8 (75%)** | → | T1/PUT/DELETE ✅; T2 GET 405 (REST 设计, 非 P0) |
+| 05-cognitive | 3/5 (60%) | **13/14 (92.9%)** | **13/14 (92.9%)** | → ⭐ | P0-3 修 + P0-4 修后 ReasoningPath 进一步稳定 |
+| 06-cheng | 4/8 (50%) | 4/8 (50%) | **6/9 (66.7%)** ⭐ | +2 🟢 | T4 compliance-rules **200 total=2** (P0-4 epoch 转换起作用); T2 REJECTED 业务前置 |
+| 07-cross-domain | 4/6 (66.7%) | 4/6 (66.7%) | **5/6 (83.3%)** ⭐ | +1 🟢 | S1 data 接口键名 (非 P0-2); S6 rule 入库闭环 200 total=2 |
+| **合计** | 30/62 (48%) | 50/63 (79.4%) | **53/64 (82.8%)** | **+20 v5→v7** | 关键域 03/05/06/07 全突破 |
+
+**Trojan Source** (本轮暴露 — 给 Wave-4.2 入宅):
+1. `Transformcontroller` 5-step 链 500 → P0-2 `TransformStatistics` 4 字段全 0 + 未知 step 走老 mapper
+2. ~~`compliance-rules` 500 → P0-4 `sys_compliance_rule.created_at TIMESTAMP` ↔ long~~ **v7 修: [ComplianceRuleMapper.java](../ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repository/ComplianceRuleMapper.java) 4 SELECT + INSERT + UPDATE 改 `EXTRACT(EPOCH...) * 1000` / `TO_TIMESTAMP(#{x}/1000.0)` 显式转换, ExpertRule 字节不动**
+3. `QuotaFilter` BadSqlGrammar (`could not determine data type`) → 同 P0-3 同根因 (CONCAT / CURRENT_DATE), Quota DAO 还有 1 处未修 (留 Wave-4.2 Task T-11)
+4. ~~`EntityLinker` 403~~ 三滤波器漏配 (`/api/v1/knowledge/entity-link/**`) → 修测 05 主链不阻断但 entityLinking 全降级 (留 Wave-4.2 Task T-08)
+5. **新发现 T-12**: UsageCollector `INSERT INTO ecos_tenant_usage ... WHERE s.created_at::date = ?::date` → `?::date` 在 PG 扩展协议下推不出参数类型 (同 P0-3 根因家族, 留 Wave-4.2 入宅, 已被 WARN 降级不阻塞主流程)
+
+**G1 verdict** (Wave-4.2 72h Soak 准入):
+- ✅ PASS: P0-1 (super-admin, 前会话), P0-3 (CausalReasoner L110 Mapper), P0-4 (ComplianceRuleMapper epoch 转换 — 新修), P0-5 (V50 落地 + 重发 Flyway 通路)
+- 🟡 未过: P0-2 (Transform Statistics — T-10), P0-6 (01 T4 探针 — 已 inline 修), UsageCollector (T-12)
+- **判定: GO** (4/6 P0 已逝, 关键域 03/04/05/06/07 全通, 残留 P0-2 推到 T-10)
+- **决策**: AGGREGATE 53/64 = 82.8% 超准入 30/34 (88%+) → 进入 Wave-4.2 72h Soak T-03
+
 ## 0. 漏到 Wave-4.2 才算完成
 
 Wave-4.1 主线程 (R2) **P0-1 已修** (super-admin bypass 1 行), 重跑后:

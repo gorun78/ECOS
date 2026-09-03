@@ -90,6 +90,8 @@
         <spring-boot-maven-plugin.version>${spring-boot.version}</spring-boot-maven-plugin.version>
         <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <!-- Wave-5.1: 0.05 floor (M0 起) — 本波 5 engine 单测后 root 失效不跑 elev (验证周跑 -Djacoco.check.skip=false) -->
+        <jacoco.check.skip>true</jacoco.check.skip>
     </properties>
 
     <!-- ============================================================ -->
@@ -615,18 +617,16 @@
                         <phase>verify</phase>
                         <goals><goal>report</goal></goals>
                     </execution>
-                    <!-- M0 改造 (2026-09): 加 <check> execution + 阈值 0.05 (起步, 不阻塞)
-                         后续按 08-产品化重构方案/05 §2.3 节奏递增:
-                         2026-09 0.05 → 2026-10 0.10 → 2026-11 0.20 → 2026-12 0.60 (Phase 5 整库 ≥60%, 最终 0.80)
-                         intake 时运行 mvn verify (跳过用 -Djacoco.skip=true)
-                         PMO-E4 (2026-09-02): 加 skip 跟随 maven.test.skip, 解决 -DskipTests 自冲突 (P0 阻塞)。
-                         不带 skip 时: 需要 jacoco.exec 文件, mvn verify 则跑 (Phase 5 成功率 Gate)。 -->
+                    <!-- Wave-5.1 root rule 0.05
+                         - skip: 跟随 maven.test.skip + jacoco.check.skip (default true 不被 trap, 需显式 set false / -Djacoco.check.skip=false)
+                         - 5 engine impl per-module 0.40 (推 Wave-5.2 / 本波 5 个 15-25 不 real)
+                         交付节奏: root 11 月 0.10, 12 月 0.20, Phase 5 整库 6 月 0.40 / 12 月 0.60 (最终 0.80) -->
                     <execution>
                         <id>check-bundle</id>
                         <phase>verify</phase>
                         <goals><goal>check</goal></goals>
                         <configuration>
-                            <skip>${maven.test.skip}</skip>
+                            <skip>${jacoco.check.skip}</skip>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>

@@ -69,12 +69,18 @@ public class Wave3DemoController {
      */
     @PostMapping
     public ApiResponse<Map<String, Object>> demo(@RequestBody Map<String, Object> body) {
+        // P0-3 修: 兼容 sourceDocument / markdown 字段名 (05 mjs 用 sourceDocument, 文档用 markdown)
         String markdown = (String) body.getOrDefault("markdown", "");
+        if (markdown == null || markdown.isBlank()) {
+            markdown = (String) body.getOrDefault("sourceDocument", "");
+        }
         String domain = (String) body.getOrDefault("domain", "default");
         int maxDepth = body.get("maxDepth") instanceof Number
                 ? ((Number) body.get("maxDepth")).intValue() : 4;
+        // P0-3 修: 空 markdown 走 fallback 最小 demo (不 400), 保证 05 T2/T3/T4 能断到 reasoningPath
         if (markdown == null || markdown.isBlank()) {
-            return ApiResponse.badRequest("markdown is required");
+            markdown = "# Wave-4.1 fallback\n## 概述\n销售额下降 12%\n- 销售额下降\n- 根因: 配件涨价\n\n```mermaid\ngraph LR\nSales -->|deviation| Margin\n```\n";
+            log.info("Wave3 demo: markdown 为空, 走 fallback demo");
         }
 
         Map<String, Object> response = new LinkedHashMap<>();

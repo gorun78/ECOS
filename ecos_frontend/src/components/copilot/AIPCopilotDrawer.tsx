@@ -248,8 +248,8 @@ export default function AIPCopilotDrawer({
         });
         const data = await res.json();
         const answerMsgId = `agent-qa-${Date.now()}`;
-        // Push message through the hook's setMessages (cast as updater)
-        (autom.current ?? useAipAutomationApi(messages)).setMessages((prev: any) => [...(prev || []), {
+        // Push message through the hook's setMessages
+        setMessages((prev: any) => [...(prev || []), {
           id: answerMsgId,
           sender: 'agent',
           text: data.answer || t('copilot.chat.noAnswer'),
@@ -267,7 +267,7 @@ export default function AIPCopilotDrawer({
       } catch (err) {
         console.error('Copilot Q&A backend query failed:', err);
         const errMsgId = `agent-err-${Date.now()}`;
-        (autom.current ?? useAipAutomationApi(messages)).setMessages((prev: any) => [...(prev || []), {
+        setMessages((prev: any) => [...(prev || []), {
           id: errMsgId,
           sender: 'agent',
           text: t('copilot.chat.gatewayOffline'),

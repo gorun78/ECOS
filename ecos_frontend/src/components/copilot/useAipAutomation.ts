@@ -86,6 +86,8 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
     onViewModeChange,
     onSelectCategory,
     onIntegrationTabChange,
+    securityTab,
+    onSecurityTabChange,
     showToast,
     objectTypes, setObjectTypes,
     linkTypes, setLinkTypes,

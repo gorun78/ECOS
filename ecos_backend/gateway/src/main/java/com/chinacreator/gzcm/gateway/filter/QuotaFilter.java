@@ -67,15 +67,25 @@ public class QuotaFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws IOException, ServletException {
+        // ── P0-3' 修复：POST/PUT/PATCH 包装 request，使 body 可重读 ──
+        // 仅带 body 的方法包装（避免 GET/DELETE 无谓读流占用）
+        String method = request.getMethod();
+        boolean hasBody = "POST".equalsIgnoreCase(method)
+                || "PUT".equalsIgnoreCase(method)
+                || "PATCH".equalsIgnoreCase(method);
+        final HttpServletRequest effectiveRequest = (hasBody && !(request instanceof CachedBodyHttpServletRequest))
+                ? new CachedBodyHttpServletRequest(request)
+                : request;
+
         // 优先从 JWT 解析的租户上下文获取，其次从 HTTP Header 回退
         String tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null || tenantId.isBlank()) {
-            tenantId = request.getHeader("X-Tenant-Id");
+            tenantId = effectiveRequest.getHeader("X-Tenant-Id");
         }
 
         // 无租户ID → 直接放行（未启用多租户隔离的请求）
         if (tenantId == null || tenantId.isBlank()) {
-            chain.doFilter(request, response);
+            chain.doFilter(effectiveRequest, response);
             return;
         }
 
@@ -85,7 +95,7 @@ public class QuotaFilter extends OncePerRequestFilter {
             String today = LocalDate.now().toString();
 
             // P2-17: 确定配额类型
-            String quotaType = determineQuotaType(request);
+            String quotaType = determineQuotaType(effectiveRequest);
             String quotaTypeLabel = quotaType != null ? quotaType : "API_CALLS";
 
             // 从缓存获取每日限额（A12: 60s TTL本地缓存）
@@ -102,11 +112,11 @@ public class QuotaFilter extends OncePerRequestFilter {
                 if (quotas.isEmpty()) {
                     // 未配置该类型配额 → 只检查 API_CALLS 作为兜底，其他类型放过
                     if (!"API_CALLS".equals(quotaTypeLabel)) {
-                        chain.doFilter(request, response);
+                        chain.doFilter(effectiveRequest, response);
                         return;
                     }
                     // API_CALLS 未配置 → 放行
-                    chain.doFilter(request, response);
+                    chain.doFilter(effectiveRequest, response);
                     return;
                 }
                 dailyLimit = ((Number) quotas.get(0).get("daily_limit")).longValue();
@@ -115,14 +125,14 @@ public class QuotaFilter extends OncePerRequestFilter {
 
             if (dailyLimit <= 0) {
                 // 无限额 → 直接放行
-                chain.doFilter(request, response);
+                chain.doFilter(effectiveRequest, response);
                 return;
             }
 
             // P2-17: STORAGE_MB — 从 X-Content-Length 估算
             long usageIncrement = 1;
             if ("STORAGE_MB".equals(quotaTypeLabel)) {
-                String contentLength = request.getHeader("X-Content-Length");
+                String contentLength = effectiveRequest.getHeader("X-Content-Length");
                 if (contentLength != null) {
                     try {
                         long bytes = Long.parseLong(contentLength);
@@ -170,12 +180,12 @@ public class QuotaFilter extends OncePerRequestFilter {
                 return;
             }
 
-            chain.doFilter(request, response);
+            chain.doFilter(effectiveRequest, response);
 
         } catch (Exception e) {
             log.error("Quota check failed for tenantId={}: {}", tenantId, e.getMessage(), e);
             // 配额检查异常不阻塞业务，放行
-            chain.doFilter(request, response);
+            chain.doFilter(effectiveRequest, response);
         } finally {
             TenantContextHolder.clear();
         }

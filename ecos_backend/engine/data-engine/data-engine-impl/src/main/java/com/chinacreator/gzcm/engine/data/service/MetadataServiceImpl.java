@@ -1,17 +1,23 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.data.model.DataField;
+import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.engine.data.MetadataService;
+import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
+import com.chinacreator.gzcm.runtime.access.connector.Connector;
+import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
- * MetadataService JdbcTemplate 实现（PMO-E3: 替换启动兜底 stub）。
+ * MetadataService JdbcTemplate 实现。
+ * collectAll 走 runtime-access Connector 真实发现表清单，经 ResourceSyncService 落库
+ * （与 MetadataCollectTaskExecutor 异步链路同源，避免双轨实现）。
  * 表: td_data_resource, td_data_field
  */
 @Service
@@ -20,20 +26,45 @@ public class MetadataServiceImpl implements MetadataService {
     private static final Logger log = LoggerFactory.getLogger(MetadataServiceImpl.class);
 
     private final JdbcTemplate jdbc;
+    private final DataSourceRepository dataSourceRepository;
+    private final ConnectorFactory connectorFactory;
+    private final ResourceSyncService resourceSyncService;
 
-    public MetadataServiceImpl(JdbcTemplate jdbc) {
+    public MetadataServiceImpl(JdbcTemplate jdbc,
+                               DataSourceRepository dataSourceRepository,
+                               ConnectorFactory connectorFactory,
+                               ResourceSyncService resourceSyncService) {
         this.jdbc = jdbc;
+        this.dataSourceRepository = dataSourceRepository;
+        this.connectorFactory = connectorFactory;
+        this.resourceSyncService = resourceSyncService;
     }
 
     @Override
     public int collectAll(String datasourceId) {
-        // 查询该数据源下所有资源，为每个资源收集字段信息
-        Integer count = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM td_data_resource WHERE datasource_id = ?",
-            Integer.class, datasourceId
-        );
-        log.info("Collected metadata for datasource {}: {} resources", datasourceId, count);
-        return count != null ? count : 0;
+        DataSourceEntity ds = dataSourceRepository.findById(datasourceId);
+        if (ds == null) {
+            throw new IllegalArgumentException("数据源不存在: " + datasourceId);
+        }
+
+        // Connector 发现表/视图清单（连接失败时异常上抛，由调用方决定任务失败语义）
+        Connector connector = connectorFactory.getConnector(ds.getDatasourceType());
+        List<DataResource> resources = connector.listResources(
+                ds.getConnectionConfig(), ds.getOrgId(), ds.getDatasourceName());
+
+        // 逐表落库（幂等 upsert）；行数不在此统计（rowCnt=null 保持 -1，由异步任务按 countMethod 统计）
+        int ok = 0;
+        for (DataResource r : resources) {
+            try {
+                resourceSyncService.syncResource(datasourceId, r, null);
+                ok++;
+            } catch (Exception e) {
+                log.warn("资源 {} 落库失败: {}", r.getResourceName(), e.getMessage());
+            }
+        }
+        log.info("Collected metadata for datasource {}: {}/{} resources",
+                datasourceId, ok, resources.size());
+        return ok;
     }
 
     @Override
