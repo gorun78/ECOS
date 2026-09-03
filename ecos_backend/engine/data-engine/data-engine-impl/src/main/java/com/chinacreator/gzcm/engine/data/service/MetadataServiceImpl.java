@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.data.model.DataField;
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.MetadataService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
@@ -44,7 +45,7 @@ public class MetadataServiceImpl implements MetadataService {
     public int collectAll(String datasourceId) {
         DataSourceEntity ds = dataSourceRepository.findById(datasourceId);
         if (ds == null) {
-            throw new IllegalArgumentException("数据源不存在: " + datasourceId);
+            throw NotFoundException.entity("数据源", datasourceId);
         }
 
         // Connector 发现表/视图清单（连接失败时异常上抛，由调用方决定任务失败语义）

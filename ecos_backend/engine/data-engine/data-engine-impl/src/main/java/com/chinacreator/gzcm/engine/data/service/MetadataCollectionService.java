@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
 import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
 import com.chinacreator.gzcm.engine.data.MetadataService;
@@ -49,7 +50,7 @@ public class MetadataCollectionService {
     public Map<String, Object> collect(String datasourceId) {
         DataSourceEntity ds = dsRepository.findById(datasourceId);
         if (ds == null) {
-            throw new IllegalArgumentException("数据源不存在: " + datasourceId);
+            throw NotFoundException.entity("数据源", datasourceId);
         }
 
         long start = System.currentTimeMillis();
@@ -181,12 +182,12 @@ public class MetadataCollectionService {
     public Map<String, Object> preview(String resourceId, int limit) {
         DataResource resource = resourceRepository.findById(resourceId);
         if (resource == null) {
-            throw new IllegalArgumentException("资源不存在: " + resourceId);
+            throw NotFoundException.entity("资源", resourceId);
         }
 
         DataSourceEntity ds = dsRepository.findById(resource.getDatasourceId());
         if (ds == null) {
-            throw new IllegalArgumentException("数据源不存在: " + resource.getDatasourceId());
+            throw NotFoundException.entity("数据源", resource.getDatasourceId());
         }
 
         Connector connector = connectorFactory.getConnector(ds.getDatasourceType());

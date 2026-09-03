@@ -1,0 +1,1 @@
+for t in ecos_ontology_proposals ecos_agent_registry td_catalog_item ecos_dq_issue ecos Workflow_instance; do :; done

@@ -5,19 +5,36 @@ import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeGraphServiceImpl.class);
 
+    private static final int SEARCH_CACHE_TTL_SECONDS = 30;
+
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
+
+    /**
+     * P99 优化: search 结果 30s 缓存。
+     * <p>{@code ILIKE '%..%'} 无法命中 B-tree 索引 (需 pg_trgm GIN 才加速),
+     * 同源 query 在 UI 弹跳 / 前端防抖 / 多次重绘等高频场景内命中率很高,
+     * 缓存至列表显示稳定后 (30s) 到期重建, 兼顾一致性与开销。</p>
+     */
+    private final Cache<String, List<KnowledgeNode>> searchCache = Caffeine.newBuilder()
+            .maximumSize(512)
+            .expireAfterWrite(SEARCH_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
+            .build();
 
     public KnowledgeGraphServiceImpl(KnowledgeNodeMapper nodeMapper, KnowledgeEdgeMapper edgeMapper) {
         this.nodeMapper = nodeMapper;
@@ -53,7 +70,9 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         if (query == null || query.isBlank()) {
             return Collections.emptyList();
         }
-        return nodeMapper.searchByLabelPattern("%" + query + "%");
+        // P99 优化: 30s 缓存, 前后端重复 query / 防抖 / 前端重绘等同一 query 复用结果
+        String cacheKey = "search:" + query;
+        return searchCache.get(cacheKey, k -> nodeMapper.searchByLabelPattern("%" + query + "%"));
     }
 
     @Override
@@ -80,14 +99,15 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
 
     @Override
     public KnowledgeNode createNode(String label, String nodeType, String description, String propertiesJson) {
+        LocalDateTime now = LocalDateTime.now();
         KnowledgeNode node = new KnowledgeNode();
         node.setId(UUID.randomUUID().toString());
         node.setLabel(label);
         node.setNodeType(nodeType);
         node.setDescription(description);
         node.setPropertiesJson(propertiesJson);
-        node.setCreatedAt(System.currentTimeMillis());
-        node.setUpdatedAt(System.currentTimeMillis());
+        node.setCreatedAt(now);
+        node.setUpdatedAt(now);
         nodeMapper.insert(node);
         log.info("Created knowledge node: {} [{}]", node.getId(), label);
         return node;
@@ -101,7 +121,7 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         edge.setTargetNodeId(targetNodeId);
         edge.setRelationship(relationship);
         edge.setWeight(weight);
-        edge.setCreatedAt(System.currentTimeMillis());
+        edge.setCreatedAt(LocalDateTime.now());
         edgeMapper.insert(edge);
         log.info("Created knowledge edge: {} [{}]-[{}]->[{}]", edge.getId(), sourceNodeId, relationship, targetNodeId);
         return edge;

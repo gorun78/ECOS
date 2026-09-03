@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,8 +101,14 @@ public class GuardrailsServiceImpl implements GuardrailsService {
 
     @Override
     public Map<String, Object> createPolicy(Map<String, Object> policy) {
+        if (policy == null) {
+            throw new ValidationException("policy is required");
+        }
         String name = String.valueOf(policy.getOrDefault("name", ""));
-        if (name.isEmpty()) throw new IllegalArgumentException("name is required");
+        if (name.isEmpty() || "null".equals(name)) {
+            // Wave-6 T-25: 参数校验失败统一走 ValidationException → 400
+            throw new ValidationException("name is required");
+        }
 
         String id = String.valueOf(idSeq.incrementAndGet());
         long now = Instant.now().toEpochMilli();

@@ -65,21 +65,29 @@ public class ArchitectureTest {
     @Test
     void apiLayerShouldNotDependOnImplPackage() {
         // api 模块的接口不能依赖 impl 中的实现类
-        // 排除 DAO impl（api 层定义 DAO 接口，impl 实现它们）
+        // 排除 DAO impl (api 层定义 DAO 接口, impl 实现它们)
+        // Wave-5.1: 允许空 (api 包可能为空)
         ArchRule rule = noClasses().that()
             .resideInAPackage("com.chinacreator.gzcm.sysman..api..")
             .and().resideOutsideOfPackage("..dao..")
             .should().dependOnClassesThat()
-            .resideInAPackage("..impl..");
+            .resideInAPackage("..impl..")
+            .allowEmptyShould(true);
         rule.check(allClasses);
     }
 
     @Test
     void serviceInterfacesShouldStartWithI() {
+        // Wave-5.1: 允许空 + 排除 impl 子包 + 顶层 interface (避免 inner listener / inner store 等 misfire)
         ArchRule rule = classes().that()
             .resideInAPackage("..service..")
+            .and().areTopLevelClasses()
             .and().areInterfaces()
-            .should().haveSimpleNameStartingWith("I");
+            .and().resideOutsideOfPackage("..service.impl..")
+            .and().resideOutsideOfPackage("..service.cache..")
+            .and().resideOutsideOfPackage("..service.config..")
+            .should().haveSimpleNameStartingWith("I")
+            .allowEmptyShould(true);
         rule.check(allClasses);
     }
 
@@ -102,9 +110,14 @@ public class ArchitectureTest {
 
     @Test
     void serviceImplementationsShouldBeInServiceImplPackage() {
+        // Wave-5.1: 允许空 + 排除 cache.impl/log.impl 等横切 impl 包 (不是业务 serviceImpl)
         ArchRule rule = classes().that()
             .haveSimpleNameEndingWith("ServiceImpl")
-            .should().resideInAPackage("..service.impl..");
+            .and().resideOutsideOfPackage("..cache..")
+            .and().resideOutsideOfPackage("..log.impl..")
+            .and().resideOutsideOfPackage("..logging..")
+            .should().resideInAPackage("..service.impl..")
+            .allowEmptyShould(true);
         rule.check(allClasses);
     }
 

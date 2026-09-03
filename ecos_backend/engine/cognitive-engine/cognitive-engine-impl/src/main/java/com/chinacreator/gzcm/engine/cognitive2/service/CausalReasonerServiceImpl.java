@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.cognitive2.model.RuleRef;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,6 +98,22 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         CausalChainResult result = new CausalChainResult();
 
         // ── 第1层：指标自身节点 ──
+        // Wave-6 T-25: 先查 KG 是否存在指标对应节点 — 不存在时返回 metricFound=false，
+        // 让上游按 404 处理（避免在 Reasoner/ReasoningPath 阶段触发 NPE）
+        boolean metricFound = false;
+        try {
+            List<KnowledgeNode> kgStartNodes = knowledgeGraphService.search(request.getMetric());
+            metricFound = kgStartNodes != null && !kgStartNodes.isEmpty();
+        } catch (Exception e) {
+            log.debug("KG 指标节点预检失败（降级为未找到）: {}", e.getMessage());
+        }
+        if (!metricFound) {
+            log.info("指标 '{}' 在 KG 中不存在，cascade=0 终止诊断", request.getMetric());
+            result.setMetricFound(false);
+            return result;
+        }
+        result.setMetricFound(true);
+
         String metricDesc = request.getMetric() + (request.getDeviation() != 0
                 ? String.format(" (%.0f%%)", request.getDeviation())
                 : "");

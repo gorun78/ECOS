@@ -34,7 +34,9 @@
   - `/api/v1/kb/rules` + `/api/v1/kb/rules/versions` — 规则 CRUD + 版本（`ExpertRuleController`）。
   - `/api/v1/kb/articles` — 文章（`KnowledgeArticleController`）。
   - `/api/v1/kb/graph/sync` — KG 入湖（`GraphSyncController`）。
-  - `/api/v1/ecos/knowledge-graph` — Ecos 通用兼容端点（`EcosKnowledgeGraphController`）。
+  - `/api/v1/knowledge/ecos-graph` — Ecos 通用兼容端点（`EcosKnowledgeGraphController`，2 method：
+    `GET /` 取图快照 / `POST /sync` 同步到 Neo4j）。
+    注意：gateway 侧同名 Controller 用 base `/api/v1/ecos/knowledge-graph`，本模块侧路径独立，勿混。
 - 示例（GraphSyncController 片段）：
 ```java
 @RestController

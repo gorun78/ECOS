@@ -92,6 +92,8 @@
         <jacoco.version>0.8.12</jacoco.version>
         <!-- Wave-5.1: 0.05 floor (M0 起) — 本波 5 engine 单测后 root 失效不跑 elev (验证周跑 -Djacoco.check.skip=false) -->
         <jacoco.check.skip>true</jacoco.check.skip>
+        <!-- Wave-5.4 T-19: 5 engine impl per-module CLASS 0.40 floor, 默认强制；临时跳过 -Djacoco.perModuleCheck.skip=true -->
+        <jacoco.perModuleCheck.skip>false</jacoco.perModuleCheck.skip>
     </properties>
 
     <!-- ============================================================ -->

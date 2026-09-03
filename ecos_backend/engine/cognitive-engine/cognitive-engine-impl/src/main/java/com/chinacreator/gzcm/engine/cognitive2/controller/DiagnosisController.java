@@ -39,6 +39,11 @@ public class DiagnosisController {
         DiagnosisRequest diagReq = new DiagnosisRequest(metric, deviation, domain, maxDepth);
         CausalChainResult result = causalReasonerService.diagnose(diagReq);
 
+        // Wave-6 T-25: 指标在 KG 中未找到 → 404（避免下游 Reasoner 触及 pk=null NPE）
+        if (!result.isMetricFound()) {
+            return ApiResponse.notFound("指标 '" + metric + "' 在知识图谱中不存在，无法执行因果诊断");
+        }
+
         // 缓存历史
         String key = UUID.randomUUID().toString().substring(0, 8);
         historyCache.put(key, result);

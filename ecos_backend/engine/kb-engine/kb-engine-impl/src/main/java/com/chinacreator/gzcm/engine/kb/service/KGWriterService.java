@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -268,7 +269,7 @@ public class KGWriterService {
                 updated = true;
             }
             if (updated) {
-                existing.setUpdatedAt(System.currentTimeMillis());
+                existing.setUpdatedAt(LocalDateTime.now());
                 nodeMapper.insert(existing); // re-insert for simplicity (or add update method)
             }
             log.debug("Entity '{}' already exists (id={}), updated={}", name, existing.getId(), updated);
@@ -276,14 +277,15 @@ public class KGWriterService {
         }
 
         // 新实体
+        LocalDateTime now = LocalDateTime.now();
         KnowledgeNode node = new KnowledgeNode();
         node.setId(UUID.randomUUID().toString());
         node.setLabel(name);
         node.setNodeType(entity.getType() != null ? entity.getType() : "UNKNOWN");
         node.setDescription("confidence=" + entity.getConfidence());
         node.setPropertiesJson(serializeProperties(entity.getProperties()));
-        node.setCreatedAt(System.currentTimeMillis());
-        node.setUpdatedAt(System.currentTimeMillis());
+        node.setCreatedAt(now);
+        node.setUpdatedAt(now);
         nodeMapper.insert(node);
         log.info("Created entity: '{}' (id={}, type={})", name, node.getId(), node.getNodeType());
         return new WriteEntityResult(node.getId(), true);
@@ -318,7 +320,7 @@ public class KGWriterService {
         edge.setTargetNodeId(targetId);
         edge.setRelationship(rel.getRelationType() != null ? rel.getRelationType() : "RELATED_TO");
         edge.setWeight(rel.getConfidence());
-        edge.setCreatedAt(System.currentTimeMillis());
+        edge.setCreatedAt(LocalDateTime.now());
         edgeMapper.insert(edge);
         log.debug("Created relation: [{}] -[{}]-> [{}] (confidence={})",
                 rel.getSourceEntity(), rel.getRelationType(), rel.getTargetEntity(), rel.getConfidence());

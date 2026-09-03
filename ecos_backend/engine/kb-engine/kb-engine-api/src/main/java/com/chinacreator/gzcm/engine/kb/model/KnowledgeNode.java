@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.model;
 
+import java.time.LocalDateTime;
+
 public class KnowledgeNode {
 
     private String id;
@@ -8,8 +10,8 @@ public class KnowledgeNode {
     private String description;
     private String propertiesJson;
     private String domain;
-    private long createdAt;
-    private long updatedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public KnowledgeNode() {}
 
@@ -33,8 +35,8 @@ public class KnowledgeNode {
     public void setPropertiesJson(String propertiesJson) { this.propertiesJson = propertiesJson; }
     public String getDomain() { return domain; }
     public void setDomain(String domain) { this.domain = domain; }
-    public long getCreatedAt() { return createdAt; }
-    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
-    public long getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(long updatedAt) { this.updatedAt = updatedAt; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

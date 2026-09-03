@@ -99,11 +99,9 @@ public class DqRepository {
             ps.setBoolean(6, entity.getEnabled() != null && entity.getEnabled());
             return ps;
         }, keyHolder);
-        Number key = keyHolder.getKey();
-        if (key != null) {
-            return key.longValue();
-        }
-        throw new RuntimeException("Failed to retrieve generated key for ecos_dq_rule");
+        // Wave-6 T-25: PG 返回生成键可能是多列（id + nextval），getKey() 会抛 InvalidDataAccessApiUsageException
+        // → 回退到 keys() map，取 id（或第一个数值列）
+        return resolveGeneratedKey(keyHolder, "ecoss_dq_rule");
     }
 
     public int updateRule(Long id, String name, String description, String ruleType,
@@ -160,11 +158,8 @@ public class DqRepository {
                 ? java.sql.Timestamp.valueOf(entity.getResolvedAt()) : null);
             return ps;
         }, keyHolder);
-        Number key = keyHolder.getKey();
-        if (key != null) {
-            return key.longValue();
-        }
-        throw new RuntimeException("Failed to retrieve generated key for ecos_dq_issue");
+        // Wave-6 T-25: PG 返回生成键可能是多列（id + nextval），与 rule 同理
+        return resolveGeneratedKey(keyHolder, "ecoss_dq_issue");
     }
 
     public int resolveIssue(Long id, String resolution) {
@@ -240,5 +235,32 @@ public class DqRepository {
             result.put(rs.getString("rule_type"), rs.getLong("cnt"));
         });
         return result;
+    }
+
+    /**
+     * Wave-6 T-25: 从 KeyHolder 解析生成的主键。
+     * <p>PG 在 INSERT 后可能返回多条生成列（如 {@code id} 与 {@code nextval(...)}），
+     * 直接调 {@link KeyHolder#getKey()} 会抛 {@code InvalidDataAccessApiUsageException}。
+     * 这里走 {@link #keys()} 取第一个数值列兜底（PG 默认返回 id 在前）。
+     */
+    private long resolveGeneratedKey(KeyHolder keyHolder, String table) {
+        java.util.Map<String, Object> keys = keyHolder.getKeys();
+        if (keys == null || keys.isEmpty()) {
+            log.warn("No generated key returned from {}", table);
+            throw new RuntimeException("Failed to retrieve generated key for " + table);
+        }
+        // 1) 优先显式取 "id"
+        Object idVal = keys.get("id");
+        if (idVal instanceof Number n) {
+            return n.longValue();
+        }
+        // 2) 退而求其次：取第一个 Number
+        for (Object v : keys.values()) {
+            if (v instanceof Number n) {
+                return n.longValue();
+            }
+        }
+        log.warn("No numeric generated key in {} for table {}", keys, table);
+        throw new RuntimeException("Failed to retrieve numeric generated key for " + table);
     }
 }

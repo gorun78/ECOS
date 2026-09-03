@@ -59,7 +59,10 @@ class Wave31OntologyConvergenceTest {
     @Mock private OntologyVersionRepository versionRepo;
     @Mock private OntologyRepository ontRepo;
     @Mock private OntologyDomainRepository domainRepo;
-    @Mock private com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore mappingStore;
+    // P0: OntologyMappingStore 的 `public final Map store = new ConcurrentHashMap<>()` 用 mock 会 NPE
+    // (Mockito 默认 field 初始化 skipped), 改用真实 instance (重 feder memcfg OFF, Pi can) 模拟 in-process 内存存储。
+    private final com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore mappingStore =
+            new com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore();
 
     @AfterEach
     void clearTenant() {

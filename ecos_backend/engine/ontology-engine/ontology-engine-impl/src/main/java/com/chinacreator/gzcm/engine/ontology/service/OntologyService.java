@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
@@ -70,7 +71,13 @@ public class OntologyService {
         entity.setDescription(String.valueOf(body.getOrDefault("description", "")));
         entity.setEntityType(String.valueOf(body.getOrDefault("entityType", "MASTER")));
         entity.setSortOrder(1);
-        repository.insertEntity(entity);
+        try {
+            repository.insertEntity(entity);
+        } catch (DuplicateKeyException e) {
+            // Wave-6 T-25: 唯一约束冲突（如 (ontology_id, code)）→ 409
+            log.warn("Entity unique constraint violation: {} in ontology {}", entity.getCode(), ontologyId);
+            throw e;
+        }
         log.info("Ontology entity created: {} [{}]", id, entity.getCode());
         return entityToMap(entity);
     }
@@ -125,7 +132,13 @@ public class OntologyService {
         prop.setMaxValue(body.containsKey("maxValue") ? toDouble(body.get("maxValue")) : null);
         prop.setFunctionType(String.valueOf(body.getOrDefault("functionType", "")));
         prop.setFunctionExpression(String.valueOf(body.getOrDefault("functionExpression", "")));
-        repository.insertProperty(prop);
+        try {
+            repository.insertProperty(prop);
+        } catch (DuplicateKeyException e) {
+            // Wave-6 T-25: 唯一约束冲突（如 (entity_id, code)）→ 409
+            log.warn("Property unique constraint violation: {} on entity {}", prop.getCode(), entityId);
+            throw e;
+        }
         log.info("Property created: {} [{}] for entity {}", id, prop.getCode(), entityId);
         return propToMap(prop);
     }
@@ -180,7 +193,14 @@ public class OntologyService {
         rel.setCode(String.valueOf(body.getOrDefault("code", "")));
         rel.setName(String.valueOf(body.getOrDefault("name", "")));
         rel.setRelationshipType(String.valueOf(body.getOrDefault("relationshipType", "ONE_TO_MANY")));
-        repository.insertRelationship(rel);
+        try {
+            repository.insertRelationship(rel);
+        } catch (DuplicateKeyException e) {
+            // Wave-6 T-25: 唯一约束冲突（如 (sourceEntityId, targetEntityId, code)）→ 409
+            log.warn("Relationship unique constraint violation: {} {}→{}",
+                    rel.getCode(), sourceEntityId, rel.getTargetEntityId());
+            throw e;
+        }
         log.info("Relationship created: {} [{}] {}→{}", id, rel.getCode(), sourceEntityId, rel.getTargetEntityId());
         return relToMap(rel);
     }
