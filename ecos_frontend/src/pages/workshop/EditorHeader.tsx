@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Play, Settings } from 'lucide-react';
+import { ArrowLeft, Palette, Play, Send, Settings } from 'lucide-react';
 import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

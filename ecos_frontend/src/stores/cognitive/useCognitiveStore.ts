@@ -61,14 +61,14 @@ export interface CognitiveState {
 export const useCognitiveStore = create<CognitiveState>()(
   devtools(
     (set, get) => ({
-      worldState: null,
-      scenarios: [],
-      currentScenarioId: null,
-      simulationResult: null,
-      strategyRecommendation: null,
-      causalGraph: [],
+      worldState: null as WorldState | null,
+      scenarios: [] as Scenario[],
+      currentScenarioId: null as string | null,
+      simulationResult: null as SimulationResult | null,
+      strategyRecommendation: null as StrategyRecommendation | null,
+      causalGraph: [] as CausalEdge[],
       loading: false,
-      error: null,
+      error: null as string | null,
 
       fetchWorldState: async () => {
         set({ loading: true, error: null });

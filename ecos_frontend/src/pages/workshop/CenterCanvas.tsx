@@ -4,7 +4,7 @@ import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterCanvas(vm: any) {
-  const { styles: _s, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
   return (
     <>
               
@@ -21,7 +21,7 @@ export function renderCenterCanvas(vm: any) {
                 
                 {/* Horizontal Navigation tabs inside App page */}
                 <div className="flex items-center gap-1.5">
-                  {activeApp.pages.map(p => (
+                  {activeApp.pages.map((p: any) => (
                     <button
                       key={p.id}
                       onClick={() => {
@@ -45,7 +45,7 @@ export function renderCenterCanvas(vm: any) {
                 
                 {/* 2.1. TOP METRICS SLOT */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {activePage?.widgets.filter(w => w.slot === 'main_top').map(w => {
+                  {activePage?.widgets.filter((w: any) => w.slot === 'main_top').map((w: any) => {
                     const isSelected = w.id === selectedWidgetId;
                     const ds = w.config.dataSourceVarId;
                     const type = w.config.metricType;
@@ -59,7 +59,7 @@ export function renderCenterCanvas(vm: any) {
                       if (type === 'count') {
                         metricValue = simData.length;
                       } else {
-                        metricValue = simData.filter(f => f.status === 'DELAYED').length;
+                        metricValue = simData.filter((f: any) => f.status === 'DELAYED').length;
                       }
                     } else {
                       metricValue = aircraftData.length;

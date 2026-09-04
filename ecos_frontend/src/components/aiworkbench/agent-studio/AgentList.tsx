@@ -7,7 +7,7 @@ import React from 'react';
 import { AIPAgent, AIPModel, AIPGuardrail } from '../../../types/aiworkbench';
 import type { ThemeStyles } from '../../ThemeContext';
 import * as Icons from 'lucide-react';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -182,7 +182,7 @@ export default function AgentList({
                 >
                   {models.map(m => (
                     <option key={m.id} value={m.id}>{m.displayName}</option>
-                  )}
+                  ))}
                 </select>
               </div>
 
@@ -211,7 +211,7 @@ export default function AgentList({
                           checked={isChecked}
                           onChange={() => {
                             if (isChecked) {
-                              setFormTools(formTools.filter(t => t !== tool,)};
+                              setFormTools(formTools.filter(t => t !== tool));
                             } else {
                               setFormTools([...formTools, tool]);
                             }
@@ -238,7 +238,7 @@ export default function AgentList({
                           checked={isChecked}
                           onChange={() => {
                             if (isChecked) {
-                              setFormGuardrails(formGuardrails.filter(gid => gid !== g.id,)};
+                              setFormGuardrails(formGuardrails.filter(gid => gid !== g.id));
                             } else {
                               setFormGuardrails([...formGuardrails, g.id]);
                             }

@@ -78,7 +78,7 @@ export default function LineageTab({
                     "job": { "namespace": "ds_scheduler", "name": "spark_clean_flight_acars_job" },
                     "inputs": [{ "namespace": "postgresql_raw_sched", "name": "flights_raw" }],
                     "outputs": [{ "namespace": "doris_production_olap", "name": "ds_flights_clean" }]
-                  }, null, 2,)};
+                  }, null, 2));
                 }}
                 className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${parserFormatSelected === 'openlineage' ? 'styles.cardBg styles.cardText shadow-xs' : 'styles.cardTextMuted hover:styles.cardText'}`}
               >
@@ -97,7 +97,7 @@ export default function LineageTab({
                         "outputs": [{ "typeName": "hive_table", "uniqueAttributes": { "qualifiedName": "doris_production_olap.ds_pilots_biography@cluster" } }]
                       }
                     }
-                  ], null, 2,)};
+                  ], null, 2));
                 }}
                 className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${parserFormatSelected === 'atlas' ? 'styles.cardBg styles.cardText shadow-xs' : 'styles.cardTextMuted hover:styles.cardText'}`}
               >
@@ -119,7 +119,7 @@ export default function LineageTab({
                       "job": { "namespace": "ds_scheduler", "name": "spark_clean_flight_acars_job" },
                       "inputs": [{ "namespace": "postgresql_raw_sched", "name": "flights_raw" }],
                       "outputs": [{ "namespace": "doris_production_olap", "name": "ds_flights_clean" }]
-                    }, null, 2,)};
+                    }, null, 2));
                   } else {
                     setRawPayloadInput(JSON.stringify([
                       {
@@ -131,7 +131,7 @@ export default function LineageTab({
                           "outputs": [{ "typeName": "hive_table", "uniqueAttributes": { "qualifiedName": "doris_production_olap.ds_pilots_biography@cluster" } }]
                         }
                       }
-                    ], null, 2,)};
+                    ], null, 2));
                   }
                 }}
                 className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline cursor-pointer"
@@ -175,7 +175,7 @@ export default function LineageTab({
           </h3>
 
           <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed font-sans -mt-1`}>
-            {t('aiworkbench.knowledge.lineage.topoDesc').replace('{nodes}', String(lineageNodes.length,)}.replace('{links}', String(lineageLinks.length)}
+            {t('aiworkbench.knowledge.lineage.topoDesc').replace('{nodes}', String(lineageNodes.length)).replace('{links}', String(lineageLinks.length))}
           </p>
 
           <div className={`flex-1 ${styles.inputBg} border ${styles.cardBorder}/60 rounded-xl p-4 overflow-y-auto max-h-[300px] space-y-3`}>
@@ -197,7 +197,7 @@ export default function LineageTab({
                         <div className={`text-[8px] ${styles.cardTextMuted} font-sans`}>{node.label}</div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
 
@@ -213,7 +213,7 @@ export default function LineageTab({
                         <div className="text-[8px] text-blue-500 font-sans">{node.label}</div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
 
@@ -229,7 +229,7 @@ export default function LineageTab({
                         <div className="text-[8px] text-emerald-500 font-sans">{node.label}</div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
 
@@ -245,7 +245,7 @@ export default function LineageTab({
                         <div className={`text-[8px] ${styles.accentText} font-sans`}>{node.label}</div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
 
@@ -261,7 +261,7 @@ export default function LineageTab({
                         <div className="text-[8px] text-rose-500 font-sans">{node.label}</div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
 
@@ -291,7 +291,7 @@ export default function LineageTab({
             >
               {lineageNodes.filter(n => n.type === 'physical_table' || n.type === 'olap_table').map(n => (
                 <option key={n.id} value={n.id}>{n.id} ({n.type === 'physical_table' ? t('aiworkbench.knowledge.lineage.sourceTable').split(' / ')[0] : t('aiworkbench.knowledge.lineage.sourceTable').split(' / ')[1] || 'OLAP Wide Table'})</option>
-              )}
+              ))}
             </select>
           </div>
         </div>
@@ -397,7 +397,7 @@ export default function LineageTab({
                         </div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>

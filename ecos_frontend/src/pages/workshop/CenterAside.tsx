@@ -1,16 +1,16 @@
 import React from 'react';
-import { Trash2, Zap } from 'lucide-react';
+import { Trash2, Zap, Inbox, Plus } from 'lucide-react';
 import { mockActionTypes } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterAside(vm: any) {
-  const { styles: _s, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
   return (
     <>
                   {/* RIGHT ASIDE VIEW (Object View and Actions) */}
                   <div className="lg:col-span-3 space-y-4">
                     {/* Object card */}
-                    {activePage?.widgets.filter(w => w.slot === 'aside' && w.type === 'object_view').map(w => {
+                    {activePage?.widgets.filter(w: any => w.slot === 'aside' && w.type === 'object_view').map((w: any) => {
                       const isSelected = w.id === selectedWidgetId;
                       const boundTarget = w.config.targetVarId;
                       const currentSelection = getVarValue(boundTarget);
@@ -94,7 +94,7 @@ export function renderCenterAside(vm: any) {
                     })}
 
                     {/* Action Button */}
-                    {activePage?.widgets.filter(w => w.slot === 'aside' && w.type === 'action_button').map(w => {
+                    {activePage?.widgets.filter((w: any) => w.slot === 'aside' && w.type === 'action_button').map((w: any) => {
                       const isSelected = w.id === selectedWidgetId;
                       const boundActionId = w.config.actionTypeId;
                       const boundTargetVarId = w.config.targetVarId;
@@ -135,7 +135,7 @@ export function renderCenterAside(vm: any) {
                       );
                     })}
 
-                    {editorMode === 'design' && activePage?.widgets.filter(w => w.slot === 'aside').length === 0 && (
+                    {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'aside').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('aside'); setShowAddWidgetModal(true); }}
                         className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[140px] w-full`}

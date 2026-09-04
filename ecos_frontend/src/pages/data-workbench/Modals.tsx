@@ -74,6 +74,7 @@ interface AddSyncModalProps {
 }
 
 export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncConn, setNewSyncConn, newSyncTable, setNewSyncTable, newSyncMode, setNewSyncMode, newSyncSched, setNewSyncSched, connections, onClose, onCreate }: AddSyncModalProps) {
+  const { styles } = useTheme();
   return (
     <div className={`absolute inset-0 ${styles.overlayBg} backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none`}>
       <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-md w-full overflow-hidden flex flex-col`}>
@@ -113,6 +114,7 @@ interface AddHealthCheckModalProps {
 }
 
 export function AddHealthCheckModal({ t, locale, newCheckName, setNewCheckName, newCheckDs, setNewCheckDs, newCheckType, setNewCheckType, newCheckThreshold, setNewCheckThreshold, onClose, onCreate }: AddHealthCheckModalProps) {
+  const { styles } = useTheme();
   return (
     <div className={`absolute inset-0 ${styles.overlayBg} backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none`}>
       <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-md w-full overflow-hidden flex flex-col`}>
@@ -146,6 +148,7 @@ interface ExternalInterfacesDrawerProps {
 }
 
 export function ExternalInterfacesDrawer({ t, connections, onClose }: ExternalInterfacesDrawerProps) {
+  const { styles } = useTheme();
   return (
     <div className={`absolute top-12 right-0 bottom-0 w-96 ${styles.overlayBg} ${styles.cardText} border-l ${styles.cardBorder} shadow-2xl z-40 flex flex-col overflow-hidden select-none`}>
       <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.overlayBg} shrink-0`}>

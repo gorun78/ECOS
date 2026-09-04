@@ -33,7 +33,7 @@ export interface DataAsset {
   id: string;
   name: string;
   description: string;
-  type: "dataset" | "ontology" | "pipeline" | "dashboard" | "source" | "view";
+  type: "dataset" | "ontology" | "pipeline" | "dashboard" | "source" | "view" | "table";
   owner: string;
   domain: string;
   tags: string[];
@@ -100,6 +100,8 @@ export interface RelationshipDefinition {
   name: string;
   targetEntity: string;
   cardinality: "one" | "many";
+  /** 扩展占位 — 后端可能返回任意字符串 */
+  [key: string]: unknown;
 }
 
 export interface ActionDefinition {
@@ -208,6 +210,7 @@ export interface AgentMetrics {
 export interface KnowledgeNode {
   id: string;
   label: string;
+  name?: string;
   nodeType?: string;       // 后端字段
   type?: string;            // 兼容旧mock
   description?: string;     // 后端字段
@@ -224,6 +227,7 @@ export interface KnowledgeEdge {
   target?: string;          // 兼容旧mock
   relationship: string;
   weight?: number;
+  label?: string;
 }
 
 export interface Goal {

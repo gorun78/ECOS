@@ -82,7 +82,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { locale } = useLanguage();
   const zh = locale === "zh";
 

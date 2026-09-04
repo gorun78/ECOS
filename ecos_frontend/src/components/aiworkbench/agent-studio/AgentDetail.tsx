@@ -7,7 +7,7 @@ import React from 'react';
 import { AIPAgent, AIPGuardrail } from '../../../types/aiworkbench';
 import type { ThemeStyles } from '../../ThemeContext';
 import * as Icons from 'lucide-react';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -99,7 +99,7 @@ export default function AgentDetail({
                   </div>
                   <span className="px-1.5 bg-amber-500/10 text-amber-600 text-[8px] font-bold rounded">{t("aiworkbench.agentStudio.privileged")}</span>
                 </div>
-              )}
+              ))}
               {selectedAgent.assignedTools.functionIds.map(fn => (
                 <div key={fn} className="flex items-center gap-2 p-1.5 bg-blue-500/5 border border-blue-200/50 rounded-lg">
                   <span className="p-0.5 rounded bg-blue-100 text-blue-600">
@@ -111,7 +111,7 @@ export default function AgentDetail({
                   </div>
                   <span className={`px-1.5 ${styles.badgeBg} ${styles.accentText} text-[8px] font-bold rounded`}>{t("aiworkbench.agentStudio.readonly")}</span>
                 </div>
-              )}
+              ))}
             </div>
           </div>
 

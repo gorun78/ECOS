@@ -54,6 +54,8 @@ export interface AIPAgent {
 export interface AIPModel {
   id: string;
   displayName: string;
+  /** 历史/兼容字段（displayName 的别名） */
+  name?: string;
   provider: 'Google' | 'Anthropic' | 'OpenAI' | 'Meta' | 'On-Premises';
   type: 'language' | 'vision' | 'embedding' | 'audio';
   status: 'connected' | 'testing' | 'offline';

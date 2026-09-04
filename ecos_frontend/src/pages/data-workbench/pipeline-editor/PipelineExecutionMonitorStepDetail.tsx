@@ -9,21 +9,15 @@ import {
   STATUS_COLORS, STATUS_LABELS, StatusIcon,
   type StepRunInfo,
 } from './PipelineExecutionMonitorTypes';
-import { useTheme } from '../../../components/ThemeContext';
+
 
 interface Props {
   step: StepRunInfo;
   onClose: () => void;
-  styles: {
-    cardBg: string;
-    cardBorder: string;
-    cardText: string;
-    cardTextMuted: string;
-  };
+  styles: Record<string, string>;
 }
 
 const PipelineExecutionMonitorStepDetail: React.FC<Props> = ({ step, onClose, styles }) => {
-  const { styles } = useTheme();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />

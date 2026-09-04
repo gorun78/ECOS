@@ -229,7 +229,7 @@ export default function DomainGraphCanvas({
 
   /** 连线开始 — 可用于高亮有效目标 */
   const handleConnectStart: OnConnectStart = useCallback(
-    (_event, { nodeId }) => {
+    (_event, nodeId, handleId) => {
       // 预留扩展：高亮合法连接目标节点
     },
     []

@@ -48,6 +48,7 @@ export interface ThemeStyles {
   infoBorder: string;
   /** Overlay backdrop for modals/drawers */
   overlayBg: string;
+  [key: string]: string;
 }
 
 interface ThemeContextType {

@@ -4,7 +4,8 @@
  * Falls back to mock data when backend is unavailable.
  */
 import type {
-  DataAsset, EntityDefinition, EntityInstance, AuditEvent,
+  DataAsset, DatasetHistoryRecord, EntityDefinition, EntityInstance, AuditEvent,
+  RelationshipDefinition, ActionDefinition,
   AgentDefinition, ToolDefinition, PromptTemplate,
   KnowledgeNode, KnowledgeEdge, Goal, CausalLink, Scenario,
   DataSource, DataResource, DataField, AuditStats,
@@ -166,21 +167,21 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
       id: r.tableName || r.name || `ds_${i}`,
       name: r.tableName || r.name || `dataset_${i}`,
       description: r.comment || r.description || "",
-      type: "table",
+      type: "table" as const,
       owner: active.createBy || "data-team",
       domain: r.schema || "public",
-      tags: [],
+      tags: [] as string[],
       status: "Healthy" as const,
       qualityScore: 85 + (i % 15),
       rows: r.rowCount || 0,
       columns: r.columnCount || 0,
       storageSize: r.dataSize || "—",
       updatedAt: r.updatedAt || new Date().toISOString().slice(0, 10),
-      schema: [],
-      qualityRules: [],
-      history: [],
-      permissions: { owner: [active.createBy || "data-team"], editor: [], viewer: [] },
-    }));
+      schema: [] as { name: string; type: string; nullable?: boolean; primaryKey?: boolean; qualityScore?: number; description?: string }[],
+      qualityRules: [] as any[],
+      history: [] as DatasetHistoryRecord[],
+      permissions: { owner: [active.createBy || "data-team"], editor: [] as string[], viewer: [] as string[] },
+    })) as unknown as DataAsset[];
   } catch (e) {
     console.warn("fetchDatasets: backend unavailable, using mock", e);
     return MOCK_DATA_ASSETS;
@@ -226,9 +227,9 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
         storageSize: "—",
         updatedAt: "—",
         schema,
-        qualityRules: [],
-        history: [],
-        permissions: { owner: [found.datasourceName || "data-team"], editor: [], viewer: [] },
+        qualityRules: [] as any[],
+        history: [] as DatasetHistoryRecord[],
+        permissions: { owner: [found.datasourceName || "data-team"], editor: [] as string[], viewer: [] as string[] },
       };
     }
   } catch (e) {
@@ -255,7 +256,7 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
     schema: [],
     qualityRules: [],
     history: [],
-    permissions: { owner: ["data-team"], editor: [], viewer: [] },
+    permissions: { owner: ["data-team"], editor: [] as string[], viewer: [] as string[] },
   };
 }
 
@@ -279,8 +280,8 @@ export async function fetchOntology(): Promise<{
           searchable: p.searchableFlag === 1,
           editable: true,
         })),
-        relationships: [],
-        actions: [],
+        relationships: [] as RelationshipDefinition[],
+        actions: [] as ActionDefinition[],
       }));
       return { entities, instances: {} };
     }

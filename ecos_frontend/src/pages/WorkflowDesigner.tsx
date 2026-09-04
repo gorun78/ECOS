@@ -312,7 +312,7 @@ export default function WorkflowDesigner() {
               <Controls className="!rounded-lg !shadow-sm !border !border-slate-200" />
               <Background gap={20} size={1} color="#E2E8F0" />
               <MiniMap className="!rounded-lg !shadow-sm !border !border-slate-200"
-                nodeColor={(n) => MINIMAP_COLORS[n.type || ""] || MINIMAP_FALLBACK}
+                nodeColor={(n: any) => MINIMAP_COLORS[n.type || ""] || MINIMAP_FALLBACK}
               />
             </ReactFlow>
           </div>

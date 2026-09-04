@@ -8,7 +8,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../../components/ThemeContext';
 import * as Icons from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+type AnyMonacoCodeEditor = any;
+declare const editorNS: typeof import('monaco-editor').editor;
 
 import SchemaTree from './SchemaTree';
 import QueryToolbar from './QueryToolbar';
@@ -49,7 +50,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
 
   // ── SQL 编辑器 ──
   const [sql, setSql] = useState('SELECT 1');
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<AnyMonacoCodeEditor | null>(null);
 
   // ── 查询结果 ──
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
@@ -103,7 +104,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         pageSize: pagination.pageSize,
       });
 
-      setColumns(result.columns || []);
+      setColumns((result.columns || []) as ColumnMeta[]);
       setRows(result.rows || []);
       setPagination({
         page: result.page || 1,
@@ -245,7 +246,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
   }, [handleExecute]);
 
   // ── Monaco Editor 配置 ──
-  const editorOptions: editor.IStandaloneEditorConstructionOptions = {
+  const editorOptions: Record<string, unknown> = {
     minimap: { enabled: false },
     fontSize: 13,
     lineNumbers: 'on',
@@ -269,10 +270,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       {showLeftPanel && (
         <div className="w-60 shrink-0 border-r border-slate-700">
           <SchemaTree
-            dataSources={dataSources}
-            selectedDsId={selectedDsId}
-            onSelectDs={setSelectedDsId}
-            onInsertField={handleInsertField}
+            datasourceId={selectedDsId}
           />
         </div>
       )}
@@ -326,14 +324,9 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <ResultTable
-                columns={columns}
-                rows={rows}
-                pagination={pagination}
-                executionTimeMs={executionTimeMs}
-                errorMessage={errorMessage}
-                isLoading={isExecuting}
-                onPageChange={handlePageChange}
-                onExportCsv={handleExportCsv}
+                result={{ columns, rows, pagination, executionTimeMs, total: pagination.total } as QueryExecuteResponse}
+                loading={isExecuting}
+                error={errorMessage || null}
               />
             </div>
 
@@ -341,10 +334,9 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
             {isHistoryOpen && (
               <div className="w-72 shrink-0">
                 <HistoryPanel
-                  isOpen={isHistoryOpen}
+                  show={isHistoryOpen}
+                  onLoadSql={(sql: string) => handleLoadHistory(sql, selectedDsId || '')}
                   onClose={() => setIsHistoryOpen(false)}
-                  onLoadHistory={handleLoadHistory}
-                  showToast={showToast}
                 />
               </div>
             )}
@@ -367,11 +359,10 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       {showRightPanel && (
         <div className="w-64 shrink-0">
           <TemplatePanel
-            currentSql={sql}
-            selectedDsId={selectedDsId}
-            onLoadTemplate={handleLoadTemplate}
-            onOpenSaveDialog={handleOpenSaveDialog}
-            showToast={showToast}
+            show={showRightPanel}
+            datasourceId={selectedDsId}
+            onLoad={handleLoadTemplate}
+            onClose={() => setShowRightPanel(false)}
           />
         </div>
       )}

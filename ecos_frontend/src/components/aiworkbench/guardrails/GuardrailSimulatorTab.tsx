@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import type { ThemeStyles } from '../../ThemeContext';
 import type { AIPGuardrail } from '../../../types/aiworkbench';
 import * as Icons from 'lucide-react';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import Pagination from '../../common/Pagination';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
@@ -43,6 +43,12 @@ export default function GuardrailSimulatorTab({
   const [guardPageSize] = useState(6);
   const [guardSortBy, setGuardSortBy] = useState<string>("name");
   const [guardSortOrder, setGuardSortOrder] = useState<"asc" | "desc">("asc");
+  const sortedGuards = [...guardrails].sort((a: any, b: any) => {
+    const aVal = String(a[guardSortBy] ?? "");
+    const bVal = String(b[guardSortBy] ?? "");
+    return guardSortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+  });
+  const pagedGards = sortedGuards.slice((guardPage - 1) * guardPageSize, guardPage * guardPageSize);
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -52,14 +58,8 @@ export default function GuardrailSimulatorTab({
           <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider`}>{t("aiworkbench.guardrails.rulesConfig")} ({guardrails.length})</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(() => {
-              const sorted = [...guardrails].sort((a: any, b: any) => {
-                const aVal = String(a[guardSortBy] ?? "");
-                const bVal = String(b[guardSortBy] ?? "");
-                return guardSortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-              });
-              return sorted.slice((guardPage - 1) * guardPageSize, guardPage * guardPageSize).map(g => (
-              <div key={g.id} className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow`}>
+            {pagedGards.map((g: any) => (
+                <div key={g.id} className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow`}>
                 
                 <div className="space-y-2">
                   <div className="flex items-start justify-between">
@@ -100,8 +100,7 @@ export default function GuardrailSimulatorTab({
                 </div>
 
               </div>
-            )}
-          })})()}
+            ))}
           </div>
           {guardrails.length > guardPageSize && (
             <Pagination
@@ -162,7 +161,7 @@ export default function GuardrailSimulatorTab({
               <div className={`${styles.appBg} rounded-xl p-3 max-h-48 overflow-y-auto space-y-2 text-[10px] font-mono ${styles.cardTextMuted}`}>
                 {sandboxTrace.map((log, idx) => (
                   <p key={idx} className="leading-relaxed">{log}</p>
-                )}
+                ))}
               </div>
             </div>
           )}
@@ -185,7 +184,7 @@ export default function GuardrailSimulatorTab({
                       <span key={idx} className={`block text-[10px] text-rose-600 font-mono font-bold ${styles.cardBg} px-2 py-0.5 border ${styles.cardBorder} rounded-md`}>
                         {filter}
                       </span>
-                    )}
+                    ))}
                   </div>
                 </div>
 

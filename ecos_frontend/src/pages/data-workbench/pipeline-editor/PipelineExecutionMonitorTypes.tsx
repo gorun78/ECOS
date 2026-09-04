@@ -53,13 +53,22 @@ export interface PipelineExecutionMonitorProps {
 
 // ─── Status color map ─────────────────────────────────
 
+const PIPELINE_STATUS_STYLE: Record<string, string> = {
+  sidebarBg: 'bg-slate-100', muted: 'text-slate-500', inputBorder: 'border-[#E2E8F0]',
+  infoBg: 'bg-blue-50', accentText: 'text-indigo-600', infoBorder: 'border-blue-200',
+  infoText: 'text-blue-700', warningBg: 'bg-amber-50', warningText: 'text-amber-700',
+  warningBorder: 'border-amber-200', successBg: 'bg-emerald-50', successText: 'text-emerald-700',
+  successBorder: 'border-emerald-200', dangerBg: 'bg-red-50', dangerText: 'text-red-700',
+  dangerBorder: 'border-red-200', cardTextMuted: 'text-slate-500',
+};
+
 export const STATUS_COLORS: Record<StepStatus, { bg: string; text: string; border: string; icon: React.FC<{ size?: number; className?: string }> }> = {
-  idle: { bg: `${styles.sidebarBg}`, text: `${styles.muted}`, border: `${styles.inputBorder}`, icon: ({ size, className }) => <div className={`w-3 h-3 rounded-full ${styles.sidebarBg} ${className || ''}`} /> },
-  queued: { bg: `${styles.infoBg}`, text: `${styles.accentText}`, border: `${styles.infoBorder}`, icon: ({ size, className }) => <Clock size={size || 12} className={`${styles.infoText} ${className || ''}`} /> },
-  running: { bg: `${styles.warningBg}`, text: `${styles.warningText}`, border: `${styles.warningBorder}`, icon: ({ size, className }) => <Loader2 size={size || 12} className={`${styles.warningText} animate-spin ${className || ''}`} /> },
-  succeeded: { bg: `${styles.successBg}`, text: `${styles.successText}`, border: `${styles.successBorder}`, icon: ({ size, className }) => <CheckCircle size={size || 12} className={`${styles.successText} ${className || ''}`} /> },
-  failed: { bg: `${styles.dangerBg}`, text: `${styles.dangerText}`, border: `${styles.dangerBorder}`, icon: ({ size, className }) => <XCircle size={size || 12} className={`${styles.dangerText} ${className || ''}`} /> },
-  cancelled: { bg: `${styles.sidebarBg}`, text: `${styles.muted}`, border: `${styles.inputBorder}`, icon: ({ size, className }) => <AlertTriangle size={size || 12} className={`${styles.cardTextMuted} ${className || ''}`} /> },
+  idle: { bg: `${PIPELINE_STATUS_STYLE.sidebarBg}`, text: `${PIPELINE_STATUS_STYLE.muted}`, border: `${PIPELINE_STATUS_STYLE.inputBorder}`, icon: ({ size, className }) => <div className={`w-3 h-3 rounded-full ${PIPELINE_STATUS_STYLE.sidebarBg} ${className || ''}`} /> },
+  queued: { bg: `${PIPELINE_STATUS_STYLE.infoBg}`, text: `${PIPELINE_STATUS_STYLE.accentText}`, border: `${PIPELINE_STATUS_STYLE.infoBorder}`, icon: ({ size, className }) => <Clock size={size || 12} className={`${PIPELINE_STATUS_STYLE.infoText} ${className || ''}`} /> },
+  running: { bg: `${PIPELINE_STATUS_STYLE.warningBg}`, text: `${PIPELINE_STATUS_STYLE.warningText}`, border: `${PIPELINE_STATUS_STYLE.warningBorder}`, icon: ({ size, className }) => <Loader2 size={size || 12} className={`${PIPELINE_STATUS_STYLE.warningText} animate-spin ${className || ''}`} /> },
+  succeeded: { bg: `${PIPELINE_STATUS_STYLE.successBg}`, text: `${PIPELINE_STATUS_STYLE.successText}`, border: `${PIPELINE_STATUS_STYLE.successBorder}`, icon: ({ size, className }) => <CheckCircle size={size || 12} className={`${PIPELINE_STATUS_STYLE.successText} ${className || ''}`} /> },
+  failed: { bg: `${PIPELINE_STATUS_STYLE.dangerBg}`, text: `${PIPELINE_STATUS_STYLE.dangerText}`, border: `${PIPELINE_STATUS_STYLE.dangerBorder}`, icon: ({ size, className }) => <XCircle size={size || 12} className={`${PIPELINE_STATUS_STYLE.dangerText} ${className || ''}`} /> },
+  cancelled: { bg: `${PIPELINE_STATUS_STYLE.sidebarBg}`, text: `${PIPELINE_STATUS_STYLE.muted}`, border: `${PIPELINE_STATUS_STYLE.inputBorder}`, icon: ({ size, className }) => <AlertTriangle size={size || 12} className={`${PIPELINE_STATUS_STYLE.cardTextMuted} ${className || ''}`} /> },
 };
 
 export const STATUS_LABELS: Record<StepStatus, string> = {
@@ -75,12 +84,12 @@ export const STATUS_LABELS: Record<StepStatus, string> = {
 
 export const StatusIcon: React.FC<{ status: StepStatus; size?: number }> = React.memo(({ status, size = 12 }) => {
   switch (status) {
-    case 'idle': return <div className={`w-3 h-3 rounded-full ${styles.sidebarBg}`} />;
-    case 'queued': return <Clock size={size} className={`${styles.infoText}`} />;
-    case 'running': return <Loader2 size={size} className={`${styles.warningText} animate-spin`} />;
-    case 'succeeded': return <CheckCircle size={size} className={`${styles.successText}`} />;
-    case 'failed': return <XCircle size={size} className={`${styles.dangerText}`} />;
-    case 'cancelled': return <AlertTriangle size={size} className={`${styles.cardTextMuted}`} />;
+    case 'idle': return <div className={`w-3 h-3 rounded-full ${PIPELINE_STATUS_STYLE.sidebarBg}`} />;
+    case 'queued': return <Clock size={size} className={`${PIPELINE_STATUS_STYLE.infoText}`} />;
+    case 'running': return <Loader2 size={size} className={`${PIPELINE_STATUS_STYLE.warningText} animate-spin`} />;
+    case 'succeeded': return <CheckCircle size={size} className={`${PIPELINE_STATUS_STYLE.successText}`} />;
+    case 'failed': return <XCircle size={size} className={`${PIPELINE_STATUS_STYLE.dangerText}`} />;
+    case 'cancelled': return <AlertTriangle size={size} className={`${PIPELINE_STATUS_STYLE.cardTextMuted}`} />;
   }
 });
 

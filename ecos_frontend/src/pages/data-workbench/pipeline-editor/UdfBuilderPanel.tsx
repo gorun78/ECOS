@@ -10,6 +10,7 @@ import {
   ChevronRight, Loader2, CheckCircle, XCircle,
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
+import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Props ────────────────────────────────────────────
 
@@ -354,7 +355,6 @@ def transform(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     
     return df
 `;
-import { useTheme } from '../../../components/ThemeContext';
-}
+};
 
 export default UdfBuilderPanel;

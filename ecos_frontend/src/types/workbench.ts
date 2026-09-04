@@ -127,10 +127,14 @@ export interface GlossaryTerm {
   status: string;
   /** 描述 */
   description?: string;
+  /** 术语定义（正文） */
+  definition?: string;
   /** 创建时间 */
   createdAt?: string;
   /** 更新时间 */
   updatedAt?: string;
+  /** 后端可能返回任意扩展字段 */
+  [key: string]: unknown;
 }
 
 /** 术语查询过滤条件 */

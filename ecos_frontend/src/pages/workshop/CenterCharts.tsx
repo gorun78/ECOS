@@ -4,12 +4,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterCharts(vm: any) {
-  const { styles: _s, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass, showToast } = vm;
   return (
     <>
                   <div className="lg:col-span-6 space-y-4">
                     {/* Charts slot */}
-                    {activePage?.widgets.filter(w => w.slot === 'main_middle').map(w => {
+                    {activePage?.widgets.filter((w: any) => w.slot === 'main_middle').map((w: any) => {
                       const isSelected = w.id === selectedWidgetId;
                       const simData = getSimulatedFlights();
                       
@@ -18,7 +18,7 @@ export function renderCenterCharts(vm: any) {
                       
                       // Count occurrences of each value for the groupKey
                       const counts: Record<string, number> = {};
-                      simData.forEach(item => {
+                      simData.forEach((item: any) => {
                         const val = item[groupKey] || 'UNKNOWN';
                         let label = val;
                         if (val === 'ON_TIME') label = '准点';
@@ -75,7 +75,7 @@ export function renderCenterCharts(vm: any) {
                                     paddingAngle={3}
                                     dataKey="value"
                                   >
-                                    {chartData.map((entry, index) => (
+                                    {chartData.map((entry: any, index: any) => (
                                       <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
                                     ))}
                                   </Pie>
@@ -96,7 +96,7 @@ export function renderCenterCharts(vm: any) {
                       );
                     })}
 
-                    {editorMode === 'design' && activePage?.widgets.filter(w => w.slot === 'main_middle').length === 0 && (
+                    {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'main_middle').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('main_middle'); setShowAddWidgetModal(true); }}
                         className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[120px] w-full`}
@@ -107,7 +107,7 @@ export function renderCenterCharts(vm: any) {
                     )}
 
                     {/* Table Slot */}
-                    {activePage?.widgets.filter(w => w.slot === 'main_bottom').map(w => {
+                    {activePage?.widgets.filter((w: any) => w.slot === 'main_bottom').map((w: any) => {
                       const isSelected = w.id === selectedWidgetId;
                       const boundSource = w.config.dataSourceVarId;
                       const boundTarget = w.config.targetVarId;
@@ -157,7 +157,7 @@ export function renderCenterCharts(vm: any) {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-[11px]">
-                                {rowData.map((row, idx) => {
+                                {rowData.map((row: any, idx: any) => {
                                   const key = isAircraftTable ? row.tailNumber : row.flightNumber;
                                   const isRowSelected = activeSelection && (isAircraftTable ? activeSelection.tailNumber === key : activeSelection.flightNumber === key);
                                   
@@ -220,7 +220,7 @@ export function renderCenterCharts(vm: any) {
                       );
                     })}
 
-                    {editorMode === 'design' && activePage?.widgets.filter(w => w.slot === 'main_bottom').length === 0 && (
+                    {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'main_bottom').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('main_bottom'); setShowAddWidgetModal(true); }}
                         className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[140px] w-full`}

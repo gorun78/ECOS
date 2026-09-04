@@ -12,7 +12,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 import {
   SecurityOrg, ProjectDAC, SecurityMarking, PurposePBAC, RowColPolicy, SecurityAuditLog
-} from '../../../pages/security-center/types';
+} from '../../pages/security-center/types';
 import { AgentScenarioType, scenarioPrompt } from './AgentScenarioData';
 
 type ViewMode = 'ontology' | 'explorer' | 'integration' | 'knowledge' | 'aip' | 'security' | 'workshop';

@@ -132,7 +132,7 @@ export default function OntologyWorkbenchLayout() {
         });
         showToast('success', t('ow.msg.objectCreated').replace('{name}', created.name));
         // Reload from backend
-        const entities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch(() => []);
+        const entities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
         const list: ObjectType[] = (entities || []).map((e: any) => ({
           id: e.id,
           displayName: e.name || e.code,
@@ -143,7 +143,14 @@ export default function OntologyWorkbenchLayout() {
           primaryKey: 'id',
           titleProperty: 'id',
           status: 'PUBLISHED',
-          properties: [],
+          properties: (Array.isArray(e.properties) ? e.properties : []).map((pAny: any, i: number) => ({
+            id: pAny.id || `p_${i}`,
+            displayName: pAny.displayName || pAny.name || pAny.code || `Prop_${i}`,
+            apiName: pAny.apiName || pAny.code || pAny.name || `prop_${i}`,
+            dataType: (pAny.dataType || pAny.type || 'string') as 'string',
+            isPrimaryKey: Boolean(pAny.isPrimaryKey),
+            description: pAny.description || '',
+          })),
           mapping: e.mapping || { datasetId: '', propertyMappings: {} },
           domainId: e.domainId || null,
         }));
@@ -165,7 +172,7 @@ export default function OntologyWorkbenchLayout() {
           relationshipType: 'ONE_TO_MANY',
         }, DEFAULT_ONTOLOGY_ID);
         showToast('success', t('ow.msg.linkCreated'));
-        const rels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch(() => []);
+        const rels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
         const list: LinkType[] = (rels || []).map((r: any) => ({
           id: r.id,
           displayName: r.name || '',

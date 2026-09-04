@@ -1,18 +1,24 @@
-import type { WorkshopApp } from './types';
+import type { WorkshopApp, WorkshopWidget } from './types';
+
+interface AipHandlerDeps {
+  saveAppsState: (apps: WorkshopApp[]) => void;
+  setActiveAppId: (id: string) => void;
+  setActivePageId: (id: string) => void;
+  setEditorMode: (mode: 'design' | 'preview') => void;
+  setSelectedWidgetId: (id: string | null) => void;
+  setLeftTab: (tab: string) => void;
+}
 
 // AIP voice command handler — generates/updates workshop dashboards from natural language
 export function handleAipCommand(
   event: Event,
   apps: WorkshopApp[],
   activeAppId: string | null,
-  setApps: (apps: WorkshopApp[]) => void,
-  setActiveAppId: (id: string) => void,
-  setActivePageId: (id: string) => void,
-  setEditorMode: (mode: 'design' | 'preview') => void,
-  setSelectedWidgetId: (id: string | null) => void,
+  activePageId: string | null,
+  deps: AipHandlerDeps,
 ) {
-const handleAipCommand = (e: Event) => {
-  const customEvent = e as CustomEvent;
+  const { saveAppsState, setActiveAppId, setActivePageId, setEditorMode, setSelectedWidgetId, setLeftTab } = deps;
+  const customEvent = event as CustomEvent;
   const { action } = customEvent.detail;
   
   if (action === 'ws_generate_dashboard') {
@@ -219,7 +225,15 @@ const handleAipCommand = (e: Event) => {
     saveAppsState(updatedApps);
     setLeftTab('theme');
   }
-};
-
-window.addEventListener('aip-workshop-command', handleAipCommand);
 }
+
+window.addEventListener('aip-workshop-command', (e: Event) => {
+  handleAipCommand(e as Event, [], null, null, {
+    saveAppsState: () => {},
+    setActiveAppId: () => {},
+    setActivePageId: () => {},
+    setEditorMode: () => {},
+    setSelectedWidgetId: () => {},
+    setLeftTab: () => {},
+  });
+});

@@ -5,10 +5,32 @@
  */
 import React, { useRef, useCallback, useEffect, useMemo } from 'react';
 import Editor, { type OnMount, type BeforeMount } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
 import { PB_FUNCTIONS, type PBFunctionDef, CATEGORY_LABELS } from './pbFunctions';
 import { FunctionSquare } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
+
+// Alias the Monaco editor namespace so `editor.IRange` works without leaking a global
+type MonacoEditorNamespace = typeof import('monaco-editor').editor;
+declare module 'monaco-editor' {
+  export namespace editor {
+    interface IRange { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number }
+    interface IPosition { lineNumber: number; column: number }
+    interface ITextModel {
+      getWordUntilPosition(p: IPosition): { startColumn: number; endColumn: number };
+    }
+    interface ICompletionItem {}
+    namespace languages {
+      type CompletionItem = unknown;
+      enum CompletionItemKind { Text = 0 }
+      enum CompletionItemInsertTextRule { InsertAsSnippet = 4 }
+      function registerCompletionItemProvider(_lang: string, _prov: unknown): unknown;
+    }
+    interface IStandaloneCodeEditor {
+      getModel(): ITextModel | null;
+    }
+    interface IStandaloneEditorConstructionOptions { readonly [k: string]: unknown }
+  }
+}
 
 // ─── Props ────────────────────────────────────────────
 
@@ -204,7 +226,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 
     // Register completion provider
     monaco.languages.registerCompletionItemProvider('pb-expression', {
-      provideCompletionItems: (model, position) => {
+      provideCompletionItems: (model: any, position: any) => {
         return buildCompletionProvider({
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
@@ -216,7 +238,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 
     // Register hover provider for function docs
     monaco.languages.registerHoverProvider('pb-expression', {
-      provideHover: (model, position) => {
+      provideHover: (model: any, position: any) => {
         const word = model.getWordAtPosition(position);
         if (!word) return null;
         const fn = PB_FUNCTIONS.find((f) => f.name === word.word);
