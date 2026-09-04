@@ -104,7 +104,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         pageSize: pagination.pageSize,
       });
 
-      setColumns((result.columns || []) as ColumnMeta[]);
+      setColumns(((result.columns || []) as unknown) as ColumnMeta[]);
       setRows(result.rows || []);
       setPagination({
         page: result.page || 1,
@@ -324,7 +324,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <ResultTable
-                result={{ columns, rows, pagination, executionTimeMs, total: pagination.total } as QueryExecuteResponse}
+                result={{ columns, rows, pagination, executionTimeMs, total: pagination.total } as unknown as QueryExecuteResponse}
                 loading={isExecuting}
                 error={errorMessage || null}
               />

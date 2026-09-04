@@ -133,7 +133,7 @@ export function renderWorkshopModals(vm: any) {
 
       {/* 6. MODAL: RUN SIMULATED ACTION TYPE */}
       {showActionModal && (() => {
-        const boundObject = activeApp ? activeApp.variables.find(v => v.type === 'object')?.value : null;
+        const boundObject = activeApp ? activeApp.variables.find((v: any) => v.type === 'object')?.value : null;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">

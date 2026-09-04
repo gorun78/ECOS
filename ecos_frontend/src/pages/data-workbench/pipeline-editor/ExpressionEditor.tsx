@@ -9,28 +9,8 @@ import { PB_FUNCTIONS, type PBFunctionDef, CATEGORY_LABELS } from './pbFunctions
 import { FunctionSquare } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 
-// Alias the Monaco editor namespace so `editor.IRange` works without leaking a global
-type MonacoEditorNamespace = typeof import('monaco-editor').editor;
-declare module 'monaco-editor' {
-  export namespace editor {
-    interface IRange { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number }
-    interface IPosition { lineNumber: number; column: number }
-    interface ITextModel {
-      getWordUntilPosition(p: IPosition): { startColumn: number; endColumn: number };
-    }
-    interface ICompletionItem {}
-    namespace languages {
-      type CompletionItem = unknown;
-      enum CompletionItemKind { Text = 0 }
-      enum CompletionItemInsertTextRule { InsertAsSnippet = 4 }
-      function registerCompletionItemProvider(_lang: string, _prov: unknown): unknown;
-    }
-    interface IStandaloneCodeEditor {
-      getModel(): ITextModel | null;
-    }
-    interface IStandaloneEditorConstructionOptions { readonly [k: string]: unknown }
-  }
-}
+// Monaco 类型通过 @monaco-editor/react 内部暴露；这里不再手动 declare module 'monaco-editor'
+// （官方 types 自带 editor namespace，declare 会冲突 TS2451）
 
 // ─── Props ────────────────────────────────────────────
 
@@ -50,11 +30,11 @@ interface ExpressionEditorProps {
 // ─── Monaco integration ──────────────────────────────
 
 // Register PB functions as completion items
-function buildCompletionProvider(range: editor.IRange) {
+function buildCompletionProvider(range: any) {
   return {
-    provideCompletionItems: (model: editor.ITextModel, position: editor.IPosition) => {
+    provideCompletionItems: (model: any, position: any) => {
       const word = model.getWordUntilPosition(position);
-      const currentRange: editor.IRange = {
+      const currentRange: any = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
         startColumn: word.startColumn,
@@ -62,7 +42,7 @@ function buildCompletionProvider(range: editor.IRange) {
       };
 
       // Build function completions
-      const suggestions: editor.languages.CompletionItem[] = PB_FUNCTIONS.map(
+      const suggestions: any[] = PB_FUNCTIONS.map(
         (fn: PBFunctionDef) => ({
           label: fn.name,
           kind: window.monaco?.languages.CompletionItemKind.Function ?? 1,
@@ -80,7 +60,7 @@ function buildCompletionProvider(range: editor.IRange) {
       );
 
       // Add column name suggestions
-      const columnSuggestions: editor.languages.CompletionItem[] = (
+      const columnSuggestions: any[] = (
         (window as any).__expressionColumns__ || []
       ).map((col: string) => ({
         label: col,
@@ -144,7 +124,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
   onOperatorButtonClick,
 }) => {
   const { styles } = useTheme();
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<any>(null);
 
   // Store available columns globally for completion provider
   useEffect(() => {
@@ -260,7 +240,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
     editorRef.current = editor;
 
     // Single-line mode: intercept Enter to prevent new lines
-    editor.onKeyDown((e) => {
+    editor.onKeyDown((e: any) => {
       if (e.keyCode === monaco.KeyCode.Enter) {
         e.preventDefault();
         e.stopPropagation();

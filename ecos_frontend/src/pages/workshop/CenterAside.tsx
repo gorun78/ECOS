@@ -10,7 +10,7 @@ export function renderCenterAside(vm: any) {
                   {/* RIGHT ASIDE VIEW (Object View and Actions) */}
                   <div className="lg:col-span-3 space-y-4">
                     {/* Object card */}
-                    {activePage?.widgets.filter(w: any => w.slot === 'aside' && w.type === 'object_view').map((w: any) => {
+                    {activePage?.widgets.filter((w: any) => w.slot === 'aside' && w.type === 'object_view').map((w: any) => {
                       const isSelected = w.id === selectedWidgetId;
                       const boundTarget = w.config.targetVarId;
                       const currentSelection = getVarValue(boundTarget);

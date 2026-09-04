@@ -1,6 +1,8 @@
 docs\*
 dist\*
 node_modules\*
-*archive*
+*.tar.gz
+*.zip
+*.7z
 .aider*
 *.m2*
