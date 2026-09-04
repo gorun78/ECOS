@@ -142,24 +142,49 @@ public class DqRepository {
     }
 
     public long insertIssue(DqIssueEntity entity) {
+        // Wave-7 T-27 (R3) 真实根因:
+        //   ecos_dq_issue.id 是 VARCHAR(64) NOT NULL 主键 (无默认, 无序列), RETURN_GENERATED_KEYS 对 VARCHAR 无意义。
+        //   Wave-6 T-25 的 resolveGeneratedKey 改法整体错误方向; 必须显式生成 id。
+        //   这里改为: 使用 entity.getId() (服务层已赋 UUID), insert 直接把 id 写入, 返回该 id 字段的哈希索引。
+        if (entity.getId() == null || entity.getId().isBlank()) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException("DqIssueEntity.id 必填 (服务层应生成 UUID)");
+        }
         String sql = """
-            INSERT INTO ecos_dq_issue (rule_id, entity_id, description, status, severity, detected_at, resolved_at)
-            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+            INSERT INTO ecos_dq_issue (id, rule_id, entity_id, description, status, severity, detected_at, resolved_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
             """;
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, entity.getRuleId());
-            ps.setString(2, entity.getAssetId());
-            ps.setString(3, entity.getDescription());
-            ps.setString(4, entity.getStatus() != null ? entity.getStatus() : "open");
-            ps.setString(5, entity.getSeverity());
-            ps.setObject(6, entity.getResolvedAt() != null
+        Integer updated = jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setString(1, entity.getId());
+            ps.setString(2, entity.getRuleId());
+            ps.setString(3, entity.getAssetId());
+            ps.setString(4, entity.getDescription());
+            ps.setString(5, entity.getStatus() != null ? entity.getStatus() : "open");
+            ps.setString(6, entity.getSeverity());
+            ps.setObject(7, entity.getResolvedAt() != null
                 ? java.sql.Timestamp.valueOf(entity.getResolvedAt()) : null);
             return ps;
-        }, keyHolder);
-        // Wave-6 T-25: PG 返回生成键可能是多列（id + nextval），与 rule 同理
-        return resolveGeneratedKey(keyHolder, "ecoss_dq_issue");
+        });
+        // 返回 id 字段的 hashCode (保持稳定精度, 与 Map<Long, ...> 接口兼容)
+        long idHash = Math.abs((long) entity.getId().hashCode());
+        log.debug("Dq issue inserted: id={}, rows={}", entity.getId(), updated);
+        return idHash;
+    }
+
+    /**
+     * 更新质量问题描述/状态/严重度；状态切到 resolved/closed 时同步更新时间戳。
+     */
+    public int updateIssue(Long id, String description, String status, String severity) {
+        String sql = """
+            UPDATE ecos_dq_issue
+            SET description = COALESCE(?, description),
+                status = COALESCE(?, status),
+                severity = COALESCE(?, severity),
+                updated_at = NOW(),
+                resolved_at = CASE WHEN ?::text IN ('resolved', 'closed') THEN NOW() ELSE resolved_at END
+            WHERE id = ?
+            """;
+        return jdbc.update(sql, description, status, severity, status, id);
     }
 
     public int resolveIssue(Long id, String resolution) {

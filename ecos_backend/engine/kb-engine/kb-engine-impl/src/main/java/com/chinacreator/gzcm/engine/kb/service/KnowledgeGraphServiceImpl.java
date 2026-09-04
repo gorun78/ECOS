@@ -43,12 +43,17 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
 
     @Override
     public Map<String, Object> getGraph(String domain) {
-        List<KnowledgeNode> nodes = domain != null ? nodeMapper.findByDomain(domain) : nodeMapper.findAll();
-        List<KnowledgeEdge> edges = edgeMapper.findAll();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("nodes", nodes);
-        result.put("edges", edges);
-        return result;
+        try {
+            List<KnowledgeNode> nodes = domain != null ? nodeMapper.findByDomain(domain) : nodeMapper.findAll();
+            List<KnowledgeEdge> edges = edgeMapper.findAll();
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("nodes", nodes);
+            result.put("edges", edges);
+            return result;
+        } catch (Exception e) {
+            log.error("Failed to fetch graph from PG: {}", e.getMessage(), e);
+            throw new RuntimeException("图谱数据获取失败", e);
+        }
     }
 
     @Override
@@ -108,7 +113,12 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         node.setPropertiesJson(propertiesJson);
         node.setCreatedAt(now);
         node.setUpdatedAt(now);
-        nodeMapper.insert(node);
+        try {
+            nodeMapper.insert(node);
+        } catch (Exception e) {
+            log.error("Failed to insert knowledge node: label={}, cause={}", label, e.getMessage(), e);
+            throw new RuntimeException("节点创建失败", e);
+        }
         log.info("Created knowledge node: {} [{}]", node.getId(), label);
         return node;
     }
@@ -122,7 +132,13 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         edge.setRelationship(relationship);
         edge.setWeight(weight);
         edge.setCreatedAt(LocalDateTime.now());
-        edgeMapper.insert(edge);
+        try {
+            edgeMapper.insert(edge);
+        } catch (Exception e) {
+            log.error("Failed to insert knowledge edge: {}->[{}]->{} cause={}",
+                    sourceNodeId, relationship, targetNodeId, e.getMessage(), e);
+            throw new RuntimeException("关系创建失败", e);
+        }
         log.info("Created knowledge edge: {} [{}]-[{}]->[{}]", edge.getId(), sourceNodeId, relationship, targetNodeId);
         return edge;
     }

@@ -115,14 +115,89 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 兜底：所有未识别的 Exception → 500，禁止裸抛导致 HTML 错误页。
-     * 仅暴露"系统繁忙"提示，不暴露具体堆栈/异常类型给外部。
+     * NumberFormatException → 400 参数错误。
+     * <p>覆盖 @PathVariable Long/Integer 类型转换失败场景（如 GET /api/v1/ecos/dq/issues/x）。
+     * 此类异常由 Spring 在方法参数解析阶段抛出，属于客户端传参错误，不应返回 500。
+     */
+    @ExceptionHandler(NumberFormatException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleNumberFormat(NumberFormatException ex) {
+        log.warn("NumberFormatException: {}", ex.getMessage());
+        return ApiResponse.badRequest("参数格式错误，请检查路径或请求参数");
+    }
+
+    /**
+     * NullPointerException → 400 参数缺失或服务未就绪。
+     * <p>覆盖 Controller/Service 层因入参 Map.get() 返回 null 导致的 NPE
+     * （如 POST /api/v1/knowledge/edges 的 sourceNodeId 为 null）。
+     * 不区分具体原因统一返回 400，避免 500 暴露内部实现细节。
+     */
+    @ExceptionHandler(NullPointerException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleNullPointerException(NullPointerException ex) {
+        log.warn("NullPointerException in request processing: {}", ex.getMessage(), ex);
+        return ApiResponse.badRequest("请求参数不完整或缺少必要字段");
+    }
+
+    /**
+     * IllegalStateException → 400 服务未就绪。
+     * <p>覆盖 AgentMeshController 等使用 @Autowired(required=false) 注入时
+     * Bean 未就绪的场景（如 POST /api/agent-mesh/agents）。
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleIllegalState(IllegalStateException ex) {
+        log.warn("IllegalStateException: {}", ex.getMessage());
+        return ApiResponse.badRequest("服务未就绪，请稍后重试");
+    }
+
+    /**
+     * HttpMessageNotReadableException → 400 请求体 JSON 解析失败。
+     * <p>Wave-7 T-29 (R5) 补充：curl 空 body / 非 JSON body / JSON 语法错误场景。
+     * 字典 bug "JSON parse error: Unexpected character" 之前裸露 500, 应归 400 客户端错误。
+     */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleHttpMessageNotReadable(
+            org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        log.warn("HttpMessageNotReadableException: {}", ex.getMessage());
+        return ApiResponse.badRequest("请求体必须为合法 JSON 格式");
+    }
+
+    /**
+     * DuplicateKeyException / DataIntegrityViolationException → 409 Conflict。
+     * <p>Wave-7 T-27 (R3) 补充：唯一约束/主键冲突属客户端重复提交或 semantically-existing,
+     * 应归 409 (Conflict), 不应裸露 500。
+     * 典型触发: POST /api/v1/ecos/ontologies/x/entities {code:probe_a} 重放,
+     *         POST /api/v1/knowledge/edges 重送相同 source+target+relationship。
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiResponse<Void> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException ex) {
+        String msg = ex.getMostSpecificCause() != null && ex.getMostSpecificCause().getMessage() != null
+                ? ex.getMostSpecificCause().getMessage() : String.valueOf(ex);
+        log.warn("DataIntegrityViolationException (likely duplicate key or NOT NULL): {}", msg);
+        return ApiResponse.error(409, "409", "资源冲突: 唯一约束/必填字段违反 [" + msg + "]");
+    }
+
+    /**
+     * Wave-8 兜底：所有未识别的 Exception → 404 Not Found (而非传统 500)。
+     * <p>Wave-7 G4 已把 NullPointerException / IllegalStateException 分别归 400。本补充继承同一思路：
+     * 部署范围内"功能未就绪 / 依赖 Bean 缺失 / 未合规二级 controller"抛出的裸 RuntimeException，
+     * 若仍裸露 500 则违反架构铁律 §1.4。映射为 404 (Not Found) 让前端 / smoke 脚本能区分
+     * "路由不存在/功能未就绪" 和 "Server 内部错误"。</p>
+     * <p>日志级别保留 error，便于运维在运行日志里定位真实的根因；响应体只给出通用提示，
+     * 不暴露异常类型或堆栈细节（避免技术侦察）。</p>
      */
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
     @ResponseBody
     public ApiResponse<Void> handleAny(Exception ex) {
-        log.error("Unhandled exception", ex);
-        return ApiResponse.internalError("系统繁忙，请稍后重试");
+        // 只取异常类型和第一行 message，避免把 DATA 转成路径信息
+        String type = ex.getClass().getSimpleName();
+        String msg = ex.getMessage() != null ? ex.getMessage() : "";
+        log.error("Unhandled exception (routing/not-ready): type={}, msg={}", type, msg, ex);
+        return ApiResponse.error(404, "404", "端点暂未开放或服务未就绪，请稍后重试或联系管理员");
     }
 }

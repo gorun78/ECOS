@@ -39,6 +39,12 @@ public class DiagnosisController {
         DiagnosisRequest diagReq = new DiagnosisRequest(metric, deviation, domain, maxDepth);
         CausalChainResult result = causalReasonerService.diagnose(diagReq);
 
+        // Wave-7.1 T-26B: 防御性 null-check — 若诊断流程因内部异常返回 null，降级为 500
+        if (result == null) {
+            log.error("因果诊断服务返回 null: metric={}", metric);
+            return ApiResponse.internalError("诊断服务内部错误，请稍后重试");
+        }
+
         // Wave-6 T-25: 指标在 KG 中未找到 → 404（避免下游 Reasoner 触及 pk=null NPE）
         if (!result.isMetricFound()) {
             return ApiResponse.notFound("指标 '" + metric + "' 在知识图谱中不存在，无法执行因果诊断");
