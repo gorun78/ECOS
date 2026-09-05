@@ -6,3 +6,6 @@ node_modules\*
 *.7z
 .aider*
 *.m2*
+
+# Wave-32 scratch test logs (2026-09) — do not track ad-hoc exercise output
+wave32-*.log
