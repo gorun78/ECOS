@@ -30,6 +30,16 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
     const cached = localStorage.getItem('ecos_workshop_apps');
     return cached ? JSON.parse(cached) : initialApps;
   });
+  /**
+   * Persistence for the workshop app list. Must be declared before use in
+   * useWidgetOps / aipHandler callbacks, hence hoisted above the earlier
+   * hook call sites (Wave-9 reorder preorder fix).
+   */
+  const saveAppsState = (updated: WorkshopApp[]) => {
+    setApps(updated);
+    localStorage.setItem('ecos_workshop_apps', JSON.stringify(updated));
+  };
+
   const [activeAppId, setActiveAppId] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string>('');
   const [editorMode, setEditorMode] = useState<'design' | 'preview'>('design');
@@ -45,21 +55,42 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
 
   const activeApp = apps.find(a => a.id === activeAppId);
   const activePage = activeApp?.pages.find(p => p.id === activePageId);
-  const widgetOps = useWidgetOps(apps, activeAppId, setApps, showToast as any);
+
+  const widgetOps = useWidgetOps(
+    apps,
+    activeApp ?? null,
+    activePage ?? null,
+    saveAppsState,
+    showToast as any,
+    {
+      newVarName, setNewVarName,
+      newVarDesc, setNewVarDesc,
+      newVarType, setNewVarType,
+      newVarObjType, setNewVarObjType,
+      showAddVarModal, setShowAddVarModal,
+      showAddWidgetModal, setShowAddWidgetModal,
+      addWidgetSlot, setAddWidgetSlot,
+      selectedWidgetId, setSelectedWidgetId,
+      activePageId, setActivePageId,
+      persistApps: saveAppsState,
+    },
+  );
 
   const handleAipCommand = useCallback((e: Event) => {
-    aipHandler(e, apps, activeAppId, setApps, setActiveAppId, setActivePageId, setEditorMode, setSelectedWidgetId);
-  }, [apps, activeAppId]);
+    aipHandler(e, apps, activeAppId, activePageId || null, {
+      saveAppsState,
+      setActiveAppId,
+      setActivePageId,
+      setEditorMode,
+      setSelectedWidgetId,
+      setLeftTab: (tab: string) => setLeftTab(tab as 'theme' | 'pages' | 'widgets' | 'variables'),
+    });
+  }, [apps, activeAppId, activePageId]);
 
   useEffect(() => {
     window.addEventListener('workshop-aip-command', handleAipCommand as any);
     return () => window.removeEventListener('workshop-aip-command', handleAipCommand as any);
   }, [handleAipCommand]);
-
-  const saveAppsState = (updated: WorkshopApp[]) => {
-    setApps(updated);
-    localStorage.setItem('ecos_workshop_apps', JSON.stringify(updated));
-  };
 
   const handleCreateNewApp = () => {
     const newApp: WorkshopApp = {

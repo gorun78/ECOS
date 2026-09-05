@@ -74,12 +74,25 @@ interface GitCommit {
 
 // ── 状态标签映射 ────────────────────────────────────────────
 
+const FLOW_STYLE_HARDCODED: Record<string, string> = {
+  warningText: 'text-amber-700',
+  warningBg: 'bg-amber-50',
+  successText: 'text-emerald-700',
+  successBg: 'bg-emerald-50',
+  dangerText: 'text-red-700',
+  dangerBg: 'bg-red-50',
+  cardTextMuted: 'text-slate-500',
+  sidebarBg: 'bg-slate-100',
+  infoText: 'text-blue-700',
+  infoBg: 'bg-blue-50',
+};
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  modified:  { label: 'M', color: `${styles.warningText}`, bg: `${styles.warningBg}` },
-  added:     { label: 'A', color: `${styles.successText}`, bg: `${styles.successBg}` },
-  deleted:   { label: 'D', color: `${styles.dangerText}`,    bg: `${styles.dangerBg}` },
-  untracked: { label: 'U', color: `${styles.cardTextMuted}`,   bg: `${styles.sidebarBg}` },
-  renamed:   { label: 'R', color: `${styles.infoText}`,    bg: `${styles.infoBg}` },
+  modified:  { label: 'M', color: `${FLOW_STYLE_HARDCODED.warningText}`, bg: `${FLOW_STYLE_HARDCODED.warningBg}` },
+  added:     { label: 'A', color: `${FLOW_STYLE_HARDCODED.successText}`, bg: `${FLOW_STYLE_HARDCODED.successBg}` },
+  deleted:   { label: 'D', color: `${FLOW_STYLE_HARDCODED.dangerText}`,    bg: `${FLOW_STYLE_HARDCODED.dangerBg}` },
+  untracked: { label: 'U', color: `${FLOW_STYLE_HARDCODED.cardTextMuted}`,   bg: `${FLOW_STYLE_HARDCODED.sidebarBg}` },
+  renamed:   { label: 'R', color: `${FLOW_STYLE_HARDCODED.infoText}`,    bg: `${FLOW_STYLE_HARDCODED.infoBg}` },
 };
 
 // ── 组件 ────────────────────────────────────────────────────
@@ -479,6 +492,7 @@ interface ActionButtonProps {
 }
 
 function ActionButton({ icon, label, loading, onClick, variant = 'default' }: ActionButtonProps) {
+  const { styles } = useTheme();
   const base =
     'flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition disabled:opacity-50';
   const primary =

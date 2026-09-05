@@ -123,6 +123,18 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        // ── 1.5 P0-1 (Wave-4.1): super-admin 旁路 — 跨租户遥测视角, 不受 clearance 级别限制 ──
+        // C1 平台 cookies: 单 admin 凭 admin123 看 tenant-a, 这种遥测在 QA / 验收场景需要
+        // 在 clearance 之前绕过 (roll back / 报漏 仍需审计日志, super-admin 操作左侧 audit 雎 follow 类似 position)
+        try {
+            var auth = ((org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication()));
+            if (auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()))) {
+                return true;
+            }
+        } catch (Throwable ignore) {}
+
         // ── 2. 获取当前用户的准入等级 ──────────────────
         String userId = UserContext.getCurrentUserId();
         if (userId == null) {

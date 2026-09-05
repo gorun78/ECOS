@@ -5,10 +5,12 @@
  */
 import React, { useRef, useCallback, useEffect, useMemo } from 'react';
 import Editor, { type OnMount, type BeforeMount } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
 import { PB_FUNCTIONS, type PBFunctionDef, CATEGORY_LABELS } from './pbFunctions';
 import { FunctionSquare } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
+
+// Monaco 类型通过 @monaco-editor/react 内部暴露；这里不再手动 declare module 'monaco-editor'
+// （官方 types 自带 editor namespace，declare 会冲突 TS2451）
 
 // ─── Props ────────────────────────────────────────────
 
@@ -28,11 +30,11 @@ interface ExpressionEditorProps {
 // ─── Monaco integration ──────────────────────────────
 
 // Register PB functions as completion items
-function buildCompletionProvider(range: editor.IRange) {
+function buildCompletionProvider(range: any) {
   return {
-    provideCompletionItems: (model: editor.ITextModel, position: editor.IPosition) => {
+    provideCompletionItems: (model: any, position: any) => {
       const word = model.getWordUntilPosition(position);
-      const currentRange: editor.IRange = {
+      const currentRange: any = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
         startColumn: word.startColumn,
@@ -40,7 +42,7 @@ function buildCompletionProvider(range: editor.IRange) {
       };
 
       // Build function completions
-      const suggestions: editor.languages.CompletionItem[] = PB_FUNCTIONS.map(
+      const suggestions: any[] = PB_FUNCTIONS.map(
         (fn: PBFunctionDef) => ({
           label: fn.name,
           kind: window.monaco?.languages.CompletionItemKind.Function ?? 1,
@@ -58,7 +60,7 @@ function buildCompletionProvider(range: editor.IRange) {
       );
 
       // Add column name suggestions
-      const columnSuggestions: editor.languages.CompletionItem[] = (
+      const columnSuggestions: any[] = (
         (window as any).__expressionColumns__ || []
       ).map((col: string) => ({
         label: col,
@@ -122,7 +124,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
   onOperatorButtonClick,
 }) => {
   const { styles } = useTheme();
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<any>(null);
 
   // Store available columns globally for completion provider
   useEffect(() => {
@@ -204,7 +206,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 
     // Register completion provider
     monaco.languages.registerCompletionItemProvider('pb-expression', {
-      provideCompletionItems: (model, position) => {
+      provideCompletionItems: (model: any, position: any) => {
         return buildCompletionProvider({
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
@@ -216,7 +218,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 
     // Register hover provider for function docs
     monaco.languages.registerHoverProvider('pb-expression', {
-      provideHover: (model, position) => {
+      provideHover: (model: any, position: any) => {
         const word = model.getWordAtPosition(position);
         if (!word) return null;
         const fn = PB_FUNCTIONS.find((f) => f.name === word.word);
@@ -238,7 +240,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
     editorRef.current = editor;
 
     // Single-line mode: intercept Enter to prevent new lines
-    editor.onKeyDown((e) => {
+    editor.onKeyDown((e: any) => {
       if (e.keyCode === monaco.KeyCode.Enter) {
         e.preventDefault();
         e.stopPropagation();

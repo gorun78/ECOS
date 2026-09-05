@@ -102,6 +102,18 @@ public class OntologyDomainController {
         }
     }
 
+    // ═══════════════ search 端点 (PMO E8) ═════════════════
+    // GET /api/v1/ecos/domains/search?q=&limit=20
+    // 模糊匹配 name/code/description, 按 sort_order + created_at DESC 返回。
+    // 无租户上下文时返回全部域; 有上下文时只返回当前租户及 NULL 共享域。
+
+    @GetMapping("/search")
+    public ApiResponse<List<Map<String, Object>>> searchDomains(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ApiResponse.success(domainService.searchDomains(q, limit));
+    }
+
     // ═══════════════ Domain → Entities 子资源 ═══════════════════
 
     @GetMapping("/{domainCode}/entities")

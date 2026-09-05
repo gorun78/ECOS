@@ -125,7 +125,7 @@ public class AuditHashChainService {
         return obj != null ? obj.toString() : "";
     }
 
-    private static String sha256(String input) {
+    static String sha256(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance(HASH_ALGORITHM);
             byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));

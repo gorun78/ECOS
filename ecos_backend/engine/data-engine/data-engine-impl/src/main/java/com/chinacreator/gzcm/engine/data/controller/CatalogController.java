@@ -60,6 +60,15 @@ public class CatalogController {
 
     @PostMapping("/register")
     public ApiResponse<CatalogItem> register(@RequestBody DataResource resource) {
+        if (resource == null) {
+            return ApiResponse.badRequest("请求体不能为空");
+        }
+        if (resource.getResourceName() == null || resource.getResourceName().isBlank()) {
+            return ApiResponse.badRequest("resourceName 不能为空");
+        }
+        if (resource.getResourceType() == null || resource.getResourceType().isBlank()) {
+            return ApiResponse.badRequest("resourceType 不能为空");
+        }
         return ApiResponse.success(catalogService.register(resource));
     }
 

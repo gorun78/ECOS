@@ -1,0 +1,18 @@
+{
+  "task_id": "{{task_id}}",
+  "artifact_type": "{{PRD / ARCH_SPEC / OPENAPI / DDL / TEST_CASES / TEST_PLAN / SOURCE_PATCH / USER_STORY}}",
+  "artifact_ref": "{{artifact}}@{{hash}}",
+  "workflow_mode": "{{L1 / L2 / L3}}",
+  "targets": [
+    {
+      "skill": "{{skill_name}}",
+      "artifact": "{{artifact}}@{{hash}}",
+      "context": [],
+      "mode": "{{serial / parallel}}",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["{{APPROVAL_RECORD_TYPES}}"],
+  "final_gate_logic": "AND_ALL",
+  "timestamp": "{{ISO8601}}"
+}

@@ -123,6 +123,9 @@ public class TaskController {
     public ApiResponse<Map<String, Object>> getTask(@PathVariable String taskId) {
         try {
             TaskDescription task = taskManagementService.getTaskDescription(taskId);
+            if (task == null) {
+                return ApiResponse.notFound("任务不存在: " + taskId);
+            }
             TaskStatus status = taskManagementService.getTaskStatus(taskId);
 
             return ApiResponse.success(Map.of(
@@ -177,6 +180,9 @@ public class TaskController {
     public ApiResponse<Map<String, Object>> getTaskStatus(@PathVariable String taskId) {
         try {
             TaskStatus status = taskManagementService.getTaskStatus(taskId);
+            if (status == null) {
+                return ApiResponse.notFound("任务状态不存在: " + taskId);
+            }
             return ApiResponse.success(toStatusMap(status));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());

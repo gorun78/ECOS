@@ -2,23 +2,20 @@ package com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge;
 
 import com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.entity.KnowledgeNode;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.entity.KnowledgeEdge;
-import org.neo4j.driver.AuthTokens;
-import org.neo4j.driver.Config;
 import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Session;
 import org.neo4j.driver.SessionConfig;
 import org.neo4j.driver.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Neo4j Cypher 查询服务 — 知识图谱专用查询。
@@ -44,52 +41,41 @@ public class Neo4jQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(Neo4jQueryService.class);
 
-    @org.springframework.beans.factory.annotation.Value("${neo4j.uri:bolt://localhost:7687}")
-    private String neo4jUri;
+    // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
+    // standard 档 / neo4j.uri 未配置时 Driver 为 null, 调用方 isAvailable() 判空。
+    @Autowired(required = false)
+    private Driver driver;
 
-    @org.springframework.beans.factory.annotation.Value("${neo4j.username:neo4j}")
-    private String neo4jUsername;
-
-    @org.springframework.beans.factory.annotation.Value("${neo4j.password:neo4j123}")
-    private String neo4jPassword;
-
+    // 数据库名仍在本 Service 内使用 (Neo4j database 概念), 不超出基础设施访问范围
     @org.springframework.beans.factory.annotation.Value("${neo4j.database:neo4j}")
     private String neo4jDatabase;
 
-    private Driver driver;
     private volatile boolean available = false;
 
     @PostConstruct
     public void init() {
         try {
-            driver = GraphDatabase.driver(neo4jUri,
-                    AuthTokens.basic(neo4jUsername, neo4jPassword),
-                    Config.builder()
-                            .withConnectionTimeout(5, TimeUnit.SECONDS)
-                            .withMaxConnectionPoolSize(10)
-                            .build());
-            // 验证连接
+            if (driver == null) {
+                log.warn("Neo4j 不可用 (standard 档 或 neo4j.uri 未配置), 将回退到 PG JDBC 查询");
+                available = false;
+                return;
+            }
+            // 验证连接 (使用 runtime-access 共享 Driver)
             try (Session session = driver.session(SessionConfig.forDatabase(neo4jDatabase))) {
                 session.run("RETURN 1").consume();
             }
             available = true;
-            log.info("Neo4jQueryService 已连接: {} (database: {})", neo4jUri, neo4jDatabase);
+            log.info("Neo4jQueryService 已连接 (database: {}), 使用 runtime-access 统一 Driver", neo4jDatabase);
         } catch (Exception e) {
-            log.warn("Neo4j 不可用, 将回退到 PG JDBC 查询: {}", e.getMessage());
+            log.warn("Neo4j 连接验证失败, 将回退到 PG JDBC 查询: {}", e.getMessage());
             available = false;
-            if (driver != null) {
-                try { driver.close(); } catch (Exception ignored) {}
-                driver = null;
-            }
         }
     }
 
     @PreDestroy
     public void shutdown() {
-        if (driver != null) {
-            try { driver.close(); } catch (Exception ignored) {}
-            log.info("Neo4jQueryService 已关闭");
-        }
+        // Driver 是 runtime-access 管理的 Bean, 不在此 close
+        log.info("Neo4jQueryService shutdown: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
     }
 
     public boolean isAvailable() {

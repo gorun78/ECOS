@@ -8,8 +8,8 @@ export MVND_HOME=/home/guorongxiao/.local/mvnd
 export PATH="$MVND_HOME/bin:$JAVA_HOME/bin:$M2_HOME/bin:$PATH"
 alias mvn='mvnd --no-transfer-progress'
 
-export ECOS_BACKEND=/home/guorongxiao/databridge-v2
-export ECOS_FRONTEND=/home/guorongxiao/c2eos
+export ECOS_BACKEND=/home/guorongxiao/ECOS/ecos_backend
+export ECOS_FRONTEND=/home/guorongxiao/ECOS/ecos_frontend
 
 alias ecos-be='cd $ECOS_BACKEND'
 alias ecos-fe='cd $ECOS_FRONTEND'

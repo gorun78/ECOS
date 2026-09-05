@@ -13,8 +13,64 @@ import CommandPalette from "./components/CommandPalette";
 import AIPCopilotDrawer from "./components/copilot/AIPCopilotDrawer";
 import { useMobileSidebar } from "./hooks/useMobileSidebar";
 import { useTheme } from "./components/ThemeContext";
+import { useLanguage } from "./components/LanguageContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import { apiTaskStats, type TaskStats } from "./api";
+
+/**
+ * Route path → i18n key (common.app.tab.{id}).
+ * Keep these tab labels out of the JS source so they follow the
+ * active locale — switching zh/en re-renders the openTabs strip.
+ * (Previously hardcoded as `TAB_LABELS: Record<string, string>`.)
+ */
+const TAB_LABEL_KEY: Record<string, string> = {
+  mission_control: "app.tab.mission_control",
+  world_model: "app.tab.world_model",
+  monitor: "app.tab.monitor",
+  "security-center": "app.tab.security_center",
+  security: "app.tab.security_center",
+  marketplace: "app.tab.marketplace",
+  knowledge_graph: "app.tab.knowledge_graph",
+  knowledge_view: "app.tab.knowledge_view",
+  ops_apps: "app.tab.ops_apps",
+  iam: "app.tab.iam",
+  dict: "app.tab.dict",
+  "system-config": "app.tab.system_config",
+  project_workbench: "app.tab.project_workbench",
+  "ai-workbench": "app.tab.ai_workbench",
+  agent_studio: "app.tab.ai_workbench",
+  agent_mesh: "app.tab.agent_mesh",
+  "agent-builder": "app.tab.agent_builder",
+  "agent-test": "app.tab.agent_test",
+  ontology_workbench: "app.tab.ontology_workbench",
+  ontology: "app.tab.ontology",
+  ontology_designer: "app.tab.ontology_designer",
+  "business-workbench": "app.tab.business_workbench",
+  "data-workbench": "app.tab.data_workbench",
+  catalog: "app.tab.catalog",
+  dataset_explorer: "app.tab.dataset_explorer",
+  pipeline: "app.tab.pipeline",
+  workbook: "app.tab.workbook",
+  lineage: "app.tab.lineage",
+  datasources: "app.tab.datasources",
+  workshop: "app.tab.workflow",
+  workflow_designer: "app.tab.workflow",
+  objects: "app.tab.objects",
+  dq_dashboard: "app.tab.dq_dashboard",
+  glossary: "app.tab.glossary",
+  guardrails: "app.tab.guardrails",
+  biz_dashboard: "app.tab.biz_dashboard",
+  project_tracker: "app.tab.project_tracker",
+  contract_manager: "app.tab.contract_manager",
+  ops_dashboard: "app.tab.ops_dashboard",
+  kanban: "app.tab.kanban",
+  "engine-tasks": "app.tab.engine_tasks",
+  telemetry: "app.tab.telemetry",
+  tokens: "app.tab.tokens",
+};
+/** Default tab label: return the raw route id for unknown views (keep prior behaviour). */
+const getTabLabel = (t: (k: string) => string, id: string): string =>
+  t(TAB_LABEL_KEY[id] ?? `app.tab.${id}`);
 
 async function apiHealth(): Promise<string> {
   try {
@@ -30,55 +86,9 @@ interface Tab {
   active: boolean;
 }
 
-/** Map route paths to human-readable tab labels (Chinese default, translateTabLabel in Topbar handles localization) */
-const TAB_LABELS: Record<string, string> = {
-  mission_control: "认知蓝图",
-  world_model: "战略目标",
-  monitor: "监控中心",
-  "security-center": "安全中心",
-  security: "安全中心",
-  marketplace: "数据市场",
-  knowledge_graph: "企业知识图谱",
-  knowledge_view: "知识工作台",
-  ops_apps: "运营应用",
-  iam: "用户管理",
-  dict: "数据字典",
-  "system-config": "系统配置",
-  project_workbench: "项目工作台",
-  "ai-workbench": "AI工作台",
-  agent_studio: "AI工作台",
-  agent_mesh: "Agent网格",
-  "agent-builder": "Agent构建器",
-  "agent-test": "Agent测试",
-  ontology_workbench: "本体工作台",
-  ontology: "本体浏览器",
-  ontology_designer: "本体设计器",
-  "business-workbench": "业务工作台",
-  "data-workbench": "数据工作台",
-  catalog: "数据目录",
-  dataset_explorer: "数据集浏览器",
-  pipeline: "管道构建器",
-  workbook: "代码工作簿",
-  lineage: "数据血缘",
-  datasources: "物理表注册",
-  workshop: "工作流设计",
-  workflow_designer: "工作流设计",
-  objects: "数据浏览器",
-  dq_dashboard: "数据质量",
-  glossary: "术语表",
-  guardrails: "安全护栏",
-  biz_dashboard: "信科数据仪表盘",
-  project_tracker: "项目跟踪",
-  contract_manager: "合同管理",
-  ops_dashboard: "产值分配看板",
-  kanban: "项目看板",
-  "engine-tasks": "任务中心",
-  telemetry: "遥测监控",
-  tokens: "令牌管理",
-};
-
 export default function App() {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -123,10 +133,18 @@ export default function App() {
   // Mobile sidebar hook
   const { isMobile, sidebarOpen, toggleSidebar, closeSidebar } = useMobileSidebar();
 
-  // Workspace tabs
-  const [openTabs, setOpenTabs] = useState<Tab[]>([
-    { id: "world_model", label: "战略目标", active: true }
+  // Workspace tabs. Labels are stored by key (not display string) so the
+  // strip re-renders when the user switches locale. The `id` doubles as the
+  // stable i18n id — Topbar.applyTranslateTabLabel will resolve keys to UI.
+  const [openTabs, setOpenTabs] = useState<Tab[]>(() => [
+    { id: "world_model", label: getTabLabel((k) => k, "world_model"), active: true }
   ]);
+
+  // Re-resolve every tab label whenever the locale changes. Without this
+  // effect, switching zh↔en leaves the existing tabs permanently stale.
+  useEffect(() => {
+    setOpenTabs((prev) => prev.map((tab) => ({ ...tab, label: getTabLabel(t, tab.id) })));
+  }, [t]);
 
   // Sync active tab with current URL
   useEffect(() => {
@@ -135,10 +153,10 @@ export default function App() {
       if (existing) {
         return prev.map((t) => ({ ...t, active: t.id === currentView }));
       }
-      const label = TAB_LABELS[currentView] || currentView;
+      const label = getTabLabel(t, currentView);
       return [...prev.map((t) => ({ ...t, active: false })), { id: currentView, label, active: true }];
     });
-  }, [currentView]);
+  }, [currentView, t]);
 
   // Sidebar resize
   useEffect(() => {
@@ -259,7 +277,7 @@ export default function App() {
       {/* AIP Copilot floating entry button */}
       <button
         type="button"
-        aria-label="打开 AIP Copilot"
+        aria-label={t("app.copilot.open")}
         onClick={() => setCopilotOpen(true)}
         className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
       >

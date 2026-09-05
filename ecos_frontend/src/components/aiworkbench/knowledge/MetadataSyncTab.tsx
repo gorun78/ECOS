@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { ThemeStyles } from '../../../components/ThemeContext';
 import * as Icons from 'lucide-react';
@@ -47,6 +47,16 @@ export default function MetadataSyncTab({
   const [assetPageSize] = useState(10);
   const [assetSortBy, setAssetSortBy] = useState<string>("name");
   const [assetSortOrder, setAssetSortOrder] = useState<"asc" | "desc">("asc");
+
+  const sortedAssets = useMemo(() => {
+    const sorted = [...assets].sort((a: MetadataAsset, b: MetadataAsset) => {
+      const aVal = String((a as unknown as Record<string, unknown>)[assetSortBy] ?? "");
+      const bVal = String((b as unknown as Record<string, unknown>)[assetSortBy] ?? "");
+      return assetSortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+    return sorted.slice((assetPage - 1) * assetPageSize, assetPage * assetPageSize);
+  }, [assets, assetSortBy, assetSortOrder, assetPage, assetPageSize]);
+
   return (
     <div className="space-y-6">
       
@@ -93,7 +103,7 @@ export default function MetadataSyncTab({
               </h3>
               <div className="flex gap-1.5">
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'styles.inputBg styles.cardBorder styles.cardTextMuted'}`}>
-                  {isSchemaDrift || isSlaBreach ? '\u25CF {t('aiworkbench.knowledge.sync.simulationActive')}' : '\u25CF {t('aiworkbench.knowledge.sync.simulationStable')}'}
+                  {isSchemaDrift || isSlaBreach ? '\u25CF ' + t('aiworkbench.knowledge.sync.simulationActive') : '\u25CF ' + t('aiworkbench.knowledge.sync.simulationStable')}
                 </span>
               </div>
             </div>
@@ -164,7 +174,7 @@ export default function MetadataSyncTab({
                     </div>
                     <span className={`${styles.cardTextMuted} shrink-0 text-[8px]`}>{log.timestamp}</span>
                   </div>
-                ,)}
+                ))
               )}
             </div>
           </div>
@@ -192,13 +202,7 @@ export default function MetadataSyncTab({
                 </tr>
               </thead>
               <tbody className={`divide-y ${styles.cardBorder}`}>
-                {(() => {
-                  const sorted = [...assets].sort((a: any, b: any) => {
-                    const aVal = String(a[assetSortBy] ?? "");
-                    const bVal = String(b[assetSortBy] ?? "");
-                    return assetSortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-                  });
-                  return sorted.slice((assetPage - 1) * assetPageSize, assetPage * assetPageSize).map(asset => {
+                {sortedAssets.map((asset: MetadataAsset) => {
                   return (
                     <tr key={asset.id} className={`hover:${styles.appBg} transition-colors`}>
                       <td className={`p-3 font-bold ${styles.cardText}`}>
@@ -260,7 +264,6 @@ export default function MetadataSyncTab({
                     </tr>
                   );
                 })}
-              })})()}
               </tbody>
             </table>
           </div>
@@ -293,10 +296,10 @@ export default function MetadataSyncTab({
               </div>
             ) : (
               syncLogs.map((log, idx) => (
-                <p key={idx} className={`${log.includes('\u2705') ? 'text-emerald-400 font-bold' : log.includes('\uD83E\uDD16') ? 'text-blue-400 font-bold' : 'styles.cardTextMuted'}`}>
+                <p key={idx} className={`${log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('🤖') ? 'text-blue-400 font-bold' : 'styles.cardTextMuted'}`}>
                   {log}
                 </p>
-              ,)}
+              ))
             )}
           </div>
 

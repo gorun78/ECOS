@@ -8,6 +8,7 @@ import type {
   MetadataAsset,
   RuleRepository,
   RuleVersion,
+  GlossaryTerm,
 } from '../typesAndConstants';
 
 const KNOWLEDGE_BASE = '/api/knowledge';
@@ -187,14 +188,14 @@ export async function updateSettings(data: Partial<KnowledgeSettings>) {
   });
 }
 
-export async function fetchGlossaryTerms(params?: { domain?: string; status?: string }) {
+export async function fetchGlossaryTerms(params?: { domain?: string; status?: string }): Promise<GlossaryTerm[]> {
   const qs = new URLSearchParams();
   if (params?.domain) qs.set('domain', params.domain);
   if (params?.status) qs.set('status', params.status);
   const query = qs.toString();
   const url = query ? `${GLOSSARY_BASE}/terms?${query}` : `${GLOSSARY_BASE}/terms`;
   try {
-    const data = await apiFetchData<unknown[]>(url);
+    const data = await apiFetchData<GlossaryTerm[]>(url);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -247,9 +248,9 @@ export async function parseLineage(format: string, payload: string) {
   }
 }
 
-export async function fetchIntegrationMetadata() {
+export async function fetchIntegrationMetadata(): Promise<{ simulationState?: { isSchemaDriftActive?: boolean; isSlaBreachActive?: boolean } } | null> {
   try {
-    return await apiFetchData('/api/v1/integration/metadata');
+    return await apiFetchData<{ simulationState?: { isSchemaDriftActive?: boolean; isSlaBreachActive?: boolean } }>('/api/v1/integration/metadata');
   } catch {
     return null;
   }

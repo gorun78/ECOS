@@ -73,7 +73,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
           ).catch(() => ({ data: [{ name: 'main', current: true }] })),
           apiFetchData<{ data?: { files: GitFileStatus[] } }>(
             `/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/status`
-          ).catch(() => ({ data: { files: [] } })),
+          ).catch((): { data: { files: GitFileStatus[] } } => ({ data: { files: [] as GitFileStatus[] } })),
         ]);
 
         if (cancelled) return;

@@ -110,7 +110,7 @@ public class DqController {
 
     @PutMapping("/issues/{id}")
     public ApiResponse<Map<String, Object>> updateIssue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return dqService.updateRule(id, body)
+        return dqService.updateIssue(id, body)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("问题 " + id + " 不存在"));
     }

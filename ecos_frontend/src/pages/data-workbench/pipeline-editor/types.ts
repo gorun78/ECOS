@@ -92,7 +92,28 @@ export interface PipelineFlowEditorProps {
   onExecute: (pipelineId: string) => void;
   showToast?: (type: 'success' | 'error' | 'info', msg: string) => void;
   computeEngine: 'memory' | 'doris';
-  onEngineChange: (engine: 'memory' | 'doris') => void;
+  onEngineChange?: (engine: 'memory' | 'doris') => void;
   editingPipeline?: import('../types').DataPipeline | null;
   onBack?: () => void;
+}
+
+export interface JoinCondition {
+  id: string;
+  leftColumn: string;
+  operator: string;
+  rightColumn: string;
+}
+
+export interface TransformRule {
+  id: string;
+  name: string;
+  type: string;
+  expression?: string;
+  enabled: boolean;
+  /** 函数名 (Wave-9 extend — 之前缺失字段导致表达编辑器无法落表达式) */
+  function?: string;
+  /** 函数参数 (Wave-9 extend) */
+  params?: string;
+  /** 目标列名 (Wave-9 extend) */
+  column?: string;
 }

@@ -62,7 +62,14 @@
             COALESCE(r.record_count, CASE WHEN c.reltuples > 0 THEN c.reltuples::bigint ELSE NULL END) AS record_count,
             r.last_sync_time, r.create_by, r.create_time, r.update_by, r.update_time
         FROM td_data_resource r
-        LEFT JOIN pg_class c ON c.relname = SPLIT_PART(r.source_path, '.', 2)
+        LEFT JOIN pg_namespace nsp
+               ON nsp.nspname = CASE WHEN r.source_path LIKE '%.%'
+                                     THEN SPLIT_PART(r.source_path, '.', 1)
+                                     ELSE 'public' END
+        LEFT JOIN pg_class c
+               ON c.relnamespace = nsp.oid
+              AND c.relname = SPLIT_PART(r.source_path, '.', 2)
+              AND c.relkind IN ('r', 'p', 'v', 'm')
         WHERE r.datasource_id = #{datasourceId}
         ORDER BY r.resource_name
     </select>

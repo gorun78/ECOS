@@ -85,11 +85,28 @@ public class AgentMeshController {
     @PostMapping("/agents")
     public ApiResponse<AgentRegistryEntity> createAgent(@RequestBody AgentRegistryEntity agent) {
         if (agentRegistryRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        // Wave-7 T-29 (R5): 防御空 body / null 字段, 避免 PG NOT NULL 违表 5xx
+        if (agent == null) return ApiResponse.badRequest("请求体不能为空");
+        if (agent.getName() == null || agent.getName().trim().isEmpty()) {
+            return ApiResponse.badRequest("name 必填");
+        }
         if (agent.getId() == null || agent.getId().trim().isEmpty()) {
             agent.setId(UUID.randomUUID().toString().replace("-", ""));
         }
         if (agent.getStatus() == null) agent.setStatus("ACTIVE");
-        agentRegistryRepo.insert(agent);
+        // ecos_agent_registry NOT NULL 列 (endpoint/metadata/capability/created_at/updated_at)
+        if (agent.getEndpoint() == null) agent.setEndpoint("");
+        if (agent.getCapability() == null) agent.setCapability("{}");
+        if (agent.getMetadata() == null) agent.setMetadata("{}");
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (agent.getCreatedAt() == null) agent.setCreatedAt(now);
+        if (agent.getUpdatedAt() == null) agent.setUpdatedAt(now);
+        try {
+            agentRegistryRepo.insert(agent);
+        } catch (org.springframework.dao.DataAccessException ex) {
+            log.error("Agent insert failed: id={}, name={}", agent.getId(), agent.getName(), ex);
+            return ApiResponse.badRequest("Agent 注册失败: " + ex.getMostSpecificCause().getMessage());
+        }
         log.info("Agent registered: {} [{}]", agent.getId(), agent.getName());
         return ApiResponse.success(agent);
     }

@@ -27,7 +27,8 @@ async function get<T>(url: string): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, { headers });
-  if (res.status === 401 || res.status === 403) {
+  // P-009: 403 (RLS / RLS-policy / 权限) 不应登出；仅 401 (token 过期) 登出
+  if (res.status === 401) {
     localStorage.removeItem('token');
     window.location.hash = '#/login';
     throw new Error('登录已过期');
@@ -50,7 +51,8 @@ async function post<T>(url: string, body: unknown): Promise<T> {
     headers,
     body: JSON.stringify(body),
   });
-  if (res.status === 401 || res.status === 403) {
+  // P-009: 403 (RLS / RLS-policy / 权限) 不应登出；仅 401 (token 过期) 登出
+  if (res.status === 401) {
     localStorage.removeItem('token');
     window.location.hash = '#/login';
     throw new Error('登录已过期');
@@ -72,7 +74,8 @@ async function del<T>(url: string): Promise<T> {
     method: 'DELETE',
     headers,
   });
-  if (res.status === 401 || res.status === 403) {
+  // P-009: 403 (RLS / RLS-policy / 权限) 不应登出；仅 401 (token 过期) 登出
+  if (res.status === 401) {
     localStorage.removeItem('token');
     window.location.hash = '#/login';
     throw new Error('登录已过期');
@@ -113,13 +116,17 @@ export async function fetchSchemaTree(datasourceId: string): Promise<TreeNode[]>
 
 /** 执行 SQL 查询 */
 export async function executeQuery(req: QueryExecuteRequest): Promise<QueryExecuteResponse> {
-  return post<QueryExecuteResponse>(EXECUTE_URL, {
-    datasourceId: req.datasourceId,
-    sql: req.sql,
-    params: req.params,
-    page: req.page || 1,
-    pageSize: req.pageSize || 50,
-  });
+// P-008: 后端 QueryController#execute 使用 snake_case 字段（datasource_id, max_rows, timeout_seconds），
+// 前端必须显式发送 snake_case 字段，否则后端读不到 datasource_id → 400。
+// P-007: 后端一次性拉结果（无分页），pageSize 含义改为"拉取的行数上限"（max_rows）。
+return post<QueryExecuteResponse>(EXECUTE_URL, {
+  datasource_id: req.datasourceId,
+  sql: req.sql,
+  params: req.params,
+  max_rows: req.pageSize || 100,
+  timeout_seconds: 60,
+  table_name: (req as { tableName?: string }).tableName,
+});
 }
 
 // ─── 查询历史 ─────────────────────────────────────────────

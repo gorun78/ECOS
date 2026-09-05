@@ -99,11 +99,9 @@ public class DqRepository {
             ps.setBoolean(6, entity.getEnabled() != null && entity.getEnabled());
             return ps;
         }, keyHolder);
-        Number key = keyHolder.getKey();
-        if (key != null) {
-            return key.longValue();
-        }
-        throw new RuntimeException("Failed to retrieve generated key for ecos_dq_rule");
+        // Wave-6 T-25: PG 返回生成键可能是多列（id + nextval），getKey() 会抛 InvalidDataAccessApiUsageException
+        // → 回退到 keys() map，取 id（或第一个数值列）
+        return resolveGeneratedKey(keyHolder, "ecoss_dq_rule");
     }
 
     public int updateRule(Long id, String name, String description, String ruleType,
@@ -144,27 +142,49 @@ public class DqRepository {
     }
 
     public long insertIssue(DqIssueEntity entity) {
+        // Wave-7 T-27 (R3) 真实根因:
+        //   ecos_dq_issue.id 是 VARCHAR(64) NOT NULL 主键 (无默认, 无序列), RETURN_GENERATED_KEYS 对 VARCHAR 无意义。
+        //   Wave-6 T-25 的 resolveGeneratedKey 改法整体错误方向; 必须显式生成 id。
+        //   这里改为: 使用 entity.getId() (服务层已赋 UUID), insert 直接把 id 写入, 返回该 id 字段的哈希索引。
+        if (entity.getId() == null || entity.getId().isBlank()) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException("DqIssueEntity.id 必填 (服务层应生成 UUID)");
+        }
         String sql = """
-            INSERT INTO ecos_dq_issue (rule_id, entity_id, description, status, severity, detected_at, resolved_at)
-            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+            INSERT INTO ecos_dq_issue (id, rule_id, entity_id, description, status, severity, detected_at, resolved_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
             """;
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, entity.getRuleId());
-            ps.setString(2, entity.getAssetId());
-            ps.setString(3, entity.getDescription());
-            ps.setString(4, entity.getStatus() != null ? entity.getStatus() : "open");
-            ps.setString(5, entity.getSeverity());
-            ps.setObject(6, entity.getResolvedAt() != null
+        Integer updated = jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setString(1, entity.getId());
+            ps.setString(2, entity.getRuleId());
+            ps.setString(3, entity.getAssetId());
+            ps.setString(4, entity.getDescription());
+            ps.setString(5, entity.getStatus() != null ? entity.getStatus() : "open");
+            ps.setString(6, entity.getSeverity());
+            ps.setObject(7, entity.getResolvedAt() != null
                 ? java.sql.Timestamp.valueOf(entity.getResolvedAt()) : null);
             return ps;
-        }, keyHolder);
-        Number key = keyHolder.getKey();
-        if (key != null) {
-            return key.longValue();
-        }
-        throw new RuntimeException("Failed to retrieve generated key for ecos_dq_issue");
+        });
+        // 返回 id 字段的 hashCode (保持稳定精度, 与 Map<Long, ...> 接口兼容)
+        long idHash = Math.abs((long) entity.getId().hashCode());
+        log.debug("Dq issue inserted: id={}, rows={}", entity.getId(), updated);
+        return idHash;
+    }
+
+    /**
+     * 更新质量问题描述/状态/严重度；状态切到 resolved/closed 时同步更新时间戳。
+     */
+    public int updateIssue(Long id, String description, String status, String severity) {
+        String sql = """
+            UPDATE ecos_dq_issue
+            SET description = COALESCE(?, description),
+                status = COALESCE(?, status),
+                severity = COALESCE(?, severity),
+                updated_at = NOW(),
+                resolved_at = CASE WHEN ?::text IN ('resolved', 'closed') THEN NOW() ELSE resolved_at END
+            WHERE id = ?
+            """;
+        return jdbc.update(sql, description, status, severity, status, id);
     }
 
     public int resolveIssue(Long id, String resolution) {
@@ -240,5 +260,32 @@ public class DqRepository {
             result.put(rs.getString("rule_type"), rs.getLong("cnt"));
         });
         return result;
+    }
+
+    /**
+     * Wave-6 T-25: 从 KeyHolder 解析生成的主键。
+     * <p>PG 在 INSERT 后可能返回多条生成列（如 {@code id} 与 {@code nextval(...)}），
+     * 直接调 {@link KeyHolder#getKey()} 会抛 {@code InvalidDataAccessApiUsageException}。
+     * 这里走 {@link #keys()} 取第一个数值列兜底（PG 默认返回 id 在前）。
+     */
+    private long resolveGeneratedKey(KeyHolder keyHolder, String table) {
+        java.util.Map<String, Object> keys = keyHolder.getKeys();
+        if (keys == null || keys.isEmpty()) {
+            log.warn("No generated key returned from {}", table);
+            throw new RuntimeException("Failed to retrieve generated key for " + table);
+        }
+        // 1) 优先显式取 "id"
+        Object idVal = keys.get("id");
+        if (idVal instanceof Number n) {
+            return n.longValue();
+        }
+        // 2) 退而求其次：取第一个 Number
+        for (Object v : keys.values()) {
+            if (v instanceof Number n) {
+                return n.longValue();
+            }
+        }
+        log.warn("No numeric generated key in {} for table {}", keys, table);
+        throw new RuntimeException("Failed to retrieve numeric generated key for " + table);
     }
 }

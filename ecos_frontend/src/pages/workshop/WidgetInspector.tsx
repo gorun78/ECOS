@@ -1,5 +1,6 @@
 import React from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, MousePointerClick } from 'lucide-react';
+import { mockActionTypes } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderWidgetInspector(vm: any) {
@@ -10,7 +11,7 @@ export function renderWidgetInspector(vm: any) {
               <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase tracking-wider`}>组件属性配置面板 (Properties)</span>
 
               {selectedWidgetId ? (() => {
-                const w = activePage?.widgets.find(wg => wg.id === selectedWidgetId);
+                const w = activePage?.widgets.find((wg: any) => wg.id === selectedWidgetId);
                 if (!w) return <div className={`${styles.cardTextMuted} py-6 text-center`}>请选中任意组件进行设置</div>;
 
                 return (
@@ -44,7 +45,7 @@ export function renderWidgetInspector(vm: any) {
                           onChange={e => handleUpdateWidgetConfig({ dataSourceVarId: e.target.value })}
                           className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                         >
-                          {activeApp.variables.filter(v => v.type === 'object_set').map(v => (
+                          {activeApp.variables.filter((v: any) => v.type === 'object_set').map((v: any) => (
                             <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
                           ))}
                         </select>
@@ -61,7 +62,7 @@ export function renderWidgetInspector(vm: any) {
                           className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                         >
                           <option value="">-- 请指派变量 --</option>
-                          {activeApp.variables.filter(v => v.type === 'object').map(v => (
+                          {activeApp.variables.filter((v: any) => v.type === 'object').map((v: any) => (
                             <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
                           ))}
                         </select>
@@ -105,7 +106,7 @@ export function renderWidgetInspector(vm: any) {
                           onChange={e => handleUpdateWidgetConfig({ targetVarId: e.target.value })}
                           className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                         >
-                          {activeApp.variables.filter(v => v.type === 'object').map(v => (
+                          {activeApp.variables.filter((v: any) => v.type === 'object').map((v: any) => (
                             <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
                           ))}
                         </select>
@@ -122,7 +123,7 @@ export function renderWidgetInspector(vm: any) {
                             className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                           >
                             <option value="">-- 请选择 Action --</option>
-                            {mockActionTypes.map(act => (
+                            {mockActionTypes.map((act: any) => (
                               <option key={act.id} value={act.id}>{act.displayName}</option>
                             ))}
                           </select>
@@ -136,7 +137,7 @@ export function renderWidgetInspector(vm: any) {
                             className={`w-full px-2 py-1.5 border ${styles.cardBorder} rounded-md text-xs ${styles.cardBg}`}
                           >
                             <option value="">-- 请指派选定实体 --</option>
-                            {activeApp.variables.filter(v => v.type === 'object').map(v => (
+                            {activeApp.variables.filter((v: any) => v.type === 'object').map((v: any) => (
                               <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
                             ))}
                           </select>

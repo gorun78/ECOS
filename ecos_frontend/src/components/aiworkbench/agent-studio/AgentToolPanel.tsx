@@ -8,7 +8,7 @@ import { AIPAgent } from '../../../types/aiworkbench';
 import type { ThemeStyles } from '../../ThemeContext';
 import * as Icons from 'lucide-react';
 import SimulationTab from './SimulationTab';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -179,7 +179,7 @@ export default function AgentToolPanel({
                           <span className={styles.cardTextMuted}>▶</span>
                           <span>{log}</span>
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
 
@@ -268,7 +268,7 @@ export default function AgentToolPanel({
               >
                 {p}
               </button>
-            )}
+            ))}
           </div>
 
           {/* Input Bar */}

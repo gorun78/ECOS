@@ -103,7 +103,7 @@ export default function VectorIndexTab({
                   max={1024}
                   step={64}
                   value={chunkSize}
-                  onChange={e => setChunkSize(Number(e.target.value)}
+                  onChange={e => setChunkSize(Number(e.target.value))}
                   className={`w-full h-1.5 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-indigo-600`}
                 />
               </div>
@@ -119,7 +119,7 @@ export default function VectorIndexTab({
                   max={200}
                   step={10}
                   value={overlap}
-                  onChange={e => setOverlap(Number(e.target.value)}
+                  onChange={e => setOverlap(Number(e.target.value))}
                   className={`w-full h-1.5 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-indigo-600`}
                 />
               </div>
@@ -158,10 +158,10 @@ export default function VectorIndexTab({
             <div className="font-mono text-[9.5px] leading-relaxed h-52 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
               {syncLogs.length > 0 ? (
                 syncLogs.map((log, idx) => {
-                  let textClass = "styles.cardTextMuted";
-                  if (log.includes('🚨',)} textClass = "text-rose-400 font-bold";
-                  else if (log.includes('✅',)} textClass = "text-emerald-400";
-                  else if (log.includes('🔄',)} textClass = "text-amber-400";
+                  let textClass = `${styles.cardTextMuted}`;
+                  if (log.includes('🚨')) textClass = "text-rose-400 font-bold";
+                  else if (log.includes('✅')) textClass = "text-emerald-400";
+                  else if (log.includes('🔄')) textClass = "text-amber-400";
                   return (
                     <div key={idx} className={textClass}>
                       {log}
@@ -247,7 +247,7 @@ export default function VectorIndexTab({
                       </span>
                     </div>
                   </div>
-                ,)}
+                ))
               ) : (
                 <div className={`py-8 text-center ${styles.cardTextMuted} space-y-1`}>
                   <Icon name="FolderClosed" size={24} className={`${styles.cardTextMuted} mx-auto`} />

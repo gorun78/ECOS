@@ -59,25 +59,54 @@ public class JdbcConnector implements Connector {
             String catalog = conn.getCatalog();
             String schema = config.getOrDefault("schema", conn.getSchema());
 
-            // 发现表
-            try (ResultSet tables = metaData.getTables(catalog, schema, "%", new String[]{"TABLE"})) {
-                while (tables.next()) {
-                    resources.add(buildResource(tables, orgId, orgName, "TABLE", schema));
-                }
-            }
+            // 优先扫描配置/默认 schema
+            collectTablesAndViews(metaData, catalog, schema, orgId, orgName, resources);
 
-            // 发现视图
-            try (ResultSet views = metaData.getTables(catalog, schema, "%", new String[]{"VIEW"})) {
-                while (views.next()) {
-                    resources.add(buildResource(views, orgId, orgName, "VIEW", schema));
+            // 兜底：默认 schema 无表时扫描所有非系统 schema（表可能不在 public 下）
+            if (resources.isEmpty()) {
+                for (String s : listNonSystemSchemas(metaData)) {
+                    collectTablesAndViews(metaData, catalog, s, orgId, orgName, resources);
                 }
             }
 
         } catch (SQLException e) {
+            // 连接/元数据读取失败必须上抛：调用方（采集任务）需感知失败而非静默返回 0 表
             log.error("Failed to list JDBC resources: {}", e.getMessage(), e);
+            throw new RuntimeException("数据源表清单读取失败（请检查 host/端口/库名/账号是否正确）: " + e.getMessage(), e);
         }
 
         return resources;
+    }
+
+    /** 扫描指定 schema 下的表与视图 */
+    private void collectTablesAndViews(DatabaseMetaData metaData, String catalog, String schema,
+                                       String orgId, String orgName, List<DataResource> out) throws SQLException {
+        try (ResultSet tables = metaData.getTables(catalog, schema, "%", new String[]{"TABLE"})) {
+            while (tables.next()) {
+                out.add(buildResource(tables, orgId, orgName, "TABLE", schema));
+            }
+        }
+        try (ResultSet views = metaData.getTables(catalog, schema, "%", new String[]{"VIEW"})) {
+            while (views.next()) {
+                out.add(buildResource(views, orgId, orgName, "VIEW", schema));
+            }
+        }
+    }
+
+    /** 列出所有非系统 schema（排除 pg_catalog / information_schema / pg_toast） */
+    private List<String> listNonSystemSchemas(DatabaseMetaData metaData) throws SQLException {
+        List<String> schemas = new ArrayList<>();
+        try (ResultSet rs = metaData.getSchemas()) {
+            while (rs.next()) {
+                String s = rs.getString("TABLE_SCHEM");
+                if (s != null && !s.equalsIgnoreCase("pg_catalog")
+                        && !s.equalsIgnoreCase("information_schema")
+                        && !s.equalsIgnoreCase("pg_toast")) {
+                    schemas.add(s);
+                }
+            }
+        }
+        return schemas;
     }
 
     @Override

@@ -56,13 +56,13 @@ export interface AgentState {
 export const useAgentStore = create<AgentState>()(
   devtools(
     (set, get) => ({
-      agents: [],
-      selectedAgentId: null,
-      missions: [],
-      currentMissionId: null,
-      executionPlans: [],
+      agents: [] as AgentDefinition[],
+      selectedAgentId: null as string | null,
+      missions: [] as Mission[],
+      currentMissionId: null as string | null,
+      executionPlans: [] as ExecutionPlan[],
       loading: false,
-      error: null,
+      error: null as string | null,
 
       fetchAgents: async () => {
         set({ loading: true, error: null });

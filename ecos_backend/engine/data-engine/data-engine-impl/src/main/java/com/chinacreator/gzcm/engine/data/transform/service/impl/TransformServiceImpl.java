@@ -7,7 +7,16 @@ import com.chinacreator.gzcm.engine.data.transform.TransformStep;
 import com.chinacreator.gzcm.engine.data.transform.model.DataFrame;
 import com.chinacreator.gzcm.engine.data.transform.model.TransformResult;
 import com.chinacreator.gzcm.engine.data.transform.service.ITransformService;
+import org.springframework.stereotype.Service;
 
+/**
+ * 转换服务实现 — 委托 {@link TransformChain} 执行多步骤串联。
+ * <p>
+ * Wave-2B ge (D→I) 收口：以 Spring Bean 形式注册，
+ * 供 {@code TransformController} 注入；步骤内本模块 internal new，
+ * 不引入跨引擎依赖。
+ */
+@Service
 public class TransformServiceImpl implements ITransformService {
 
     @Override

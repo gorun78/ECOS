@@ -34,11 +34,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.sysman",
     "com.chinacreator.gzcm.runtime",
     "com.chinacreator.gzcm.buszhi",
-    "com.chinacreator.gzcm.market",
-    "com.chinacreator.gzcm.worldmodel",
+    // M0 改造 (2026-09): 删除 4 个已删/迁移 basePackages (0 class 残留):
+    //   - com.chinacreator.gzcm.market      (workspace 吸收, 已无 class)
+    //   - com.chinacreator.gzcm.worldmodel  (buszhi 吸收, 已无 class)
+    //   - com.chinacreator.gzcm.portal      (workspace 吸收, 已无 class)
+    //   - com.chinacreator.gzcm.cognitive   (引擎层在 com.chinacreator.gzcm.engine.cognitive*, 不是 .cognitive)
+    // 排除项保留 (excludeFilters 仍引用这些包的 class, 父类用于冲突规避)
     "com.chinacreator.gzcm.workspace",
-    "com.chinacreator.gzcm.portal",
-    "com.chinacreator.gzcm.cognitive",
     "com.chinacreator.gzcm.engine",
     "com.chinacreator.gzcm.services.agent.runtime",
     "com.chinacreator.gzcm.services.agent.model",
@@ -66,22 +68,18 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.gateway.controller.SecurityController.class,
         // 安全引擎: security-engine-impl 的 abac.dao 与 runtime-crypto JAR 冲突，exclude 源码版本
         com.chinacreator.gzcm.engine.security.abac.dao.impl.AbacPolicyDaoImpl.class,
-        // 模块吸收: portal→workspace (阶段5.1)
-        com.chinacreator.gzcm.portal.controller.BizDashboardController.class,
-        com.chinacreator.gzcm.portal.controller.ContractStatsController.class,
-        com.chinacreator.gzcm.portal.controller.ProjectStatsController.class,
-        com.chinacreator.gzcm.portal.controller.PortalAggregationController.class,
-        com.chinacreator.gzcm.portal.controller.MenuController.class,
-        // 模块吸收: market→workspace (阶段5.1)
-        com.chinacreator.gzcm.market.controller.MarketplaceController.class,
-        // 模块吸收: worldmodel→buszhi (阶段5.1)
-        com.chinacreator.gzcm.worldmodel.controller.CaseController.class,
-        com.chinacreator.gzcm.worldmodel.controller.CausalController.class,
-        com.chinacreator.gzcm.worldmodel.controller.ParetoController.class,
-        com.chinacreator.gzcm.worldmodel.controller.WorldModelController.class,
-        com.chinacreator.gzcm.worldmodel.service.OntologyKgSyncService.class,
-        com.chinacreator.gzcm.worldmodel.service.PgGraphService.class,
-        com.chinacreator.gzcm.worldmodel.service.Neo4jGraphService.class,
+        // M0-P0 修复 (2026-09-01): CognitiveService 引用 pre-existing 已删除的
+        // com.chinacreator.gzcm.cognitive.impl.RuleEngine/CausalReasoner/NsgaIIOptimizer
+        // (只在 .m2 stale JAR 中存在, 当前 0 模块构建), 启动时 UnsatisfiedDependencyException.
+        // 真实认知能力由 cognitive-engine (com.chinacreator.gzcm.engine.cognitive2.*) 提供,
+        // CognitiveController 此前已 exclude, 一并 exclude CognitiveService Bean.
+        // 跟踪: 08-产品化重构方案/04-C1-CognitiveService重复-impl-清理 (Wave-2 ai)
+        com.chinacreator.gzcm.engine.ai.service.CognitiveService.class,
+        // M0 改造 (2026-09): 删除 5 个已删/迁移模块的排除项 (class 已从 classpath 移除):
+        //   - portal (workspace 吸收): BizDashboard/ContractStats/ProjectStats/PortalAggregation/Menu
+        //   - market (workspace 吸收): Marketplace
+        //   - worldmodel (buszhi 吸收): Case/Causal/Pareto/WorldModel
+        //   - worldmodel services: OntologyKgSync/PgGraph/Neo4jGraph (迁到 ontology-engine)
         // E3-T2: gateway PgObjectStorageService是stub, workspace版是权威(@Profile("standard")), 删gateway副本避免Bean名冲突
         com.chinacreator.gzcm.gateway.service.PgObjectStorageService.class,
         // E3: sysman-boot GlobalExceptionHandler与gateway版本冲突,排除sysman-boot副本

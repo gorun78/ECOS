@@ -98,9 +98,9 @@ export default function TaskCenter() {
       await apiTaskSubmit({
         taskName: submitForm.taskName,
         taskType: submitForm.taskType,
-        description: submitForm.description,
-        priority: submitForm.priority,
-        params: submitForm.sql ? { sql: submitForm.sql } : undefined,
+        config: submitForm.sql ? { description: submitForm.description, sql: submitForm.sql } : { description: submitForm.description },
+        runner: "DORIS",
+        priority: String(submitForm.priority),
       });
       setShowModal(false);
       setSubmitForm({ taskName: "", taskType: "DORIS_SQL", description: "", priority: 0, sql: "" });

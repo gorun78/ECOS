@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
 import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
 import com.chinacreator.gzcm.engine.data.MetadataService;
@@ -49,7 +50,7 @@ public class MetadataCollectionService {
     public Map<String, Object> collect(String datasourceId) {
         DataSourceEntity ds = dsRepository.findById(datasourceId);
         if (ds == null) {
-            throw new IllegalArgumentException("数据源不存在: " + datasourceId);
+            throw NotFoundException.entity("数据源", datasourceId);
         }
 
         long start = System.currentTimeMillis();
@@ -116,6 +117,44 @@ public class MetadataCollectionService {
         return resourcesCache.get(datasourceId, id -> resourceRepository.findByDatasource(id));
     }
 
+    /**
+     * PMO-37 数据表目录分页查询（元数据缓存分页，DB 不分页）：
+     * 返回 [items(当前页), total(总条数)]。列含 record_count 三态语义。
+     *
+     * @param pageNum  从 1 起
+     * @param pageSize 每页条数（上限 100）
+     */
+    public List<Object> getResourcePages(String datasourceId, int pageNum, int pageSize) {
+        int pn = Math.max(1, pageNum);
+        int ps = Math.max(1, Math.min(pageSize, 100));
+        List<DataResource> all = getResources(datasourceId);
+        int total = all == null ? 0 : all.size();
+        int from = Math.min((pn - 1) * ps, total);
+        int to = Math.min(from + ps, total);
+
+        List<Map<String, Object>> page = new ArrayList<>();
+        if (all != null) {
+            for (DataResource r : all.subList(from, to)) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("resourceId", r.getResourceId());
+                item.put("resourceName", r.getResourceName());
+                item.put("resourceType", r.getResourceType());
+                item.put("sourcePath", r.getSourcePath());
+                item.put("description", r.getDescription());
+                item.put("fieldCount", r.getFieldCount());
+                // 行数三态：-1 未采集 / 0 空表 / >=0 真实或估算
+                Long rc = r.getRecordCount();
+                item.put("recordCount", rc == null ? -1L : rc);
+                item.put("lastSyncTime", r.getLastSyncTime());
+                page.add(item);
+            }
+        }
+        List<Object> out = new ArrayList<>(2);
+        out.add(page);
+        out.add(total);
+        return out;
+    }
+
     public List<Map<String, Object>> getAllResources() {
         return bulkResourcesCache.get("ALL", key -> {
             List<DataSourceEntity> sources = dsRepository.findAll();
@@ -143,12 +182,12 @@ public class MetadataCollectionService {
     public Map<String, Object> preview(String resourceId, int limit) {
         DataResource resource = resourceRepository.findById(resourceId);
         if (resource == null) {
-            throw new IllegalArgumentException("资源不存在: " + resourceId);
+            throw NotFoundException.entity("资源", resourceId);
         }
 
         DataSourceEntity ds = dsRepository.findById(resource.getDatasourceId());
         if (ds == null) {
-            throw new IllegalArgumentException("数据源不存在: " + resource.getDatasourceId());
+            throw NotFoundException.entity("数据源", resource.getDatasourceId());
         }
 
         Connector connector = connectorFactory.getConnector(ds.getDatasourceType());

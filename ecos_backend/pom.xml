@@ -90,6 +90,10 @@
         <spring-boot-maven-plugin.version>${spring-boot.version}</spring-boot-maven-plugin.version>
         <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <!-- Wave-5.1: 0.05 floor (M0 起) — 本波 5 engine 单测后 root 失效不跑 elev (验证周跑 -Djacoco.check.skip=false) -->
+        <jacoco.check.skip>true</jacoco.check.skip>
+        <!-- Wave-5.4 T-19: 5 engine impl per-module CLASS 0.40 floor, 默认强制；临时跳过 -Djacoco.perModuleCheck.skip=true -->
+        <jacoco.perModuleCheck.skip>false</jacoco.perModuleCheck.skip>
     </properties>
 
     <!-- ============================================================ -->
@@ -614,6 +618,30 @@
                         <id>report</id>
                         <phase>verify</phase>
                         <goals><goal>report</goal></goals>
+                    </execution>
+                    <!-- Wave-5.1 root rule 0.05
+                         - skip: 跟随 maven.test.skip + jacoco.check.skip (default true 不被 trap, 需显式 set false / -Djacoco.check.skip=false)
+                         - 5 engine impl per-module 0.40 (推 Wave-5.2 / 本波 5 个 15-25 不 real)
+                         交付节奏: root 11 月 0.10, 12 月 0.20, Phase 5 整库 6 月 0.40 / 12 月 0.60 (最终 0.80) -->
+                    <execution>
+                        <id>check-bundle</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <skip>${jacoco.check.skip}</skip>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.05</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

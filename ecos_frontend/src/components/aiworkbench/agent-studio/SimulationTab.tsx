@@ -6,7 +6,7 @@
 import React from 'react';
 import type { ThemeStyles } from '../../ThemeContext';
 import * as Icons from 'lucide-react';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -102,7 +102,7 @@ export default function SimulationTab({
             onClick={() => {
               setSimUserId('analyst_li');
               setSimDatasetId('ds_pilots_biography');
-              setSimQuery(t("aiworkbench.agentStudio.presetQuerySSN",)};
+              setSimQuery(t("aiworkbench.agentStudio.presetQuerySSN"));
             }}
             className="px-2 py-0.5 bg-red-50 hover:bg-red-100 border border-red-100 rounded text-[9px] text-red-700 font-bold"
           >
@@ -112,7 +112,7 @@ export default function SimulationTab({
             onClick={() => {
               setSimUserId('EU_DPO');
               setSimDatasetId('ds_pilots_biography');
-              setSimQuery(t("aiworkbench.agentStudio.presetQueryDPO",)};
+              setSimQuery(t("aiworkbench.agentStudio.presetQueryDPO"));
             }}
             className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded text-[9px] text-emerald-700 font-bold"
           >
@@ -122,7 +122,7 @@ export default function SimulationTab({
             onClick={() => {
               setSimUserId('hr_manager');
               setSimDatasetId('ds_flights_clean');
-              setSimQuery(t("aiworkbench.agentStudio.presetQueryFlights",)};
+              setSimQuery(t("aiworkbench.agentStudio.presetQueryFlights"));
             }}
             className={`px-2 py-0.5 ${styles.badgeBg} hover:opacity-80 ${styles.accentBorder} border rounded text-[9px] ${styles.accentText} font-bold`}
           >
@@ -249,7 +249,7 @@ export default function SimulationTab({
                         {/* Node Trace logs */}
                         <div className={`${styles.appBg} ${styles.cardTextMuted} p-2.5 rounded-lg font-mono text-[9px] leading-relaxed space-y-1`}>
                           {node.traces.map((trace: string, tIdx: number) => {
-                            const isErr = trace.includes('❌') || trace.includes('FAIL') || trace.includes(t("aiworkbench.agentStudio.rejected",)};
+                            const isErr = trace.includes('❌') || trace.includes('FAIL') || trace.includes('REJECTED');
                             const isAlert = trace.includes('⚠️');
                             return (
                               <div key={tIdx} className={`flex items-start gap-1 ${isErr ? 'text-rose-400' : isAlert ? 'text-amber-400' : ''}`}>

@@ -83,7 +83,7 @@ export default function RagSimTab({
                     >
                       💡 {p}
                     </button>
-                  )}
+                  ))}
                 </div>
               </div>
             </div>
@@ -131,7 +131,7 @@ export default function RagSimTab({
                     </div>
                     <p className={`text-[9px] ${styles.cardTextMuted} leading-relaxed font-sans`}>{doc.snippet}</p>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )}

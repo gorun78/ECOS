@@ -20,16 +20,8 @@
             <artifactId>ontology-engine-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- dccheng-api/impl: 阶段 5 已吸收 (AI 引擎内吸收, 非独立 module) —
+             原孤儿 dependency, 源码 0 import, Wave-10 CI root-cause 修. -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>buszhi-impl</artifactId>

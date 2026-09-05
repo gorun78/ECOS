@@ -6,7 +6,7 @@
 import React from 'react';
 import type { ThemeStyles } from '../../ThemeContext';
 import * as Icons from 'lucide-react';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -160,7 +160,7 @@ export default function GuardrailPolicyCompilerTab({
                     </button>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
 
@@ -258,7 +258,7 @@ export default function GuardrailPolicyCompilerTab({
                     )}
                   </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
 
@@ -286,7 +286,7 @@ export default function GuardrailPolicyCompilerTab({
                 }>
                   {log}
                 </p>
-              )}
+              ))}
             </div>
           </div>
 
@@ -355,7 +355,7 @@ export default function GuardrailPolicyCompilerTab({
                               <td className={`p-1 ${styles.cardTextMuted}`}>￥{p.base_salary.toLocaleString()}</td>
                               <td className={`p-1 ${styles.accentText}`}>{p.hours_flown}h</td>
                             </tr>
-                          )}
+                          ))}
                         </tbody>
                       </table>
                     ) : (
@@ -376,7 +376,7 @@ export default function GuardrailPolicyCompilerTab({
                               <td className={`p-1 font-sans font-medium ${styles.cardTextMuted}`}>{f.pilot_name}</td>
                               <td className={`p-1 ${styles.cardTextMuted}`}>{f.status} ({f.delay_minutes}min)</td>
                             </tr>
-                          )}
+                          ))}
                         </tbody>
                       </table>
                     )}

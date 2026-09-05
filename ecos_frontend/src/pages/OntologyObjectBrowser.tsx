@@ -500,6 +500,7 @@ function ObjectHeader({
   const Icon = resolveIcon(obj.icon);
   const tint = resolveTint(obj.color);
   const badge = STATUS_BADGE[obj.status];
+  const { t } = useLanguage();
   return (
     <div className="bg-[#141924] border border-[#1E293B] rounded-xl p-4">
       <div className="flex items-start gap-3">

@@ -31,7 +31,7 @@ export function renderAppListScreen(vm: any) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {apps.map(app => (
+            {apps.map((app: any) => (
               <div
                 key={app.id}
                 onClick={() => {

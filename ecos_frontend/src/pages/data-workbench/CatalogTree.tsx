@@ -110,7 +110,8 @@ export default function CatalogTree({ onContextMenu }: CatalogTreeProps) {
     if (!rid || loadedFields[rid] || loadingFields.has(rid)) return;
     setLoadingFields(prev => new Set(prev).add(rid));
     try {
-      setLoadedFields(prev => ({ ...prev, [rid]: await fetchFields(rid) }));
+      const fields = await fetchFields(rid);
+      setLoadedFields(prev => ({ ...prev, [rid]: fields }));
     } catch {
       setLoadedFields(prev => ({ ...prev, [rid]: [] }));
     } finally {

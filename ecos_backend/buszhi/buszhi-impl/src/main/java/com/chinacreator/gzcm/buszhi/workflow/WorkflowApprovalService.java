@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
+import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,7 @@ public class WorkflowApprovalService {
      */
     public Map<String, Object> approve(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
-        if (taskOpt.isEmpty()) throw new RuntimeException("WF-009: 任务不存在: " + taskId);
+        if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
         WorkflowTaskEntity task = taskOpt.get();
         String approver = body != null && body.containsKey("userId")
@@ -75,7 +76,7 @@ public class WorkflowApprovalService {
      */
     public Map<String, Object> reject(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
-        if (taskOpt.isEmpty()) throw new RuntimeException("WF-009: 任务不存在: " + taskId);
+        if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
         WorkflowTaskEntity task = taskOpt.get();
         String approver = body != null && body.containsKey("userId")
@@ -108,7 +109,7 @@ public class WorkflowApprovalService {
      */
     public Map<String, Object> transfer(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
-        if (taskOpt.isEmpty()) throw new RuntimeException("WF-009: 任务不存在: " + taskId);
+        if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
         WorkflowTaskEntity task = taskOpt.get();
         String newAssignee = body != null ? String.valueOf(body.getOrDefault("targetUserId", "")) : "";
@@ -130,7 +131,7 @@ public class WorkflowApprovalService {
      */
     public Map<String, Object> addSign(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
-        if (taskOpt.isEmpty()) throw new RuntimeException("WF-009: 任务不存在: " + taskId);
+        if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
         // 简化实现：记录加签
         logRepo.log(taskOpt.get().getInstanceId(), taskOpt.get().getNodeId(), "userTask",

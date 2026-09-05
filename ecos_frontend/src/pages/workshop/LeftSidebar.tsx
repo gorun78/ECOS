@@ -4,7 +4,7 @@ import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderLeftSidebar(vm: any) {
-  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm as { styles: Record<string, string>; [key: string]: any };
   return (
     <>
             {/* COLUMN 1: LEFT CONFIG SIDEBAR (Widget list, Pages, Variables, Styles) */}
@@ -39,7 +39,7 @@ export function renderLeftSidebar(vm: any) {
                       </button>
                     </div>
                     <div className="space-y-1">
-                      {activeApp.pages.map(p => {
+                      {activeApp.pages.map((p: any) => {
                         const isActive = p.id === activePageId;
                         return (
                           <div
@@ -60,11 +60,11 @@ export function renderLeftSidebar(vm: any) {
                                 disabled={!isActive}
                                 onChange={e => {
                                   const title = e.target.value;
-                                  const updated = apps.map(a => {
+                                  const updated = apps.map((a: any) => {
                                     if (a.id === activeApp.id) {
                                       return {
                                         ...a,
-                                        pages: a.pages.map(pg => pg.id === p.id ? { ...pg, title } : pg)
+                                        pages: a.pages.map((pg: any) => pg.id === p.id ? { ...pg, title } : pg)
                                       };
                                     }
                                     return a;
@@ -79,15 +79,15 @@ export function renderLeftSidebar(vm: any) {
                                 onClick={e => {
                                   e.stopPropagation();
                                   if (!window.confirm(`确定要删除页面「${p.title}」吗？`)) return;
-                                  const updated = apps.map(a => {
+                                  const updated = apps.map((a: any) => {
                                     if (a.id === activeApp.id) {
-                                      const remaining = a.pages.filter(pg => pg.id !== p.id);
+                                      const remaining = a.pages.filter((pg: any) => pg.id !== p.id);
                                       return { ...a, pages: remaining };
                                     }
                                     return a;
                                   });
                                   saveAppsState(updated);
-                                  if (isActive) setActivePageId(activeApp.pages.find(pg => pg.id !== p.id)?.id || '');
+                                  if (isActive) setActivePageId(activeApp.pages.find((pg: any) => pg.id !== p.id)?.id || '');
                                 }}
                                 className="p-1 opacity-0 hover:opacity-100 text-red-500 hover:bg-red-50 rounded"
                               >
@@ -116,7 +116,7 @@ export function renderLeftSidebar(vm: any) {
                     </div>
 
                     <div className="space-y-2">
-                      {activeApp.variables.map(v => (
+                      {activeApp.variables.map((v: any) => (
                         <div key={v.id} className={`p-2 ${styles.cardBg} rounded-lg border ${styles.cardBorder} space-y-1 hover:border-slate-300`}>
                           <div className="flex items-center justify-between">
                             <span className={`font-bold ${styles.cardText} text-xs truncate`} title={v.name}>{v.name}</span>
@@ -142,7 +142,7 @@ export function renderLeftSidebar(vm: any) {
                   <div className="space-y-3">
                     <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase block mb-1`}>页面组件层级 Tree</span>
                     <div className="space-y-1">
-                      {activePage?.widgets.map(w => {
+                      {activePage?.widgets.map((w: any) => {
                         const isSelected = w.id === selectedWidgetId;
                         return (
                           <div

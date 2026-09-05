@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.engine.data.repository.DataSourceRepository">
+
+    <resultMap id="DataSourceMap" type="com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity">
+        <id property="datasourceId" column="datasource_id"/>
+        <result property="datasourceName" column="datasource_name"/>
+        <result property="datasourceType" column="datasource_type"/>
+        <result property="orgId" column="org_id"/>
+        <result property="nodeId" column="node_id"/>
+        <result property="description" column="description"/>
+        <result property="connectionConfig" column="connection_config"/>
+        <result property="status" column="status"/>
+        <result property="isDefault" column="is_default"/>
+        <result property="lastTestTime" column="last_test_time"/>
+        <result property="lastTestResult" column="last_test_result"/>
+        <result property="lastTestMessage" column="last_test_message"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="tags" column="tags"/>
+        <result property="remark" column="remark"/>
+        <result property="metadataConfig" column="metadata_config"/>
+        <result property="lastCollectTime" column="last_collect_time"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity">
+        INSERT INTO td_datasource (datasource_id, datasource_name, datasource_type, org_id,
+            description, connection_config, status, tags, remark,
+            metadata_config, create_by, create_time, update_by, update_time
+        ) VALUES (
+            #{datasourceId}, #{datasourceName}, #{datasourceType}, #{orgId},
+            #{description}, #{connectionConfig}, #{status}, #{tags}, #{remark},
+            #{metadataConfig}::jsonb, #{createBy}, NOW(), #{updateBy}, NOW()
+        )
+    </insert>
+
+    <update id="update" parameterType="com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity">
+        UPDATE td_datasource SET
+            datasource_name = #{datasourceName},
+            datasource_type = #{datasourceType},
+            org_id = #{orgId},
+            description = #{description},
+            connection_config = #{connectionConfig},
+            status = #{status},
+            tags = #{tags},
+            remark = #{remark},
+            metadata_config = #{metadataConfig}::jsonb,
+            update_by = #{updateBy},
+            update_time = NOW()
+        WHERE datasource_id = #{datasourceId}
+    </update>
+
+    <select id="findById" resultMap="DataSourceMap">
+        SELECT * FROM td_datasource WHERE datasource_id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="DataSourceMap">
+        SELECT * FROM td_datasource ORDER BY create_time DESC
+    </select>
+
+    <update id="updateLastCollectTime">
+        UPDATE td_datasource SET last_collect_time = NOW() WHERE datasource_id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM td_datasource WHERE datasource_id = #{id}
+    </delete>
+
+</mapper>

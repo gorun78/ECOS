@@ -5,8 +5,14 @@ import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainResult;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalEdge;
 import com.chinacreator.gzcm.engine.cognitive2.model.DiagnosisRequest;
+import com.chinacreator.gzcm.engine.cognitive2.model.PrecedentRef;
+import com.chinacreator.gzcm.engine.cognitive2.model.ReasoningPath;
+import com.chinacreator.gzcm.engine.cognitive2.model.RuleRef;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
+import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
+import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -41,23 +47,43 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
     private final CausalDetector causalDetector;
     private final SuggestionBuilder suggestionBuilder;
     private final RootCauseAnalyzer rootCauseAnalyzer;
+    /** Wave-3.2 增量：因果链 → ReasoningPath 构建器 */
+    private final ReasoningPathFromCausalBuilder reasoningPathFromCausalBuilder;
+    /** Wave-3.2 增量：先例召回（PMO-32 复用，不写 DB） */
+    private final PrecedentRecaller precedentRecaller;
+    /** Wave-3.2 增量：RuleRef 收口（从 KB 读取规则 + 去重） */
+    private final RuleRefCollector ruleRefCollector;
+    /** Wave-3.2 增量：KB 合规规则源（用于给 ruleRef 补充 version 信息） */
+    private final ComplianceRuleMapper ruleMapper;
 
     /**
      * 构造器注入。
      *
-     * @param knowledgeGraphService 知识图谱服务（kb-engine-api 接口）
-     * @param causalDetector        KG因果链遍历器
-     * @param suggestionBuilder     LLM推理构建器
-     * @param rootCauseAnalyzer     根因分析器
+     * @param knowledgeGraphService              知识图谱服务（kb-engine-api 接口）
+     * @param causalDetector                     KG因果链遍历器
+     * @param suggestionBuilder                  LLM推理构建器
+     * @param rootCauseAnalyzer                  根因分析器
+     * @param reasoningPathFromCausalBuilder     因果链 → ReasoningPath 转换器
+     * @param precedentRecaller                  先例召回器（PMO-32 复用）
+     * @param ruleRefCollector                   RuleRef 收口器（KB 规则 → 去重索引）
+     * @param ruleMapper                         KB 合规规则源
      */
     public CausalReasonerServiceImpl(KnowledgeGraphService knowledgeGraphService,
                                       CausalDetector causalDetector,
                                       SuggestionBuilder suggestionBuilder,
-                                      RootCauseAnalyzer rootCauseAnalyzer) {
+                                      RootCauseAnalyzer rootCauseAnalyzer,
+                                      ReasoningPathFromCausalBuilder reasoningPathFromCausalBuilder,
+                                      PrecedentRecaller precedentRecaller,
+                                      RuleRefCollector ruleRefCollector,
+                                      ComplianceRuleMapper ruleMapper) {
         this.knowledgeGraphService = knowledgeGraphService;
         this.causalDetector = causalDetector;
         this.suggestionBuilder = suggestionBuilder;
         this.rootCauseAnalyzer = rootCauseAnalyzer;
+        this.reasoningPathFromCausalBuilder = reasoningPathFromCausalBuilder;
+        this.precedentRecaller = precedentRecaller;
+        this.ruleRefCollector = ruleRefCollector;
+        this.ruleMapper = ruleMapper;
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -72,6 +98,22 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         CausalChainResult result = new CausalChainResult();
 
         // ── 第1层：指标自身节点 ──
+        // Wave-6 T-25: 先查 KG 是否存在指标对应节点 — 不存在时返回 metricFound=false，
+        // 让上游按 404 处理（避免在 Reasoner/ReasoningPath 阶段触发 NPE）
+        boolean metricFound = false;
+        try {
+            List<KnowledgeNode> kgStartNodes = knowledgeGraphService.search(request.getMetric());
+            metricFound = kgStartNodes != null && !kgStartNodes.isEmpty();
+        } catch (Exception e) {
+            log.debug("KG 指标节点预检失败（降级为未找到）: {}", e.getMessage());
+        }
+        if (!metricFound) {
+            log.info("指标 '{}' 在 KG 中不存在，cascade=0 终止诊断", request.getMetric());
+            result.setMetricFound(false);
+            return result;
+        }
+        result.setMetricFound(true);
+
         String metricDesc = request.getMetric() + (request.getDeviation() != 0
                 ? String.format(" (%.0f%%)", request.getDeviation())
                 : "");
@@ -104,12 +146,66 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         // ── 根因定位与建议生成 ──
         rootCauseAnalyzer.identifyRootCauseAndSuggestions(result, request);
 
-        log.info("== 因果诊断完成: 因果链长度={}, 根因={}, 建议数={}",
+        // ── Wave-3.2 增量：把因果链 → ReasoningPath（含 RuleRef + PrecedentRef） ──
+        buildAndAttachReasoningPath(result, request, maxDepth);
+
+        log.info("== 因果诊断完成: 因果链长度={}, 根因={}, 建议数={}, reasoningPath.steps={}",
                 result.getCausalChain().size(),
                 result.getRootCause(),
-                result.getSuggestions().size());
+                result.getSuggestions().size(),
+                result.getReasoningPath() != null ? result.getReasoningPath().getSteps().size() : 0);
 
         return result;
+    }
+
+    /**
+     * 把因果链 + 先例召回 + KB 规则 → ReasoningPath，附到 CausalChainResult。
+     *
+     * <p>Wave-3.2 增量：
+     * <ol>
+     *   <li>T2: 调 PrecedentRecaller.recall 拿 topK=3 先例 → precedentRefs 索引</li>
+     *   <li>T4: 读 KB 规则 (ruleMapper.findByDomain) → RuleRef 去重索引</li>
+     *   <li>T1: 用 ReasoningPathFromCausalBuilder 转 step（支持 RULE/PRECEDENT 两类引用）</li>
+     *   <li>T5: 调 RuleRefCollector 把 rule_hits/precedent_count 写进 justification</li>
+     * </ol>
+     *
+     * @param result    CausalChainResult
+     * @param request   DiagnosisRequest
+     * @param maxDepth  目标层数（>0 时裁剪）
+     */
+    private void buildAndAttachReasoningPath(CausalChainResult result, DiagnosisRequest request, int maxDepth) {
+        // T2: 先例召回（场景文本 = 指标 + 偏差 + 域）
+        String scenario = request.getMetric() + " 偏差 " + (int) ((Math.abs(request.getDeviation()) * 100) / 100) + "%"
+                + " 业务域 " + request.getDomain();
+        List<PrecedentRef> precedentRefs;
+        try {
+            precedentRefs = precedentRecaller.recall(scenario, request.getDomain(), PrecedentRecaller.DEFAULT_TOP_K);
+        } catch (Exception e) {
+            log.warn("先例召回失败(降级): {}", e.getMessage());
+            precedentRefs = Collections.emptyList();
+        }
+
+        // T4: KB 规则 → RuleRef 去重索引
+        Map<String, RuleRef> ruleRefIndex;
+        try {
+            List<ComplianceRule> kbRules = ruleMapper.findByDomain(request.getDomain());
+            if (kbRules == null || kbRules.isEmpty()) {
+                kbRules = ruleMapper.findAll();
+            }
+            ruleRefIndex = ruleRefCollector.toIndex(kbRules);
+        } catch (Exception e) {
+            log.warn("KB规则读取失败(降级): {}", e.getMessage());
+            ruleRefIndex = Collections.emptyMap();
+        }
+
+        // T1 + T5: 因果链 → ReasoningPath
+        ReasoningPathFromCausalBuilder.Context ctx =
+                new ReasoningPathFromCausalBuilder.Context(ruleRefIndex, precedentRecaller.toIndex(precedentRefs));
+        String conclusion = result.getRootCause() != null ? result.getRootCause() : "诊断完成";
+        ReasoningPath path = reasoningPathFromCausalBuilder.buildPath(
+                result.getCausalChain(), conclusion, ctx, maxDepth > 0 ? maxDepth : 8);
+        ruleRefCollector.attachStructuralCount(path);
+        result.setReasoningPath(path);
     }
 
     // ══════════════════════════════════════════════════════════════════

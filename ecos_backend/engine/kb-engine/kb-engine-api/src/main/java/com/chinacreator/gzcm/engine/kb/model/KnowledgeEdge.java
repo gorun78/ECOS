@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.model;
 
+import java.time.LocalDateTime;
+
 public class KnowledgeEdge {
 
     private String id;
@@ -8,7 +10,7 @@ public class KnowledgeEdge {
     private String relationship;
     private double weight;
     private String propertiesJson;
-    private long createdAt;
+    private LocalDateTime createdAt;
 
     public KnowledgeEdge() {}
 
@@ -32,6 +34,6 @@ public class KnowledgeEdge {
     public void setWeight(double weight) { this.weight = weight; }
     public String getPropertiesJson() { return propertiesJson; }
     public void setPropertiesJson(String propertiesJson) { this.propertiesJson = propertiesJson; }
-    public long getCreatedAt() { return createdAt; }
-    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

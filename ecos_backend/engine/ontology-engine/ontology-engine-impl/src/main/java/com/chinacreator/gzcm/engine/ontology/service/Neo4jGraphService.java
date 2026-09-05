@@ -5,14 +5,13 @@ import org.neo4j.driver.*;
 import org.neo4j.driver.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A1: Neo4j 图服务实现 — 企业版/旗舰版。
@@ -24,39 +23,24 @@ public class Neo4jGraphService implements IGraphService {
 
     private static final Logger log = LoggerFactory.getLogger(Neo4jGraphService.class);
 
-    @org.springframework.beans.factory.annotation.Value("${neo4j.uri:bolt://localhost:7687}")
-    private String neo4jUri;
-
-    @org.springframework.beans.factory.annotation.Value("${neo4j.username:neo4j}")
-    private String neo4jUsername;
-
-    @org.springframework.beans.factory.annotation.Value("${neo4j.password:neo4j123}")
-    private String neo4jPassword;
-
+    // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
+    // standard 档 / neo4j.uri 未配置时, @Autowired(required=false) 留 null, query() 等需判空。
+    @Autowired(required = false)
     private Driver driver;
 
     @PostConstruct
     public void init() {
-        try {
-            driver = GraphDatabase.driver(neo4jUri,
-                AuthTokens.basic(neo4jUsername, neo4jPassword),
-                Config.builder()
-                    .withMaxConnectionPoolSize(10)
-                    .withConnectionTimeout(30, TimeUnit.SECONDS)
-                    .build());
-            driver.verifyConnectivity();
-            log.info("Neo4jGraphService connected to {}", neo4jUri);
-        } catch (Exception e) {
-            log.error("Neo4jGraphService init failed: {}", e.getMessage());
-            driver = null;
+        if (driver == null) {
+            log.warn("Neo4jGraphService init: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), IGraphService 按 no-op 处理");
+            return;
         }
+        log.info("Neo4jGraphService init: 使用 runtime-access 统一 Driver");
     }
 
     @PreDestroy
     public void destroy() {
-        if (driver != null) {
-            driver.close();
-        }
+        // Driver 是 runtime-access 管理的 Bean, 不在此 close (生命周期统一)
+        log.info("Neo4jGraphService destroy: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
     }
 
     @Override

@@ -51,13 +51,13 @@ export function useOntologyData(
         }));
 
         // 2. Load entities for the primary ontology
-        const rawEntities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch(() => []);
+        const rawEntities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
         const entityList: ObjectType[] = [];
         for (const e of (rawEntities || [])) {
           const entity = e as any;
           let props: { id: string; displayName: string; apiName: string; dataType: string; isPrimaryKey: boolean; description: string }[] = [];
           try {
-            const rawProps = await fetchProperties(entity.id, DEFAULT_ONTOLOGY_ID).catch(() => []);
+            const rawProps = await fetchProperties(entity.id, DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
             props = (rawProps || []).map((p: any) => ({
               id: p.id || p.apiName || p.name,
               displayName: p.displayName || p.name || p.apiName,
@@ -87,7 +87,7 @@ export function useOntologyData(
         }
 
         // 3. Load relationships
-        const rawRels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch(() => []);
+        const rawRels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
         const relList: LinkType[] = (rawRels || []).map((r: any) => ({
           id: r.id,
           displayName: r.name || `${r.source_entity_id}→${r.target_entity_id}`,

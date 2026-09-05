@@ -23,6 +23,9 @@ import java.util.*;
  *   <li>KG      → kb-engine 建图（POST /api/v1/knowledge/graph/build）</li>
  *   <li>REASON  → cognitive-engine 混合推理（POST /api/v1/knowledge/reason）</li>
  *   <li>DECISION → PMO-32 决策落地（本地 Service 调用，不走 REST）</li>
+ *   <li>OAG_INTAKE   — Wave-3.2 新增，本地 OagIntakeService（需求解读）</li>
+ *   <li>OAG_PLAN     — Wave-3.2 新增，本地 OagPlannerService（任务拆解）</li>
+ *   <li>OAG_STRATEGY — Wave-3.2 新增，本地 StrategyGeneratorService（策略生成）</li>
  * </ul>
  */
 @Service
@@ -35,11 +38,20 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
     private static final String INTERNAL_BASE = "http://localhost:8080";
 
     private final DecisionService decisionService;
+    private final OagIntakeService oagIntakeService;
+    private final OagPlannerService oagPlannerService;
+    private final StrategyGeneratorService strategyGeneratorService;
     private final RestTemplate restTemplate;
 
     @Autowired
-    public EngineCapabilityRegistryImpl(DecisionService decisionService) {
+    public EngineCapabilityRegistryImpl(DecisionService decisionService,
+                                         OagIntakeService oagIntakeService,
+                                         OagPlannerService oagPlannerService,
+                                         StrategyGeneratorService strategyGeneratorService) {
         this.decisionService = decisionService;
+        this.oagIntakeService = oagIntakeService;
+        this.oagPlannerService = oagPlannerService;
+        this.strategyGeneratorService = strategyGeneratorService;
         this.restTemplate = new RestTemplate();
         // 防 XML 响应解析
         this.restTemplate.getMessageConverters().removeIf(c ->
@@ -54,11 +66,14 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
         Map<String, Object> config = parseConfig(node.getConfig());
 
         return switch (type) {
-            case DECISION -> executeDecision(node, config, context);
-            case REASON   -> executeReason(node, config, context);
-            case EXTRACT  -> executeExtract(node, config, context);
-            case KG       -> executeKg(node, config, context);
-            case INGEST   -> executeIngest(node, config, context);
+            case DECISION     -> executeDecision(node, config, context);
+            case REASON       -> executeReason(node, config, context);
+            case EXTRACT      -> executeExtract(node, config, context);
+            case KG           -> executeKg(node, config, context);
+            case INGEST       -> executeIngest(node, config, context);
+            case OAG_INTAKE   -> executeOagIntake(node, config, context);
+            case OAG_PLAN     -> executeOagPlan(node, config, context);
+            case OAG_STRATEGY -> executeOagStrategy(node, config, context);
         };
     }
 
@@ -177,6 +192,100 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
             result.put("endpoint", path);
             return result;
         }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  OAG_INTAKE — Wave-3.2 本地节点：需求解读
+    // ════════════════════════════════════════════════════
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeOagIntake(CognitivePipelineNode node,
+                                                 Map<String, Object> config,
+                                                 Map<String, Object> context) {
+        String rawRequest = (String) config.get("raw_request");
+        String domain = (String) config.getOrDefault("domain", "default");
+        if (rawRequest == null && context != null && !context.isEmpty()) {
+            // 上游可能携带 raw_request
+            for (Object upObj : context.values()) {
+                if (!(upObj instanceof Map)) continue;
+                Map<String, Object> up = (Map<String, Object>) upObj;
+                if (up.get("raw_request") != null) {
+                    rawRequest = String.valueOf(up.get("raw_request"));
+                    break;
+                }
+            }
+        }
+        Map<String, Object> out = oagIntakeService.handle(rawRequest, domain, config);
+        out.put("nodeId", node.getNodeId());
+        out.put("status", "intake_completed");
+        return out;
+    }
+
+    // ════════════════════════════════════════════════════
+    //  OAG_PLAN — Wave-3.2 本地节点：任务拆解
+    // ════════════════════════════════════════════════════
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeOagPlan(CognitivePipelineNode node,
+                                               Map<String, Object> config,
+                                               Map<String, Object> context) {
+        String intentId = null;
+        Map<String, Object> slots = new LinkedHashMap<>();
+        if (context != null) {
+            for (Object upObj : context.values()) {
+                if (!(upObj instanceof Map)) continue;
+                Map<String, Object> up = (Map<String, Object>) upObj;
+                if (up.get("intent_id") != null) intentId = String.valueOf(up.get("intent_id"));
+                Object sm = up.get("slot_map");
+                if (sm instanceof Map) slots.putAll((Map<String, Object>) sm);
+            }
+        }
+        Map<String, Object> out = oagPlannerService.handle(intentId, slots, config);
+        out.put("nodeId", node.getNodeId());
+        out.put("status", "plan_completed");
+        return out;
+    }
+
+    // ════════════════════════════════════════════════════
+    //  OAG_STRATEGY — Wave-3.2 本地节点：策略生成
+    // ════════════════════════════════════════════════════
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeOagStrategy(CognitivePipelineNode node,
+                                                   Map<String, Object> config,
+                                                   Map<String, Object> context) {
+        Map<String, Object> reasonerResult = null;
+        List<String> precedentIds = new ArrayList<>();
+        if (context != null) {
+            for (Object upObj : context.values()) {
+                if (!(upObj instanceof Map)) continue;
+                Map<String, Object> up = (Map<String, Object>) upObj;
+                Object resp = up.get("response");
+                if (resp instanceof Map) {
+                    Map<String, Object> r = (Map<String, Object>) resp;
+                    if (reasonerResult == null) {
+                        reasonerResult = r;
+                    }
+                    Object pids = r.get("precedent_ids");
+                    if (pids instanceof List) {
+                        for (Object o : (List<Object>) pids) {
+                            if (o != null) precedentIds.add(String.valueOf(o));
+                        }
+                    }
+                } else if (up.get("reasoner_result") instanceof Map) {
+                    reasonerResult = (Map<String, Object>) up.get("reasoner_result");
+                }
+            }
+        }
+
+        int maxActions = config.get("max_actions") instanceof Number
+                ? ((Number) config.get("max_actions")).intValue() : 5;
+
+        Map<String, Object> out = strategyGeneratorService.handle(
+                reasonerResult, precedentIds, null /* precedents 由 Reviewer/QA 注入 */, maxActions);
+        out.put("nodeId", node.getNodeId());
+        out.put("status", "strategy_completed");
+        return out;
     }
 
     // ════════════════════════════════════════════════════

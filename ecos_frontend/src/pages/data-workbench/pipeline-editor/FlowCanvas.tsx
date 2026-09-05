@@ -367,8 +367,8 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         nodeTypes={CUSTOM_NODE_TYPES}
         fitView
         deleteKeyCode={['Backspace', 'Delete']}
-        multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
-        selectionKeyCode="Shift"
+        multiSelectionKeyCode="Shift"
+        nodesConnectable
         snapToGrid
         snapGrid={[16, 16]}
         defaultEdgeOptions={{

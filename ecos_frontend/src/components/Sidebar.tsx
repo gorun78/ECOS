@@ -1,6 +1,6 @@
 /**
  * ECOS Sidebar — 四组flat结构 + 桌面端可折叠
- * 总览 | 资源概览 | 系统管理 | 产品功能(5项平铺)
+ * Wave-2A T3: 所有 labelZh/descZh/groupZh 改为 `sidebar.*` namespace i18n
  * @license Apache-2.0
  */
 
@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
+import type { ComponentType } from "react";
 
 interface SidebarProps {
   width?: number;
@@ -44,18 +45,16 @@ interface SidebarProps {
   onDesktopToggle?: () => void;
 }
 
+/** A nav item resolved to its i18n key (avoid stale labelZh/descZh strings). */
 interface NavItem {
   id: string;
-  label: string;
-  labelZh: string;
-  icon: React.ComponentType<{ className?: string }>;
-  desc: string;
-  descZh: string;
+  labelKey: string;
+  icon: ComponentType<{ className?: string }>;
+  descKey: string;
 }
 
 interface NavGroup {
-  group: string;
-  groupZh: string;
+  groupKey: string;
   items: NavItem[];
 }
 
@@ -69,7 +68,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [productCollapsed, setProductCollapsed] = useState(true);
@@ -79,42 +78,39 @@ export default function Sidebar({
 
   // ── 总览组 ──────────────────────────────────────────
   const overviewGroup: NavGroup = {
-    group: "总览",
-    groupZh: "总览",
+    groupKey: "sidebar.group.overview",
     items: [
-      { id: "world_model", label: "Strategic Goals", labelZh: "战略目标", icon: Target, desc: "Enterprise strategic goals", descZh: "企业战略目标与决策模拟" },
-      { id: "monitor", label: "Monitoring Center", labelZh: "监控中心", icon: Gauge, desc: "System status & alerts", descZh: "系统运行状态与告警" },
+      { id: "world_model", labelKey: "app.tab.world_model", icon: Target, descKey: "sidebar.desc.world_model" },
+      { id: "monitor", labelKey: "app.tab.monitor", icon: Gauge, descKey: "sidebar.desc.monitor" },
     ],
   };
 
   // ── 资源概览组 ──────────────────────────────────────
   const resourceGroup: NavGroup = {
-    group: "资源概览",
-    groupZh: "资源概览",
+    groupKey: "sidebar.group.resources",
     items: [
-      { id: "marketplace", label: "Marketplace", labelZh: "数据市场", icon: Store, desc: "Browse data assets", descZh: "浏览数据资产，申请访问权限" },
-      { id: "knowledge_graph", label: "Knowledge Graph", labelZh: "知识图谱", icon: BookOpen, desc: "Interactive ontology graph exploration", descZh: "交互式本体图谱探索" },
-      { id: "ops_apps", label: "Operational Apps", labelZh: "运营应用", icon: Play, desc: "Operational apps", descZh: "运营应用快速入口" },
+      { id: "marketplace", labelKey: "app.tab.marketplace", icon: Store, descKey: "sidebar.desc.marketplace" },
+      { id: "knowledge_graph", labelKey: "app.tab.knowledge_graph", icon: BookOpen, descKey: "sidebar.desc.knowledge_graph" },
+      { id: "ops_apps", labelKey: "app.tab.ops_apps", icon: Play, descKey: "sidebar.desc.ops_apps" },
     ],
   };
 
   // ── 系统管理组 ──────────────────────────────────────
   const systemGroup: NavGroup = {
-    group: "系统管理",
-    groupZh: "系统管理",
+    groupKey: "sidebar.group.system",
     items: [
-      { id: "security-center", label: "Security Center", labelZh: "安全中心", icon: Shield, desc: "IAM, access control, audit logs", descZh: "用户管理·访问控制·安全审计" },
-      { id: "dict", label: "Data Dictionary", labelZh: "数据字典", icon: Table2, desc: "Data dictionary management", descZh: "数据字典与表结构定义管理" },
+      { id: "security-center", labelKey: "app.tab.security_center", icon: Shield, descKey: "sidebar.desc.security_center" },
+      { id: "dict", labelKey: "app.tab.dict", icon: Table2, descKey: "sidebar.desc.dict" },
     ],
   };
 
-  // ── 产品功能 — 5项平铺：项目→AI→知识→本体→数据 ──
+  // ── 产品功能 — 5项平铺 ──────────────────────────────
   const productItems: NavItem[] = [
-    { id: "project_workbench", label: "Project Workbench", labelZh: "项目工作台", icon: Briefcase, desc: "Scenario management & project orchestration", descZh: "场景调度·项目管理·资源编排" },
-    { id: "agent_studio", label: "AI Workbench", labelZh: "AI工作台", icon: Cpu, desc: "Agent orchestration & model catalog", descZh: "Agent协同·模型目录·安全审计" },
-    { id: "knowledge_view", label: "Knowledge Workbench", labelZh: "知识工作台", icon: BookOpen, desc: "Vector store, RAG retrieval", descZh: "知识库管理·RAG检索·数据对象图谱导入" },
-    { id: "ontology_workbench", label: "Ontology Workbench", labelZh: "本体工作台", icon: Network, desc: "Ontology modeling & entity management", descZh: "本体建模·实体管理·关系图谱·术语标准" },
-    { id: "data-workbench", label: "Data Workbench", labelZh: "数据工作台", icon: LayoutDashboard, desc: "Data sources, pipelines, governance", descZh: "数据源·管道·治理·血缘·调度" },
+    { id: "project_workbench", labelKey: "app.tab.project_workbench", icon: Briefcase, descKey: "sidebar.desc.project_workbench" },
+    { id: "agent_studio", labelKey: "app.tab.ai_workbench", icon: Cpu, descKey: "sidebar.desc.agent_studio" },
+    { id: "knowledge_view", labelKey: "app.tab.knowledge_view", icon: BookOpen, descKey: "sidebar.desc.knowledge_view" },
+    { id: "ontology_workbench", labelKey: "app.tab.ontology_workbench", icon: Network, descKey: "sidebar.desc.ontology_workbench" },
+    { id: "data-workbench", labelKey: "app.tab.data_workbench", icon: LayoutDashboard, descKey: "sidebar.desc.data_workbench" },
   ];
 
   // Render a nav item button
@@ -135,10 +131,10 @@ export default function Sidebar({
         <Icon className={`w-[16px] h-[16px] shrink-0 mt-0.5 ${isActive ? styles.sidebarActiveText : "opacity-60"}`} />
         <div className="flex-1 min-w-0">
           <span className="text-[13px] font-medium block truncate leading-none">
-            {locale === "zh" ? item.labelZh : item.label}
+            {t(item.labelKey)}
           </span>
           <span className="text-[9.5px] opacity-60 overflow-hidden text-ellipsis block truncate mt-1">
-            {locale === "zh" ? item.descZh : item.desc}
+            {t(item.descKey)}
           </span>
         </div>
       </button>
@@ -149,7 +145,7 @@ export default function Sidebar({
   const renderGroup = (group: NavGroup, keyPrefix: string = "") => (
     <div className="space-y-1">
       <span className="px-3 text-[9px] uppercase font-mono tracking-wider opacity-60 block mb-1.5 font-semibold">
-        {locale === "zh" ? group.groupZh : group.group}
+        {t(group.groupKey)}
       </span>
       <div className="space-y-0.5">
         {group.items.map(item => renderNavItem(item, keyPrefix))}
@@ -165,19 +161,14 @@ export default function Sidebar({
           ECOS <span className="font-light opacity-65 text-xs">v2.0</span>
         </div>
         <div className="text-[10px] font-mono tracking-widest text-indigo-500 dark:text-[#3B82F6] uppercase mt-1 leading-none">
-          {locale === "zh" ? "企业认知操作系统" : "Enterprise Cognitive OS"}
+          {t("sidebar.brand.tagline")}
         </div>
       </div>
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4 scrollbar-thin">
-        {/* ── 总览 ────────────────────────────────────── */}
         {renderGroup(overviewGroup, "ov_")}
-
-        {/* ── 资源概览 ────────────────────────────────── */}
         {renderGroup(resourceGroup, "res_")}
-
-        {/* ── 系统管理 ────────────────────────────────── */}
         {renderGroup(systemGroup, "sys_")}
       </div>
 
@@ -188,7 +179,7 @@ export default function Sidebar({
           className="flex items-center justify-between w-full px-1 hover:opacity-80 transition-opacity"
         >
           <span className="text-[9px] uppercase font-mono tracking-wider opacity-50 font-semibold">
-            {locale === "zh" ? "产品功能" : "Product Features"}
+            {t("sidebar.group.product")}
           </span>
           <ChevronDown className={`w-3.5 h-3.5 opacity-40 transition-transform duration-200 ${productCollapsed ? '' : 'rotate-180'}`} />
         </button>
@@ -204,27 +195,27 @@ export default function Sidebar({
         <div className="flex items-center justify-between py-0.5">
           <span className="flex items-center gap-1.5 opacity-85">
             <span className={`w-2 h-2 rounded-full ${statusMetrics.serviceStatus === "UP" ? "bg-[#4ADE80]" : "bg-[#EF4444]"}`}></span>
-            内核状态
+            {t("sidebar.footer.kernel")}
           </span>
           <span className={`font-bold ${statusMetrics.serviceStatus === "UP" ? "text-[#4ADE80]" : "text-[#EF4444]"}`}>
-            {statusMetrics.serviceStatus === "UP" ? "运行中" : statusMetrics.serviceStatus}
+            {statusMetrics.serviceStatus === "UP" ? t("sidebar.footer.running") : statusMetrics.serviceStatus}
           </span>
         </div>
         <div
           className="flex items-center justify-between py-0.5 opacity-85 hover:opacity-100 cursor-pointer hover:bg-white/5 rounded px-0.5 transition"
           onClick={() => setIsTaskPanelOpen(true)}
-          title="点击打开任务引擎面板"
+          title={t("sidebar.footer.task.open")}
         >
-          <span>任务引擎</span>
+          <span>{t("sidebar.task.title")}</span>
           <span className="font-bold">
-            {statusMetrics.taskRunning > 0 && <span className="text-[#4ADE80]">{statusMetrics.taskRunning} 运行 </span>}
-            {statusMetrics.taskPending > 0 && <span className="text-[#F59E0B]">{statusMetrics.taskPending} 等待 </span>}
-            {statusMetrics.taskTotal > 0 && <span className="opacity-60">{statusMetrics.taskTotal} 总计</span>}
-            {statusMetrics.taskTotal === 0 && <span className="opacity-50">空闲</span>}
+            {statusMetrics.taskRunning > 0 && <span className="text-[#4ADE80]">{statusMetrics.taskRunning} {t("sidebar.footer.running_count")} </span>}
+            {statusMetrics.taskPending > 0 && <span className="text-[#F59E0B]">{statusMetrics.taskPending} {t("sidebar.footer.waiting")} </span>}
+            {statusMetrics.taskTotal > 0 && <span className="opacity-60">{statusMetrics.taskTotal} {t("sidebar.footer.total")}</span>}
+            {statusMetrics.taskTotal === 0 && <span className="opacity-50">{t("sidebar.footer.idle")}</span>}
           </span>
         </div>
         <div className={`flex items-center justify-between py-0.5 text-[9.5px] border-t ${styles.sidebarBorder} pt-2 opacity-70`}>
-          <span>认知引擎</span>
+          <span>{t("sidebar.footer.engine")}</span>
           <span className="font-bold font-sans">v{statusMetrics.engineVersion}</span>
         </div>
       </div>
@@ -257,7 +248,7 @@ export default function Sidebar({
           <button
             onClick={onDesktopToggle}
             className="hidden md:flex absolute bottom-3 right-2 w-7 h-7 items-center justify-center rounded-full bg-slate-300/60 dark:bg-slate-600/60 hover:bg-slate-400/70 dark:hover:bg-slate-500/70 shadow-md opacity-60 hover:opacity-100 transition-all z-10"
-            title={locale === "zh" ? "收起侧边栏" : "Collapse sidebar"}
+            title={t("sidebar.desktop.collapse")}
           >
             <ChevronLeft className="w-[14px] h-[14px]" />
           </button>
@@ -274,7 +265,7 @@ export default function Sidebar({
           {[...overviewGroup.items, ...resourceGroup.items, ...systemGroup.items, ...productItems].map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
-            const label = locale === "zh" ? item.labelZh : item.label;
+            const label = t(item.labelKey);
             return (
               <button
                 key={"rail-" + item.id}
@@ -303,25 +294,25 @@ export default function Sidebar({
           <button
             onClick={onDesktopToggle}
             className="w-10 h-10 flex items-center justify-center rounded-lg opacity-50 hover:opacity-100 transition-all"
-            title={locale === "zh" ? "展开侧边栏" : "Expand sidebar"}
+            title={t("sidebar.desktop.expand")}
           >
             <ChevronRight className="w-[16px] h-[16px]" />
           </button>
         </nav>
       )}
 
-      {/* AsyncTaskCenterView — 异步任务中心 (替换旧TaskPanel) */}
+      {/* AsyncTaskCenterView */}
       {isTaskPanelOpen && (
         <div className="fixed inset-0 z-[60] bg-black/50 flex items-start justify-center pt-12" onClick={() => setIsTaskPanelOpen(false)}>
           <div className="bg-white dark:bg-slate-900 w-[95vw] max-w-[1400px] h-[85vh] rounded-xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="font-bold text-lg">{locale === "zh" ? "异步任务中心" : "Async Task Center"}</h2>
+              <h2 className="font-bold text-lg">{t("sidebar.task_center")}</h2>
               <button onClick={() => setIsTaskPanelOpen(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                 <X size={20} />
               </button>
             </div>
             <div className="h-[calc(85vh-52px)] overflow-auto">
-              <AsyncTaskCenterView 
+              <AsyncTaskCenterView
                 showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
                 onViewModeChange={(mode) => { navigate("/" + mode); setIsTaskPanelOpen(false); }}
               />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Plus, PlusCircle, Zap } from 'lucide-react';
+import { Check, Plus, PlusCircle, Zap, Settings } from 'lucide-react';
 import { DynamicIcon, mockActionTypes } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,7 +27,7 @@ export function renderWorkshopModals(vm: any) {
                 { type: 'object_view', title: '实体档案卡片 (Object View)', desc: '绑定单个选定实体变量，直接读取实体的主键、名称及所有本体属性。', icon: 'FileText' },
                 { type: 'action_button', title: 'Ontology 操作按钮', desc: '执行由本体工作台发布的业务流 Action，具备参数表单映射及防错规则。', icon: 'Zap' },
                 { type: 'filter_bar', title: '应用属性筛选器', desc: '为页面生成条件单选、多选、下拉等过滤面板，驱动大盘视图同步刷新。', icon: 'SlidersHorizontal' }
-              ].map(item => (
+              ].map((item: any) => (
                 <div
                   key={item.type}
                   onClick={() => handleAddWidget(item.type as any)}
@@ -133,7 +133,7 @@ export function renderWorkshopModals(vm: any) {
 
       {/* 6. MODAL: RUN SIMULATED ACTION TYPE */}
       {showActionModal && (() => {
-        const boundObject = activeApp ? activeApp.variables.find(v => v.type === 'object')?.value : null;
+        const boundObject = activeApp ? activeApp.variables.find((v: any) => v.type === 'object')?.value : null;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">

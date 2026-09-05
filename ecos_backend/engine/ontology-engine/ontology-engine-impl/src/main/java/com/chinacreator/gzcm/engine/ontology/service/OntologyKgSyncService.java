@@ -1,13 +1,10 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
-import org.neo4j.driver.AuthTokens;
-import org.neo4j.driver.Config;
 import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
 import org.neo4j.driver.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -17,7 +14,6 @@ import jakarta.annotation.PreDestroy;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A1 — Ontology → Neo4j Schema 同步引擎。
@@ -33,16 +29,11 @@ public class OntologyKgSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyKgSyncService.class);
 
-    @Value("${neo4j.uri:bolt://localhost:7687}")
-    private String neo4jUri;
-
-    @Value("${neo4j.username:neo4j}")
-    private String neo4jUser;
-
-    @Value("${neo4j.password:neo4j123}")
-    private String neo4jPass;
-
+    // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
+    // standard 档 / neo4j.uri 未配置时, @Autowired(required=false) 留 null, 调用方需判空。
+    @Autowired(required = false)
     private Driver driver;
+
     private final JdbcTemplate jdbc;
 
     public OntologyKgSyncService(JdbcTemplate jdbc) {
@@ -51,14 +42,17 @@ public class OntologyKgSyncService {
 
     @PostConstruct
     void init() {
-        driver = GraphDatabase.driver(neo4jUri, AuthTokens.basic(neo4jUser, neo4jPass),
-                Config.builder().withConnectionTimeout(5, TimeUnit.SECONDS).build());
-        log.info("OntologyKgSyncService Neo4j driver initialized: {}", neo4jUri);
+        if (driver == null) {
+            log.warn("OntologyKgSyncService init: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), Ontology→KG 同步功能禁用");
+            return;
+        }
+        log.info("OntologyKgSyncService init: 使用 runtime-access 统一 Driver");
     }
 
     @PreDestroy
     void close() {
-        if (driver != null) driver.close();
+        // Driver 是 runtime-access 管理的 Bean, 不在此 close (生命周期统一)
+        log.info("OntologyKgSyncService close: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
     }
 
     /**
@@ -69,9 +63,25 @@ public class OntologyKgSyncService {
      *   <li>从 ecos_ontology_relationship 读取关系 → 记录关系数量</li>
      * </ul>
      *
+     * <p>只在 enterprise / flagship profile 下激活（@Profile 守卫），
+     * 若 driver 为 null（neo4j.uri 未配置或 standard 档），返回 syncedEntities=0/syncedRelationships=-1
+     * 并 log.warn 禁用状态，不抛 NPE。</p>
+     *
      * @return {"syncedEntities": N, "syncedRelationships": M}
      */
     public Map<String, Object> syncOntologyToNeo4j() {
+        // M0 改造 (2026-09): 判空 driver — neo4j.uri 未配置 / standard 档时
+        // @Autowired(required=false) 留 null，调用方无需判空。
+        if (driver == null) {
+            log.warn("OntologyKgSyncService.syncOntologyToNeo4j: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), 同步功能禁用 — 返回 syncedEntities=0/syncedRelationships=-1");
+            Map<String, Object> disabled = new LinkedHashMap<>();
+            disabled.put("syncedEntities", 0);
+            disabled.put("syncedRelationships", -1);
+            disabled.put("disabled", true);
+            disabled.put("reason", "Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置)");
+            return disabled;
+        }
+
         int syncedEntities = 0;
         int syncedRelationships = 0;
 

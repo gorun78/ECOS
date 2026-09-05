@@ -21,7 +21,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Play, Save, GitBranch, Trash2, Zap, Cpu, ArrowLeft,
+  Play, Save, GitBranch, Trash2, ArrowLeft,
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
@@ -79,7 +79,6 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
   onExecute,
   showToast,
   computeEngine,
-  onEngineChange,
   editingPipeline,
   onBack,
 }) => {
@@ -350,17 +349,6 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 rounded-lg p-0.5 ${styles.cardBg}`}>
-            <button onClick={() => onEngineChange('memory')}
-              className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${computeEngine === 'memory' ? `${styles.accentBg} ${styles.cardText} shadow` : `${styles.cardTextMuted} hover:${styles.cardText}`}`}>
-              <Zap size={12} /> Memory
-            </button>
-            <button onClick={() => onEngineChange('doris')}
-              className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${computeEngine === 'doris' ? `${styles.accentBg} ${styles.cardText} shadow` : `${styles.cardTextMuted} hover:${styles.cardText}`}`}>
-              <Cpu size={12} /> Doris
-            </button>
-          </div>
-          <div className={`w-px h-5 mx-1 ${styles.appBorder}`} />
           <button onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:${styles.cardText}`} title={t('dw.pipeline.editor.clearCanvas')}>
             <Trash2 size={13} /> {t('dw.pipeline.editor.clear')}
           </button>

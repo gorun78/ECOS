@@ -15,7 +15,7 @@ import java.util.Map;
  * 知识抽取控制器 — 文档上传、状态查询、审核（通过/驳回）。
  *
  * @author ECOS KB Engine Team
- * @since 2026-08-08
+ * @since 2026-08-08, 2026-09-02 (Wave-2C)
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/extract")
@@ -73,13 +73,16 @@ public class ExtractionController {
     }
 
     /**
-     * 审核通过 — 实体写Neo4j + 规则写compliance_rules。
+     * 审核通过 — 实体写Neo4j + 规则写compliance_rules + 实体链接本体。
+     * Wave-2C: 返回结构化 ApprovalOutcome { status, counts, rejectedReasons }
      */
     @PostMapping("/{id}/approve")
     public ApiResponse<Map<String, Object>> approve(@PathVariable String id) {
         try {
             Map<String, Object> result = extractionService.approve(id);
             return ApiResponse.success(result);
+        } catch (IllegalStateException e) {
+            return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("审核通过失败: id={}, {}", id, e.getMessage());
             return ApiResponse.badRequest("审核失败: " + e.getMessage());
@@ -87,13 +90,18 @@ public class ExtractionController {
     }
 
     /**
-     * 审核驳回。
+     * 审核驳回 — Wave-2C: 支持 reason 参数。
+     * 请求体: { reason: "..." }, 可选。
      */
     @PostMapping("/{id}/reject")
-    public ApiResponse<Map<String, Object>> reject(@PathVariable String id) {
+    public ApiResponse<Map<String, Object>> reject(@PathVariable String id,
+                                                    @RequestBody(required = false) Map<String, String> body) {
         try {
-            Map<String, Object> result = extractionService.reject(id);
+            String reason = body != null ? body.getOrDefault("reason", "no reason provided") : "no reason provided";
+            Map<String, Object> result = extractionService.reject(id, reason);
             return ApiResponse.success(result);
+        } catch (IllegalStateException e) {
+            return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("驳回失败: id={}, {}", id, e.getMessage());
             return ApiResponse.badRequest("驳回失败: " + e.getMessage());

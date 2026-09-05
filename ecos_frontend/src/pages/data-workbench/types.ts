@@ -25,7 +25,8 @@ export interface Dataset {
 
 export interface TableInfo {
   name: string;
-  rowCount: number;
+  // B8: 后端 recordCount 可能 -1/ null, 前端用 null 表"未知"，UI 显示"未知"
+  rowCount: number | null;
   columns: { name: string; type: string }[];
 }
 
@@ -51,6 +52,9 @@ export interface DataConnection {
   description?: string;
   category?: string;
   tablesAvailable: TableInfo[];
+  // PMO-37 元数据获取策略（存储于 td_datasource.metadata_config JSONB）
+  strategy?: { trigger?: 'MANUAL' | 'ON_SAVE' | 'ON_SCHEDULE'; countMethod?: 'OFF' | 'ESTIMATE' | 'EXACT'; scheduleCron?: string };
+  metadataConfig?: Record<string, any>;
 }
 
 export interface DataSyncTask {

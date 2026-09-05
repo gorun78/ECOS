@@ -25,6 +25,17 @@ public class CausalChainResult {
     /** 受影响的业务指标列表 */
     private List<String> affectedMetrics;
 
+    // ── 新增字段（Wave-3.2，对齐 04 文档 §四） ──
+    /** 推广到推理路径：可解释的因果链步骤 + RuleRef/PrecedentRef 标记 */
+    private ReasoningPath reasoningPath;
+
+    // ── 新增字段（Wave-6 T-25: NPE null-check） ──
+    /**
+     * 指标在 KG 中是否找到对应节点。false 时上游（DiagnosisController）应返回 404，
+     * 避免 Reasoner/ReasoningPath 阶段触及 pk=null 的 NPE。
+     */
+    private boolean metricFound = true;
+
     // ── 构造器 ──
     public CausalChainResult() {
         this.nodes = new ArrayList<>();
@@ -61,4 +72,10 @@ public class CausalChainResult {
 
     public List<String> getAffectedMetrics() { return affectedMetrics; }
     public void setAffectedMetrics(List<String> affectedMetrics) { this.affectedMetrics = affectedMetrics; }
+
+    public ReasoningPath getReasoningPath() { return reasoningPath; }
+    public void setReasoningPath(ReasoningPath reasoningPath) { this.reasoningPath = reasoningPath; }
+
+    public boolean isMetricFound() { return metricFound; }
+    public void setMetricFound(boolean metricFound) { this.metricFound = metricFound; }
 }

@@ -352,7 +352,7 @@ export default function LogicView({
     setTotalDuration(null);
 
     // Reset all node statuses
-    setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, status: 'idle' as LogicNodeStatus, duration: undefined } })));
+    setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, status: 'idle' as LogicNodeStatus, duration: undefined as number | undefined } })));
 
     const execOrder = topologicalSort(nodes, edges);
     const startTime = performance.now();

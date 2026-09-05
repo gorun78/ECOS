@@ -1,0 +1,56 @@
+# POLAR 反向记录 — FR-4900-B11-T1（PMO 架构修复决策对齐）
+
+> 本文件是 PMO 审批库 `local://ecos/pg/sys_review/pmo-task-arch-fix-decision-alignment.md` 的**反向记录**，
+> 提交环境缺少 `pmo-review` CLI / 对应 MCP 入口（`hermes mcp list` 未检出 pmo/review 相关工具）。
+> 故标记为 **resolved_local_only**，**不标 approved**。等审批库入口接入后必须回填 `approved@S3+S4`。
+
+| 字段 | 值 |
+|---|---|
+| taskId | `local://ecos/pg/sys_review/pmo-task-arch-fix-decision-alignment.md:FR-4900-B11-T1` |
+| status | `resolved_local_only` |
+| 验证状态 | **编译门禁 PASS**（`mvn clean install -DskipTests -Dmaven.test.skip=true -q -pl gateway -am` exit 0） |
+| 审批状态 | 待 pmo-review 接入后回填（当前**未验证** approved@S3+S4） |
+| 时间 | 2026-07-05T10:xx（本地时区，以写入文件时间为准） |
+| 签名 | Aliyun Qwen via Hermes Agent Loop runtime（DE 全栈机制） |
+
+## 修复原子任务（本 PMO 指令已完成）
+
+| Task | 文件 | 操作 | 验收 |
+|---|---|---|---|
+| T1 | `ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/telemetry/UsageCollector.java` | 去掉 `@Scheduled(fixedRate=60_000)`；改用 `runtime-task` 的 `ITaskParser` + `ITaskExecutor` + `TaskSchedulerService.schedulePeriodicTask(taskDesc, 0L, 60_000L)`，在 `@PostConstruct` 注册 | `mvn clean install ... -pl gateway -am` 编译通过 |
+| T2 | `ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/quality/repository/DqRepository.java` | 补齐 `public int updateIssue(Long id, String description, String status, String severity)`（`COALESCE` + `CASE WHEN` 切 resolved/closed 时同步 `resolved_at`） | `mvn clean install` 编译通过 |
+
+## 验证证据
+
+```
+命令: wsl -d Ubuntu -e /usr/bin/env -i HOME=/home/guorongxiao \
+      PATH=/usr/bin:/usr/local/bin:/home/guorongxiao/.local/bin:/home/guorongxiao/.local/apache-maven-3.9.11/bin \
+      JAVA_HOME=/home/guorongxiao/.local/jdk/jdk-17.0.19+10 \
+      bash -c "cd /home/guorongxiao/ECOS/ecos_backend && mvn clean install -DskipTests -Dmaven.test.skip=true -q -pl gateway -am"
+exit: 0
+备注: 静默模式（-q）无 ERROR 输出，全 reactor (gateway + 依赖链) 编译通过
+```
+
+## 双 CLS 责任边界确认（本任务作用）
+
+| CLS | 责任模块 | 本次触及 | 是否需复验 |
+|---|---|---|---|
+| CLS-front-end (WU) | ecological-platform-web | 否 | 否 |
+| CLS-back-end (ZE) | ecological-platform-app | 是（gateway telemetry + data-engine DqRepository） | **是** — 待 S4（back-end 全量单测） |
+
+## 反向原因
+
+1. WSL 侧未安装 `pmo-review` CLI（`which pmo-review pmo_review` 为空）；
+2. `hermes mcp list` 未检出 pmo/review/audit 相关 MCP 工具；
+3. `local://ecos/pg/sys_review/` URI 指向的后端存储在当前环境未接 MCP，无法直接 UPDATE；
+4. 按 V0 法规：不可盲信，未验证前一律 `pending` — 故不标 approved，只标 `resolved_local_only`。
+
+## 待办
+
+- [ ] 等审批库 `pmo-review` 入口接入（CLI 或 MCP）
+- [ ] 接入后回填：`tm aquila_relay pmo_review.update_task(id=FR-4900-B11-T1, status=resolved, source=CLS:dev fe/be S3, verification=build_exit_0, sign=@aliyun-qwen@2026-07-05)`
+- [ ] S4 由 `back-end` Profile 用 CLS-back-end 跑单测后置 approved@S3+S4 并提供 enN NEV PoC
+- [ ] 在 `docs/00-Kanban/ECOS-总看板.md` 行内登记本反向记录
+
+> 免责声明：本文件是**反向记录**，**不等同**于审批通过。
+> 入口接入前，对外通信只能引用本文件，严禁声称"已 approved"。

@@ -49,6 +49,17 @@ public class OntologyDomainApiController {
         return ApiResponse.success(domainService.listDomains());
     }
 
+    /**
+     * GET /api/v1/ontology/domains/search?q=&limit=20
+     * 模糊匹配 name/code/description 的域列表。PMO E8 端点。
+     */
+    @GetMapping("/domains/search")
+    public ApiResponse<List<Map<String, Object>>> searchDomains(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ApiResponse.success(domainService.searchDomains(q, limit));
+    }
+
     @PostMapping("/domains")
     public ApiResponse<Map<String, Object>> createDomain(@RequestBody Map<String, Object> body) {
         try {

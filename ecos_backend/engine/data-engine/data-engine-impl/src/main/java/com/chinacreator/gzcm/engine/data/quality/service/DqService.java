@@ -102,10 +102,21 @@ public class DqService {
     }
 
     public Map<String, Object> createIssue(Map<String, Object> body) {
+        // Wave-7 T-27 (R3): 空 body / null 防御 → 400 (而非 NOT NULL 5xx)
+        if (body == null || body.isEmpty()) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException("请求体不能为空");
+        }
         DqIssueEntity entity = new DqIssueEntity();
         Object ruleIdObj = body.get("ruleId");
-        if (ruleIdObj != null) {
-            entity.setRuleId(String.valueOf(ruleIdObj));
+        // ecos_dq_issue.rule_id NOT NULL 约束 -- 必填字段缺失直接 400, 避免 NOT NULL 5xx
+        if (ruleIdObj == null || String.valueOf(ruleIdObj).isBlank()) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException("ruleId 必填");
+        }
+        entity.setRuleId(String.valueOf(ruleIdObj));
+        // Wave-7 T-27 (R3 真实根因): ecos_dq_issue.id 是 VARCHAR 主键 (无默认),
+        //   服务层必须显式生成 UUID; 否则 Repository 会为 NOT NULL 失败抛 500。
+        if (entity.getId() == null || entity.getId().isBlank()) {
+            entity.setId(java.util.UUID.randomUUID().toString().replace("-", ""));
         }
         // assetId: if "entity" and "entityId" are provided, combine them
         String entityStr = String.valueOf(body.getOrDefault("entity", ""));
@@ -117,9 +128,25 @@ public class DqService {
         entity.setDescription(String.valueOf(body.getOrDefault("description", "")));
         entity.setStatus(String.valueOf(body.getOrDefault("status", "open")));
         entity.setSeverity(String.valueOf(body.getOrDefault("severity", "HIGH")));
-        long id = repository.insertIssue(entity);
-        log.info("DQ issue created: {} [rule={}]", id, ruleIdObj);
-        return getIssue(id).orElseThrow(() -> new RuntimeException("Failed to retrieve created issue " + id));
+        repository.insertIssue(entity);
+        log.info("DQ issue created: {} [rule={}]", entity.getId(), ruleIdObj);
+        // Wave-7 T-27: 直接用已写入的 entity 转 Map, 不再走 getIssue(id) (避免 Long->VARCHAR 类型空匹配)
+        return issueToMap(entity);
+    }
+
+    /**
+     * 更新质量问题 — 支持按 status/description/severity 字段更新
+     */
+    public Optional<Map<String, Object>> updateIssue(Long id, Map<String, Object> body) {
+        Optional<DqIssueEntity> existing = repository.findIssueById(id);
+        if (existing.isEmpty()) return Optional.empty();
+
+        String description = body.containsKey("description") ? String.valueOf(body.get("description")) : null;
+        String status = body.containsKey("status") ? String.valueOf(body.get("status")) : null;
+        String severity = body.containsKey("severity") ? String.valueOf(body.get("severity")) : null;
+
+        repository.updateIssue(id, description, status, severity);
+        return repository.findIssueById(id).map(this::issueToMap);
     }
 
     public Optional<Map<String, Object>> resolveIssue(Long id, String resolution) {

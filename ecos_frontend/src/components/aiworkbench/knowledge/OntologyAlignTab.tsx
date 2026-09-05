@@ -120,7 +120,7 @@ export default function OntologyAlignTab({
                   const newId = prompt('请输入新本体实体标识符 (如 AircraftMaintenance):');
                   if (newId) {
                     const name = prompt('请输入该本体实体的中文显示名称 (如 飞机维保本体):') || newId;
-                    const desc = prompt('请输入本体描述:') || '{t('aiworkbench.knowledge.ontology.newEntityTitle')}';
+                    const desc = prompt('请输入本体描述:') || 'New Entity';
                     const newEntity: any = {
                       entityId: newId,
                       entityName: newId,
@@ -194,7 +194,7 @@ export default function OntologyAlignTab({
                   <div className="flex items-center gap-2">
                     <span className={`font-black ${styles.cardText} text-sm font-mono`}>{editingOntology.entityId}</span>
                     <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md">
-                      {editingOntology.chineseName || '{t('aiworkbench.knowledge.ontology.entityLogicalLabel')}'}
+                      {editingOntology.chineseName || t('aiworkbench.knowledge.ontology.entityLogicalLabel')}
                     </span>
                   </div>
                   <p className={`text-[11px] ${styles.cardTextMuted} font-sans`}>{editingOntology.description}</p>
@@ -203,7 +203,7 @@ export default function OntologyAlignTab({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
-                      if (confirm(`确认要删除 ${editingOntology.entityId} 语义实体及其全部列级映射吗？`,)} {
+                      if (confirm(`确认要删除 ${editingOntology.entityId} 语义实体及其全部列级映射吗？`)) {
                         const remaining = ontologyMappings.filter(e => e.entityId !== editingOntology.entityId);
                         setOntologyMappings(remaining);
                         setEditingOntology(remaining[0] || null);
@@ -229,7 +229,7 @@ export default function OntologyAlignTab({
                         logicalType: 'String',
                         physicalTable: availableTables[0]?.tableName || 'ds_flights_clean',
                         physicalColumn: availableTables[0]?.columns[0]?.name || 'flight_id',
-                        description: '{t('aiworkbench.knowledge.ontology.newMapping')}'
+                        description: t('aiworkbench.knowledge.ontology.newMapping')
                       };
                       const updatedMappings = ontologyMappings.map(e => {
                         if (e.entityId === editingOntology.entityId) {
@@ -241,7 +241,7 @@ export default function OntologyAlignTab({
                         return e;
                       });
                       setOntologyMappings(updatedMappings);
-                      setEditingOntology(updatedMappings.find(e => e.entityId === editingOntology.entityId,)};
+                      setEditingOntology(updatedMappings.find(e => e.entityId === editingOntology.entityId));
                     }}
                     className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
                   >
@@ -294,7 +294,7 @@ export default function OntologyAlignTab({
                                       return ent;
                                     });
                                     setOntologyMappings(updated);
-                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId,)};
+                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId));
                                   }}
                                   className={`w-full px-2 py-1 border ${styles.cardBorder} rounded-md font-mono text-[10px] font-bold ${styles.cardTextMuted} ${styles.cardBg}`}
                                 />
@@ -315,7 +315,7 @@ export default function OntologyAlignTab({
                                       return ent;
                                     });
                                     setOntologyMappings(updated);
-                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId,)};
+                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId));
                                   }}
                                   className={`px-1.5 py-1 border ${styles.cardBorder} rounded-md font-bold text-[10px] ${styles.cardBg} ${styles.cardTextMuted}`}
                                 >
@@ -345,13 +345,13 @@ export default function OntologyAlignTab({
                                       return ent;
                                     });
                                     setOntologyMappings(updated);
-                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId,)};
+                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId));
                                   }}
                                   className={`px-1.5 py-1 border ${styles.cardBorder} rounded-md font-bold text-[10px] ${styles.cardBg} text-blue-800`}
                                 >
                                   {availableTables.map(t => (
                                     <option key={t.tableName} value={t.tableName}>{t.tableName}</option>
-                                  )}
+                                  ))}
                                 </select>
                               </td>
 
@@ -370,13 +370,13 @@ export default function OntologyAlignTab({
                                       return ent;
                                     });
                                     setOntologyMappings(updated);
-                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId,)};
+                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId));
                                   }}
                                   className={`px-1.5 py-1 border ${styles.cardBorder} rounded-md font-mono text-[10px] font-bold ${styles.cardBg} text-emerald-800`}
                                 >
                                   {availableCols.map((c: any) => (
                                     <option key={c.name} value={c.name}>{c.name} ({c.type})</option>
-                                  )}
+                                  ))}
                                 </select>
                               </td>
 
@@ -396,7 +396,7 @@ export default function OntologyAlignTab({
                                       return ent;
                                     });
                                     setOntologyMappings(updated);
-                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId,)};
+                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId));
                                   }}
                                   className={`w-full px-2 py-1 border ${styles.cardBorder} rounded-md text-[10px] ${styles.cardTextMuted} ${styles.cardBg}`}
                                 />
@@ -414,7 +414,7 @@ export default function OntologyAlignTab({
                                       return ent;
                                     });
                                     setOntologyMappings(updated);
-                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId,)};
+                                    setEditingOntology(updated.find(ent => ent.entityId === editingOntology.entityId));
                                   }}
                                   className="p-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer transition-colors"
                                 >
@@ -496,7 +496,7 @@ export default function OntologyAlignTab({
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(exportedMarkdown);
-                  showToast?.('success', '{t('aiworkbench.knowledge.ontology.copySuccess')}');
+                  showToast?.('success', t('aiworkbench.knowledge.ontology.copySuccess'));
                 }}
                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1 transition-all"
               >

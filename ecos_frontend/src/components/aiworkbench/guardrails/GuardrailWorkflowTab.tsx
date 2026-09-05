@@ -7,7 +7,7 @@ import React from 'react';
 import type { ThemeStyles } from '../../ThemeContext';
 import * as Icons from 'lucide-react';
 import type { Proposal, PhysicalFlight, PhysicalPilot } from './types';
-import { useLanguage } from '../../../../components/LanguageContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -20,8 +20,8 @@ interface GuardrailWorkflowTabProps {
   proposals: Proposal[];
   selectedProposalId: string | null;
   setSelectedProposalId: (id: string | null) => void;
-  userRole: t("aiworkbench.guardrails.dispatchDirector") | t("aiworkbench.guardrails.dispatcher");
-  setUserRole: (role: t("aiworkbench.guardrails.dispatchDirector") | t("aiworkbench.guardrails.dispatcher",)} => void;
+  userRole: string;
+  setUserRole: (role: string) => void;
   verificationResult: any | null;
   verificationLoading: boolean;
   executionResult: any | null;
@@ -79,8 +79,8 @@ export default function GuardrailWorkflowTab({
           <span className={`text-[10px] font-bold ${styles.cardTextMuted}`}>{t("aiworkbench.guardrails.switchTestIdentity")}</span>
           <button
             onClick={() => {
-              setUserRole(t("aiworkbench.guardrails.dispatchDirector",)};
-              showToast?.('info', t("aiworkbench.guardrails.toastDirectorSwitched",)};
+              setUserRole("dispatchDirector");
+              showToast?.('info', t("aiworkbench.guardrails.toastDirectorSwitched"));
             }}
             className={`px-2.5 py-1 rounded font-bold text-[10px] cursor-pointer transition-colors ${
               userRole === t("aiworkbench.guardrails.dispatchDirector")
@@ -92,8 +92,8 @@ export default function GuardrailWorkflowTab({
           </button>
           <button
             onClick={() => {
-              setUserRole(t("aiworkbench.guardrails.dispatcher",)};
-              showToast?.('info', t("aiworkbench.guardrails.toastDispatcherSwitched",)};
+              setUserRole("dispatchDispatcher");
+              showToast?.('info', t("aiworkbench.guardrails.toastDispatcherSwitched"));
             }}
             className={`px-2.5 py-1 rounded font-bold text-[10px] cursor-pointer transition-colors ${
               userRole === t("aiworkbench.guardrails.dispatcher")
@@ -166,7 +166,7 @@ export default function GuardrailWorkflowTab({
                         <div key={k}>
                           <span className={`font-bold ${styles.cardTextMuted}`}>{k}:</span> <span>{v}</span>
                         </div>
-                      )}
+                      ))}
                     </div>
                   </button>
                 );
@@ -244,7 +244,7 @@ export default function GuardrailWorkflowTab({
                             </span>
                           </td>
                         </tr>
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -291,7 +291,7 @@ export default function GuardrailWorkflowTab({
                             </td>
                             <td className={`p-2 ${styles.cardTextMuted} font-bold text-right text-[9px]`}>{item.message}</td>
                           </tr>
-                        )}
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -391,7 +391,7 @@ export default function GuardrailWorkflowTab({
                                     </span>
                                   </td>
                                 </tr>
-                              )}
+                              ))}
                             </tbody>
                           </table>
                         </div>
@@ -456,7 +456,7 @@ export default function GuardrailWorkflowTab({
                         </td>
                         <td className={`p-1.5 font-sans font-bold ${styles.cardTextMuted}`}>{f.delay_minutes}</td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -486,7 +486,7 @@ export default function GuardrailWorkflowTab({
                         <td className={`p-1.5 ${styles.cardTextMuted}`}>{p.hours_flown}{t("aiworkbench.guardrails.hours")}</td>
                         <td className={`p-1.5 ${styles.cardTextMuted}`}>￥{p.base_salary.toLocaleString()}</td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

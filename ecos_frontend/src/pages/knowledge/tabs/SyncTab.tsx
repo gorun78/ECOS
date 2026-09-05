@@ -29,8 +29,8 @@ export default function SyncTab() {
     try {
       const meta = await knowledgeApi.fetchIntegrationMetadata();
       if (meta?.simulationState) {
-        setIsSchemaDrift(meta.simulationState.isSchemaDriftActive);
-        setIsSlaBreach(meta.simulationState.isSlaBreachActive);
+        setIsSchemaDrift(Boolean(meta.simulationState.isSchemaDriftActive));
+        setIsSlaBreach(Boolean(meta.simulationState.isSlaBreachActive));
       }
     } catch { /* fallback to defaults */ }
     try {

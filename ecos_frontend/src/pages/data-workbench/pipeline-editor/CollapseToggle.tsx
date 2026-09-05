@@ -7,25 +7,28 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 // ─── Collapse toggle icon ─────────────────────────────────
 
 const CollapseToggle: React.FC<{
   expanded: boolean;
   onToggle: () => void;
-}> = ({ expanded, onToggle }) => (
-  <button
-    onClick={onToggle}
-    className={`flex items-center gap-1 px-2 py-1 text-xs ${styles.cardTextMuted} hover:${styles.cardText} transition-colors`}
-    title={expanded ? '收起侧栏' : '展开侧栏'}
-  >
-    <ChevronDown
-      size={14}
-      className={`transition-transform duration-200 ${expanded ? 'rotate-0' : '-rotate-90'}`}
-    />
-  </button>
-);
+}> = ({ expanded, onToggle }) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex items-center gap-1 px-2 py-1 text-xs ${styles.cardTextMuted} hover:${styles.cardText} transition-colors`}
+      title={expanded ? t('dw.txt.collapse') : t('dw.txt.expand')}
+    >
+      <ChevronDown
+        size={14}
+        className={`transition-transform duration-200 ${expanded ? 'rotate-0' : '-rotate-90'}`}
+      />
+    </button>
+  );
+};
 
 export default CollapseToggle;
-
-// TODO: useTheme insertion needed

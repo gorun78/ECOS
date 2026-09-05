@@ -15,6 +15,7 @@ const Toast: React.FC<{
   message: string;
   onClose: () => void;
 }> = ({ type, message, onClose }) => {
+  const { styles } = useTheme();
   const bgColor =
     type === 'success'
       ? `${styles.successBg}`

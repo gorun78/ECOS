@@ -57,5 +57,65 @@
             <artifactId>archunit-junit5</artifactId>
             <scope>test</scope>
         </dependency>
-</dependencies>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Wave-5.4 T-19: per-module jacoco CLASS 0.40 floor — 强制 cognitive-engine-impl per-class instruction 40%
+                 (5 engine per-module 0.40, root bundle 0.05 兜底; skip=false 默认强 enforce) -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>per-module-check</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <skip>${jacoco.perModuleCheck.skip}</skip>
+                            <rules>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.NewsFeedReader</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.ReasoningPathBuilder</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.RuleRefCollector</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.ReasoningPathFromCausalBuilder</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.EntityLinker</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.CausalReasonerServiceImpl</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.CausalDetector</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.StrategyGeneratorService</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.OagIntakeService</include>
+                                        <include>com.chinacreator.gzcm.engine.cognitive2.service.OagPlannerService</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.40</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -112,7 +112,7 @@ export default function ScenarioSandbox() {
 
   const causalLinksTrans = useMemo(() => {
     return causalLinks.map((cl, i) => ({
-      id: cl.id || `cl_${i}`,
+      id: String(cl.id || `cl_${i}`),
       source: `goal_${cl.sourceGoalId ?? ''}`,
       target: `goal_${cl.targetGoalId ?? ''}`,
       animated: true,

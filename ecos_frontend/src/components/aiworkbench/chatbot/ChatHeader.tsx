@@ -22,7 +22,7 @@ const Icon = ({ name, size, className }: { name: string; size?: number; classNam
 interface ChatThread {
   id: string;
   name: string;
-  messages: { sender: string; content: string; timestamp: string; thinkingTrace?: string[]; metadata?: any }[];
+  messages: { sender: string; content: string; timestamp: string; thinkingTrace?: string[]; metadata?: any; id?: string }[];
   createdAt: string;
 }
 

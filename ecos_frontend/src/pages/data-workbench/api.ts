@@ -57,6 +57,24 @@ function mapDsToConn(e: Record<string, unknown>): DataConnection {
     description: (e.description as string) || '',
     category: (e.tags as string) || '',
     tablesAvailable: [],
+    // PMO-37: 解析 metadataConfig (JSONB string or object)
+    ...(() => {
+      try {
+        const raw = (e.metadataConfig as Record<string, any>) || (e.metadataConfig as string);
+        let mc: Record<string, any> = {};
+        if (typeof raw === 'string' && raw.length > 1) { try { mc = JSON.parse(raw); } catch { mc = {}; } }
+        else if (raw && typeof raw === 'object') mc = raw;
+        let strategy;
+        if (mc && (mc.trigger || mc.countMethod)) {
+          strategy = {
+            trigger: (mc.trigger as string) || 'MANUAL',
+            countMethod: (mc.countMethod as string) || (mc.count_method as string) || 'OFF',
+            scheduleCron: mc.scheduleCron as string,
+          };
+        }
+        return { metadataConfig: mc as Record<string, any>, ...(strategy ? { strategy } : {}) };
+      } catch { return {}; }
+    })(),
   };
 }
 
@@ -445,11 +463,22 @@ function buildConnectionConfig(c: {
   return JSON.stringify(cfg);
 }
 
+/** PMO-37: 策略 → metadataConfig JSON string (td_datasource.metadata_config JSONB) */
+function toMetadataConfigJson(strategy: { trigger?: string; countMethod?: string; scheduleCron?: string }): string {
+  const cfg: Record<string, unknown> = {
+    trigger: strategy.trigger || 'MANUAL',
+    countMethod: strategy.countMethod || 'OFF',
+  };
+  if (strategy.scheduleCron) cfg.scheduleCron = strategy.scheduleCron;
+  return JSON.stringify(cfg);
+}
+
 /** 创建数据源 → DataSourceController POST /datanet/datasource */
 export async function createDataSource(payload: {
   name: string; type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
   description?: string; tags?: string; password?: string;
+  strategy?: { trigger?: string; countMethod?: string; scheduleCron?: string };
 }): Promise<DataConnection | null> {
   try {
     const dto = {
@@ -458,6 +487,7 @@ export async function createDataSource(payload: {
       connectionConfig: buildConnectionConfig(payload),
       description: payload.description || '',
       tags: payload.tags || '',
+      ...(payload.strategy ? { metadataConfig: toMetadataConfigJson(payload.strategy) } : {}),
     };
     const entity = await post<Record<string, unknown>>(DATANET_DS, dto);
     return mapDsToConn(entity);
@@ -482,6 +512,7 @@ export async function updateDataSource(id: string, payload: {
   name: string; type: string; host: string; port: number; username: string;
   database?: string; schema?: string; bucket?: string; endpointUrl?: string; role?: string;
   description?: string; tags?: string; password?: string;
+  strategy?: { trigger?: string; countMethod?: string; scheduleCron?: string };
 }): Promise<DataConnection | null> {
   try {
     const dto = {
@@ -490,6 +521,7 @@ export async function updateDataSource(id: string, payload: {
       connectionConfig: buildConnectionConfig(payload),
       description: payload.description || '',
       tags: payload.tags || '',
+      ...(payload.strategy ? { metadataConfig: toMetadataConfigJson(payload.strategy) } : {}),
     };
     const entity = await put<Record<string, unknown>>(`${DATANET_DS}/${id}`, dto);
     return mapDsToConn(entity);
@@ -506,6 +538,82 @@ export async function deleteDataSource(id: string): Promise<boolean> {
     return true;
   } catch (e) {
     console.warn('[data-workbench] deleteDataSource failed:', e);
+    return false;
+  }
+}
+
+/** 立即触发元数据采集 → POST /api/v1/datanet/metadata/collect-async/{id} (PMO-37) */
+export async function triggerMetadataCollect(datasourceId: string): Promise<{ taskId?: string; message?: string } | null> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    return (json.data ?? json) as { taskId?: string; message?: string } | null;
+  } catch (e) {
+    console.warn('[data-workbench] triggerMetadataCollect failed:', e);
+    return null;
+  }
+}
+
+/** 查询元数据采集任务状态 → GET /api/v1/datanet/metadata/collect-status/{taskId}
+ *  后端 result 字段是 JSON 字符串（如 {"tablesTotal":0,"tablesOk":0}），
+ *  这里解析后展平到返回类型里，方便 UI 显示采集结果。
+ */
+export async function fetchCollectStatus(taskId: string): Promise<{
+  status?: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | string;
+  progress?: number;
+  message?: string;
+  collectedTables?: number;
+  totalTables?: number;
+  tablesOk?: number;
+  tablesFailed?: number;
+  errorMessage?: string;
+  elapsedMs?: number;
+} | null> {
+  try {
+    const raw = await get<Record<string, unknown>>(`/api/v1/datanet/metadata/collect-status/${encodeURIComponent(taskId)}`);
+    if (!raw) return null;
+    // 后端 result 是 JSON 字符串，解析后展平
+    let result: Record<string, unknown> = {};
+    const rawResult = raw.result;
+    if (typeof rawResult === 'string') {
+      try { result = JSON.parse(rawResult); } catch { result = {}; }
+    } else if (rawResult && typeof rawResult === 'object') {
+      result = rawResult as Record<string, unknown>;
+    }
+    return {
+      status: raw.status as string,
+      progress: (raw.progress as number) ?? 0,
+      message: raw.message as string | undefined,
+      errorMessage: raw.errorMessage as string | undefined,
+      totalTables: (result.tablesTotal as number) ?? 0,
+      collectedTables: (result.tablesOk as number) ?? 0,
+      tablesOk: (result.tablesOk as number) ?? 0,
+      tablesFailed: (result.tablesFailed as number) ?? 0,
+      elapsedMs: (result.elapsedMs as number) ?? 0,
+    };
+  } catch (e) {
+    console.warn('[data-workbench] fetchCollectStatus failed:', e);
+    return null;
+  }
+}
+
+/** 保存元数据策略配置 → PUT /api/v1/datanet/metadata/strategy/{id} (P0-3) */
+export async function saveMetadataStrategy(datasourceId: string, strategy: string, countMethod: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ trigger: strategy, countMethod }),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    return !!json?.success;
+  } catch (e) {
+    console.warn('[data-workbench] saveMetadataStrategy failed:', e);
     return false;
   }
 }
@@ -529,14 +637,25 @@ export async function testDataSourceRaw(payload: {
   }
 }
 
-/** 获取数据源的物理表/目录列表 → GET /datanet/metadata/resources/{datasourceId} */
+/** 获取数据源的物理表/目录列表 → GET /api/v1/datanet/metadata/resources/{datasourceId}
+ *  禁缓存：Vite BFF 给 API 响应加 ETag，采集后重拉会拿到 304 空数组缓存，
+ *  加 cache: 'no-store' + _=timestamp 强制后端重新查询。
+ */
 export async function fetchDataSourceResources(datasourceId: string): Promise<TableInfo[]> {
   try {
-    const raw = await get<unknown[]>(`/datanet/metadata/resources/${datasourceId}`);
+    // 禁缓存：加 _=Date.now() + cache:'no-store' 双保险
+    const url = `/api/v1/datanet/metadata/resources/${encodeURIComponent(datasourceId)}?_=${Date.now()}`;
+    const res = await fetch(url, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    const raw: unknown[] = (json?.data ?? json);
     if (!Array.isArray(raw)) return [];
     return raw.map((r: Record<string, unknown>) => ({
       name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',
-      rowCount: (r.recordCount as number) || (r.rowCount as number) || (r.rows as number) || 0,
+      rowCount: normalizeRowCount(r.recordCount, r.rowCount, r.rows),
       columns: Array.isArray(r.columns)
         ? (r.columns as Record<string, unknown>[]).map(c => ({
             name: (c.name as string) || (c.columnName as string) || '',
@@ -548,6 +667,16 @@ export async function fetchDataSourceResources(datasourceId: string): Promise<Ta
     console.warn('[data-workbench] fetchDataSourceResources failed:', e);
     return [];
   }
+}
+
+// B8: 后端 recordCount 可能为 -1 (countMethod=OFF) / null / 0 / 正数。
+// 归一: -1/null/NaN → null(UI 显示"未知"), 其它数值保留。
+function normalizeRowCount(rc?: unknown, rowCount?: unknown, rows?: unknown): number | null {
+  const v = rc != null ? rc : rowCount != null ? rowCount : rows;
+  if (v == null || (typeof v === 'number' && Number.isNaN(v))) return null;
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
 }
 
 /** 创建同步任务 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks (taskType=SYNC) */

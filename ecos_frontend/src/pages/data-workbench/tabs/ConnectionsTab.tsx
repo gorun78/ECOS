@@ -5,8 +5,19 @@ import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
-import { deleteDataSource, updateDataSource, fetchDataSourceResources } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy } from '../api';
 import { apiFetchData } from '../../../api';
+
+const STRATEGY_OPTIONS: { value: string; key: string }[] = [
+  { value: 'MANUAL', key: 'dw.strategy.manual' },
+  { value: 'ON_SAVE', key: 'dw.strategy.onSave' },
+  { value: 'ON_SCHEDULE', key: 'dw.strategy.onSchedule' },
+];
+const COUNT_METHOD_OPTIONS: { value: string; key: string }[] = [
+  { value: 'OFF', key: 'dw.strategy.countOff' },
+  { value: 'ESTIMATE', key: 'dw.strategy.countEstimate' },
+  { value: 'EXACT', key: 'dw.strategy.countExact' },
+];
 
 
 interface ConnectionsTabProps {
@@ -43,6 +54,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [loadingTables, setLoadingTables] = useState(false);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(20); // 默认20，从引擎配置获取
+  // PMO-37 元数据获取策略
+  const [collecting, setCollecting] = useState(false);
+  const [lastCollectInfo, setLastCollectInfo] = useState<{ time?: string; countMethod?: string } | null>(null);
 
   // 从引擎配置获取每页行数
   useEffect(() => {
@@ -245,6 +259,67 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                   <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.165c7b")}</span>
                    <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || t("dw.neverTested")}</span>
                 </div>
+
+                {/* PMO-37 元数据获取策略 */}
+                <hr className={`${styles.cardBorder}`} />
+                <div>
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono mb-2`}>{t("dw.strategy.section")}</span>
+                  <div className="space-y-2">
+                    <div>
+                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.trigger")}</label>
+                      <select
+                        value={conn.strategy?.trigger || 'MANUAL'}
+                        onChange={async e => {
+                          const newTrigger = e.target.value;
+                          const newCount = conn.strategy?.countMethod || 'OFF';
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: newTrigger as any } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
+                        }}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+                      >
+                        {STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.count")}</label>
+                      <select
+                        value={conn.strategy?.countMethod || 'OFF'}
+                        onChange={async e => {
+                          const newCount = e.target.value;
+                          const newTrigger = conn.strategy?.trigger || 'MANUAL';
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, countMethod: newCount as any } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
+                        }}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+                      >
+                        {COUNT_METHOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
+                      </select>
+                    </div>
+                    <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("dw.strategy.hint")}</p>
+                    <div className="flex gap-2">
+                      <button
+                        disabled={collecting}
+                        onClick={async () => {
+                          setCollecting(true);
+                          const r = await triggerMetadataCollect(conn.id);
+                          setCollecting(false);
+                          if (r?.taskId) showToast('success', t('dw.strategy.collectStarted').replace('{id}', String(r.taskId)));
+                          else showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
+                        }}
+                        className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
+                      >
+                        <LucideIcon name="RefreshCw" size={11} className={collecting ? 'animate-spin' : ''} />
+                        {collecting ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
+                      </button>
+                    </div>
+                    <div className={`text-[10px] ${styles.cardTextMuted}`}>
+                      {t("dw.strategy.lastCollect")}:{' '}
+                      {conn.metadataConfig?.lastCollectTime
+                        ? new Date(String(conn.metadataConfig.lastCollectTime)).toLocaleString()
+                        : t('dw.strategy.neverCollected')}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -255,8 +330,48 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <div className="flex items-center gap-3">
                   <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
                   <button
-                    onClick={() => {
-                      setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: [] } : c));
+                    onClick={async () => {
+                      setLoadingTables(true);
+                      const r = await triggerMetadataCollect(conn.id);
+                      if (r?.taskId) {
+                        let done = false;
+                        for (let i = 0; i < 60 && !done; i++) {
+                          await new Promise(res => setTimeout(res, 1000));
+                          const st = await fetchCollectStatus(r.taskId);
+                          if (st?.status === 'SUCCEEDED' || st?.status === 'FAILED' || st?.status === 'error') {
+                            done = true;
+                            if (st.status === 'SUCCEEDED') {
+                              const fresh = await fetchDataSourceResources(conn.id);
+                              setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                              // 根据采集结果给用户准确反馈
+                              if (st.totalTables === 0 && fresh.length === 0) {
+                                showToast('warning', `${t('dw.conn.refreshTables')} → ${t('dw.conn.noTablesFound') || '采集完成但未发现可用数据表，请检查数据源连接配置'}`);
+                              } else {
+                                showToast('success', `${t('dw.conn.refreshTables')} → ${fresh.length} ${t('dw.tablesUnit') || '张表'}`);
+                              }
+                            } else if (st.status === 'FAILED') {
+                              showToast('error', `${t('dw.conn.refreshTables')} → ${st.errorMessage || t('dw.conn.collectFailed') || '采集任务执行失败'}`);
+                              // 任务失败也尝试重拉目录（可能之前已有数据）
+                              const fresh = await fetchDataSourceResources(conn.id);
+                              setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                            }
+                            break;
+                          }
+                        }
+                        // 轮询超时
+                        if (!done) {
+                          const fresh = await fetchDataSourceResources(conn.id);
+                          setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                          showToast('info', t('dw.conn.collectTimeout') || '采集任务超时，已拉取当前可用目录');
+                        }
+                      } else {
+                        const fresh = await fetchDataSourceResources(conn.id);
+                        setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                        if (!r) {
+                          showToast('error', t('dw.conn.collectSubmitFailed') || '采集任务提交失败');
+                        }
+                      }
+                      setLoadingTables(false);
                     }}
                     disabled={loadingTables}
                     className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}

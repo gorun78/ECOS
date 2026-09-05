@@ -79,19 +79,19 @@ const CopilotPanelMessages: React.FC<Props> = ({
               <div className="text-xs prose prose-sm max-w-none dark:prose-invert">
                 <ReactMarkdown
                   components={{
-                    code({ children, className: codeClass, ...rest }) {
+                    code({ children, className: codeClass }: { children?: unknown; className?: string; [key: string]: unknown }) {
                       const match = /language-(\w+)/.exec(codeClass || '');
                       const codeStr = String(children).replace(/\n$/, '');
                       if (match) {
                         return renderCodeBlock(codeStr, match[1]);
                       }
                       return (
-                        <code className={`${styles.sidebarBg} ${styles.cardText} px-1 py-0.5 rounded text-[10px] font-mono`} {...rest}>
-                          {children}
+                        <code className={`${styles.sidebarBg} ${styles.cardText} px-1 py-0.5 rounded text-[10px] font-mono`}>
+                          {String(children)}
                         </code>
                       );
                     },
-                    pre({ children }) {
+                    pre({ children }: { children?: unknown }) {
                       return <>{children}</>;
                     },
                   }}

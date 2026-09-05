@@ -68,15 +68,8 @@
         </dependency>
     </dependencies>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>com.chinacreator.gzcm.services.agent.AgentServiceApplication</mainClass>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+    <!-- M0 改造 (2026-09): 移除独立 Spring Boot 启动器 (spring-boot-maven-plugin)。
+         单体 fat-JAR 铁律: 所有业务模块统一由 gateway 集成启动,
+         本模块仍为 library (packaging=jar) 被 gateway 依赖。
+         mainClass 声明保留以兼容 standalone 调试使用。 -->
 </project>

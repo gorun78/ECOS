@@ -5,9 +5,11 @@ import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.UnauthorizedException;
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -51,6 +53,16 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Bad request: {}", ex.getMessage());
+        return ApiResponse.badRequest(ex.getMessage());
+    }
+
+    /**
+     * Wave-6 T-25: 参数校验异常 → 400 Bad Request
+     */
+    @ExceptionHandler(ValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleValidationException(ValidationException ex) {
+        log.warn("Validation error: {}", ex.getMessage());
         return ApiResponse.badRequest(ex.getMessage());
     }
 
@@ -147,6 +159,17 @@ public class GlobalExceptionHandler {
     }
 
     // ── 409 Conflict ─────────────────────────────────
+
+    /**
+     * Wave-6 T-25: 唯一键冲突（DuplicateKeyException 父类是 DataIntegrityViolationException）→ 409 Conflict
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiResponse<Void> handleDuplicateKey(DuplicateKeyException ex) {
+        log.warn("Duplicate key: {}", ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage() : ex.getMessage());
+        return ApiResponse.error(409, "数据已存在，请勿重复创建");
+    }
 
     /**
      * 数据完整性冲突（唯一约束、外键等）→ 409 Conflict

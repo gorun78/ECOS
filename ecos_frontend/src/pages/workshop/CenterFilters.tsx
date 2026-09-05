@@ -3,11 +3,11 @@ import { Plus } from 'lucide-react';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterFilters(vm: any) {
-  const { styles: _s, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
   return (
     <>
                   <div className="lg:col-span-3 space-y-4">
-                    {activePage?.widgets.filter(w => w.slot === 'sidebar').map(w => {
+                    {activePage?.widgets.filter((w: any) => w.slot === 'sidebar').map((w: any) => {
                       const isSelected = w.id === selectedWidgetId;
                       const activeStatus = getVarValue('v_filter_status') || 'ALL';
                       const activeAirport = getVarValue('v_filter_airport') || 'ALL';
@@ -33,7 +33,7 @@ export function renderCenterFilters(vm: any) {
                             <div className="space-y-1">
                               <label className={`${styles.cardTextMuted} text-[10px] uppercase font-bold tracking-wider`}>航班状态：</label>
                               <div className="space-y-1.5">
-                                {['ALL', 'ON_TIME', 'DELAYED', 'BOARDING', 'CANCELLED'].map(st => (
+                                {['ALL', 'ON_TIME', 'DELAYED', 'BOARDING', 'CANCELLED'].map((st: any) => (
                                   <label key={st} className={`flex items-center gap-2 cursor-pointer ${styles.cardText}`}>
                                     <input
                                       type="radio"
