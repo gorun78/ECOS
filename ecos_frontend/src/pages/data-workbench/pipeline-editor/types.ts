@@ -92,7 +92,7 @@ export interface PipelineFlowEditorProps {
   onExecute: (pipelineId: string) => void;
   showToast?: (type: 'success' | 'error' | 'info', msg: string) => void;
   computeEngine: 'memory' | 'doris';
-  onEngineChange: (engine: 'memory' | 'doris') => void;
+  onEngineChange?: (engine: 'memory' | 'doris') => void;
   editingPipeline?: import('../types').DataPipeline | null;
   onBack?: () => void;
 }
