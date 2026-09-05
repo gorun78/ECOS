@@ -21,16 +21,16 @@ beforeEach(() => {
   if (typeof window !== 'undefined' && !window.matchMedia) {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
-      value: (query: string) => ({
+      value: ((query: string) => ({
         matches: false,
         media: query,
-        onchange: null,
+        onchange: null as null | ((e: MediaQueryListEvent) => void),
         addListener: () => {},
         removeListener: () => {},
         addEventListener: () => {},
         removeEventListener: () => {},
         dispatchEvent: () => false,
-      }),
+      })) as unknown as typeof window.matchMedia,
     });
   }
 });

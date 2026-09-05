@@ -143,35 +143,13 @@
             <artifactId>archunit-junit5</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Dc-Cheng (数据资源中心) — 术语/本体/知识图谱 -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- Dc-Cheng / Portal / Market / WorldModel: 原独立 impl 已吸收，
+             阶段 5 吸收到 workspace / buszhi 模块 — sysman-impl 不再直接依赖。
+             (Wave-10 CI root-cause: 之前 reactor 缺 4 个 impl → clean clone 时 sysman-impl 依赖 resolve FAIL) -->
         <!-- Bus-Zhi (数据处理) — DQ/Workflow/StateMachine -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>buszhi-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <!-- AIMod (智能模块) — Agent Mesh/Studio/LLM -->
-        <!-- Portal (门户) — FrontendBridge/Menu -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>portal-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <!-- Market (市场) — Marketplace -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>market-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <!-- WorldModel (世界模型) -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>worldmodel-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <!-- Workspace (工作区) -->
