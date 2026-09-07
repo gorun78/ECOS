@@ -46,8 +46,13 @@ export default function SqlQueryConsole() {
           timeout_seconds: 30
         })
       });
+      // 后端返回 columns 为对象数组 [{name, label, type}]，rows 以 columnLabel 为键
+      const rawCols: unknown[] = res?.columns || [];
+      const colLabels: string[] = rawCols.map((c: any) =>
+        typeof c === 'string' ? c : (c.label || c.name || '')
+      );
       setResult({
-        columns: res?.columns || [],
+        columns: colLabels,
         rows: res?.rows || [],
         rowCount: res?.rowCount || 0,
         elapsedMs: res?.elapsedMs || 0

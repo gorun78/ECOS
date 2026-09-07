@@ -79,7 +79,7 @@ export interface QueryExecuteRequest {
 }
 
 export interface QueryExecuteResponse {
-  columns: string[];
+  columns: (string | { name: string; label: string; type: string })[];
   rows: Record<string, unknown>[];
   rowCount: number;
   elapsedMs: number;

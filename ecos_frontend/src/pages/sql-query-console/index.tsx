@@ -104,17 +104,27 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         pageSize: pagination.pageSize,
       });
 
-      setColumns(((result.columns || []) as unknown) as ColumnMeta[]);
+      // 后端返回 columns 为对象数组 [{name, label, type}]，rows 以 columnLabel 为键
+      // 提取 label 作为列名，用于渲染和行数据取值
+      const rawCols: unknown[] = result.columns || [];
+      const colLabels: string[] = rawCols.map((c: any) =>
+        typeof c === 'string' ? c : (c.label || c.name || '')
+      );
+      setColumns(colLabels as unknown as ColumnMeta[]);
       setRows(result.rows || []);
+      // 后端返回 rowCount 而非 total
+      const rowCount = result.rowCount ?? result.total ?? 0;
       setPagination({
         page: result.page || 1,
         pageSize: result.pageSize || 50,
-        total: result.total || 0,
+        total: rowCount,
       });
-      setExecutionTimeMs(result.executionTimeMs || 0);
+      // 后端返回 elapsedMs 而非 executionTimeMs
+      const elapsedMs = result.elapsedMs ?? result.executionTimeMs ?? 0;
+      setExecutionTimeMs(elapsedMs);
 
       if (showToast) {
-        showToast('success', `查询完成，返回 ${result.total || 0} 行 (${result.executionTimeMs}ms)`);
+        showToast('success', `查询完成，返回 ${rowCount} 行 (${elapsedMs}ms)`);
       }
     } catch (e: any) {
       const msg = e?.message || '查询执行失败';
@@ -324,7 +334,12 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <ResultTable
-                result={{ columns, rows, pagination, executionTimeMs, total: pagination.total } as unknown as QueryExecuteResponse}
+                result={{
+                  columns: columns as unknown as string[],
+                  rows,
+                  rowCount: pagination.total,
+                  elapsedMs: executionTimeMs,
+                }}
                 loading={isExecuting}
                 error={errorMessage || null}
               />

@@ -5,8 +5,8 @@ import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
-import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy } from '../api';
-import { apiFetchData } from '../../../api';
+import TableDetailDrawer from '../TableDetailDrawer';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff } from '../api';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
   { value: 'MANUAL', key: 'dw.strategy.manual' },
@@ -53,22 +53,52 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loadingTables, setLoadingTables] = useState(false);
   const [tablePage, setTablePage] = useState(1);
-  const [tablePageSize, setTablePageSize] = useState(20); // 默认20，从引擎配置获取
+  const [tablePageSize] = useState(10); // 数据表目录默认每页显示 10 条
   // PMO-37 元数据获取策略
   const [collecting, setCollecting] = useState(false);
   const [lastCollectInfo, setLastCollectInfo] = useState<{ time?: string; countMethod?: string } | null>(null);
+  // 活跃采集任务状态（对接异步任务中心）
+  const [activeTasks, setActiveTasks] = useState<{ taskId: string; status: string; progress: number; startTime?: string }[]>([]);
+  // 采集差异记录（采集完成后展示最近 N 次 diff 摘要）
+  const [diffRecords, setDiffRecords] = useState<{ collectedAt: string; taskId?: string; diffSummary?: string; diffMarkdown?: string; gitCommit?: string; tablesTotal?: number }[]>([]);
+  const [showDiffDetail, setShowDiffDetail] = useState<number | null>(null);
+  const [loadingDiff, setLoadingDiff] = useState(false);
+  // T3-2: 表详情抽屉状态
+  const [drawerTable, setDrawerTable] = useState<import('../types').TableInfo | null>(null);
 
-  // 从引擎配置获取每页行数
+  // 轮询活跃采集任务（5s 间隔，选中数据源变化时重置）
   useEffect(() => {
-    apiFetchData<any>('/api/v1/engine/data/settings')
-      .then((cfg: any) => {
-        const exec = cfg?.execution || cfg?.data?.execution || {};
-        const pageSize = parseInt(exec['catalog.page_size'] || exec['memory.max_rows'] || '20', 10);
-        // memory.max_rows 是查询上限，分页用合理值
-        setTablePageSize(Math.min(pageSize > 0 ? pageSize : 20, 100));
-      })
-      .catch(() => {});
-  }, []);
+    if (!selectedConnId) { setActiveTasks([]); return; }
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      const tasks = await fetchActiveCollectTasks(selectedConnId);
+      if (!cancelled) setActiveTasks(tasks);
+    };
+    poll();
+    const timer = setInterval(poll, 5000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [selectedConnId]);
+
+  // 加载最近 5 次采集差异记录
+  useEffect(() => {
+    if (!selectedConnId) { setDiffRecords([]); return; }
+    let cancelled = false;
+    loadDiff();
+    async function loadDiff() {
+      if (cancelled) return;
+      setLoadingDiff(true);
+      try {
+        const diffs = await fetchCollectDiff(selectedConnId, 5);
+        if (!cancelled) setDiffRecords(diffs || []);
+      } catch (e) {
+        console.warn('[ConnTab] loadDiff failed:', e);
+      } finally {
+        if (!cancelled) setLoadingDiff(false);
+      }
+    }
+    return () => { cancelled = true; };
+  }, [selectedConnId]);
 
   // 选中连接时获取数据表目录
   useEffect(() => {
@@ -280,6 +310,30 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                         {STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
                       </select>
                     </div>
+                    {/* 定时采集策略 — 选择 ON_SCHEDULE 时显示 cron 配置 */}
+                    {conn.strategy?.trigger === 'ON_SCHEDULE' && (
+                    <div className="space-y-1.5 p-2 rounded-lg border border-dashed border-slate-500/40">
+                      <label className={`text-[10px] ${styles.cardTextMuted} block`}>{t("dw.strategy.cronLabel")}</label>
+                      <select
+                        value={conn.strategy?.scheduleCron || '0 0 * * *'}
+                        onChange={async e => {
+                          const newCron = e.target.value;
+                          const newTrigger = conn.strategy?.trigger || 'ON_SCHEDULE';
+                          const newCount = conn.strategy?.countMethod || 'OFF';
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, scheduleCron: newCron } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
+                          showToast('success', t('dw.strategy.updateSuccess') || '策略已保存');
+                        }}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText} font-mono`}
+                      >
+                        <option value="0 0 * * *">{t('dw.strategy.cron.daily')}</option>
+                        <option value="0 */6 * * *">{t('dw.strategy.cron.sixHourly')}</option>
+                        <option value="0 0 */2 * *">{t('dw.strategy.cron.twoDays')}</option>
+                        <option value="0 0 * * 1">{t('dw.strategy.cron.weekly')}</option>
+                      </select>
+                      <p className={`text-[10px] ${styles.cardTextMuted} font-mono`}>cron: {t('dw.strategy.cron.format')}</p>
+                    </div>
+                    )}
                     <div>
                       <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.count")}</label>
                       <select
@@ -318,6 +372,35 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                         ? new Date(String(conn.metadataConfig.lastCollectTime)).toLocaleString()
                         : t('dw.strategy.neverCollected')}
                     </div>
+                    {/* 活跃采集任务状态指示器 — 对接异步任务中心 */}
+                    {activeTasks.length > 0 && (
+                      <div className={`space-y-1.5 p-2 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>
+                        <div className={`flex items-center gap-2 text-[11px]`}>
+                          <LucideIcon name="Loader2" size={13} className={`animate-spin ${styles.accentText}`} />
+                          <span className={`font-semibold ${styles.cardText}`}>
+                            {t('dw.strategy.taskRunning') || '任务执行中'}
+                          </span>
+                        </div>
+                        {activeTasks.map((task, i) => (
+                          <div key={task.taskId} className={`text-[10px] font-mono ${styles.cardTextMuted} flex items-center gap-2`}>
+                            <span className={`${task.status === 'RUNNING' ? styles.successText : styles.warningText} font-bold`}>
+                              {task.status}
+                            </span>
+                            <span>{task.taskId.slice(0, 8)}...{task.progress}%</span>
+                            {task.startTime && (
+                              <span className="opacity-70">{new Date(task.startTime).toLocaleTimeString()}</span>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => window.open('#/task-center', '_blank')}
+                          className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer flex items-center gap-1`}
+                        >
+                          <LucideIcon name="ExternalLink" size={10} />
+                          {t('dw.strategy.viewInTaskCenter') || '在任务中心查看'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -343,6 +426,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                             if (st.status === 'SUCCEEDED') {
                               const fresh = await fetchDataSourceResources(conn.id);
                               setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+                              // 采集成功后刷新差异记录列表
+                              fetchCollectDiff(conn.id, 5).then(diffs => setDiffRecords(diffs || [])).catch(() => {});
                               // 根据采集结果给用户准确反馈
                               if (st.totalTables === 0 && fresh.length === 0) {
                                 showToast('warning', `${t('dw.conn.refreshTables')} → ${t('dw.conn.noTablesFound') || '采集完成但未发现可用数据表，请检查数据源连接配置'}`);
@@ -383,6 +468,53 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 </div>
               </h4>
 
+              {/* 采集差异记录 — Task2 版本差异可视化 */}
+              {diffRecords.length > 0 && (
+                <div className={`mb-4 border ${styles.cardBorder} rounded-lg overflow-hidden ${styles.appBg}`}>
+                  <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.sidebarBg}/60 flex items-center justify-between`}>
+                    <span className={`text-[10px] font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+                      <LucideIcon name="GitCommit" size={12} className={styles.accentText} />
+                      {t('dw.strategy.diffTitle') || '采集差异记录'}
+                    </span>
+                    {loadingDiff && <LucideIcon name="Loader2" size={11} className="animate-spin" />}
+                  </div>
+                  <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
+                    {diffRecords.map((rec, idx) => (
+                      <div key={idx} className={`group`}>
+                        {showDiffDetail === idx ? (
+                          <button
+                            onClick={() => setShowDiffDetail(null)}
+                            className="w-full text-left px-3 py-2 text-[10px] font-mono whitespace-pre-wrap break-words cursor-pointer hover:bg-opacity-50 transition-colors"
+                            style={{ background: styles.cardBg }}
+                          >
+                            {rec.diffMarkdown || '(空)'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setShowDiffDetail(idx)}
+                            className="w-full text-left px-3 py-2 transition-colors hover:bg-opacity-50 cursor-pointer"
+                            style={{ background: styles.cardBg }}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+                                {rec.collectedAt && new Date(rec.collectedAt).toLocaleString()}
+                              </span>
+                              <span className={`text-[10px] font-mono ${styles.cardText}`}>{rec.diffSummary || ''}</span>
+                            </div>
+                            {rec.gitCommit && (
+                              <div className={`text-[9px] font-mono ${styles.cardTextMuted} mt-1 flex items-center gap-1`}>
+                                <LucideIcon name="GitBranch" size={9} />
+                                {rec.gitCommit}
+                              </div>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {loadingTables ? (
                  <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
                    <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
@@ -398,11 +530,18 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <>
                 <div className="space-y-4">
                   {conn.tablesAvailable.slice((tablePage - 1) * tablePageSize, tablePage * tablePageSize).map(tbl => (
-                    <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50`}>
+                    <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50 cursor-pointer transition-colors hover:ring-1`} 
+                         onClick={() => setDrawerTable(tbl)}
+                         title={t('dw.btn.view') || '点击查看字段明细'}>
                       <div className={`${styles.sidebarBg}/70 px-4 py-2 flex justify-between items-center border-b ${styles.cardBorder}`}>
                         <div className="flex items-center gap-2 text-xs">
                            <LucideIcon name="Table" size={13} className={`${styles.accentText}`} />
                           <span className={`font-bold font-mono ${styles.cardText}`}>{tbl.name}</span>
+                          {tbl.resourceId && (
+                            <span className="text-[9px] font-mono" style={{ color: styles.cardTextMuted }} title={tbl.resourceId}>
+                              {tbl.resourceId.slice(0,12)}…
+                            </span>
+                          )}
                         </div>
                         <span className={`text-[10px] ${styles.cardTextMuted} ${styles.cardBg} border ${styles.cardBorder} px-2 py-0.5 rounded-full font-mono`}>
                            {t("dw.physicalRows")} {tbl.rowCount != null && tbl.rowCount > 0 ? tbl.rowCount.toLocaleString() : t("dw.conn.rowsUnknown")} {tbl.rowCount != null && tbl.rowCount > 0 ? t("dw.rowsUnit") : ''}
@@ -484,6 +623,14 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       onCancel={() => setEditingConn(null)}
     />
   )}
+
+  {/* T3-2: 表详情抽屉 — 点击数据表卡片打开, 异步加载字段明细 */}
+  <TableDetailDrawer
+    table={drawerTable}
+    connId={drawerTable ? selectedConnId || "" : ""}
+    onClose={() => setDrawerTable(null)}
+  />
+
 </div>
   );
 };
@@ -572,7 +719,13 @@ function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       const d = data.data || data;
-      setResult({ columns: d.columns || [], rows: d.rows || [], rowCount: d.rowCount || 0, elapsedMs: d.elapsedMs || 0 });
+      // 后端返回 columns 为对象数组 [{name, label, type}]，rows 以 columnLabel 为键
+      // 提取 label 作为列名，用于渲染和行数据取值
+      const rawCols = d.columns || [];
+      const colLabels: string[] = rawCols.map((c: any) =>
+        typeof c === 'string' ? c : (c.label || c.name || '')
+      );
+      setResult({ columns: colLabels, rows: d.rows || [], rowCount: d.rowCount || 0, elapsedMs: d.elapsedMs || 0 });
     } catch (e: any) {
       setError(e?.message || t("dw.execFailed"));
       setResult(null);

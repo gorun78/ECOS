@@ -889,5 +889,17 @@
   "dw.strategy.updateSuccess": "策略已保存",
   "dw.strategy.updateFailed": "策略保存失败",
   "dw.strategy.collectStarted": "采集任务已提交（taskId: {id}）",
-  "dw.strategy.collectFailed": "采集任务提交失败: {err}"
+  "dw.strategy.collectFailed": "采集任务提交失败: {err}",
+  "dw.strategy.cronLabel": "定时策略",
+  "dw.strategy.cron.daily": "每天 00:00",
+  "dw.strategy.cron.sixHourly": "每 6 小时",
+  "dw.strategy.cron.twoDays": "每 2 天",
+  "dw.strategy.cron.weekly": "每周一 00:00",
+  "dw.strategy.cron.format": "分 时 日 月 周（5位 cron）",
+  "dw.strategy.taskRunning": "采集任务执行中",
+  "dw.strategy.viewInTaskCenter": "在任务中心查看",
+  "dw.strategy.diffTitle": "采集差异记录",
+  "dw.btn.view": "点击查看字段明细",
+  "dw.tableDrawer.title": "数据表字段详情",
+  "dw.tableDrawer.loadFailed": "字段加载失败"
 }

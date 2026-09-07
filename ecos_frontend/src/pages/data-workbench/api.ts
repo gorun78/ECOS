@@ -601,13 +601,78 @@ export async function fetchCollectStatus(taskId: string): Promise<{
   }
 }
 
-/** 保存元数据策略配置 → PUT /api/v1/datanet/metadata/strategy/{id} (P0-3) */
-export async function saveMetadataStrategy(datasourceId: string, strategy: string, countMethod: string): Promise<boolean> {
+/** 查询当前数据源的活跃采集任务 → GET /api/v1/task/list?taskType=METADATA_COLLECT
+ *  过滤出 parameters 中 datasourceId 匹配的任务，用于"在任务中心查看"功能 */
+export async function fetchActiveCollectTasks(datasourceId: string): Promise<{ taskId: string; status: string; progress: number; startTime?: string }[]> {
   try {
+    const res = await fetch(`/api/v1/task/list?taskType=METADATA_COLLECT&offset=0&limit=20`, {
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const list = json?.data?.data || json?.data || [];
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((t: any) => {
+        // 任务 parameters 中应包含 datasourceId
+        const params = t?.parameters || {};
+        const dsId = params.datasourceId || params.datasource_id || '';
+        return dsId === datasourceId;
+      })
+      .map((t: any) => ({
+        taskId: t.taskId || t.id || '',
+        status: t.status || 'RUNNING',
+        progress: t.progress ?? 0,
+        startTime: t.startedAt || t.createdAt,
+      }));
+  } catch (e) {
+    console.warn('[data-workbench] fetchActiveCollectTasks failed:', e);
+    return [];
+  }
+}
+
+/** 获取采集差异记录 → GET /api/v1/datanet/metadata/collect-diff/{id}
+ *  返回最近 N 次采集的 diff 摘要（含 gitCommit / diffSummary / diffMarkdown） */
+export async function fetchCollectDiff(datasourceId: string, limit = 5): Promise<{
+  collectedAt: string;
+  taskId?: string;
+  diffSummary?: string;
+  diffMarkdown?: string;
+  gitCommit?: string;
+  tablesTotal?: number;
+}[]> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/collect-diff/${encodeURIComponent(datasourceId)}?limit=${limit}`, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const list = json?.data?.diffs || [];
+    if (!Array.isArray(list)) return [];
+    return list.map((d: any) => ({
+      collectedAt: d.collectedAt,
+      taskId: d.taskId,
+      diffSummary: d.diffSummary,
+      diffMarkdown: d.diffMarkdown,
+      gitCommit: d.gitCommit,
+      tablesTotal: d.tablesTotal,
+    }));
+  } catch (e) {
+    console.warn('[data-workbench] fetchCollectDiff failed:', e);
+    return [];
+  }
+}
+
+/** 保存元数据策略配置 → PUT /api/v1/datanet/metadata/strategy/{id} (P0-3) */
+export async function saveMetadataStrategy(datasourceId: string, strategy: string, countMethod: string, scheduleCron?: string): Promise<boolean> {
+  try {
+    const body: Record<string, unknown> = { trigger: strategy, countMethod };
+    if (scheduleCron) body.scheduleCron = scheduleCron;
     const res = await fetch(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ trigger: strategy, countMethod }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
@@ -662,6 +727,11 @@ export async function fetchDataSourceResources(datasourceId: string): Promise<Ta
             type: (c.type as string) || (c.dataType as string) || '',
           }))
         : [],
+      // T3-2: 保留 resourceId 供表详情抽屉调用 preview/{resourceId}
+      resourceId: (r.resourceId as string) || undefined,
+      sourcePath: (r.sourcePath as string) || undefined,
+      description: (r.description as string) || undefined,
+      fieldCount: (r.fieldCount as number | undefined) ?? undefined,
     }));
   } catch (e) {
     console.warn('[data-workbench] fetchDataSourceResources failed:', e);

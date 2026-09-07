@@ -1666,10 +1666,29 @@ export async function fetchFields(resourceId: string): Promise<DataField[]> {
   return [];
 }
 
-/** GET /datanet/metadata/preview/{resourceId} — 预览数据行 */
-export async function fetchPreview(resourceId: string, limit = 50): Promise<{rows: Record<string,any>[], columns: number, rowCount: number}> {
+/** GET /datanet/metadata/preview/{resourceId} — 预览数据行 + 列元数据
+ *  后端返回: { rows: Record<string,any>[], columns: {name,label,type}[], rowCount: number } */
+export interface DataPreview {
+  rows: Record<string, any>[];
+  columns: { name: string; label?: string; type: string }[];
+  rowCount: number;
+}
+
+export async function fetchPreview(resourceId: string, limit = 50): Promise<DataPreview> {
   const resp = await doFetch(`${DATANET_META}/preview/${resourceId}?limit=${limit}`);
-  return resp?.data ?? { rows: [], columns: 0, rowCount: 0 };
+  const d = resp?.data;
+  if (!d) return { rows: [], columns: [], rowCount: 0 };
+  return {
+    rows: Array.isArray(d.rows) ? d.rows : [],
+    columns: Array.isArray(d.columns)
+      ? (d.columns as Record<string, unknown>[]).map(c => ({
+          name: (c.name as string) || (c.columnName as string) || '',
+          label: (c.label as string) || undefined,
+          type: (c.type as string) || (c.dataType as string) || '',
+        }))
+      : [],
+    rowCount: typeof d.rowCount === 'number' ? d.rowCount : 0,
+  };
 }
 
 // ── Monitoring Dashboard ───────────────────────────────

@@ -28,6 +28,12 @@ export interface TableInfo {
   // B8: 后端 recordCount 可能 -1/ null, 前端用 null 表"未知"，UI 显示"未知"
   rowCount: number | null;
   columns: { name: string; type: string }[];
+  // T3-2: 新增 — 表对应的 DataResource ID, 用于调 preview/{resourceId} 取字段明细
+  resourceId?: string;
+  // T3-2: 新增 — 后端 DataResource 附带信息
+  sourcePath?: string;
+  description?: string;
+  fieldCount?: number;
 }
 
 export interface DataConnection {
