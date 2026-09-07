@@ -5,6 +5,7 @@ import { useTheme } from "../components/ThemeContext";
 import BasicMonitoringTab from "./monitoring/tabs/BasicMonitoringTab";
 import DigitalTwinTab from "./monitoring/tabs/DigitalTwinTab";
 import EngineMonitor from "./EngineMonitor";
+import { useToast } from "../components/common/Toast";
 
 interface TabDef {
   id: string;
@@ -45,12 +46,22 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
-async function apiFetch<T>(url: string): Promise<T | null> {
+async function apiFetch<T>(url: string, id?: string): Promise<T | null> {
   try {
     const res = await fetch(url, { headers: authHeaders() });
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
+      // Login expired — force re-login (PMO-43 T4).
       localStorage.removeItem("token");
       window.location.hash = "#/login";
+      return null;
+    }
+    if (res.status === 403) {
+      // Permission denied on a valid session — never log out.
+      // Surface via the global toast (ToastProvider mounted at main.tsx);
+      // the EngineMonitor child renders its own inline no-permission state.
+      // H-001: `id` is the owning card's identity — lets each EngineCard
+      // filter out 403s raised by sibling cards (cross-card mis-report).
+      window.dispatchEvent(new CustomEvent("ecos-403", { detail: { id, url, timestamp: Date.now() } }));
       return null;
     }
     if (!res.ok) return null;
@@ -86,8 +97,10 @@ interface EngineCardProps {
 }
 
 function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { styles } = useTheme();
+  const { showToast } = useToast();
+  const [noPermission, setNoPermission] = useState(false);
   const Icon = def.icon;
 
   const [health, setHealth] = useState<HealthSummary | null>(null);
@@ -96,14 +109,34 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // 403 (no permission) — surface inline, never log the user out.
+    // H-001: scope the flag to THIS card's id so a sibling card's 403
+    // (which also fans out as an `ecos-403` CustomEvent) does NOT trigger
+    // this card's no-permission state + toast.
+    let saw403 = false;
+    const on403 = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.id !== def.id) return; // ignore sibling cards' 403s
+      saw403 = true;
+      setNoPermission(true);
+      showToast("error", t("common.noPermission"));
+    };
+    window.addEventListener("ecos-403", on403);
     const [h, s] = await Promise.all([
-      apiFetch<HealthSummary>(`${def.apiBase}/health`),
-      apiFetch<StatusSummary>(`${def.apiBase}/status`),
+      apiFetch<HealthSummary>(`${def.apiBase}/health`, def.id),
+      apiFetch<StatusSummary>(`${def.apiBase}/status`, def.id),
     ]);
+    window.removeEventListener("ecos-403", on403);
+    if (h === null || s === null || saw403) {
+      // Either no-permission (403) or service failure (network/5xx).
+      // 403 shows a dedicated "无权限" card; network failure relies on
+      // the global NetworkErrorBanner plus an EMPTY inline state.
+      setNoPermission(saw403);
+    }
     setHealth(h);
     setStatus(s);
     setLoading(false);
-  }, [def.apiBase]);
+  }, [def.id, def.apiBase, showToast, t]);
 
   useEffect(() => { load(); }, [load]);
 

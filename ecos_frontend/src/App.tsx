@@ -4,7 +4,7 @@
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Bot } from "lucide-react";
 import Sidebar from "./components/Sidebar";
@@ -15,7 +15,8 @@ import { useMobileSidebar } from "./hooks/useMobileSidebar";
 import { useTheme } from "./components/ThemeContext";
 import { useLanguage } from "./components/LanguageContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
-import { apiTaskStats, type TaskStats } from "./api";
+import NetworkErrorBanner from "./components/NetworkErrorBanner";
+import { apiTaskStats, notifyNetworkDown, notifyNetworkUp, type TaskStats } from "./api";
 
 /**
  * Route path → i18n key (common.app.tab.{id}).
@@ -77,7 +78,14 @@ async function apiHealth(): Promise<string> {
     const r = await fetch("/api/health");
     const d = await r.json();
     return d.data?.status || d.status || "DOWN";
-  } catch { return "DOWN"; }
+  } catch (err: unknown) {
+    // G3: surface transport failures to the top NetworkErrorBanner.
+    // HTTP status responses (e.g. 401 carrying a numeric `status`) are
+    // auth/HTTP tokens, not network outages — only non-HTTP failures go up.
+    const st = err && typeof err === "object" ? (err as { status?: unknown }).status : undefined;
+    if (st === undefined) notifyNetworkDown(err);
+    return "DOWN";
+  }
 }
 
 interface Tab {
@@ -111,19 +119,42 @@ export default function App() {
 
   useEffect(() => {
     const poll = () => {
-      apiTaskStats().then(s => setTaskStats(s)).catch(() => {});
+      apiTaskStats()
+        .then((s) => setTaskStats(s))
+        // PMO-43 T2: apiFetchData already dispatches `ecos-network-down` for
+        // real network failures (the global NetworkErrorBanner reacts). The
+        // catch here is defensive for non-transport errors (4xx/5xx business)
+        // — in that case the banner stays hidden and the UI just keeps the
+        // last known stats rather than the page blowing up.
+        .catch(() => {});
     };
     poll();
     const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  // Health polling
+  // Health polling — network failures are surfaced via the global
+  // NetworkErrorBanner (T5/G3); DOWN/UP transitions feed the Sidebar
+  // status chip, and recovery calls notifyNetworkUp exactly once per
+  // DOWN→UP edge so the banner clears on recovery.
   const [serviceStatus, setServiceStatus] = useState("UP");
+  const prevHealthUpRef = useRef(true);
 
   useEffect(() => {
     const poll = () => {
-      apiHealth().then(s => setServiceStatus(s)).catch(() => setServiceStatus("DOWN"));
+      apiHealth()
+        .then((s) => {
+          const up = s !== "DOWN";
+          if (prevHealthUpRef.current === false && up) notifyNetworkUp(); // DOWN→UP edge
+          prevHealthUpRef.current = up;
+          setServiceStatus(s);
+        })
+        .catch(() => {
+          // G3: track DOWN→UP edges so the banner clears on recovery.
+          if (prevHealthUpRef.current) notifyNetworkUp(); // last UP → DOWN edge; banner re-raises on next DOWN
+          prevHealthUpRef.current = false;
+          setServiceStatus("DOWN");
+        });
     };
     poll();
     const interval = setInterval(poll, 30000);
@@ -213,6 +244,9 @@ export default function App() {
 
   return (
     <div className={`flex h-screen ${styles.appBg} ${styles.appText} overflow-hidden font-sans select-none antialiased transition-colors duration-150`}>
+      {/* Global network/offline banner (PMO-43 T5) — fixed top overlay */}
+      <NetworkErrorBanner />
+
       {/* Sidebar */}
       <Sidebar
         width={sidebarWidth}

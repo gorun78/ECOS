@@ -3,12 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   mockAIPAuditLogs
 } from './mockData';
 import { AIPLogicPipeline, AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
-import { fetchAIPAgentsFromMesh, fetchGuardrailPolicies, fetchPipelineDefinitions, fetchAgentModels } from './api';
+import {
+  fetchAIPAgentsFromMesh,
+  fetchGuardrailPolicies,
+  fetchPipelineDefinitions,
+  fetchAgentModels,
+} from './api';
 import DashboardView from './DashboardView';
 import LogicView from './LogicView';
 import AgentStudioView from './AgentStudioView';
@@ -17,7 +22,9 @@ import ModelCatalogView from './ModelCatalogView';
 import AiGuardrailsView from './AiGuardrailsView';
 import KnowledgeView from '../KnowledgeView';
 import * as Icons from 'lucide-react';
+import { CloudOff, RefreshCw } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -29,23 +36,52 @@ interface AIPWorkbenchProps {
 }
 
 export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
+  const { styles } = useTheme();
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'logic' | 'agent' | 'chatbot' | 'knowledge' | 'model' | 'guardrails'>('dashboard');
 
-  // Master AIP States (loaded from backend API, fallback to empty)
+  // Master AIP States (loaded from backend API, PMO-43 T3: errors are
+  // re-thrown rather than swallowed — the affected tab shows an inline
+  // error + retry state instead of silently rendering empty data).
   const [pipelines, setPipelines] = useState<AIPLogicPipeline[]>([]);
   const [agents, setAgents] = useState<AIPAgent[]>([]);
   const [models, setModels] = useState<AIPModel[]>([]);
   const [guardrails, setGuardrails] = useState<AIPGuardrail[]>([]);
   const [auditLogs, setAuditLogs] = useState<AIPAuditLog[]>(mockAIPAuditLogs);
-  const { styles } = useTheme();
+  type LoadKey = 'pipelines' | 'agents' | 'models' | 'guardrails';
+  const [loadErrors, setLoadErrors] = useState<Partial<Record<LoadKey, string>>>({});
+
+  const loadPipelines = useCallback(() => {
+    setLoadErrors((prev) => ({ ...prev, pipelines: undefined }));
+    fetchPipelineDefinitions()
+      .then(setPipelines)
+      .catch((e) => setLoadErrors((prev) => ({ ...prev, pipelines: e?.message || String(e) })));
+  }, []);
+  const loadAgents = useCallback(() => {
+    setLoadErrors((prev) => ({ ...prev, agents: undefined }));
+    fetchAIPAgentsFromMesh()
+      .then(setAgents)
+      .catch((e) => setLoadErrors((prev) => ({ ...prev, agents: e?.message || String(e) })));
+  }, []);
+  const loadModels = useCallback(() => {
+    setLoadErrors((prev) => ({ ...prev, models: undefined }));
+    fetchAgentModels()
+      .then(setModels)
+      .catch((e) => setLoadErrors((prev) => ({ ...prev, models: e?.message || String(e) })));
+  }, []);
+  const loadGuardrails = useCallback(() => {
+    setLoadErrors((prev) => ({ ...prev, guardrails: undefined }));
+    fetchGuardrailPolicies()
+      .then(setGuardrails)
+      .catch((e) => setLoadErrors((prev) => ({ ...prev, guardrails: e?.message || String(e) })));
+  }, []);
 
   // Load data from backend APIs on mount
   useEffect(() => {
-    fetchAIPAgentsFromMesh().then(setAgents).catch(() => {});
-    fetchGuardrailPolicies().then(setGuardrails).catch(() => {});
-    fetchPipelineDefinitions().then(setPipelines).catch(() => {});
-    fetchAgentModels().then(setModels).catch(() => {});
-  }, []);
+    loadAgents();
+    loadGuardrails();
+    loadPipelines();
+    loadModels();
+  }, [loadAgents, loadGuardrails, loadPipelines, loadModels]);
 
   const handleAddAuditLog = (newLog: AIPAuditLog) => {
     setAuditLogs(prev => [newLog, ...prev]);
@@ -165,55 +201,60 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
             />
           )}
 
-          {currentTab === 'logic' && (
-            <LogicView
-              pipelines={pipelines}
-              models={models}
-              onUpdatePipelines={setPipelines}
-              showToast={showToast}
-            />
+          {currentTab === 'logic' && (loadErrors.pipelines
+            ? <ErrorState message={loadErrors.pipelines} onRetry={loadPipelines} />
+            : <LogicView
+                pipelines={pipelines}
+                models={models}
+                onUpdatePipelines={setPipelines}
+                showToast={showToast}
+              />
           )}
 
-          {currentTab === 'agent' && (
-            <AgentStudioView
-              agents={agents}
-              models={models}
-              guardrails={guardrails}
-              onUpdateAgents={setAgents}
-              onAddAuditLog={handleAddAuditLog}
-              showToast={showToast}
-            />
+          {currentTab === 'agent' && (loadErrors.agents
+            ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
+            : <AgentStudioView
+                agents={agents}
+                models={models}
+                guardrails={guardrails}
+                onUpdateAgents={setAgents}
+                onAddAuditLog={handleAddAuditLog}
+                showToast={showToast}
+              />
           )}
 
-          {currentTab === 'chatbot' && (
-            <ChatbotStudioView
-              agents={agents}
-              models={models}
-              guardrails={guardrails}
-              onUpdateAgents={setAgents}
-              onAddAuditLog={handleAddAuditLog}
-              showToast={showToast}
-            />
+          {currentTab === 'chatbot' && (loadErrors.agents
+            ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
+            : <ChatbotStudioView
+                agents={agents}
+                models={models}
+                guardrails={guardrails}
+                onUpdateAgents={setAgents}
+                onAddAuditLog={handleAddAuditLog}
+                showToast={showToast}
+              />
           )}
 
           {currentTab === 'knowledge' && (
             <KnowledgeView showToast={showToast} />
           )}
 
-          {currentTab === 'model' && (
-            <ModelCatalogView
-              models={models}
-              onUpdateModels={setModels}
-              showToast={showToast}
-            />
+          {currentTab === 'model' && (loadErrors.models
+            ? <ErrorState message={loadErrors.models} onRetry={loadModels} />
+            : <ModelCatalogView
+                models={models}
+                onUpdateModels={setModels}
+                showToast={showToast}
+              />
           )}
 
-          {currentTab === 'guardrails' && (
-            <AiGuardrailsView
-              guardrails={guardrails}
-              onUpdateGuardrails={setGuardrails}
-              showToast={showToast}
-            />
+          {currentTab === 'guardrails' && (loadErrors.guardrails
+            ? <ErrorState message={loadErrors.guardrails} onRetry={loadGuardrails} />
+            : <AiGuardrailsView
+                guardrails={guardrails}
+                onUpdateGuardrails={setGuardrails}
+                showToast={showToast}
+              />
           )}
         </div>
       </div>
@@ -221,3 +262,33 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
     </div>
   );
 }
+
+/**
+ * PMO-43 T3: inline error/retry state for the 4 AIP data-fetch
+ * anti-patterns ("terminal coding style: empty catch → real error state,
+ * error/retry to the UI"). Pure presentation — no global state store.
+ */
+const ErrorState: React.FC<{ message?: string; onRetry: () => void }> = ({ message, onRetry }) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <div
+      className={`h-full w-full flex flex-col items-center justify-center gap-3 text-sm ${styles.appText} px-6`}
+      role="alert"
+    >
+      <CloudOff size={36} className="opacity-60 shrink-0" />
+      <div className="text-center leading-relaxed">
+        <p className="font-semibold">{t("network.error.title")}</p>
+        <p className="opacity-70 text-xs mt-1 max-w-md">{message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border ${styles.cardBorder} bg-transparent shadow-xs hover:opacity-80 cursor-pointer`}
+      >
+        <RefreshCw size={13} />
+        {t("network.retry")}
+      </button>
+    </div>
+  );
+};
