@@ -7,8 +7,10 @@ import './index.css';
 import App from './App.tsx';
 import RequireAuth from './components/RequireAuth.tsx';
 import Login from './pages/Login.tsx';
+import NoAccessPage from './pages/NoAccess.tsx';
 import { LanguageProvider } from './components/LanguageContext.tsx';
 import { ThemeProvider } from './components/ThemeContext.tsx';
+import { ToastProvider, showToastGlobal } from './components/common/Toast';
 
 // Per-route lazy-loaded feature pages (50 routes → ~50 chunks)
 const CognitiveOperatingSystem = lazy(() => import('./pages/CognitiveOperatingSystem.tsx'));
@@ -83,7 +85,7 @@ function TasksCenterRoute() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <AsyncTaskCenterView
-        showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
+        showToast={(type, msg) => showToastGlobal(type, msg)}
         onViewModeChange={() => {}}
       />
     </Suspense>
@@ -95,9 +97,11 @@ createRoot(document.getElementById('root')!).render(
     <HashRouter>
       <LanguageProvider>
         <ThemeProvider>
+          <ToastProvider>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/no-access" element={<NoAccessPage />} />
               <Route
                 element={
                   <RequireAuth>
@@ -168,6 +172,7 @@ createRoot(document.getElementById('root')!).render(
               </Route>
             </Routes>
           </Suspense>
+          </ToastProvider>
         </ThemeProvider>
       </LanguageProvider>
     </HashRouter>

@@ -5,7 +5,7 @@
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Cpu, Play, Send, Plus, RefreshCw, Trash2, ArrowRight, Check, X,
   Clock, AlertTriangle, BarChart3, GanttChart, Layers, Timer, Hash,
@@ -35,8 +35,17 @@ export default function AgentMesh() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Ref to track the current polling mission ID to avoid stale closures
-  const pollingRef = useRef<string | null>(null);
+  // PMO-43 T3 C-001 (P1): per-mission polling error state. A failed 3s poll
+  // (3s interval, fetchAgentMeshMission) surfaced an inline banner + retry
+  // instead of silently freezing the task list ("Silently ignore polling
+  // errors" was the empty-catch anti-pattern). Retry = re-run pollOnce now.
+  const [pollError, setPollError] = useState("");
+
+  // PMO-43 T3: loadErrors tracks per-key fetch failures (agents / missions)
+  // so the UI can render "error + retry" state instead of a silent empty list.
+  // Mirrors the same pattern already used in aiworkbench/index.tsx.
+  type LoadKey = 'agents' | 'missions';
+  const [loadErrors, setLoadErrors] = useState<Partial<Record<LoadKey, string>>>({});
 
   // New mission form
   const [newTitle, setNewTitle] = useState("");
@@ -47,33 +56,48 @@ export default function AgentMesh() {
   ]);
 
   // ── 实时轮询: Mission RUNNING/PENDING 时每3秒拉取子任务 ──
-  useEffect(() => {
-    const missionId = selectedMission?.id ?? null;
-    const shouldPoll = selectedMission && (
-      selectedMission.status === "RUNNING" || selectedMission.status === "PENDING"
-    );
-
-    // Update tracking ref
-    pollingRef.current = shouldPoll ? missionId : null;
-
-    if (!shouldPoll || !missionId) return;
-
-    const pollTasks = async () => {
-      try {
-        const data = await fetchAgentMeshMission(missionId);
+  // PMO-43 T3 C-001 (P1): a failed poll no longer dies silently. The error
+  // is written to per-mission state (pollError) and rendered as an inline
+  // banner with a 重试/retry button that re-runs this poll immediately.
+  const pollOnce = useCallback(async () => {
+    const sel = selectedMission;
+    if (!sel) return;
+    const mid = sel.id;
+    try {
+      const data = await fetchAgentMeshMission(mid);
+      // Guard against a stale response landing after the user switched mission
+      if (selectedMission?.id === mid) {
         setSelectedMission(data.mission);
         setMissionTasks(data.tasks || []);
-      } catch (e) {
-        // Silently ignore polling errors
       }
-    };
+      setPollError("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setPollError(msg);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMission?.id, selectedMission?.status]);
+
+  // C-001: stable identity — interval callback + manual "重试/Retry" button share it.
+  const pollTasks = useCallback(() => pollOnce(), [pollOnce]);
+
+  useEffect(() => {
+    const sel = selectedMission;
+    const shouldPoll = sel && (
+      sel.status === "RUNNING" || sel.status === "PENDING"
+    );
+
+    // Clear stale banner when the polled mission (or its poll-able status) switches
+    if (!shouldPoll) setPollError("");
+    if (!shouldPoll || !sel) return;
 
     // Initial poll immediately
-    pollTasks();
+    pollOnce();
 
-    const interval = setInterval(pollTasks, 3000);
+    const interval = setInterval(pollOnce, 3000);
     return () => clearInterval(interval);
-  }, [selectedMission?.id, selectedMission?.status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMission?.id, selectedMission?.status, pollOnce]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -82,11 +106,24 @@ export default function AgentMesh() {
   }, []);
 
   const loadAgents = async () => {
-    try { setAgents(await fetchAgentMeshAgents()); } catch (e) {}
+    // Reset the agents error before retrying so a successful reload clears it.
+    setLoadErrors((prev) => ({ ...prev, agents: undefined }));
+    try {
+      setAgents(await fetchAgentMeshAgents());
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLoadErrors((prev) => ({ ...prev, agents: msg }));
+    }
   };
 
   const loadMissions = async () => {
-    try { setMissions(await fetchAgentMeshMissions()); } catch (e) {}
+    setLoadErrors((prev) => ({ ...prev, missions: undefined }));
+    try {
+      setMissions(await fetchAgentMeshMissions());
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLoadErrors((prev) => ({ ...prev, missions: msg }));
+    }
   };
 
   const loadMission = async (id: string) => {
@@ -173,6 +210,15 @@ export default function AgentMesh() {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
             <Cpu size={16} /> Agent 注册表
+            {loadErrors.agents && (
+              <button
+                onClick={loadAgents}
+                className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
+                title={loadErrors.agents}
+              >
+                <RefreshCw size={11} /> {t("network.retry")}
+              </button>
+            )}
           </div>
         </div>
         <div className="flex-1 overflow-auto p-3 space-y-2">
@@ -199,9 +245,19 @@ export default function AgentMesh() {
               </div>
             </div>
           ))}
-          {agents.length === 0 && (
+          {agents.length === 0 && loadErrors.agents ? (
+            <div className="text-center py-8">
+              <p className="text-xs text-red-500 mb-2">{loadErrors.agents}</p>
+              <button
+                onClick={loadAgents}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
+              >
+                <RefreshCw size={12} /> {t("network.retry")}
+              </button>
+            </div>
+          ) : agents.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-8">无已注册Agent</p>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -322,9 +378,19 @@ export default function AgentMesh() {
             <TaskStatsPanel mission={selectedMission} tasks={missionTasks} />
           )}
 
-          {missions.length === 0 && (
+          {missions.length === 0 && loadErrors.missions ? (
+            <div className="text-center py-16">
+              <p className="text-sm text-red-500 mb-3">{loadErrors.missions}</p>
+              <button
+                onClick={loadMissions}
+                className="inline-flex items-center gap-1 px-4 py-1.5 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
+              >
+                <RefreshCw size={12} /> {t("network.retry")}
+              </button>
+            </div>
+          ) : missions.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-16">暂无 Mission，创建一个开始协作</p>
-          )}
+          ) : null}
 
           {missions.map(mission => (
             <div key={mission.id}
@@ -363,6 +429,24 @@ export default function AgentMesh() {
               )}
               {mission.errorMessage && (
                 <p className="text-xs text-red-500 mt-1">{mission.errorMessage}</p>
+              )}
+
+              {/* C-001 (P1): inline poll-failure banner with immediate retry.
+                  Shown while the mission is polling (RUNNING/PENDING) and a
+                  fetchAgentMeshMission round-trip failed. */}
+              {selectedMission?.id === mission.id && pollError && (
+                <div className="mt-2 flex items-center gap-2 p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+                  <AlertTriangle size={13} className="text-red-500 shrink-0" />
+                  <span className="text-[11px] text-red-600 dark:text-red-400 flex-1 min-w-0 truncate">
+                    {t("agentMesh.pollError")} · {pollError}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); pollTasks(); }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40"
+                  >
+                    <RefreshCw size={11} /> {t("network.retry")}
+                  </button>
+                </div>
               )}
 
               {/* Expanded: Gantt Timeline + Task list */}
