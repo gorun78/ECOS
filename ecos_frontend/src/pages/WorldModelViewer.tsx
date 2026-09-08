@@ -187,15 +187,9 @@ export default function WorldModelViewer() {
         endDate: `${year + 1}-01-01`,
       };
 
-      // Fetch next code
-      try {
-        const token = localStorage.getItem("token") || "";
-        const r = await fetch("/api/v1/ecos/world-model/goals/next-code", {
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        });
-        const j = await r.json();
-        if (j?.data) defaults.code = j.data;
-      } catch {}
+      // 后端未提供 /next-code 端点（404）；改为本地生成一个占位 code，
+      // 避免每次「新建目标」都触发 404 且不影响保存流程。
+      defaults.code = `GOAL-${year}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
       // Fetch org tree (fire and forget)
       fetchOrgs();

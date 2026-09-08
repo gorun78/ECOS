@@ -1,0 +1,30 @@
+{
+  "passed": false,
+  "security_concerns": [],
+  "logic_errors": [
+    {
+      "file": "ecos_frontend/src/components/NetworkErrorBanner.tsx",
+      "line": 65,
+      "severity": "critical",
+      "description": "Auto-dismiss timer setTimeout(() => setDown(false), 120_000) unconditionally hides the banner after 120 seconds regardless of whether the network actually recovered. If the backend stays down beyond 120s, down flips to false, visible becomes false, and the red offline banner disappears while the service is still unreachable - directly contradicting the file's own docstring (lines 8-10: banner clears on 'online' event or successful fetch, never on a wall-clock timeout). This is the off-by-time/off-by-char failure the spec explicitly requires be caught. Additionally the file is 134 lines vs the <=80 line budget documented in its own header (line 12), violating the size invariant."
+    },
+    {
+      "file": "ecos_frontend/src/components/RequireAuth.tsx",
+      "severity": "critical",
+      "description": "Fail-open race: the effect sets checkedRef.current = true before the fetch resolves. If the component re-renders before /api/v1/me responds, the effect cleanup aborts the in-flight fetch, the AbortError hits .catch(() => setState('ok')) pinning state to 'ok', and because checkedRef is already true no re-verification ever happens. A user with a 403 (valid token, no permission) never reaches the /no-access redirect; protected children render as if auth were verified. Contradicts the file's documented intent (403 to /no-access)."
+    },
+    {
+      "file": "ecos_frontend/src/pages/MonitoringCenter.tsx",
+      "line": "EngineCard.load()",
+      "severity": "moderate",
+      "description": "Race condition: load() attaches a global window 'ecos-403' listener before firing two concurrent apiFetch calls and removes it after Promise.all. If two EngineCards load concurrently, a 403 from either card's fetch triggers setNoPermission(true) and a toast on BOTH cards - the no-permission state is non-atomic and cross-card."
+    }
+  ],
+  "suggestions": [
+    "api.ts: wrapNet (lines ~35-48) is defined but never used - dead code.",
+    "api.ts: 403 handling uses two parallel mechanisms (notifyNoAccess event + NoAccessError throw); consider unifying so consumers check one.",
+    "EngineMonitor.tsx: 403 branch throws new Error('NO_PERMISSION') magic string instead of NoAccessError; a call site forgetting the e.message check leaks NO_PERMISSION verbatim into a toast.",
+    "api.ts: fetchDatasets/fetchDataset still swallow backend errors into mock fallback via try/catch; T1 spec says catch sites must notifyNetworkDown + surface a real error - the mock-fallback path is degraded but the caller only sees synthetic data via the error:'MOCK' tag; verify the UI actually renders that tag."
+  ],
+  "summary": "PMO-43 T1-T5 largely landed; security posture clean (no secrets, no eval/exec, no injection, no exfiltration). T1: all 5 silent .catch(() => {}) sites gone, fetch wrappers throw NetworkError, 401 login / 403 NoAccessError correctly split. T5 banner mounted in App.tsx, subscribes to all 4 events. FAIL-CLOSED on two critical logic errors: (1) NetworkErrorBanner 120s auto-dismiss hides the banner while still down (spec invariant violation) and file is 134 lines vs 80-line budget; (2) RequireAuth fail-open AbortController race permanently pins state to 'ok' on re-render, bypassing the 403 to no-access redirect. Plus one moderate cross-card race in MonitoringCenter EngineCard."
+}

@@ -1,11 +1,11 @@
 /* Extracted from DataWorkbenchLayout.tsx */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import LucideIcon from '../LucideIcon';
 import { getSourceIcon, getSourceTypeLabel } from '../helpers';
-import type { DataConnection } from '../types';
+import type { DataConnection, TableInfo } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
-import TableDetailDrawer from '../TableDetailDrawer';
+
 import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff } from '../api';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
@@ -44,9 +44,12 @@ interface ConnectionsTabProps {
   setNewConnUser: (v:string)=>void;
   onTestConnection: (connId: string) => void;
   t: (key:string)=>string;
+  /** PMO-48-T5: type-specific extra fields */
+  ncExtra?: Record<string, string | number | boolean>;
+  setNcExtraField?: (key: string, val: string | number | boolean) => void;
 }
 
-const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, onTestConnection, t }) => {
+const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, onTestConnection, t, ncExtra, setNcExtraField }) => {
   const { styles } = useTheme();
   const { t: tt } = useLanguage();
   const [editingConn, setEditingConn] = useState<DataConnection | null>(null);
@@ -63,8 +66,6 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [diffRecords, setDiffRecords] = useState<{ collectedAt: string; taskId?: string; diffSummary?: string; diffMarkdown?: string; gitCommit?: string; tablesTotal?: number }[]>([]);
   const [showDiffDetail, setShowDiffDetail] = useState<number | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
-  // T3-2: 表详情抽屉状态
-  const [drawerTable, setDrawerTable] = useState<import('../types').TableInfo | null>(null);
 
   // 轮询活跃采集任务（5s 间隔，选中数据源变化时重置）
   useEffect(() => {
@@ -166,10 +167,21 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       {connections.map(conn => {
         const isSelected = selectedConnId === conn.id;
         return (
-          <button
+          // 用 div[role=button] 取代原 <button>：HTML 严禁 <button> 内嵌 <button>，
+          // 否则 React 19 会报 hydration/nesting 警告，且会破坏内层编辑/删除
+          // 按钮的事件委托，导致「数据源卡片点不动」。
+          <div
             key={conn.id}
+            role="button"
+            tabIndex={0}
             onClick={() => setSelectedConnId(conn.id)}
-            className={`w-full text-left p-3 rounded-lg border transition-all text-xs flex flex-col gap-1.5 ${
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSelectedConnId(conn.id);
+              }
+            }}
+            className={`w-full text-left p-3 rounded-lg border transition-all text-xs flex flex-col gap-1.5 cursor-pointer focus:outline-none ${
               isSelected
                 ? `${styles.badgeBg} ${styles.accentBorder} shadow-2xs`
                 : `${styles.cardBorder} hover:${styles.appBg}`
@@ -203,7 +215,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               <span>{t("dw.type")} {conn.type.toUpperCase()}</span>
               <span>{conn.tablesAvailable.length} {t("dw.tablesDirs")}</span>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>
@@ -530,37 +542,11 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <>
                 <div className="space-y-4">
                   {conn.tablesAvailable.slice((tablePage - 1) * tablePageSize, tablePage * tablePageSize).map(tbl => (
-                    <div key={tbl.name} className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50 cursor-pointer transition-colors hover:ring-1`} 
-                         onClick={() => setDrawerTable(tbl)}
-                         title={t('dw.btn.view') || '点击查看字段明细'}>
-                      <div className={`${styles.sidebarBg}/70 px-4 py-2 flex justify-between items-center border-b ${styles.cardBorder}`}>
-                        <div className="flex items-center gap-2 text-xs">
-                           <LucideIcon name="Table" size={13} className={`${styles.accentText}`} />
-                          <span className={`font-bold font-mono ${styles.cardText}`}>{tbl.name}</span>
-                          {tbl.resourceId && (
-                            <span className="text-[9px] font-mono" style={{ color: styles.cardTextMuted }} title={tbl.resourceId}>
-                              {tbl.resourceId.slice(0,12)}…
-                            </span>
-                          )}
-                        </div>
-                        <span className={`text-[10px] ${styles.cardTextMuted} ${styles.cardBg} border ${styles.cardBorder} px-2 py-0.5 rounded-full font-mono`}>
-                           {t("dw.physicalRows")} {tbl.rowCount != null && tbl.rowCount > 0 ? tbl.rowCount.toLocaleString() : t("dw.conn.rowsUnknown")} {tbl.rowCount != null && tbl.rowCount > 0 ? t("dw.rowsUnit") : ''}
-                        </span>
-                      </div>
-
-                      {tbl.columns.length > 0 && (
-                        <div className={`p-3 ${styles.cardBg}`}>
-                          <div className="grid grid-cols-4 gap-2 text-[11px]">
-                            {tbl.columns.map(col => (
-                              <div key={col.name} className={`p-1.5 ${styles.appBg} rounded border ${styles.cardBorder} flex flex-col font-mono`}>
-                                <span className={`${styles.cardText} truncate font-semibold`} title={col.name}>{col.name}</span>
-                                <span className={`text-[9px] ${styles.cardTextMuted} mt-0.5`}>{col.type}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <TableExpandRow
+                      key={tbl.name}
+                      connId={conn.id}
+                      table={tbl}
+                    />
                   ))}
                 </div>
                 {conn.tablesAvailable.length > tablePageSize && (
@@ -624,16 +610,140 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     />
   )}
 
-  {/* T3-2: 表详情抽屉 — 点击数据表卡片打开, 异步加载字段明细 */}
-  <TableDetailDrawer
-    table={drawerTable}
-    connId={drawerTable ? selectedConnId || "" : ""}
-    onClose={() => setDrawerTable(null)}
-  />
-
 </div>
   );
 };
+
+// ── TableExpandRow ──────────────────────────────────────
+// 数据表卡片 + 表名右侧 Chevron 图标：
+//   首次点击「向下展开」，懒加载 fetchPreview 全量列，
+//   面积以 max-height + opacity 过渡实现（340ms cubic-bezier）。
+//   再次点击 ChevecDown 图标（轴线反转为 ChevronUp）→ 收起隐藏。
+// 主题感知 (useTheme)，i18n (useLanguage)，禁 hardcoded 中文/颜色。
+function TableExpandRow({ connId, table }: { connId: string; table: TableInfo }) {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  const [expanded, setExpanded] = useState(false);
+  const [columns, setColumns] = useState<{ name: string; type: string; label?: string }[]>(table.columns || []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+
+  const toggle = useCallback(() => {
+    setExpanded(prev => {
+      const next = !prev;
+      // 首次展开时懒加载全量列
+      if (next && !loadedRef.current && table.resourceId) {
+        setLoading(true);
+        setError(null);
+        (async () => {
+          try {
+            const p = await fetchPreview(table.resourceId!, 1);
+            const cols = (p?.columns ?? []).map(c => ({
+              name: c.name,
+              type: c.type,
+              label: c.label,
+            }));
+            if (cols.length > 0) setColumns(cols);
+            loadedRef.current = true;
+          } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+          } finally {
+            setLoading(false);
+          }
+        })();
+      }
+      return next;
+    });
+  }, [table.resourceId]);
+
+  const isLoading = expanded && loading;
+  const expandedCls = expanded
+    ? 'max-h-[800px] opacity-100 translate-y-0'
+    : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none';
+  const transition = 'max-height 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+
+  return (
+    <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}/50 transition-shadow hover:ring-1`}>
+      {/* 表头行：表名 + 右侧展开/收起图标 */}
+      <div
+        className={`${styles.sidebarBg}/70 px-4 py-2 flex items-center justify-between gap-2 border-b ${styles.cardBorder}`}
+      >
+        <div className="flex items-center gap-2 text-xs flex-1 min-w-0">
+          <LucideIcon name="Table" size={13} className={styles.accentText} />
+          <span className={`font-bold font-mono ${styles.cardText} truncate`}>{table.name}</span>
+          {table.resourceId && (
+            <span className="text-[9px] font-mono" style={{ color: styles.cardTextMuted }} title={table.resourceId}>
+              {table.resourceId.slice(0, 12)}…
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[10px] ${styles.cardTextMuted} ${styles.cardBg} border ${styles.cardBorder} px-2 py-0.5 rounded-full font-mono`}>
+            {t('dw.physicalRows')} {table.rowCount != null && table.rowCount > 0 ? table.rowCount.toLocaleString() : t('dw.conn.rowsUnknown')}
+            {table.rowCount != null && table.rowCount > 0 ? ' ' + t('dw.rowsUnit') : ''}
+          </span>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={expanded}
+            aria-label={expanded ? t('dw.expandRow.collapse') : t('dw.expandRow.expand')}
+            title={expanded ? t('dw.expandRow.collapse') : t('dw.expandRow.expand')}
+            className={`p-1 rounded flex items-center justify-center transition-transform ${
+              expanded ? 'rotate-180' : ''
+            } ${styles.cardTextMuted} hover:${styles.accentText}`}
+          >
+            <LucideIcon name="ChevronDown" size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* 展开区域：全量列网格（懒加载） */}
+      <div
+        className={`overflow-hidden transition-all ${expandedCls}`}
+        style={{ transition }}
+        aria-hidden={!expanded}
+      >
+        <div className={`p-3 ${styles.cardBg} space-y-2`}>
+          {isLoading ? (
+            <div className={`flex items-center justify-center py-4 text-xs ${styles.cardTextMuted}`}>
+              <LucideIcon name="RefreshCw" size={13} className="animate-spin mr-2" />
+              {t('dw.loading') || 'Loading...'}
+            </div>
+          ) : error ? (
+            <div className={`p-3 rounded border text-xs ${styles.dangerText}`} style={{ borderColor: styles.dangerText }}>
+              {error}
+            </div>
+          ) : columns.length === 0 ? (
+            <div className={`p-3 rounded border text-center text-xs ${styles.cardTextMuted} ${styles.cardBorder}`}>
+              {t('db.preview.empty') || 'No columns'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 text-[11px]">
+              {columns.map((col, i) => (
+                <div
+                  key={col.name + i}
+                  className={`p-1.5 ${styles.appBg} rounded border ${styles.cardBorder} flex flex-col font-mono`}
+                  title={col.name}
+                >
+                  <span className={`${styles.cardText} truncate font-semibold`}>
+                    {col.label || col.name}
+                  </span>
+                  <span className={`text-[9px] ${styles.cardTextMuted} mt-0.5 truncate`} title={col.type}>
+                    {col.type}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className={`text-[10px] ${styles.cardTextMuted} font-mono pt-1`}>
+            {t('dw.expandRow.colCount').replace('{n}', String(columns.length))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Edit Connection Modal ─────────────────────────────────
 function EditConnectionModal({ conn, onSave, onCancel }: {

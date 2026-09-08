@@ -25,19 +25,19 @@ const GLOBAL_KEYS = new Set([
   'audit_retention_days',
 ]);
 
-// ── Labels for known config keys ──
-const KEY_LABELS: Record<string, { zh: string; en: string }> = {
-  session_timeout_minutes: { zh: '会话超时（分钟）', en: 'Session Timeout (min)' },
-  audit_retention_days: { zh: '审计保留天数', en: 'Audit Retention (days)' },
-  password_min_length: { zh: '密码最小长度', en: 'Password Min Length' },
-  password_require_upper: { zh: '密码需含大写', en: 'Password Require Upper' },
-  password_require_digit: { zh: '密码需含数字', en: 'Password Require Digit' },
-  password_require_special: { zh: '密码需含特殊字符', en: 'Password Require Special' },
-  password_expire_days: { zh: '密码过期天数', en: 'Password Expire Days' },
-  password_history_count: { zh: '密码历史数量', en: 'Password History Count' },
-  max_login_attempts: { zh: '最大登录尝试次数', en: 'Max Login Attempts' },
-  lockout_duration_minutes: { zh: '锁定持续时间（分钟）', en: 'Lockout Duration (min)' },
-  max_concurrent_sessions: { zh: '最大并发会话数', en: 'Max Concurrent Sessions' },
+// ── i18n key map for known config keys ──
+const KEY_LABEL_KEYS: Record<string, string> = {
+  session_timeout_minutes: 'systemConfig.key.sessionTimeout',
+  audit_retention_days: 'systemConfig.key.auditRetention',
+  password_min_length: 'systemConfig.key.pwdMinLength',
+  password_require_upper: 'systemConfig.key.pwdRequireUpper',
+  password_require_digit: 'systemConfig.key.pwdRequireDigit',
+  password_require_special: 'systemConfig.key.pwdRequireSpecial',
+  password_expire_days: 'systemConfig.key.pwdExpireDays',
+  password_history_count: 'systemConfig.key.pwdHistoryCount',
+  max_login_attempts: 'systemConfig.key.maxLoginAttempts',
+  lockout_duration_minutes: 'systemConfig.key.lockoutMins',
+  max_concurrent_sessions: 'systemConfig.key.maxConcurrentSessions',
 };
 
 // ── Toast ──────────────────────────────────────────────────────
@@ -59,10 +59,8 @@ const Toast: React.FC<{
 );
 
 export default function SystemConfigManager() {
-  const { locale } = useLanguage() as any;
-  const { styles } = useTheme() as any;
-
-  const isZh = locale !== 'en';
+  const { t } = useLanguage();
+  const { styles } = useTheme();
 
   const [allConfigs, setAllConfigs] = useState<SysConfigItem[]>([]);
   const [editing, setEditing] = useState<Record<string, string>>({});
@@ -122,10 +120,10 @@ export default function SystemConfigManager() {
       setAllConfigs(prev => prev.map(item =>
         item.key === key ? { ...item, value: val } : item
       ));
-      setToast({ type: 'success', msg: `${isZh ? '配置' : 'Config'} ${key} ${isZh ? '已更新' : 'updated'}` });
+      setToast({ type: 'success', msg: t('systemConfig.updated', { key }) });
     } catch (e: any) {
       setErrors(prev => ({ ...prev, [key]: e.message }));
-      setToast({ type: 'error', msg: `${isZh ? '保存失败' : 'Save failed'}: ${e.message}` });
+      setToast({ type: 'error', msg: `${t('systemConfig.saveFailed')}: ${e.message}` });
     }
     setSaving(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
@@ -138,10 +136,10 @@ export default function SystemConfigManager() {
       setAllConfigs(prev => prev.map(item =>
         item.key === key ? { ...item, value: updated.value ?? item.default_value ?? '' } : item
       ));
-      setToast({ type: 'success', msg: `${isZh ? '配置' : 'Config'} ${key} ${isZh ? '已恢复默认值' : 'reset to default'}` });
+      setToast({ type: 'success', msg: t('systemConfig.resetDone', { key }) });
     } catch (e: any) {
       setErrors(prev => ({ ...prev, [key]: e.message }));
-      setToast({ type: 'error', msg: `${isZh ? '恢复失败' : 'Reset failed'}: ${e.message}` });
+      setToast({ type: 'error', msg: `${t('systemConfig.resetFailed')}: ${e.message}` });
     }
     setResetting(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
@@ -169,8 +167,9 @@ export default function SystemConfigManager() {
     const isSaving = saving[cfg.key];
     const isResetting = resetting[cfg.key];
     const error = errors[cfg.key];
-    const label = isZh ? (KEY_LABELS[cfg.key]?.zh || cfg.labelZh || cfg.label) : (KEY_LABELS[cfg.key]?.en || cfg.label);
-    const desc = isZh && cfg.descriptionZh ? cfg.descriptionZh : cfg.description;
+    const labelKey = KEY_LABEL_KEYS[cfg.key];
+    const label = labelKey ? (t(labelKey) || cfg.label || cfg.key) : (cfg.label || cfg.key);
+    const desc = cfg.description;
     const defaultVal = cfg.default_value || '—';
     const modifiedAt = (cfg as any).modifiedAt || (cfg as any).modified_at || (cfg as any).updatedAt || '—';
 
@@ -178,14 +177,14 @@ export default function SystemConfigManager() {
       <tr key={cfg.key} className={`border-b ${styles.sidebarBorder} ${styles.text} hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors`}>
         {/* Key */}
         <td className="py-3 px-3">
-          <code className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono">{cfg.key}</code>
+          <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-bg)', color: 'var(--text-muted)' }}>{cfg.key}</code>
         </td>
-        {/* 描述 */}
+        {/* Description */}
         <td className="py-3 px-3">
           <div className="text-sm font-medium">{label}</div>
           {desc && <div className={`text-xs ${styles.muted} mt-0.5`}>{desc}</div>}
         </td>
-        {/* 当前值（可编辑） */}
+        {/* Current value (editable) */}
         <td className="py-3 px-3">
           {inputType === 'BOOLEAN' ? (
             <select
@@ -193,10 +192,10 @@ export default function SystemConfigManager() {
               onChange={e => setEditing(prev => ({ ...prev, [cfg.key]: e.target.value }))}
               onBlur={() => { if (editing[cfg.key] !== undefined) handleSave(cfg.key); }}
               className="px-2 py-1.5 rounded text-sm border"
-              style={{ background: '#0f172a', color: '#e2e8f0', borderColor: '#334155' }}
+              style={{ background: 'var(--input-bg, #0f172a)', color: 'var(--text, #e2e8f0)', borderColor: 'var(--border, #334155)' }}
             >
-              <option value="true">{isZh ? '是' : 'true'}</option>
-              <option value="false">{isZh ? '否' : 'false'}</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
             </select>
           ) : (
             <div className="flex items-center gap-1.5">
@@ -206,34 +205,34 @@ export default function SystemConfigManager() {
                 onChange={e => setEditing(prev => ({ ...prev, [cfg.key]: e.target.value }))}
                 onKeyDown={handleKeyDown(cfg.key)}
                 className="px-2 py-1.5 rounded text-sm w-40"
-                style={{ background: '#0f172a', color: '#e2e8f0', border: '1px solid #334155' }}
+                style={{ background: 'var(--input-bg, #0f172a)', color: 'var(--text, #e2e8f0)', border: '1px solid var(--border, #334155)' }}
               />
               <button
                 onClick={() => handleSave(cfg.key)}
                 disabled={isSaving}
-                className="p-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
-                title={isZh ? '保存' : 'Save'}
+                className="p-1.5 rounded text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: 'var(--accent)' }}
+                title={t('systemConfig.action.save')}
               >
                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               </button>
             </div>
           )}
         </td>
-        {/* 默认值 */}
+        {/* Default value */}
         <td className={`py-3 px-3 text-sm ${styles.muted} font-mono`}>{defaultVal}</td>
-        {/* 修改时间 */}
+        {/* Modified time */}
         <td className={`py-3 px-3 text-xs ${styles.muted}`}>{modifiedAt}</td>
-        {/* 恢复默认 */}
+        {/* Reset to default */}
         <td className="py-3 px-3">
           <button
             onClick={() => handleReset(cfg.key)}
             disabled={isResetting}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50"
-            style={{ borderColor: '#d97706', color: '#d97706' }}
-            title={isZh ? '恢复默认值' : 'Reset to default'}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-50 ${styles.warningBg} ${styles.warningText} ${styles.warningBorder} hover:opacity-80`}
+            title={t('systemConfig.action.reset')}
           >
             {isResetting ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-            <span>{isZh ? '恢复' : 'Reset'}</span>
+            <span>{t('systemConfig.action.reset')}</span>
           </button>
         </td>
       </tr>
@@ -253,7 +252,7 @@ export default function SystemConfigManager() {
             <hr className={`mt-3 mb-2 ${styles.sidebarBorder}`} />
           </div>
           <p className={`text-center py-4 text-xs ${styles.muted}`}>
-            {isZh ? '暂无配置项' : 'No configs available'}
+            {t('systemConfig.noConfigs')}
           </p>
         </div>
       );
@@ -272,12 +271,12 @@ export default function SystemConfigManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className={`border-b ${styles.sidebarBorder} ${styles.muted} text-xs uppercase`}>
-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '配置键' : 'Key'}</th>
-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '描述' : 'Description'}</th>
-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '当前值' : 'Current Value'}</th>
-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '默认值' : 'Default'}</th>
-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '修改时间' : 'Modified'}</th>
-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '恢复默认' : 'Reset'}</th>
+                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.key')}</th>
+                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.desc')}</th>
+                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.current')}</th>
+                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.default')}</th>
+                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.modified')}</th>
+                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.action.reset')}</th>
               </tr>
             </thead>
             <tbody>
@@ -297,13 +296,15 @@ export default function SystemConfigManager() {
           <div className="flex items-center gap-2">
             <Settings size={18} className={styles.muted} />
             <h2 className={`text-lg font-semibold ${styles.text}`}>
-              {isZh ? '系统配置管理' : 'System Config Manager'}
+              {t('systemConfig.title')}
             </h2>
           </div>
           <button onClick={handleAudit}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm transition-colors">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white text-sm transition-colors"
+            style={{ backgroundColor: 'var(--accent)' }}
+          >
             <Shield size={14} />
-            {isZh ? '参数审计' : 'Audit'}
+            {t('systemConfig.audit')}
           </button>
         </div>
 
@@ -312,24 +313,24 @@ export default function SystemConfigManager() {
           {loading ? (
             <div className="flex items-center gap-2 p-8">
               <Loader2 size={24} className="animate-spin text-indigo-400" />
-              <span className={styles.muted}>{isZh ? '加载中...' : 'Loading...'}</span>
+              <span className={styles.muted}>{t('common.loading')}</span>
             </div>
           ) : (
             <div>
               {/* Section 1: Global configs */}
               {renderSection(
-                isZh ? '全局通用配置' : 'Global Configuration',
+                t('systemConfig.section.global'),
                 <Settings size={15} className="text-indigo-400" />,
                 globalConfigs,
                 ''
               )}
 
-              {/* Grey separator between sections */}
-              <div className="h-2 bg-gray-100 dark:bg-gray-800" />
+              {/* Separator between sections */}
+              <div className={`h-2 ${styles.cardBorder}`} />
 
-              {/* Section 2: Security configs — grey background */}
+              {/* Section 2: Security configs */}
               {renderSection(
-                isZh ? '安全配置' : 'Security Configuration',
+                t('systemConfig.section.security'),
                 <Shield size={15} className="text-amber-400" />,
                 securityConfigs,
                 'bg-slate-50 dark:bg-slate-900'
@@ -345,27 +346,27 @@ export default function SystemConfigManager() {
               <div className={`flex items-center justify-between p-4 border-b ${styles.sidebarBorder}`}>
                 <div className="flex items-center gap-2">
                   <Shield size={18} className="text-indigo-400" />
-                  <h3 className={`font-semibold ${styles.text}`}>{isZh ? '参数消耗审计' : 'Config Consumption Audit'}</h3>
+                  <h3 className={`font-semibold ${styles.text}`}>{t('systemConfig.paraAudit.title')}</h3>
                 </div>
                 <button onClick={() => setAuditOpen(false)} className={`p-1 rounded hover:bg-gray-600/30 ${styles.muted}`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  <X size={18} />
                 </button>
               </div>
               <div className="overflow-auto p-4 flex-1">
                 {auditLoading ? (
-                  <div className="flex items-center gap-2 p-8"><Loader2 size={24} className="animate-spin text-indigo-400" /><span className={styles.muted}>{isZh ? '加载中...' : 'Loading...'}</span></div>
+                  <div className="flex items-center gap-2 p-8"><Loader2 size={24} className="animate-spin text-indigo-400" /><span className={styles.muted}>{t('common.loading')}</span></div>
                 ) : auditData.length === 0 ? (
-                  <p className={`text-center py-8 ${styles.muted}`}>{isZh ? '暂无审计数据' : 'No audit data available'}</p>
+                  <p className={`text-center py-8 ${styles.muted}`}>{t('systemConfig.paraAudit.empty')}</p>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
                       <tr className={`border-b ${styles.sidebarBorder} ${styles.muted} text-left text-xs uppercase`}>
-                        <th className="py-2 px-3">{isZh ? '参数键' : 'Key'}</th>
-                        <th className="py-2 px-3">{isZh ? '标签' : 'Label'}</th>
-                        <th className="py-2 px-3">{isZh ? '当前值' : 'Value'}</th>
-                        <th className="py-2 px-3">{isZh ? '消耗状态' : 'Consumed'}</th>
-                        <th className="py-2 px-3">{isZh ? '消耗者' : 'Consumed By'}</th>
-                        <th className="py-2 px-3">{isZh ? '消耗时间' : 'Consumed At'}</th>
+                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.key')}</th>
+                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.label')}</th>
+                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.value')}</th>
+                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.consumed')}</th>
+                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.by')}</th>
+                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.at')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -376,7 +377,7 @@ export default function SystemConfigManager() {
                           <td className="py-2 px-3 font-mono text-xs max-w-[120px] truncate">{item.value}</td>
                           <td className="py-2 px-3">
                             <span className={`px-1.5 py-0.5 rounded text-xs ${item.consumed ? 'bg-amber-700 text-amber-200' : 'bg-emerald-700 text-emerald-200'}`}>
-                              {item.consumed ? (isZh ? '已消耗' : 'Yes') : (isZh ? '未消耗' : 'No')}
+                              {item.consumed ? t('systemConfig.paraAudit.yes') : t('systemConfig.paraAudit.no')}
                             </span>
                           </td>
                           <td className="py-2 px-3 text-xs">{item.consumedBy || '—'}</td>

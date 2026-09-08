@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useLanguage } from "../LanguageContext";
 import { useTheme } from "../ThemeContext";
 import LoadingSkeleton from "./LoadingSkeleton";
 import EmptyState from "./EmptyState";
@@ -55,6 +56,7 @@ export default function DataTable<T extends Record<string, any>>({
   hidePagination = false,
 }: DataTableProps<T>) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [internalPage, setInternalPage] = useState(1);
 
   const isControlled = controlledPage !== undefined;
@@ -162,7 +164,7 @@ export default function DataTable<T extends Record<string, any>>({
           className={`flex items-center justify-between px-3 py-2.5 border-t ${styles.cardBorder} text-xs select-none`}
         >
           <span className={`${styles.cardTextMuted} text-[11px]`}>
-            {total} 条记录，第 {page}/{totalPages} 页
+            {t("common.pagination.total", { n: total })} {t("common.pagination.page", { p: page, m: totalPages })}
           </span>
 
           <div className="flex items-center gap-1">

@@ -47,6 +47,13 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/v1/portal/",       "/api/portal/"),
         Map.entry("/api/v1/agent-call/",   "/api/agent-call/"),
         Map.entry("/api/v1/glossary/",     "/api/glossary/"),
+        // ── PMO-45 T5: /api/v1/datasource/ → /datasource/ (PMO45DataSourceController 裸路径) ──
+        Map.entry("/api/v1/datasource/",   "/datasource/"),
+        // ── PMO-38 T5: 新增两条 v1 前缀正/反向重写 ──
+        // /api/v1/knowledge-bases → /api/knowledge-bases (Controller 双路径)
+        Map.entry("/api/v1/knowledge-bases",  "/api/knowledge-bases"),
+        // /api/v1/sysconfig/ → /api/sysconfig/ (T4 双路径)
+        Map.entry("/api/v1/sysconfig/",     "/api/sysconfig/"),
         Map.entry("/api/v1/marketplace/",   "/api/marketplace/")
     );
 
@@ -59,7 +66,12 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/agent/agents",     "/api/v1/agents"),
         Map.entry("/api/agent/models",     "/api/v1/agents/models"),
         Map.entry("/api/agent/prompts",    "/api/v1/agents/prompts"),
-        Map.entry("/api/alerts",           "/api/v1/alerts")
+        Map.entry("/api/alerts",           "/api/v1/alerts"),
+        // ── PMO-38 T5: 新增反向重写（/api/ → /api/v1/）──
+        Map.entry("/api/knowledge-bases",  "/api/v1/knowledge-bases"),
+        Map.entry("/api/sysconfig/",       "/api/v1/sysconfig/"),
+        // ── PMO-45 T5: /datasource/ → /api/v1/datasource/ 反向重写 ──
+        Map.entry("/datasource/",          "/api/v1/datasource/")
     );
 
     private static final Map<String, String> REVERSE_PREFIX_MAP = Map.ofEntries(

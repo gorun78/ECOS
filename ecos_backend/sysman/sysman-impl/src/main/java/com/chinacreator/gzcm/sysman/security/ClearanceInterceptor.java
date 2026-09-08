@@ -106,7 +106,41 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/ontology/functions")
                 || path.startsWith("/api/v1/engine")
                 || path.startsWith("/api/v1/cognitive")
-                || path.startsWith("/api/v1/knowledge/")) {
+                || path.startsWith("/api/v1/knowledge/")
+                // ── PMO-38 T5: 新增豁免（双路径）──
+                // knowledge-bases 列表端点
+                || path.startsWith("/api/v1/knowledge-bases")
+                || path.startsWith("/api/knowledge-bases")
+                // sysconfig/{key}/reset 双路径
+                || path.startsWith("/api/v1/sysconfig/")
+                || path.startsWith("/api/sysconfig/")
+                // ── PMO-39 T5: 5 新端点双路径豁免 ──
+                // T1 cognitive /plan, /plan/{id}, /optimize
+                || path.startsWith("/api/cognitive/plan")
+                || path.startsWith("/api/cognitive/optimize")
+                // T2 ontology workflow definitions
+                || path.startsWith("/api/engine/ontology/workflow/definitions")
+                // T3 ontology versions diff
+                || path.startsWith("/api/ontology/versions/diff")
+                || path.startsWith("/api/v1/ontology/versions/diff")
+                // T4 portal search
+                || path.startsWith("/api/portal/search")
+                // ── PMO-40 T5: 3 新端点双路径豁免 ──
+                // T1 agent-metrics 兼容路径
+                || path.startsWith("/api/v1/agent-metrics")
+                || path.startsWith("/api/agent-metrics")
+                // T4a ontology sources (GET /api/v1/ecos/ontology/** 已豁免 /api/v1/ecos/ontologies 同前缀)
+                || path.startsWith("/api/v1/ecos/ontology/sources")
+                || path.startsWith("/api/ecos/ontology/sources")
+                // T4b ontology auto-discover preview (under /api/v1/ecos/ already exempt)
+                || path.startsWith("/api/ecos/domains")
+                // T2 metadata strategy 双路径
+                || path.startsWith("/api/v1/datanet/metadata/strategy")
+                || path.startsWith("/api/datanet/metadata/strategy")
+                // ── PMO-45 T5: datasource 双路径豁免 (PMO45DataSourceController) ──
+                || path.startsWith("/api/v1/datasource")
+                || path.startsWith("/datasource")
+                ) {
             return true;
         }
 

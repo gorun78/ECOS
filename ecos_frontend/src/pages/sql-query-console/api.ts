@@ -19,7 +19,10 @@ const DATASOURCE_URL = '/datanet/datasource';
 const SCHEMA_URL = '/api/v1/engine/data/query/schema';
 const EXECUTE_URL = '/api/v1/engine/data/query/execute';
 const HISTORY_URL = '/api/v1/engine/data/query/history';
-const TEMPLATE_URL = '/api/v1/engine/data/query/template';
+// PMO-41: 对齐后端 QueryController — 列表/详情/删除用复数 /templates，
+// 保存(新增/更新)后端实际为单数 POST /template，故保存 URL 单独定义。
+const TEMPLATE_LIST_URL = '/api/v1/engine/data/query/templates';
+const TEMPLATE_SAVE_URL = '/api/v1/engine/data/query/template';
 
 /** 通用 GET 请求辅助函数 */
 async function get<T>(url: string): Promise<T> {
@@ -171,25 +174,25 @@ export async function clearQueryHistory(): Promise<boolean> {
 
 // ─── 模板管理 ─────────────────────────────────────────────
 
-/** 获取模板列表 */
+/** 获取模板列表（后端 GET /api/v1/engine/data/query/templates，复数） */
 export async function fetchTemplates(): Promise<QueryTemplate[]> {
   try {
-    return await get<QueryTemplate[]>(TEMPLATE_URL);
+    return await get<QueryTemplate[]>(TEMPLATE_LIST_URL);
   } catch (e) {
     console.warn('[sql-query-console] fetchTemplates failed:', e);
     return [];
   }
 }
 
-/** 保存模板 */
+/** 保存模板（后端 POST /api/v1/engine/data/query/template，单数 — 新增或更新） */
 export async function saveTemplate(req: SaveTemplateRequest): Promise<QueryTemplate> {
-  return post<QueryTemplate>(TEMPLATE_URL, req);
+  return post<QueryTemplate>(TEMPLATE_SAVE_URL, req);
 }
 
-/** 删除模板 */
+/** 删除模板（后端 DELETE /api/v1/engine/data/query/templates/{id}，复数） */
 export async function deleteTemplate(id: string): Promise<boolean> {
   try {
-    await del(`${TEMPLATE_URL}/${id}`);
+    await del(`${TEMPLATE_LIST_URL}/${id}`);
     return true;
   } catch (e) {
     console.warn('[sql-query-console] deleteTemplate failed:', e);

@@ -1,0 +1,30 @@
+{
+  "artifact_type": "REVIEW_REPORT_APPROVAL_RECORD",
+  "task_id": "t_75b3faf3",
+  "name": "ECOS PMO-43 前端P0边界/基础设施/网络 — T1-T5 验收审查",
+  "source_patch_ref": "SOURCE_PATCH@git:feature/pmo-43-fe-p0-infra-network(API,uncommitted)",
+  "prd_ref": "PRD@docs/PMO/PMO-43-前端P0边界-基础设施-网络.md",
+  "reviewed_at": "2026-09-07T15:43:00+08:00",
+  "reviewer": "reviewer-code-review (Layer-1 routed via reviewer-review-dispatcher, L2)",
+  "status": "PENDING_HUMAN_REVIEW",
+  "human_review_required": true,
+  "deliverable_allowed": false,
+  "gates": [
+    { "gate": "P0_GATE", "status": "FAIL", "value": 2, "threshold": "0" },
+    { "gate": "P1_GATE", "status": "PASS", "value": 2, "threshold": "<=3" },
+    { "gate": "SECURITY_GATE", "status": "PASS", "value": 0, "threshold": "0 (no CRITICAL/HIGH)" },
+    { "gate": "ARCH_GATE", "status": "PASS", "value": 0, "threshold": "0 P0/P1" }
+  ],
+  "defect_summary": { "P0": 2, "P1": 2, "P2": 4 },
+  "defects": [
+    "C-001 [P0] EngineMonitor.tsx:72-79 + GuardrailsView.tsx:114-122 缺少 heartbeat-fallback 回退语义（返回错误 → 触发横幅降级），违反 PMO-43 T4 验收第②条",
+    "C-002 [P0] App.tsx:130-168 健康轮询仍在 onFailure 直接 setServiceStatus('DOWN') + 仅 close silent，未走 NetworkErrorBanner/网络重组通道，违反 PMO-43 T2 验收第①条",
+    "C-003 [P1] GuardrailsView.tsx:119-121 未走 NoAccessError/notifyNoAccess 公共语义，自行 throw 裸 Error('无权限访问该资源')；api.ts 通知路径未在 GuardrailsView 生效",
+    "C-004 [P1] MonitoringCenter.tsx:55-63 403 分支走 window.dispatchEvent('ecos-403') 私有事件而非公共 notifyNoAccess/NoAccessError；非超时 apiFetch 错误（网络失败）未通过 NetworkErrorBanner 通道，与 T5 通道割裂",
+    "C-005 [P2] EngineMonitor.tsx:125-159 403 时 showToast 被抑制（非 TaskPanel 显示 toast 语义）且未渲染内联 '无权限' 卡片（与 MonitoringCenter 实现不对称）",
+    "C-006 [P2] NetworkErrorBanner.tsx:45-56 使用 setTimeout(15s) 自熄灭，Acceptance T5 要求 30s 内消散，实现为 30s 最坏值=15s dismiss+anim，边界模糊；建议对齐 spec 30s 常量",
+    "C-007 [P2] aiworkbench/index.tsx:3465-3488 ErrorState 重试按钮 borderColor '#555' 硬编码，违反前端铁律（禁止硬编码 Tailwind 颜色）",
+    "C-008 [P2] AgentMesh.tsx:198-238 中英文硬编码 '重试加载'/'重试' 混用 i18n 未统一走 t()，与同页 2362 行已用 t() 不一致"
+  ],
+  "summary": "deliverable_allowed=false — P0_GATE FAIL (2 P0)。C-001/C-002 为 T4/T2 验收裁决性偏差；C-003/C-004 为实现路径偏离公共语义（P1，可带条件修复）。其余 4 P2 为工程规范项（i18n/硬编码颜色/banner 定时器常量对齐）。"
+}

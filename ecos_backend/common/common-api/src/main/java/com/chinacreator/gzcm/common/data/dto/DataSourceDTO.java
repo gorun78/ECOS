@@ -83,4 +83,15 @@ public class DataSourceDTO {
 
     public String getMetadataConfig() { return metadataConfig; }
     public void setMetadataConfig(String metadataConfig) { this.metadataConfig = metadataConfig; }
+
+    // ===== PMO-46: 密码加密字段 =====
+    /**
+     * PMO-46: 明文密码（可选）。FE 编辑时仅在密码变化时提交；
+     * 提交后服务端加密存入 password_enc，connectionConfig 中的密码字段不再持久化。
+     * null/空白 = 保留既有 password_enc 不变；提交空白字符串 "" = 清空既有密码。
+     */
+    private String password;
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
 }

@@ -1,0 +1,33 @@
+{
+  "artifact": "REVIEW_REPORT",
+  "name": "PMO-43 T1 api.ts error handling refactoring 审查",
+  "version": "v1",
+  "hash": "api.ts@wt-diff-HEAD(228+/21-)",
+  "status": "PENDING_HUMAN_REVIEW",
+  "human_review_required": false,
+  "workflow_mode": "L2",
+  "approvals": [
+    {
+      "role": "reviewer-code-review",
+      "result": "REJECTED",
+      "timestamp": "2026-09-07T08:16:00+08:00",
+      "conditions": []
+    }
+  ],
+  "gates": {
+    "P0_GATE": {"status": "PASS", "p0_count": 0},
+    "P1_GATE": {"status": "FAIL", "p1_count": 2, "threshold": 3, "note": "2 P1 unmet acceptance"},
+    "SECURITY_GATE": {"status": "PASS", "critical": 0, "high": 0},
+    "ARCH_GATE": {"status": "PASS", "p0_arch": 0, "p1_arch": 0}
+  },
+  "defect_summary": {"total": 5, "P0": 0, "P1": 2, "P2": 1, "P3": 2},
+  "prd_ref": "PMO-43-T1",
+  "source_patch_ref": "ecos_frontend/src/api.ts@wt-diff-HEAD",
+  "prd_defect_density": {
+    "PMO-43-T1": {"p1_count": 2, "bugs": ["C-001", "C-002"]}
+  },
+  "deliverable_allowed": false,
+  "prev_version": null,
+  "next_version": null,
+  "timestamp": "2026-09-07T08:16:00+08:00"
+}

@@ -765,7 +765,7 @@ export const ontologyApi = {
 // 版本管理 (Version Timeline) — T3
 // ================================================================
 
-const VERSION_BASE = "/api/v1/ontology/versions";
+const VERSION_BASE = "/api/v1/ecos/versions";
 
 /** 版本列表项 */
 export interface VersionItem {
@@ -798,7 +798,11 @@ export interface VersionDiff {
 
 /**
  * 获取版本历史列表
- * GET /api/v1/ontology/versions?domainCode=finance
+ * GET /api/v1/ecos/versions?domainCode=finance
+ * PMO-41: 路径由 /api/v1/ontology/versions 对齐后端实际路径
+ * OntologyVersionSimpleController @RequestMapping("/api/v1/ecos/versions")。
+ * 原 ?domainCode= 查询参数后端未消费（列表为全量跨 ontology），
+ * 签名为 API 只增不改原则保留；前端如需按 ontology 过滤应在客户端本地过滤。
  */
 export async function fetchVersions(domainCode: string): Promise<VersionItem[]> {
   return apiFetchData<VersionItem[]>(
@@ -809,6 +813,9 @@ export async function fetchVersions(domainCode: string): Promise<VersionItem[]> 
 /**
  * 获取两个版本之间的 diff
  * GET /api/v1/ontology/versions/diff?v1=3.1&v2=3.2
+ * 说明: PMO-39 T3 将补齐该端点；后端现状仅有按 id 的 diff-with-previous
+ * (GET /api/v1/ecos/versions/{id}/diff)，故此处路径本批次保持不变，
+ * 待后端落地后再校。
  */
 export async function fetchVersionDiff(v1: string, v2: string): Promise<VersionDiff> {
   return apiFetchData<VersionDiff>(

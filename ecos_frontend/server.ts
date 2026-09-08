@@ -24,14 +24,20 @@ const gatewayProxy = async (req: express.Request, res: express.Response) => {
   const method = req.method;
   console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl} (gateway)`);
   try {
+    // 仅在请求体存在时声明 JSON Content-Type —
+    // GET/HEAD 请求对 Java 后端加 JSON Content-Type 会被部分 Filter 判定为非法
+    // 触发 500 空响应（原本导致前端"点按钮无反馈"）。
+    const withBody =
+      method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
     const fetchOptions: RequestInit = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-      },
+      headers: upstreamHeaders,
     };
-    if (method !== "GET" && method !== "HEAD" && req.body) {
+    if (withBody) {
       fetchOptions.body = JSON.stringify(req.body);
     }
     const upstream = await fetch(targetUrl, fetchOptions);
@@ -91,15 +97,20 @@ app.use("/api", async (req, res) => {
   console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl}`);
 
   try {
+    // 与 gatewayProxy 保持一致 — 仅在请求体存在时设置 JSON Content-Type，
+    // 避免 GET 请求因带 JSON Content-Type 被 Java 后端 Filter 拒绝返回 500。
+    const withBody =
+      method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
     const fetchOptions: RequestInit = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-      },
+      headers: upstreamHeaders,
     };
 
-    if (method !== "GET" && method !== "HEAD" && req.body) {
+    if (withBody) {
       fetchOptions.body = JSON.stringify(req.body);
     }
 

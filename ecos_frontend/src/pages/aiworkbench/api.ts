@@ -1,7 +1,11 @@
 /**
  * AI Workbench — API layer
  * Connects to ECOS backend controllers: AgentMesh, Guardrails, Pipeline, Models.
- * Gracefully returns empty arrays on error so UI never whitescreens.
+ *
+ * PMO-43 P0 (2026-09-05 FE Check Report item 2): network/HTTP errors are
+ * RE-THROWN so callers can surface explicit error + retry UI. apiFetchData
+ * (src/api.ts) emits the `NetworkDownEvent` for the global NetworkErrorBanner;
+ * this layer no longer swallows failures into empty arrays.
  * @license Apache-2.0
  */
 import { apiFetchData } from '../../api';
@@ -26,13 +30,9 @@ interface AgentMeshAgentRaw {
 }
 
 export async function fetchAIPAgentsFromMesh(): Promise<AIPAgent[]> {
-  try {
-    const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
-    return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
-  } catch (e) {
-    console.warn('[ai-workbench] fetchAIPAgentsFromMesh failed', e);
-    return [];
-  }
+  // PMO-43 T3: no silent catch — caller renders error + retry state
+  const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
+  return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
 }
 
 function convertMeshAgentToAIP(raw: AgentMeshAgentRaw): AIPAgent {
@@ -77,13 +77,8 @@ interface GuardrailPolicyRaw {
 }
 
 export async function fetchGuardrailPolicies(): Promise<AIPGuardrail[]> {
-  try {
-    const data = await apiFetchData<GuardrailPolicyRaw[]>('/api/v1/guardrails/policies');
-    return (Array.isArray(data) ? data : []).map(convertPolicyToGuardrail);
-  } catch (e) {
-    console.warn('[ai-workbench] fetchGuardrailPolicies failed', e);
-    return [];
-  }
+  const data = await apiFetchData<GuardrailPolicyRaw[]>('/api/v1/guardrails/policies');
+  return (Array.isArray(data) ? data : []).map(convertPolicyToGuardrail);
 }
 
 function convertPolicyToGuardrail(raw: GuardrailPolicyRaw): AIPGuardrail {
@@ -127,22 +122,17 @@ interface PipelineDefinitionRaw {
 }
 
 export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
-  try {
-    const data = await apiFetchData<PipelineDefinitionRaw[]>('/api/v1/pipeline/definitions');
-    return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
-      id: p.id || p.name,
-      name: p.name,
-      description: p.description || '',
-      status: (p.status as AIPLogicPipeline['status']) || 'draft',
-      creator: (p as any).creator || 'system',
-      lastUpdated: (p as any).lastUpdated || new Date().toISOString(),
-      inputs: Array.isArray((p as any).inputs) ? (p as any).inputs : [],
-      blocks: (Array.isArray((p as any).blocks) ? (p as any).blocks : []) as AIPLogicPipeline['blocks'],
-    }));
-  } catch (e) {
-    console.warn('[ai-workbench] fetchPipelineDefinitions failed', e);
-    return [];
-  }
+  const data = await apiFetchData<PipelineDefinitionRaw[]>('/api/v1/pipeline/definitions');
+  return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
+    id: p.id || p.name,
+    name: p.name,
+    description: p.description || '',
+    status: (p.status as AIPLogicPipeline['status']) || 'draft',
+    creator: (p as any).creator || 'system',
+    lastUpdated: (p as any).lastUpdated || new Date().toISOString(),
+    inputs: Array.isArray((p as any).inputs) ? (p as any).inputs : [],
+    blocks: (Array.isArray((p as any).blocks) ? (p as any).blocks : []) as AIPLogicPipeline['blocks'],
+  }));
 }
 
 // ── ActionTypes (Ontology) ─────────────────────────────────────
@@ -161,16 +151,11 @@ interface ActionTypeRaw {
 }
 
 export async function fetchActionTypes(objectTypeId?: string): Promise<AIPActionType[]> {
-  try {
-    const url = objectTypeId
-      ? `/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
-      : '/api/v1/ontology/actions';
-    const data = await apiFetchData<ActionTypeRaw[]>(url);
-    return (Array.isArray(data) ? data : []).map(convertActionType);
-  } catch (e) {
-    console.warn('[ai-workbench] fetchActionTypes failed', e);
-    return [];
-  }
+  const url = objectTypeId
+    ? `/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
+    : '/api/v1/ontology/actions';
+  const data = await apiFetchData<ActionTypeRaw[]>(url);
+  return (Array.isArray(data) ? data : []).map(convertActionType);
 }
 
 function convertActionType(raw: ActionTypeRaw): AIPActionType {
@@ -234,53 +219,47 @@ export async function executeActionType(
 }
 
 export async function fetchAgentModels(): Promise<AIPModel[]> {
-  try {
-    const raw = await apiFetchData<any[]>('/api/v1/aip/models');
-    return (Array.isArray(raw) ? raw : []).map((item: any) => ({
-      id: item.id,
-      displayName: item.name || item.displayName || item.id,
-      provider: item.provider || 'On-Premises',
-      type: item.modelType === 'embedding' ? 'embedding'
-          : item.modelType === 'vision' ? 'vision'
-          : item.modelType === 'audio' ? 'audio'
-          : 'language',
-      status: item.status === 'active' ? 'connected'
-          : item.status === 'testing' ? 'testing'
-          : 'offline',
-      maxContext: item.maxContext || '128K',
-      latencyMs: item.latencyMs || 150,
-      costPerMillion: item.costPerMillion || '$0.005',
-      inputCost: item.inputCost || '$0.003',
-      outputCost: item.outputCost || '$0.006',
-      healthRate: item.healthRate || 99.5,
-      temperature: item.temperature || 0.7,
-    }));
-  } catch (e) {
-    console.warn('[ai-workbench] fetchAgentModels failed', e);
-    return [];
-  }
+  // PMO-43 T1: mock fallback removed — re-throw so ModelCatalogView can
+  // distinguish "backend down" from "no models registered".
+  const raw = await apiFetchData<any[]>('/api/v1/aip/models');
+  return (Array.isArray(raw) ? raw : []).map((item: any) => ({
+    id: item.id,
+    displayName: item.name || item.displayName || item.id,
+    provider: item.provider || 'On-Premises',
+    type: item.modelType === 'embedding' ? 'embedding'
+        : item.modelType === 'vision' ? 'vision'
+        : item.modelType === 'audio' ? 'audio'
+        : 'language',
+    status: item.status === 'active' ? 'connected'
+        : item.status === 'testing' ? 'testing'
+        : 'offline',
+    maxContext: item.maxContext || '128K',
+    latencyMs: item.latencyMs || 150,
+    costPerMillion: item.costPerMillion || '$0.005',
+    inputCost: item.inputCost || '$0.003',
+    outputCost: item.outputCost || '$0.006',
+    healthRate: item.healthRate || 99.5,
+    temperature: item.temperature || 0.7,
+  }));
 }
 
 // ── Agent Market (T9-1) ──────────────────────────────────────
 
 export async function fetchAgentTemplates(): Promise<AIPAgentTemplate[]> {
-  try {
-    const raw = await apiFetchData<any[]>('/api/v1/aip/agents/templates');
-    return (Array.isArray(raw) ? raw : []).map((t: any) => ({
-      id: t.id,
-      name: t.name || t.id,
-      icon: t.icon || 'Bot',
-      description: t.description || '',
-      model: t.model || 'gemini-1.5-pro',
-      temperature: t.temperature || 0.7,
-      maxIterations: t.maxIterations || 10,
-      category: t.category || 'chat',
-      isInstantiated: t.isInstantiated === true,
-    }));
-  } catch (e) {
-    console.warn('[ai-workbench] fetchAgentTemplates failed', e);
-    return [];
-  }
+  // PMO-43 T3: no silent catch — caller (AgentMarket) merges with BUILTIN
+  // defaults and surfaces an inline error state when the backend is down.
+  const raw = await apiFetchData<any[]>('/api/v1/aip/agents/templates');
+  return (Array.isArray(raw) ? raw : []).map((t: any) => ({
+    id: t.id,
+    name: t.name || t.id,
+    icon: t.icon || 'Bot',
+    description: t.description || '',
+    model: t.model || 'gemini-1.5-pro',
+    temperature: t.temperature || 0.7,
+    maxIterations: t.maxIterations || 10,
+    category: t.category || 'chat',
+    isInstantiated: t.isInstantiated === true,
+  }));
 }
 
 export async function instantiateAgent(
@@ -309,25 +288,20 @@ export async function instantiateAgent(
 // ── Agent Manager (T9-2) ─────────────────────────────────────
 
 export async function fetchManagedAgents(): Promise<AIPAgent[]> {
-  try {
-    const raw = await apiFetchData<any[]>('/api/v1/aip/agents');
-    return (Array.isArray(raw) ? raw : []).map((a: any) => ({
-      id: a.id,
-      name: a.name || a.id,
-      avatar: a.icon || 'Bot',
-      role: a.role || 'assistant',
-      description: a.description || '',
-      modelId: a.model || 'gemini-1.5-pro',
-      systemPrompt: a.systemPrompt || '',
-      assignedTools: { actionIds: (a.tools || []) as string[], functionIds: [] as string[] },
-      guardrailIds: (a.guardrails || []) as string[],
-      status: (a.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
-      lastModified: a.updatedAt || a.createdAt || new Date().toISOString(),
-    }));
-  } catch (e) {
-    console.warn('[ai-workbench] fetchManagedAgents failed', e);
-    return [];
-  }
+  const raw = await apiFetchData<any[]>('/api/v1/aip/agents');
+  return (Array.isArray(raw) ? raw : []).map((a: any) => ({
+    id: a.id,
+    name: a.name || a.id,
+    avatar: a.icon || 'Bot',
+    role: a.role || 'assistant',
+    description: a.description || '',
+    modelId: a.model || 'gemini-1.5-pro',
+    systemPrompt: a.systemPrompt || '',
+    assignedTools: { actionIds: (a.tools || []) as string[], functionIds: [] as string[] },
+    guardrailIds: (a.guardrails || []) as string[],
+    status: (a.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
+    lastModified: a.updatedAt || a.createdAt || new Date().toISOString(),
+  }));
 }
 
 export async function updateManagedAgent(
@@ -348,19 +322,14 @@ export async function toggleAgentStatus(id: string, status: 'active' | 'developm
 }
 
 export async function fetchAgentVersions(agentId: string): Promise<AIPAgentVersion[]> {
-  try {
-    const raw = await apiFetchData<any[]>(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/versions`);
-    return (Array.isArray(raw) ? raw : []).map((v: any) => ({
-      id: v.id,
-      agentId: v.agentId || agentId,
-      version: v.version || 0,
-      config: typeof v.config === 'string' ? v.config : JSON.stringify(v.config || {}),
-      createdAt: v.createdAt || new Date().toISOString(),
-    }));
-  } catch (e) {
-    console.warn('[ai-workbench] fetchAgentVersions failed', e);
-    return [];
-  }
+  const raw = await apiFetchData<any[]>(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/versions`);
+  return (Array.isArray(raw) ? raw : []).map((v: any) => ({
+    id: v.id,
+    agentId: v.agentId || agentId,
+    version: v.version || 0,
+    config: typeof v.config === 'string' ? v.config : JSON.stringify(v.config || {}),
+    createdAt: v.createdAt || new Date().toISOString(),
+  }));
 }
 
 export async function rollbackAgent(agentId: string, version: number): Promise<void> {
@@ -372,41 +341,48 @@ export async function rollbackAgent(agentId: string, version: number): Promise<v
 
 // ── Agent Monitor (T9-3) ─────────────────────────────────────
 
+/**
+ * 获取 Agent 指标汇总
+ * GET /api/v1/aip/agent-metrics/{agentId}（主路径，对齐后端 AgentMetricsController）
+ * PMO-41: 由前端自承的别名路径 /api/v1/agent-metrics/... 改为主路径 /api/v1/aip/agent-metrics。
+ * 字段对齐后端实际返回: agentId/totalCount/successCount/successRate/avgElapsedMs/p50Ms/p99Ms 等。
+ */
 export async function fetchAgentMetrics(agentId: string): Promise<AIPAgentMetrics> {
-  try {
-    const data = await apiFetchData<any>(`/api/v1/agent-metrics/${encodeURIComponent(agentId)}`);
-    return {
-      agentId: data.agentId || agentId,
-      agentName: data.agentName || agentId,
-      totalCalls: data.totalCalls || 0,
-      successRate: data.successRate || 0,
-      avgLatencyMs: data.avgLatencyMs || 0,
-      p99LatencyMs: data.p99LatencyMs || 0,
-      trend24h: Array.isArray(data.trend24h) ? data.trend24h : [],
-      trend7d: Array.isArray(data.trend7d) ? data.trend7d : [],
-      trend30d: Array.isArray(data.trend30d) ? data.trend30d : [],
-      lastUpdated: data.lastUpdated || new Date().toISOString(),
-    };
-  } catch (e) {
-    console.warn('[ai-workbench] fetchAgentMetrics failed', e);
-    throw e;
-  }
+  const data = await apiFetchData<any>(`/api/v1/aip/agent-metrics/${encodeURIComponent(agentId)}`);
+  return {
+    agentId: data.agentId || agentId,
+    agentName: data.agentName || agentId,
+    // 后端返回 totalCount，前端展示字段为 totalCalls
+    totalCalls: data.totalCalls ?? data.totalCount ?? 0,
+    successRate: data.successRate ?? 0,
+    // 后端返回 avgElapsedMs / p99Ms，前端展示字段为 avgLatencyMs / p99LatencyMs
+    avgLatencyMs: data.avgLatencyMs ?? data.avgElapsedMs ?? 0,
+    p99LatencyMs: data.p99LatencyMs ?? data.p99Ms ?? 0,
+    trend24h: Array.isArray(data.trend24h) ? data.trend24h : [],
+    trend7d: Array.isArray(data.trend7d) ? data.trend7d : [],
+    trend30d: Array.isArray(data.trend30d) ? data.trend30d : [],
+    lastUpdated: data.lastUpdated || new Date().toISOString(),
+  };
 }
 
+/**
+ * 获取 Agent 错误/告警列表
+ * GET /api/v1/aip/agent-metrics/{agentId}/errors（主路径，对齐后端 AgentMetricsController）
+ * PMO-41: 由前端自承的别名路径 /api/v1/agent-metrics/... 改为主路径 /api/v1/aip/agent-metrics。
+ * 后端返回 { agentId, total, errors: [...] }，errors 为数组。
+ */
 export async function fetchAgentErrors(agentId: string): Promise<AIPAgentError[]> {
-  try {
-    const raw = await apiFetchData<any[]>(`/api/v1/agent-metrics/${encodeURIComponent(agentId)}/errors`);
-    return (Array.isArray(raw) ? raw : []).map((e: any) => ({
-      id: e.id || `err-${Date.now()}`,
-      timestamp: e.timestamp || new Date().toISOString(),
-      agentId: e.agentId || agentId,
-      agentName: e.agentName || agentId,
-      errorMessage: e.errorMessage || e.message || 'Unknown error',
-      traceId: e.traceId || '',
-      status: e.status || 'unresolved',
-    }));
-  } catch (e) {
-    console.warn('[ai-workbench] fetchAgentErrors failed', e);
-    return [];
-  }
+  const resp = await apiFetchData<{ total?: number; errors?: any[] }>(
+    `/api/v1/aip/agent-metrics/${encodeURIComponent(agentId)}/errors`
+  );
+  const raw = Array.isArray(resp) ? resp : (resp?.errors ?? []);
+  return (Array.isArray(raw) ? raw : []).map((e: any) => ({
+    id: e.id || `err-${Date.now()}`,
+    timestamp: e.timestamp || new Date().toISOString(),
+    agentId: e.agentId || agentId,
+    agentName: e.agentName || agentId,
+    errorMessage: e.errorMessage || e.message || 'Unknown error',
+    traceId: e.traceId || '',
+    status: e.status || 'unresolved',
+  }));
 }

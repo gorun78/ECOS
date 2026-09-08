@@ -1,0 +1,64 @@
+{
+  "task_id": "t_c733cd62",
+  "parent_task": "t_6d63b733",
+  "skill": "reviewer-code-review",
+  "artifact": "PMO-43 T3 — aiworkbench silent fetch fix + AgentMesh retry UI",
+  "evidence": {
+    "aiworkbench_4_fetch_errors": "PASS",
+    "agentmesh_polling_retry_ui": "FAIL"
+  },
+  "findings": [
+    {
+      "id": "C-001",
+      "severity": "P1",
+      "status": "FAIL",
+      "location": "ecos_frontend/src/pages/AgentMesh.tsx:67-75",
+      "title": "AgentMesh 轮询仍静默吞错，未显示重试 UI",
+      "detail": "pollTasks 的 catch 块内容为空注释 `// Silently ignore polling errors`（工作区 AgentMesh.tsx:72-74）。PMO-43 T3 验收要求（docs/PMO/PMO-43-前端P0边界-基础设施-网络.md:26）『AgentMesh 列表无白屏；重试』仅部分完成：agents/missions 初始加载已补 error+retry 三态（loadErrors.agents/missions，UI 按钮在 195-203/230-242/363-375），但 3s 轮询（fetchAgentMeshMission, setInterval 3000，行 80）失败时 UI 零反馈——RUNNING mission 的后端即故障表现为任务列表冻结且不更新，正是本任务验收明文排除的『silent polling failures』。grep 证实 AgentMesh.tsx 全文件无 pollError 状态、无 retry handler、无相关 i18n key；pollingRef (行 45, 63) 只写不读，死代码。",
+      "suggestion": "给 pollTasks 的 catch 写入 per-mission 错误状态（如 setPollError(msg)），在 TaskStatsPanel/任务区顶部渲染 inline 提示 + 立即重试按钮（onClick 调 pollTasks 并计次），轮询连续失败 N 次可停止 interval 并显示告警。",
+      "spec_ref": "PMO-43 T3 验收：『AgentMesh 列表无白屏；后端恢复后重试 → 3 个 Tab 加载 agents/guardrails/models』"
+    },
+    {
+      "id": "C-002",
+      "severity": "P2",
+      "status": "NOTE",
+      "location": "ecos_frontend/src/pages/AgentMesh.tsx:201,237,370",
+      "title": "重试按钮硬编码中文，绕过 i18n",
+      "detail": "『重试加载』/『重试』为硬编码中文字符串，且无英文 fallback key（network.retry 在 common/en.json:50 已存在）。前端铁律禁止硬编码中文字符串，4 主题/双语下英文用户看到中文。aiworkbench ErrorState 已正确使用 t(\"network.retry\")，AgentMesh 同文件内不一致。",
+      "suggestion": "改用 t(\"agentMesh.retry\"|\"network.retry\")。"
+    },
+    {
+      "id": "C-003",
+      "severity": "P2",
+      "status": "NOTE",
+      "location": "ecos_frontend/src/pages/aiworkbench/index.tsx:194-202 (logic tab)",
+      "title": "pipelines error 已捕获但 UI 未展示 → logic tab 静默空态",
+      "detail": "loadPipelines 将错误写入 loadErrors.pipelines（index.tsx:53-58），但 render 分支仅对 agents/models/guardrails 做 ErrorState 门控；logic tab (LogicView) 与 dashboard (lines 194-202) 不消费 loadErrors.pipelines，pipeline 拉取失败时该 Tab 显示空列表而非错误态。『4 个 fetch 均有显式 error 状态』的字面验收因此不闭环（错误被捕获但未暴露给用户）。",
+      "suggestion": "logic/dashboard 分支加 loadErrors.pipelines 门控或顶部错误条，重试按钮 onRetry=loadPipelines。"
+    },
+    {
+      "id": "C-004",
+      "severity": "P2",
+      "status": "NOTE",
+      "location": "ecos_frontend/src/services/aiworkbenchApi.ts:80-87,114-122,149-157,161-169,181-189",
+      "title": "services/aiworkbenchApi.ts 仍保留 5 处 empty-catch→[] 静默反模式",
+      "detail": "aiworkbenchApi.ts 的 fetchPipelines/fetchAgents/fetchModels/fetchGuardrails/fetchAuditLogs 全部 `catch { console.warn; return [] }`。当前 aiworkbench/index.tsx 与 AgentMesh 消费的是 pages/aiworkbench/api.ts（已 re-throw，正确），故不阻断本任务验收；但同模块平行服务层残留同类反模式，后续调用方接入即复发静默失败。",
+      "suggestion": "随 T3 返工一并 re-throw 或标记 deprecated 指向 pages/aiworkbench/api.ts。"
+    }
+  ],
+  "verified": [
+    "aiworkbench/index.tsx:79-84 — 4 个 fetch（agents/guardrails/pipelines/models）全部经 useCallback 加载器，catch → setLoadErrors，原 .catch(() => {}) 已消除（git diff 证实旧代码删除）",
+    "aiworkbench/index.tsx:213-257 — agent/chatbot/model/guardrails 4 tab 均有 loadError 门控渲染 ErrorState",
+    "aiworkbench/index.tsx:270-294 — ErrorState 组件：role=alert + CloudOff + t(\"network.error.title\") + 错误 message + Retry 按钮(RefreshCw + t(\"network.retry\"))；locale keys network.error.title/network.retry 在 common/en.json:46,50 与 common/zh-CN.json:46,50 均存在",
+    "AgentMesh.tsx:90-109 — loadAgents/loadMissions 初始加载 error+retry 三态实现正确（P1-1 对象）",
+    "AgentMesh.tsx:195-203,230-242,363-375 — agents/missions 空态+错误提示+重试按钮 UI 已上线",
+    "npm run lint (tsc --noEmit) exit 0 — 2026-09-07 本次运行"
+  ],
+  "gate": {
+    "p0": 0,
+    "p1": 1,
+    "p2": 3,
+    "deliverable_allowed": false,
+    "reason": "P1 C-001：AgentMesh 轮询静默失败未闭环验收项。另 3×P2 建议同批修复。"
+  }
+}

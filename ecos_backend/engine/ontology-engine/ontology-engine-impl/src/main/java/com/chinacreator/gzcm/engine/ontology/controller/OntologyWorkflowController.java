@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/engine/ontology/workflow")
+@RequestMapping({"/api/v1/engine/ontology/workflow", "/api/engine/ontology/workflow"})
 public class OntologyWorkflowController {
 
     private final WorkflowService workflowService;
@@ -26,11 +26,20 @@ public class OntologyWorkflowController {
 
     @GetMapping("/definitions")
     public ApiResponse<Map<String, Object>> listDefinitions(
-            @RequestParam(defaultValue = "50") int pageSize) {
+            @RequestParam(defaultValue = "50") int pageSize,
+            @RequestParam(defaultValue = "1") int pageNum) {
         List<Map<String, Object>> list = workflowService.listWorkflows(pageSize);
         Map<String, Object> result = new LinkedHashMap<>();
+        // PMO-39 T2: 规范分页结构 = total/pageNum/pageSize/records（§3 后端分页规范）。
+        // records 取当前页切片；data 字段保留全量列表（既有消费者兼容，API 只增不改）。
+        int from = Math.min((pageNum - 1) * pageSize, list.size());
+        int to = Math.min(from + pageSize, list.size());
+        result.put("records", list.subList(from, to));
+        // 兼容保留：既有消费者使用 data（API 只增不改）
         result.put("data", list);
         result.put("total", workflowService.totalCount());
+        result.put("pageNum", pageNum);
+        result.put("pageSize", pageSize);
         return ApiResponse.success(result);
     }
 

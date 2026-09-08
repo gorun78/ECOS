@@ -92,8 +92,14 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
   };
 
   // 通过 portal 渲染, 脱离表格 td 层级
+  // 外层 wrapper 必须随 open 切换 pointerEvents — 否则 drawer 关闭后，
+  // 它依旧作为铺满视口 (fixed inset-0 z-[80]) 的元素拦截下方所有点击，
+  // 表现为「数据工作台进入后所有按钮无法操作」。
   return createPortal(
-    <div className="fixed inset-0 z-[80]">
+    <div
+      className="fixed inset-0 z-[80]"
+      style={{ pointerEvents: open ? "auto" : "none" }}
+    >
       {/* 遮罩 */}
       <div
         onClick={onClose}

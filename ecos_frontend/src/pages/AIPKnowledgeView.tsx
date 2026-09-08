@@ -1,38 +1,43 @@
 /**
- * AIPKnowledgeView — 独立AIP Knowledge知识库页面
- * 从 ceos_new AIPWorkbench/KnowledgeView 中提取RAG检索子Tab，
- * 适配ECOS：lucide-react图标、Bearer认证、/api/v1/端点前缀。
+ * AIPKnowledgeView — standalone AIP Knowledge base page.
+ * RAG search subtab extracted from ceos_new AIPWorkbench/KnowledgeView,
+ * adapted for ECOS: lucide-react icons, Bearer auth, /api/v1/ endpoint prefix.
  * @license Apache-2.0
  */
 
 import React, { useState } from 'react';
 import {
-  Keyboard, Flame, Layers, Sparkles, Bot, RefreshCw,
-  Search, Database, Shield, Network, Cpu
+  GitBranch, Keyboard, Flame, Layers, Sparkles, Bot, RefreshCw,
+  Search, Database, Shield, Network, Lightbulb, Loader2
 } from 'lucide-react';
+import { useLanguage } from '../components/LanguageContext';
+import { useTheme } from '../components/ThemeContext';
+import { useToast } from '../components/common/Toast';
 
 // ═══════════════════ API helpers ═══════════════════
 
-function authHeaders(): HeadersInit {
+function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('token') || '';
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-}
-
-function showToast(type: 'success' | 'info' | 'error', msg: string) {
-  console.log(`[AIPKnowledge ${type}] ${msg}`);
+  if (token) headers.Authorization = ['Bearer', token].join(' ');
+  return headers;
 }
 
 // ═══════════════════ Component ═══════════════════
 
 export default function AIPKnowledgeView() {
-  const [queryInput, setQueryInput] = useState('帮我分析企业当前的数据资产健康状况，包括各业务域数据覆盖率、数据质量风险和合规性');
+  const { t } = useLanguage();
+  const { styles } = useTheme();
+  const { showToast } = useToast();
+  const [queryInput, setQueryInput] = useState('');
   const [isRetrieving, setIsRetrieving] = useState(false);
   const [retrievedDocs, setRetrievedDocs] = useState<Array<{ title: string; type: string; snippet: string; score: number }>>([]);
   const [ragPrompt, setRagPrompt] = useState<string>('');
   const [llmOutput, setLlmOutput] = useState<string>('');
+
+  const applyQuery = (key: string) => setQueryInput(t(key));
 
   const handleRunRAG = async () => {
     if (!queryInput.trim()) return;
@@ -48,85 +53,93 @@ export default function AIPKnowledgeView() {
         body: JSON.stringify({ query: queryInput })
       });
       const data = await response.json();
-      
+
       if (data.success || data.code === 0 || data.code === 200) {
-        const payload = data.data || data;
-        setRetrievedDocs((payload.groundedDocs || []).map((doc: any) => ({
-          title: doc.title,
-          type: doc.title?.includes('Security') ? '安全元数据' : doc.title?.includes('Ontology') ? '本体元数据' : '集成元数据',
-          snippet: doc.snippet || 'N/A',
-          score: doc.score
-        })));
+      const payload = data.data || data;
+      setRetrievedDocs((payload.groundedDocs || []).map((doc: any) => ({
+        title: doc.title,
+        type: doc.title?.includes('Security') ? 'security' : doc.title?.includes('Ontology') ? 'ontology' : 'integration',
+        snippet: doc.snippet || t('common.na'),
+        score: doc.score,
+      })));
         setRagPrompt(payload.promptGrounded || '');
         setLlmOutput(payload.answer || '');
       } else {
-        showToast('error', data.error || '元数据知识召回失败');
+        showToast('error', data.error || t('aipKnowledge.errRetrieve'));
       }
     } catch (e) {
-      showToast('error', '与大模型交互失败，请检查网络');
+      showToast('error', t('aipKnowledge.errLlm'));
     } finally {
       setIsRetrieving(false);
     }
   };
 
-  return (
-    <div className="flex h-full select-none text-xs overflow-hidden bg-slate-50">
+  const stepHeader = (icon: React.ReactNode, label: string, badge?: string) => (
+    <div className={`border-b border-slate-50 pb-2 flex items-center justify-between ${styles.divider}`}>
+      <div className="flex items-center gap-1.5 font-bold text-xs">
+        {icon}
+        <span>{label}</span>
+      </div>
+      {badge && <span className="text-[9px] text-slate-400 font-mono">{badge}</span>}
+    </div>
+  );
 
-      {/* Main Panel — 全宽RAG检索页面 */}
+  const card = `rounded-xl p-4 ${styles.cardBg} ${styles.cardBorder} shadow-sm space-y-3`;
+
+  return (
+    <div className={`flex h-full select-none text-xs overflow-hidden ${styles.appBg}`}>
+
+      {/* Main Panel — full-width RAG search page */}
       <div className="flex-1 p-6 overflow-y-auto h-full">
 
         {/* Header */}
-        <div className="mb-6 border-b border-slate-200 pb-4 space-y-1">
+        <div className={`mb-6 border-b pb-4 space-y-1 ${styles.divider}`}>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-indigo-500 text-white">
-              <Search size={15} />
+            <span className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--accent)' }}>
+              <Search size={15} className="text-white" />
             </span>
-            <h1 className="text-base font-black text-slate-800">AIP Knowledge · 知识检索</h1>
+            <h1 className={`text-base font-black ${styles.text}`}>{t('aipKnowledge.title')}</h1>
           </div>
-          <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
-            基于企业知识库的语义检索与RAG推理——输入自然语言查询，系统自动从数据资产、本体模型、安全策略中检索相关元数据，
-            融合为强上下文提示词，驱动大模型生成精准答案。
+          <p className={`text-xs max-w-2xl leading-relaxed ${styles.muted}`}>
+            {t('aipKnowledge.desc')}
           </p>
         </div>
 
         {/* Four-step flow */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
+
           {/* Left column: Step 1 + Step 2 */}
           <div className="lg:col-span-5 space-y-4">
-            
+
             {/* Step 1: Query Input */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-4">
-              <div className="border-b border-slate-100 pb-2 flex items-center gap-2">
-                <span className="p-1.5 rounded bg-blue-50 text-blue-600">
+            <div className={card}>
+              {stepHeader(
+                <span className="p-1.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   <Keyboard size={13} />
-                </span>
-                <h3 className="font-bold text-slate-800 text-xs">第1步: 输入自然语言查询</h3>
-              </div>
+                </span>,
+                t('aipKnowledge.step1')
+              )}
 
               <div className="space-y-2">
                 <textarea
                   value={queryInput}
                   onChange={e => setQueryInput(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-sans leading-relaxed text-slate-700 focus:outline-none focus:border-blue-500"
-                  placeholder="请输入企业数据资产、业务合规或安全权限相关的提问..."
+                  className={`w-full px-3 py-2 border rounded-lg text-xs font-sans leading-relaxed focus:outline-none transition ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+                  placeholder={t('aipKnowledge.placeholder')}
                 />
-                
+
                 <div className="space-y-1.5">
-                  <span className="text-[9px] text-slate-400 font-extrabold uppercase block">推荐测试问题:</span>
+                  <span className="text-[9px] text-slate-400 font-extrabold uppercase block">{t('aipKnowledge.suggested')}</span>
                   <div className="flex flex-col gap-1">
-                    {[
-                      '帮我分析企业当前的数据资产健康状况，包括各业务域数据覆盖率、数据质量风险和合规性',
-                      '查询销售域下所有客户主数据的血缘链路与下游影响范围',
-                      '从安全合规角度，评估财务域敏感字段的脱敏策略是否完备'
-                    ].map((p, idx) => (
+                    {['aipKnowledge.suggested1', 'aipKnowledge.suggested2', 'aipKnowledge.suggested3'].map((key, idx) => (
                       <button
                         key={idx}
-                        onClick={() => setQueryInput(p)}
-                        className="text-left px-2 py-1 bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 rounded-lg text-[10px] text-slate-600 truncate cursor-pointer transition-all"
+                        onClick={() => applyQuery(key)}
+                        className={`text-left px-2 py-1 border rounded-lg text-[10px] truncate cursor-pointer transition-all ${styles.cardBg} ${styles.cardBorder} ${styles.muted} hover:opacity-80`}
                       >
-                        💡 {p}
+                        <Lightbulb size={10} className="inline mr-1 text-amber-500" />
+                        {t(key)}
                       </button>
                     ))}
                   </div>
@@ -136,19 +149,18 @@ export default function AIPKnowledgeView() {
               <button
                 onClick={handleRunRAG}
                 disabled={isRetrieving || !queryInput.trim()}
-                className={`w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
-                  isRetrieving ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
+                className="w-full py-2 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--accent)' }}
               >
                 {isRetrieving ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>向量检索与元数据对齐中...</span>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>{t('aipKnowledge.retrieving')}</span>
                   </>
                 ) : (
                   <>
                     <Flame size={13} />
-                    <span>开始检索并模拟 AI 推理</span>
+                    <span>{t('aipKnowledge.run')}</span>
                   </>
                 )}
               </button>
@@ -156,30 +168,28 @@ export default function AIPKnowledgeView() {
 
             {/* Step 2: Retrieved Documents */}
             {retrievedDocs.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
-                <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-                    <Layers size={12} className="text-emerald-500" />
-                    <span>第2步: 向量相关度检索结果</span>
-                  </div>
-                  <span className="text-[9px] text-slate-400 font-mono">VECTOR MATCH</span>
-                </div>
+              <div className={card}>
+                {stepHeader(
+                  <Layers size={12} className="text-emerald-500" />,
+                  t('aipKnowledge.step2'),
+                  'VECTOR MATCH'
+                )}
 
                 <div className="space-y-2 max-h-56 overflow-y-auto">
                   {retrievedDocs.map((doc, idx) => (
-                    <div key={idx} className="p-2 bg-slate-50 border border-slate-150 rounded-lg space-y-1">
+                    <div key={idx} className={`p-2 ${styles.cardBg} ${styles.cardBorder} border rounded-lg space-y-1`}>
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-bold text-slate-800 flex items-center gap-1">
-                          {doc.type === '安全元数据' ? <Shield size={10} className="text-rose-500" /> :
-                           doc.type === '本体元数据' ? <Network size={10} className="text-indigo-500" /> :
+                        <span className={`font-bold flex items-center gap-1 ${styles.text}`}>
+                          {doc.type === 'security' ? <Shield size={10} className="text-rose-500" /> :
+                           doc.type === 'ontology' ? <Network size={10} className="text-indigo-500" /> :
                            <Database size={10} className="text-emerald-500" />}
                           {doc.title}
                         </span>
-                        <span className="px-1.5 bg-emerald-50 text-emerald-600 text-[9px] font-bold rounded-md">
+                        <span className="px-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold rounded-md" title={t('aipKnowledge.score')}>
                           {(doc.score * 100).toFixed(0)}%
                         </span>
                       </div>
-                      <p className="text-[9px] text-slate-500 leading-relaxed font-sans">{doc.snippet}</p>
+                      <p className={`text-[9px] leading-relaxed font-sans ${styles.muted}`}>{doc.snippet}</p>
                     </div>
                   ))}
                 </div>
@@ -190,41 +200,41 @@ export default function AIPKnowledgeView() {
 
           {/* Right column: Step 3 + Step 4 */}
           <div className="lg:col-span-7 space-y-4">
-            
+
             {/* Step 3: RAG Prompt */}
             {ragPrompt && (
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-2">
-                <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 text-indigo-600 border-b border-slate-100 pb-2">
-                  <Sparkles size={13} />
-                  <span>第3步: 融合生成的 AI 提示词 (RAG Prompt Context)</span>
-                </h3>
-                <div className="bg-slate-900 text-slate-300 rounded-xl p-3 h-32 overflow-y-auto font-mono text-[9px] leading-relaxed">
+              <div className={card}>
+                <div className={`flex items-center gap-1.5 font-bold text-xs border-b pb-2 ${styles.divider}`}>
+                  <Sparkles size={13} className="text-indigo-500" />
+                  <span className="text-indigo-600 dark:text-indigo-400">{t('aipKnowledge.step3')}</span>
+                </div>
+                <div className={`rounded-xl p-3 ${styles.inputBg} ${styles.inputText} h-32 overflow-y-auto font-mono text-[9px] leading-relaxed`}>
                   {ragPrompt}
                 </div>
               </div>
             )}
 
             {/* Step 4: LLM Output */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
-              <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 text-emerald-600 border-b border-slate-100 pb-2">
-                <Bot size={14} className="animate-bounce" />
-                <span>第4步: AIP Copilot 合规输出</span>
-              </h3>
+            <div className={card}>
+              <div className={`flex items-center gap-1.5 font-bold text-xs border-b pb-2 ${styles.divider}`}>
+                <Bot size={14} className="animate-bounce text-emerald-500" />
+                <span className="text-emerald-600 dark:text-emerald-400">{t('aipKnowledge.step4')}</span>
+              </div>
 
               {isRetrieving ? (
-                <div className="py-8 text-center text-slate-400 space-y-2">
-                  <RefreshCw size={24} className="animate-spin text-slate-300 mx-auto" />
-                  <p className="text-xs font-medium">模型正在依据知识库元数据进行合规校正推理，请稍候...</p>
+                <div className={`py-8 text-center space-y-2 ${styles.muted}`}>
+                  <RefreshCw size={24} className="animate-spin mx-auto opacity-40" />
+                  <p className="text-xs font-medium">{t('aipKnowledge.thinking')}</p>
                 </div>
               ) : llmOutput ? (
-                <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl text-slate-700 text-[11px] font-sans leading-relaxed whitespace-pre-wrap">
+                <div className={`p-4 rounded-xl border ${styles.cardBg} ${styles.cardBorder} text-[11px] font-sans leading-relaxed whitespace-pre-wrap ${styles.text}`}>
                   {llmOutput}
                 </div>
               ) : (
-                <div className="py-8 text-center text-slate-400 space-y-1">
-                  <Bot size={24} className="text-slate-300 mx-auto" />
-                  <p>等待运行 RAG 仿真推理...</p>
-                  <p className="text-[10px] text-slate-400">左侧输入查询并点击按钮，即可一键查看知识检索与AI推理结果</p>
+                <div className={`py-8 text-center space-y-1 ${styles.muted}`}>
+                  <Bot size={24} className={`${styles.muted} mx-auto opacity-30`} />
+                  <p className={styles.text}>{t('aipKnowledge.idleTitle')}</p>
+                  <p className="text-[10px]">{t('aipKnowledge.idleHint')}</p>
                 </div>
               )}
             </div>

@@ -1,0 +1,3789 @@
+diff --git a/ecos_frontend/package.json b/ecos_frontend/package.json
+index f9f7b6a..8ce9444 100644
+--- a/ecos_frontend/package.json
++++ b/ecos_frontend/package.json
+@@ -26,6 +26,7 @@
+     "ag-grid-react": "^33.0.0",
+     "cytoscape": "^3.34.0",
+     "dotenv": "^17.2.3",
++    "dompurify": "^3.2.7",
+     "echarts": "^6.1.0",
+     "echarts-for-react": "^3.0.6",
+     "express": "^4.21.2",
+diff --git a/ecos_frontend/src/App.tsx b/ecos_frontend/src/App.tsx
+index 0eaa241..80213c7 100644
+--- a/ecos_frontend/src/App.tsx
++++ b/ecos_frontend/src/App.tsx
+@@ -15,7 +15,8 @@ import { useMobileSidebar } from "./hooks/useMobileSidebar";
+ import { useTheme } from "./components/ThemeContext";
+ import { useLanguage } from "./components/LanguageContext";
+ import ErrorBoundary from "./components/common/ErrorBoundary";
+-import { apiTaskStats, type TaskStats } from "./api";
++import NetworkErrorBanner from "./components/NetworkErrorBanner";
++import { apiTaskStats, notifyNetworkDown, type TaskStats } from "./api";
+ 
+ /**
+  * Route path → i18n key (common.app.tab.{id}).
+@@ -111,14 +112,23 @@ export default function App() {
+ 
+   useEffect(() => {
+     const poll = () => {
+-      apiTaskStats().then(s => setTaskStats(s)).catch(() => {});
++      apiTaskStats()
++        .then((s) => setTaskStats(s))
++        // PMO-43 T2: apiFetchData already dispatches `ecos-network-down` for
++        // real network failures (the global NetworkErrorBanner reacts). The
++        // catch here is defensive for non-transport errors (4xx/5xx business)
++        // — in that case the banner stays hidden and the UI just keeps the
++        // last known stats rather than the page blowing up.
++        .catch(() => {});
+     };
+     poll();
+     const interval = setInterval(poll, 10000);
+     return () => clearInterval(interval);
+   }, []);
+ 
+-  // Health polling
++  // Health polling — network failures are surfaced via the global
++  // NetworkErrorBanner (T5); the raw fetch here keeps its own DOWN state
++  // for the Sidebar status chip.
+   const [serviceStatus, setServiceStatus] = useState("UP");
+ 
+   useEffect(() => {
+@@ -213,6 +223,9 @@ export default function App() {
+ 
+   return (
+     <div className={`flex h-screen ${styles.appBg} ${styles.appText} overflow-hidden font-sans select-none antialiased transition-colors duration-150`}>
++      {/* Global network/offline banner (PMO-43 T5) — fixed top overlay */}
++      <NetworkErrorBanner />
++
+       {/* Sidebar */}
+       <Sidebar
+         width={sidebarWidth}
+diff --git a/ecos_frontend/src/api.ts b/ecos_frontend/src/api.ts
+index 87246f1..9c2d964 100644
+--- a/ecos_frontend/src/api.ts
++++ b/ecos_frontend/src/api.ts
+@@ -18,6 +18,116 @@ import {
+ 
+ const API_BASE = "/api";
+ 
++// ═══════════════════════════════════════════════
++//  PMO-43: Network error handling primitives
++// ═══════════════════════════════════════════════
++
++/** Thrown when a network-level failure occurs (backend down, offline, unreachable). */
++export class NetworkError extends Error {
++  constructor(message = "Network error: service unavailable", original?: unknown) {
++    super(message);
++    this.name = "NetworkError";
++    if (original instanceof Error) this.cause = original;
++  }
++}
++
++/**
++ * Wrap a promise chain so that network-level failures propagate visibly
++ * (instead of being swallowed by a Promise chain) while still notifying the
++ * global network-down UI. Business errors (thrown as Error with a message)
++ * re-throw as-is; the caller's own catch remains responsible.
++ */
++function wrapNet(p: Promise<unknown>): Promise<unknown> {
++  return p.then(
++    v => v,
++    (e: unknown) => {
++      const network = e instanceof NetworkError ||
++        e instanceof TypeError ||
++        (typeof navigator !== "undefined" && navigator.onLine === false);
++      if (network) void notifyNetworkDown(e);
++      if (network && !(e instanceof NetworkError)) throw new NetworkError(undefined, e);
++      throw e;
++    }
++  );
++}
++
++/** Check response status for auth failure — only 401 triggers logout, 403 is a permission issue */
++export function isErrorResponse(e: unknown): { message: string; kind: "network" | "http" | "unknown"; status?: number } {
++  if (e instanceof NetworkError) return { message: e.message, kind: "network" };
++  if (e instanceof TypeError) return { message: "网络错误：服务不可用", kind: "network" };
++  if (e instanceof Error) {
++    const status = typeof (e as { status?: unknown }).status === "number" ? (e as { status?: number }).status : undefined;
++    if (typeof status === "number") return { message: e.message, kind: "http", status };
++    return { message: e.message, kind: "unknown" };
++  }
++  return { message: String(e ?? "Unknown error"), kind: "unknown" };
++}
++
++/**
++ * Publish a `ecos-network-down` CustomEvent so global UI layers
++ * (NetworkErrorBanner) can react to backend/network failures.
++ */
++export async function notifyNetworkDown(e?: unknown): Promise<void> {
++  if (typeof window === "undefined") return;
++  try {
++    const detail: Record<string, unknown> = { timestamp: Date.now() };
++    if (e && typeof e === "object") {
++      const record = e as { status?: number; message?: string };
++      if (record.status !== undefined) detail.status = record.status;
++      if (record.message) detail.message = record.message;
++      if (e instanceof NetworkError) detail.kind = "network";
++    }
++    window.dispatchEvent(new CustomEvent("ecos-network-down", { detail }));
++  } catch {
++    // SSR/runtime without window — ignore
++  }
++}
++
++/**
++ * Publish a `ecos-network-up` CustomEvent when a fetch succeeds after a
++ * previously reported network-down, so the banner can self-clear.
++ * Idempotent: only dispatches while a down state is tracked (best-effort
++ * module-level flag, no global state store).
++ */
++let lastNetworkDownAt = 0;
++
++export function markNetworkDown(at: number = Date.now()): void {
++  lastNetworkDownAt = at;
++}
++
++export function notifyNetworkUp(): void {
++  if (typeof window === "undefined") return;
++  if (lastNetworkDownAt === 0) return;
++  const elapsed = Date.now() - lastNetworkDownAt;
++  // Only announce recovery if we recently went down (avoids noisy events
++  // after a long quiet period where the banner has already self-dismissed).
++  if (elapsed > 5 * 60_000) return;
++  lastNetworkDownAt = 0;
++  try {
++    window.dispatchEvent(new CustomEvent("ecos-network-up", { detail: { timestamp: Date.now() } }));
++  } catch {
++    // SSR/runtime without window — ignore
++  }
++}
++
++/** Decode network failures from raw fetch → throw instead of swallow silently. */
++function toNetworkError(e: unknown, operation = "fetch"): NetworkError | Error {
++  if (e instanceof NetworkError) return e;
++  if (e instanceof TypeError) {
++    return new NetworkError(`Network error: ${operation} unreachable`);
++  }
++  if (e instanceof Error) return e;
++  return new Error(e instanceof Error ? e.message : String(e ?? "Unknown error"));
++}
++
++/** Safely convert an AbortError into a user-visible "Request cancelled" error. */
++function toAbortError(e: unknown): Error {
++  if (e instanceof DOMException && e.name === "AbortError") {
++    return new Error("Request cancelled");
++  }
++  return toNetworkError(e, "fetch");
++}
++
+ // ── Internal fetch helpers ────────────────────────────────────
+ 
+ /** Global token expiration handler — clears auth and redirects to login */
+@@ -27,12 +137,64 @@ function handleAuthExpired(): never {
+   localStorage.removeItem('roles');
+   // Hash-based redirect avoids React Router race conditions
+   window.location.hash = '#/login';
+-  throw new Error('登录已过期，请重新登录');
++  throw new Error('Session expired. Please sign in again.');
+ }
+ 
+-/** Check response status for auth failure — only 401 triggers logout, 403 is a permission issue */
++/**
++ * Check response status for auth failure.
++ * 401 → token invalid: clear auth and redirect to login.
++ * 403 → token VALID but insufficient permission: never clear the token.
++ *      Notify the global UI (ecos-no-access) so the caller can surface the
++ *      NoAccess page/message — see PMO-44 T5.
++ */
+ function checkAuthExpired(status: number): void {
+   if (status === 401) handleAuthExpired();
++  if (status === 403) notifyNoAccess();
++}
++
++/** 403 marker attached to thrown errors for 403 responses */
++export const NO_ACCESS_ERROR_NAME = "NoAccessError";
++
++/**
++ * Thrown-like marker for 403 responses: token is valid but the resource is
++ * forbidden. The error carries `status: 403` and `name: NoAccessError` so
++ * UI layers can render a dedicated "no access" state (instead of logging
++ * the user out or showing a generic HTTP error).
++ */
++export class NoAccessError extends Error {
++  status = 403;
++  constructor(message = "You do not have permission to access this resource.") {
++    super(message);
++    this.name = NO_ACCESS_ERROR_NAME;
++  }
++}
++
++/** 403 notification event name */
++export const NO_ACCESS_EVENT = "ecos-no-access";
++
++/**
++ * Publish a `ecos-no-access` CustomEvent so global UI layers
++ * (e.g. the NoAccess page / a banner) can react to permission denials.
++ * The token must NOT be cleared — the user is authenticated, just
++ * unauthorized for this specific resource.
++ */
++export function notifyNoAccess(detail?: { path?: string; status?: number }): void {
++  if (typeof window === "undefined") return;
++  try {
++    window.dispatchEvent(new CustomEvent(NO_ACCESS_EVENT, {
++      detail: { ...detail, timestamp: Date.now() },
++    }));
++  } catch {
++    // SSR/runtime without window — ignore
++  }
++}
++
++/**
++ * Detect whether an error thrown by apiFetch/apiFetchData/doFetch was a
++ * 403 permission denial (token still valid).
++ */
++export function isNoAccessError(e: unknown): e is NoAccessError {
++  return e instanceof NoAccessError;
+ }
+ 
+ /**
+@@ -44,12 +206,21 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
+   const token = localStorage.getItem('token') || '';
+   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+   if (token) headers['Authorization'] = `Bearer ${token}`;
+-  const res = await fetch(`${API_BASE}${finalPath}`, {
+-    headers,
+-    ...options,
+-  });
++  let res: Response;
++  try {
++    res = await fetch(`${API_BASE}${finalPath}`, { headers, ...options });
++  } catch (e) {
++    markNetworkDown();
++    await notifyNetworkDown(e);
++    throw toNetworkError(e, `fetch ${path}`);
++  }
+   if (res.status === 401) handleAuthExpired();
+-  if (!res.ok) throw new Error(`API ${path} returned ${res.status}`);
++  if (res.status === 403) notifyNoAccess({ path });
++  if (!res.ok) {
++    if (res.status === 403) throw new NoAccessError(`API ${path} forbidden`);
++    throw new Error(`API ${path} returned ${res.status}`);
++  }
++  notifyNetworkUp();
+   return res.json();
+ }
+ 
+@@ -62,36 +233,58 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
+   const token = localStorage.getItem('token') || '';
+   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+   if (token) headers['Authorization'] = `Bearer ${token}`;
+-  const res = await fetch(url, {
+-    headers,
+-    ...options,
+-  });
++  let res: Response;
++  try {
++    res = await fetch(url, { headers, ...options });
++  } catch (e) {
++    markNetworkDown();
++    await notifyNetworkDown(e);
++    throw toNetworkError(e, `fetch ${url}`);
++  }
+   if (res.status === 401) handleAuthExpired();
++  if (res.status === 403) notifyNoAccess({ path: url });
+   if (!res.ok) {
+-    const text = await res.text();
++    const text = await res.text().catch(() => '');
++    if (res.status === 403) throw new NoAccessError(text || `HTTP 403`);
+     throw new Error(text || `HTTP ${res.status}`);
+   }
+   const json = await res.json();
+   if (json.success === false) throw new Error(json.message || "Request failed");
+   if (json.code && json.code !== 200 && json.code !== 0) throw new Error(json.message || `Error ${json.code}`);
++  notifyNetworkUp();
+   return json.data !== undefined ? json.data : json;
+ }
+ 
+ /**
+  * Simple doFetch – returns full JSON body from arbitrary URL.
+  * Includes Authorization Bearer token from localStorage when available.
++ * Network failures are normalized to NetworkError + ecos-network-down event.
+  */
+ async function doFetch(url: string, opts: RequestInit = {}): Promise<any> {
+   const token = localStorage.getItem('token') || '';
+   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+   if (token) headers['Authorization'] = `Bearer ${token}`;
++  let r: Response;
++  try {
++    r = await fetch(url, { headers, ...opts });
++  } catch (e) {
++    markNetworkDown();
++    await notifyNetworkDown(e);
++    throw toNetworkError(e, `fetch ${url}`);
++  }
+   try {
+-    const r = await fetch(url, { headers, ...opts });
+     if (r.status === 401) handleAuthExpired();
+-    if (!r.ok) throw new Error(`${r.status}`);
++    if (r.status === 403) notifyNoAccess({ path: url });
++    if (!r.ok) {
++      if (r.status === 403) throw new NoAccessError(`HTTP 403 on ${url}`);
++      throw new Error(`${r.status}`);
++    }
+     const ct = r.headers.get('content-type');
+-    return ct && ct.includes('application/json') ? await r.json() : null;
++    const body = ct && ct.includes('application/json') ? await r.json() : null;
++    notifyNetworkUp();
++    return body;
+   } catch (e) {
++    // 401 redirects outside; business errors keep their message/pass-through.
+     throw e;
+   }
+ }
+@@ -141,6 +334,19 @@ export async function authLogin(body: LoginRequest): Promise<LoginResponse> {
+ }
+ 
+ // ── Datasets ────────────────────────────────────────────
++
++/**
++ * PMO-43 T1 — tag mock-fallback data with `error: 'MOCK'` so UI and tests can
++ * distinguish provable real backend data from placeholder enrichment rows.
++ * Each entry is shallow-copied (shallow is sufficient because the status items
++ * in the raw mock are primitives/leaf arrays; a shallow copy is O(1) per asset
++ * and avoids accidentally mutating the mock singletons).
++ */
++const MOCK_DATA_ASSETS_TAGGED: DataAsset[] = MOCK_DATA_ASSETS.map((a) => ({
++  ...a,
++  error: 'MOCK',
++}));
++
+ export async function fetchDatasets(): Promise<DataAsset[]> {
+   try {
+     // Get first active datasource and its resources
+@@ -148,12 +354,12 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
+     const sources = dsResp?.data ?? [];
+     if (!Array.isArray(sources) || sources.length === 0) {
+       console.warn("fetchDatasets: no datasources registered, using mock");
+-      return MOCK_DATA_ASSETS;
++      return MOCK_DATA_ASSETS_TAGGED;
+     }
+     const active = sources.find((s: any) => s.status === "ACTIVE");
+     if (!active) {
+       console.warn("fetchDatasets: no active datasource, using mock");
+-      return MOCK_DATA_ASSETS;
++      return MOCK_DATA_ASSETS_TAGGED;
+     }
+     // Try to get resources from this datasource
+     const resResp = await doFetch(`/api/v1/datanet/metadata/resources/${active.datasourceId}`);
+@@ -161,7 +367,7 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
+     const items = Array.isArray(resources) ? resources : [];
+     if (items.length === 0) {
+       console.warn("fetchDatasets: no resources collected, using mock");
+-      return MOCK_DATA_ASSETS;
++      return MOCK_DATA_ASSETS_TAGGED;
+     }
+     return items.map((r: any, i: number) => ({
+       id: r.tableName || r.name || `ds_${i}`,
+@@ -184,7 +390,7 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
+     })) as unknown as DataAsset[];
+   } catch (e) {
+     console.warn("fetchDatasets: backend unavailable, using mock", e);
+-    return MOCK_DATA_ASSETS;
++    return MOCK_DATA_ASSETS_TAGGED;
+   }
+ }
+ 
+@@ -237,8 +443,8 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
+   }
+   // Fallback: try mock data, then construct minimal asset
+   const mockAsset = MOCK_DATA_ASSETS.find(a => a.id === id || a.name === id);
+-  if (mockAsset) return mockAsset;
+-  // Construct minimal asset so the page isn't blank
++  if (mockAsset) return { ...mockAsset, error: 'MOCK' };
++  // Construct minimal asset so the page isn't blank — tag it as a placeholder
+   return {
+     id,
+     name: id,
+@@ -257,6 +463,7 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
+     qualityRules: [],
+     history: [],
+     permissions: { owner: ["data-team"], editor: [] as string[], viewer: [] as string[] },
++    error: 'MOCK',
+   };
+ }
+ 
+diff --git a/ecos_frontend/src/components/RequireAuth.tsx b/ecos_frontend/src/components/RequireAuth.tsx
+index 9dbf684..5e0393f 100644
+--- a/ecos_frontend/src/components/RequireAuth.tsx
++++ b/ecos_frontend/src/components/RequireAuth.tsx
+@@ -1,23 +1,67 @@
+ /**
+- * Route guard — checks for a valid auth token in localStorage.
+- * Redirects to /login if not authenticated.
++ * RequireAuth — route guard.
++ * 1. No token → redirect to /login.
++ * 2. Token present → verify via backend GET /api/v1/auth/me.
++ *    - 401 → redirect to /login (token expired).
++ *    - 403 → redirect to /no-access (token valid, insufficient permission).
++ *    - 200 → render children.
++ *    - network error → render children optimistically (fail-open for network).
++ *
+  * @license SPDX-License-Identifier: Apache-2.0
+  */
+-import type { ReactNode } from "react";
++import { useEffect, useRef, useState, type ReactNode } from "react";
+ import { Navigate, useLocation } from "react-router-dom";
++import { useTheme } from "./ThemeContext";
+ 
+-interface RequireAuthProps {
+-  children: ReactNode;
+-}
++type AuthState = "loading" | "ok" | "no-access" | "login";
+ 
+-export default function RequireAuth({ children }: RequireAuthProps) {
++export default function RequireAuth({ children }: { children: ReactNode }) {
+   const location = useLocation();
++  const { styles } = useTheme();
+   const token = localStorage.getItem("token");
++  const [state, setState] = useState<AuthState>("loading");
++  const checkedRef = useRef(false);
++
++  useEffect(() => {
++    if (!token) {
++      setState("login");
++      return;
++    }
++    if (checkedRef.current) return; // avoid re-checking on re-render
++    checkedRef.current = true;
++
++    const ctrl = new AbortController();
++    fetch("/api/v1/auth/me", {
++      headers: { Authorization: `Bearer ${token}` },
++      signal: ctrl.signal,
++    })
++      .then((res) => {
++        if (res.status === 401) setState("login");
++        else if (res.status === 403) setState("no-access");
++        else setState("ok");
++      })
++      .catch(() => setState("ok")); // network error — fail open
++    return () => ctrl.abort();
++  }, [token]);
+ 
+   if (!token) {
+-    // Preserve the attempted URL so Login can redirect back after auth
+     return <Navigate to="/login" state={{ from: location }} replace />;
+   }
+ 
++  if (state === "loading") {
++    return (
++      <div
++        className={`min-h-screen flex items-center justify-center ${styles.appBg}`}
++      >
++        <div className="text-sm animate-pulse" style={{ color: styles.muted }}>
++          …
++        </div>
++      </div>
++    );
++  }
++
++  if (state === "login") return <Navigate to="/login" state={{ from: location }} replace />;
++  if (state === "no-access") return <Navigate to="/no-access" replace />;
++
+   return <>{children}</>;
+ }
+diff --git a/ecos_frontend/src/components/Sidebar.tsx b/ecos_frontend/src/components/Sidebar.tsx
+index a3e6b2e..135b591 100644
+--- a/ecos_frontend/src/components/Sidebar.tsx
++++ b/ecos_frontend/src/components/Sidebar.tsx
+@@ -28,6 +28,7 @@ import {
+ } from "lucide-react";
+ import { useLanguage } from "./LanguageContext";
+ import { useTheme } from "./ThemeContext";
++import { showToastGlobal } from "./common/Toast";
+ import type { ComponentType } from "react";
+ 
+ interface SidebarProps {
+@@ -313,7 +314,7 @@ export default function Sidebar({
+             </div>
+             <div className="h-[calc(85vh-52px)] overflow-auto">
+               <AsyncTaskCenterView
+-                showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
++                showToast={(type, msg) => showToastGlobal(type, msg)}
+                 onViewModeChange={(mode) => { navigate("/" + mode); setIsTaskPanelOpen(false); }}
+               />
+             </div>
+diff --git a/ecos_frontend/src/components/TaskPanel.tsx b/ecos_frontend/src/components/TaskPanel.tsx
+index 86219a3..983a74e 100644
+--- a/ecos_frontend/src/components/TaskPanel.tsx
++++ b/ecos_frontend/src/components/TaskPanel.tsx
+@@ -1,12 +1,16 @@
+ /**
+- * TaskPanel — 任务引擎管理面板
+- * 统计卡片 + 筛选栏 + 任务列表 + 批量操作 + 详情抽屉
+- * 支持四类分组: 管道 / Agent / 实时 / 管理
++ * TaskPanel — Task Engine Management Panel
++ * Stats cards + filter bar + task list + batch operations + detail drawer
++ * Supports 4 categories: Pipeline / Agent / Realtime / Management
+  * @license Apache-2.0
+  */
+ 
+ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+-import { X, RefreshCw, Search, Play, Pause, RotateCcw, Square, Archive } from "lucide-react";
++import { X, RefreshCw, Search, Play, Pause, RotateCcw, Square, Archive, GitBranch, Bot, Zap, SlidersHorizontal } from "lucide-react";
++import { useLanguage } from "./LanguageContext";
++import { useTheme } from "./ThemeContext";
++import { useToast } from "./common/Toast";
++import ConfirmDialog from "./common/ConfirmDialog";
+ 
+ // ── 类型定义 ──────────────────────────────────────────────
+ 
+@@ -51,7 +55,8 @@ interface TaskStats {
+ 
+ interface CategoryConfig {
+   key: TaskCategory;
+-  label: string;
++  /** i18n key for the category label */
++  labelKey: string;
+   /** 该分类包含的任务类型 */
+   types: string[];
+   /** Tailwind 颜色（用于卡片左侧色条 + 标题） */
+@@ -63,54 +68,54 @@ interface CategoryConfig {
+   /** Badge 背景 + 文字 */
+   badgeBg: string;
+   badgeText: string;
+-  /** 图标 */
+-  icon: string;
++  /** lucide-react 图标组件 */
++  Icon: typeof GitBranch;
+ }
+ 
+ const CATEGORIES: CategoryConfig[] = [
+   {
+     key: "pipeline",
+-    label: "管道",
++    labelKey: "taskPanel.category.pipeline",
+     types: ["DORIS_SQL", "ETL", "DATA_SYNC", "PIPELINE"],
+     color: "border-l-blue-500",
+     bg: "bg-blue-50/60 dark:bg-blue-900/20",
+     textColor: "text-blue-600 dark:text-blue-400",
+     badgeBg: "bg-blue-100 dark:bg-blue-900/40",
+     badgeText: "text-blue-700 dark:text-blue-300",
+-    icon: "🔗",
++    Icon: GitBranch,
+   },
+   {
+     key: "agent",
+-    label: "Agent",
++    labelKey: "taskPanel.category.agent",
+     types: ["AGENT", "AI_AGENT", "LLM_TASK", "KG_SYNC"],
+     color: "border-l-purple-500",
+     bg: "bg-purple-50/60 dark:bg-purple-900/20",
+     textColor: "text-purple-600 dark:text-purple-400",
+     badgeBg: "bg-purple-100 dark:bg-purple-900/40",
+     badgeText: "text-purple-700 dark:text-purple-300",
+-    icon: "🤖",
++    Icon: Bot,
+   },
+   {
+     key: "realtime",
+-    label: "实时",
++    labelKey: "taskPanel.category.realtime",
+     types: ["REALTIME", "STREAMING", "MONITOR", "ALERT", "TELEMETRY"],
+     color: "border-l-green-500",
+     bg: "bg-green-50/60 dark:bg-green-900/20",
+     textColor: "text-green-600 dark:text-green-400",
+     badgeBg: "bg-green-100 dark:bg-green-900/40",
+     badgeText: "text-green-700 dark:text-green-300",
+-    icon: "⚡",
++    Icon: Zap,
+   },
+   {
+     key: "management",
+-    label: "管理",
++    labelKey: "taskPanel.category.management",
+     types: ["DATA_QUALITY", "REPORT", "MAINTENANCE", "BACKUP", "CONFIG", "ADMIN"],
+     color: "border-l-gray-400",
+     bg: "bg-gray-50/60 dark:bg-gray-800/40",
+     textColor: "text-gray-600 dark:text-gray-400",
+     badgeBg: "bg-gray-100 dark:bg-gray-700",
+     badgeText: "text-gray-700 dark:text-gray-300",
+-    icon: "⚙️",
++    Icon: SlidersHorizontal,
+   },
+ ];
+ 
+@@ -141,12 +146,12 @@ const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; dot: string
+   CANCELLED: { bg: "bg-yellow-100 dark:bg-yellow-900/40",text: "text-yellow-700 dark:text-yellow-300",dot: "bg-yellow-500" },
+ };
+ 
+-const STATUS_LABELS: Record<TaskStatus, string> = {
+-  PENDING: "等待中", RUNNING: "运行中", SUCCEEDED: "已完成", FAILED: "失败", CANCELLED: "已取消",
++const STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
++  PENDING: "taskPanel.status.pending", RUNNING: "taskPanel.status.running", SUCCEEDED: "taskPanel.status.succeeded", FAILED: "taskPanel.status.failed", CANCELLED: "taskPanel.status.cancelled",
+ };
+ 
+-const PRIORITY_LABELS: Record<string, string> = {
+-  HIGH: "高", MEDIUM: "中", LOW: "低", CRITICAL: "紧急",
++const PRIORITY_LABEL_KEYS: Record<string, string> = {
++  HIGH: "taskPanel.priority.high", MEDIUM: "taskPanel.priority.medium", LOW: "taskPanel.priority.low", CRITICAL: "taskPanel.priority.critical",
+ };
+ 
+ // ── Props ──────────────────────────────────────────────────
+@@ -159,6 +164,10 @@ interface TaskPanelProps {
+ // ── 组件 ──────────────────────────────────────────────────
+ 
+ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
++  const { t } = useLanguage();
++  const { styles } = useTheme();
++  const { showToast } = useToast();
++
+   // 列表 & 统计
+   const [tasks, setTasks] = useState<TaskItem[]>([]);
+   const [statusMap, setStatusMap] = useState<Record<string, TaskStatusInfo>>({});
+@@ -187,6 +196,9 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+   const [detailTask, setDetailTask] = useState<TaskDetail | null>(null);
+   const [detailLoading, setDetailLoading] = useState(false);
+ 
++  // 批量操作确认框
++  const [batchConfirm, setBatchConfirm] = useState<null | "cancel" | "pause" | "resume" | "archive">(null);
++
+   // 操作中状态
+   const [actingIds, setActingIds] = useState<Set<string>>(new Set());
+ 
+@@ -302,19 +314,24 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+     try {
+       const r = await fetch(`/api/v1/task/${taskId}/${action}`, { method: "POST" });
+       const d = await r.json();
+-      if (d.code !== 0) alert(`操作失败: ${d.message || "未知错误"}`);
++      if (d.code !== 0) showToast("error", `${t("taskPanel.actionFailed")}: ${d.message || t("taskPanel.unknownError")}`);
+     } catch (e: any) {
+-      alert(`操作异常: ${e.message}`);
++      showToast("error", `${t("taskPanel.actionError")}: ${e.message}`);
+     } finally {
+       setActingIds(prev => { const s = new Set(prev); s.delete(taskId); return s; });
+       refresh();
+     }
+   };
+ 
+-  const doBatchAction = async (action: "cancel" | "pause" | "resume" | "archive") => {
++  const doBatchAction = (action: "cancel" | "pause" | "resume" | "archive") => {
+     if (selectedIds.size === 0) return;
+-    const actionLabels: Record<string, string> = { cancel: "中止", pause: "暂停", resume: "恢复", archive: "归档" };
+-    if (!window.confirm(`确定要批量${actionLabels[action]} ${selectedIds.size} 个任务吗？`)) return;
++    setBatchConfirm(action);
++  };
++
++  const confirmBatchAction = async () => {
++    const action = batchConfirm;
++    setBatchConfirm(null);
++    if (!action) return;
+     setBatchActioning(true);
+     try {
+       const r = await fetch("/api/v1/task/batch", {
+@@ -323,13 +340,14 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+         body: JSON.stringify({ taskIds: [...selectedIds], action }),
+       });
+       const d = await r.json();
+-      if (d.code !== 0) alert(`批量操作失败: ${d.message || "未知错误"}`);
++      if (d.code !== 0) showToast("error", `${t("taskPanel.batchFailed")}: ${d.message || t("taskPanel.unknownError")}`);
+       else {
++        showToast("success", t("taskPanel.batchDone"));
+         setSelectedIds(new Set());
+         refresh();
+       }
+     } catch (e: any) {
+-      alert(`批量操作异常: ${e.message}`);
++      showToast("error", `${t("taskPanel.batchError")}: ${e.message}`);
+     } finally {
+       setBatchActioning(false);
+     }
+@@ -369,9 +387,13 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+ 
+   // ── 辅助 ─────────────────────────────────────────────────
+ 
+-  const formatTime = (ts: string | null) => {
++  const formatTime = (ts: string | null, localeHint?: string) => {
+     if (!ts) return "—";
+-    try { return new Date(ts).toLocaleString("zh-CN"); } catch { return ts; }
++    try {
++      // Use the active UI locale so timestamps follow the language toggle
++      const loc = localeHint || (typeof window !== "undefined" ? (localStorage.getItem("ecos_locale") === "en" ? "en-US" : "zh-CN") : "zh-CN");
++      return new Date(ts).toLocaleString(loc);
++    } catch { return ts; }
+   };
+ 
+   const renderStatusBadge = (status: TaskStatus) => {
+@@ -379,7 +401,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+     return (
+       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
+         <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+-        {STATUS_LABELS[status] || status}
++        {t(STATUS_LABEL_KEYS[status] || "taskPanel.status.pending")}
+       </span>
+     );
+   };
+@@ -395,8 +417,8 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+     }
+     return (
+       <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${cat.badgeBg} ${cat.badgeText}`}>
+-        <span>{cat.icon}</span>
+-        {cat.label}
++        <cat.Icon size={12} />
++        {t(cat.labelKey)}
+       </span>
+     );
+   };
+@@ -405,8 +427,8 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+     <div className="flex items-center gap-2">
+       <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+         <div
+-          className="h-full bg-blue-500 rounded-full transition-all duration-500"
+-          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
++          className="h-full rounded-full transition-all duration-500"
++          style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: "var(--accent)" }}
+         />
+       </div>
+       <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{progress}%</span>
+@@ -432,15 +454,15 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+         {/* ── Header ─────────────────────────────── */}
+         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+           <div>
+-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">任务引擎</h2>
+-            <p className="text-xs text-slate-400 dark:text-slate-500">任务管理 · 调度监控 · 批量操作</p>
++            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t("taskPanel.title")}</h2>
++            <p className="text-xs text-slate-400 dark:text-slate-500">{t("taskPanel.subtitle")}</p>
+           </div>
+           <div className="flex items-center gap-2">
+             <button
+               onClick={refresh}
+               disabled={loading}
+               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition disabled:opacity-50"
+-              title="刷新"
++              title={t("taskPanel.refresh")}
+             >
+               <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? "animate-spin" : ""}`} />
+             </button>
+@@ -455,7 +477,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+           {CATEGORIES.map(cat => (
+             <div key={cat.key} className={`rounded-lg border-l-4 px-4 py-3 ${cat.color} ${cat.bg} transition`}>
+               <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+-                {cat.icon} {cat.label}
++                {t(cat.labelKey)}
+               </div>
+               <div className={`text-2xl font-bold ${cat.textColor}`}>
+                 {categoryCounts[cat.key]}
+@@ -467,13 +489,13 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+         {/* ── Stats Cards — 状态统计 ─────────────── */}
+         <div className="grid grid-cols-4 gap-3 px-6 py-3 shrink-0">
+           {([
+-            { label: "运行中", value: stats.running, color: "border-l-blue-500 bg-blue-50/60 dark:bg-blue-900/20", textColor: "text-blue-600 dark:text-blue-400" },
+-            { label: "等待中", value: stats.pending, color: "border-l-gray-400 bg-gray-50/60 dark:bg-gray-800/40", textColor: "text-gray-600 dark:text-gray-400" },
+-            { label: "已完成", value: stats.succeeded, color: "border-l-green-500 bg-green-50/60 dark:bg-green-900/20", textColor: "text-green-600 dark:text-green-400" },
+-            { label: "失败", value: stats.failed, color: "border-l-red-500 bg-red-50/60 dark:bg-red-900/20", textColor: "text-red-600 dark:text-red-400" },
+-          ] as const).map(({ label, value, color, textColor }) => (
+-            <div key={label} className={`rounded-lg border-l-4 px-4 py-3 ${color}`}>
+-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</div>
++            { key: "taskPanel.status.running", value: stats.running, color: "border-l-blue-500 bg-blue-50/60 dark:bg-blue-900/20", textColor: "text-blue-600 dark:text-blue-400" },
++            { key: "taskPanel.status.pending", value: stats.pending, color: "border-l-gray-400 bg-gray-50/60 dark:bg-gray-800/40", textColor: "text-gray-600 dark:text-gray-400" },
++            { key: "taskPanel.status.succeeded", value: stats.succeeded, color: "border-l-green-500 bg-green-50/60 dark:bg-green-900/20", textColor: "text-green-600 dark:text-green-400" },
++            { key: "taskPanel.status.failed", value: stats.failed, color: "border-l-red-500 bg-red-50/60 dark:bg-red-900/20", textColor: "text-red-600 dark:text-red-400" },
++          ] as const).map(({ key, value, color, textColor }) => (
++            <div key={key} className={`rounded-lg border-l-4 px-4 py-3 ${color}`}>
++              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t(key)}</div>
+               <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
+             </div>
+           ))}
+@@ -483,7 +505,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+         <div className="flex flex-col gap-2 px-6 py-3 border-b border-slate-100 dark:border-slate-700/50 shrink-0">
+           {/* 分类 Tab 按钮 */}
+           <div className="flex items-center gap-1.5">
+-            <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">分类:</span>
++            <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">{t("taskPanel.filter.category")}</span>
+             <button
+               onClick={() => setFilterCategory("")}
+               className={`px-2.5 py-1 text-xs rounded-full transition ${
+@@ -492,7 +514,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+                   : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+               }`}
+             >
+-              全部
++              {t("taskPanel.filter.all")}
+             </button>
+             {CATEGORIES.map(cat => (
+               <button
+@@ -504,8 +526,8 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+                     : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                 }`}
+               >
+-                <span>{cat.icon}</span>
+-                {cat.label}
++                <cat.Icon size={12} />
++                {t(cat.labelKey)}
+               </button>
+             ))}
+           </div>
+@@ -517,19 +539,19 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+               onChange={e => setFilterStatus(e.target.value)}
+               className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30"
+             >
+-              <option value="">全部状态</option>
+-              <option value="PENDING">等待中</option>
+-              <option value="RUNNING">运行中</option>
+-              <option value="SUCCEEDED">已完成</option>
+-              <option value="FAILED">失败</option>
+-              <option value="CANCELLED">已取消</option>
++              <option value="">{t("taskPanel.filter.allStatus")}</option>
++              <option value="PENDING">{t("taskPanel.status.pending")}</option>
++              <option value="RUNNING">{t("taskPanel.status.running")}</option>
++              <option value="SUCCEEDED">{t("taskPanel.status.succeeded")}</option>
++              <option value="FAILED">{t("taskPanel.status.failed")}</option>
++              <option value="CANCELLED">{t("taskPanel.status.cancelled")}</option>
+             </select>
+             <input
+               type="text"
+               value={filterType}
+               onChange={e => setFilterType(e.target.value)}
+               onKeyDown={e => { if (e.key === "Enter") setSearchType(filterType.trim()); }}
+-              placeholder="任务类型..."
++              placeholder={t("taskPanel.filter.typePlaceholder")}
+               className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30 w-40"
+             />
+             {taskTypes.length > 0 && (
+@@ -538,7 +560,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+                 onChange={e => { setFilterType(e.target.value); setSearchType(e.target.value); }}
+                 className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30"
+               >
+-                <option value="">选择类型…</option>
++                <option value="">{t("taskPanel.filter.selectType")}</option>
+                 {taskTypes.map(t => (
+                   <option key={t} value={t}>{t}</option>
+                 ))}
+@@ -546,10 +568,11 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+             )}
+             <button
+               onClick={() => setSearchType(filterType.trim())}
+-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition"
++              className="flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg transition"
++              style={{ backgroundColor: "var(--accent)", color: "#fff" }}
+             >
+               <Search className="w-3.5 h-3.5" />
+-              搜索
++              {t("taskPanel.filter.searchBtn")}
+             </button>
+           </div>
+         </div>
+@@ -557,20 +580,20 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+         {/* ── Batch Action Bar ───────────────────── */}
+         {selectedIds.size > 0 && (
+           <div className="flex items-center gap-2 px-6 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30 shrink-0">
+-            <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+-              已选 {selectedIds.size} 项
++            <span className="text-sm font-medium" style={{ color: "var(--accent)" }}>
++              {t("taskPanel.batch.selected", { n: selectedIds.size })}
+             </span>
+             <div className="flex-1" />
+             <button onClick={() => doBatchAction("resume")} disabled={batchActioning}
+-              className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition disabled:opacity-50">▶ 批量恢复</button>
++              className="px-3 py-1 text-xs rounded transition disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "#fff" }}>{t("taskPanel.batch.resume")}</button>
+             <button onClick={() => doBatchAction("pause")} disabled={batchActioning}
+-              className="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded transition disabled:opacity-50">⏸ 批量暂停</button>
++              className="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.pause")}</button>
+             <button onClick={() => doBatchAction("cancel")} disabled={batchActioning}
+-              className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">⏹ 批量中止</button>
++              className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.cancel")}</button>
+             <button onClick={() => doBatchAction("archive")} disabled={batchActioning}
+-              className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded transition disabled:opacity-50">📦 批量归档</button>
++              className="px-3 py-1 text-xs bg-slate-500 hover:bg-slate-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.archive")}</button>
+             <button onClick={() => setSelectedIds(new Set())}
+-              className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition">取消选择</button>
++              className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition">{t("taskPanel.batch.deselect")}</button>
+           </div>
+         )}
+ 
+@@ -582,21 +605,21 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+                 <th className="px-4 py-2.5 w-10">
+                   <input type="checkbox" checked={displayTasks.length > 0 && selectedIds.size === displayTasks.length} onChange={toggleAll} />
+                 </th>
+-                <th className="px-2 py-2.5">任务名称</th>
+-                <th className="px-2 py-2.5">分类</th>
+-                <th className="px-2 py-2.5">类型</th>
+-                <th className="px-2 py-2.5">状态</th>
+-                <th className="px-2 py-2.5 w-36">进度</th>
+-                <th className="px-2 py-2.5">创建时间</th>
+-                <th className="px-2 py-2.5">操作</th>
++                <th className="px-2 py-2.5">{t("taskPanel.col.name")}</th>
++                <th className="px-2 py-2.5">{t("taskPanel.col.category")}</th>
++                <th className="px-2 py-2.5">{t("taskPanel.col.type")}</th>
++                <th className="px-2 py-2.5">{t("taskPanel.col.status")}</th>
++                <th className="px-2 py-2.5 w-36">{t("taskPanel.col.progress")}</th>
++                <th className="px-2 py-2.5">{t("taskPanel.col.created")}</th>
++                <th className="px-2 py-2.5">{t("taskPanel.col.actions")}</th>
+               </tr>
+             </thead>
+             <tbody>
+               {displayTasks.length === 0 && !loading && (
+                 <tr>
+                   <td colSpan={8} className="text-center py-16 text-slate-400 dark:text-slate-500">
+-                    <div className="text-4xl mb-2">📋</div>
+-                    <p>暂无任务</p>
++                    <div className="text-4xl mb-2" aria-hidden>📋</div>
++                    <p>{t("taskPanel.empty")}</p>
+                   </td>
+                 </tr>
+               )}
+@@ -637,31 +660,31 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+                           onClick={() => doAction(task.taskId, "execute")}
+                           disabled={isActing || status === "RUNNING"}
+                           className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
+-                          title="启动"
++                          title={t("taskPanel.action.start")}
+                         ><Play className="w-3.5 h-3.5" /></button>
+                         <button
+                           onClick={() => doAction(task.taskId, "pause")}
+                           disabled={isActing || status !== "RUNNING"}
+                           className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
+-                          title="暂停"
++                          title={t("taskPanel.action.pause")}
+                         ><Pause className="w-3.5 h-3.5" /></button>
+                         <button
+                           onClick={() => doAction(task.taskId, "resume")}
+                           disabled={isActing || status === "RUNNING"}
+                           className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
+-                          title="恢复"
++                          title={t("taskPanel.action.resume")}
+                         ><RotateCcw className="w-3.5 h-3.5" /></button>
+                         <button
+                           onClick={() => doAction(task.taskId, "cancel")}
+                           disabled={isActing || status === "SUCCEEDED" || status === "CANCELLED"}
+                           className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
+-                          title="中止"
++                          title={t("taskPanel.action.cancel")}
+                         ><Square className="w-3.5 h-3.5" /></button>
+                         <button
+                           onClick={() => doAction(task.taskId, "archive")}
+                           disabled={isActing}
+                           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+-                          title="归档"
++                          title={t("taskPanel.action.archive")}
+                         ><Archive className="w-3.5 h-3.5" /></button>
+                       </div>
+                     </td>
+@@ -675,19 +698,19 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+         {/* ── Pagination ─────────────────────────── */}
+         {totalPages > 1 && (
+           <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 dark:border-slate-700/50 shrink-0 text-sm">
+-            <span className="text-slate-500 dark:text-slate-400">共 {total} 条</span>
++            <span className="text-slate-500 dark:text-slate-400">{t("taskPanel.pagination.total", { n: total })}</span>
+             <div className="flex items-center gap-1">
+               <button
+                 onClick={() => setPage(p => Math.max(1, p - 1))}
+                 disabled={page <= 1}
+                 className="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition"
+-              >上一页</button>
++              >{t("taskPanel.pagination.prev")}</button>
+               <span className="px-2 text-slate-600 dark:text-slate-300">{page} / {totalPages}</span>
+               <button
+                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                 disabled={page >= totalPages}
+                 className="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition"
+-              >下一页</button>
++              >{t("taskPanel.pagination.next")}</button>
+             </div>
+           </div>
+         )}
+@@ -706,13 +729,13 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+       >
+         {detailLoading ? (
+           <div className="flex items-center justify-center h-full">
+-            <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
++            <RefreshCw className="w-6 h-6 animate-spin" style={{ color: "var(--accent)" }} />
+           </div>
+         ) : detailTask ? (
+           <div className="p-5 space-y-5">
+             {/* Header */}
+             <div className="flex items-center justify-between">
+-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">任务详情</h3>
++              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("taskPanel.detail.title")}</h3>
+               <button onClick={() => setDetailTask(null)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                 <X className="w-4 h-4 text-slate-400" />
+               </button>
+@@ -720,22 +743,22 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+ 
+             {/* 执行状态 */}
+             <section>
+-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">执行状态</h4>
++              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{t("taskPanel.detail.execution")}</h4>
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">状态</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.status")}</span>
+                   {renderStatusBadge(detailTask.status.status)}
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">进度</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.progress")}</span>
+                   <span className="w-48">{renderProgress(detailTask.status.progress)}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">启动时间</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.startedAt")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.status.startedAt)}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">完成时间</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.completedAt")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.status.completedAt)}</span>
+                 </div>
+               </div>
+@@ -743,41 +766,41 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+ 
+             {/* 基本信息 */}
+             <section>
+-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">基本信息</h4>
++              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{t("taskPanel.detail.basicInfo")}</h4>
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务ID</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskId")}</span>
+                   <span className="text-sm font-mono text-slate-700 dark:text-slate-300 text-xs">{detailTask.task.taskId}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务名称</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskName")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{detailTask.task.taskName}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务分类</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskCategory")}</span>
+                   <span>{renderCategoryBadge(detailTask.task.taskType)}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务类型</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskType")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300">{detailTask.task.taskType || "—"}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">优先级</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.priority")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300">
+-                    {PRIORITY_LABELS[detailTask.task.priority] || detailTask.task.priority || "—"}
++                    {t(PRIORITY_LABEL_KEYS[detailTask.task.priority] || "taskPanel.priority.medium")}
+                   </span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">创建人</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.createdBy")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300">{detailTask.task.createdBy || "—"}</span>
+                 </div>
+                 <div className="flex items-center justify-between">
+-                  <span className="text-sm text-slate-500 dark:text-slate-400">创建时间</span>
++                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.createdAt")}</span>
+                   <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.task.createTime)}</span>
+                 </div>
+                 {detailTask.task.description && (
+                   <div>
+-                    <span className="text-sm text-slate-500 dark:text-slate-400 block mb-1">描述</span>
++                    <span className="text-sm text-slate-500 dark:text-slate-400 block mb-1">{t("taskPanel.detail.description")}</span>
+                     <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 rounded p-2">
+                       {detailTask.task.description}
+                     </p>
+@@ -788,18 +811,30 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+ 
+             {/* 参数信息 */}
+             <section>
+-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">参数信息</h4>
++              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{t("taskPanel.detail.params")}</h4>
+               {detailTask.task.parameters && Object.keys(detailTask.task.parameters).length > 0 ? (
+                 <pre className="text-xs font-mono bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 overflow-auto max-h-48 text-slate-700 dark:text-slate-300">
+                   {JSON.stringify(detailTask.task.parameters, null, 2)}
+                 </pre>
+               ) : (
+-                <p className="text-sm text-slate-400 dark:text-slate-500">无参数</p>
++                <p className="text-sm text-slate-400 dark:text-slate-500">{t("taskPanel.detail.noParams")}</p>
+               )}
+             </section>
+           </div>
+         ) : null}
+       </div>
++
++      {/* ── 批量操作确认框 ────────────────────────── */}
++      {batchConfirm && (
++        <ConfirmDialog
++          visible
++          variant={batchConfirm === "cancel" || batchConfirm === "archive" ? "danger" : "warning"}
++          title={t(`taskPanel.batch.confirm.${batchConfirm}`)}
++          message={t("taskPanel.batch.confirmMessage", { n: selectedIds.size })}
++          onConfirm={confirmBatchAction}
++          onCancel={() => setBatchConfirm(null)}
++        />
++      )}
+     </div>
+   );
+ }
+diff --git a/ecos_frontend/src/components/ThemeContext.tsx b/ecos_frontend/src/components/ThemeContext.tsx
+index 4ed9097..3f33e05 100644
+--- a/ecos_frontend/src/components/ThemeContext.tsx
++++ b/ecos_frontend/src/components/ThemeContext.tsx
+@@ -48,6 +48,10 @@ export interface ThemeStyles {
+   infoBorder: string;
+   /** Overlay backdrop for modals/drawers */
+   overlayBg: string;
++  /** Horizontal divider — used by Login / AIPKnowledgeView */
++  divider: string;
++  /** Primary text (aliased default highlight text) — used by Login / AIPKnowledgeView etc. */
++  text: string;
+   [key: string]: string;
+ }
+ 
+@@ -94,7 +98,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
+     infoBg: "bg-blue-50",
+     infoText: "text-blue-700",
+     infoBorder: "border-blue-200",
+-    overlayBg: "bg-slate-900/40"
++    overlayBg: "bg-slate-900/40",
++    divider: "border-[#E2E8F0]",
++    text: "text-slate-800"
+   },
+   "deep-space": {
+     appBg: "bg-[#0B0F19]",
+@@ -132,7 +138,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
+     infoBg: "bg-blue-500/10",
+     infoText: "text-blue-400",
+     infoBorder: "border-blue-500/30",
+-    overlayBg: "bg-slate-950/50"
++    overlayBg: "bg-slate-950/50",
++    divider: "border-[#1E293B]",
++    text: "text-slate-100"
+   },
+   "cyber-terminal": {
+     appBg: "bg-[#020202]",
+@@ -170,7 +178,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
+     infoBg: "bg-cyan-500/10",
+     infoText: "text-cyan-400",
+     infoBorder: "border-cyan-500/40",
+-    overlayBg: "bg-black/60"
++    overlayBg: "bg-black/60",
++    divider: "border-emerald-650/50",
++    text: "text-emerald-500"
+   },
+   "royal-purple": {
+     appBg: "bg-[#0F0C1B]",
+@@ -208,7 +218,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
+     infoBg: "bg-blue-500/10",
+     infoText: "text-blue-400",
+     infoBorder: "border-blue-500/30",
+-    overlayBg: "bg-purple-950/50"
++    overlayBg: "bg-purple-950/50",
++    divider: "border-purple-900/40",
++    text: "text-purple-100"
+   }
+ };
+ 
+diff --git a/ecos_frontend/src/components/common/DataTable.tsx b/ecos_frontend/src/components/common/DataTable.tsx
+index 965f297..77b73db 100644
+--- a/ecos_frontend/src/components/common/DataTable.tsx
++++ b/ecos_frontend/src/components/common/DataTable.tsx
+@@ -5,6 +5,7 @@
+ 
+ import React, { useState } from "react";
+ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
++import { useLanguage } from "../LanguageContext";
+ import { useTheme } from "../ThemeContext";
+ import LoadingSkeleton from "./LoadingSkeleton";
+ import EmptyState from "./EmptyState";
+@@ -55,6 +56,7 @@ export default function DataTable<T extends Record<string, any>>({
+   hidePagination = false,
+ }: DataTableProps<T>) {
+   const { styles } = useTheme();
++  const { t } = useLanguage();
+   const [internalPage, setInternalPage] = useState(1);
+ 
+   const isControlled = controlledPage !== undefined;
+@@ -162,7 +164,7 @@ export default function DataTable<T extends Record<string, any>>({
+           className={`flex items-center justify-between px-3 py-2.5 border-t ${styles.cardBorder} text-xs select-none`}
+         >
+           <span className={`${styles.cardTextMuted} text-[11px]`}>
+-            {total} 条记录，第 {page}/{totalPages} 页
++            {t("common.pagination.total", { n: total })} {t("common.pagination.page", { p: page, m: totalPages })}
+           </span>
+ 
+           <div className="flex items-center gap-1">
+diff --git a/ecos_frontend/src/components/common/Toast.tsx b/ecos_frontend/src/components/common/Toast.tsx
+index 3b833a9..e591e2e 100644
+--- a/ecos_frontend/src/components/common/Toast.tsx
++++ b/ecos_frontend/src/components/common/Toast.tsx
+@@ -4,7 +4,7 @@
+  * @license Apache-2.0
+  */
+ 
+-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
++import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
+ import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
+ 
+ // ── Types ────────────────────────────────────────────────────
+@@ -69,6 +69,22 @@ const ToastItem: React.FC<{
+ 
+ let toastIdCounter = 0;
+ 
++/**
++ * PMO-43 T2: 模块级全局 toast 句柄 — 供 ToastProvider 之外的代码（路由守卫、
++ * apiFetch 401/403 事件监听、测试环境无 Provider 场景）发送 toast。
++ * 页面已收到 propShowToast 时仍以 prop 为准，仅在 prop 缺席时降级到此处。
++ */
++const toastSubscribers: Array<(type: ToastType, message: string) => void> = [];
++
++export function showToastGlobal(type: ToastType, message: string): void {
++  if (toastSubscribers.length > 0) {
++    toastSubscribers.forEach(handler => handler(type, message));
++  } else {
++    // 测试/Story 环境下无 Provider 时静默降级
++    if (typeof console !== "undefined") console.log(`[toast:${type}] ${message}`);
++  }
++}
++
+ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+@@ -91,6 +107,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
+     timersRef.current.set(id, timer);
+   }, [removeToast]);
+ 
++  const showToastRef = useRef(showToast);
++  showToastRef.current = showToast;
++
++  useEffect(() => {
++    const handler: (type: ToastType, message: string) => void = (type, message) => showToastRef.current(type, message);
++    toastSubscribers.push(handler);
++    return () => {
++      const idx = toastSubscribers.indexOf(handler);
++      if (idx >= 0) toastSubscribers.splice(idx, 1);
++    };
++  }, []);
++
+   return (
+     <ToastContext.Provider value={{ showToast }}>
+       {children}
+diff --git a/ecos_frontend/src/locales/common/en.json b/ecos_frontend/src/locales/common/en.json
+index 0d2ae70..8017d68 100644
+--- a/ecos_frontend/src/locales/common/en.json
++++ b/ecos_frontend/src/locales/common/en.json
+@@ -41,6 +41,14 @@
+   "common.export": "Export",
+   "common.save": "Save",
+   "common.search": "Search",
++  "common.noPermission": "You do not have permission to access this resource",
++  "login.expired": "Login expired, please log in again",
++  "network.error.title": "Service Unavailable",
++  "network.error.description": "Cannot reach the backend service. Showing cached data. Please retry once the service is back.",
++  "network.reconnect.title": "Network Disconnected",
++  "network.reconnect.description": "You are offline. API requests are intercepted. Please retry when back online.",
++  "network.retry": "Retry",
++  "network.resumed.title": "Connection Restored",
+   "config.group.general": "General Configuration",
+   "config.group.notification": "Notification Configuration",
+   "config.group.security": "Security Configuration",
+@@ -347,5 +355,109 @@
+   "sidebar.desc.agent_studio": "Agent collab, model catalog, audit",
+   "sidebar.desc.knowledge_view": "KB mgmt, RAG retrieval, KG import",
+   "sidebar.desc.ontology_workbench": "Ontology modeling, entities, relations, glossary",
+-  "sidebar.desc.data_workbench": "Data sources, pipelines, governance, lineage"
++  "sidebar.desc.data_workbench": "Data sources, pipelines, governance, lineage",
++  "login.username": "Username",
++  "login.username.placeholder": "Enter your username",
++  "login.password": "Password",
++  "login.password.placeholder": "Enter your password",
++  "login.login": "Sign in",
++  "login.loading": "Signing in...",
++  "login.fail": "Login failed, please try again",
++  "login.noNetwork": "Network error, please check your connection and retry",
++  "login.empty": "Please enter username and password",
++  "login.subtitle": "Enterprise Cognitive Operating System",
++  "login.footer": "Secure platform access. All activity is audited.",
++  "login.advanced.open": "Advanced options",
++  "login.advanced.collapse": "Hide advanced options",
++  "login.token.label": "Access Token",
++  "login.token.placeholder": "Paste Access Token...",
++  "login.token.submit": "Sign in with Token",
++  "common.pagination.total": "Total {n} records",
++  "common.pagination.page": "Page {p}/{m}",
++  "common.noAccess.title": "Access Denied",
++  "common.noAccess.desc": "Your account does not have permission to view this page. Contact an administrator if this is unexpected.",
++  "common.noAccess.back": "Back to Home",
++  "common.noAccess.logout": "Sign in again",
++  "noAccess.title": "Access Denied",
++  "noAccess.message": "Your account does not have permission to access this resource. Contact an administrator to request access.",
++  "noAccess.affected": "Requesting path: {path}",
++  "noAccess.back": "Go Back",
++  "noAccess.home": "Back to Home",
++  "noAccess.switch": "Switch account",
++  "common.na": "N/A",
++  "aipKnowledge.title": "AIP Knowledge Search",
++  "aipKnowledge.desc": "Semantic search and RAG reasoning over the enterprise knowledge base. Enter a natural-language query and the system retrieves relevant metadata from data assets, ontology models, and security policies, fusing them into a grounded prompt that drives the LLM to a precise answer.",
++  "aipKnowledge.step1": "Step 1: Enter a Natural-Language Query",
++  "aipKnowledge.step2": "Step 2: Vector Similarity Search Results",
++  "aipKnowledge.step3": "Step 3: Fused AI Prompt Context (RAG)",
++  "aipKnowledge.step4": "Step 4: AIP Copilot Compliance Output",
++  "aipKnowledge.placeholder": "Ask about data assets, business compliance, or security permissions...",
++  "aipKnowledge.suggested": "Suggested test questions:",
++  "aipKnowledge.suggested1": "Analyze the health of the enterprise data assets, including per-domain coverage, data-quality risks, and compliance.",
++  "aipKnowledge.suggested2": "Trace the lineage of all customer master data in the sales domain and its downstream impact scope.",
++  "aipKnowledge.suggested3": "From a security-compliance perspective, assess whether the masking strategy for sensitive fields in the finance domain is complete.",
++  "aipKnowledge.retrieving": "Retrieving vectors and aligning metadata...",
++  "aipKnowledge.run": "Start retrieval & simulate AI reasoning",
++  "aipKnowledge.score": "Similarity",
++  "aipKnowledge.typeSecurity": "Security Metadata",
++  "aipKnowledge.typeOntology": "Ontology Metadata",
++  "aipKnowledge.typeIntegration": "Integration Metadata",
++  "aipKnowledge.thinking": "The model is performing compliance-grounded reasoning over knowledge-base metadata, please wait...",
++  "aipKnowledge.idleTitle": "Waiting for RAG simulation to run...",
++  "aipKnowledge.idleHint": "Enter a query on the left and click the button to run retrieval and AI reasoning.",
++  "aipKnowledge.errRetrieve": "Failed to retrieve knowledge metadata",
++  "aipKnowledge.errLlm": "Failed to interact with the LLM, please check your network",
++  "systemConfig.paraAudit.title": "Config Consumption Audit",
++  "systemConfig.paraAudit.loading": "Loading...",
++  "systemConfig.paraAudit.empty": "No audit data available",
++  "systemConfig.paraAudit.col.key": "Key",
++  "systemConfig.paraAudit.col.label": "Label",
++  "systemConfig.paraAudit.col.value": "Value",
++  "systemConfig.paraAudit.col.consumed": "Consumed",
++  "systemConfig.paraAudit.col.by": "Consumed By",
++  "systemConfig.paraAudit.col.at": "Consumed At",
++  "systemConfig.paraAudit.yes": "Consumed",
++  "systemConfig.paraAudit.no": "Not consumed",
++  "taskPanel.batch.confirm": "Are you sure you want to {action} {count} task(s)?",
++  "taskPanel.action.cancel": "Cancel",
++  "taskPanel.action.pause": "Pause",
++  "taskPanel.action.resume": "Resume",
++  "taskPanel.action.archive": "Archive",
++  "taskPanel.status.pending": "Pending",
++  "taskPanel.status.running": "Running",
++  "taskPanel.status.succeeded": "Succeeded",
++  "taskPanel.status.failed": "Failed",
++  "taskPanel.status.cancelled": "Cancelled",
++  "taskPanel.priority.high": "High",
++  "taskPanel.priority.medium": "Medium",
++  "taskPanel.priority.low": "Low",
++  "taskPanel.priority.critical": "Critical",
++  "systemConfig.title": "System Config Manager",
++  "systemConfig.audit": "Audit",
++  "systemConfig.section.global": "Global Configuration",
++  "systemConfig.section.security": "Security Configuration",
++  "systemConfig.noConfigs": "No configs available",
++  "systemConfig.col.key": "Key",
++  "systemConfig.col.desc": "Description",
++  "systemConfig.col.current": "Current Value",
++  "systemConfig.col.default": "Default",
++  "systemConfig.col.modified": "Modified",
++  "systemConfig.updated": "Config {key} updated",
++  "systemConfig.saveFailed": "Save failed",
++  "systemConfig.resetDone": "Config {key} reset to default",
++  "systemConfig.resetFailed": "Reset failed",
++  "systemConfig.action.save": "Save",
++  "systemConfig.action.reset": "Reset to default",
++  "systemConfig.key.sessionTimeout": "Session Timeout (min)",
++  "systemConfig.key.auditRetention": "Audit Retention (days)",
++  "systemConfig.key.pwdMinLength": "Password Min Length",
++  "systemConfig.key.pwdRequireUpper": "Password Require Upper",
++  "systemConfig.key.pwdRequireDigit": "Password Require Digit",
++  "systemConfig.key.pwdRequireSpecial": "Password Require Special",
++  "systemConfig.key.pwdExpireDays": "Password Expire Days",
++  "systemConfig.key.pwdHistoryCount": "Password History Count",
++  "systemConfig.key.maxLoginAttempts": "Max Login Attempts",
++  "systemConfig.key.lockoutMins": "Lockout Duration (min)",
++  "systemConfig.key.maxConcurrentSessions": "Max Concurrent Sessions",
++  "common.loading": "Loading..."
+ }
+diff --git a/ecos_frontend/src/locales/common/zh-CN.json b/ecos_frontend/src/locales/common/zh-CN.json
+index b12803f..f2ed4f4 100644
+--- a/ecos_frontend/src/locales/common/zh-CN.json
++++ b/ecos_frontend/src/locales/common/zh-CN.json
+@@ -41,6 +41,14 @@
+   "common.export": "导出",
+   "common.save": "保存",
+   "common.search": "搜索",
++  "common.noPermission": "无权限访问该资源",
++  "login.expired": "登录已过期，请重新登录",
++  "network.error.title": "服务暂不可用",
++  "network.error.description": "无法连接后端服务，已在后台显示临时缓存数据。恢复后请点击重试。",
++  "network.reconnect.title": "网络已断开",
++  "network.reconnect.description": "当前设备离线，API 请求已被拦截。网络恢复后请重试。",
++  "network.retry": "重试",
++  "network.resumed.title": "网络连接已恢复",
+   "config.group.general": "全局通用配置",
+   "config.group.notification": "通知配置",
+   "config.group.security": "安全配置",
+@@ -347,5 +355,109 @@
+   "sidebar.desc.agent_studio": "Agent协同·模型目录·安全审计",
+   "sidebar.desc.knowledge_view": "知识库管理·RAG检索·数据对象图谱导入",
+   "sidebar.desc.ontology_workbench": "本体建模·实体管理·关系图谱·术语标准",
+-  "sidebar.desc.data_workbench": "数据源·管道·治理·血缘·调度"
++  "sidebar.desc.data_workbench": "数据源·管道·治理·血缘·调度",
++  "login.username": "用户名",
++  "login.username.placeholder": "请输入用户名",
++  "login.password": "密码",
++  "login.password.placeholder": "请输入密码",
++  "login.login": "登录",
++  "login.loading": "登录中...",
++  "login.fail": "登录失败，请重试",
++  "login.noNetwork": "网络连接失败，请检查网络后重试",
++  "login.empty": "请输入用户名和密码",
++  "login.subtitle": "企业认知操作系统",
++  "login.footer": "安全平台访问 · 所有操作均被审计",
++  "login.advanced.open": "高级选项",
++  "login.advanced.collapse": "收起高级选项",
++  "login.token.label": "Access Token",
++  "login.token.placeholder": "粘贴 Access Token...",
++  "login.token.submit": "Token 登录",
++  "common.pagination.total": "{n} 条记录",
++  "common.pagination.page": "第 {p}/{m} 页",
++  "common.noAccess.title": "无权限访问",
++  "common.noAccess.desc": "您的账号无权访问该页面，请联系系统管理员",
++  "common.noAccess.back": "返回首页",
++  "common.noAccess.logout": "重新登录",
++  "noAccess.title": "无权限访问",
++  "noAccess.message": "您的账号当前无权访问该资源，如需权限请联系系统管理员",
++  "noAccess.affected": "触发的请求路径：{path}",
++  "noAccess.back": "返回上一页",
++  "noAccess.home": "返回首页",
++  "noAccess.switch": "切换到其他账号",
++  "common.na": "N/A",
++  "aipKnowledge.title": "AIP Knowledge · 知识检索",
++  "aipKnowledge.desc": "基于企业知识库的语义检索与 RAG 推理——输入自然语言查询，系统自动从数据资产、本体模型、安全策略中检索相关元数据，融合为强上下文提示词，驱动大模型生成精准答案。",
++  "aipKnowledge.step1": "第1步: 输入自然语言查询",
++  "aipKnowledge.step2": "第2步: 向量相关度检索结果",
++  "aipKnowledge.step3": "第3步: 融合生成的 AI 提示词 (RAG Prompt Context)",
++  "aipKnowledge.step4": "第4步: AIP Copilot 合规输出",
++  "aipKnowledge.placeholder": "请输入企业数据资产、业务合规或安全权限相关的提问...",
++  "aipKnowledge.suggested": "推荐测试问题:",
++  "aipKnowledge.suggested1": "帮我分析企业当前的数据资产健康状况，包括各业务域数据覆盖率、数据质量风险和合规性",
++  "aipKnowledge.suggested2": "查询销售域下所有客户主数据的血缘链路与下游影响范围",
++  "aipKnowledge.suggested3": "从安全合规角度，评估财务域敏感字段的脱敏策略是否完备",
++  "aipKnowledge.retrieving": "向量检索与元数据对齐中...",
++  "aipKnowledge.run": "开始检索并模拟 AI 推理",
++  "aipKnowledge.score": "相关度",
++  "aipKnowledge.typeSecurity": "安全元数据",
++  "aipKnowledge.typeOntology": "本体元数据",
++  "aipKnowledge.typeIntegration": "集成元数据",
++  "aipKnowledge.thinking": "模型正在依据知识库元数据进行合规校正推理，请稍候...",
++  "aipKnowledge.idleTitle": "等待运行 RAG 仿真推理...",
++  "aipKnowledge.idleHint": "左侧输入查询并点击按钮，即可一键查看知识检索与AI推理结果",
++  "aipKnowledge.errRetrieve": "元数据知识召回失败",
++  "aipKnowledge.errLlm": "与大模型交互失败，请检查网络",
++  "systemConfig.paraAudit.title": "参数消耗审计",
++  "systemConfig.paraAudit.loading": "加载中...",
++  "systemConfig.paraAudit.empty": "暂无审计数据",
++  "systemConfig.paraAudit.col.key": "参数键",
++  "systemConfig.paraAudit.col.label": "标签",
++  "systemConfig.paraAudit.col.value": "当前值",
++  "systemConfig.paraAudit.col.consumed": "消耗状态",
++  "systemConfig.paraAudit.col.by": "消耗者",
++  "systemConfig.paraAudit.col.at": "消耗时间",
++  "systemConfig.paraAudit.yes": "已消耗",
++  "systemConfig.paraAudit.no": "未消耗",
++  "taskPanel.batch.confirm": "确定要批量{action} {count} 个任务吗？",
++  "taskPanel.action.cancel": "中止",
++  "taskPanel.action.pause": "暂停",
++  "taskPanel.action.resume": "恢复",
++  "taskPanel.action.archive": "归档",
++  "taskPanel.status.pending": "等待中",
++  "taskPanel.status.running": "运行中",
++  "taskPanel.status.succeeded": "已完成",
++  "taskPanel.status.failed": "失败",
++  "taskPanel.status.cancelled": "已取消",
++  "taskPanel.priority.high": "高",
++  "taskPanel.priority.medium": "中",
++  "taskPanel.priority.low": "低",
++  "taskPanel.priority.critical": "紧急",
++  "systemConfig.title": "系统配置管理",
++  "systemConfig.audit": "参数审计",
++  "systemConfig.section.global": "全局通用配置",
++  "systemConfig.section.security": "安全配置",
++  "systemConfig.noConfigs": "暂无配置项",
++  "systemConfig.col.key": "配置键",
++  "systemConfig.col.desc": "描述",
++  "systemConfig.col.current": "当前值",
++  "systemConfig.col.default": "默认值",
++  "systemConfig.col.modified": "修改时间",
++  "systemConfig.updated": "配置 {key} 已更新",
++  "systemConfig.saveFailed": "保存失败",
++  "systemConfig.resetDone": "配置 {key} 已恢复默认值",
++  "systemConfig.resetFailed": "恢复失败",
++  "systemConfig.action.save": "保存",
++  "systemConfig.action.reset": "恢复默认值",
++  "systemConfig.key.sessionTimeout": "会话超时（分钟）",
++  "systemConfig.key.auditRetention": "审计保留天数",
++  "systemConfig.key.pwdMinLength": "密码最小长度",
++  "systemConfig.key.pwdRequireUpper": "密码需含大写",
++  "systemConfig.key.pwdRequireDigit": "密码需含数字",
++  "systemConfig.key.pwdRequireSpecial": "密码需含特殊字符",
++  "systemConfig.key.pwdExpireDays": "密码过期天数",
++  "systemConfig.key.pwdHistoryCount": "密码历史数量",
++  "systemConfig.key.maxLoginAttempts": "最大登录尝试次数",
++  "systemConfig.key.lockoutMins": "锁定持续时间（分钟）",
++  "systemConfig.key.maxConcurrentSessions": "最大并发会话数",
++  "common.loading": "加载中..."
+ }
+diff --git a/ecos_frontend/src/locales/knowledge/en.json b/ecos_frontend/src/locales/knowledge/en.json
+index 40849e5..aeaed64 100644
+--- a/ecos_frontend/src/locales/knowledge/en.json
++++ b/ecos_frontend/src/locales/knowledge/en.json
+@@ -38,6 +38,37 @@
+   "glossary.transition.publish": "Publish",
+   "glossary.transition.submit_review": "Submit for Review",
+   "glossary.unit": "terms",
++  "aipKnowledge.title": "AI Knowledge Assistant",
++  "aipKnowledge.desc": "RAG Q&A over the enterprise knowledge graph: ask a question, it retrieves the most relevant knowledge and generates an answer with cited sources.",
++  "aipKnowledge.step1": "Ask a Question",
++  "aipKnowledge.placeholder": "Type a question, e.g. How is data security classified?",
++  "aipKnowledge.suggested": "Suggested Questions",
++  "aipKnowledge.suggested1": "What are the data security classification standards?",
++  "aipKnowledge.suggested2": "How do I define a business ontology?",
++  "aipKnowledge.suggested3": "How does the system integrate with external platforms?",
++  "aipKnowledge.run": "Run Retrieval",
++  "aipKnowledge.retrieving": "Retrieving relevant knowledge...",
++  "aipKnowledge.step2": "Retrieved Documents",
++  "aipKnowledge.score": "Relevance",
++  "aipKnowledge.step3": "RAG Prompt",
++  "aipKnowledge.step4": "Model Output",
++  "aipKnowledge.thinking": "The model is thinking, please wait...",
++  "aipKnowledge.idleTitle": "Waiting for a new query",
++  "aipKnowledge.idleHint": "Enter a question and click \"Run Retrieval\"; results appear here.",
++  "aipKnowledge.errRetrieve": "Retrieval request failed, please retry",
++  "aipKnowledge.errLlm": "Model call failed, please check your network",
++  "extractReview.backToUpload": "Back to Upload",
++  "extractReview.selected": "{n} selected",
++  "extractReview.rejectAll": "Reject All",
++  "extractReview.approve": "Confirm Registration",
++  "extractReview.sourceText": "Source Text",
++  "extractReview.tabs.entities": "Entities",
++  "extractReview.tabs.relations": "Relations",
++  "extractReview.tabs.rules": "Rules",
++  "extractReview.edit": "Edit",
++  "extractReview.complete.title": "Processing Complete",
++  "extractReview.complete.subtitle": "The extraction result has been submitted. Return to upload or review other tasks.",
++  "extractReview.noData": "No data",
+   "kb.common.close": "Close",
+   "kb.index.chunkConfig": "Chunking Config",
+   "kb.index.syncBtn": "Build Vector Index",
+diff --git a/ecos_frontend/src/locales/knowledge/zh-CN.json b/ecos_frontend/src/locales/knowledge/zh-CN.json
+index 1cd38e1..b27abf2 100644
+--- a/ecos_frontend/src/locales/knowledge/zh-CN.json
++++ b/ecos_frontend/src/locales/knowledge/zh-CN.json
+@@ -38,6 +38,37 @@
+   "glossary.transition.publish": "发布",
+   "glossary.transition.submit_review": "提交审核",
+   "glossary.unit": "条",
++  "aipKnowledge.title": "AI 知识助手",
++  "aipKnowledge.desc": "基于企业知识图谱的 RAG 问答：输入问题，自动检索高相关知识并生成附带引用来源的解答。",
++  "aipKnowledge.step1": "输入问题",
++  "aipKnowledge.placeholder": "请输入你的问题，例如：数据安全等级如何划分？",
++  "aipKnowledge.suggested": "推荐问题",
++  "aipKnowledge.suggested1": "数据安全分级标准是什么？",
++  "aipKnowledge.suggested2": "如何定义一个业务本体？",
++  "aipKnowledge.suggested3": "系统如何与外部平台集成？",
++  "aipKnowledge.run": "运行检索",
++  "aipKnowledge.retrieving": "正在检索相关知识...",
++  "aipKnowledge.step2": "检索结果",
++  "aipKnowledge.score": "相关度",
++  "aipKnowledge.step3": "RAG 提示词",
++  "aipKnowledge.step4": "模型输出",
++  "aipKnowledge.thinking": "模型正在思考，请稍候…",
++  "aipKnowledge.idleTitle": "等待新的查询",
++  "aipKnowledge.idleHint": "输入问题后点击「运行检索」，结果将显示在此。",
++  "aipKnowledge.errRetrieve": "检索请求失败，请重试",
++  "aipKnowledge.errLlm": "模型调用失败，请检查网络连接",
++  "extractReview.backToUpload": "返回上传",
++  "extractReview.selected": "已选 {n} 项",
++  "extractReview.rejectAll": "全部驳回",
++  "extractReview.approve": "确认入库",
++  "extractReview.sourceText": "源文本",
++  "extractReview.tabs.entities": "实体",
++  "extractReview.tabs.relations": "关系",
++  "extractReview.tabs.rules": "规则",
++  "extractReview.edit": "编辑",
++  "extractReview.complete.title": "处理完成",
++  "extractReview.complete.subtitle": "抽取结果已提交，返回继续上传或查看其他任务",
++  "extractReview.noData": "暂无数据",
+   "kb.common.close": "关闭",
+   "kb.index.chunkConfig": "向量分片参数配置",
+   "kb.index.syncBtn": "构建闭环元数据向量库",
+diff --git a/ecos_frontend/src/main.tsx b/ecos_frontend/src/main.tsx
+index bfb1063..1811413 100644
+--- a/ecos_frontend/src/main.tsx
++++ b/ecos_frontend/src/main.tsx
+@@ -7,8 +7,10 @@ import './index.css';
+ import App from './App.tsx';
+ import RequireAuth from './components/RequireAuth.tsx';
+ import Login from './pages/Login.tsx';
++import NoAccessPage from './pages/NoAccess.tsx';
+ import { LanguageProvider } from './components/LanguageContext.tsx';
+ import { ThemeProvider } from './components/ThemeContext.tsx';
++import { ToastProvider, showToastGlobal } from './components/common/Toast';
+ 
+ // Per-route lazy-loaded feature pages (50 routes → ~50 chunks)
+ const CognitiveOperatingSystem = lazy(() => import('./pages/CognitiveOperatingSystem.tsx'));
+@@ -83,7 +85,7 @@ function TasksCenterRoute() {
+   return (
+     <Suspense fallback={<RouteFallback />}>
+       <AsyncTaskCenterView
+-        showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
++        showToast={(type, msg) => showToastGlobal(type, msg)}
+         onViewModeChange={() => {}}
+       />
+     </Suspense>
+@@ -95,9 +97,11 @@ createRoot(document.getElementById('root')!).render(
+     <HashRouter>
+       <LanguageProvider>
+         <ThemeProvider>
++          <ToastProvider>
+           <Suspense fallback={<RouteFallback />}>
+             <Routes>
+               <Route path="/login" element={<Login />} />
++              <Route path="/no-access" element={<NoAccessPage />} />
+               <Route
+                 element={
+                   <RequireAuth>
+@@ -168,6 +172,7 @@ createRoot(document.getElementById('root')!).render(
+               </Route>
+             </Routes>
+           </Suspense>
++          </ToastProvider>
+         </ThemeProvider>
+       </LanguageProvider>
+     </HashRouter>
+diff --git a/ecos_frontend/src/pages/AIPKnowledgeView.tsx b/ecos_frontend/src/pages/AIPKnowledgeView.tsx
+index 525775e..fc44bcd 100644
+--- a/ecos_frontend/src/pages/AIPKnowledgeView.tsx
++++ b/ecos_frontend/src/pages/AIPKnowledgeView.tsx
+@@ -1,39 +1,44 @@
+ /**
+- * AIPKnowledgeView — 独立AIP Knowledge知识库页面
+- * 从 ceos_new AIPWorkbench/KnowledgeView 中提取RAG检索子Tab，
+- * 适配ECOS：lucide-react图标、Bearer认证、/api/v1/端点前缀。
++ * AIPKnowledgeView — standalone AIP Knowledge base page.
++ * RAG search subtab extracted from ceos_new AIPWorkbench/KnowledgeView,
++ * adapted for ECOS: lucide-react icons, Bearer auth, /api/v1/ endpoint prefix.
+  * @license Apache-2.0
+  */
+ 
+ import React, { useState } from 'react';
+ import {
+-  Keyboard, Flame, Layers, Sparkles, Bot, RefreshCw,
+-  Search, Database, Shield, Network, Cpu
++  GitBranch, Keyboard, Flame, Layers, Sparkles, Bot, RefreshCw,
++  Search, Database, Shield, Network, Lightbulb, Loader2
+ } from 'lucide-react';
++import { useLanguage } from '../components/LanguageContext';
++import { useTheme } from '../components/ThemeContext';
++import { useToast } from '../components/common/Toast';
+ 
+ // ═══════════════════ API helpers ═══════════════════
+ 
+-function authHeaders(): HeadersInit {
++function authHeaders(): Record<string, string> {
+   const token = localStorage.getItem('token') || '';
+-  return {
++  const headers: Record<string, string> = {
+     'Content-Type': 'application/json',
+-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+   };
+-}
+-
+-function showToast(type: 'success' | 'info' | 'error', msg: string) {
+-  console.log(`[AIPKnowledge ${type}] ${msg}`);
++  if (token) headers.Authorization = ['Bearer', token].join(' ');
++  return headers;
+ }
+ 
+ // ═══════════════════ Component ═══════════════════
+ 
+ export default function AIPKnowledgeView() {
+-  const [queryInput, setQueryInput] = useState('帮我分析企业当前的数据资产健康状况，包括各业务域数据覆盖率、数据质量风险和合规性');
++  const { t } = useLanguage();
++  const { styles } = useTheme();
++  const { showToast } = useToast();
++  const [queryInput, setQueryInput] = useState('');
+   const [isRetrieving, setIsRetrieving] = useState(false);
+   const [retrievedDocs, setRetrievedDocs] = useState<Array<{ title: string; type: string; snippet: string; score: number }>>([]);
+   const [ragPrompt, setRagPrompt] = useState<string>('');
+   const [llmOutput, setLlmOutput] = useState<string>('');
+ 
++  const applyQuery = (key: string) => setQueryInput(t(key));
++
+   const handleRunRAG = async () => {
+     if (!queryInput.trim()) return;
+     setIsRetrieving(true);
+@@ -48,85 +53,93 @@ export default function AIPKnowledgeView() {
+         body: JSON.stringify({ query: queryInput })
+       });
+       const data = await response.json();
+-      
++
+       if (data.success || data.code === 0 || data.code === 200) {
+-        const payload = data.data || data;
+-        setRetrievedDocs((payload.groundedDocs || []).map((doc: any) => ({
+-          title: doc.title,
+-          type: doc.title?.includes('Security') ? '安全元数据' : doc.title?.includes('Ontology') ? '本体元数据' : '集成元数据',
+-          snippet: doc.snippet || 'N/A',
+-          score: doc.score
+-        })));
++      const payload = data.data || data;
++      setRetrievedDocs((payload.groundedDocs || []).map((doc: any) => ({
++        title: doc.title,
++        type: doc.title?.includes('Security') ? 'security' : doc.title?.includes('Ontology') ? 'ontology' : 'integration',
++        snippet: doc.snippet || t('common.na'),
++        score: doc.score,
++      })));
+         setRagPrompt(payload.promptGrounded || '');
+         setLlmOutput(payload.answer || '');
+       } else {
+-        showToast('error', data.error || '元数据知识召回失败');
++        showToast('error', data.error || t('aipKnowledge.errRetrieve'));
+       }
+     } catch (e) {
+-      showToast('error', '与大模型交互失败，请检查网络');
++      showToast('error', t('aipKnowledge.errLlm'));
+     } finally {
+       setIsRetrieving(false);
+     }
+   };
+ 
++  const stepHeader = (icon: React.ReactNode, label: string, badge?: string) => (
++    <div className={`border-b border-slate-50 pb-2 flex items-center justify-between ${styles.divider}`}>
++      <div className="flex items-center gap-1.5 font-bold text-xs">
++        {icon}
++        <span>{label}</span>
++      </div>
++      {badge && <span className="text-[9px] text-slate-400 font-mono">{badge}</span>}
++    </div>
++  );
++
++  const card = `rounded-xl p-4 ${styles.cardBg} ${styles.cardBorder} shadow-sm space-y-3`;
++
+   return (
+-    <div className="flex h-full select-none text-xs overflow-hidden bg-slate-50">
++    <div className={`flex h-full select-none text-xs overflow-hidden ${styles.appBg}`}>
+ 
+-      {/* Main Panel — 全宽RAG检索页面 */}
++      {/* Main Panel — full-width RAG search page */}
+       <div className="flex-1 p-6 overflow-y-auto h-full">
+ 
+         {/* Header */}
+-        <div className="mb-6 border-b border-slate-200 pb-4 space-y-1">
++        <div className={`mb-6 border-b pb-4 space-y-1 ${styles.divider}`}>
+           <div className="flex items-center gap-2">
+-            <span className="p-1.5 rounded-lg bg-indigo-500 text-white">
+-              <Search size={15} />
++            <span className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--accent)' }}>
++              <Search size={15} className="text-white" />
+             </span>
+-            <h1 className="text-base font-black text-slate-800">AIP Knowledge · 知识检索</h1>
++            <h1 className={`text-base font-black ${styles.text}`}>{t('aipKnowledge.title')}</h1>
+           </div>
+-          <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
+-            基于企业知识库的语义检索与RAG推理——输入自然语言查询，系统自动从数据资产、本体模型、安全策略中检索相关元数据，
+-            融合为强上下文提示词，驱动大模型生成精准答案。
++          <p className={`text-xs max-w-2xl leading-relaxed ${styles.muted}`}>
++            {t('aipKnowledge.desc')}
+           </p>
+         </div>
+ 
+         {/* Four-step flow */}
+         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+-          
++
+           {/* Left column: Step 1 + Step 2 */}
+           <div className="lg:col-span-5 space-y-4">
+-            
++
+             {/* Step 1: Query Input */}
+-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-4">
+-              <div className="border-b border-slate-100 pb-2 flex items-center gap-2">
+-                <span className="p-1.5 rounded bg-blue-50 text-blue-600">
++            <div className={card}>
++              {stepHeader(
++                <span className="p-1.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                   <Keyboard size={13} />
+-                </span>
+-                <h3 className="font-bold text-slate-800 text-xs">第1步: 输入自然语言查询</h3>
+-              </div>
++                </span>,
++                t('aipKnowledge.step1')
++              )}
+ 
+               <div className="space-y-2">
+                 <textarea
+                   value={queryInput}
+                   onChange={e => setQueryInput(e.target.value)}
+                   rows={3}
+-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-sans leading-relaxed text-slate-700 focus:outline-none focus:border-blue-500"
+-                  placeholder="请输入企业数据资产、业务合规或安全权限相关的提问..."
++                  className={`w-full px-3 py-2 border rounded-lg text-xs font-sans leading-relaxed focus:outline-none transition ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
++                  placeholder={t('aipKnowledge.placeholder')}
+                 />
+-                
++
+                 <div className="space-y-1.5">
+-                  <span className="text-[9px] text-slate-400 font-extrabold uppercase block">推荐测试问题:</span>
++                  <span className="text-[9px] text-slate-400 font-extrabold uppercase block">{t('aipKnowledge.suggested')}</span>
+                   <div className="flex flex-col gap-1">
+-                    {[
+-                      '帮我分析企业当前的数据资产健康状况，包括各业务域数据覆盖率、数据质量风险和合规性',
+-                      '查询销售域下所有客户主数据的血缘链路与下游影响范围',
+-                      '从安全合规角度，评估财务域敏感字段的脱敏策略是否完备'
+-                    ].map((p, idx) => (
++                    {['aipKnowledge.suggested1', 'aipKnowledge.suggested2', 'aipKnowledge.suggested3'].map((key, idx) => (
+                       <button
+                         key={idx}
+-                        onClick={() => setQueryInput(p)}
+-                        className="text-left px-2 py-1 bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 rounded-lg text-[10px] text-slate-600 truncate cursor-pointer transition-all"
++                        onClick={() => applyQuery(key)}
++                        className={`text-left px-2 py-1 border rounded-lg text-[10px] truncate cursor-pointer transition-all ${styles.cardBg} ${styles.cardBorder} ${styles.muted} hover:opacity-80`}
+                       >
+-                        💡 {p}
++                        <Lightbulb size={10} className="inline mr-1 text-amber-500" />
++                        {t(key)}
+                       </button>
+                     ))}
+                   </div>
+@@ -136,19 +149,18 @@ export default function AIPKnowledgeView() {
+               <button
+                 onClick={handleRunRAG}
+                 disabled={isRetrieving || !queryInput.trim()}
+-                className={`w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
+-                  isRetrieving ? 'opacity-70 cursor-not-allowed' : ''
+-                }`}
++                className="w-full py-2 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
++                style={{ backgroundColor: 'var(--accent)' }}
+               >
+                 {isRetrieving ? (
+                   <>
+-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+-                    <span>向量检索与元数据对齐中...</span>
++                    <Loader2 size={13} className="animate-spin" />
++                    <span>{t('aipKnowledge.retrieving')}</span>
+                   </>
+                 ) : (
+                   <>
+                     <Flame size={13} />
+-                    <span>开始检索并模拟 AI 推理</span>
++                    <span>{t('aipKnowledge.run')}</span>
+                   </>
+                 )}
+               </button>
+@@ -156,30 +168,28 @@ export default function AIPKnowledgeView() {
+ 
+             {/* Step 2: Retrieved Documents */}
+             {retrievedDocs.length > 0 && (
+-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
+-                <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+-                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+-                    <Layers size={12} className="text-emerald-500" />
+-                    <span>第2步: 向量相关度检索结果</span>
+-                  </div>
+-                  <span className="text-[9px] text-slate-400 font-mono">VECTOR MATCH</span>
+-                </div>
++              <div className={card}>
++                {stepHeader(
++                  <Layers size={12} className="text-emerald-500" />,
++                  t('aipKnowledge.step2'),
++                  'VECTOR MATCH'
++                )}
+ 
+                 <div className="space-y-2 max-h-56 overflow-y-auto">
+                   {retrievedDocs.map((doc, idx) => (
+-                    <div key={idx} className="p-2 bg-slate-50 border border-slate-150 rounded-lg space-y-1">
++                    <div key={idx} className={`p-2 ${styles.cardBg} ${styles.cardBorder} border rounded-lg space-y-1`}>
+                       <div className="flex items-center justify-between text-[10px]">
+-                        <span className="font-bold text-slate-800 flex items-center gap-1">
+-                          {doc.type === '安全元数据' ? <Shield size={10} className="text-rose-500" /> :
+-                           doc.type === '本体元数据' ? <Network size={10} className="text-indigo-500" /> :
++                        <span className={`font-bold flex items-center gap-1 ${styles.text}`}>
++                          {doc.type === 'security' ? <Shield size={10} className="text-rose-500" /> :
++                           doc.type === 'ontology' ? <Network size={10} className="text-indigo-500" /> :
+                            <Database size={10} className="text-emerald-500" />}
+                           {doc.title}
+                         </span>
+-                        <span className="px-1.5 bg-emerald-50 text-emerald-600 text-[9px] font-bold rounded-md">
++                        <span className="px-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold rounded-md" title={t('aipKnowledge.score')}>
+                           {(doc.score * 100).toFixed(0)}%
+                         </span>
+                       </div>
+-                      <p className="text-[9px] text-slate-500 leading-relaxed font-sans">{doc.snippet}</p>
++                      <p className={`text-[9px] leading-relaxed font-sans ${styles.muted}`}>{doc.snippet}</p>
+                     </div>
+                   ))}
+                 </div>
+@@ -190,41 +200,41 @@ export default function AIPKnowledgeView() {
+ 
+           {/* Right column: Step 3 + Step 4 */}
+           <div className="lg:col-span-7 space-y-4">
+-            
++
+             {/* Step 3: RAG Prompt */}
+             {ragPrompt && (
+-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-2">
+-                <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 text-indigo-600 border-b border-slate-100 pb-2">
+-                  <Sparkles size={13} />
+-                  <span>第3步: 融合生成的 AI 提示词 (RAG Prompt Context)</span>
+-                </h3>
+-                <div className="bg-slate-900 text-slate-300 rounded-xl p-3 h-32 overflow-y-auto font-mono text-[9px] leading-relaxed">
++              <div className={card}>
++                <div className={`flex items-center gap-1.5 font-bold text-xs border-b pb-2 ${styles.divider}`}>
++                  <Sparkles size={13} className="text-indigo-500" />
++                  <span className="text-indigo-600 dark:text-indigo-400">{t('aipKnowledge.step3')}</span>
++                </div>
++                <div className={`rounded-xl p-3 ${styles.inputBg} ${styles.inputText} h-32 overflow-y-auto font-mono text-[9px] leading-relaxed`}>
+                   {ragPrompt}
+                 </div>
+               </div>
+             )}
+ 
+             {/* Step 4: LLM Output */}
+-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+-              <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 text-emerald-600 border-b border-slate-100 pb-2">
+-                <Bot size={14} className="animate-bounce" />
+-                <span>第4步: AIP Copilot 合规输出</span>
+-              </h3>
++            <div className={card}>
++              <div className={`flex items-center gap-1.5 font-bold text-xs border-b pb-2 ${styles.divider}`}>
++                <Bot size={14} className="animate-bounce text-emerald-500" />
++                <span className="text-emerald-600 dark:text-emerald-400">{t('aipKnowledge.step4')}</span>
++              </div>
+ 
+               {isRetrieving ? (
+-                <div className="py-8 text-center text-slate-400 space-y-2">
+-                  <RefreshCw size={24} className="animate-spin text-slate-300 mx-auto" />
+-                  <p className="text-xs font-medium">模型正在依据知识库元数据进行合规校正推理，请稍候...</p>
++                <div className={`py-8 text-center space-y-2 ${styles.muted}`}>
++                  <RefreshCw size={24} className="animate-spin mx-auto opacity-40" />
++                  <p className="text-xs font-medium">{t('aipKnowledge.thinking')}</p>
+                 </div>
+               ) : llmOutput ? (
+-                <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl text-slate-700 text-[11px] font-sans leading-relaxed whitespace-pre-wrap">
++                <div className={`p-4 rounded-xl border ${styles.cardBg} ${styles.cardBorder} text-[11px] font-sans leading-relaxed whitespace-pre-wrap ${styles.text}`}>
+                   {llmOutput}
+                 </div>
+               ) : (
+-                <div className="py-8 text-center text-slate-400 space-y-1">
+-                  <Bot size={24} className="text-slate-300 mx-auto" />
+-                  <p>等待运行 RAG 仿真推理...</p>
+-                  <p className="text-[10px] text-slate-400">左侧输入查询并点击按钮，即可一键查看知识检索与AI推理结果</p>
++                <div className={`py-8 text-center space-y-1 ${styles.muted}`}>
++                  <Bot size={24} className={`${styles.muted} mx-auto opacity-30`} />
++                  <p className={styles.text}>{t('aipKnowledge.idleTitle')}</p>
++                  <p className="text-[10px]">{t('aipKnowledge.idleHint')}</p>
+                 </div>
+               )}
+             </div>
+diff --git a/ecos_frontend/src/pages/AgentMesh.tsx b/ecos_frontend/src/pages/AgentMesh.tsx
+index 803026a..8353b6c 100644
+--- a/ecos_frontend/src/pages/AgentMesh.tsx
++++ b/ecos_frontend/src/pages/AgentMesh.tsx
+@@ -35,6 +35,12 @@ export default function AgentMesh() {
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState("");
+ 
++  // PMO-43 T3: loadErrors tracks per-key fetch failures (agents / missions)
++  // so the UI can render "error + retry" state instead of a silent empty list.
++  // Mirrors the same pattern already used in aiworkbench/index.tsx.
++  type LoadKey = 'agents' | 'missions';
++  const [loadErrors, setLoadErrors] = useState<Partial<Record<LoadKey, string>>>({});
++
+   // Ref to track the current polling mission ID to avoid stale closures
+   const pollingRef = useRef<string | null>(null);
+ 
+@@ -82,11 +88,24 @@ export default function AgentMesh() {
+   }, []);
+ 
+   const loadAgents = async () => {
+-    try { setAgents(await fetchAgentMeshAgents()); } catch (e) {}
++    // Reset the agents error before retrying so a successful reload clears it.
++    setLoadErrors((prev) => ({ ...prev, agents: undefined }));
++    try {
++      setAgents(await fetchAgentMeshAgents());
++    } catch (e: unknown) {
++      const msg = e instanceof Error ? e.message : String(e);
++      setLoadErrors((prev) => ({ ...prev, agents: msg }));
++    }
+   };
+ 
+   const loadMissions = async () => {
+-    try { setMissions(await fetchAgentMeshMissions()); } catch (e) {}
++    setLoadErrors((prev) => ({ ...prev, missions: undefined }));
++    try {
++      setMissions(await fetchAgentMeshMissions());
++    } catch (e: unknown) {
++      const msg = e instanceof Error ? e.message : String(e);
++      setLoadErrors((prev) => ({ ...prev, missions: msg }));
++    }
+   };
+ 
+   const loadMission = async (id: string) => {
+@@ -173,6 +192,15 @@ export default function AgentMesh() {
+         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+             <Cpu size={16} /> Agent 注册表
++            {loadErrors.agents && (
++              <button
++                onClick={loadAgents}
++                className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
++                title={loadErrors.agents}
++              >
++                <RefreshCw size={11} /> 重试加载
++              </button>
++            )}
+           </div>
+         </div>
+         <div className="flex-1 overflow-auto p-3 space-y-2">
+@@ -199,9 +227,19 @@ export default function AgentMesh() {
+               </div>
+             </div>
+           ))}
+-          {agents.length === 0 && (
++          {agents.length === 0 && loadErrors.agents ? (
++            <div className="text-center py-8">
++              <p className="text-xs text-red-500 mb-2">{loadErrors.agents}</p>
++              <button
++                onClick={loadAgents}
++                className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
++              >
++                <RefreshCw size={12} /> 重试
++              </button>
++            </div>
++          ) : agents.length === 0 ? (
+             <p className="text-xs text-slate-400 text-center py-8">无已注册Agent</p>
+-          )}
++          ) : null}
+         </div>
+       </div>
+ 
+@@ -322,9 +360,19 @@ export default function AgentMesh() {
+             <TaskStatsPanel mission={selectedMission} tasks={missionTasks} />
+           )}
+ 
+-          {missions.length === 0 && (
++          {missions.length === 0 && loadErrors.missions ? (
++            <div className="text-center py-16">
++              <p className="text-sm text-red-500 mb-3">{loadErrors.missions}</p>
++              <button
++                onClick={loadMissions}
++                className="inline-flex items-center gap-1 px-4 py-1.5 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
++              >
++                <RefreshCw size={12} /> 重试加载
++              </button>
++            </div>
++          ) : missions.length === 0 ? (
+             <p className="text-sm text-slate-400 text-center py-16">暂无 Mission，创建一个开始协作</p>
+-          )}
++          ) : null}
+ 
+           {missions.map(mission => (
+             <div key={mission.id}
+diff --git a/ecos_frontend/src/pages/DataWorkbenchLayout.tsx b/ecos_frontend/src/pages/DataWorkbenchLayout.tsx
+index 9d3541a..0e96000 100644
+--- a/ecos_frontend/src/pages/DataWorkbenchLayout.tsx
++++ b/ecos_frontend/src/pages/DataWorkbenchLayout.tsx
+@@ -12,6 +12,7 @@
+ import React, { useState } from 'react';
+ import { useLanguage } from '../components/LanguageContext';
+ import { useTheme } from '../components/ThemeContext';
++import { showToastGlobal } from '../components/common/Toast';
+ import type { ObjectType, Dataset } from './data-workbench/types';
+ import LucideIcon from './data-workbench/LucideIcon';
+ import ConnectionsTab from './data-workbench/tabs/ConnectionsTab';
+@@ -46,7 +47,7 @@ export default function DataWorkbenchLayout({
+ }: DataWorkbenchLayoutProps = {}) {
+   const { t, locale } = useLanguage();
+   const { styles } = useTheme();
+-  const showToast = propShowToast || ((type: string, msg: string) => console.log('[toast]', type, msg));
++  const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
+ 
+   const dw = useDataWorkbench(showToast, t);
+ 
+diff --git a/ecos_frontend/src/pages/EngineMonitor.tsx b/ecos_frontend/src/pages/EngineMonitor.tsx
+index e7447f0..cd1771e 100644
+--- a/ecos_frontend/src/pages/EngineMonitor.tsx
++++ b/ecos_frontend/src/pages/EngineMonitor.tsx
+@@ -20,6 +20,7 @@ import {
+ } from 'lucide-react';
+ import { useLanguage } from '../components/LanguageContext';
+ import { useTheme } from '../components/ThemeContext';
++import { useToast } from '../components/common/Toast';
+ 
+ // ── Types ────────────────────────────────────────────────────
+ 
+@@ -68,11 +69,17 @@ function authHeaders(): Record<string, string> {
+ 
+ async function apiFetch<T = any>(url: string): Promise<T> {
+   const res = await fetch(url, { headers: authHeaders() });
+-  if (res.status === 401 || res.status === 403) {
++  if (res.status === 401) {
++    // Token expired/invalid → prompt re-login (AM-30 event, PMO-43 T4)
+     localStorage.removeItem('token');
+     window.location.hash = '#/login';
+     throw new Error('登录已过期，请重新登录');
+   }
++  if (res.status === 403) {
++    // Permission denied on a valid session → surface "no permission",
++    // never log the user out (previously conflated with 401).
++    throw new Error('NO_PERMISSION');
++  }
+   if (!res.ok) {
+     const text = await res.text().catch(() => '');
+     throw new Error(text || `HTTP ${res.status}`);
+@@ -90,15 +97,9 @@ async function apiFetch<T = any>(url: string): Promise<T> {
+ export default function EngineMonitor({ engine, initialHealth, initialStatus }: EngineMonitorProps) {
+   const { t, locale } = useLanguage();
+   const { styles } = useTheme();
++  const { showToast } = useToast();
+   const meta = ENGINE_META[engine];
+ 
+-  // ── Toast ──
+-  const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
+-  const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
+-    setToast({ type, msg });
+-    setTimeout(() => setToast(null), 3500);
+-  }, []);
+-
+   // ── State ──
+   const [health, setHealth] = useState<HealthData | null>(initialHealth ?? null);
+   const [healthLoading, setHealthLoading] = useState(!initialHealth);
+@@ -121,7 +122,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }:
+       setHealth(data);
+     } catch (e: any) {
+       setHealthError(e.message || 'Unknown error');
+-      showToast('error', `健康检查失败: ${e.message}`);
++      if (e.message !== 'NO_PERMISSION') showToast('error', `健康检查失败: ${e.message}`);
+     } finally {
+       setHealthLoading(false);
+     }
+@@ -136,7 +137,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }:
+       setConfig(data);
+     } catch (e: any) {
+       setConfigError(e.message || 'Unknown error');
+-      showToast('error', `配置加载失败: ${e.message}`);
++      if (e.message !== 'NO_PERMISSION') showToast('error', `配置加载失败: ${e.message}`);
+     } finally {
+       setConfigLoading(false);
+     }
+@@ -151,7 +152,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }:
+       setStatus(data);
+     } catch (e: any) {
+       setStatusError(e.message || 'Unknown error');
+-      showToast('error', `状态加载失败: ${e.message}`);
++      if (e.message !== 'NO_PERMISSION') showToast('error', `状态加载失败: ${e.message}`);
+     } finally {
+       setStatusLoading(false);
+     }
+@@ -384,22 +385,6 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }:
+             </div>
+           </div>
+         </div>
+-
+-        {/* ── Toast ── */}
+-        {toast && (
+-          <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
+-            <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2
+-              ${toast.type === 'success' ? 'bg-emerald-600 text-white' : ''}
+-              ${toast.type === 'error' ? 'bg-red-600 text-white' : ''}
+-              ${toast.type === 'info' ? 'bg-slate-700 text-slate-100' : ''}
+-            `}>
+-              {toast.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
+-              {toast.type === 'error' && <AlertTriangle className="w-4 h-4" />}
+-              {toast.type === 'info' && <Activity className="w-4 h-4" />}
+-              {toast.msg}
+-            </div>
+-          </div>
+-        )}
+       </div>
+     </div>
+   );
+diff --git a/ecos_frontend/src/pages/GuardrailsView.tsx b/ecos_frontend/src/pages/GuardrailsView.tsx
+index 5582ff2..73a129d 100644
+--- a/ecos_frontend/src/pages/GuardrailsView.tsx
++++ b/ecos_frontend/src/pages/GuardrailsView.tsx
+@@ -111,11 +111,19 @@ function authHeaders(): Record<string, string> {
+ /** Generic guarded fetch returning JSON; handles {success,data} envelopes. */
+ async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {
+   const res = await fetch(url, { headers: authHeaders(), ...options });
+-  if (res.status === 401 || res.status === 403) {
++  // PMO-43 T4: 401 and 403 semantics split.
++  // 401 = unauthenticated/expired → clear token + redirect to login.
++  // 403 = authenticated but permission denied → surface as normal error;
++  // never clear the token or bounce the user back to /login.
++  if (res.status === 401) {
+     localStorage.removeItem('token');
+     window.location.hash = '#/login';
+     throw new Error('登录已过期，请重新登录');
+   }
++  if (res.status === 403) {
++    const forbidden = await res.text().catch(() => '');
++    throw new Error(`无权限访问该资源 (${forbidden || '403 Forbidden'})`);
++  }
+   if (!res.ok) {
+     const text = await res.text().catch(() => '');
+     throw new Error(text || `HTTP ${res.status}`);
+diff --git a/ecos_frontend/src/pages/Login.tsx b/ecos_frontend/src/pages/Login.tsx
+index c8fb208..3f961f1 100644
+--- a/ecos_frontend/src/pages/Login.tsx
++++ b/ecos_frontend/src/pages/Login.tsx
+@@ -5,11 +5,20 @@
+  */
+ import React, { useState } from "react";
+ import { useNavigate, useLocation } from "react-router-dom";
++import {
++  ShieldCheck,
++  Loader2,
++  LogIn,
++  KeyRound,
++  ChevronDown,
++} from "lucide-react";
+ import { useLanguage } from "../components/LanguageContext";
++import { useTheme } from "../components/ThemeContext";
+ import { authLogin } from "../api";
+ 
+ export default function Login() {
+   const { t } = useLanguage();
++  const { styles } = useTheme();
+   const navigate = useNavigate();
+   const location = useLocation();
+ 
+@@ -25,17 +34,19 @@ export default function Login() {
+     (location.state as { from?: { pathname: string } })?.from?.pathname ||
+     "/app";
+ 
++  const inputCls = `w-full px-4 py-2.5 ${styles.inputBg} ${styles.inputBorder} border rounded-lg text-sm ${styles.inputText} transition`;
++
+   // ── Username / Password login ─────────────────────────────
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setError("");
+ 
+     if (!username.trim()) {
+-      setError("请输入用户名");
++      setError(t("login.empty"));
+       return;
+     }
+     if (!password) {
+-      setError("请输入密码");
++      setError(t("login.empty"));
+       return;
+     }
+ 
+@@ -64,9 +75,9 @@ export default function Login() {
+       navigate(from, { replace: true });
+     } catch (err: any) {
+       if (err.message === "Failed to fetch" || err.name === "TypeError") {
+-        setError("网络连接失败，请检查网络后重试");
++        setError(t("login.noNetwork"));
+       } else {
+-        setError(err.message || "登录失败，请重试");
++        setError(err.message || t("login.fail"));
+       }
+     } finally {
+       setLoading(false);
+@@ -79,7 +90,7 @@ export default function Login() {
+     setError("");
+ 
+     if (!token.trim()) {
+-      setError("请输入 Access Token");
++      setError(t("login.empty"));
+       return;
+     }
+ 
+@@ -88,41 +99,29 @@ export default function Login() {
+   };
+ 
+   return (
+-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50">
++    <div className={`min-h-screen flex items-center justify-center ${styles.appBg}`}>
+       <div className="w-full max-w-md mx-4">
+         {/* ── Brand ──────────────────────────────────────── */}
+         <div className="text-center mb-8">
+-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-200/60">
+-            <svg
+-              className="w-8 h-8 text-white"
+-              fill="none"
+-              stroke="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                strokeWidth={2}
+-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+-              />
+-            </svg>
++          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: "var(--accent)" }}>
++            <ShieldCheck className="w-8 h-8 text-white" />
+           </div>
+-          <h1 className="text-2xl font-bold text-gray-800">ECOS Platform</h1>
+-          <p className="text-gray-500 mt-1 text-sm">
+-            Enterprise Cognitive Operating System
++          <h1 className={`text-2xl font-bold ${styles.text}`}>ECOS Platform</h1>
++          <p className={`text-sm mt-1 ${styles.muted}`}>
++            {t("login.subtitle")}
+           </p>
+         </div>
+ 
+         {/* ── Login card ─────────────────────────────────── */}
+-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
++        <div className={`rounded-2xl shadow-xl border p-8 ${styles.cardBg} ${styles.cardBorder}`}>
+           <form onSubmit={handleSubmit} className="space-y-5">
+             {/* Username */}
+             <div>
+               <label
+                 htmlFor="username"
+-                className="block text-sm font-medium text-gray-700 mb-1.5"
++                className={`block text-sm font-medium mb-1.5 ${styles.text}`}
+               >
+-                用户名
++                {t("login.username")}
+               </label>
+               <input
+                 id="username"
+@@ -132,8 +131,8 @@ export default function Login() {
+                   setUsername(e.target.value);
+                   setError("");
+                 }}
+-                placeholder="请输入用户名"
+-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition"
++                placeholder={t("login.username.placeholder")}
++                className={inputCls}
+                 autoFocus
+                 disabled={loading}
+               />
+@@ -143,9 +142,9 @@ export default function Login() {
+             <div>
+               <label
+                 htmlFor="password"
+-                className="block text-sm font-medium text-gray-700 mb-1.5"
++                className={`block text-sm font-medium mb-1.5 ${styles.text}`}
+               >
+-                密码
++                {t("login.password")}
+               </label>
+               <input
+                 id="password"
+@@ -155,16 +154,16 @@ export default function Login() {
+                   setPassword(e.target.value);
+                   setError("");
+                 }}
+-                placeholder="请输入密码"
+-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition"
++                placeholder={t("login.password.placeholder")}
++                className={inputCls}
+                 disabled={loading}
+               />
+             </div>
+ 
+             {/* Error message */}
+             {error && (
+-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+-                <p className="text-red-700 text-sm">{error}</p>
++              <div className="rounded-lg px-4 py-3 border border-red-500/50 bg-red-500/10">
++                <p className="text-red-500 text-sm">{error}</p>
+               </div>
+             )}
+ 
+@@ -172,60 +171,36 @@ export default function Login() {
+             <button
+               type="submit"
+               disabled={loading}
+-              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium rounded-lg shadow-md shadow-blue-200/60 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
++              className="w-full py-2.5 px-4 text-white font-medium rounded-lg shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] inline-flex items-center justify-center gap-2 cursor-pointer"
++              style={{ backgroundColor: "var(--accent)" }}
+             >
+               {loading ? (
+-                <span className="flex items-center justify-center gap-2">
+-                  <svg
+-                    className="animate-spin h-4 w-4"
+-                    viewBox="0 0 24 24"
+-                  >
+-                    <circle
+-                      className="opacity-25"
+-                      cx="12"
+-                      cy="12"
+-                      r="10"
+-                      stroke="currentColor"
+-                      strokeWidth="4"
+-                      fill="none"
+-                    />
+-                    <path
+-                      className="opacity-75"
+-                      fill="currentColor"
+-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+-                    />
+-                  </svg>
+-                  登录中...
+-                </span>
++                <>
++                  <Loader2 className="animate-spin h-4 w-4" />
++                  {t("login.loading")}
++                </>
+               ) : (
+-                "登录"
++                <>
++                  <LogIn className="h-4 w-4" />
++                  {t("login.login")}
++                </>
+               )}
+             </button>
+           </form>
+ 
+           {/* ── Advanced: Token login ────────────────────── */}
+-          <div className="mt-6 pt-4 border-t border-gray-100">
++          <div className={`mt-6 pt-4 border-t ${styles.divider}`}>
+             <button
+               type="button"
+               onClick={() => setShowAdvanced(!showAdvanced)}
+-              className="w-full text-xs text-gray-400 hover:text-gray-600 transition flex items-center justify-center gap-1"
++              className={`w-full text-xs flex items-center justify-center gap-1 transition cursor-pointer ${styles.muted} hover:opacity-80`}
+             >
+-              {showAdvanced ? "收起高级选项" : "高级选项"}
+-              <svg
++              {showAdvanced ? t("login.advanced.collapse") : t("login.advanced.open")}
++              <ChevronDown
+                 className={`w-3 h-3 transition-transform ${
+                   showAdvanced ? "rotate-180" : ""
+                 }`}
+-                fill="none"
+-                stroke="currentColor"
+-                viewBox="0 0 24 24"
+-              >
+-                <path
+-                  strokeLinecap="round"
+-                  strokeLinejoin="round"
+-                  strokeWidth={2}
+-                  d="M19 9l-7 7-7-7"
+-                />
+-              </svg>
++              />
+             </button>
+ 
+             {showAdvanced && (
+@@ -233,9 +208,9 @@ export default function Login() {
+                 <div>
+                   <label
+                     htmlFor="token"
+-                    className="block text-sm font-medium text-gray-700 mb-1.5"
++                    className={`block text-sm font-medium mb-1.5 ${styles.text}`}
+                   >
+-                    Access Token
++                    {t("login.token.label")}
+                   </label>
+                   <input
+                     id="token"
+@@ -245,15 +220,16 @@ export default function Login() {
+                       setToken(e.target.value);
+                       setError("");
+                     }}
+-                    placeholder="粘贴 Access Token..."
+-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent focus:bg-white transition text-sm"
++                    placeholder={t("login.token.placeholder")}
++                    className={inputCls}
+                   />
+                 </div>
+                 <button
+                   type="submit"
+-                  className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm"
++                  className={`w-full py-2 px-4 rounded-lg transition text-sm font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer ${styles.cardTextMuted} bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10`}
+                 >
+-                  Token 登录
++                  <KeyRound className="h-3.5 w-3.5" />
++                  {t("login.token.submit")}
+                 </button>
+               </form>
+             )}
+@@ -261,8 +237,8 @@ export default function Login() {
+         </div>
+ 
+         {/* ── Footer ─────────────────────────────────────── */}
+-        <p className="text-center text-xs text-gray-400 mt-6">
+-          Secure platform access &bull; All activity is audited
++        <p className={`text-center text-xs mt-6 ${styles.muted}`}>
++          {t("login.footer")}
+         </p>
+       </div>
+     </div>
+diff --git a/ecos_frontend/src/pages/MonitoringCenter.tsx b/ecos_frontend/src/pages/MonitoringCenter.tsx
+index ea66473..33335fa 100644
+--- a/ecos_frontend/src/pages/MonitoringCenter.tsx
++++ b/ecos_frontend/src/pages/MonitoringCenter.tsx
+@@ -5,6 +5,7 @@ import { useTheme } from "../components/ThemeContext";
+ import BasicMonitoringTab from "./monitoring/tabs/BasicMonitoringTab";
+ import DigitalTwinTab from "./monitoring/tabs/DigitalTwinTab";
+ import EngineMonitor from "./EngineMonitor";
++import { useToast } from "../components/common/Toast";
+ 
+ interface TabDef {
+   id: string;
+@@ -48,11 +49,19 @@ function authHeaders(): Record<string, string> {
+ async function apiFetch<T>(url: string): Promise<T | null> {
+   try {
+     const res = await fetch(url, { headers: authHeaders() });
+-    if (res.status === 401 || res.status === 403) {
++    if (res.status === 401) {
++      // Login expired — force re-login (PMO-43 T4).
+       localStorage.removeItem("token");
+       window.location.hash = "#/login";
+       return null;
+     }
++    if (res.status === 403) {
++      // Permission denied on a valid session — never log out.
++      // Surface via the global toast (ToastProvider mounted at main.tsx);
++      // the EngineMonitor child renders its own inline no-permission state.
++      window.dispatchEvent(new CustomEvent("ecos-403", { detail: { url, timestamp: Date.now() } }));
++      return null;
++    }
+     if (!res.ok) return null;
+     const ct = res.headers.get("content-type");
+     if (!ct || !ct.includes("application/json")) return null;
+@@ -86,8 +95,10 @@ interface EngineCardProps {
+ }
+ 
+ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
+-  const { locale } = useLanguage();
++  const { locale, t } = useLanguage();
+   const { styles } = useTheme();
++  const { showToast } = useToast();
++  const [noPermission, setNoPermission] = useState(false);
+   const Icon = def.icon;
+ 
+   const [health, setHealth] = useState<HealthSummary | null>(null);
+@@ -96,14 +107,29 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
+ 
+   const load = useCallback(async () => {
+     setLoading(true);
++    // 403 (no permission) — surface inline, never log the user out.
++    let saw403 = false;
++    const on403 = () => {
++      saw403 = true;
++      setNoPermission(true);
++      showToast("error", t("common.noPermission"));
++    };
++    window.addEventListener("ecos-403", on403);
+     const [h, s] = await Promise.all([
+       apiFetch<HealthSummary>(`${def.apiBase}/health`),
+       apiFetch<StatusSummary>(`${def.apiBase}/status`),
+     ]);
++    window.removeEventListener("ecos-403", on403);
++    if (h === null || s === null || saw403) {
++      // Either no-permission (403) or service failure (network/5xx).
++      // 403 shows a dedicated "无权限" card; network failure relies on
++      // the global NetworkErrorBanner plus an EMPTY inline state.
++      setNoPermission(saw403);
++    }
+     setHealth(h);
+     setStatus(s);
+     setLoading(false);
+-  }, [def.apiBase]);
++  }, [def.apiBase, showToast, t]);
+ 
+   useEffect(() => { load(); }, [load]);
+ 
+diff --git a/ecos_frontend/src/pages/ScenarioManagementView.tsx b/ecos_frontend/src/pages/ScenarioManagementView.tsx
+index 422036b..6d631bb 100644
+--- a/ecos_frontend/src/pages/ScenarioManagementView.tsx
++++ b/ecos_frontend/src/pages/ScenarioManagementView.tsx
+@@ -4,6 +4,7 @@
+ import React, { useState, useEffect } from 'react';
+ import LucideIcon from '../components/LucideIcon';
+ import { useLanguage } from '../components/LanguageContext';
++import { showToastGlobal } from '../components/common/Toast';
+ import { useTheme } from '../components/ThemeContext';
+ import { CopilotPanel } from '../components/CopilotPanel';
+ import type { BusinessScenario, ScenarioManagementViewProps } from './project-workbench/types';
+@@ -25,7 +26,7 @@ const DEF_COMMITS = [
+ const BRANCH_DEFAULTS = { scen_summer_rush:'main', scen_pilot_audit:'main', scen_evtol_sandbox:'main' };
+ 
+ export default function ScenarioManagementView({ showToast }: ScenarioManagementViewProps) {
+-  const toast = showToast || ((t:string,m:string)=>console.log(`[PMO] ${t}:`,m));
++  const toast = showToast || ((t: 'success' | 'info' | 'error', m: string) => showToastGlobal(t, m));
+   const { locale } = useLanguage(); const { styles } = useTheme();
+   const tl = (zh:string,en:string)=>locale==='zh'?zh:en;
+ 
+diff --git a/ecos_frontend/src/pages/SystemConfigManager.tsx b/ecos_frontend/src/pages/SystemConfigManager.tsx
+index 6bfdd7b..a48b8f3 100644
+--- a/ecos_frontend/src/pages/SystemConfigManager.tsx
++++ b/ecos_frontend/src/pages/SystemConfigManager.tsx
+@@ -25,19 +25,19 @@ const GLOBAL_KEYS = new Set([
+   'audit_retention_days',
+ ]);
+ 
+-// ── Labels for known config keys ──
+-const KEY_LABELS: Record<string, { zh: string; en: string }> = {
+-  session_timeout_minutes: { zh: '会话超时（分钟）', en: 'Session Timeout (min)' },
+-  audit_retention_days: { zh: '审计保留天数', en: 'Audit Retention (days)' },
+-  password_min_length: { zh: '密码最小长度', en: 'Password Min Length' },
+-  password_require_upper: { zh: '密码需含大写', en: 'Password Require Upper' },
+-  password_require_digit: { zh: '密码需含数字', en: 'Password Require Digit' },
+-  password_require_special: { zh: '密码需含特殊字符', en: 'Password Require Special' },
+-  password_expire_days: { zh: '密码过期天数', en: 'Password Expire Days' },
+-  password_history_count: { zh: '密码历史数量', en: 'Password History Count' },
+-  max_login_attempts: { zh: '最大登录尝试次数', en: 'Max Login Attempts' },
+-  lockout_duration_minutes: { zh: '锁定持续时间（分钟）', en: 'Lockout Duration (min)' },
+-  max_concurrent_sessions: { zh: '最大并发会话数', en: 'Max Concurrent Sessions' },
++// ── i18n key map for known config keys ──
++const KEY_LABEL_KEYS: Record<string, string> = {
++  session_timeout_minutes: 'systemConfig.key.sessionTimeout',
++  audit_retention_days: 'systemConfig.key.auditRetention',
++  password_min_length: 'systemConfig.key.pwdMinLength',
++  password_require_upper: 'systemConfig.key.pwdRequireUpper',
++  password_require_digit: 'systemConfig.key.pwdRequireDigit',
++  password_require_special: 'systemConfig.key.pwdRequireSpecial',
++  password_expire_days: 'systemConfig.key.pwdExpireDays',
++  password_history_count: 'systemConfig.key.pwdHistoryCount',
++  max_login_attempts: 'systemConfig.key.maxLoginAttempts',
++  lockout_duration_minutes: 'systemConfig.key.lockoutMins',
++  max_concurrent_sessions: 'systemConfig.key.maxConcurrentSessions',
+ };
+ 
+ // ── Toast ──────────────────────────────────────────────────────
+@@ -59,10 +59,8 @@ const Toast: React.FC<{
+ );
+ 
+ export default function SystemConfigManager() {
+-  const { locale } = useLanguage() as any;
+-  const { styles } = useTheme() as any;
+-
+-  const isZh = locale !== 'en';
++  const { t } = useLanguage();
++  const { styles } = useTheme();
+ 
+   const [allConfigs, setAllConfigs] = useState<SysConfigItem[]>([]);
+   const [editing, setEditing] = useState<Record<string, string>>({});
+@@ -122,10 +120,10 @@ export default function SystemConfigManager() {
+       setAllConfigs(prev => prev.map(item =>
+         item.key === key ? { ...item, value: val } : item
+       ));
+-      setToast({ type: 'success', msg: `${isZh ? '配置' : 'Config'} ${key} ${isZh ? '已更新' : 'updated'}` });
++      setToast({ type: 'success', msg: t('systemConfig.updated', { key }) });
+     } catch (e: any) {
+       setErrors(prev => ({ ...prev, [key]: e.message }));
+-      setToast({ type: 'error', msg: `${isZh ? '保存失败' : 'Save failed'}: ${e.message}` });
++      setToast({ type: 'error', msg: `${t('systemConfig.saveFailed')}: ${e.message}` });
+     }
+     setSaving(prev => { const n = { ...prev }; delete n[key]; return n; });
+   };
+@@ -138,10 +136,10 @@ export default function SystemConfigManager() {
+       setAllConfigs(prev => prev.map(item =>
+         item.key === key ? { ...item, value: updated.value ?? item.default_value ?? '' } : item
+       ));
+-      setToast({ type: 'success', msg: `${isZh ? '配置' : 'Config'} ${key} ${isZh ? '已恢复默认值' : 'reset to default'}` });
++      setToast({ type: 'success', msg: t('systemConfig.resetDone', { key }) });
+     } catch (e: any) {
+       setErrors(prev => ({ ...prev, [key]: e.message }));
+-      setToast({ type: 'error', msg: `${isZh ? '恢复失败' : 'Reset failed'}: ${e.message}` });
++      setToast({ type: 'error', msg: `${t('systemConfig.resetFailed')}: ${e.message}` });
+     }
+     setResetting(prev => { const n = { ...prev }; delete n[key]; return n; });
+   };
+@@ -169,8 +167,9 @@ export default function SystemConfigManager() {
+     const isSaving = saving[cfg.key];
+     const isResetting = resetting[cfg.key];
+     const error = errors[cfg.key];
+-    const label = isZh ? (KEY_LABELS[cfg.key]?.zh || cfg.labelZh || cfg.label) : (KEY_LABELS[cfg.key]?.en || cfg.label);
+-    const desc = isZh && cfg.descriptionZh ? cfg.descriptionZh : cfg.description;
++    const labelKey = KEY_LABEL_KEYS[cfg.key];
++    const label = labelKey ? (t(labelKey) || cfg.label || cfg.key) : (cfg.label || cfg.key);
++    const desc = cfg.description;
+     const defaultVal = cfg.default_value || '—';
+     const modifiedAt = (cfg as any).modifiedAt || (cfg as any).modified_at || (cfg as any).updatedAt || '—';
+ 
+@@ -178,14 +177,14 @@ export default function SystemConfigManager() {
+       <tr key={cfg.key} className={`border-b ${styles.sidebarBorder} ${styles.text} hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors`}>
+         {/* Key */}
+         <td className="py-3 px-3">
+-          <code className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono">{cfg.key}</code>
++          <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-bg)', color: 'var(--text-muted)' }}>{cfg.key}</code>
+         </td>
+-        {/* 描述 */}
++        {/* Description */}
+         <td className="py-3 px-3">
+           <div className="text-sm font-medium">{label}</div>
+           {desc && <div className={`text-xs ${styles.muted} mt-0.5`}>{desc}</div>}
+         </td>
+-        {/* 当前值（可编辑） */}
++        {/* Current value (editable) */}
+         <td className="py-3 px-3">
+           {inputType === 'BOOLEAN' ? (
+             <select
+@@ -193,10 +192,10 @@ export default function SystemConfigManager() {
+               onChange={e => setEditing(prev => ({ ...prev, [cfg.key]: e.target.value }))}
+               onBlur={() => { if (editing[cfg.key] !== undefined) handleSave(cfg.key); }}
+               className="px-2 py-1.5 rounded text-sm border"
+-              style={{ background: '#0f172a', color: '#e2e8f0', borderColor: '#334155' }}
++              style={{ background: 'var(--input-bg, #0f172a)', color: 'var(--text, #e2e8f0)', borderColor: 'var(--border, #334155)' }}
+             >
+-              <option value="true">{isZh ? '是' : 'true'}</option>
+-              <option value="false">{isZh ? '否' : 'false'}</option>
++              <option value="true">true</option>
++              <option value="false">false</option>
+             </select>
+           ) : (
+             <div className="flex items-center gap-1.5">
+@@ -206,34 +205,34 @@ export default function SystemConfigManager() {
+                 onChange={e => setEditing(prev => ({ ...prev, [cfg.key]: e.target.value }))}
+                 onKeyDown={handleKeyDown(cfg.key)}
+                 className="px-2 py-1.5 rounded text-sm w-40"
+-                style={{ background: '#0f172a', color: '#e2e8f0', border: '1px solid #334155' }}
++                style={{ background: 'var(--input-bg, #0f172a)', color: 'var(--text, #e2e8f0)', border: '1px solid var(--border, #334155)' }}
+               />
+               <button
+                 onClick={() => handleSave(cfg.key)}
+                 disabled={isSaving}
+-                className="p-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
+-                title={isZh ? '保存' : 'Save'}
++                className="p-1.5 rounded text-white transition-colors disabled:opacity-50"
++                style={{ backgroundColor: 'var(--accent)' }}
++                title={t('systemConfig.action.save')}
+               >
+                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+               </button>
+             </div>
+           )}
+         </td>
+-        {/* 默认值 */}
++        {/* Default value */}
+         <td className={`py-3 px-3 text-sm ${styles.muted} font-mono`}>{defaultVal}</td>
+-        {/* 修改时间 */}
++        {/* Modified time */}
+         <td className={`py-3 px-3 text-xs ${styles.muted}`}>{modifiedAt}</td>
+-        {/* 恢复默认 */}
++        {/* Reset to default */}
+         <td className="py-3 px-3">
+           <button
+             onClick={() => handleReset(cfg.key)}
+             disabled={isResetting}
+-            className="flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50"
+-            style={{ borderColor: '#d97706', color: '#d97706' }}
+-            title={isZh ? '恢复默认值' : 'Reset to default'}
++            className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-50 ${styles.warningBg} ${styles.warningText} ${styles.warningBorder} hover:opacity-80`}
++            title={t('systemConfig.action.reset')}
+           >
+             {isResetting ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+-            <span>{isZh ? '恢复' : 'Reset'}</span>
++            <span>{t('systemConfig.action.reset')}</span>
+           </button>
+         </td>
+       </tr>
+@@ -253,7 +252,7 @@ export default function SystemConfigManager() {
+             <hr className={`mt-3 mb-2 ${styles.sidebarBorder}`} />
+           </div>
+           <p className={`text-center py-4 text-xs ${styles.muted}`}>
+-            {isZh ? '暂无配置项' : 'No configs available'}
++            {t('systemConfig.noConfigs')}
+           </p>
+         </div>
+       );
+@@ -272,12 +271,12 @@ export default function SystemConfigManager() {
+           <table className="w-full text-sm">
+             <thead>
+               <tr className={`border-b ${styles.sidebarBorder} ${styles.muted} text-xs uppercase`}>
+-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '配置键' : 'Key'}</th>
+-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '描述' : 'Description'}</th>
+-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '当前值' : 'Current Value'}</th>
+-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '默认值' : 'Default'}</th>
+-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '修改时间' : 'Modified'}</th>
+-                <th className="py-2 px-3 text-left font-semibold">{isZh ? '恢复默认' : 'Reset'}</th>
++                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.key')}</th>
++                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.desc')}</th>
++                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.current')}</th>
++                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.default')}</th>
++                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.col.modified')}</th>
++                <th className="py-2 px-3 text-left font-semibold">{t('systemConfig.action.reset')}</th>
+               </tr>
+             </thead>
+             <tbody>
+@@ -297,13 +296,15 @@ export default function SystemConfigManager() {
+           <div className="flex items-center gap-2">
+             <Settings size={18} className={styles.muted} />
+             <h2 className={`text-lg font-semibold ${styles.text}`}>
+-              {isZh ? '系统配置管理' : 'System Config Manager'}
++              {t('systemConfig.title')}
+             </h2>
+           </div>
+           <button onClick={handleAudit}
+-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm transition-colors">
++            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white text-sm transition-colors"
++            style={{ backgroundColor: 'var(--accent)' }}
++          >
+             <Shield size={14} />
+-            {isZh ? '参数审计' : 'Audit'}
++            {t('systemConfig.audit')}
+           </button>
+         </div>
+ 
+@@ -312,24 +313,24 @@ export default function SystemConfigManager() {
+           {loading ? (
+             <div className="flex items-center gap-2 p-8">
+               <Loader2 size={24} className="animate-spin text-indigo-400" />
+-              <span className={styles.muted}>{isZh ? '加载中...' : 'Loading...'}</span>
++              <span className={styles.muted}>{t('common.loading')}</span>
+             </div>
+           ) : (
+             <div>
+               {/* Section 1: Global configs */}
+               {renderSection(
+-                isZh ? '全局通用配置' : 'Global Configuration',
++                t('systemConfig.section.global'),
+                 <Settings size={15} className="text-indigo-400" />,
+                 globalConfigs,
+                 ''
+               )}
+ 
+-              {/* Grey separator between sections */}
+-              <div className="h-2 bg-gray-100 dark:bg-gray-800" />
++              {/* Separator between sections */}
++              <div className={`h-2 ${styles.cardBorder}`} />
+ 
+-              {/* Section 2: Security configs — grey background */}
++              {/* Section 2: Security configs */}
+               {renderSection(
+-                isZh ? '安全配置' : 'Security Configuration',
++                t('systemConfig.section.security'),
+                 <Shield size={15} className="text-amber-400" />,
+                 securityConfigs,
+                 'bg-slate-50 dark:bg-slate-900'
+@@ -345,27 +346,27 @@ export default function SystemConfigManager() {
+               <div className={`flex items-center justify-between p-4 border-b ${styles.sidebarBorder}`}>
+                 <div className="flex items-center gap-2">
+                   <Shield size={18} className="text-indigo-400" />
+-                  <h3 className={`font-semibold ${styles.text}`}>{isZh ? '参数消耗审计' : 'Config Consumption Audit'}</h3>
++                  <h3 className={`font-semibold ${styles.text}`}>{t('systemConfig.paraAudit.title')}</h3>
+                 </div>
+                 <button onClick={() => setAuditOpen(false)} className={`p-1 rounded hover:bg-gray-600/30 ${styles.muted}`}>
+-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
++                  <X size={18} />
+                 </button>
+               </div>
+               <div className="overflow-auto p-4 flex-1">
+                 {auditLoading ? (
+-                  <div className="flex items-center gap-2 p-8"><Loader2 size={24} className="animate-spin text-indigo-400" /><span className={styles.muted}>{isZh ? '加载中...' : 'Loading...'}</span></div>
++                  <div className="flex items-center gap-2 p-8"><Loader2 size={24} className="animate-spin text-indigo-400" /><span className={styles.muted}>{t('common.loading')}</span></div>
+                 ) : auditData.length === 0 ? (
+-                  <p className={`text-center py-8 ${styles.muted}`}>{isZh ? '暂无审计数据' : 'No audit data available'}</p>
++                  <p className={`text-center py-8 ${styles.muted}`}>{t('systemConfig.paraAudit.empty')}</p>
+                 ) : (
+                   <table className="w-full text-sm">
+                     <thead>
+                       <tr className={`border-b ${styles.sidebarBorder} ${styles.muted} text-left text-xs uppercase`}>
+-                        <th className="py-2 px-3">{isZh ? '参数键' : 'Key'}</th>
+-                        <th className="py-2 px-3">{isZh ? '标签' : 'Label'}</th>
+-                        <th className="py-2 px-3">{isZh ? '当前值' : 'Value'}</th>
+-                        <th className="py-2 px-3">{isZh ? '消耗状态' : 'Consumed'}</th>
+-                        <th className="py-2 px-3">{isZh ? '消耗者' : 'Consumed By'}</th>
+-                        <th className="py-2 px-3">{isZh ? '消耗时间' : 'Consumed At'}</th>
++                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.key')}</th>
++                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.label')}</th>
++                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.value')}</th>
++                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.consumed')}</th>
++                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.by')}</th>
++                        <th className="py-2 px-3">{t('systemConfig.paraAudit.col.at')}</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+@@ -376,7 +377,7 @@ export default function SystemConfigManager() {
+                           <td className="py-2 px-3 font-mono text-xs max-w-[120px] truncate">{item.value}</td>
+                           <td className="py-2 px-3">
+                             <span className={`px-1.5 py-0.5 rounded text-xs ${item.consumed ? 'bg-amber-700 text-amber-200' : 'bg-emerald-700 text-emerald-200'}`}>
+-                              {item.consumed ? (isZh ? '已消耗' : 'Yes') : (isZh ? '未消耗' : 'No')}
++                              {item.consumed ? t('systemConfig.paraAudit.yes') : t('systemConfig.paraAudit.no')}
+                             </span>
+                           </td>
+                           <td className="py-2 px-3 text-xs">{item.consumedBy || '—'}</td>
+diff --git a/ecos_frontend/src/pages/UserManagement.tsx b/ecos_frontend/src/pages/UserManagement.tsx
+index 28b64aa..1728698 100644
+--- a/ecos_frontend/src/pages/UserManagement.tsx
++++ b/ecos_frontend/src/pages/UserManagement.tsx
+@@ -922,8 +922,6 @@ export default function UserManagement() {
+           orgMap={orgMap}
+           onEdit={async (u) => { if (!orgTree.length) await loadOrgs(); if (!roles.length) await loadRoles(); setUserForm({ mode: "edit", user: u }); }}
+           onDelete={(u) => {
+-            console.log('[DELETE BTN] user object:', JSON.stringify(u));
+-            console.log('[DELETE BTN] u.userId:', u.userId, 'u.user_id:', (u as any).user_id);
+             setConfirmAction({ type: "delete", tab: "users", id: u.userId || (u as any).user_id || (u as any).id, name: u.username });
+           }}
+           onForceLogout={(u) => handleForceLogout(u.userId)}
+diff --git a/ecos_frontend/src/pages/WorkshopView.tsx b/ecos_frontend/src/pages/WorkshopView.tsx
+index 55df331..9910fbc 100644
+--- a/ecos_frontend/src/pages/WorkshopView.tsx
++++ b/ecos_frontend/src/pages/WorkshopView.tsx
+@@ -5,6 +5,7 @@
+ 
+ import React, { useState, useEffect, useCallback } from 'react';
+ import { useTheme } from "../components/ThemeContext";
++import { showToastGlobal } from "../components/common/Toast";
+ 
+ import type { WorkshopApp, WorkshopWidget } from './workshop/types';
+ import { initialApps } from './workshop/mockData';
+@@ -24,7 +25,7 @@ export type { WorkshopApp, WorkshopWidget, WorkshopVariable } from './workshop/t
+ 
+ export default function WorkshopView({ showToast: propShowToast }: { showToast?: (type: 'success' | 'info' | 'error', message: string) => void }) {
+   const { styles } = useTheme();
+-  const showToast = propShowToast || ((type: string, msg: string) => console.log(`[Workshop ${type}]: ${msg}`));
++  const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
+ 
+   const [apps, setApps] = useState<WorkshopApp[]>(() => {
+     const cached = localStorage.getItem('ecos_workshop_apps');
+diff --git a/ecos_frontend/src/pages/aiworkbench/api.ts b/ecos_frontend/src/pages/aiworkbench/api.ts
+index 6a5498e..18ae940 100644
+--- a/ecos_frontend/src/pages/aiworkbench/api.ts
++++ b/ecos_frontend/src/pages/aiworkbench/api.ts
+@@ -1,7 +1,11 @@
+ /**
+  * AI Workbench — API layer
+  * Connects to ECOS backend controllers: AgentMesh, Guardrails, Pipeline, Models.
+- * Gracefully returns empty arrays on error so UI never whitescreens.
++ *
++ * PMO-43 P0 (2026-09-05 FE Check Report item 2): network/HTTP errors are
++ * RE-THROWN so callers can surface explicit error + retry UI. apiFetchData
++ * (src/api.ts) emits the `NetworkDownEvent` for the global NetworkErrorBanner;
++ * this layer no longer swallows failures into empty arrays.
+  * @license Apache-2.0
+  */
+ import { apiFetchData } from '../../api';
+@@ -26,13 +30,9 @@ interface AgentMeshAgentRaw {
+ }
+ 
+ export async function fetchAIPAgentsFromMesh(): Promise<AIPAgent[]> {
+-  try {
+-    const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
+-    return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchAIPAgentsFromMesh failed', e);
+-    return [];
+-  }
++  // PMO-43 T3: no silent catch — caller renders error + retry state
++  const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
++  return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
+ }
+ 
+ function convertMeshAgentToAIP(raw: AgentMeshAgentRaw): AIPAgent {
+@@ -77,13 +77,8 @@ interface GuardrailPolicyRaw {
+ }
+ 
+ export async function fetchGuardrailPolicies(): Promise<AIPGuardrail[]> {
+-  try {
+-    const data = await apiFetchData<GuardrailPolicyRaw[]>('/api/v1/guardrails/policies');
+-    return (Array.isArray(data) ? data : []).map(convertPolicyToGuardrail);
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchGuardrailPolicies failed', e);
+-    return [];
+-  }
++  const data = await apiFetchData<GuardrailPolicyRaw[]>('/api/v1/guardrails/policies');
++  return (Array.isArray(data) ? data : []).map(convertPolicyToGuardrail);
+ }
+ 
+ function convertPolicyToGuardrail(raw: GuardrailPolicyRaw): AIPGuardrail {
+@@ -127,22 +122,17 @@ interface PipelineDefinitionRaw {
+ }
+ 
+ export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
+-  try {
+-    const data = await apiFetchData<PipelineDefinitionRaw[]>('/api/v1/pipeline/definitions');
+-    return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
+-      id: p.id || p.name,
+-      name: p.name,
+-      description: p.description || '',
+-      status: (p.status as AIPLogicPipeline['status']) || 'draft',
+-      creator: (p as any).creator || 'system',
+-      lastUpdated: (p as any).lastUpdated || new Date().toISOString(),
+-      inputs: Array.isArray((p as any).inputs) ? (p as any).inputs : [],
+-      blocks: (Array.isArray((p as any).blocks) ? (p as any).blocks : []) as AIPLogicPipeline['blocks'],
+-    }));
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchPipelineDefinitions failed', e);
+-    return [];
+-  }
++  const data = await apiFetchData<PipelineDefinitionRaw[]>('/api/v1/pipeline/definitions');
++  return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
++    id: p.id || p.name,
++    name: p.name,
++    description: p.description || '',
++    status: (p.status as AIPLogicPipeline['status']) || 'draft',
++    creator: (p as any).creator || 'system',
++    lastUpdated: (p as any).lastUpdated || new Date().toISOString(),
++    inputs: Array.isArray((p as any).inputs) ? (p as any).inputs : [],
++    blocks: (Array.isArray((p as any).blocks) ? (p as any).blocks : []) as AIPLogicPipeline['blocks'],
++  }));
+ }
+ 
+ // ── ActionTypes (Ontology) ─────────────────────────────────────
+@@ -161,16 +151,11 @@ interface ActionTypeRaw {
+ }
+ 
+ export async function fetchActionTypes(objectTypeId?: string): Promise<AIPActionType[]> {
+-  try {
+-    const url = objectTypeId
+-      ? `/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
+-      : '/api/v1/ontology/actions';
+-    const data = await apiFetchData<ActionTypeRaw[]>(url);
+-    return (Array.isArray(data) ? data : []).map(convertActionType);
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchActionTypes failed', e);
+-    return [];
+-  }
++  const url = objectTypeId
++    ? `/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
++    : '/api/v1/ontology/actions';
++  const data = await apiFetchData<ActionTypeRaw[]>(url);
++  return (Array.isArray(data) ? data : []).map(convertActionType);
+ }
+ 
+ function convertActionType(raw: ActionTypeRaw): AIPActionType {
+@@ -234,53 +219,47 @@ export async function executeActionType(
+ }
+ 
+ export async function fetchAgentModels(): Promise<AIPModel[]> {
+-  try {
+-    const raw = await apiFetchData<any[]>('/api/v1/aip/models');
+-    return (Array.isArray(raw) ? raw : []).map((item: any) => ({
+-      id: item.id,
+-      displayName: item.name || item.displayName || item.id,
+-      provider: item.provider || 'On-Premises',
+-      type: item.modelType === 'embedding' ? 'embedding'
+-          : item.modelType === 'vision' ? 'vision'
+-          : item.modelType === 'audio' ? 'audio'
+-          : 'language',
+-      status: item.status === 'active' ? 'connected'
+-          : item.status === 'testing' ? 'testing'
+-          : 'offline',
+-      maxContext: item.maxContext || '128K',
+-      latencyMs: item.latencyMs || 150,
+-      costPerMillion: item.costPerMillion || '$0.005',
+-      inputCost: item.inputCost || '$0.003',
+-      outputCost: item.outputCost || '$0.006',
+-      healthRate: item.healthRate || 99.5,
+-      temperature: item.temperature || 0.7,
+-    }));
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchAgentModels failed', e);
+-    return [];
+-  }
++  // PMO-43 T1: mock fallback removed — re-throw so ModelCatalogView can
++  // distinguish "backend down" from "no models registered".
++  const raw = await apiFetchData<any[]>('/api/v1/aip/models');
++  return (Array.isArray(raw) ? raw : []).map((item: any) => ({
++    id: item.id,
++    displayName: item.name || item.displayName || item.id,
++    provider: item.provider || 'On-Premises',
++    type: item.modelType === 'embedding' ? 'embedding'
++        : item.modelType === 'vision' ? 'vision'
++        : item.modelType === 'audio' ? 'audio'
++        : 'language',
++    status: item.status === 'active' ? 'connected'
++        : item.status === 'testing' ? 'testing'
++        : 'offline',
++    maxContext: item.maxContext || '128K',
++    latencyMs: item.latencyMs || 150,
++    costPerMillion: item.costPerMillion || '$0.005',
++    inputCost: item.inputCost || '$0.003',
++    outputCost: item.outputCost || '$0.006',
++    healthRate: item.healthRate || 99.5,
++    temperature: item.temperature || 0.7,
++  }));
+ }
+ 
+ // ── Agent Market (T9-1) ──────────────────────────────────────
+ 
+ export async function fetchAgentTemplates(): Promise<AIPAgentTemplate[]> {
+-  try {
+-    const raw = await apiFetchData<any[]>('/api/v1/aip/agents/templates');
+-    return (Array.isArray(raw) ? raw : []).map((t: any) => ({
+-      id: t.id,
+-      name: t.name || t.id,
+-      icon: t.icon || 'Bot',
+-      description: t.description || '',
+-      model: t.model || 'gemini-1.5-pro',
+-      temperature: t.temperature || 0.7,
+-      maxIterations: t.maxIterations || 10,
+-      category: t.category || 'chat',
+-      isInstantiated: t.isInstantiated === true,
+-    }));
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchAgentTemplates failed', e);
+-    return [];
+-  }
++  // PMO-43 T3: no silent catch — caller (AgentMarket) merges with BUILTIN
++  // defaults and surfaces an inline error state when the backend is down.
++  const raw = await apiFetchData<any[]>('/api/v1/aip/agents/templates');
++  return (Array.isArray(raw) ? raw : []).map((t: any) => ({
++    id: t.id,
++    name: t.name || t.id,
++    icon: t.icon || 'Bot',
++    description: t.description || '',
++    model: t.model || 'gemini-1.5-pro',
++    temperature: t.temperature || 0.7,
++    maxIterations: t.maxIterations || 10,
++    category: t.category || 'chat',
++    isInstantiated: t.isInstantiated === true,
++  }));
+ }
+ 
+ export async function instantiateAgent(
+@@ -309,25 +288,20 @@ export async function instantiateAgent(
+ // ── Agent Manager (T9-2) ─────────────────────────────────────
+ 
+ export async function fetchManagedAgents(): Promise<AIPAgent[]> {
+-  try {
+-    const raw = await apiFetchData<any[]>('/api/v1/aip/agents');
+-    return (Array.isArray(raw) ? raw : []).map((a: any) => ({
+-      id: a.id,
+-      name: a.name || a.id,
+-      avatar: a.icon || 'Bot',
+-      role: a.role || 'assistant',
+-      description: a.description || '',
+-      modelId: a.model || 'gemini-1.5-pro',
+-      systemPrompt: a.systemPrompt || '',
+-      assignedTools: { actionIds: (a.tools || []) as string[], functionIds: [] as string[] },
+-      guardrailIds: (a.guardrails || []) as string[],
+-      status: (a.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
+-      lastModified: a.updatedAt || a.createdAt || new Date().toISOString(),
+-    }));
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchManagedAgents failed', e);
+-    return [];
+-  }
++  const raw = await apiFetchData<any[]>('/api/v1/aip/agents');
++  return (Array.isArray(raw) ? raw : []).map((a: any) => ({
++    id: a.id,
++    name: a.name || a.id,
++    avatar: a.icon || 'Bot',
++    role: a.role || 'assistant',
++    description: a.description || '',
++    modelId: a.model || 'gemini-1.5-pro',
++    systemPrompt: a.systemPrompt || '',
++    assignedTools: { actionIds: (a.tools || []) as string[], functionIds: [] as string[] },
++    guardrailIds: (a.guardrails || []) as string[],
++    status: (a.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
++    lastModified: a.updatedAt || a.createdAt || new Date().toISOString(),
++  }));
+ }
+ 
+ export async function updateManagedAgent(
+@@ -348,19 +322,14 @@ export async function toggleAgentStatus(id: string, status: 'active' | 'developm
+ }
+ 
+ export async function fetchAgentVersions(agentId: string): Promise<AIPAgentVersion[]> {
+-  try {
+-    const raw = await apiFetchData<any[]>(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/versions`);
+-    return (Array.isArray(raw) ? raw : []).map((v: any) => ({
+-      id: v.id,
+-      agentId: v.agentId || agentId,
+-      version: v.version || 0,
+-      config: typeof v.config === 'string' ? v.config : JSON.stringify(v.config || {}),
+-      createdAt: v.createdAt || new Date().toISOString(),
+-    }));
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchAgentVersions failed', e);
+-    return [];
+-  }
++  const raw = await apiFetchData<any[]>(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/versions`);
++  return (Array.isArray(raw) ? raw : []).map((v: any) => ({
++    id: v.id,
++    agentId: v.agentId || agentId,
++    version: v.version || 0,
++    config: typeof v.config === 'string' ? v.config : JSON.stringify(v.config || {}),
++    createdAt: v.createdAt || new Date().toISOString(),
++  }));
+ }
+ 
+ export async function rollbackAgent(agentId: string, version: number): Promise<void> {
+@@ -372,41 +341,48 @@ export async function rollbackAgent(agentId: string, version: number): Promise<v
+ 
+ // ── Agent Monitor (T9-3) ─────────────────────────────────────
+ 
++/**
++ * 获取 Agent 指标汇总
++ * GET /api/v1/aip/agent-metrics/{agentId}（主路径，对齐后端 AgentMetricsController）
++ * PMO-41: 由前端自承的别名路径 /api/v1/agent-metrics/... 改为主路径 /api/v1/aip/agent-metrics。
++ * 字段对齐后端实际返回: agentId/totalCount/successCount/successRate/avgElapsedMs/p50Ms/p99Ms 等。
++ */
+ export async function fetchAgentMetrics(agentId: string): Promise<AIPAgentMetrics> {
+-  try {
+-    const data = await apiFetchData<any>(`/api/v1/agent-metrics/${encodeURIComponent(agentId)}`);
+-    return {
+-      agentId: data.agentId || agentId,
+-      agentName: data.agentName || agentId,
+-      totalCalls: data.totalCalls || 0,
+-      successRate: data.successRate || 0,
+-      avgLatencyMs: data.avgLatencyMs || 0,
+-      p99LatencyMs: data.p99LatencyMs || 0,
+-      trend24h: Array.isArray(data.trend24h) ? data.trend24h : [],
+-      trend7d: Array.isArray(data.trend7d) ? data.trend7d : [],
+-      trend30d: Array.isArray(data.trend30d) ? data.trend30d : [],
+-      lastUpdated: data.lastUpdated || new Date().toISOString(),
+-    };
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchAgentMetrics failed', e);
+-    throw e;
+-  }
++  const data = await apiFetchData<any>(`/api/v1/aip/agent-metrics/${encodeURIComponent(agentId)}`);
++  return {
++    agentId: data.agentId || agentId,
++    agentName: data.agentName || agentId,
++    // 后端返回 totalCount，前端展示字段为 totalCalls
++    totalCalls: data.totalCalls ?? data.totalCount ?? 0,
++    successRate: data.successRate ?? 0,
++    // 后端返回 avgElapsedMs / p99Ms，前端展示字段为 avgLatencyMs / p99LatencyMs
++    avgLatencyMs: data.avgLatencyMs ?? data.avgElapsedMs ?? 0,
++    p99LatencyMs: data.p99LatencyMs ?? data.p99Ms ?? 0,
++    trend24h: Array.isArray(data.trend24h) ? data.trend24h : [],
++    trend7d: Array.isArray(data.trend7d) ? data.trend7d : [],
++    trend30d: Array.isArray(data.trend30d) ? data.trend30d : [],
++    lastUpdated: data.lastUpdated || new Date().toISOString(),
++  };
+ }
+ 
++/**
++ * 获取 Agent 错误/告警列表
++ * GET /api/v1/aip/agent-metrics/{agentId}/errors（主路径，对齐后端 AgentMetricsController）
++ * PMO-41: 由前端自承的别名路径 /api/v1/agent-metrics/... 改为主路径 /api/v1/aip/agent-metrics。
++ * 后端返回 { agentId, total, errors: [...] }，errors 为数组。
++ */
+ export async function fetchAgentErrors(agentId: string): Promise<AIPAgentError[]> {
+-  try {
+-    const raw = await apiFetchData<any[]>(`/api/v1/agent-metrics/${encodeURIComponent(agentId)}/errors`);
+-    return (Array.isArray(raw) ? raw : []).map((e: any) => ({
+-      id: e.id || `err-${Date.now()}`,
+-      timestamp: e.timestamp || new Date().toISOString(),
+-      agentId: e.agentId || agentId,
+-      agentName: e.agentName || agentId,
+-      errorMessage: e.errorMessage || e.message || 'Unknown error',
+-      traceId: e.traceId || '',
+-      status: e.status || 'unresolved',
+-    }));
+-  } catch (e) {
+-    console.warn('[ai-workbench] fetchAgentErrors failed', e);
+-    return [];
+-  }
++  const resp = await apiFetchData<{ total?: number; errors?: any[] }>(
++    `/api/v1/aip/agent-metrics/${encodeURIComponent(agentId)}/errors`
++  );
++  const raw = Array.isArray(resp) ? resp : (resp?.errors ?? []);
++  return (Array.isArray(raw) ? raw : []).map((e: any) => ({
++    id: e.id || `err-${Date.now()}`,
++    timestamp: e.timestamp || new Date().toISOString(),
++    agentId: e.agentId || agentId,
++    agentName: e.agentName || agentId,
++    errorMessage: e.errorMessage || e.message || 'Unknown error',
++    traceId: e.traceId || '',
++    status: e.status || 'unresolved',
++  }));
+ }
+diff --git a/ecos_frontend/src/pages/aiworkbench/index.tsx b/ecos_frontend/src/pages/aiworkbench/index.tsx
+index c4894af..2002915 100644
+--- a/ecos_frontend/src/pages/aiworkbench/index.tsx
++++ b/ecos_frontend/src/pages/aiworkbench/index.tsx
+@@ -3,12 +3,17 @@
+  * SPDX-License-Identifier: Apache-2.0
+  */
+ 
+-import React, { useState, useEffect } from 'react';
++import React, { useState, useEffect, useCallback } from 'react';
+ import {
+   mockAIPAuditLogs
+ } from './mockData';
+ import { AIPLogicPipeline, AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
+-import { fetchAIPAgentsFromMesh, fetchGuardrailPolicies, fetchPipelineDefinitions, fetchAgentModels } from './api';
++import {
++  fetchAIPAgentsFromMesh,
++  fetchGuardrailPolicies,
++  fetchPipelineDefinitions,
++  fetchAgentModels,
++} from './api';
+ import DashboardView from './DashboardView';
+ import LogicView from './LogicView';
+ import AgentStudioView from './AgentStudioView';
+@@ -17,7 +22,9 @@ import ModelCatalogView from './ModelCatalogView';
+ import AiGuardrailsView from './AiGuardrailsView';
+ import KnowledgeView from '../KnowledgeView';
+ import * as Icons from 'lucide-react';
++import { CloudOff, RefreshCw } from 'lucide-react';
+ import { useTheme } from '../../components/ThemeContext';
++import { useLanguage } from '../../components/LanguageContext';
+ 
+ const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
+   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+@@ -29,23 +36,52 @@ interface AIPWorkbenchProps {
+ }
+ 
+ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
++  const { styles } = useTheme();
+   const [currentTab, setCurrentTab] = useState<'dashboard' | 'logic' | 'agent' | 'chatbot' | 'knowledge' | 'model' | 'guardrails'>('dashboard');
+ 
+-  // Master AIP States (loaded from backend API, fallback to empty)
++  // Master AIP States (loaded from backend API, PMO-43 T3: errors are
++  // re-thrown rather than swallowed — the affected tab shows an inline
++  // error + retry state instead of silently rendering empty data).
+   const [pipelines, setPipelines] = useState<AIPLogicPipeline[]>([]);
+   const [agents, setAgents] = useState<AIPAgent[]>([]);
+   const [models, setModels] = useState<AIPModel[]>([]);
+   const [guardrails, setGuardrails] = useState<AIPGuardrail[]>([]);
+   const [auditLogs, setAuditLogs] = useState<AIPAuditLog[]>(mockAIPAuditLogs);
+-  const { styles } = useTheme();
++  type LoadKey = 'pipelines' | 'agents' | 'models' | 'guardrails';
++  const [loadErrors, setLoadErrors] = useState<Partial<Record<LoadKey, string>>>({});
++
++  const loadPipelines = useCallback(() => {
++    setLoadErrors((prev) => ({ ...prev, pipelines: undefined }));
++    fetchPipelineDefinitions()
++      .then(setPipelines)
++      .catch((e) => setLoadErrors((prev) => ({ ...prev, pipelines: e?.message || String(e) })));
++  }, []);
++  const loadAgents = useCallback(() => {
++    setLoadErrors((prev) => ({ ...prev, agents: undefined }));
++    fetchAIPAgentsFromMesh()
++      .then(setAgents)
++      .catch((e) => setLoadErrors((prev) => ({ ...prev, agents: e?.message || String(e) })));
++  }, []);
++  const loadModels = useCallback(() => {
++    setLoadErrors((prev) => ({ ...prev, models: undefined }));
++    fetchAgentModels()
++      .then(setModels)
++      .catch((e) => setLoadErrors((prev) => ({ ...prev, models: e?.message || String(e) })));
++  }, []);
++  const loadGuardrails = useCallback(() => {
++    setLoadErrors((prev) => ({ ...prev, guardrails: undefined }));
++    fetchGuardrailPolicies()
++      .then(setGuardrails)
++      .catch((e) => setLoadErrors((prev) => ({ ...prev, guardrails: e?.message || String(e) })));
++  }, []);
+ 
+   // Load data from backend APIs on mount
+   useEffect(() => {
+-    fetchAIPAgentsFromMesh().then(setAgents).catch(() => {});
+-    fetchGuardrailPolicies().then(setGuardrails).catch(() => {});
+-    fetchPipelineDefinitions().then(setPipelines).catch(() => {});
+-    fetchAgentModels().then(setModels).catch(() => {});
+-  }, []);
++    loadAgents();
++    loadGuardrails();
++    loadPipelines();
++    loadModels();
++  }, [loadAgents, loadGuardrails, loadPipelines, loadModels]);
+ 
+   const handleAddAuditLog = (newLog: AIPAuditLog) => {
+     setAuditLogs(prev => [newLog, ...prev]);
+@@ -174,46 +210,50 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
+             />
+           )}
+ 
+-          {currentTab === 'agent' && (
+-            <AgentStudioView
+-              agents={agents}
+-              models={models}
+-              guardrails={guardrails}
+-              onUpdateAgents={setAgents}
+-              onAddAuditLog={handleAddAuditLog}
+-              showToast={showToast}
+-            />
++          {currentTab === 'agent' && (loadErrors.agents
++            ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
++            : <AgentStudioView
++                agents={agents}
++                models={models}
++                guardrails={guardrails}
++                onUpdateAgents={setAgents}
++                onAddAuditLog={handleAddAuditLog}
++                showToast={showToast}
++              />
+           )}
+ 
+-          {currentTab === 'chatbot' && (
+-            <ChatbotStudioView
+-              agents={agents}
+-              models={models}
+-              guardrails={guardrails}
+-              onUpdateAgents={setAgents}
+-              onAddAuditLog={handleAddAuditLog}
+-              showToast={showToast}
+-            />
++          {currentTab === 'chatbot' && (loadErrors.agents
++            ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
++            : <ChatbotStudioView
++                agents={agents}
++                models={models}
++                guardrails={guardrails}
++                onUpdateAgents={setAgents}
++                onAddAuditLog={handleAddAuditLog}
++                showToast={showToast}
++              />
+           )}
+ 
+           {currentTab === 'knowledge' && (
+             <KnowledgeView showToast={showToast} />
+           )}
+ 
+-          {currentTab === 'model' && (
+-            <ModelCatalogView
+-              models={models}
+-              onUpdateModels={setModels}
+-              showToast={showToast}
+-            />
++          {currentTab === 'model' && (loadErrors.models
++            ? <ErrorState message={loadErrors.models} onRetry={loadModels} />
++            : <ModelCatalogView
++                models={models}
++                onUpdateModels={setModels}
++                showToast={showToast}
++              />
+           )}
+ 
+-          {currentTab === 'guardrails' && (
+-            <AiGuardrailsView
+-              guardrails={guardrails}
+-              onUpdateGuardrails={setGuardrails}
+-              showToast={showToast}
+-            />
++          {currentTab === 'guardrails' && (loadErrors.guardrails
++            ? <ErrorState message={loadErrors.guardrails} onRetry={loadGuardrails} />
++            : <AiGuardrailsView
++                guardrails={guardrails}
++                onUpdateGuardrails={setGuardrails}
++                showToast={showToast}
++              />
+           )}
+         </div>
+       </div>
+@@ -221,3 +261,34 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
+     </div>
+   );
+ }
++
++/**
++ * PMO-43 T3: inline error/retry state for the 4 AIP data-fetch
++ * anti-patterns ("terminal coding style: empty catch → real error state,
++ * error/retry to the UI"). Pure presentation — no global state store.
++ */
++const ErrorState: React.FC<{ message?: string; onRetry: () => void }> = ({ message, onRetry }) => {
++  const { styles } = useTheme();
++  const { t } = useLanguage();
++  return (
++    <div
++      className={`h-full w-full flex flex-col items-center justify-center gap-3 text-sm ${styles.appText} px-6`}
++      role="alert"
++    >
++      <CloudOff size={36} className="opacity-60 shrink-0" />
++      <div className="text-center leading-relaxed">
++        <p className="font-semibold">{t("network.error.title")}</p>
++        <p className="opacity-70 text-xs mt-1 max-w-md">{message}</p>
++      </div>
++      <button
++        type="button"
++        onClick={onRetry}
++        className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border shadow-xs hover:opacity-80 cursor-pointer"
++        style={{ borderColor: '#555', background: 'transparent' }}
++      >
++        <RefreshCw size={13} />
++        {t("network.retry")}
++      </button>
++    </div>
++  );
++};
+diff --git a/ecos_frontend/src/pages/business-workbench/BusinessWorkbenchLayout.tsx b/ecos_frontend/src/pages/business-workbench/BusinessWorkbenchLayout.tsx
+index 4cf9260..771852b 100644
+--- a/ecos_frontend/src/pages/business-workbench/BusinessWorkbenchLayout.tsx
++++ b/ecos_frontend/src/pages/business-workbench/BusinessWorkbenchLayout.tsx
+@@ -6,6 +6,7 @@
+  */
+ import React, { useState, useEffect, useCallback } from 'react';
+ import { useLanguage } from '../../components/LanguageContext';
++import { showToastGlobal } from '../../components/common/Toast';
+ import { apiFetch } from '../../api';
+ import { CopilotPanel } from '../../components/CopilotPanel';
+ 
+@@ -78,7 +79,7 @@ export default function BusinessWorkbenchLayout({
+     if (propShowToast) {
+       propShowToast(type, message);
+     } else {
+-      console.log(`[${type.toUpperCase()}] ${message}`);
++      showToastGlobal(type, message);
+     }
+   }, [propShowToast]);
+ 
+diff --git a/ecos_frontend/src/pages/knowledge/components/ExtractionReviewPanel.tsx b/ecos_frontend/src/pages/knowledge/components/ExtractionReviewPanel.tsx
+index fbfd08a..e5d2306 100644
+--- a/ecos_frontend/src/pages/knowledge/components/ExtractionReviewPanel.tsx
++++ b/ecos_frontend/src/pages/knowledge/components/ExtractionReviewPanel.tsx
+@@ -1,7 +1,7 @@
+ /**
+- * ExtractionReviewPanel — 知识抽取审核面板
+- * 左栏: 原文Markdown渲染 + 实体高亮
+- * 右栏: 抽取结果列表(实体/关系/规则, checkbox确认) + 手动修正 + 确认入库
++ * ExtractionReviewPanel — Knowledge extraction review panel
++ * Left column: raw text with entity highlighting (DOMPurify whitelist sanctioned)
++ * Right column: extraction result list (entities/relations/rule checkbox confirmation) + manual correction + confirm registration
+  *
+  * @license Apache-2.0
+  */
+@@ -9,12 +9,24 @@
+ import React, { useState, useMemo, useCallback } from 'react';
+ import {
+   Check, X, Edit3, RotateCw, ChevronDown, Network, ShieldAlert,
+-  Layers, Send, Ban, CheckSquare, Square, ExternalLink, FileText,
++  Layers, Send, Ban, CheckSquare, Square, FileText,
+ } from 'lucide-react';
++import DOMPurify from 'dompurify';
+ import { useLanguage } from '../../../components/LanguageContext';
+ import { useTheme } from '../../../components/ThemeContext';
+ import { apiFetch } from '../../../api';
+ 
++// ── XSS Whitelist: Only allow <mark> highlight tags ────────────────────────
++
++const SANITIZE_CONFIG = {
++  ALLOWED_TAGS: ['mark', 'span', 'code', 'strong'],
++  ALLOWED_ATTR: ['class', 'style'],
++};
++
++function sanitizeHighlight(html: string): string {
++  return DOMPurify.sanitize(html, SANITIZE_CONFIG);
++}
++
+ // ── Types ──────────────────────────────────────────────────────
+ 
+ interface ReviewEntity {
+@@ -42,9 +54,8 @@ interface Props {
+ // ── Component ──────────────────────────────────────────────────
+ 
+ export default function ExtractionReviewPanel({ extractionId, sourceText, reviewData, onBack }: Props) {
+-  const { locale } = useLanguage();
++  const { t } = useLanguage();
+   const { styles } = useTheme();
+-  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
+ 
+   const [entities, setEntities] = useState<ReviewEntity[]>(reviewData.entities.map(e => ({...e, selected: true})));
+   const [relations, setRelations] = useState<ReviewRelation[]>(reviewData.relations.map(r => ({...r, selected: true})));
+@@ -119,20 +130,20 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+     finally { setSubmitting(false); }
+   }, [extractionId]);
+ 
+-  const tabItems: Array<{key:'entities'|'relations'|'rules';labelZh:string;labelEn:string;Icon:typeof Network;count:number}> = [
+-    { key:'entities', labelZh:'实体', labelEn:'Entities', Icon: Layers, count: entities.length },
+-    { key:'relations', labelZh:'关系', labelEn:'Relations', Icon: Network, count: relations.length },
+-    { key:'rules', labelZh:'规则', labelEn:'Rules', Icon: ShieldAlert, count: rules.length },
++  const tabItems: Array<{key:'entities'|'relations'|'rules';labelKey:string;Icon:typeof Network;count:number}> = [
++    { key:'entities', labelKey:'extractReview.tabs.entities', Icon: Layers, count: entities.length },
++    { key:'relations', labelKey:'extractReview.tabs.relations', Icon: Network, count: relations.length },
++    { key:'rules', labelKey:'extractReview.tabs.rules', Icon: ShieldAlert, count: rules.length },
+   ];
+ 
+   if (done) {
+     return (
+       <div className={`flex flex-col items-center justify-center py-16 space-y-4 ${styles.cardBg} border ${styles.cardBorder} rounded-xl`}>
+         <div className="p-4 bg-emerald-100 rounded-2xl"><Check size={32} className="text-emerald-600" /></div>
+-        <p className={`text-sm font-extrabold ${styles.cardText}`}>{tl('审核完成', 'Review Complete')}</p>
+-        <p className={`text-[11px] ${styles.cardTextMuted}`}>{tl('知识已确认入库，实体链接已完成', 'Knowledge confirmed and stored, entity linking completed')}</p>
++        <p className={`text-sm font-extrabold ${styles.cardText}`}>{t('extractReview.complete.title')}</p>
++        <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('extractReview.complete.subtitle')}</p>
+         <button onClick={onBack} className={`px-4 py-2 ${styles.accentBg} text-white font-bold rounded-lg text-xs cursor-pointer`}>
+-          {tl('返回上传', 'Back to Upload')}
++          {t('extractReview.backToUpload')}
+         </button>
+       </div>
+     );
+@@ -143,18 +154,18 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+       {/* Top bar: back + actions */}
+       <div className="flex items-center justify-between">
+         <button onClick={onBack} className={`text-[11px] font-bold ${styles.cardTextMuted} hover:underline cursor-pointer flex items-center gap-1`}>
+-          <ChevronDown size={12} className="rotate-90" /> {tl('返回上传', 'Back')}
++          <ChevronDown size={12} className="rotate-90" /> {t('extractReview.backToUpload')}
+         </button>
+         <div className="flex items-center gap-2">
+-          <span className={`text-[10px] ${styles.cardTextMuted}`}>{tl(`已选 ${totalSelected} 项`, `${totalSelected} selected`)}</span>
++          <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('extractReview.selected', { n: totalSelected })}</span>
+           <button onClick={handleReject} disabled={submitting}
+             className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
+-            <Ban size={11} /> {tl('全部拒绝', 'Reject All')}
++            <Ban size={11} /> {t('extractReview.rejectAll')}
+           </button>
+           <button onClick={handleApprove} disabled={submitting || totalSelected===0}
+             className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
+             {submitting ? <RotateCw size={11} className="animate-spin" /> : <Send size={11} />}
+-            {tl('确认入库', 'Approve')}
++            {t('extractReview.approve')}
+           </button>
+         </div>
+       </div>
+@@ -164,11 +175,11 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+         {/* Left: Source text with highlighting */}
+         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-2 min-h-[400px]`}>
+           <h3 className={`text-[11px] font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
+-            <FileText size={12} /> {tl('原文标注', 'Source Text')}
++            <FileText size={12} /> {t('extractReview.sourceText')}
+           </h3>
+           <div
+             className={`text-[11px] leading-relaxed font-sans whitespace-pre-wrap overflow-y-auto max-h-[500px] ${styles.cardText}`}
+-            dangerouslySetInnerHTML={{ __html: highlightedSource }}
++            dangerouslySetInnerHTML={{ __html: sanitizeHighlight(highlightedSource) }}
+           />
+         </div>
+ 
+@@ -181,7 +192,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+                 className={`flex-1 px-3 py-2 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                   activeTab===tab.key ? `${styles.accentBg} text-white` : `${styles.cardTextMuted} hover:bg-slate-50`
+                 }`}>
+-                <tab.Icon size={11} /> {tl(tab.labelZh, tab.labelEn)} ({tab.count})
++                <tab.Icon size={11} /> {t(tab.labelKey)} ({tab.count})
+               </button>
+             ))}
+           </div>
+@@ -199,7 +210,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+                       <input value={editName} onChange={e=>setEditName(e.target.value)}
+                         className={`flex-1 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
+                       <input value={editType} onChange={e=>setEditType(e.target.value)}
+-                        className={`w-20 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] ${styles.inputText}`} />
++                        className={`w-20 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
+                       <button onClick={saveEdit} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px]"><Check size={10}/></button>
+                       <button onClick={()=>setEditingId(null)} className="px-2 py-1 bg-slate-200 rounded text-[10px]"><X size={10}/></button>
+                     </div>
+@@ -212,7 +223,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+                       ))}
+                       <button onClick={()=>startEdit(entity.id,entity.name,entity.type)}
+                         className="ml-auto text-[9px] text-amber-500 hover:underline cursor-pointer flex items-center gap-0.5">
+-                        <Edit3 size={9}/> {tl('修正','Edit')}
++                        <Edit3 size={9}/> {t('extractReview.edit')}
+                       </button>
+                     </div>
+                   )}
+@@ -242,7 +253,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
+               </div>
+             ))}
+             {(activeTab==='entities'&&!entities.length || activeTab==='relations'&&!relations.length || activeTab==='rules'&&!rules.length) && (
+-              <div className="px-3 py-8 text-center text-[10px] text-slate-400">{tl('无数据', 'No data')}</div>
++              <div className="px-3 py-8 text-center text-[10px] text-slate-400">{t('extractReview.noData')}</div>
+             )}
+           </div>
+         </div>
+diff --git a/ecos_frontend/src/pages/sql-query-console/api.ts b/ecos_frontend/src/pages/sql-query-console/api.ts
+index f98304e..6d15b4d 100644
+--- a/ecos_frontend/src/pages/sql-query-console/api.ts
++++ b/ecos_frontend/src/pages/sql-query-console/api.ts
+@@ -19,7 +19,10 @@ const DATASOURCE_URL = '/datanet/datasource';
+ const SCHEMA_URL = '/api/v1/engine/data/query/schema';
+ const EXECUTE_URL = '/api/v1/engine/data/query/execute';
+ const HISTORY_URL = '/api/v1/engine/data/query/history';
+-const TEMPLATE_URL = '/api/v1/engine/data/query/template';
++// PMO-41: 对齐后端 QueryController — 列表/详情/删除用复数 /templates，
++// 保存(新增/更新)后端实际为单数 POST /template，故保存 URL 单独定义。
++const TEMPLATE_LIST_URL = '/api/v1/engine/data/query/templates';
++const TEMPLATE_SAVE_URL = '/api/v1/engine/data/query/template';
+ 
+ /** 通用 GET 请求辅助函数 */
+ async function get<T>(url: string): Promise<T> {
+@@ -171,25 +174,25 @@ export async function clearQueryHistory(): Promise<boolean> {
+ 
+ // ─── 模板管理 ─────────────────────────────────────────────
+ 
+-/** 获取模板列表 */
++/** 获取模板列表（后端 GET /api/v1/engine/data/query/templates，复数） */
+ export async function fetchTemplates(): Promise<QueryTemplate[]> {
+   try {
+-    return await get<QueryTemplate[]>(TEMPLATE_URL);
++    return await get<QueryTemplate[]>(TEMPLATE_LIST_URL);
+   } catch (e) {
+     console.warn('[sql-query-console] fetchTemplates failed:', e);
+     return [];
+   }
+ }
+ 
+-/** 保存模板 */
++/** 保存模板（后端 POST /api/v1/engine/data/query/template，单数 — 新增或更新） */
+ export async function saveTemplate(req: SaveTemplateRequest): Promise<QueryTemplate> {
+-  return post<QueryTemplate>(TEMPLATE_URL, req);
++  return post<QueryTemplate>(TEMPLATE_SAVE_URL, req);
+ }
+ 
+-/** 删除模板 */
++/** 删除模板（后端 DELETE /api/v1/engine/data/query/templates/{id}，复数） */
+ export async function deleteTemplate(id: string): Promise<boolean> {
+   try {
+-    await del(`${TEMPLATE_URL}/${id}`);
++    await del(`${TEMPLATE_LIST_URL}/${id}`);
+     return true;
+   } catch (e) {
+     console.warn('[sql-query-console] deleteTemplate failed:', e);
+diff --git a/ecos_frontend/src/services/agentConfig.ts b/ecos_frontend/src/services/agentConfig.ts
+index 90c32e8..73f597f 100644
+--- a/ecos_frontend/src/services/agentConfig.ts
++++ b/ecos_frontend/src/services/agentConfig.ts
+@@ -193,10 +193,17 @@ export async function fetchModels(): Promise<string[]> {
+   }
+ }
+ 
+-/** Fetch available knowledge bases */
++/**
++ * Fetch available knowledge bases
++ * GET /api/v1/knowledge-bases
++ * PMO-41: 去掉 /v1 重复前缀（本文件走 apiFetch 统一封装，
++ * API_BASE 自动补 /api 前缀）。
++ * 已走 apiFetch 统一 request 封装（含 handleAuthExpired on 401）。
++ * PMO-38 T3 将补齐该后端端点，本批次仅校正前端路径。
++ */
+ export async function fetchKnowledgeBases(): Promise<KnowledgeBase[]> {
+   try {
+-    const resp = await apiFetch<{ code: number; data: KnowledgeBase[] }>("/v1/knowledge-bases");
++    const resp = await apiFetch<{ code: number; data: KnowledgeBase[] }>("/knowledge-bases");
+     return resp.data || [];
+   } catch {
+     return [];
+diff --git a/ecos_frontend/src/services/ontologyApi.ts b/ecos_frontend/src/services/ontologyApi.ts
+index a6f1c92..1b1651c 100644
+--- a/ecos_frontend/src/services/ontologyApi.ts
++++ b/ecos_frontend/src/services/ontologyApi.ts
+@@ -765,7 +765,7 @@ export const ontologyApi = {
+ // 版本管理 (Version Timeline) — T3
+ // ================================================================
+ 
+-const VERSION_BASE = "/api/v1/ontology/versions";
++const VERSION_BASE = "/api/v1/ecos/versions";
+ 
+ /** 版本列表项 */
+ export interface VersionItem {
+@@ -798,7 +798,11 @@ export interface VersionDiff {
+ 
+ /**
+  * 获取版本历史列表
+- * GET /api/v1/ontology/versions?domainCode=finance
++ * GET /api/v1/ecos/versions?domainCode=finance
++ * PMO-41: 路径由 /api/v1/ontology/versions 对齐后端实际路径
++ * OntologyVersionSimpleController @RequestMapping("/api/v1/ecos/versions")。
++ * 原 ?domainCode= 查询参数后端未消费（列表为全量跨 ontology），
++ * 签名为 API 只增不改原则保留；前端如需按 ontology 过滤应在客户端本地过滤。
+  */
+ export async function fetchVersions(domainCode: string): Promise<VersionItem[]> {
+   return apiFetchData<VersionItem[]>(
+@@ -809,6 +813,9 @@ export async function fetchVersions(domainCode: string): Promise<VersionItem[]>
+ /**
+  * 获取两个版本之间的 diff
+  * GET /api/v1/ontology/versions/diff?v1=3.1&v2=3.2
++ * 说明: PMO-39 T3 将补齐该端点；后端现状仅有按 id 的 diff-with-previous
++ * (GET /api/v1/ecos/versions/{id}/diff)，故此处路径本批次保持不变，
++ * 待后端落地后再校。
+  */
+ export async function fetchVersionDiff(v1: string, v2: string): Promise<VersionDiff> {
+   return apiFetchData<VersionDiff>(
+diff --git a/ecos_frontend/src/types.ts b/ecos_frontend/src/types.ts
+index 7b838cb..f06cef1 100644
+--- a/ecos_frontend/src/types.ts
++++ b/ecos_frontend/src/types.ts
+@@ -51,6 +51,13 @@ export interface DataAsset {
+     editor: string[];
+     viewer: string[];
+   };
++  /**
++   * Optional provenance marker: set to `'MOCK'` when this item comes from the
++   * mock fallback rather than the live backend. PMO-43 T1 — lets UI layers
++   * and tests distinguish real data from enrichment/placeholder data
++   * (instead of treating the empty-and-busy-state as "0 rows").
++   */
++  error?: 'MOCK' | string;
+ }
+ 
+ // Lineage & Pipeline

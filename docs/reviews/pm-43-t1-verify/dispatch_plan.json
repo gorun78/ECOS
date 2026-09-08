@@ -1,0 +1,19 @@
+{
+  "task_id": "t_e6bf3c74",
+  "artifact_type": "SOURCE_PATCH",
+  "artifact_ref": "api.ts@wt-diff-HEAD(228+/21-)",
+  "workflow_mode": "L2",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "api.ts@wt-diff-HEAD",
+      "context": ["T1-acceptance: 5 instances of .catch{warn,return empty} replaced with NetworkDownEvent / real propagation"],
+      "mode": "serial",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT", "REVIEW_REPORT_APPROVAL_RECORD"],
+  "final_gate_logic": "AND_ALL",
+  "notes": "L2 (focus code-review) + manual scan for anti-pattern instances; no P0 security- or architecture-relevant changes (event handlers removed not added). OCR engine not required for a 228-line diff; manual + tsc gate used.",
+  "timestamp": "2026-09-07T08:16:00+08:00"
+}

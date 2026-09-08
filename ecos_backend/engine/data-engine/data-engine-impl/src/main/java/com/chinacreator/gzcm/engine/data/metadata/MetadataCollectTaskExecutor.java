@@ -51,6 +51,7 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
     private final ConnectorFactory connectorFactory;
     private final MetadataRowCountService rowCountService;
     private final com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync;
+    private final MetadataCollectGitArchive gitArchive;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final Map<String, Boolean> cancelFlags = new ConcurrentHashMap<>();
@@ -59,11 +60,13 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
     public MetadataCollectTaskExecutor(DataSourceRepository dsRepository,
                                        ConnectorFactory connectorFactory,
                                        MetadataRowCountService rowCountService,
-                                       com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync) {
+                                       com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync,
+                                       MetadataCollectGitArchive gitArchive) {
         this.dsRepository = dsRepository;
         this.connectorFactory = connectorFactory;
         this.rowCountService = rowCountService;
         this.resourceSync = resourceSync;
+        this.gitArchive = gitArchive;
     }
 
     @Override
@@ -186,6 +189,18 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                 dsRepository.updateLastCollectTime(datasourceId);
             } catch (Exception e) {
                 log.warn("审计写入失败（不影响任务成功判定）: {}", e.getMessage());
+            }
+
+            // Git 存档 + 版本差异对比（失败不影响采集任务成功判定）
+            try {
+                Map<String, Object> gitResult = gitArchive.archiveAndDiff(datasourceId, resources);
+                if (Boolean.TRUE.equals(gitResult.get("archived"))) {
+                    result.put("diffSummary", gitResult.get("diffSummary"));
+                    result.put("diffMarkdown", gitResult.get("diffMarkdown"));
+                    result.put("gitCommit", gitResult.get("commitMessage"));
+                }
+            } catch (Exception e) {
+                log.warn("Git 存档调用失败（不影响任务成功）: datasource={}, error={}", datasourceId, e.getMessage());
             }
 
             log.info("METADATA_COLLECT 完成 datasource={} status={} tables={}/{} failed={} elapsed={}ms",

@@ -56,11 +56,15 @@ public class SecurityConfig {
                     "/api/v1/twins/**",
                     "/api/v1/pareto/**",
                     "/api/v1/portal/**",
+                    "/api/portal/**",
+                    "/api/cognitive/**",
                     "/api/v1/integration/**",
                     "/api/v1/ontology/**",
                     "/api/v1/lineage/**",
                     "/api/v1/guardrails/**",
                     "/api/v1/aip/**",
+                    "/api/v1/agent-metrics/**",
+                    "/api/agent-metrics/**",
                     "/api/v1/agents/**",
                     "/api/v1/mfa/**",
                     "/api/v1/privacy/**",
@@ -70,6 +74,39 @@ public class SecurityConfig {
                     "/api/v1/evolution/**",
                     "/api/v1/cognitive/**",
                     "/api/v1/engine/**",
+                    // ── PMO-38 T5: 新增 4 条 permitAll (sysman/knowledge-bases/sysconfig 三组) ──
+                    // ── PMO-39 T5: 双路径全覆盖 — 5 新端点的 /api/ 与 /api/v1/ ──
+                    // cognitive T1: /plan, /plan/{id}, /optimize
+                    "/api/cognitive/plan",
+                    "/api/cognitive/plan/**",
+                    "/api/cognitive/optimize",
+                    // ontology T2: workflow definitions
+                    "/api/engine/ontology/workflow/definitions",
+                    "/api/engine/ontology/workflow/definitions/**",
+                    // ontology T3: versions diff
+                    "/api/ontology/versions/diff",
+                    "/api/ontology/versions/diff/**",
+                    // portal T4: search
+                    "/api/portal/search",
+                    "/api/portal/search/**",
+                    "/api/v1/knowledge-bases",
+                    "/api/knowledge-bases",
+                    "/api/v1/sysconfig/**",
+                    "/api/sysconfig/**",
+                    // ── PMO-40 T5: agent-metrics 双路径 (已有) + ontology auto-discover/preview 裸路径 ──
+                    // agent-metrics 双路径已在上方 (第 66-67 行)
+                    // ontology sources (GET /api/v1/ecos/ontology/sources) 已被 /api/v1/ecos/** 覆盖
+                    // ontology auto-discover preview (POST /api/v1/ecos/domains/{code}/auto-discover/preview) 已被 /api/v1/ecos/** 覆盖
+                    // auto-discover preview 裸路径 /api/ecos/domains/ 需单独加
+                    "/api/ecos/domains/**",
+                    "/api/v1/ecos/domains/**",
+                    // PMO-40 T2: metadata strategy 裸路径双路径（v1 路径 /api/v1/datanet/metadata/** 已被 Controller 直接映射）
+                    "/api/datanet/metadata/**",
+                    // ── PMO-45 T5: datasource 三路径 (PMO45DataSourceController 双路径 /api/v1/datasource + /datasource) ──
+                    // Wave2: 补全 /api/v1/datasource/** v1 路径 permitAll (Wave1 只放行 /api/datasource + /datasource)
+                    "/api/v1/datasource/**",
+                    "/api/datasource/**",
+                    "/datasource/**",
                     // ── P0-1: 安全端点移出 permitAll（需认证）
                     // /api/v1/abac/**, /api/v1/audit/**, /api/v1/data-masking/**,
                     // /api/v1/policy-engine/**, /api/v1/data-permission/**,

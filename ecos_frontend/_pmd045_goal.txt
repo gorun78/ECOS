@@ -1,0 +1,67 @@
+# PMO-45: 数据源管理扩展 — 6 种数据库/存储类型 CRUD 全链路
+
+> 架构铁律: ECOS §0.2/§0.4/§2.5 | task_id: ecos-datasource-045
+> 铁律: 基础设施访问走 runtime-access；安全加密走 security-engine；不加新 Maven 模块（基线13）
+
+## 新增类型与连接参数
+
+| type | 驱动类 | 默认端口 | 特有参数 |
+|------|--------|----------|----------|
+| ORACLE | oracle.jdbc.OracleDriver | 1521 | serviceName, urlFormat(JDBC/THIN/EZCONNECT), connectionTimeout, statementCacheSize |
+| MSSQL | com.microsoft.sqlserver.jdbc.SQLServerDriver | 1433 | encrypt, trustServerCertificate, sendStringParametersAsUnicode, applicationName, multiSubnetFailover |
+| DM | dm.jdbc.driver.DmDriver | 5236 | compatibleMode(MySQL/Oracle), loginEncrypt, passwordEncryptMode(0=None/1=AES/2=SM3/3=SM4) |
+| KINGBASE | com.kingbase8.Driver | 54321 | database(KINGBASEES/POSTGRES/Oracle), tablecase, compatibleMode(1=Oracle/2=MySQL/3=PG) |
+| GAUSS | org.opengauss.Driver | 5432 | sslMode(disable/require/verify-ca/verify-full), compression, readOnly, applicationName |
+| MINIO | MinIO Client (S3) | 9000 | bucket, region, pathStyleAccess, credential(s3cli 可选), 仅 enterprise/ultimate 支持 |
+| FILESYSTEM | — (本地) | — | basePath, readOnly, maxFileSizeMB, allowedExtensions(csv,json,txt,xml) |
+
+## 后端实现
+
+1. **DataSourceBaseVO.type 枚举**：扩展为 ORACLE/MSSQL/DM/KINGBASE/GAUSS/MINIO/FILESYSTEM
+2. **DataSourceConfigVO**：增加 `Map<String,String> typeSpecificParams` 字段承载类型特有参数
+3. **runtime-access**：pom.xml 添加 Oracle/MSSQL/达梦/金仓/高斯 JDBC 驱动依赖（optional=true），按需 Class.forName 加载
+4. **JdbcConnectionTester**：在 data-engine 新建，根据 type 构造 JDBC URL，真实 DriverManager 连接验证
+5. **密码加密**：存 DB 前调 `POST /api/v1/security/encrypt`，读取时调 `POST /api/v1/security/decrypt`
+6. **MinIO 版本控制**：createDataSource 时 type=MINIO 且 spring profile=standard → 抛 ValidationException
+7. **新增 API**：
+   - `POST /api/v1/datasource/test-connection/{id}` — 测试已保存的数据源连接
+   - `POST /api/v1/datasource/preview-schema` — 新建前预览（body=config）
+   - 三滤波器：VersionPrefixRewriteFilter + SecurityConfig + ClearanceInterceptor 双路径注册
+
+## 前端实现
+
+1. **types.ts**：DataConnection.type 扩展，新增 Config 类型定义
+2. **6 个类型配置表单组件**（放在 data-workbench/components/ 下）：
+   - OracleConfigForm / MssqlConfigForm / DmConfigForm / KingbaseConfigForm / GaussConfigForm / MinioConfigForm / FilesystemConfigForm
+   - 通用参数(host/port/username/password)由外层 DataSourceModal 统一
+3. **DataSourceModal.tsx**：type 切换时渲染对应 ConfigForm；保存/测试按钮
+4. **连接测试**：保存前可点"测试连接"调 preview-schema，弹窗显示成功/失败
+5. **i18n**：dw/zh-CN.json + dw/en.json 补全，类型名 + 每类型特有参数 label
+6. **图标映射**：每种类型 lucide icon（不做自定义 SVG）
+
+## 验收 curl
+
+```bash
+TOKEN=...
+# 创建 ORACLE
+curl -X POST :8080/api/v1/datasource -H"Authorization:Bearer $TOKEN" -H"Content-Type:application/json" \
+  -d '{"name":"t-oracle","type":"ORACLE","config":{"host":"127.0.0.1","port":1521,"serviceName":"ORCL","username":"system","password":"x"},"authMode":"BASIC"}'
+# 预期: 201
+
+# 创建 MINIO（standard 版应 400）
+curl -X POST :8080/api/v1/datasource -H"Authorization:Bearer $TOKEN" -H"Content-Type:application/json" \
+  -d '{"name":"t-minio","type":"MINIO","config":{"host":"127.0.0.1","port":9000,"bucket":"ecos","accessKey":"x","secretKey":"y"},"authMode":"KEY"}'
+# standard: 400 | enterprise: 201
+
+# 测试连接
+curl -X POST :8080/api/v1/datasource/test-connection/{id} -H"Authorization:Bearer $TOKEN"
+# 预期: 200 {success:true|false, error:"..."}
+```
+
+## 禁止事项
+
+1. 不加新 Maven 模块（基线13）
+2. 不绕过 security-engine 自行加密
+3. 前端不硬编码颜色/中文
+4. 三滤波器必须同步注册
+5. 文件 ≤800 行，Tab 独立

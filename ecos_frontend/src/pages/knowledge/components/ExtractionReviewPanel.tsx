@@ -1,7 +1,7 @@
 /**
- * ExtractionReviewPanel — 知识抽取审核面板
- * 左栏: 原文Markdown渲染 + 实体高亮
- * 右栏: 抽取结果列表(实体/关系/规则, checkbox确认) + 手动修正 + 确认入库
+ * ExtractionReviewPanel — Knowledge extraction review panel
+ * Left column: raw text with entity highlighting (DOMPurify whitelist sanctioned)
+ * Right column: extraction result list (entities/relations/rule checkbox confirmation) + manual correction + confirm registration
  *
  * @license Apache-2.0
  */
@@ -9,11 +9,23 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   Check, X, Edit3, RotateCw, ChevronDown, Network, ShieldAlert,
-  Layers, Send, Ban, CheckSquare, Square, ExternalLink, FileText,
+  Layers, Send, Ban, CheckSquare, Square, FileText,
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { apiFetch } from '../../../api';
+
+// ── XSS Whitelist: Only allow <mark> highlight tags ────────────────────────
+
+const SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['mark', 'span', 'code', 'strong'],
+  ALLOWED_ATTR: ['class', 'style'],
+};
+
+function sanitizeHighlight(html: string): string {
+  return DOMPurify.sanitize(html, SANITIZE_CONFIG);
+}
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -42,9 +54,8 @@ interface Props {
 // ── Component ──────────────────────────────────────────────────
 
 export default function ExtractionReviewPanel({ extractionId, sourceText, reviewData, onBack }: Props) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
 
   const [entities, setEntities] = useState<ReviewEntity[]>(reviewData.entities.map(e => ({...e, selected: true})));
   const [relations, setRelations] = useState<ReviewRelation[]>(reviewData.relations.map(r => ({...r, selected: true})));
@@ -119,20 +130,20 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
     finally { setSubmitting(false); }
   }, [extractionId]);
 
-  const tabItems: Array<{key:'entities'|'relations'|'rules';labelZh:string;labelEn:string;Icon:typeof Network;count:number}> = [
-    { key:'entities', labelZh:'实体', labelEn:'Entities', Icon: Layers, count: entities.length },
-    { key:'relations', labelZh:'关系', labelEn:'Relations', Icon: Network, count: relations.length },
-    { key:'rules', labelZh:'规则', labelEn:'Rules', Icon: ShieldAlert, count: rules.length },
+  const tabItems: Array<{key:'entities'|'relations'|'rules';labelKey:string;Icon:typeof Network;count:number}> = [
+    { key:'entities', labelKey:'extractReview.tabs.entities', Icon: Layers, count: entities.length },
+    { key:'relations', labelKey:'extractReview.tabs.relations', Icon: Network, count: relations.length },
+    { key:'rules', labelKey:'extractReview.tabs.rules', Icon: ShieldAlert, count: rules.length },
   ];
 
   if (done) {
     return (
       <div className={`flex flex-col items-center justify-center py-16 space-y-4 ${styles.cardBg} border ${styles.cardBorder} rounded-xl`}>
         <div className="p-4 bg-emerald-100 rounded-2xl"><Check size={32} className="text-emerald-600" /></div>
-        <p className={`text-sm font-extrabold ${styles.cardText}`}>{tl('审核完成', 'Review Complete')}</p>
-        <p className={`text-[11px] ${styles.cardTextMuted}`}>{tl('知识已确认入库，实体链接已完成', 'Knowledge confirmed and stored, entity linking completed')}</p>
+        <p className={`text-sm font-extrabold ${styles.cardText}`}>{t('extractReview.complete.title')}</p>
+        <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('extractReview.complete.subtitle')}</p>
         <button onClick={onBack} className={`px-4 py-2 ${styles.accentBg} text-white font-bold rounded-lg text-xs cursor-pointer`}>
-          {tl('返回上传', 'Back to Upload')}
+          {t('extractReview.backToUpload')}
         </button>
       </div>
     );
@@ -143,18 +154,18 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
       {/* Top bar: back + actions */}
       <div className="flex items-center justify-between">
         <button onClick={onBack} className={`text-[11px] font-bold ${styles.cardTextMuted} hover:underline cursor-pointer flex items-center gap-1`}>
-          <ChevronDown size={12} className="rotate-90" /> {tl('返回上传', 'Back')}
+          <ChevronDown size={12} className="rotate-90" /> {t('extractReview.backToUpload')}
         </button>
         <div className="flex items-center gap-2">
-          <span className={`text-[10px] ${styles.cardTextMuted}`}>{tl(`已选 ${totalSelected} 项`, `${totalSelected} selected`)}</span>
+          <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('extractReview.selected', { n: totalSelected })}</span>
           <button onClick={handleReject} disabled={submitting}
             className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
-            <Ban size={11} /> {tl('全部拒绝', 'Reject All')}
+            <Ban size={11} /> {t('extractReview.rejectAll')}
           </button>
           <button onClick={handleApprove} disabled={submitting || totalSelected===0}
             className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
             {submitting ? <RotateCw size={11} className="animate-spin" /> : <Send size={11} />}
-            {tl('确认入库', 'Approve')}
+            {t('extractReview.approve')}
           </button>
         </div>
       </div>
@@ -164,11 +175,11 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
         {/* Left: Source text with highlighting */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-2 min-h-[400px]`}>
           <h3 className={`text-[11px] font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
-            <FileText size={12} /> {tl('原文标注', 'Source Text')}
+            <FileText size={12} /> {t('extractReview.sourceText')}
           </h3>
           <div
             className={`text-[11px] leading-relaxed font-sans whitespace-pre-wrap overflow-y-auto max-h-[500px] ${styles.cardText}`}
-            dangerouslySetInnerHTML={{ __html: highlightedSource }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHighlight(highlightedSource) }}
           />
         </div>
 
@@ -181,7 +192,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
                 className={`flex-1 px-3 py-2 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                   activeTab===tab.key ? `${styles.accentBg} text-white` : `${styles.cardTextMuted} hover:bg-slate-50`
                 }`}>
-                <tab.Icon size={11} /> {tl(tab.labelZh, tab.labelEn)} ({tab.count})
+                <tab.Icon size={11} /> {t(tab.labelKey)} ({tab.count})
               </button>
             ))}
           </div>
@@ -199,7 +210,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
                       <input value={editName} onChange={e=>setEditName(e.target.value)}
                         className={`flex-1 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
                       <input value={editType} onChange={e=>setEditType(e.target.value)}
-                        className={`w-20 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] ${styles.inputText}`} />
+                        className={`w-20 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
                       <button onClick={saveEdit} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px]"><Check size={10}/></button>
                       <button onClick={()=>setEditingId(null)} className="px-2 py-1 bg-slate-200 rounded text-[10px]"><X size={10}/></button>
                     </div>
@@ -212,7 +223,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
                       ))}
                       <button onClick={()=>startEdit(entity.id,entity.name,entity.type)}
                         className="ml-auto text-[9px] text-amber-500 hover:underline cursor-pointer flex items-center gap-0.5">
-                        <Edit3 size={9}/> {tl('修正','Edit')}
+                        <Edit3 size={9}/> {t('extractReview.edit')}
                       </button>
                     </div>
                   )}
@@ -242,7 +253,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
               </div>
             ))}
             {(activeTab==='entities'&&!entities.length || activeTab==='relations'&&!relations.length || activeTab==='rules'&&!rules.length) && (
-              <div className="px-3 py-8 text-center text-[10px] text-slate-400">{tl('无数据', 'No data')}</div>
+              <div className="px-3 py-8 text-center text-[10px] text-slate-400">{t('extractReview.noData')}</div>
             )}
           </div>
         </div>

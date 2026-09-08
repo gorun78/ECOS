@@ -86,6 +86,15 @@ auth:
       - "/api/alerts/**"
       - "/api/datalake/**"
       - "/api/workbook/**"
+      # ── PMO-38 T5: 新增双路径 JWT 白名单 ──
+      # force-logout (sysman-impl, 需 PM_USER_UPDATE + 认证透传 userId)
+      - "/api/v1/system/users/**"
+      # knowledge-bases 列表
+      - "/api/v1/knowledge-bases"
+      - "/api/knowledge-bases"
+      # sysconfig reset
+      - "/api/v1/sysconfig/**"
+      - "/api/sysconfig/**"
       - "/api/agent/tools/**"
       - "/datanet/**"
       - "/cases/**"

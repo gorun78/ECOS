@@ -16,14 +16,14 @@ export interface GoalTreeNodeProps {
   onSelect: (g: Goal) => void;
   selectedId: number | string | null;
   styles: any;
-  key?: React.Key;
   onEdit?: (g: Goal) => void;
   onDelete?: (id: number | string) => void;
 }
 
 // ── GoalTreeNode (recursive, expandable) ───────
+// key 是 React 内部特殊 prop，无需（也不能）在组件里读取。
 export default function GoalTreeNode({
-  node, depth = 0, expandedIds, toggleExpand, onSelect, selectedId, styles, key: _key, onEdit, onDelete, ..._rest
+  node, depth = 0, expandedIds, toggleExpand, onSelect, selectedId, styles, onEdit, onDelete,
 }: GoalTreeNodeProps) {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);

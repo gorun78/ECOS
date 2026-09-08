@@ -48,19 +48,25 @@ public class MetadataController {
     private final MetadataRowCountService rowCountService;
     private final DataSourceService dataSourceService;
     private final MetadataAsyncTrigger asyncTrigger;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    private static final com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>> MAP_TYPE =
+            new com.fasterxml.jackson.core.type.TypeReference<>() {};
 
     public MetadataController(MetadataCollectionService collectionService,
                               MetadataTaskService taskService,
                               AutoCollectScheduler scheduler,
                               MetadataRowCountService rowCountService,
                               DataSourceService dataSourceService,
-                              MetadataAsyncTrigger asyncTrigger) {
+                              MetadataAsyncTrigger asyncTrigger,
+                              org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.collectionService = collectionService;
         this.taskService = taskService;
         this.scheduler = scheduler;
         this.rowCountService = rowCountService;
         this.dataSourceService = dataSourceService;
         this.asyncTrigger = asyncTrigger;
+        this.jdbc = jdbc;
     }
 
     // ===== 既有端点（签名不变） =====
@@ -196,6 +202,52 @@ public class MetadataController {
                                            @RequestParam(defaultValue = "10") int limit) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("logs", rowCountService.recentLogs(datasourceId, limit));
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("code", 0);
+        r.put("message", "ok");
+        r.put("data", data);
+        return r;
+    }
+
+    // ===== 新增：采集差异记录 =====
+
+    @GetMapping("/collect-diff/{datasourceId}")
+    public Map<String, Object> collectDiff(@PathVariable String datasourceId,
+                                           @RequestParam(defaultValue = "5") int limit) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        try {
+            List<Map<String, Object>> logs = jdbc.queryForList(
+                    "SELECT result, created_at, task_id FROM td_metadata_collect_log " +
+                    "WHERE datasource_id = ? AND result IS NOT NULL ORDER BY created_at DESC LIMIT ?",
+                    datasourceId, Math.max(1, limit));
+            // 解析 result JSON 提取 diffSummary/diffMarkdown
+            List<Map<String, Object>> diffs = new java.util.ArrayList<>();
+            for (Map<String, Object> row : logs) {
+                String resultJson = (String) row.get("result");
+                if (resultJson == null || resultJson.isEmpty()) continue;
+                try {
+                    Map<String, Object> r = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(resultJson, MAP_TYPE);
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("collectedAt", row.get("created_at"));
+                    item.put("taskId", row.get("task_id"));
+                    item.put("diffSummary", r.get("diffSummary"));
+                    item.put("diffMarkdown", r.get("diffMarkdown"));
+                    item.put("gitCommit", r.get("gitCommit"));
+                    item.put("tablesTotal", r.get("tablesTotal"));
+                    item.put("tablesOk", r.get("tablesOk"));
+                    item.put("tablesFailed", r.get("tablesFailed"));
+                    diffs.add(item);
+                } catch (Exception e) {
+                    log.debug("解析 result JSON 失败: {}", e.getMessage());
+                }
+            }
+            data.put("diffs", diffs);
+        } catch (Exception e) {
+            log.warn("collect-diff 查询失败: {}", e.getMessage());
+            return error("差异记录查询失败: " + e.getMessage());
+        }
+        data.put("datasourceId", datasourceId);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("code", 0);
         r.put("message", "ok");

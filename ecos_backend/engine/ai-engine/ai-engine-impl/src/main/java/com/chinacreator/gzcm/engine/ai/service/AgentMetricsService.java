@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +15,8 @@ import java.util.Map;
  */
 @Service
 public class AgentMetricsService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentMetricsService.class);
 
     private final JdbcTemplate jdbc;
 
@@ -54,6 +58,26 @@ public class AgentMetricsService {
             "FROM ecos_agent_metrics WHERE agent_id = ?",
             agentId
         );
+    }
+
+    /**
+     * 判断 agent 是否存在任何指标记录（用于 404 探测）。
+     *
+     * <p>主路径 {@link AgentMetricsController} 是 COUNT 永不报错（SUM 0），
+     * 兼容性路径需要显式 404，因此走 exists 探测。
+     *
+     * @return true 只要 ecos_agent_metrics 中有 ≥1 行记录
+     */
+    public boolean exists(String agentId) {
+        try {
+            Integer cnt = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ecos_agent_metrics WHERE agent_id = ?",
+                Integer.class, agentId);
+            return cnt != null && cnt > 0;
+        } catch (Exception e) {
+            log.warn("exists() failed for agentId={}: {}", agentId, e.getMessage());
+            return true; // 宽松降级：查询失败不判 404，继续走主流程
+        }
     }
 
     /**

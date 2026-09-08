@@ -9,9 +9,10 @@
  * @license Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
+import { showToastGlobal } from '../components/common/Toast';
 import type { ObjectType, Dataset } from './data-workbench/types';
 import LucideIcon from './data-workbench/LucideIcon';
 import ConnectionsTab from './data-workbench/tabs/ConnectionsTab';
@@ -21,6 +22,7 @@ import PipelineBuilderTab from './data-workbench/tabs/PipelineBuilderTab';
 import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
 import { AddConnectionModal, AddSyncModal, AddHealthCheckModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
 import { useDataWorkbench } from './data-workbench/hooks/useDataWorkbench';
+import { detectEdition } from './data-workbench/api';
 
 type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'engine-config';
 
@@ -46,7 +48,7 @@ export default function DataWorkbenchLayout({
 }: DataWorkbenchLayoutProps = {}) {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
-  const showToast = propShowToast || ((type: string, msg: string) => console.log('[toast]', type, msg));
+  const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
 
   const dw = useDataWorkbench(showToast, t);
 
@@ -88,16 +90,15 @@ export default function DataWorkbenchLayout({
 
         {/* Body */}
         <div className="flex-1 flex overflow-hidden min-w-0">
-          {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} />}
+          {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} triggerSync={dw.triggerSync} t={t} />}
           {activeTab === 'health' && <HealthTab healthChecks={dw.healthChecks} setHealthChecks={dw.setHealthChecks} showToast={showToast} showAddCheck={dw.showAddCheck} setShowAddCheck={dw.setShowAddCheck} newCheckName={dw.nhName} setNewCheckName={dw.setNhName} newCheckDs={dw.nhDs} setNewCheckDs={dw.setNhDs} checkType={dw.nhType} setCheckType={dw.setNhType as any} newCheck={{}} t={t} />}
           {activeTab === 'lineage' && <DataLineageTab />}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>
       </div>
-
       {/* Modals */}
-      {dw.showAddConn && <AddConnectionModal t={t} locale={locale} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} newConnPassword={dw.ncPassword} setNewConnPassword={dw.setNcPassword} newConnDatabase={dw.ncDatabase} setNewConnDatabase={dw.setNcDatabase} onClose={() => dw.setShowAddConn(false)} onCreate={dw.createConnection} onTestConnection={dw.testConnectionRaw} />}
+      {dw.showAddConn && <AddConnectionModal t={t} locale={locale} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} newConnPassword={dw.ncPassword} setNewConnPassword={dw.setNcPassword} newConnDatabase={dw.ncDatabase} setNewConnDatabase={dw.setNcDatabase} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} onClose={() => dw.setShowAddConn(false)} onCreate={dw.createConnection} onTestConnection={dw.testConnectionRaw} />}
       {dw.showAddSync && <AddSyncModal t={t} locale={locale} newSyncName={dw.nsName} setNewSyncName={dw.setNsName} newSyncConn={dw.nsConn} setNewSyncConn={dw.setNsConn} newSyncTable={dw.nsTable} setNewSyncTable={dw.setNsTable} newSyncMode={dw.nsMode} setNewSyncMode={dw.setNsMode as any} newSyncSched={dw.nsSched} setNewSyncSched={dw.setNsSched as any} connections={dw.connections} onClose={() => dw.setShowAddSync(false)} onCreate={dw.createSync} />}
       {dw.showAddCheck && <AddHealthCheckModal t={t} locale={locale} newCheckName={dw.nhName} setNewCheckName={dw.setNhName} newCheckDs={dw.nhDs} setNewCheckDs={dw.setNhDs} newCheckType={dw.nhType} setNewCheckType={dw.setNhType as any} newCheckThreshold={dw.nhThr} setNewCheckThreshold={dw.setNhThr} onClose={() => dw.setShowAddCheck(false)} onCreate={dw.createHealth} />}
       {showExtIfaces && <ExternalInterfacesDrawer t={t} connections={dw.connections} onClose={() => setShowExtIfaces(false)} />}
@@ -106,6 +107,9 @@ export default function DataWorkbenchLayout({
 }
 
 export function DataWorkbenchLayoutStandalone() {
-  const { styles } = useTheme();
-  return <div className={`h-screen flex flex-col ${styles.appBg} ${styles.appText} font-sans`}><DataWorkbenchLayout /></div>;
+  // 直接渲染 DataWorkbenchLayout — 它内部统一消费 useTheme。
+  // 旧版本这里额外调用一次 useTheme() 拿 shell 样式，导致懒加载 chunk
+  // 与主 bundle ThemeContext 不一致时抛 "useTheme must be used within a
+  // ThemeProvider"，被 ErrorBoundary 捕获后整个数据工作台按钮全部失效。
+  return <DataWorkbenchLayout />;
 }

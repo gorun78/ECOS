@@ -76,14 +76,11 @@ export function convertPolicyToGuardrail(raw: GuardrailPolicyRaw): AIPGuardrail 
 
 // ── Pipelines ──────────────────────────────────────────────────
 
-/** Fetch all AIP logic pipelines */
+/** Fetch all AIP logic pipelines.
+ *  PMO-43 T3 C-004: errors propagate (re-throw) so the UI can show a
+ *  real error/retry state — no more `catch → console.warn → []` swallowing. */
 export async function fetchPipelines(): Promise<AIPLogicPipeline[]> {
-  try {
-    return await apiFetchData<AIPLogicPipeline[]>("/api/v1/aip/pipelines");
-  } catch {
-    console.warn("[aiworkbench] fetchPipelines failed");
-    return [];
-  }
+  return apiFetchData<AIPLogicPipeline[]>("/api/v1/aip/pipelines");
 }
 
 /** Create a new AIP logic pipeline */
@@ -111,14 +108,9 @@ export async function deletePipeline(id: string): Promise<void> {
 
 // ── Agents ─────────────────────────────────────────────────────
 
-/** Fetch all AIP agents */
+/** Fetch all AIP agents. Errors propagate (re-throw) — see fetchPipelines. */
 export async function fetchAgents(): Promise<AIPAgent[]> {
-  try {
-    return await apiFetchData<AIPAgent[]>("/api/v1/aip/agents");
-  } catch {
-    console.warn("[aiworkbench] fetchAgents failed");
-    return [];
-  }
+  return apiFetchData<AIPAgent[]>("/api/v1/aip/agents");
 }
 
 /** Create a new AIP agent */
@@ -146,26 +138,16 @@ export async function deleteAgent(id: string): Promise<void> {
 
 // ── Models ─────────────────────────────────────────────────────
 
-/** Fetch all AIP models */
+/** Fetch all AIP models. Errors propagate (re-throw) — see fetchPipelines. */
 export async function fetchModels(): Promise<AIPModel[]> {
-  try {
-    return await apiFetchData<AIPModel[]>("/api/v1/aip/models");
-  } catch {
-    console.warn("[aiworkbench] fetchModels failed");
-    return [];
-  }
+  return apiFetchData<AIPModel[]>("/api/v1/aip/models");
 }
 
 // ── Guardrails ─────────────────────────────────────────────────
 
-/** Fetch all AIP guardrails */
+/** Fetch all AIP guardrails. Errors propagate (re-throw) — see fetchPipelines. */
 export async function fetchGuardrails(): Promise<AIPGuardrail[]> {
-  try {
-    return await apiFetchData<AIPGuardrail[]>("/api/v1/aip/guardrails");
-  } catch {
-    console.warn("[aiworkbench] fetchGuardrails failed");
-    return [];
-  }
+  return apiFetchData<AIPGuardrail[]>("/api/v1/aip/guardrails");
 }
 
 /** Create a new AIP guardrail */
@@ -178,12 +160,7 @@ export async function createGuardrail(body: Partial<AIPGuardrail>): Promise<AIPG
 
 // ── Audit Logs ─────────────────────────────────────────────────
 
-/** Fetch all AIP audit logs */
+/** Fetch all AIP audit logs. Errors propagate (re-throw) — see fetchPipelines. */
 export async function fetchAuditLogs(): Promise<AIPAuditLog[]> {
-  try {
-    return await apiFetchData<AIPAuditLog[]>("/api/v1/aip/audit-logs");
-  } catch {
-    console.warn("[aiworkbench] fetchAuditLogs failed");
-    return [];
-  }
+  return apiFetchData<AIPAuditLog[]>("/api/v1/aip/audit-logs");
 }

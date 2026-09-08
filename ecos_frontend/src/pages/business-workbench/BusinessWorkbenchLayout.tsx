@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../components/LanguageContext';
+import { showToastGlobal } from '../../components/common/Toast';
 import { apiFetch } from '../../api';
 import { CopilotPanel } from '../../components/CopilotPanel';
 
@@ -78,7 +79,7 @@ export default function BusinessWorkbenchLayout({
     if (propShowToast) {
       propShowToast(type, message);
     } else {
-      console.log(`[${type.toUpperCase()}] ${message}`);
+      showToastGlobal(type, message);
     }
   }, [propShowToast]);
 
@@ -592,10 +593,7 @@ export default function BusinessWorkbenchLayout({
 }
 
 // Standalone wrapper for full-page business workbench
+// 仅透传子组件；子组件内部已有主题/语言 context 消费。
 export function BusinessWorkbenchLayoutStandalone() {
-  return (
-    <div className="h-screen flex flex-col bg-slate-900 text-slate-100 font-sans">
-      <BusinessWorkbenchLayout />
-    </div>
-  );
+  return <BusinessWorkbenchLayout />;
 }

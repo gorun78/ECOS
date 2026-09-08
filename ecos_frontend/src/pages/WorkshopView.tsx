@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from "../components/ThemeContext";
+import { showToastGlobal } from "../components/common/Toast";
 
 import type { WorkshopApp, WorkshopWidget } from './workshop/types';
 import { initialApps } from './workshop/mockData';
@@ -24,7 +25,7 @@ export type { WorkshopApp, WorkshopWidget, WorkshopVariable } from './workshop/t
 
 export default function WorkshopView({ showToast: propShowToast }: { showToast?: (type: 'success' | 'info' | 'error', message: string) => void }) {
   const { styles } = useTheme();
-  const showToast = propShowToast || ((type: string, msg: string) => console.log(`[Workshop ${type}]: ${msg}`));
+  const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
 
   const [apps, setApps] = useState<WorkshopApp[]>(() => {
     const cached = localStorage.getItem('ecos_workshop_apps');

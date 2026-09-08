@@ -111,10 +111,18 @@ function authHeaders(): Record<string, string> {
 /** Generic guarded fetch returning JSON; handles {success,data} envelopes. */
 async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: authHeaders(), ...options });
-  if (res.status === 401 || res.status === 403) {
+  // PMO-43 T4: 401 and 403 semantics split.
+  // 401 = unauthenticated/expired → clear token + redirect to login.
+  // 403 = authenticated but permission denied → surface as normal error;
+  // never clear the token or bounce the user back to /login.
+  if (res.status === 401) {
     localStorage.removeItem('token');
     window.location.hash = '#/login';
     throw new Error('登录已过期，请重新登录');
+  }
+  if (res.status === 403) {
+    const forbidden = await res.text().catch(() => '');
+    throw new Error(`无权限访问该资源 (${forbidden || '403 Forbidden'})`);
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');

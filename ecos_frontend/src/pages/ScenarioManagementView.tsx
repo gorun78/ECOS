@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import LucideIcon from '../components/LucideIcon';
 import { useLanguage } from '../components/LanguageContext';
+import { showToastGlobal } from '../components/common/Toast';
 import { useTheme } from '../components/ThemeContext';
 import { CopilotPanel } from '../components/CopilotPanel';
 import type { BusinessScenario, ScenarioManagementViewProps } from './project-workbench/types';
@@ -25,7 +26,7 @@ const DEF_COMMITS = [
 const BRANCH_DEFAULTS = { scen_summer_rush:'main', scen_pilot_audit:'main', scen_evtol_sandbox:'main' };
 
 export default function ScenarioManagementView({ showToast }: ScenarioManagementViewProps) {
-  const toast = showToast || ((t:string,m:string)=>console.log(`[PMO] ${t}:`,m));
+  const toast = showToast || ((t: 'success' | 'info' | 'error', m: string) => showToastGlobal(t, m));
   const { locale } = useLanguage(); const { styles } = useTheme();
   const tl = (zh:string,en:string)=>locale==='zh'?zh:en;
 

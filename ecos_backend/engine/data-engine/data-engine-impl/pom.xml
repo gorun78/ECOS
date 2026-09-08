@@ -21,6 +21,14 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- PMO-49: security-engine crypto (IDataEncryptionService / IKeyManagementService)
+             for datasource password encryption (dataSourcePwd key → td_datasource.password_enc) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>security-engine-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
                 <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>runtime-core</artifactId>

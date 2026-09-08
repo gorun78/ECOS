@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
+import { showToastGlobal } from "./common/Toast";
 import type { ComponentType } from "react";
 
 interface SidebarProps {
@@ -313,7 +314,7 @@ export default function Sidebar({
             </div>
             <div className="h-[calc(85vh-52px)] overflow-auto">
               <AsyncTaskCenterView
-                showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
+                showToast={(type, msg) => showToastGlobal(type, msg)}
                 onViewModeChange={(mode) => { navigate("/" + mode); setIsTaskPanelOpen(false); }}
               />
             </div>

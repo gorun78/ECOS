@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck } from '../types';
+import type { ConnType } from '../types';
 
 type ShowToast = (type: 'success' | 'info' | 'error', message: string) => void;
 type TFn = (key: string, params?: Record<string, unknown>) => string;
@@ -58,10 +59,29 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
 
   // ── Connection form ──
   const [ncName, setNcName] = useState('');
-  const [ncType, setNcType] = useState<'postgresql' | 's3' | 'rest_api' | 'sftp' | 'sap'>('postgresql');
+  const [ncType, setNcType] = useState<ConnType>('postgresql');
   const [ncHost, setNcHost] = useState('');
   const [ncPort, setNcPort] = useState(5432);
   const [ncUser, setNcUser] = useState('');
+  const [ncPassword, setNcPassword] = useState('');
+  const [ncDatabase, setNcDatabase] = useState('');
+  // PMO-47 Wave3: 类型特定字段统一存储
+  const [ncExtra, setNcExtra] = useState<Record<string, string | number | boolean>>({});
+  const setNcExtraField = useCallback((key: string, val: string | number | boolean) => {
+    setNcExtra(prev => ({ ...prev, [key]: val }));
+  }, []);
+  // PMO-48-T5: 类型切换时按类型预填默认值 (extra 字段与 uiType 对齐)
+  const handleNcTypeChange = useCallback((t: string) => {
+    setNcType(t as ConnType);
+    setNcExtra({});
+    // 按类型重置 common 字段默认值
+    setNcPort(t === 'oracle' ? 1521 : t === 'mssql' ? 1433 : t === 'dm' ? 5236
+      : t === 'kingbase' ? 54321 : t === 'gaussdb' ? 5432
+      : t === 'doris' ? 9030 : t === 'mysql' ? 3306
+      : t === 'minio' ? 9000 : t === 'mongodb' ? 27017
+      : t === 'kafka' ? 9092 : t === 'sap' ? 3300
+      : t === 'sftp' ? 22 : 5432);
+  }, []);
 
   // ── Sync form ──
   const [nsName, setNsName] = useState('');
@@ -75,8 +95,6 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   const [nhDs, setNhDs] = useState('');
   const [nhType, setNhType] = useState<'row_count' | 'null_check' | 'schema_check' | 'freshness'>('row_count');
   const [nhThr, setNhThr] = useState('1000');
-  const [ncPassword, setNcPassword] = useState('');
-  const [ncDatabase, setNcDatabase] = useState('');
 
   // ── Handlers ──
   const testConnection = useCallback(async (connId: string) => {
@@ -118,6 +136,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
         name: ncName, type: ncType, host: ncHost || 'localhost', port: ncPort,
         username: ncUser || 'anonymous', password: ncPassword, database: ncDatabase,
         strategy: { trigger: 'ON_SAVE', countMethod: 'ESTIMATE' },
+        extra: ncExtra,
       });
       if (conn) {
         setConnections(p => [...p, conn]); setSelConnId(conn.id); setShowAddConn(false);
@@ -129,7 +148,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     } catch (e: any) {
       showToast('error', t('databench.layout.toast.connTestFailed', { name: ncName }));
     }
-  }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, showToast, t, testConnection]);
+  }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, ncExtra, showToast, t, testConnection]);
 
   const testConnectionRaw = useCallback(async () => {
     if (!ncName.trim()) { showToast('error', t('databench.layout.toast.connNameRequired')); return; }
@@ -138,6 +157,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       const result = await testDataSourceRaw({
         name: ncName, type: ncType, host: ncHost || 'localhost', port: ncPort,
         username: ncUser || 'anonymous', password: ncPassword, database: ncDatabase,
+        extra: ncExtra,
       });
       if (result?.success) {
         showToast('success', t('dw.conn.testConnSuccess'));
@@ -147,7 +167,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     } catch (e: any) {
       showToast('error', t('dw.conn.testConnFailed'));
     }
-  }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, showToast, t]);
+  }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, ncExtra, showToast, t]);
 
   const triggerSync = useCallback(async (taskId: string) => {
     setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'running' as const } : tk));
@@ -266,12 +286,13 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     showAddCheck, setShowAddCheck,
     // connection form
     ncName, setNcName,
-    ncType, setNcType,
+    ncType, setNcType, handleNcTypeChange,
     ncHost, setNcHost,
     ncPort, setNcPort,
     ncUser, setNcUser,
     ncPassword, setNcPassword,
     ncDatabase, setNcDatabase,
+    ncExtra, setNcExtraField,
     testConnectionRaw,
     // sync form
     nsName, setNsName,

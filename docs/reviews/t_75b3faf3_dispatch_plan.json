@@ -1,0 +1,19 @@
+{
+  "task_id": "t_75b3faf3",
+  "artifact_type": "SOURCE_PATCH",
+  "artifact_ref": "SOURCE_PATCH@git:feature/pmo-43-fe-p0-infra-network(API,uncommitted)",
+  "workflow_mode": "L2",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "SOURCE_PATCH@git:feature/pmo-43-fe-p0-infra-network(API,uncommitted)",
+      "context": ["PRD@docs/PMO/PMO-43-前端P0边界-基础设施-网络.md"],
+      "mode": "serial",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT", "REVIEW_REPORT_APPROVAL_RECORD"],
+  "final_gate_logic": "AND_ALL",
+  "ocr_coverage_note": "ocr CLI 未安装（which ocr 空）；本次为 PMO-43 验收型审查（5 项指定核对），采用人工源码审查 + 双证据（git diff + on-disk source）替代 OCR，不做新缺陷挖掘（finish_in_one_shot）。",
+  "timestamp": "2026-09-07T15:43:00+08:00"
+}

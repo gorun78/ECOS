@@ -922,8 +922,6 @@ export default function UserManagement() {
           orgMap={orgMap}
           onEdit={async (u) => { if (!orgTree.length) await loadOrgs(); if (!roles.length) await loadRoles(); setUserForm({ mode: "edit", user: u }); }}
           onDelete={(u) => {
-            console.log('[DELETE BTN] user object:', JSON.stringify(u));
-            console.log('[DELETE BTN] u.userId:', u.userId, 'u.user_id:', (u as any).user_id);
             setConfirmAction({ type: "delete", tab: "users", id: u.userId || (u as any).user_id || (u as any).id, name: u.username });
           }}
           onForceLogout={(u) => handleForceLogout(u.userId)}

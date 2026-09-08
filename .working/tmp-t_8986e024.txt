@@ -1,0 +1,27 @@
+Task t_8986e024: PMO-44i18n主题图标安全
+  status:    ready
+  assignee:  ecos-be
+  workspace: scratch
+  max-retries: 2 (default)
+  created:   2026-09-06 18:59 by ecos-pmo
+
+  Diagnostics (1):
+    ⚠ [warning] Ready for 40m with no worker
+       data: ready_since=1788692390 | age_seconds=2439 | assignee=ecos-be | threshold_seconds=1800
+  parents:   t_e95460a4
+  children:  t_c14e22ca
+
+Body:
+PMO-44i18n主题图标安全
+
+## Swarm protocol
+- Swarm root / shared blackboard: `t_e95460a4`.
+- Read sibling/parent handoffs from Kanban context before working.
+- Put machine-readable facts in completion metadata.
+- Put cross-worker notes on the root task using structured comments.
+- Goal: 执行 PMO-44 前端 P0 规范 i18n/主题/图标/安全。详见 /home/guorongxiao/ECOS/docs/PMO/PMO-44-前端P0规范-i18n-主题-图标-安全.md。架构铁律：/home/guorongxiao/ECOS/.trae/rules/前端开发规范.md（主题 4.1/图标 4.2/i18n 4.3）。Task T1-T5：T1 Login.tsx 整页 20+ 硬编码色换 styles.* token + 7 处中文换 t() + 4 个自定义 SVG 换 lucide-react；T2 AIPKnowledgeView.tsx 整页（56 处中文）接 useLanguage/useTheme；T3 SystemConfigManager.tsx isZh 模式换 t()，TaskPanel.tsx alert×5 + window.confirm×1 换 useToast + ConfirmDialog，DataTable.tsx 165/189 硬编码中文换 t()；T4 ExtractionReviewPanel.tsx:171 dangerouslySetInnerHTML 加 DOMPurify.sanitize 白名单 + 全仓 dangerouslySetInnerHTML 扫描报告；T5 api.ts handleAuthExpired 403 分流提示「无权限」，RequireAuth.tsx 改 token + 拉 /api/v1/auth/me 校验，加 NoAccess 路由/页面。完成后 npm run lint 0、产出归集 /home/guorongxiao/ECOS，自验 git diff。
+
+
+Events (2):
+  [2026-09-06 18:59] created {'assignee': 'ecos-be', 'status': 'todo', 'parents': ['t_e95460a4'], 'tenant': None, 'workspace_kind': 'scratch', 'workspace_path': None, 'branch_name': None, 'project_id': None, 'skills': None, 'goal_mode': None, 'model_override': None, 'provider_override': None}
+  [2026-09-06 18:59] promoted
