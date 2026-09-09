@@ -3,7 +3,7 @@
  * 对接 databridge-v2 真实后端，含字段映射适配。
  * @license Apache-2.0
  */
-import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck, TableInfo } from './types';
+import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck, TableInfo, PipelineNode } from './types';
 
 // ─── API 端点常量 ──────────────────────────────────────────
 const DATANET_DS = '/datanet/datasource';           // DataSourceController
@@ -268,6 +268,54 @@ export interface PipelineSavePayload {
   }>;
   edges?: Array<{ from: string; to: string }>;
   status?: string;
+}
+
+/** Read a node field tolerating backend field-name variants (first non-empty wins). */
+function readNodeField(n: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) {
+    const v = n[k];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return undefined;
+}
+
+// Wave 3 (lower): backend node payload is not canonicalized (id may be
+// id/nodeId, type may be type/nodeType, position may be positionX/x) —
+// normalize both for the canvas rendering.
+function normalizeBackendPipelineNode(raw: Record<string, unknown>): PipelineNode {
+  const pos = Number(readNodeField(raw, ['positionX', 'x', 'left'])) || 0;
+  const pos2 = Number(readNodeField(raw, ['positionY', 'y', 'top'])) || 0;
+  return {
+    id: String(readNodeField(raw, ['id', 'nodeId']) || ''),
+    name: readNodeField(raw, ['name', 'label', 'nodeName']) as string | undefined,
+    type: String(readNodeField(raw, ['type', 'nodeType']) || ''),
+    config: (raw.config ?? {}) as PipelineNode['config'],
+    left: String(pos),
+    right: String(pos2),
+    ...(() => {
+      const dependsOn = raw.dependsOn;
+      return Array.isArray(dependsOn) ? { inputs: dependsOn.map(String) } : {};
+    })(),
+  };
+}
+
+/**
+ * Wave 3 (lower): fetch one pipeline definition by id — full graph detail.
+ * GET /api/v1/pipeline/definitions/{id} returns the definition JSONB
+ * (with nodes/edges); the list API only returns summaries. Editor must use
+ * this to render the canvas (list/detail pairing contract).
+ */
+export async function getPipelineDefinition(id: string): Promise<DataPipeline | null> {
+  try {
+    const raw = await get<Record<string, unknown>>(`${PIPELINE_DEFS}/${encodeURIComponent(id)}`);
+    if (!raw) return null;
+    const rawNodes = Array.isArray(raw.nodes) ? (raw.nodes as Record<string, unknown>[]) : [];
+    const detail = mapPipelineDef(raw as Record<string, unknown>);
+    return { ...detail, nodes: rawNodes.map(normalizeBackendPipelineNode) };
+  } catch (e) {
+    console.warn('[data-workbench] getPipelineDefinition failed:', e);
+    return null;
+  }
 }
 
 /** Pipeline CRUD — 创建 (supports full { name, nodes, edges } payload per PMO-3J T3) */
@@ -727,6 +775,10 @@ export async function fetchCollectStatus(taskId: string): Promise<{
       status: raw.status as string,
       progress: (raw.progress as number) ?? 0,
       message: raw.message as string | undefined,
+      // runtime TaskStatus 字段（同步/定时采集都会持续刷新）
+      statusMessage: raw.statusMessage as string | undefined,
+      processedRecords: raw.processedRecords as number | undefined,
+      totalRecords: raw.totalRecords as number | undefined,
       errorMessage: raw.errorMessage as string | undefined,
       totalTables: (result.tablesTotal as number) ?? 0,
       collectedTables: (result.tablesOk as number) ?? 0,
@@ -736,6 +788,26 @@ export async function fetchCollectStatus(taskId: string): Promise<{
     };
   } catch (e) {
     console.warn('[data-workbench] fetchCollectStatus failed:', e);
+    return null;
+  }
+}
+
+/** 立即触发采集（同步 UI 模式）— POST /api/v1/datanet/metadata/collect-sync/{id}
+ *  后端立即提交并后台执行（与本机异步行为一致），任务中心正常追踪；
+ *  前端则应基于返回的 taskId 立即进入实时轮询 /collect-status 来渲染进度面板。
+ *  与 collect-async 的差异：返回 mode:'sync-ui' 并鼓舞调用方在 success/failed 后关闭面板并 toast。
+ */
+export async function triggerCollectSync(datasourceId: string): Promise<{ taskId?: string; mode?: string } | null> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/collect-sync/${encodeURIComponent(datasourceId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    return (json.data ?? json) as { taskId?: string; mode?: string } | null;
+  } catch (e) {
+    console.warn('[data-workbench] triggerCollectSync failed:', e);
     return null;
   }
 }
@@ -800,6 +872,110 @@ export async function fetchCollectDiff(datasourceId: string, limit = 5): Promise
   } catch (e) {
     console.warn('[data-workbench] fetchCollectDiff failed:', e);
     return [];
+  }
+}
+
+/** 历史版本条目（Git 元数据存档 history/ 目录） */
+export interface MetadataVersion {
+  versionId: string;      // yyyyMMdd_HHmmss
+  collectedAt?: string;   // 快照采集时间
+  tableCount?: number;    // 该版本表数量
+}
+
+/** 历史版本比较差异行（对应差异表格 7 列） */
+export interface VersionDiffRow {
+  changeType: 'ADDED' | 'DELETED' | 'MODIFIED';
+  tableName: string;
+  field: string;
+  currentValue: string;
+  previousValue: string;
+  changeTime: string;
+  commitMessage: string;
+}
+
+/** 版本比较结果 */
+export interface VersionDiffResult {
+  rows: VersionDiffRow[];
+  currentCollectedAt: string;
+  versionCollectedAt: string;
+  summary?: string;
+}
+
+/** 获取数据源的历史版本列表 → GET /api/v1/datanet/metadata/version-history/{id}
+ *  失败返回 null（调用方据此展示错误提示而非空列表，避免与"无历史版本"混淆） */
+export async function fetchVersionHistory(datasourceId: string): Promise<{
+  versions: MetadataVersion[];
+  current: { exists: boolean; collectedAt?: string; tableCount?: number };
+} | null> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/version-history/${encodeURIComponent(datasourceId)}`, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json?.code !== 0) return null;
+    return {
+      versions: Array.isArray(json?.data?.versions) ? json.data.versions : [],
+      current: json?.data?.current || { exists: false },
+    };
+  } catch (e) {
+    console.warn('[data-workbench] fetchVersionHistory failed:', e);
+    return null;
+  }
+}
+
+/** 历史版本与当前版本结构化比较 → GET /api/v1/datanet/metadata/version-diff/{id}?version={ts}
+ *  业务错误（版本不存在等）以 message 返回，网络错误返回 null */
+export async function fetchVersionDiff(datasourceId: string, version: string): Promise<VersionDiffResult | { error: string } | null> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/version-diff/${encodeURIComponent(datasourceId)}?version=${encodeURIComponent(version)}`, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+    const json = await res.json();
+    if (json?.code !== 0) {
+      return { error: json?.message || 'version diff failed' };
+    }
+    const d = json?.data || {};
+    return {
+      rows: Array.isArray(d.rows) ? d.rows : [],
+      currentCollectedAt: d.currentCollectedAt || '',
+      versionCollectedAt: d.versionCollectedAt || '',
+      summary: d.summary,
+    };
+  } catch (e) {
+    console.warn('[data-workbench] fetchVersionDiff failed:', e);
+    return null;
+  }
+}
+
+/** 表字段预览 → GET /api/v1/datanet/metadata/preview/{resourceId}?limit=n
+ *  后端返回 {rows: List<Map<列名,值>>, columns: 列数量(int)}；
+ *  此处从首行数据推导列定义（name + 按值类型推断 type），供表卡片懒加载展开显示全量列 */
+export async function fetchPreview(resourceId: string, limit = 50): Promise<{
+  columns: { name: string; type: string; label?: string }[];
+  rows: Record<string, unknown>[];
+} | null> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/preview/${encodeURIComponent(resourceId)}?limit=${limit}`, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const data = json?.data ?? json;
+    const rows: Record<string, unknown>[] = Array.isArray(data?.rows) ? data.rows : [];
+    const inferType = (v: unknown): string =>
+      typeof v === 'number' ? 'NUMBER' : typeof v === 'boolean' ? 'BOOL' : 'STRING';
+    const columns = rows.length > 0
+      ? Object.keys(rows[0]).map(name => ({ name, type: inferType(rows[0][name]) }))
+      : [];
+    return { columns, rows };
+  } catch (e) {
+    console.warn('[data-workbench] fetchPreview failed:', e);
+    return null;
   }
 }
 

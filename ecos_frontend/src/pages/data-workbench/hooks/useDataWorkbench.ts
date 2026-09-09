@@ -20,6 +20,8 @@ export interface PbOutput {
   rowCount: number;
   lastCompiled: string;
   expressionsCount: number;
+  /** Wave 3 (lower) 缺陷②: bumped by PipelineBuilderTab after save/create */
+  refreshTick?: number;
 }
 
 export function useDataWorkbench(showToast: ShowToast, t: TFn) {
@@ -36,6 +38,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       fetchDataPipelines().then(setPipelines).catch(console.error);
       fetchDataHealthChecks().then(setHealthChecks).catch(console.error);
     }).catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Selected IDs ──
@@ -46,7 +49,20 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   const [computeEngine, setComputeEngine] = useState<ComputeEngine>('memory');
 
   // ── Pipeline builder output ──
-  const [pbOutput, setPbOutput] = useState<PbOutput | null>(null);
+  const [pbOutput, setPbOutputState] = useState<PbOutput | null>(null);
+  // Local mirror of pbOutput.refreshTick: pbOutput may stay `null` forever
+  // (its other fields are never populated) so we cannot read the tick from
+  // it directly. We mirror the incoming tick whenever setPbOutput is called.
+  const [refreshTick, setRefreshTick] = useState(0);
+  const setPbOutput = useCallback((v: PbOutput | null) => {
+    setPbOutputState(v);
+    if (v?.refreshTick) setRefreshTick(v.refreshTick);
+  }, []);
+  useEffect(() => {
+    if (refreshTick === 0) return; // mount tick already covered above
+    import('../api').then(({ fetchDataPipelines }) => fetchDataPipelines().then(setPipelines).catch(console.error))
+      .catch(console.error);
+  }, [refreshTick]);
 
   // ── Connection testing ──
   const [testingConnId, setTestingConnId] = useState<string | null>(null);

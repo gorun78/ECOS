@@ -1,10 +1,11 @@
 /* Extracted from DataWorkbenchLayout.tsx — PMO-3I: list+editor layout */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { Plus, List, Loader2 } from 'lucide-react';
 import type { DataConnection, DataPipeline, DataSyncTask } from '../types';
 import PipelineFlowEditor from '../PipelineFlowEditor';
+import { getPipelineDefinition } from '../api';
 
 interface PipelineBuilderTabProps {
   connections: DataConnection[];
@@ -36,6 +37,24 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
   const { styles } = useTheme();
   const [filter, setFilter] = useState<'all' | 'pipeline' | 'sync'>('all');
 
+  // Wave 3 (lower) 缺陷①: list API only returns summaries (always nodes=[]);
+  // the editor must fetch the full definition via the detail API and feed
+  // the canvas with the real nodes/edges (list/detail pairing contract).
+  const [detail, setDetail] = useState<DataPipeline | null>(null);
+
+  useEffect(() => {
+    if (!editingPipelineId) {
+      setDetail(null);
+      return;
+    }
+    let cancelled = false;
+    setDetail(null);
+    getPipelineDefinition(editingPipelineId)
+      .then((d) => { if (!cancelled) setDetail(d); })
+      .catch((e) => { console.warn('[pipeline-builder] detail fetch failed:', e); if (!cancelled) setDetail(null); });
+    return () => { cancelled = true; };
+  }, [editingPipelineId]);
+
   // Merge pipelines + syncTasks into a unified list
   const mergedList = useMemo<ListItem[]>(() => {
     const pipeItems: ListItem[] = pipelines.map(p => ({
@@ -51,6 +70,8 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
   }, [pipelines, syncTasks, filter]);
 
   const selectedPipeline = pipelines.find(p => p.id === editingPipelineId) || null;
+  // Prefer the freshly fetched detail (full nodes/edges) over the list summary.
+  const canvasPipeline = detail ?? selectedPipeline;
 
   const handleNew = () => {
     setEditingPipelineId(null);
@@ -58,6 +79,8 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
 
   const handleSelect = (item: ListItem) => {
     if (item.type === 'pipeline') {
+      // Selecting the same item is a no-op (avoid re-fetching on click).
+      if (editingPipelineId === item.id) return;
       setEditingPipelineId(item.id);
     } else {
       // For sync tasks, trigger sync execution
@@ -122,8 +145,8 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PipelineFlowEditor
           connections={connections}
-          pipelines={selectedPipeline ? [selectedPipeline] : pipelines}
-          editingPipeline={selectedPipeline}
+          pipelines={canvasPipeline ? [canvasPipeline] : pipelines}
+          editingPipeline={canvasPipeline}
           computeEngine={computeEngine}
           onEngineChange={setComputeEngine}
           showToast={showToast}
