@@ -33,15 +33,30 @@ public class PipelineController {
     private final PipelineRepository repository;
     private final ITaskManagementService taskManagementService;
     private final PipelineSecurityService securityService;
+    private final PipelineNodeTypesService nodeTypesService;
 
     public PipelineController(PipelineService pipelineService,
                               PipelineRepository repository,
                               ITaskManagementService taskManagementService,
-                              PipelineSecurityService securityService) {
+                              PipelineSecurityService securityService,
+                              PipelineNodeTypesService nodeTypesService) {
         this.pipelineService = pipelineService;
         this.repository = repository;
         this.taskManagementService = taskManagementService;
         this.securityService = securityService;
+        this.nodeTypesService = nodeTypesService;
+    }
+
+    // ── 0. 节点类型目录（元数据，强类型 VO） ──────────────
+
+    /**
+     * GET /api/v1/pipeline/node-types
+     * 返回可用节点类型清单（type/code/name/icon/类别/属性 schema/必填字段/可用版本），
+     * 与执行器 switch 同源（架构铁律 §4.8.2），供前端节点面板渲染。
+     */
+    @GetMapping("/node-types")
+    public ApiResponse<PipelineNodeTypesVO> getNodeTypes() {
+        return ApiResponse.success("查询成功", nodeTypesService.listNodeTypes());
     }
 
     // ── 1. 创建 Pipeline 定义 ──────────────────────────

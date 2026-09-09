@@ -40,12 +40,14 @@ class PipelineControllerTest {
     private ITaskManagementService taskService;
     @Mock
     private PipelineSecurityService securityService;
+    @Mock
+    private PipelineNodeTypesService nodeTypesService;
 
     private PipelineController controller;
 
     @BeforeEach
     void setUp() {
-        this.controller = new PipelineController(pipelineService, repository, taskService, securityService);
+        this.controller = new PipelineController(pipelineService, repository, taskService, securityService, nodeTypesService);
     }
 
     private PipelineDefinition def(String id, String name, String status) {
@@ -108,8 +110,24 @@ class PipelineControllerTest {
     }
 
     @Test
+    @DisplayName("PUT /definitions/{id} — 更新成功 200 且 toVO(def, true) 全量 nodes")
+    void updateDefinitionSuccess() {
+        PipelineDefinition def = def("p-1", "renamed", "DRAFT");
+        when(pipelineService.updateDefinition(org.mockito.ArgumentMatchers.eq("p-1"), any(PipelineSaveDTO.class)))
+                .thenReturn(def);
+        when(pipelineService.toVO(def, true)).thenReturn(mockVO("p-1", "renamed", "DRAFT"));
+
+        PipelineSaveDTO dto = new PipelineSaveDTO();
+        dto.setName("renamed");
+        ApiResponse<PipelineVO> resp = controller.updateDefinition("p-1", dto);
+        assertTrue(resp.isSuccess());
+        assertEquals("p-1", resp.getData().getId());
+        assertEquals("renamed", resp.getData().getName());
+    }
+
+    @Test
     @DisplayName("POST /definitions/{id}/execute — ABAC 放行（void no-op）+ mock runtime-task 全链路")
-    void executeDefinitionSucceeds() {
+    void executeDefinitionSucceeds() throws Exception {
         // checkAbacBeforeExecute 为 void，Mock 默认 no-op（放行）
         when(taskService.submitTask(any(TaskDescription.class))).thenReturn("task-1");
         when(taskService.executeTask("task-1")).thenAnswer(inv -> null);
@@ -122,7 +140,7 @@ class PipelineControllerTest {
 
     @Test
     @DisplayName("GET /tasks/{taskId}/status — 200 含 taskId")
-    void getTaskStatusSuccess() {
+    void getTaskStatusSuccess() throws Exception {
         TaskStatus s = new TaskStatus();
         s.setTaskId("t-9");
         when(taskService.getTaskStatus("t-9")).thenReturn(s);
@@ -149,6 +167,26 @@ class PipelineControllerTest {
         assertTrue(resp.isSuccess());
         assertEquals(1, resp.getData().getPage());
         assertEquals(0L, resp.getData().getTotal());
+    }
+
+    @Test
+    @DisplayName("GET /definitions/{id}/executions — 定义 ARCHIVED → NotFoundException('已被删除')")
+    void listExecutionsArchivedDefinition404() {
+        when(pipelineService.getDefinition("p-arch")).thenReturn(def("p-arch", "a", "ARCHIVED"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.chinacreator.gzcm.common.exception.NotFoundException.class,
+                () -> controller.listExecutions("p-arch", 1, 20));
+    }
+
+    @Test
+    @DisplayName("NodeTypes 目录 — 强制枚举契约与 VALID_NODE_TYPES 同源（架构铁律 §4.8.2）")
+    void nodeTypesCatalogSizeMatchesValidNodeTypes() {
+        // 与 PipelineServiceImplTest.nodeTypesCatalogMatchesValidNodeTypes 互补：
+        // 这里断言 PUBLIC 目录是 9 类，关键子集包含前端基础 5 类 + PMO-36 新增 4 类
+        assertEquals(9, PipelineNodeTypesCatalog.SUPPORTED.size());
+        assertTrue(PipelineNodeTypesCatalog.SUPPORTED.containsAll(java.util.Set.of(
+                "SOURCE_JDBC", "SOURCE_CSV", "SOURCE_REST", "TRANSFORM_SQL", "OUTPUT_OBJECT")));
     }
 
     private PipelineVO mockVO(String id, String name, String status) {

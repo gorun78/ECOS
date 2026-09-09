@@ -32,10 +32,8 @@ public class PipelineServiceImpl implements PipelineService {
     private static final Logger log = LoggerFactory.getLogger(PipelineServiceImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** 节点类型全集（与 PipelineExecutionService.executeNode switch 同源，架构铁律 §4.8.2） */
-    private static final Set<String> VALID_NODE_TYPES = Set.of(
-            "SOURCE_JDBC", "SOURCE_CSV", "SOURCE_REST", "SOURCE_CDC",
-            "TRANSFORM_SQL", "OUTPUT_OBJECT", "TRANSFORM_UDF", "JOIN", "SINK");
+    /** 节点类型全集（Wave 4 T1 抽到 PipelineNodeTypesCatalog，前后端枚举同源 §4.8.2） */
+    private static final Set<String> VALID_NODE_TYPES = PipelineNodeTypesCatalog.SUPPORTED;
 
     /** 列表（摘要）场景下不返回 nodes */
     private final PipelineRepository repository;
