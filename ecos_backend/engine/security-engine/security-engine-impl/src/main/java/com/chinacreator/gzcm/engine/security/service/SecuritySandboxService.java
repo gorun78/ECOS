@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
-import com.chinacreator.gzcm.common.dto.PipelineEvent;
+import com.chinacreator.gzcm.common.event.PipelineEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;

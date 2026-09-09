@@ -197,6 +197,36 @@ public class PipelineRepository {
         return mapToExecution(rows.get(0));
     }
 
+    /**
+     * 按 definitionId 分页查询执行历史（V4 执行历史端点使用）。
+     *
+     * @param definitionId Pipeline 定义 ID
+     * @param page         页码（从 1 开始）
+     * @param pageSize     每页大小
+     * @return 执行记录列表（按 started_at 倒序）
+     */
+    public List<PipelineExecution> findExecutionsByDefinitionId(String definitionId, int page, int pageSize) {
+        int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
+        String sql = "SELECT id, pipeline_id, status, started_at, finished_at, error_message, rows_processed " +
+                "FROM ecos_pipeline_execution WHERE pipeline_id = ? " +
+                "ORDER BY started_at DESC, created_at DESC LIMIT ? OFFSET ?";
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, definitionId, pageSize, offset);
+        List<PipelineExecution> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            result.add(mapToExecution(row));
+        }
+        return result;
+    }
+
+    /**
+     * 按 definitionId 统计执行记录总数（分页 total 用）。
+     */
+    public long countExecutionsByDefinitionId(String definitionId) {
+        String sql = "SELECT COUNT(*) FROM ecos_pipeline_execution WHERE pipeline_id = ?";
+        Integer count = jdbc.queryForObject(sql, Integer.class, definitionId);
+        return count != null ? count : 0L;
+    }
+
     // ==================== Mappers ====================
 
     private PipelineDefinition mapToDefinition(Map<String, Object> row) {

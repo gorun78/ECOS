@@ -67,6 +67,7 @@ auth:
       - "/api/v1/agent-runtime/**"
       - "/api/v1/evolution/**"
       - "/api/v1/pipeline/**"
+      - "/api/pipeline/**"
       - "/api/v1/dq/**"
       - "/api/v1/query/**"
       - "/api/v1/causal/**"

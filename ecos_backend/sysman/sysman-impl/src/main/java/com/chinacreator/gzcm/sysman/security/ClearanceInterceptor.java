@@ -78,6 +78,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/knowledge")
                 || path.startsWith("/api/v1/guardrails")
                 || path.startsWith("/api/v1/pipeline")
+                || path.startsWith("/api/pipeline")
                 || path.startsWith("/api/v1/agents")
                 || path.startsWith("/api/v1/agent-loop")
                 || path.startsWith("/api/v1/aip")

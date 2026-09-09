@@ -1,5 +1,8 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
+import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
@@ -90,7 +93,7 @@ public class PipelineExecutionService {
                                               String taskId) {
         PipelineDefinition def = repository.findDefinitionById(definitionId);
         if (def == null) {
-            throw new IllegalArgumentException("Pipeline definition not found: " + definitionId);
+            throw new NotFoundException("Pipeline definition not found: " + definitionId);
         }
 
         // 创建执行记录
@@ -118,7 +121,7 @@ public class PipelineExecutionService {
             // 获取节点列表，按拓扑序排序
             List<PipelineNode> allNodes = repository.findNodesByDefinitionId(definitionId);
             if (allNodes.isEmpty()) {
-                throw new IllegalStateException("Pipeline has no nodes");
+                throw new BusinessException("Pipeline 无节点，无法执行");
             }
 
             // 拓扑排序 (Kahn's algorithm)
@@ -202,10 +205,10 @@ public class PipelineExecutionService {
             case "SOURCE_JDBC" -> executeSourceJdbc(config);
             case "SOURCE_CSV" -> executeSourceCsv(config);
             case "SOURCE_REST" -> executeSourceRest(config);
-            case "SOURCE_CDC" -> throw new UnsupportedOperationException("CDC is flagship edition only");
+            case "SOURCE_CDC" -> throw new BusinessException("SOURCE_CDC 仅 flagship 版本支持");
             case "TRANSFORM_SQL" -> executeTransformSql(config);
             case "OUTPUT_OBJECT" -> executeOutputObject(config);
-            default -> throw new IllegalArgumentException("Unsupported node type: " + type);
+            default -> throw new ValidationException("type", "不支持的节点类型: " + type);
         };
     }
 
@@ -219,29 +222,29 @@ public class PipelineExecutionService {
     private long executeSourceJdbc(Map<String, Object> config) throws Exception {
         String sql = (String) config.get("sql");
         if (sql == null || sql.isEmpty()) {
-            throw new IllegalArgumentException("SOURCE_JDBC: sql is required");
+            throw new ValidationException("sql", "SOURCE_JDBC: sql 必填");
         }
 
         Object dsIdObj = config.get("datasourceId");
         if (dsIdObj == null || dsIdObj.toString().isEmpty()) {
-            throw new IllegalArgumentException("SOURCE_JDBC: datasourceId is required");
+            throw new ValidationException("datasourceId", "SOURCE_JDBC: datasourceId 必填");
         }
         String datasourceId = dsIdObj.toString();
 
         // 查询数据源连接配置
         DataSourceEntity ds = dataSourceService.getById(datasourceId);
         if (ds == null) {
-            throw new IllegalArgumentException("DataSource not found: " + datasourceId);
+            throw new NotFoundException("DataSource not found: " + datasourceId);
         }
         String connectionConfig = ds.getConnectionConfig();
         if (connectionConfig == null || connectionConfig.isEmpty()) {
-            throw new IllegalStateException("DataSource has no connectionConfig: " + datasourceId);
+            throw new BusinessException("数据源无连接配置: " + datasourceId);
         }
 
         // 通过 ConnectorFactory 获取 JDBC Connector，建立外部连接执行 SQL
         Connector connector = connectorFactory.getConnector("JDBC");
         if (!(connector instanceof JdbcConnector jdbcConnector)) {
-            throw new IllegalStateException("Expected JdbcConnector but got: " + connector.getClass().getName());
+            throw new BusinessException("Expected JdbcConnector but got: " + connector.getClass().getName());
         }
 
         int fetchSize = toInt(config.get("fetchSize"), 1000);
@@ -261,12 +264,12 @@ public class PipelineExecutionService {
     private long executeSourceCsv(Map<String, Object> config) throws Exception {
         String filePath = (String) config.get("filePath");
         if (filePath == null || filePath.isEmpty()) {
-            throw new IllegalArgumentException("SOURCE_CSV: filePath is required");
+            throw new ValidationException("filePath", "SOURCE_CSV: filePath 必填");
         }
 
         Connector connector = connectorFactory.getConnector("SOURCE_CSV");
         if (!(connector instanceof CsvConnector csvConnector)) {
-            throw new IllegalStateException("Expected CsvConnector but got: " + connector.getClass().getName());
+            throw new BusinessException("Expected CsvConnector but got: " + connector.getClass().getName());
         }
 
         // CsvConnector.readRows 需要 connectionConfig JSON，从节点 config 构造
@@ -285,12 +288,12 @@ public class PipelineExecutionService {
     private long executeSourceRest(Map<String, Object> config) throws Exception {
         String url = (String) config.get("url");
         if (url == null || url.isEmpty()) {
-            throw new IllegalArgumentException("SOURCE_REST: url is required");
+            throw new ValidationException("url", "SOURCE_REST: url 必填");
         }
 
         Connector connector = connectorFactory.getConnector("SOURCE_REST");
         if (!(connector instanceof RestApiConnector restConnector)) {
-            throw new IllegalStateException("Expected RestApiConnector but got: " + connector.getClass().getName());
+            throw new BusinessException("Expected RestApiConnector but got: " + connector.getClass().getName());
         }
 
         logInfo("SOURCE_REST executing via Connector: url={}, method={}", url, config.getOrDefault("method", "GET"));
@@ -307,7 +310,7 @@ public class PipelineExecutionService {
     private long executeTransformSql(Map<String, Object> config) {
         String sql = (String) config.get("sql");
         if (sql == null || sql.isEmpty()) {
-            throw new IllegalArgumentException("TRANSFORM_SQL: sql is required");
+            throw new ValidationException("sql", "TRANSFORM_SQL: sql 必填");
         }
         return jdbc.update(sql);
     }
@@ -319,7 +322,7 @@ public class PipelineExecutionService {
     private long executeOutputObject(Map<String, Object> config) {
         String targetTable = (String) config.get("targetTable");
         if (targetTable == null || targetTable.isEmpty()) {
-            throw new IllegalArgumentException("OUTPUT_OBJECT: targetTable is required");
+            throw new ValidationException("targetTable", "OUTPUT_OBJECT: targetTable 必填");
         }
 
         List<Map<String, Object>> rows = (List<Map<String, Object>>) config.get("rows");
@@ -397,7 +400,7 @@ public class PipelineExecutionService {
             cc.put("encoding", config.getOrDefault("encoding", "UTF-8"));
             return mapper.writeValueAsString(cc);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to build CSV connection config: " + e.getMessage(), e);
+            throw new BusinessException("构建 CSV 连接配置失败: " + e.getMessage());
         }
     }
 
@@ -530,10 +533,11 @@ public class PipelineExecutionService {
         if (result.size() != nodes.size()) {
             // 循环依赖
             Set<String> remaining = new LinkedHashSet<>();
-            for (PipelineNode n : nodes) remaining.add(n.getNodeId());
+            for (PipelineNode n : nodes) {
+                remaining.add(n.getNodeId());
+            }
             result.forEach(r -> remaining.remove(r.getNodeId()));
-            throw new IllegalStateException(
-                    "Pipeline DAG has cycle, cannot sort. Remaining nodes: " + remaining);
+            throw new BusinessException("Pipeline DAG 存在循环依赖，无法拓扑排序，未排序节点: " + remaining);
         }
 
         return result;

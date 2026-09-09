@@ -21,6 +21,13 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- Lombok（DTO 使用 @Data 消除样板代码，版本由 spring-boot BOM 统一管理） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- DataNet API (for entity/model types referenced in engine API) -->
     </dependencies>
 </project>

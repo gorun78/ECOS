@@ -49,6 +49,7 @@ public class SecurityConfig {
                     // ── System management (M0 改造 移除 /api/v1/system/**)
                     "/api/v1/dict/**",
                     "/api/v1/pipeline/**",
+                    "/api/pipeline/**",
                     "/api/v1/dq/**",
                     "/api/v1/query/**",
                     "/api/v1/causal/**",

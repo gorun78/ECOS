@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.common.dto;
+package com.chinacreator.gzcm.common.event;
 
 import java.io.Serial;
 import java.io.Serializable;
