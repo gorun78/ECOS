@@ -79,6 +79,9 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/guardrails")
                 || path.startsWith("/api/v1/pipeline")
                 || path.startsWith("/api/pipeline")
+                // PMO-WX 断点调试 Panel（同时受 /api/v1/pipeline 通配）
+                || path.startsWith("/api/v1/pipeline/debug")
+                || path.startsWith("/api/pipeline/debug")
                 || path.startsWith("/api/v1/agents")
                 || path.startsWith("/api/v1/agent-loop")
                 || path.startsWith("/api/v1/aip")

@@ -50,6 +50,9 @@ public class SecurityConfig {
                     "/api/v1/dict/**",
                     "/api/v1/pipeline/**",
                     "/api/pipeline/**",
+                    // PMO-WX 断点调试 Panel：调试会话 / 日志 SSE 端点（T1+T3）
+                    "/api/v1/pipeline/debug/**",
+                    "/api/pipeline/debug/**",
                     "/api/v1/dq/**",
                     "/api/v1/query/**",
                     "/api/v1/causal/**",

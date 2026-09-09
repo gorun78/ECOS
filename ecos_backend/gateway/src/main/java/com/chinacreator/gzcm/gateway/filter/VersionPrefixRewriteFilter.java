@@ -49,6 +49,10 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/v1/glossary/",     "/api/glossary/"),
         // KEEP /api/v1/pipeline/ — PipelineController 直接映射 /api/v1/pipeline/**，
         // 无 legacy /api/pipeline 副本，故不做 v1→去v1 重写（与上方 PMO-3J 注释一致）。
+        // KEEP /api/v1/pipeline/debug — PipelineDebugController/PipelineDebugLogController
+        // 直接映射 /api/v1/pipeline/debug/**（断点调试 Panel 双路径，与 pipeline 同规则）；
+        // /api/pipeline/debug 当前无对应 Controller，仅在三滤波器豁免清单中出现以
+        // 与 PipelineController 同粒度（防止未来新增裸路径 Controller 时漏配三滤波器）。
         // ── PMO-45 T5: /api/v1/datasource/ → /datasource/ (PMO45DataSourceController 裸路径) ──
         Map.entry("/api/v1/datasource/",   "/datasource/"),
         // ── PMO-38 T5: 新增两条 v1 前缀正/反向重写 ──
