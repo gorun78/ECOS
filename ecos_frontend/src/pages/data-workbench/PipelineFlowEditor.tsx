@@ -39,6 +39,7 @@ import Toast from './pipeline-editor/Toast';
 import DebugPanel from './pipeline-editor/DebugPanel';
 import type { DebugState } from './pipeline-editor/DebugPanel';
 import { runPreFlightCheck } from './pipeline-editor/pipelineValidation';
+import MonitorPanel from './pipeline-editor/MonitorPanel';
 
 // ─── Helpers: ReactFlow ↔ backend PipelineNode conversion ──
 
@@ -155,27 +156,49 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       showLocalToast('error', t('dw.pipeline.debug.startDisabled'));
       return;
     }
-    const id = (await ensureSession()) || 'local-dbg';
-    // Lazy-load the API layer: only parsed when a debug session starts.
     try {
       const { startDebugSession } = await import('./pipelineDebugApi');
-      const res = await startDebugSession(id);
-      if (res && res.ok === false) {
-        showLocalToast('error', res.message || t('dw.pipeline.debug.backendPending'));
+      const adhocNodes = nodes.map((n) => {
+        const cfg = n.data as unknown as { nodeType?: string; config?: Record<string, unknown> };
+        const typeRaw = (cfg?.nodeType as string | number | undefined) ?? n.type ?? 'TRANSFORM_SQL';
+        return {
+          nodeId: n.id,
+          type: typeof typeRaw === 'string' ? typeRaw : String(typeRaw),
+          config: (cfg?.config || {}) as Record<string, unknown>,
+          dependsOn: edges.filter((e) => e.target === n.id).map((e) => e.source),
+        };
+      });
+      const snap = await startDebugSession({
+        definitionId: editingPipeline?.id,
+        definition: !editingPipeline?.id
+          ? {
+              name: pipelineName,
+              nodes: adhocNodes,
+            }
+          : undefined,
+        breakpoints: breakpoints.map((b) => ({ nodeId: b.nodeId, condition: b.condition })),
+      });
+      if (snap?.sessionId) {
+        setSessionId(snap.sessionId);
+        setDebugState('running');
         return;
       }
     } catch (e) {
       console.warn('[pipeline-debug] startDebugSession (placeholder) failed:', e);
     }
+    // 后端不可达时退化为本地占位（保持 UI 可用）
+    const id = (await ensureSession()) || 'local-dbg';
+    setSessionId(id);
     setDebugState('running');
-  }, [breakpoints.length, ensureSession, showLocalToast, t]);
+  }, [breakpoints.length, ensureSession, showLocalToast, t, nodes, edges, editingPipeline?.id, pipelineName]);
   const handleDebugStepOver = useCallback(async () => {
-    if (debugState !== 'paused' || !sessionId) return;
+    if (debugState !== 'paused' && debugState !== 'running') return;
+    if (!sessionId) return;
     try {
-      const { stepOverDebugSession } = await import('./pipelineDebugApi');
-      await stepOverDebugSession(sessionId);
+      const { stepDebugSession } = await import('./pipelineDebugApi');
+      await stepDebugSession(sessionId);
     } catch (e) {
-      console.warn('[pipeline-debug] stepOverDebugSession (placeholder) failed:', e);
+      console.warn('[pipeline-debug] stepDebugSession failed:', e);
     }
     setDebugState('running');
   }, [debugState, sessionId]);
@@ -529,7 +552,8 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       </div>
 
       {/* ── Main Content ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
           <NodePalette
             styles={styles}
             connectionsCount={connections.length}
@@ -580,6 +604,11 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
             </div>
           )}
         </div>
+
+        {/* ── Monitor Panel (画布下方停靠面板) ── */}
+        <MonitorPanel>
+        </MonitorPanel>
+      </div>
 
       {/* ── Toast ── */}
       {toast && <Toast type={toast.type} message={toast.msg} onClose={() => setToast(null)} />}
