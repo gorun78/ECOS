@@ -2,17 +2,29 @@
  * PropertyPanel — Pipeline node property editor
  * Extracted from PipelineFlowEditor.tsx
  * Aligned with P2-01 node config schema (PMO-3J T2).
+ * Wave 5: TRANSFORM_UDF / JOIN / SINK forms (JOIN reuses JoinConditionsEditor;
+ * TRANSFORM_UDF wires UdfBuilderPanel via a "New UDF" drawer).
  * @license Apache-2.0
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
 import type { Node } from '@xyflow/react';
-import { Trash2, X, ChevronDown } from 'lucide-react';
+import { Trash2, X, ChevronDown, Plus, Code2 } from 'lucide-react';
 import type { NodeConfig, NodeStatus, PipelineNodeType } from './types';
 import type { DataConnection } from '../types';
 import { PALETTE_LABELS, buildPaletteItems } from './constants';
+import { apiFetchData } from '../../../api';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
+import UdfBuilderPanel from './UdfBuilderPanel';
+
+/** UDF list item shape used by TRANSFORM_UDF form. */
+interface UdfItem {
+  udfId?: string;
+  id?: string;
+  name?: string;
+  language?: string;
+}
 // ─── Section collapse toggle ──────────────────────────────
 
 const SectionToggle: React.FC<{
@@ -38,7 +50,199 @@ const FieldLabel: React.FC<{ styles: Record<string, string>; children: React.Rea
 const inputCls = (styles: Record<string, string>) =>
   `w-full px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:${styles.infoBorder} focus:ring-1 focus:${styles.accentBorder} outline-none ${styles.cardBg} ${styles.cardText}`;
 
-// ─── Property Panel ───────────────────────────────────────
+// ─── Wave 5 form helpers ──────────────────────────────────
+
+interface FormSharedProps {
+  styles: Record<string, string>;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  nodeConfig: NodeConfig['config'];
+  nodeId: string;
+  onUpdateNode: (nodeId: string, config: Partial<NodeConfig>) => void;
+}
+
+/** TRANSFORM_UDF form: udfId + params key-value editor. */
+const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, nodeId, onUpdateNode }) => {
+  const [udfs, setUdfs] = useState<UdfItem[]>([]);
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [paramRows, setParamRows] = useState<Array<{ key: string; value: string }>>(
+    () => {
+      const p = nodeConfig.params || {};
+      const keys = Object.keys(p);
+      return keys.length > 0
+        ? keys.map((k) => ({ key: k, value: String(p[k] ?? '') }))
+        : [];
+    }
+  );
+
+  const loadUdfs = useCallback(() => {
+    apiFetchData<{ data?: UdfItem[]; list?: UdfItem[] } | UdfItem[]>('/api/v1/engine/data/udf/list')
+      .then((resp: any) => {
+        const list = Array.isArray(resp) ? resp : (resp?.data ?? resp?.list ?? []);
+        if (Array.isArray(list)) setUdfs(list);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { loadUdfs(); }, [loadUdfs]);
+
+  const setCfg = (field: string, value: unknown) => {
+    onUpdateNode(nodeId, { config: { ...nodeConfig, [field]: value } } as Partial<NodeConfig>);
+  };
+
+  // Sync paramRows → config.config.params
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    paramRows.forEach((r) => { if (r.key) next[r.key] = r.value; });
+    const cur = nodeConfig.params || {};
+    if (JSON.stringify(next) !== JSON.stringify(cur)) {
+      onUpdateNode(nodeId, { config: { ...nodeConfig, params: next } } as Partial<NodeConfig>);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramRows, nodeId]);
+
+  const closeBuilder = () => {
+    setBuilderOpen(false);
+    // 关闭后拉一次最新 UDF 列表（注册成功会刷新选中项可选范围）
+    loadUdfs();
+  };
+
+  return (
+    <>
+      <div>
+        <div className="flex items-center justify-between mb-1 gap-1">
+          <FieldLabel styles={styles}>{t('dw.pipeline.prop.udfId')}</FieldLabel>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={loadUdfs}
+              className={`text-[10px] ${styles.infoText} hover:${styles.infoBorder} transition-colors px-1`}
+              title={t('dw.pipeline.prop.udfRefresh')}
+            >
+              ↻
+            </button>
+            <button
+              onClick={() => setBuilderOpen(true)}
+              className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] ${styles.infoText} border ${styles.infoBorder} rounded hover:${styles.infoBg} transition-colors`}
+              title={t('dw.pipeline.prop.udfCreateNew')}
+            >
+              <Code2 size={11} /> {t('dw.pipeline.prop.udfCreateNew')}
+            </button>
+          </div>
+        </div>
+        <select
+          value={nodeConfig.udfId || ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            const udf = udfs.find((u) => (u.udfId || u.id) === val);
+            setCfg('udfId', val);
+            if (udf?.name) setCfg('udfName', udf.name);
+          }}
+          className={inputCls(styles)}
+        >
+          <option value="">{t('dw.pipeline.prop.udfSelectPlaceholder')}</option>
+          {udfs.map((u) => (
+            <option key={u.udfId || u.id || u.name} value={u.udfId || u.id || ''}>
+              {u.name} ({u.language || 'py'})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <FieldLabel styles={styles}>{t('dw.pipeline.prop.udfParams')}</FieldLabel>
+        <div className="space-y-1">
+          {paramRows.map((row, idx) => (
+            <div key={idx} className="flex gap-1">
+              <input type="text" value={row.key}
+                onChange={(e) => {
+                  const next = [...paramRows]; next[idx] = { ...next[idx], key: e.target.value };
+                  setParamRows([...next, { key: '', value: '' }]);
+                }}
+                className={`${inputCls(styles)} flex-1`}
+                placeholder={t('dw.pipeline.prop.paramKey')} />
+              <input type="text" value={row.value}
+                onChange={(e) => {
+                  const next = [...paramRows]; next[idx] = { ...next[idx], value: e.target.value };
+                  setParamRows(next);
+                }}
+                className={`${inputCls(styles)} flex-1`}
+                placeholder={t('dw.pipeline.prop.paramValue')} />
+              <button
+                onClick={() => setParamRows(paramRows.filter((_, i) => i !== idx))}
+                className={`px-1 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}
+                title={t('dw.pipeline.prop.removeParam')}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setParamRows([...paramRows, { key: '', value: '' }])}
+            className={`w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] ${styles.infoText} border border-dashed ${styles.infoBorder} rounded hover:${styles.infoBg} transition-colors`}
+          >
+            <Plus size={12} /> {t('dw.pipeline.prop.addParam')}
+          </button>
+        </div>
+      </div>
+
+      {/* UdfBuilderPanel 抽屉：节点配置入口打开/关闭 */}
+      {builderOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
+          <div className={`w-[800px] max-w-[95vw] h-[560px] max-h-[85vh] rounded-xl overflow-hidden flex flex-col shadow-2xl ${styles.cardBg} ${styles.cardBorder} border`}>
+            <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
+              <span className={`text-xs font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
+                {t('dw.pipeline.prop.udfCreateNew')}
+              </span>
+              <button onClick={closeBuilder} className={`p-1 ${styles.cardTextMuted} hover:${styles.dangerText}`} title={t('dw.pipeline.prop.closePanel')}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <UdfBuilderPanel className="h-full" />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+});
+
+/** JOIN form: joinType + joinKeys (CSV). */
+const JoinForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, nodeId, onUpdateNode }) => {
+  const setCfg = (field: string, value: unknown) => {
+    onUpdateNode(nodeId, { config: { ...nodeConfig, [field]: value } } as Partial<NodeConfig>);
+  };
+  const joinKeysCsv = Array.isArray(nodeConfig.joinKeys) ? nodeConfig.joinKeys.join(', ') : '';
+  return (
+    <>
+      <div>
+        <FieldLabel styles={styles}>{t('dw.pipeline.prop.joinTypeForm')}</FieldLabel>
+        <select
+          value={nodeConfig.joinType || 'inner'}
+          onChange={(e) => setCfg('joinType', e.target.value as NonNullable<NodeConfig['config']['joinType']>)}
+          className={inputCls(styles)}
+        >
+          <option value="inner">{t('dw.pipeline.prop.joinTypeInner')}</option>
+          <option value="left">{t('dw.pipeline.prop.joinTypeLeft')}</option>
+          <option value="right">{t('dw.pipeline.prop.joinTypeRight')}</option>
+          <option value="full">{t('dw.pipeline.prop.joinTypeFull')}</option>
+          <option value="cross">{t('dw.pipeline.prop.joinTypeCross')}</option>
+        </select>
+      </div>
+      <div>
+        <FieldLabel styles={styles}>{t('dw.pipeline.prop.joinKeysCsv')}</FieldLabel>
+        <input type="text" value={joinKeysCsv}
+          onChange={(e) => {
+            const s = e.target.value;
+            const arr = s.split(/[,，]/).map((x) => x.trim()).filter(Boolean);
+            setCfg('joinKeys', arr);
+          }}
+          className={`${inputCls(styles)} font-mono`}
+          placeholder={t('dw.pipeline.prop.joinKeysPlaceholder')} />
+      </div>
+    </>
+  );
+});
+
+// ─── Property Panel ───────────────────────────────────────────
 
 interface PropertyPanelProps {
   node: Node | null;
@@ -322,6 +526,53 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                       <FieldLabel styles={styles}>{t('dw.pipeline.prop.timeout')}</FieldLabel>
                       <input type="number" value={nodeConfig.timeout ?? 30}
                         onChange={(e) => setConfigField('timeout', Number(e.target.value))}
+                        className={inputCls(styles)} />
+                    </div>
+                  </>
+                )}
+
+                {/* TRANSFORM_UDF (Wave 5) — udfId + params key-value */}
+                {nodeType === 'TRANSFORM_UDF' && <UdfForm styles={styles} t={t} nodeConfig={nodeConfig} nodeId={node.id} onUpdateNode={onUpdateNode} />}
+
+                {/* JOIN (Wave 5) — joinType + joinKeys */}
+                {nodeType === 'JOIN' && <JoinForm styles={styles} t={t} nodeConfig={nodeConfig} nodeId={node.id} onUpdateNode={onUpdateNode} />}
+
+                {/* SINK (Wave 5) — datasourceId + table + mode + batchSize */}
+                {nodeType === 'SINK' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkDatasourceId')}</FieldLabel>
+                      <select value={nodeConfig.targetDatasourceId || nodeConfig.datasourceId || ''}
+                        onChange={(e) => setConfigField('targetDatasourceId', e.target.value)}
+                        className={inputCls(styles)}
+                      >
+                        <option value="">{t('dw.pipeline.prop.selectConnection')}</option>
+                        {connections.map((conn) => (
+                          <option key={conn.id} value={conn.id}>{conn.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkTable')}</FieldLabel>
+                      <input type="text" value={nodeConfig.targetTable || ''}
+                        onChange={(e) => setConfigField('targetTable', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="stg_orders" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkMode')}</FieldLabel>
+                      <select value={nodeConfig.mode ?? 'append'}
+                        onChange={(e) => setConfigField('mode', e.target.value as 'append' | 'overwrite')}
+                        className={inputCls(styles)}
+                      >
+                        <option value="append">{t('dw.pipeline.prop.modeAppend')}</option>
+                        <option value="overwrite">{t('dw.pipeline.prop.modeOverwrite')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkBatchSize')}</FieldLabel>
+                      <input type="number" value={nodeConfig.batchSize ?? 1000}
+                        onChange={(e) => setConfigField('batchSize', Number(e.target.value))}
                         className={inputCls(styles)} />
                     </div>
                   </>

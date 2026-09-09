@@ -25,6 +25,7 @@ import {
 } from '@xyflow/react';
 import {
   Database, FileText, Globe, Radio, Settings, HardDrive,
+  Braces, GitMerge, Upload,
   Loader2, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import type { NodeStatus, NodeConfig, PipelineNodeType } from './types';
@@ -305,7 +306,100 @@ const OutputObjectNode: React.FC<NodeProps> = (props) => {
   );
 };
 
-// ─── Node type registry (P2-01 enumeration) ───────────────
+// ─── Wave 5: TRANSFORM_UDF / JOIN / SINK nodes ─────────────
+
+const TransformUdfNode: React.FC<NodeProps> = (props) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <NodeShell
+      {...props}
+      theme={{
+        icon: Braces,
+        iconCls: styles.infoText,
+        headerBg: styles.infoBg,
+        headerText: styles.infoText,
+        borderCls: styles.infoBorder,
+        selectedRing: styles.infoBorder,
+      }}
+      body={(cfg: NodeConfigFields) =>
+        cfg.udfId ? (
+          <div className="truncate" title={cfg.udfId}>
+            {t('dw.pipeline.node.body.udf')}: <span className={`font-mono ${styles.infoText}`}>{cfg.udfName || cfg.udfId}</span>
+          </div>
+        ) : (
+          <div className={`italic ${styles.cardTextMuted}`}>{t('dw.pipeline.node.body.selectUdf')}</div>
+        )
+      }
+    />
+  );
+};
+
+const JoinNode: React.FC<NodeProps> = (props) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <NodeShell
+      {...props}
+      theme={{
+        icon: GitMerge,
+        iconCls: styles.accentText,
+        headerBg: styles.cardBg,
+        headerText: styles.accentText,
+        borderCls: styles.cardBorder,
+        selectedRing: styles.accentBorder,
+      }}
+      body={(cfg: NodeConfigFields) => {
+        const jt = cfg.joinType || 'inner';
+        const keys = cfg.joinKeys?.length ? cfg.joinKeys.join(', ') : '';
+        return (
+          <div className="truncate" title={`${jt}${keys ? ' ' + keys : ''}`}>
+            {String(jt).toUpperCase()}{keys ? <span className={`ml-1 font-mono ${styles.accentText}`}>{keys}</span> : null}
+          </div>
+        );
+      }}
+    />
+  );
+};
+
+const SinkNode: React.FC<NodeProps> = (props) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <NodeShell
+      {...props}
+      theme={{
+        icon: Upload,
+        iconCls: styles.successText,
+        headerBg: styles.successBg,
+        headerText: styles.successText,
+        borderCls: styles.successBorder,
+        selectedRing: styles.successBorder,
+      }}
+      body={(cfg: NodeConfigFields) =>
+        cfg.targetTable ? (
+          <div className="truncate" title={`${cfg.targetDatasourceId || ''} ${cfg.targetTable}`}>
+            {cfg.targetDatasourceId ? (
+              <>
+                {t('dw.pipeline.node.body.target')}: <span className={`font-mono ${styles.successText}`}>{cfg.targetDatasourceId}</span>
+                <span className={`mx-1 ${styles.cardTextMuted}`}>/</span>
+                <span className={`font-mono ${styles.successText}`}>{cfg.targetTable}</span>
+              </>
+            ) : (
+              <>
+                <span className={`font-mono ${styles.successText}`}>{cfg.targetTable}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className={`italic ${styles.cardTextMuted}`}>{t('dw.pipeline.node.body.selectSink')}</div>
+        )
+      }
+    />
+  );
+};
+
+// ─── Node type registry (P2-01 enumeration, Wave 5: 6 → 9) ──
 
 export const CUSTOM_NODE_TYPES: NodeTypes = {
   SOURCE_JDBC: SourceJdbcNode,
@@ -313,10 +407,13 @@ export const CUSTOM_NODE_TYPES: NodeTypes = {
   SOURCE_REST: SourceRestNode,
   SOURCE_CDC: SourceCdcNode,
   TRANSFORM_SQL: TransformSqlNode,
+  TRANSFORM_UDF: TransformUdfNode,
+  JOIN: JoinNode,
+  SINK: SinkNode,
   OUTPUT_OBJECT: OutputObjectNode,
 };
 
-// ─── MiniMap color helper (P2-01) ─────────────────────────
+// ─── MiniMap color helper (P2-01, Wave 5: 6 → 9) ──────────
 
 export const miniMapNodeColor = (node: Node): string => {
   switch (node.type as PipelineNodeType) {
@@ -325,6 +422,9 @@ export const miniMapNodeColor = (node: Node): string => {
     case 'SOURCE_REST': return '#0ea5e9';
     case 'SOURCE_CDC': return '#f97316';
     case 'TRANSFORM_SQL': return '#14b8a6';
+    case 'TRANSFORM_UDF': return '#06b6d4';
+    case 'JOIN': return '#8b5cf6';
+    case 'SINK': return '#22c55e';
     case 'OUTPUT_OBJECT': return '#64748b';
     default: return '#94a3b8';
   }

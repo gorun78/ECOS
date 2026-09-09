@@ -39,11 +39,14 @@ const REQUIRED_CONFIG_FIELDS: Record<PipelineNodeType, readonly string[]> = {
   SOURCE_REST: ['url'],
   SOURCE_CDC: [],
   TRANSFORM_SQL: ['transformSql'],
+  TRANSFORM_UDF: ['udfId'],
+  JOIN: ['joinType'],
+  SINK: ['targetTable'],
   OUTPUT_OBJECT: ['targetTable'],
 };
 
 const SOURCE_TYPES = new Set<PipelineNodeType>(['SOURCE_JDBC', 'SOURCE_CSV', 'SOURCE_REST', 'SOURCE_CDC']);
-const OUTPUT_TYPES = new Set<PipelineNodeType>(['OUTPUT_OBJECT']);
+const OUTPUT_TYPES = new Set<PipelineNodeType>(['OUTPUT_OBJECT', 'SINK']);
 
 /** ReadNodeConfig helper — stable across node id changes. */
 function readNodeConfig(node: Node): NodeConfig {

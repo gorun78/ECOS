@@ -12,6 +12,9 @@ export type PipelineNodeType =
   | 'SOURCE_REST'
   | 'SOURCE_CDC'
   | 'TRANSFORM_SQL'
+  | 'TRANSFORM_UDF'
+  | 'JOIN'
+  | 'SINK'
   | 'OUTPUT_OBJECT';
 
 export type NodeStatus = 'idle' | 'running' | 'success' | 'error';
@@ -46,8 +49,21 @@ export interface NodeConfig {
     // ── TRANSFORM_SQL ──
     transformSql?: string;
     timeout?: number;
-    // ── OUTPUT_OBJECT ──
+    // ── TRANSFORM_UDF (Wave 5) ──
+    udfId?: string;
+    udfName?: string;
+    params?: Record<string, unknown>;
+    // ── JOIN (Wave 5) ──
+    joinKeys?: string[];
+    joinType?: 'inner' | 'left' | 'right' | 'full' | 'cross';
+    leftNode?: string;
+    rightNode?: string;
+    on?: Array<{ left: string; right: string }>;
+    // ── SINK (Wave 5) ──
+    targetDatasourceId?: string;
     targetTable?: string;
+    target_columns?: string;
+    // ── OUTPUT_OBJECT ──
     mode?: 'append' | 'overwrite';
     batchSize?: number;
   };
