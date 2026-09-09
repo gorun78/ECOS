@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
@@ -13,20 +14,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * PipelineControllerTest — Pipeline 定义 CRUD 3 接口。
+ * PipelineControllerTest — Pipeline 定义 CRUD + 执行历史 强类型契约。
  *
- * <p>Wave-5.1 T-06：mock PipelineService / PipelineRepository /
- * ITaskManagementService，不连 PG。
+ * <p>mock PipelineService / PipelineRepository / ITaskManagementService /
+ * PipelineSecurityService，不连 PG。
  */
 @ExtendWith(MockitoExtension.class)
 class PipelineControllerTest {
@@ -37,12 +38,14 @@ class PipelineControllerTest {
     private PipelineRepository repository;
     @Mock
     private ITaskManagementService taskService;
+    @Mock
+    private PipelineSecurityService securityService;
 
     private PipelineController controller;
 
     @BeforeEach
     void setUp() {
-        this.controller = new PipelineController(pipelineService, repository, taskService);
+        this.controller = new PipelineController(pipelineService, repository, taskService, securityService);
     }
 
     private PipelineDefinition def(String id, String name, String status) {
@@ -60,71 +63,100 @@ class PipelineControllerTest {
     @DisplayName("POST /api/v1/pipeline/definitions — 创建成功 200 且返回 id/nodes")
     void createDefinitionSuccess() {
         PipelineDefinition created = def("p-1", "etl-pipeline", "DRAFT");
-        when(pipelineService.createDefinition(any())).thenReturn(created);
-        when(repository.findNodesByDefinitionId("p-1")).thenReturn(List.of());
+        when(pipelineService.createDefinition(any(PipelineSaveDTO.class))).thenReturn(created);
+        when(pipelineService.toVO(created, true)).thenReturn(mockVO("p-1", "etl-pipeline", "DRAFT"));
 
-        ApiResponse<Map<String, Object>> resp =
-                controller.createDefinition(Map.of("name", "etl-pipeline"));
+        PipelineSaveDTO dto = new PipelineSaveDTO();
+        dto.setName("etl-pipeline");
+        ApiResponse<PipelineVO> resp = controller.createDefinition(dto);
         assertTrue(resp.isSuccess());
         assertNotNull(resp.getData());
-        assertEquals("p-1", resp.getData().get("id"));
-        assertEquals("etl-pipeline", resp.getData().get("name"));
-        assertEquals("DRAFT", resp.getData().get("status"));
+        assertEquals("p-1", resp.getData().getId());
+        assertEquals("etl-pipeline", resp.getData().getName());
+        assertEquals("DRAFT", resp.getData().getStatus());
     }
 
     @Test
     @DisplayName("GET /api/v1/pipeline/definitions — 列表 200 且含 id")
     void listDefinitionsSuccess() {
-        when(pipelineService.listDefinitions())
-                .thenReturn(List.of(def("p-1", "a", "ACTIVE")));
-        ApiResponse<List<Map<String, Object>>> resp = controller.listDefinitions();
+        PipelineDefinition d = def("p-1", "a", "ACTIVE");
+        when(pipelineService.listDefinitions()).thenReturn(List.of(d));
+        when(pipelineService.toVO(d, false)).thenReturn(mockVO("p-1", "a", "ACTIVE"));
+        ApiResponse<List<PipelineVO>> resp = controller.listDefinitions();
         assertTrue(resp.isSuccess());
         assertEquals(1, resp.getData().size());
-        assertEquals("p-1", resp.getData().get(0).get("id"));
+        assertEquals("p-1", resp.getData().get(0).getId());
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/pipeline/definitions/{id} — 200 且 service 被调用")
+    @DisplayName("GET /definitions/{id} — 详情全量 nodes，供前端画布渲染")
+    void getDefinitionSuccess() {
+        PipelineDefinition d = def("p-1", "a", "ACTIVE");
+        when(pipelineService.getDefinition("p-1")).thenReturn(d);
+        when(pipelineService.toVO(d, true)).thenReturn(mockVO("p-1", "a", "ACTIVE"));
+        ApiResponse<PipelineVO> resp = controller.getDefinition("p-1");
+        assertTrue(resp.isSuccess());
+        assertEquals("p-1", resp.getData().getId());
+    }
+
+    @Test
+    @DisplayName("DELETE /definitions/{id} — 200 且 service 被调用")
     void deleteDefinitionSuccess() {
-        ApiResponse<Map<String, Object>> resp = controller.deleteDefinition("p-1");
+        ApiResponse<Void> resp = controller.deleteDefinition("p-1");
         assertTrue(resp.isSuccess());
         verify(pipelineService).deleteDefinition("p-1");
     }
 
     @Test
-    @DisplayName("POST /definitions/{id}/execute — mock runtime-task 全链路")
+    @DisplayName("POST /definitions/{id}/execute — ABAC 放行（void no-op）+ mock runtime-task 全链路")
     void executeDefinitionSucceeds() {
-        try {
-            when(taskService.submitTask(any(TaskDescription.class))).thenReturn("task-1");
-            when(taskService.getTaskStatus("task-1")).thenReturn(new TaskStatus());
-        } catch (com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.TaskManagementException ignore) {
-            throw new IllegalStateException("stub checked exception leaked unexpectedly", ignore);
-        } catch (Exception e) {
-            throw new IllegalStateException("stub setup failed", e);
-        }
+        // checkAbacBeforeExecute 为 void，Mock 默认 no-op（放行）
+        when(taskService.submitTask(any(TaskDescription.class))).thenReturn("task-1");
+        when(taskService.executeTask("task-1")).thenAnswer(inv -> null);
+        when(taskService.getTaskStatus("task-1")).thenReturn(new TaskStatus());
 
-        ApiResponse<Map<String, Object>> resp = controller.executeDefinition("p-1");
+        ApiResponse<PipelineTaskStatusVO> resp = controller.executeDefinition("p-1");
         assertTrue(resp.isSuccess());
-        assertEquals("task-1", resp.getData().get("taskId"));
+        assertEquals("task-1", resp.getData().getTaskId());
     }
 
     @Test
     @DisplayName("GET /tasks/{taskId}/status — 200 含 taskId")
-    void getTaskStatusSuccess() throws Exception {
+    void getTaskStatusSuccess() {
         TaskStatus s = new TaskStatus();
         s.setTaskId("t-9");
         when(taskService.getTaskStatus("t-9")).thenReturn(s);
-        ApiResponse<Map<String, Object>> resp = controller.getTaskStatus("t-9");
+        ApiResponse<PipelineTaskStatusVO> resp = controller.getTaskStatus("t-9");
         assertTrue(resp.isSuccess());
-        assertEquals("t-9", resp.getData().get("taskId"));
+        assertEquals("t-9", resp.getData().getTaskId());
     }
 
     @Test
     @DisplayName("GET /executions/{id} — 执行记录不存在 404")
     void getExecutionNotFound() {
         when(repository.findExecutionById("e-none")).thenReturn(null);
-        ApiResponse<PipelineExecution> resp = controller.getExecution("e-none");
-        assertEquals(ApiResponse.CODE_NOT_FOUND, resp.getCode());
-        assertNotNull(resp.getMessage());
+        assertThrows(DataBridgeException.class, () -> controller.getExecution("e-none"));
+    }
+
+    @Test
+    @DisplayName("GET /definitions/{id}/executions — 分页返回 page/total/items")
+    void listExecutionsSuccess() {
+        when(pipelineService.getDefinition("p-1")).thenReturn(def("p-1", "a", "ACTIVE"));
+        PipelineExecutionPageVO page = PipelineExecutionPageVO.empty(1, 20);
+        when(pipelineService.listExecutions("p-1", 1, 20)).thenReturn(page);
+
+        ApiResponse<PipelineExecutionPageVO> resp = controller.listExecutions("p-1", 1, 20);
+        assertTrue(resp.isSuccess());
+        assertEquals(1, resp.getData().getPage());
+        assertEquals(0L, resp.getData().getTotal());
+    }
+
+    private PipelineVO mockVO(String id, String name, String status) {
+        PipelineVO vo = new PipelineVO();
+        vo.setId(id);
+        vo.setName(name);
+        vo.setStatus(status);
+        vo.setNodes(List.of());
+        return vo;
     }
 }
