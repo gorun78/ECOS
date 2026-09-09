@@ -759,6 +759,11 @@ export async function fetchCollectStatus(taskId: string): Promise<{
   tablesFailed?: number;
   errorMessage?: string;
   elapsedMs?: number;
+  /** 运行时 statusMessage (TaskStatus 持续刷新; 与 message 不同 — 后者是"抛出"的 msg) */
+  statusMessage?: string;
+  /** 运行时 processed vs total records (live progress) */
+  processedRecords?: number;
+  totalRecords?: number;
 } | null> {
   try {
     const raw = await get<Record<string, unknown>>(`/api/v1/datanet/metadata/collect-status/${encodeURIComponent(taskId)}`);

@@ -1,12 +1,14 @@
 /* Extracted from DataWorkbenchLayout.tsx */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { GitCompare } from 'lucide-react';
 import LucideIcon from '../LucideIcon';
 import { getSourceIcon, getSourceTypeLabel } from '../helpers';
 import type { DataConnection, TableInfo } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
 
-import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff, fetchPreview } from '../api';
+import HistoryVersionCompareModal from '../HistoryVersionCompareModal';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
   { value: 'MANUAL', key: 'dw.strategy.manual' },
@@ -66,6 +68,16 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [diffRecords, setDiffRecords] = useState<{ collectedAt: string; taskId?: string; diffSummary?: string; diffMarkdown?: string; gitCommit?: string; tablesTotal?: number }[]>([]);
   const [showDiffDetail, setShowDiffDetail] = useState<number | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
+  // 历史版本比较对话框（数据表目录 Git 版本对比）
+  const [showVersionCompare, setShowVersionCompare] = useState(false);
+  // 同步采集面板：触发后立即展示，轮询后端 upsert 任务状态 → progress/step/ok/failed 实时刷新
+  const [collectTaskId, setCollectTaskId] = useState<string | null>(null);
+  const [collectStatus, setCollectStatus] = useState<{
+    status?: string; progress?: number; message?: string; statusMessage?: string;
+    processedRecords?: number; totalRecords?: number;
+    collectedTables?: number; totalTables?: number; tablesOk?: number; tablesFailed?: number; errorMessage?: string;
+  } | null>(null);
+  const collectPollingRef = useRef(false);
 
   // 轮询活跃采集任务（5s 间隔，选中数据源变化时重置）
   useEffect(() => {
@@ -80,6 +92,43 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     const timer = setInterval(poll, 5000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [selectedConnId]);
+
+  // 同步采集任务轮询（2s 间隔）：collectTaskId 出现时启动，完成（SUCCEEDED/FAILED/CANCELLED）时刷新目录与差异记录
+  useEffect(() => {
+    if (!collectTaskId) return;
+    let cancelled = false;
+    collectPollingRef.current = true;
+    const tick = async () => {
+      if (cancelled) return;
+      const st = await fetchCollectStatus(collectTaskId);
+      if (cancelled || !st) return;
+      setCollectStatus(st);
+      const done = st.status === 'SUCCEEDED' || st.status === 'FAILED' || st.status === 'CANCELLED' || st.status === 'error';
+      if (done) {
+        cancelled = true;
+        collectPollingRef.current = false;
+        // 同步采集完成 → 刷新目录 + 差异 + 提示
+        try {
+          const fresh = await fetchDataSourceResources(selectedConnId);
+          if (fresh && Array.isArray(fresh) && !cancelled) {
+            setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
+          }
+          fetchCollectDiff(selectedConnId, 5).then(d => setDiffRecords(d || [])).catch(() => {});
+        } catch { /* 网络抖动忽略 */ }
+        if (st.status === 'SUCCEEDED') {
+          showToast('success', t('dw.conn.refreshTables') + ' → ' + (st.totalTables ?? 0) + ' ' + t('dw.tablesUnit'));
+        } else {
+          showToast('error', t('dw.conn.refreshTables') + ' → ' + (st.errorMessage || st.status || 'FAILED'));
+        }
+        // 延迟 1.2s 释放面板让用户看到最终进度条
+        setTimeout(() => { if (!cancelled) { setCollectTaskId(null); setCollectStatus(null); } }, 1200);
+        return;
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 2000);
+    return () => { cancelled = true; collectPollingRef.current = false; clearInterval(timer); };
+  }, [collectTaskId, selectedConnId, showToast, t, connections, setConnections]);
 
   // 加载最近 5 次采集差异记录
   useEffect(() => {
@@ -364,20 +413,31 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("dw.strategy.hint")}</p>
                     <div className="flex gap-2">
                       <button
-                        disabled={collecting}
+                        disabled={collecting || collectTaskId !== null}
                         onClick={async () => {
                           setCollecting(true);
-                          const r = await triggerMetadataCollect(conn.id);
-                          setCollecting(false);
-                          if (r?.taskId) showToast('success', t('dw.strategy.collectStarted').replace('{id}', String(r.taskId)));
-                          else showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
+                          try {
+                            // Wave-3 lower 注：triggerCollectSync 端点暂未落地（Wave3 上 补齐）；
+                            // 这里保留元数据异步任务的轮询入口；详见 fetchCollectStatus。
+                            const r = await triggerMetadataCollect(conn.id);
+                            if (r?.taskId) {
+                              setCollectTaskId(r.taskId);
+                              setCollectStatus(null);
+                              showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
+                            } else {
+                              showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
+                            }
+                          } finally {
+                            setCollecting(false);
+                          }
                         }}
                         className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
                       >
-                        <LucideIcon name="RefreshCw" size={11} className={collecting ? 'animate-spin' : ''} />
-                        {collecting ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
+                        <LucideIcon name="RefreshCw" size={11} className={(collecting || collectTaskId !== null) ? 'animate-spin' : ''} />
+                        {(collecting || collectTaskId !== null) ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
                       </button>
                     </div>
+                    {/* 元数据采集当前轮询状态（异步任务中心统一展示，本地 inline 面板已下线） */}
                     <div className={`text-[10px] ${styles.cardTextMuted}`}>
                       {t("dw.strategy.lastCollect")}:{' '}
                       {conn.metadataConfig?.lastCollectTime
@@ -424,6 +484,15 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 <span>{t("dw.txt.42bc1b")}</span>
                 <div className="flex items-center gap-3">
                   <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
+                  <button
+                    onClick={() => setShowVersionCompare(true)}
+                    disabled={loadingTables}
+                    className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}
+                    title={t("dw.histCompare.button")}
+                  >
+                    <GitCompare size={12} />
+                    <span>{t("dw.histCompare.button")}</span>
+                  </button>
                   <button
                     onClick={async () => {
                       setLoadingTables(true);
