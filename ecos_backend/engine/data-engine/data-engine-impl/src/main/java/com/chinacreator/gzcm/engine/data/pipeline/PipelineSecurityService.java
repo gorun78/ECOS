@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -27,6 +29,9 @@ import java.util.Set;
  * </ol>
  * 统一经本类 REST 调用 security-engine，禁止各调用点重复实现安全逻辑（§2.4 第 7 条）。
  *
+ * <p>P2#4 安全补齐：RestTemplate 显式配置 connect/read 超时（默认 30s/60s），
+ * 避免第三方 security-engine 慢响应/不可达导致线程永远挂起。
+ *
  * @author DataBridge Datanet Team
  */
 @Service
@@ -42,12 +47,32 @@ public class PipelineSecurityService {
     private static final Set<String> SENSITIVE_KEYS =
             Set.of("password", "token", "secret", "apikey", "api_key", "authorization", "credential");
 
+    /** P2#4：第三方 security-engine REST 调用的连接超时（毫秒）*/
+    private static final int CONNECT_TIMEOUT_MS = 30000;
+
+    /** P2#4：第三方 security-engine REST 调用的读取超时（毫秒）*/
+    private static final int READ_TIMEOUT_MS = 60000;
+
     /** security-engine 基地址（gateway 聚合后走本进程 8080；独立部署时按环境覆盖） */
     @Value("${dw.security.base-url:http://localhost:8080}")
     private String securityBaseUrl;
 
-    /** REST 客户端（统一 new RestTemplate()，与 QueryController 等一致） */
-    private final RestTemplate restTemplate = new RestTemplate();
+    /**
+     * REST 客户端（P2#4：SimpleClientHttpRequestFactory 显式 30s/60s connect/read 超时，
+     * 第三方迟延或不可达时快速失败走默认 DENY/默认脱敏分支）。
+     */
+    private final RestTemplate restTemplate = newRestTemplateWithTimeouts(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
+
+    /**
+     * 构造带显式超时的 RestTemplate（P2#4）。
+     * 抽独立方法便于单测 / 后续切换更复杂的工厂（如 SSL）时 class 字段不动。
+     */
+    static RestTemplate newRestTemplateWithTimeouts(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Math.max(1, connectTimeoutMs));
+        factory.setReadTimeout(Math.max(1, readTimeoutMs));
+        return new RestTemplate(factory);
+    }
 
     // ==================== 1. 写操作异步审计 ====================
 
@@ -150,28 +175,45 @@ public class PipelineSecurityService {
             body.put("policy", "rbac");
             body.put("input", input);
 
-            // postForObject 仅支持 Class 泛型；取 Object 后用 ObjectMapper 解析强类型
-            Object raw = restTemplate.postForObject(
-                    securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
-                    body,
-                    Object.class);
+            // 用 HttpHeaders 显式声明 JSON Content-Type（避免 RestTemplate 默认 XML 序列化）
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            Map<String, Object> resp = MAPPER.convertValue(raw,
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
+                    entity, String.class);
+
+            String bodyStr = response.getBody();
+            if (bodyStr == null || bodyStr.isEmpty()) {
+                log.warn("ABAC evaluate returned empty body: definitionId={}", definitionId);
+                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+            }
+            // 解析 JSON 响应
+            Map<String, Object> apiResp = MAPPER.readValue(bodyStr,
                     new TypeReference<Map<String, Object>>() {});
-            if (resp == null) {
+            if (apiResp == null) {
                 log.warn("ABAC evaluate returned null: definitionId={}", definitionId);
                 return AllowedResult.deny("ABAC_EVALUATE_FAILED");
             }
-            Object allow = resp.get("allow");
+            // ApiResponse 包装：业务数据在 "data" 字段内
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) apiResp.get("data");
+            if (data == null || data.isEmpty()) {
+                // fallback: 若 data 为空（旧版 security-engine 兼容），尝试直接从顶层取
+                data = apiResp;
+            }
+            Object allow = data.get("allow");
             boolean allowed = Boolean.TRUE.equals(allow);
+            String reason = data.get("fallback") != null
+                    ? data.get("fallback").toString()
+                    : (allowed ? "ALLOW" : "DENY");
             if (allowed) {
-                log.info("ABAC allow pipeline execute: definitionId={}", definitionId);
+                log.info("ABAC allow pipeline execute: definitionId={}, reason={}", definitionId, reason);
             } else {
-                Object reason = resp.get("fallback");
                 log.warn("ABAC deny pipeline execute: definitionId={}, reason={}", definitionId, reason);
             }
-            return new AllowedResult(allowed,
-                    resp.get("fallback") != null ? resp.get("fallback").toString() : (allowed ? "ALLOW" : "DENY"));
+            return new AllowedResult(allowed, reason);
         } catch (Exception e) {
             // security-engine 不可用 → 默认 DENY（架构铁律 §2.4 第 6 条）
             log.warn("ABAC evaluate failed (default DENY): definitionId={}, error={}", definitionId, e.getMessage());
