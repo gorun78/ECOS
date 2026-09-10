@@ -40,14 +40,21 @@ public class MetadataCollectGitArchive {
     private static final Logger log = LoggerFactory.getLogger(MetadataCollectGitArchive.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-    /** 历史版本保留份数上限 */
-    private static final int MAX_HISTORY_VERSIONS = 50;
+    /** 历史版本保留份数默认上限（可通过 sys_config 的 dw.metadata.history_versions 覆盖） */
+    private static final int DEFAULT_MAX_HISTORY_VERSIONS = 50;
+    /** 历史版本保留份数允许范围 */
+    private static final int MIN_HISTORY_VERSIONS = 1;
+    private static final int MAX_HISTORY_VERSIONS_LIMIT = 500;
+    /** 历史版本文件名格式（防路径穿越：仅允许 yyyyMMdd_HHmmss） */
+    private static final String VERSION_FILE_PATTERN = "^\\d{8}_\\d{6}\\.json$";
+    /** 对比字段清单（结构化差异逐字段对比用） */
+    private static final List<String> COMPARE_FIELDS = List.of("type", "sourcePath", "description", "fieldCount", "rowCount");
 
     private final GitService gitService;
     private final JdbcTemplate jdbc;
 
-    /** 仓库根路径，从 sys_config 读取 */
-    private String repoRoot = "/home/guorongxiao/ecos-git-repos";
+    /** 仓库根路径，从 sys_config 读取（Windows/WSL 通用） */
+    private String repoRoot = Paths.get(System.getProperty("user.home"), "ecos-git-repos").toString();
 
     public MetadataCollectGitArchive(GitService gitService, JdbcTemplate jdbc) {
         this.gitService = gitService;
@@ -138,6 +145,27 @@ public class MetadataCollectGitArchive {
         }
     }
 
+    /**
+     * 从 sys_config 读取历史版本保留份数上限（配置键 dw.metadata.history_versions，
+     * 引擎配置面板"历史版本数保存记录"）。
+     * 非法/缺省时回退默认值 50，范围钳制 [1, 500]。
+     */
+    private int resolveHistoryLimit() {
+        try {
+            String val = jdbc.queryForObject(
+                    "SELECT config_value FROM sys_config WHERE config_key = 'dw.metadata.history_versions'",
+                    String.class);
+            if (val == null || val.trim().isEmpty()) {
+                return DEFAULT_MAX_HISTORY_VERSIONS;
+            }
+            int parsed = Integer.parseInt(val.trim());
+            return Math.max(MIN_HISTORY_VERSIONS, Math.min(MAX_HISTORY_VERSIONS_LIMIT, parsed));
+        } catch (Exception e) {
+            log.debug("读取 dw.metadata.history_versions 失败，使用默认值 {}", DEFAULT_MAX_HISTORY_VERSIONS);
+            return DEFAULT_MAX_HISTORY_VERSIONS;
+        }
+    }
+
     private Map<String, Object> buildSnapshot(String datasourceId, List<DataResource> resources) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("datasourceId", datasourceId);
@@ -171,19 +199,199 @@ public class MetadataCollectGitArchive {
         }
     }
 
-    /** 清理超出上限的历史版本文件 */
+    /** 清理超出上限的历史版本文件（上限从 sys_config 读取，见 resolveHistoryLimit） */
     private void cleanupHistory(String historyDir) {
         try {
+            int limit = resolveHistoryLimit();
             List<Path> files = Files.list(Paths.get(historyDir))
                     .filter(f -> f.toString().endsWith(".json"))
                     .sorted()
                     .collect(Collectors.toList());
-            while (files.size() > MAX_HISTORY_VERSIONS) {
+            int removed = 0;
+            while (files.size() > limit) {
                 Files.delete(files.remove(0));
+                removed++;
+            }
+            if (removed > 0) {
+                log.info("历史版本清理完成: 删除最旧 {} 份, 保留 {} 份 (上限 {})", removed, files.size(), limit);
             }
         } catch (Exception e) {
             log.debug("清理历史版本失败: {}", e.getMessage());
         }
+    }
+
+    // ====================================================================
+    // 历史版本比较（PMO: 数据表目录历史版本比较功能）
+    // ====================================================================
+
+    /**
+     * 列出数据源的所有历史版本 + 当前版本（供前端版本选择对话框）。
+     * 版本来源: {repoRoot}/metadata/{datasourceId}/history/{yyyyMMdd_HHmmss}.json。
+     *
+     * @param datasourceId 数据源 ID
+     * @return { versions: [{versionId, collectedAt, tableCount}], current: {collectedAt, tableCount} }
+     *         versions 按时间降序（新→旧）；目录不存在时返回空列表（非错误）
+     */
+    public Map<String, Object> listHistoryVersions(String datasourceId) {
+        initRepoRoot();
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<Map<String, Object>> versions = new ArrayList<>();
+
+        Path historyDir = Paths.get(repoRoot, "metadata", datasourceId, "history");
+        if (Files.isDirectory(historyDir)) {
+            try (var stream = Files.list(historyDir)) {
+                List<Path> files = stream
+                        .filter(f -> f.getFileName().toString().matches(VERSION_FILE_PATTERN))
+                        .sorted(Comparator.reverseOrder()) // 新版本在前
+                        .collect(Collectors.toList());
+                for (Path f : files) {
+                    Map<String, Object> snap = readSnapshot(f.toString());
+                    if (snap == null) {
+                        continue; // 损坏的快照文件跳过，不影响整体列表
+                    }
+                    Map<String, Object> v = new LinkedHashMap<>();
+                    v.put("versionId", f.getFileName().toString().replace(".json", ""));
+                    v.put("collectedAt", snap.get("collectedAt"));
+                    v.put("tableCount", snap.get("tableCount"));
+                    versions.add(v);
+                }
+            } catch (Exception e) {
+                log.warn("扫描历史版本目录失败: ds={}, err={}", datasourceId, e.getMessage());
+            }
+        }
+
+        // 当前版本（metadata.json 可能不存在 = 从未采集）
+        Map<String, Object> currentSnap = readSnapshot(
+                Paths.get(repoRoot, "metadata", datasourceId, "metadata.json").toString());
+        Map<String, Object> current = new LinkedHashMap<>();
+        current.put("exists", currentSnap != null);
+        if (currentSnap != null) {
+            current.put("collectedAt", currentSnap.get("collectedAt"));
+            current.put("tableCount", currentSnap.get("tableCount"));
+        }
+
+        result.put("versions", versions);
+        result.put("current", current);
+        return result;
+    }
+
+    /**
+     * 指定历史版本与当前版本的结构化字段级对比。
+     * 内存 diff（两份 JSON 快照哈希对比），数据量大时依然快速。
+     *
+     * @param datasourceId 数据源 ID
+     * @param versionId    历史版本 ID（= history 目录下文件名，yyyyMMdd_HHmmss）
+     * @return { rows: [...], currentCollectedAt, versionCollectedAt, summary }
+     *         rows 每行: changeType(ADDED/DELETED/MODIFIED) / tableName / field /
+     *                    currentValue / previousValue / changeTime / commitMessage
+     * @throws IllegalArgumentException 版本不存在或参数非法
+     */
+    public Map<String, Object> compareWithHistory(String datasourceId, String versionId) {
+        // 严格校验 versionId 格式，防止路径穿越
+        if (versionId == null || !versionId.matches("^\\d{8}_\\d{6}$")) {
+            throw new IllegalArgumentException("非法版本号: " + versionId);
+        }
+        initRepoRoot();
+
+        String baseDir = Paths.get(repoRoot, "metadata", datasourceId).toString();
+        Map<String, Object> currentSnap = readSnapshot(Paths.get(baseDir, "metadata.json").toString());
+        if (currentSnap == null) {
+            throw new IllegalArgumentException("当前版本快照不存在（数据源尚未完成元数据采集）");
+        }
+        Map<String, Object> prevSnap = readSnapshot(Paths.get(baseDir, "history", versionId + ".json").toString());
+        if (prevSnap == null) {
+            throw new IllegalArgumentException("历史版本不存在: " + versionId);
+        }
+
+        Map<String, Map<String, Object>> currentTables = indexTables(currentSnap);
+        Map<String, Map<String, Object>> prevTables = indexTables(prevSnap);
+        String currentCollectedAt = String.valueOf(currentSnap.getOrDefault("collectedAt", ""));
+        String versionCollectedAt = String.valueOf(prevSnap.getOrDefault("collectedAt", ""));
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        // 新增表：当前版本有、历史版本无
+        for (String name : currentTables.keySet()) {
+            if (!prevTables.containsKey(name)) {
+                rows.add(buildDiffRow("ADDED", name, "(table)", describeTable(currentTables.get(name)),
+                        "", currentCollectedAt));
+            }
+        }
+        // 删除表：历史版本有、当前版本无
+        for (String name : prevTables.keySet()) {
+            if (!currentTables.containsKey(name)) {
+                rows.add(buildDiffRow("DELETED", name, "(table)", "",
+                        describeTable(prevTables.get(name)), currentCollectedAt));
+            }
+        }
+        // 修改表：逐字段对比
+        for (Map.Entry<String, Map<String, Object>> e : currentTables.entrySet()) {
+            Map<String, Object> prev = prevTables.get(e.getKey());
+            if (prev == null) {
+                continue;
+            }
+            Map<String, Object> curr = e.getValue();
+            for (String field : COMPARE_FIELDS) {
+                Object cv = curr.get(field);
+                Object pv = prev.get(field);
+                if (!Objects.equals(cv, pv)) {
+                    rows.add(buildDiffRow("MODIFIED", e.getKey(), field,
+                            valueToString(cv), valueToString(pv), currentCollectedAt));
+                }
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("rows", rows);
+        result.put("currentCollectedAt", currentCollectedAt);
+        result.put("versionCollectedAt", versionCollectedAt);
+        result.put("summary", String.format("新增 %d / 删除 %d / 修改 %d",
+                rows.stream().filter(r -> "ADDED".equals(r.get("changeType"))).count(),
+                rows.stream().filter(r -> "DELETED".equals(r.get("changeType"))).count(),
+                rows.stream().filter(r -> "MODIFIED".equals(r.get("changeType"))).count()));
+        return result;
+    }
+
+    /** 快照 tables 列表 → 以表名为键的索引（内存 diff 用） */
+    private Map<String, Map<String, Object>> indexTables(Map<String, Object> snapshot) {
+        Map<String, Map<String, Object>> idx = new LinkedHashMap<>();
+        Object tbls = snapshot.get("tables");
+        if (tbls instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m && m.get("name") instanceof String name) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> table = (Map<String, Object>) m;
+                    idx.put(name, table);
+                }
+            }
+        }
+        return idx;
+    }
+
+    /** 构造一行结构化差异（对应前端差异表格 7 列） */
+    private Map<String, Object> buildDiffRow(String changeType, String tableName, String field,
+                                             String currentValue, String previousValue, String changeTime) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("changeType", changeType);
+        row.put("tableName", tableName);
+        row.put("field", field);
+        row.put("currentValue", currentValue);
+        row.put("previousValue", previousValue);
+        row.put("changeTime", changeTime);
+        return row;
+    }
+
+    /** 表对象 → 简要描述（新增/删除整表时展示） */
+    private String describeTable(Map<String, Object> table) {
+        return String.format("type=%s, rows=%s, fields=%s",
+                table.getOrDefault("type", ""),
+                table.getOrDefault("rowCount", "?"),
+                table.getOrDefault("fieldCount", "?"));
+    }
+
+    /** 值 → 展示字符串（null 显示为空） */
+    private String valueToString(Object v) {
+        return v == null ? "" : String.valueOf(v);
     }
 
     private Map<String, Object> generateDiff(Map<String, Object> old, Map<String, Object> new_, String datasourceId) {

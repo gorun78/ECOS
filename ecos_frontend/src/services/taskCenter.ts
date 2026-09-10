@@ -10,7 +10,7 @@ export type RealTaskStatus =
   | "PENDING" | "PARSING" | "PARSED" | "RUNNING" | "PAUSED"
   | "SUCCEEDED" | "FAILED" | "CANCELLED" | "TIMEOUT";
 
-export type TaskCategory = "pipeline" | "agent" | "realtime" | "management";
+export type TaskCategory = "pipeline" | "agent" | "realtime" | "management" | "metadata" | "cron";
 
 export interface TaskSummary {
   taskId: string;
@@ -149,8 +149,38 @@ export async function batchTask(taskIds: string[], action: BatchAction): Promise
   return jpost<{ successCount: number; errors: string[] }>(`${BASE}/batch`, { taskIds, action });
 }
 
-// ── 任务分类辅助 ──────────────────────────────────────
-export const TYPE_TO_CATEGORY: Record<string, TaskCategory> = {
+// ── 任务分类辅助：从 taskType 字符串到 category key（前端 label 从 i18n 取，避免写死）──
+export type TaskCategoryKey = "pipeline" | "agent" | "realtime" | "management" | "metadata" | "cron";
+
+export interface TaskCategoryDef {
+  key: TaskCategoryKey;
+  types: string[];        // 匹配该分类的 taskType 字符串列表（忽略大小写）
+}
+
+export const TASK_CATEGORIES: TaskCategoryDef[] = [
+  { key: "metadata",   types: ["METADATA_COLLECT", "SCHEMA_PREVIEW"] },
+  { key: "pipeline",   types: ["DORIS_SQL", "ETL", "DATA_SYNC", "DATA_INGEST", "PIPELINE", "PIPELINE_RUN"] },
+  { key: "agent",      types: ["AGENT", "AI_AGENT", "LLM_TASK", "KG_SYNC", "CRON", "AGENT_CRON"] },
+  { key: "realtime",   types: ["REALTIME", "STREAMING", "MONITOR", "ALERT", "TELEMETRY", "HEALTH_CHECK"] },
+  { key: "management", types: ["DATA_QUALITY", "REPORT", "MAINTENANCE", "BACKUP", "CONFIG", "ADMIN", "DQ_CHECK"] },
+  { key: "cron",       types: ["CRON", "SCHEDULED"] },
+];
+
+/** 单次（taskType 优先归类 metadata，避免与已有 pipeline 字集群冲突） */
+export function categorize(taskType?: string): TaskCategoryKey | null {
+  if (!taskType) return null;
+  const t = taskType.toUpperCase();
+  // metadata 优先 — 同步/定时采集都是"元数据"类
+  if (t === "METADATA_COLLECT") return "metadata";
+  for (const c of TASK_CATEGORIES) {
+    if (c.key === "metadata") continue; // 已处理
+    if (c.types.some(x => x.toUpperCase() === t)) return c.key;
+  }
+  return null;
+}
+
+/** 兼容层：保留旧 TYPE_TO_CATEGORY + getTypeCategory，防止其他模块 import 失败 */
+const LEGACY_LEGACY_TYPES: Record<string, TaskCategory> = {
   DORIS_SQL: "pipeline", ETL: "pipeline", DATA_SYNC: "pipeline", DATA_INGEST: "pipeline", PIPELINE: "pipeline",
   AGENT: "agent", AI_AGENT: "agent", LLM_TASK: "agent", KG_SYNC: "agent",
   METADATA_COLLECT: "pipeline",
@@ -158,15 +188,18 @@ export const TYPE_TO_CATEGORY: Record<string, TaskCategory> = {
   DATA_QUALITY: "management", REPORT: "management", MAINTENANCE: "management", BACKUP: "management",
   CONFIG: "management", ADMIN: "management",
 };
-
+export const TYPE_TO_CATEGORY = LEGACY_LEGACY_TYPES;
 export function getTypeCategory(taskType?: string): TaskCategory | null {
   if (!taskType) return null;
-  return TYPE_TO_CATEGORY[taskType.toUpperCase()] ?? null;
+  return LEGACY_LEGACY_TYPES[taskType.toUpperCase()] ?? null;
 }
 
+// 兼容层：CATEGORY_LABELS 已硬编码中文 — 仅供旧调用方读，新增请使用 i18n t('taskPanel.category.' + key)
 export const CATEGORY_LABELS: Record<TaskCategory, string> = {
   pipeline: "管道",
   agent: "Agent",
   realtime: "实时",
   management: "管理类",
+  metadata: "元数据",
+  cron: "定时任务",
 };

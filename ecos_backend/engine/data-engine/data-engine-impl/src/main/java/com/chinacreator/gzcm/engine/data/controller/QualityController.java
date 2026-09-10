@@ -2,13 +2,28 @@ package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.data.QualityService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * 数据质量 REST API（旧端点，只读兼容层）— PMO-48-A T4 写操作下线 410。
+ * <p>
+ * 规则/评估写操作（规则 CRUD + evaluate 触发）已随 DQ 基础设施合并统一 410 Gone，
+ * 只读 GET 端点（规则列表/详情、评估历史）保持只读兼容，读旧表 ecos_quality_rule / dq_evaluation_results。
+ * 新端点在 /api/v1/dq/*（DqGovernanceController，T3 交付）。
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/v1/engine/data/quality")
 public class QualityController {
+
+    private static final Logger log = LoggerFactory.getLogger(QualityController.class);
+
+    /** PMO-48-A T4：写操作统一 410 Gone，说明迁移到 /api/v1/dq/*。 */
+    private static final String GONE_MSG = "DQ 写操作已迁移到 /api/v1/dq/rules（Phase 1 只读兼容，写操作 Phase 2 在新端点开放）";
 
     private final QualityService qualityService;
 
@@ -18,31 +33,21 @@ public class QualityController {
 
     @PostMapping("/rules")
     public ApiResponse<Map<String, Object>> createRule(@RequestBody Map<String, Object> body) {
-        try {
-            return ApiResponse.success(qualityService.createRule(body));
-        } catch (Exception e) {
-            return ApiResponse.badRequest(e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: createRule");
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @PutMapping("/rules/{ruleId}")
     public ApiResponse<Map<String, Object>> updateRule(@PathVariable String ruleId,
                                                         @RequestBody Map<String, Object> body) {
-        try {
-            return ApiResponse.success(qualityService.updateRule(ruleId, body));
-        } catch (Exception e) {
-            return ApiResponse.badRequest(e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: updateRule ruleId={}", ruleId);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @DeleteMapping("/rules/{ruleId}")
     public ApiResponse<Void> deleteRule(@PathVariable String ruleId) {
-        try {
-            qualityService.deleteRule(ruleId);
-            return ApiResponse.success("删除成功", null);
-        } catch (Exception e) {
-            return ApiResponse.badRequest(e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: deleteRule ruleId={}", ruleId);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @GetMapping("/rules/{ruleId}")
@@ -65,32 +70,15 @@ public class QualityController {
 
     @PostMapping("/evaluate")
     public ApiResponse<Map<String, Object>> evaluate(@RequestBody Map<String, Object> body) {
-        try {
-            String datasetId = (String) body.get("dataset_id");
-            String datasourceId = (String) body.get("datasource_id");
-            String tableName = (String) body.get("table_name");
-            int sampleSize = body.containsKey("sample_size") ? ((Number) body.get("sample_size")).intValue() : 1000;
-
-            if (datasetId == null) return ApiResponse.badRequest("dataset_id 不能为空");
-
-            return ApiResponse.success(qualityService.evaluate(datasetId, datasourceId, tableName, sampleSize));
-        } catch (Exception e) {
-            return ApiResponse.internalError("质量评估失败: " + e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: evaluate");
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @PostMapping("/rules/{ruleId}/evaluate")
     public ApiResponse<Map<String, Object>> evaluateRule(@PathVariable String ruleId,
                                                           @RequestBody Map<String, Object> body) {
-        try {
-            String datasourceId = (String) body.get("datasource_id");
-            String tableName = (String) body.get("table_name");
-            int sampleSize = body.containsKey("sample_size") ? ((Number) body.get("sample_size")).intValue() : 1000;
-
-            return ApiResponse.success(qualityService.evaluateRule(ruleId, datasourceId, tableName, sampleSize));
-        } catch (Exception e) {
-            return ApiResponse.internalError("规则评估失败: " + e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: evaluateRule ruleId={}", ruleId);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @GetMapping("/evaluations")
@@ -102,14 +90,11 @@ public class QualityController {
     }
 
     /**
-     * 手动全量巡检 — 遍历所有 enabled 的 DQ 规则并逐条评估。
+     * 手动全量巡检 — 触发评估+写 evaluation 表，属写操作，已下线 410（PMO-48-A T4）。
      */
     @PostMapping("/evaluate-all")
     public ApiResponse<Map<String, Object>> evaluateAll() {
-        try {
-            return ApiResponse.success(qualityService.evaluateAll());
-        } catch (Exception e) {
-            return ApiResponse.internalError("全量巡检失败: " + e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: evaluateAll");
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 }

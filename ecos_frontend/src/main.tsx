@@ -54,6 +54,7 @@ const GuardrailsView = lazy(() => import('./pages/GuardrailsView.tsx'));
 const AIWorkbench = lazy(() => import('./pages/aiworkbench/index.tsx'));
 const WorkshopView = lazy(() => import('./pages/WorkshopView.tsx'));
 const ScenarioManagementView = lazy(() => import('./pages/ScenarioManagementView.tsx'));
+const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
 // EngineMonitor + CognitiveEngineView are imported once eagerly because
 // lazy() can't pass static props at import site.
 const EngineMonitor = lazy(() => import('./pages/EngineMonitor.tsx'));
@@ -127,6 +128,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="business-workbench" element={<BusinessWorkbenchLayoutStandalone />} />
                 {/* 数据工作台 */}
                 <Route path="data-workbench" element={<DataWorkbenchLayoutStandalone />} />
+                {/* PMO-48-A T5: 数据质量中心(独立顶级路由, 不在 DataWorkbenchLayout 内 Tab, 与 /business-workbench 同级, Topbar 有菜单入口) */}
+                <Route path="dq_dashboard" element={<DataQualityDashboard />} />
                 {/* Legacy redirects — 旧路由统一重定向到本体工作台 */}
                 <Route path="domains" element={<Navigate to="/ontology_workbench" replace />} />
                 <Route path="domain_designer" element={<Navigate to="/ontology_workbench" replace />} />

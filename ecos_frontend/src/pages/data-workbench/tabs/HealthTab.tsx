@@ -1,5 +1,7 @@
 /* Extracted from DataWorkbenchLayout.tsx */
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowUpRight, Plus } from 'lucide-react';
 import LucideIcon from '../LucideIcon';
 import type { DataHealthCheck } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
@@ -27,6 +29,7 @@ const HealthTab: React.FC<HealthTabProps> = ({
   setNewCheckDs, checkType, setCheckType, newCheck, t
 }) => {
   const { styles } = useTheme();
+  const navigate = useNavigate();
   const handleAddCheck = () => {
     if (!newCheckName.trim()) {
       showToast('error', t("dw.enterRuleName"));
@@ -56,20 +59,36 @@ const HealthTab: React.FC<HealthTabProps> = ({
   return (
     <div className={`flex-1 overflow-y-auto p-6 ${styles.cardBg}`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h3 className={`text-sm font-bold ${styles.cardText}`}>{t("dw.txt.693c4f")}</h3>
           <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>
             {t("dw.healthCheckCount").replace('{count}', String(healthChecks.length))}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddCheck(!showAddCheck)}
-          className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
-          <span>{t("dw.txt.57eece")}</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* PMO-48-B T9 — Phase 2 状态机已就绪徽章 */}
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${styles.infoBg} ${styles.infoText} border ${styles.infoBorder}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />
+            {t("dw.dqRule.statusMachine.phase2Ready")}
+          </span>
+          {/* PMO-48-A T5: 跳转入口 → 完整数据质量中心 (独立顶级路由 /dq_dashboard) */}
+          <button
+            type="button"
+            onClick={() => navigate('/dq_dashboard')}
+            className={`px-3 py-1.5 flex items-center gap-1.5 border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-xs font-semibold transition cursor-pointer`}
+          >
+            <span>{t("dw.dqRule.goFullCenter")}</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setShowAddCheck(!showAddCheck)}
+            className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer`}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{t("dw.txt.57eece")}</span>
+          </button>
+        </div>
       </div>
 
       {/* Add form */}

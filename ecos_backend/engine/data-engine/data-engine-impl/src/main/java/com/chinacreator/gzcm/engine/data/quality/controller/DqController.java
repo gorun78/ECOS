@@ -58,29 +58,29 @@ public class DqController {
             .orElseGet(() -> ApiResponse.notFound("规则 " + id + " 不存在"));
     }
 
+    /**
+     * PMO-48-A T4：DQ 旧写端点只读兼容下线。
+     * 写操作统一 410 Gone，只读 GET 端点保持只读兼容（读旧表 ecos_dq_rule_v2 / ecos_quality_rule）。
+     * 新端点在 /api/v1/dq/*（DqGovernanceController，T3 交付）。
+     */
+    private static final String GONE_MSG = "DQ 写操作已迁移到 /api/v1/dq/rules（Phase 1 只读兼容，写操作 Phase 2 在新端点开放）";
+
     @PostMapping("/rules")
     public ApiResponse<Map<String, Object>> createRule(@RequestBody Map<String, Object> body) {
-        Map<String, Object> rule = dqService.createRule(body);
-        log.info("DQ rule created via DB: {} [{}]", rule.get("id"), rule.get("name"));
-        return ApiResponse.success(rule);
+        log.warn("DQ legacy write blocked: createRule");
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @PutMapping("/rules/{id}")
     public ApiResponse<Map<String, Object>> updateRule(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return dqService.updateRule(id, body)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("规则 " + id + " 不存在"));
+        log.warn("DQ legacy write blocked: updateRule id={}", id);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @DeleteMapping("/rules/{id}")
     public ApiResponse<Map<String, Object>> deleteRule(@PathVariable Long id) {
-        if (dqService.deleteRule(id)) {
-            log.info("DQ rule deleted: {}", id);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            return ApiResponse.success(result);
-        }
-        return ApiResponse.notFound("规则 " + id + " 不存在");
+        log.warn("DQ legacy write blocked: deleteRule id={}", id);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     // ═══════════════ 问题 CRUD ═══════════════════
@@ -103,35 +103,26 @@ public class DqController {
 
     @PostMapping("/issues")
     public ApiResponse<Map<String, Object>> createIssue(@RequestBody Map<String, Object> body) {
-        Map<String, Object> issue = dqService.createIssue(body);
-        log.info("DQ issue created via DB: {} [rule={}]", issue.get("id"), issue.get("ruleId"));
-        return ApiResponse.success(issue);
+        log.warn("DQ legacy write blocked: createIssue");
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @PutMapping("/issues/{id}")
     public ApiResponse<Map<String, Object>> updateIssue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return dqService.updateIssue(id, body)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("问题 " + id + " 不存在"));
+        log.warn("DQ legacy write blocked: updateIssue id={}", id);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @PostMapping("/issues/{id}/resolve")
     public ApiResponse<Map<String, Object>> resolveIssue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        String resolution = String.valueOf(body.getOrDefault("resolution", "已修复"));
-        return dqService.resolveIssue(id, resolution)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("问题 " + id + " 不存在"));
+        log.warn("DQ legacy write blocked: resolveIssue id={}", id);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     @DeleteMapping("/issues/{id}")
     public ApiResponse<Map<String, Object>> deleteIssue(@PathVariable Long id) {
-        if (dqService.deleteIssue(id)) {
-            log.info("DQ issue deleted: {}", id);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            return ApiResponse.success(result);
-        }
-        return ApiResponse.notFound("问题 " + id + " 不存在");
+        log.warn("DQ legacy write blocked: deleteIssue id={}", id);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     // ═══════════════ 仪表盘 ═══════════════════
@@ -145,28 +136,27 @@ public class DqController {
 
     @PostMapping("/check")
     public ApiResponse<Map<String, Object>> runCheck() {
-        return ApiResponse.success(dqService.runCheck());
+        log.warn("DQ legacy write blocked: runCheck");
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
-    // ═══════════════ 兼容旧版统一路径（委托为新版） ═══════════════════
+    // ═══════════════ 兼容旧版统一路径（写操作已下线 410） ═══════════════════
 
     /**
-     * 兼容旧版 POST /{type} 路径 — 委托至对应的新版端点。
+     * 兼容旧版 POST /{type} 路径 — 已随写操作统一 410 Gone（PMO-48-A T4）。
      */
     @PostMapping("/{type}")
     public ApiResponse<Map<String, Object>> createLegacy(@PathVariable String type, @RequestBody Map<String, Object> body) {
-        if ("rules".equals(type)) return createRule(body);
-        if ("issues".equals(type)) return createIssue(body);
-        return ApiResponse.error(400, "不支持的 type: " + type);
+        log.warn("DQ legacy write blocked: createLegacy type={}", type);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 
     /**
-     * 兼容旧版 DELETE /{type}/{id} 路径 — 委托至对应的新版端点。
+     * 兼容旧版 DELETE /{type}/{id} 路径 — 已随写操作统一 410 Gone（PMO-48-A T4）。
      */
     @DeleteMapping("/{type}/{id}")
     public ApiResponse<Map<String, Object>> deleteLegacy(@PathVariable String type, @PathVariable Long id) {
-        if ("rules".equals(type)) return deleteRule(id);
-        if ("issues".equals(type)) return deleteIssue(id);
-        return ApiResponse.error(400, "不支持的 type: " + type);
+        log.warn("DQ legacy write blocked: deleteLegacy type={} id={}", type, id);
+        return ApiResponse.error(410, "GONE", GONE_MSG);
     }
 }

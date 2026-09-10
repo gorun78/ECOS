@@ -5,12 +5,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Instant;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
@@ -26,7 +30,9 @@ import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
  */
 @Component
 public class TaskSchedulerServiceImpl implements TaskSchedulerService {
-    
+
+    private static final Logger log = LoggerFactory.getLogger(TaskSchedulerServiceImpl.class);
+
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
     private final Map<String, ScheduledFuture<?>> scheduledTasks = new HashMap<>();
     private final Map<String, TaskDescription> taskDescriptions = new HashMap<>();
@@ -59,32 +65,78 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     
     @Override
     public String scheduleTask(TaskDescription taskDescription, String cronExpression) {
-        // 简化实现：Cron表达式解析和调度
-        // 实际应使用Quartz等调度框架
         String scheduleId = UUID.randomUUID().toString();
         taskDescriptions.put(scheduleId, taskDescription);
-        
-        // 简化实现：将Cron表达式转换为固定延迟（实际应使用Cron解析器）
-        long delay = parseCronToDelay(cronExpression);
-        if (delay > 0) {
-            ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
-                () -> {
-                    try {
-                        if (checkDependencies(taskDescription)) {
-                            executeTask(taskDescription);
-                        }
-                    } catch (Exception e) {
-                        // 记录错误
-                    }
-                },
-                delay,
-                delay,
-                TimeUnit.MILLISECONDS
-            );
-            scheduledTasks.put(scheduleId, future);
+
+        // 将 5 位 cron（分 时 日 月 周）补齐为 Spring 6 位（秒 分 时 日 月 周）
+        String normalized = normalizeCron(cronExpression);
+        CronExpression cron;
+        try {
+            cron = CronExpression.parse(normalized);
+        } catch (IllegalArgumentException e) {
+            log.warn("非法 cron 表达式 ' {} '，无法注册定时任务: {}", cronExpression, e.getMessage());
+            return scheduleId;
         }
-        
+
+        // 真实 cron 周期调度：计算当前时刻的下次触发时间，触发后按 next() 重排下一次
+        rescheduleCron(scheduleId, taskDescription, cron);
+        log.info("定时任务已注册 scheduleId={} cron={} taskId={}",
+                scheduleId, normalized, taskDescription.getTaskId());
         return scheduleId;
+    }
+
+    /**
+     * 按 Cron 周期调度：排定下一次触发，并在每次执行后重新计算下一轮。
+     * 相比 scheduleWithFixedDelay 的固定间隔，此实现严格按 cron 语义触发（如"每日 00:00"）。
+     */
+    private void rescheduleCron(final String scheduleId,
+                                final TaskDescription taskDescription,
+                                final CronExpression cron) {
+        if (scheduler.isShutdown()) {
+            return;
+        }
+        try {
+            Instant next = cron.next(Instant.now());
+            if (next == null) {
+                return;
+            }
+            long delayMs = Math.max(1L, next.toEpochMilli() - System.currentTimeMillis());
+            ScheduledFuture<?> future = scheduler.schedule(() -> {
+                try {
+                    if (checkDependencies(taskDescription)) {
+                        executeTask(taskDescription);
+                    }
+                } catch (Exception e) {
+                    log.warn("定时任务执行异常 scheduleId={} task={}: {}",
+                            scheduleId, taskDescription.getTaskId(), e.getMessage());
+                } finally {
+                    // 执行完毕后（无论成败）排定下一次，确保周期不中断
+                    rescheduleCron(scheduleId, taskDescription, cron);
+                }
+            }, delayMs, TimeUnit.MILLISECONDS);
+            // 更新句柄，便于 cancelSchedule 取消（覆盖旧 future）
+            ScheduledFuture<?> prev = scheduledTasks.put(scheduleId, future);
+            if (prev != null && !prev.isCancelled()) {
+                prev.cancel(false);
+            }
+        } catch (Exception e) {
+            log.warn("排定 cron 触发失败 scheduleId={}: {}", scheduleId, e.getMessage());
+        }
+    }
+
+    /**
+     * 将 5 位 cron 补齐为 Spring 6 位（秒位为 0）。
+     * 若已是 6 位则原样返回；解析失败由调用方 CronExpression.parse 抛异常处理。
+     */
+    private String normalizeCron(String cronExpression) {
+        if (cronExpression == null || cronExpression.trim().isEmpty()) {
+            return "0 0 * * * *";
+        }
+        String[] parts = cronExpression.trim().split("\\s+");
+        if (parts.length == 5) {
+            return "0 " + cronExpression.trim();
+        }
+        return cronExpression.trim();
     }
     
     @Override
@@ -196,32 +248,13 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     private void executeTask(TaskDescription taskDescription) {
         try {
             taskManagementService.submitAndExecute(taskDescription);
+            log.info("定时任务已提交执行 task={} taskType={}",
+                    taskDescription.getTaskId(), taskDescription.getTaskType());
         } catch (Exception e) {
-            // 记录错误
+            log.warn("定时任务提交失败 task={}: {}", taskDescription.getTaskId(), e.getMessage());
         }
     }
-    
-    /**
-     * 将Cron表达式转换为延迟时间（简化实现）
-     * 实际应使用Cron解析库（如Quartz的CronExpression）
-     */
-    private long parseCronToDelay(String cronExpression) {
-        // 简化实现：假设Cron表达式格式为 "秒 分 时 日 月 周"
-        // 这里只做简单解析，实际应使用专业的Cron解析库
-        if (cronExpression == null || cronExpression.trim().isEmpty()) {
-            return 0;
-        }
-        
-        // 简化实现：如果Cron表达式包含数字，尝试解析为秒数
-        // 实际应使用Quartz等库进行完整解析
-        try {
-            // 这里只是占位实现，实际应使用Cron解析库
-            return 60000; // 默认1分钟
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-    
+
     /**
      * 关闭调度器
      */

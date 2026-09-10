@@ -4,11 +4,11 @@
  * 主题感知 (useTheme), i18n (db.* 现有 key + dw.tableDrawer.* 新增)
  * 2026-09-07
  */
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
-import { fetchPreview } from '../../api';
+import { fetchPreview, fetchFields, type DataFieldMeta } from './api';
 import type { DataPreview } from '../../api';
 import type { TableInfo } from './types';
 
@@ -21,6 +21,8 @@ interface Props {
 interface FieldColumn {
   name: string;
   type: string;
+  length?: number | null;
+  primaryKey?: boolean;
   isNullable?: boolean;
 }
 
@@ -29,6 +31,7 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
   const { t } = useLanguage();
 
   const [preview, setPreview] = useState<DataPreview | null>(null);
+  const [fields, setFields] = useState<DataFieldMeta[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +43,7 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
     if (table) {
       setLoading(true);
       setPreview(null);
+      setFields(null);
       setError(null);
     }
   }
@@ -52,7 +56,7 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
     return () => window.removeEventListener('keydown', h);
   }, [table, onClose]);
 
-  // 异步加载字段 (limit=1)
+  // 异步加载字段清单 + 数据抽样（并行）
   useEffect(() => {
     if (!table || !table.resourceId) {
       if (table) setError('No resourceId - cannot load field details');
@@ -64,8 +68,24 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const p = await fetchPreview(table.resourceId!, 1);
-        if (!cancelled) setPreview(p);
+        // 并行拉取：字段元数据 + 1 行抽样预览
+        const [f, p] = await Promise.allSettled([
+    fetchFields(table.resourceId!),
+    fetchPreview(table.resourceId!, 1),
+  ]);
+  if (cancelled) return;
+  if (f.status === 'fulfilled') setFields(f.value); else setFields(null);
+  if (p.status === 'fulfilled' && p.value) {
+    // data-workbench fetchPreview returns {columns, rows}；根层 DataPreview 还要求 rowCount，此处回填
+    const rowCount = p.value.rows?.length ?? 0;
+    const rp = p.value as unknown as { columns: { name: string; type: string; label?: string }[]; rows: Record<string, unknown>[]; rowCount?: number };
+    setPreview({ columns: rp.columns ?? [], rows: rp.rows ?? [], rowCount: rowCount });
+  } else {
+    setPreview(null);
+  }
+  if (f.status === 'rejected' && p.status === 'rejected') {
+    setError(f.reason instanceof Error ? f.reason.message : String(f.reason));
+  }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -78,10 +98,20 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
 
   const open = !!table;
   const label = table?.name ?? '';
-  const columns: FieldColumn[] = (preview?.columns ?? []).map(c => ({
-    name: c.label || c.name,
-    type: c.type,
-  }));
+  // 优先使用 fetchFields 的权威字段元数据（有 length/PK），其次回退 preview 的列
+  const columns: FieldColumn[] = (fields && fields.length > 0
+    ? fields.map((f: DataFieldMeta) => ({
+        name: f.fieldName,
+        type: f.dataType,
+        length: f.dataLength ?? null,
+        primaryKey: f.primaryKey,
+        isNullable: f.nullable,
+      }))
+    : (preview?.columns ?? []).map(c => ({
+        name: c.label || c.name,
+        type: c.type,
+      }))
+  );
 
   // 平滑展开/收起: 用 CSS transition
   const drawerStyle: React.CSSProperties = {
@@ -175,6 +205,8 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
                       <th className="px-3 py-2 text-left font-semibold w-8" style={{ color: styles.cardTextMuted }}>#</th>
                       <th className="px-3 py-2 text-left font-semibold" style={{ color: styles.cardTextMuted }}>{t('db.col.field') || '字段名'}</th>
                       <th className="px-3 py-2 text-left font-semibold" style={{ color: styles.cardTextMuted }}>{t('db.col.type') || '类型'}</th>
+                      <th className="px-3 py-2 text-left font-semibold" style={{ color: styles.cardTextMuted }}>{t('db.col.length') || '长度'}</th>
+                      <th className="px-3 py-2 text-left font-semibold w-12" style={{ color: styles.cardTextMuted }}>{t('db.col.primaryKey') || '主键'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -183,6 +215,12 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
                         <td className="px-3 py-1.5 font-mono text-[10px]" style={{ color: styles.cardTextMuted }}>{i + 1}</td>
                         <td className="px-3 py-1.5 font-mono" style={{ color: styles.cardText }}>{c.name}</td>
                         <td className="px-3 py-1.5 font-mono text-[10px]" style={{ color: styles.cardTextMuted }}>{c.type}</td>
+                        <td className="px-3 py-1.5 font-mono text-[10px]" style={{ color: styles.cardTextMuted }}>{c.length != null ? c.length : '-'}</td>
+                        <td className="px-3 py-1.5">
+                          {c.primaryKey
+                            ? <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${styles.successBg} ${styles.successText}`}>{t('db.primaryYes') || 'PK'}</span>
+                            : <span className="text-[10px]" style={{ color: styles.cardTextMuted }}>—</span>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

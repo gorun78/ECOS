@@ -5,11 +5,15 @@ import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataAsyncTrigger;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataStrategyConfig;
+import com.chinacreator.gzcm.engine.data.metadata.MetadataCollectTaskParser;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -52,11 +56,14 @@ public class MetadataStrategyCompatController {
 
     private final DataSourceService dataSourceService;
     private final MetadataAsyncTrigger asyncTrigger;
+    private final TaskSchedulerService taskScheduler;
 
     public MetadataStrategyCompatController(DataSourceService dataSourceService,
-                                            MetadataAsyncTrigger asyncTrigger) {
+                                            MetadataAsyncTrigger asyncTrigger,
+                                            TaskSchedulerService taskScheduler) {
         this.dataSourceService = dataSourceService;
         this.asyncTrigger = asyncTrigger;
+        this.taskScheduler = taskScheduler;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -136,6 +143,14 @@ public class MetadataStrategyCompatController {
             }
         }
 
+        // 切换到 ON_SCHEDULE 时注册 cron 定时任务（复用 runtime-task 的 TaskSchedulerService，§2.5）
+        if (MetadataStrategyConfig.STRATEGY_ON_SCHEDULE.equalsIgnoreCase(cfg.getStrategy())) {
+            registerSchedule(datasourceId, cfg.getScheduleCron());
+        } else {
+            // 非 ON_SCHEDULE 时清理可能已存在的旧定时任务（避免残留调度任务在数据源移到 MANUAL/ON_SAVE 后仍触发）
+            cancelScheduleForDatasource(datasourceId);
+        }
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("datasourceId", datasourceId);
         data.put("strategy", cfg.getStrategy());
@@ -145,5 +160,52 @@ public class MetadataStrategyCompatController {
         data.put("success", true);
 
         return ApiResponse.success("ok", data);
+    }
+
+    /**
+     * 注册数据源定时采集 cron 任务。
+     * 复用 runtime-task 的 {@link TaskSchedulerService#scheduleTask(TaskDescription, String)}，
+     * 避免自建 ScheduledExecutorService（§2.5 任务统一走 runtime-task）。
+     *
+     * @param datasourceId    数据源 ID
+     * @param scheduleCron    5 位 cron 表达式（分 时 日 月 周）；为空时回退默认 "0 0 * * *"
+     */
+    private void registerSchedule(String datasourceId, String scheduleCron) {
+        String cron = (scheduleCron == null || scheduleCron.trim().isEmpty()) ? "0 0 * * *" : scheduleCron.trim();
+        try {
+            TaskDescription desc = new TaskDescription();
+            desc.setTaskId("META_SCHEDULED_" + datasourceId);
+            desc.setTaskName("元数据定时采集: " + datasourceId);
+            desc.setTaskType(MetadataCollectTaskParser.TASK_TYPE);
+            desc.setPriority(5);
+            desc.setCreatedBy("metadata-strategy");
+            java.util.Map<String, Object> params = new LinkedHashMap<>();
+            params.put("datasourceId", datasourceId);
+            desc.setParameters(params);
+            String scheduleId = taskScheduler.scheduleTask(desc, cron);
+            log.info("Compat: ON_SCHEDULE registered datasource={} cron={} scheduleId={}", datasourceId, cron, scheduleId);
+        } catch (Exception e) {
+            // 不阻断主流程 — 仅记录
+            log.warn("Compat: 注册定时采集任务失败 datasource={}: {}", datasourceId, e.getMessage());
+        }
+    }
+
+    /** 取消该数据源已存在的定时采集任务（cron 改为非 ON_SCHEDULE 或停用 ON_SCHEDULE 时调用） */
+    private void cancelScheduleForDatasource(String datasourceId) {
+        try {
+            List<String> all = taskScheduler.getScheduledTasks();
+            for (String tid : all) {
+                if (String.valueOf(tid).contains(datasourceId)) {
+                    try {
+                        taskScheduler.cancelSchedule(tid);
+                        log.info("Compat: cancelled stale schedule for datasource={} scheduleId={}", datasourceId, tid);
+                    } catch (Exception e) {
+                        log.debug("cancelSchedule 失败 scheduleId={}: {}", tid, e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("查询已注册定时任务失败: {}", e.getMessage());
+        }
     }
 }

@@ -69,6 +69,11 @@ auth:
       - "/api/v1/pipeline/**"
       - "/api/pipeline/**"
       - "/api/v1/dq/**"
+      # ── PMO-48-A T2: DQ 裸路径白名单 (与 /api/v1/dq/** 双路径豁免) ──
+      - "/api/dq/**"
+      # PMO-48-B T7b: scores API 双路径
+      - "/api/v1/dq/scores/**"
+      - "/api/dq/scores/**"
       - "/api/v1/query/**"
       - "/api/v1/causal/**"
       - "/api/v1/monitor/**"

@@ -36,7 +36,8 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
      * key 必须以 "/" 结尾以确保完整前缀匹配。
      */
     private static final Map<String, String> V1_REWRITE_MAP = Map.ofEntries(
-        Map.entry("/api/v1/dq/",           "/api/dq/"),
+        // PMO-48-A T3: /api/v1/dq/ KEEP（对齐 pipeline 模式）— 删除原 v1→去v1 REMOVE 条目；
+        // 新 DqGovernanceController 直接映射 /api/v1/dq/**，若 rewrite 成 /api/dq/* 将 404。
         Map.entry("/api/v1/agent-mesh/",   "/api/agent-mesh/"),
         // PMO-3J: /api/v1/pipeline/ rewrite removed — new PipelineController
         // is mapped at /api/v1/pipeline directly (no legacy /api/pipeline controller
@@ -85,7 +86,9 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/agent/",           "/api/v1/agent/"),
         Map.entry("/api/agent-call/",      "/api/v1/agent-call/"),
         Map.entry("/api/alerts/",          "/api/v1/alerts/"),
-        Map.entry("/api/portal/",          "/api/v1/portal/")
+        Map.entry("/api/portal/",          "/api/v1/portal/"),
+        // ── PMO-48-A T2: /api/dq/ → /api/v1/dq/ 反向重写 (DQ 三滤波器, 与 pipeline 同粒度) ──
+        Map.entry("/api/dq/",              "/api/v1/dq/")
     );
 
     /** 检查给定路径是否需要反向重写 */

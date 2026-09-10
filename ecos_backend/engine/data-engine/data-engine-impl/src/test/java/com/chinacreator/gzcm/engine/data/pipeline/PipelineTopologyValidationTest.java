@@ -46,6 +46,7 @@ class PipelineTopologyValidationTest {
     private ConnectorFactory connectorFactory;
     private JdbcTemplate jdbc;
     private com.chinacreator.gzcm.engine.data.DataSourceService dataSourceService;
+    private com.chinacreator.gzcm.engine.data.UdfService udfService;
     private PipelineExecutionService service;
 
     @BeforeEach
@@ -54,8 +55,9 @@ class PipelineTopologyValidationTest {
         this.connectorFactory = mock(ConnectorFactory.class);
         this.jdbc = mock(JdbcTemplate.class);
         this.dataSourceService = mock(com.chinacreator.gzcm.engine.data.DataSourceService.class);
+        this.udfService = mock(com.chinacreator.gzcm.engine.data.UdfService.class);
         this.service = new PipelineExecutionService(
-                repository, connectorFactory, jdbc, dataSourceService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService);
     }
 
     // ─── A. 环检测 ────────────────────────────────────

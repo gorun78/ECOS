@@ -144,6 +144,13 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 // ── PMO-45 T5: datasource 双路径豁免 (PMO45DataSourceController) ──
                 || path.startsWith("/api/v1/datasource")
                 || path.startsWith("/datasource")
+                // ── PMO-48-A T2: DQ 基础设施双路径豁免 (T3 DqGovernanceController) ──
+                // 显式写 /api/v1/dq 与 /api/dq 完整前缀，不依赖父级 /** 通配 (Ant 路径陷阱)
+                || path.startsWith("/api/v1/dq")
+                || path.startsWith("/api/dq")
+                // PMO-48-B T7b: /api/v1/dq/scores 与 /api/dq/scores 双路径
+                || path.startsWith("/api/v1/dq/scores")
+                || path.startsWith("/api/dq/scores")
                 ) {
             return true;
         }

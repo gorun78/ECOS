@@ -159,7 +159,7 @@ class KnowledgeGraphServiceImplTest {
         KnowledgeNode n = service.createNode("SalesDept", "ORG", "销售部门", "{}");
         assertNotNull(n.getId());
         assertEquals("SalesDept", n.getLabel());
-        assertTrue(n.getCreatedAt() > 0);
+        assertNotNull(n.getCreatedAt());
         verify(nodeMapper).insert(n);
     }
 

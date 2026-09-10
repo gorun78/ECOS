@@ -81,7 +81,7 @@ export function AddConnectionModal({
     actualKind: (ncExtra.actualKind as string) ?? undefined,
   };
 
-  const commonObj: ObjStorageProps = {
+  const commonObj: Omit<ObjStorageProps, 't'> = {
     endpointUrl: (ncExtra.endpointUrl as string) ?? newConnHost,
     setEndpointUrl: (v) => setNcExtraField('endpointUrl', v),
     bucket: (ncExtra.bucket as string) ?? '',
@@ -89,12 +89,12 @@ export function AddConnectionModal({
     accessKey: (ncExtra.accessKey as string) ?? '',
     setAccessKey: (v) => setNcExtraField('accessKey', v),
     secretKey: (ncExtra.secretKey as string) ?? newConnPassword,
-    setSecretKey: (v) => setNcExtraField('secretKey', v) || setNewConnPassword(v),
+    setSecretKey: (v) => { setNcExtraField('secretKey', v); setNewConnPassword(v); },
     region: (ncExtra.region as string) ?? '',
     setRegion: (v) => setNcExtraField('region', v),
   };
 
-  const commonFile: FileSourceProps = {
+  const commonFile: Omit<FileSourceProps, 't'> = {
     filePath: (ncExtra.filePath as string) ?? '',
     setFilePath: (v) => setNcExtraField('filePath', v),
     delimiter: (ncExtra.delimiter as string) ?? ',',
@@ -107,10 +107,10 @@ export function AddConnectionModal({
     setRowLimit: (v) => setNcExtraField('rowLimit', v),
   };
 
-  const commonMinio: MinioProps = {
+  const commonMinio: Omit<MinioProps, 't'> = {
     endpointUrl: (ncExtra.endpointUrl as string) ?? newConnHost,
     setEndpointUrl: (v) => setNcExtraField('endpointUrl', v),
-    listenPort: (ncExtra.listenPort as number) ?? newConnPort || 9000,
+    listenPort: (ncExtra.listenPort as number) ?? (newConnPort || 9000),
     setListenPort: (v) => setNcExtraField('listenPort', v),
     bucket: (ncExtra.bucket as string) ?? '',
     setBucket: (v) => setNcExtraField('bucket', v),
@@ -119,12 +119,12 @@ export function AddConnectionModal({
     accessKey: (ncExtra.accessKey as string) ?? '',
     setAccessKey: (v) => setNcExtraField('accessKey', v),
     secretKey: (ncExtra.secretKey as string) ?? newConnPassword,
-    setSecretKey: (v) => setNcExtraField('secretKey', v) || setNewConnPassword(v),
+    setSecretKey: (v) => { setNcExtraField('secretKey', v); setNewConnPassword(v); },
     pathPrefix: (ncExtra.pathPrefix as string) ?? '',
     setPathPrefix: (v) => setNcExtraField('pathPrefix', v),
   };
 
-  const commonFs: FsProps = {
+  const commonFs: Omit<FsProps, 't'> = {
     rootPath: (ncExtra.rootPath as string) ?? '',
     setRootPath: (v) => setNcExtraField('rootPath', v),
     pattern: (ncExtra.pattern as string) ?? '',

@@ -162,8 +162,16 @@ let taskId = '';
   try {
     const { status, json } = await curl('POST', `/api/v1/pipeline/definitions/${defId}/execute`, null, authHeaders());
     if (json?.code === 403) {
-      // ABAC DENY（安全服务降级 / no admin token scope）— 对 smoke 不 fail，记录原因
-      done(sE, `ABAC deny (code=403 msg=${json.message}) — 符合默认 DENY 铁律 §2.4⑥`);
+      // ABAC DENY — for smoke test, allow PASS if reason is DENY_BY_POLICY
+      // (OPA policy not yet loaded in this environment); FAIL if SECURITY_ENGINE_UNAVAILABLE
+      const msg = json.message || '';
+      if (/DENY_BY_POLICY|OPA.*deny/i.test(msg)) {
+        done(sE, `ABAC deny by policy (msg=${msg}) — OPA policy loaded`);
+      } else if (/SECURITY_ENGINE_UNAVAILABLE/i.test(msg)) {
+        fail(sE, `ABAC deny (SECURITY_ENGINE_UNAVAILABLE) — OPA 无策略，见 pipeline-ABAC-semantic-note.md`);
+      } else {
+        fail(sE, `ABAC 异常拒绝 (code=403 msg=${msg})`);
+      }
     } else if (status === 200 && json?.success) {
       taskId = json?.data?.taskId || '';
       done(sE, `taskId=${taskId}`);

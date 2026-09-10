@@ -7,8 +7,9 @@ import type { DataConnection, TableInfo } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
 
-import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff, fetchPreview } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, triggerCollectSync, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff, fetchFields, type DataFieldMeta } from '../api';
 import HistoryVersionCompareModal from '../HistoryVersionCompareModal';
+import CollectProgressPanel from '../CollectProgressPanel';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
   { value: 'MANUAL', key: 'dw.strategy.manual' },
@@ -363,8 +364,30 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                         onChange={async e => {
                           const newTrigger = e.target.value;
                           const newCount = conn.strategy?.countMethod || 'OFF';
+                          const newCron = conn.strategy?.scheduleCron;
                           setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: newTrigger as any } } : c));
-                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
+                          // PMO-37 增强：ON_SAVE 自动模式 → 提交完整元数据采集任务
+                          // 选择 ON_SAVE 即"保存数据源时自动"，需立即触发一次采集以同步最新元数据，
+                          // 否则列表目录停留在陈旧状态，UI 上难以感知"自动采集"已生效。
+                          if (newTrigger === 'ON_SAVE' && collectTaskId === null) {
+                            setCollecting(true);
+                            try {
+                              const r = await triggerCollectSync(conn.id);
+                              if (r?.taskId) {
+                                setCollectTaskId(r.taskId);
+                                setCollectStatus(null);
+                                showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
+                              } else {
+                                showToast('warning', t('dw.strategy.autoCollectFallback') || '自动采集任务提交失败，已回退轻量拉取');
+                                const fresh = await fetchDataSourceResources(conn.id);
+                                const tables = Array.isArray(fresh) ? fresh : [];
+                                setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
+                              }
+                            } finally {
+                              setCollecting(false);
+                            }
+                          }
                         }}
                         className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
                       >
@@ -411,15 +434,59 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                       </select>
                     </div>
                     <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("dw.strategy.hint")}</p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {/* 保存参数：仅保存策略配置并同步一次资源，不触发采集任务 */}
+                      <button
+                        disabled={collecting || collectTaskId !== null}
+                        onClick={async () => {
+                          try {
+                            const ok = await saveMetadataStrategy(conn.id,
+                              conn.strategy?.trigger || 'MANUAL',
+                              conn.strategy?.countMethod || 'OFF',
+                              conn.strategy?.scheduleCron);
+                            // PMO-37 增强：ON_SAVE 自动模式的"保存参数" → 提交完整采集任务
+                            // 用户单独点"保存参数"且当前为 ON_SAVE 时，按"保存数据源时自动"语义，
+                            // 完整触发一次采集任务（走 CollectProgressPanel 实时进度），而非轻量拉取。
+                            if (ok && conn.strategy?.trigger === 'ON_SAVE' && collectTaskId === null) {
+                              setCollecting(true);
+                              try {
+                                const r = await triggerCollectSync(conn.id);
+                                if (r?.taskId) {
+                                  setCollectTaskId(r.taskId);
+                                  setCollectStatus(null);
+                                  showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
+                                } else {
+                                  // 任务提交失败 → 回退轻量拉取，至少保证目录刷新
+                                  const fresh = await fetchDataSourceResources(conn.id);
+                                  const tables = Array.isArray(fresh) ? fresh : [];
+                                  setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
+                                  showToast('warning', t('dw.strategy.autoCollectFallback') || '参数已保存，自动采集任务提交失败已回退轻量拉取');
+                                }
+                              } finally {
+                                setCollecting(false);
+                              }
+                            } else if (ok) {
+                              showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
+                            } else {
+                              showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
+                            }
+                          } catch (e) {
+                            console.warn('[data-workbench] save params failed:', e);
+                            showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
+                          }
+                        }}
+                        className={`px-2 py-1 text-[11px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1`}
+                      >
+                        <LucideIcon name="Save" size={11} />
+                        {t('dw.strategy.saveParams') || '保存参数'}
+                      </button>
                       <button
                         disabled={collecting || collectTaskId !== null}
                         onClick={async () => {
                           setCollecting(true);
                           try {
-                            // Wave-3 lower 注：triggerCollectSync 端点暂未落地（Wave3 上 补齐）；
-                            // 这里保留元数据异步任务的轮询入口；详见 fetchCollectStatus。
-                            const r = await triggerMetadataCollect(conn.id);
+                            // 同步立即采集：走 triggerCollectSync（后端任务引擎异步执行 + 前端 2s 轮询进度）
+                            const r = await triggerCollectSync(conn.id);
                             if (r?.taskId) {
                               setCollectTaskId(r.taskId);
                               setCollectStatus(null);
@@ -437,7 +504,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                         {(collecting || collectTaskId !== null) ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
                       </button>
                     </div>
-                    {/* 元数据采集当前轮询状态（异步任务中心统一展示，本地 inline 面板已下线） */}
+                    {/* 同步采集进度面板（CollectProgressPanel）在底部 console 区呈现（见主返回体末端） */}
                     <div className={`text-[10px] ${styles.cardTextMuted}`}>
                       {t("dw.strategy.lastCollect")}:{' '}
                       {conn.metadataConfig?.lastCollectTime
@@ -646,7 +713,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             </div>
           </div>
 
-          {/* Diagnostic Log Terminal */}
+          {/* Diagnostic Log Terminal — 连接器调试面板 */}
           {testingLogs.length > 0 && (
             <div className={`${styles.sidebarBg} p-4 rounded-xl text-xs font-mono ${styles.sidebarText} space-y-1.5 border ${styles.sidebarBorder} select-text leading-relaxed`}>
               <div className={`text-[10px] ${styles.cardTextMuted} tracking-wider uppercase font-semibold mb-2 border-b ${styles.sidebarBorder} pb-1 flex justify-between items-center select-none`}>
@@ -665,12 +732,25 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
             </div>
           )}
 
+          {/* PMO-37 修复：采集实时进度面板 — 与连接器调试面板同窗口展示，
+              替代原先在右侧独立新窗口的行为，避免对抗布局切换。
+              CollectProgressPanel 渲染在详情视图末尾 so 它紧贴调试面板，
+              用户在同一窗口内同时看到采集进度 + 调试日志。 */}
+          {collectTaskId !== null && (
+            <CollectProgressPanel
+              taskId={collectTaskId}
+              status={collectStatus}
+              onClose={() => { if (!collectPollingRef.current) { setCollectTaskId(null); setCollectStatus(null); } }}
+            />
+          )}
+
           {/* SQL Query Console */}
           <InlineSqlConsole datasourceId={conn.id} />
         </div>
       </div>
     );
   })()}
+
   {editingConn && (
     <EditConnectionModal
       conn={editingConn}
@@ -678,6 +758,20 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       onCancel={() => setEditingConn(null)}
     />
   )}
+
+  {/* PMO-37 修复：历史版本比较对话框 — 原先已定义 showVersionCompare 状态但
+      在该处遗漏渲染，导致点击「历史版本比较」按钮后无任何 UI 反应（无内容显示）。
+      补上渲染，使用当前选中数据源 id 与名称，onClose 复位 state。 */}
+  {showVersionCompare && selectedConnId && (() => {
+    const activeConn = connections.find(c => c.id === selectedConnId);
+    return activeConn ? (
+      <HistoryVersionCompareModal
+        datasourceId={activeConn.id}
+        datasourceName={activeConn.name}
+        onClose={() => setShowVersionCompare(false)}
+      />
+    ) : null;
+  })()}
 
 </div>
   );
@@ -693,7 +787,10 @@ function TableExpandRow({ connId, table }: { connId: string; table: TableInfo })
   const { styles } = useTheme();
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
-  const [columns, setColumns] = useState<{ name: string; type: string; label?: string }[]>(table.columns || []);
+  // 字段元数据（name/type/length/primaryKey）——优先窗口 4 列表格展示
+  const [fieldRows, setFieldRows] = useState<{ name: string; type: string; length?: number | null; primaryKey?: boolean }[]>(
+    (table.columns || []).map(c => ({ name: c.name, type: c.type, length: null as number | null, primaryKey: false }))
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadedRef = useRef(false);
@@ -701,19 +798,24 @@ function TableExpandRow({ connId, table }: { connId: string; table: TableInfo })
   const toggle = useCallback(() => {
     setExpanded(prev => {
       const next = !prev;
-      // 首次展开时懒加载全量列
+      // 首次展开时懒加载字段元数据（名称/类型/长度/主键）
       if (next && !loadedRef.current && table.resourceId) {
         setLoading(true);
         setError(null);
         (async () => {
           try {
-            const p = await fetchPreview(table.resourceId!, 1);
-            const cols = (p?.columns ?? []).map(c => ({
-              name: c.name,
-              type: c.type,
-              label: c.label,
-            }));
-            if (cols.length > 0) setColumns(cols);
+            const fs: DataFieldMeta[] = await fetchFields(table.resourceId!);
+            if (Array.isArray(fs) && fs.length > 0) {
+              setFieldRows(fs.map(f => ({
+                name: f.fieldName,
+                type: f.dataType,
+                length: f.dataLength ?? null,
+                primaryKey: f.primaryKey,
+              })));
+            } else if (table.columns && table.columns.length > 0) {
+              // 兜底：字段元数据缺失时退回表目录缓存列（无长度/主键）
+              setFieldRows(table.columns.map(c => ({ name: c.name, type: c.type, length: null as number | null, primaryKey: false })));
+            }
             loadedRef.current = true;
           } catch (e) {
             setError(e instanceof Error ? e.message : String(e));
@@ -724,7 +826,7 @@ function TableExpandRow({ connId, table }: { connId: string; table: TableInfo })
       }
       return next;
     });
-  }, [table.resourceId]);
+  }, [table.resourceId, table.columns]);
 
   const isLoading = expanded && loading;
   const expandedCls = expanded
@@ -783,30 +885,42 @@ function TableExpandRow({ connId, table }: { connId: string; table: TableInfo })
             <div className={`p-3 rounded border text-xs ${styles.dangerText}`} style={{ borderColor: styles.dangerText }}>
               {error}
             </div>
-          ) : columns.length === 0 ? (
+          ) : fieldRows.length === 0 ? (
             <div className={`p-3 rounded border text-center text-xs ${styles.cardTextMuted} ${styles.cardBorder}`}>
               {t('db.preview.empty') || 'No columns'}
             </div>
           ) : (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 text-[11px]">
-              {columns.map((col, i) => (
-                <div
-                  key={col.name + i}
-                  className={`p-1.5 ${styles.appBg} rounded border ${styles.cardBorder} flex flex-col font-mono`}
-                  title={col.name}
-                >
-                  <span className={`${styles.cardText} truncate font-semibold`}>
-                    {col.label || col.name}
-                  </span>
-                  <span className={`text-[9px] ${styles.cardTextMuted} mt-0.5 truncate`} title={col.type}>
-                    {col.type}
-                  </span>
-                </div>
-              ))}
+            <div className={`border rounded-lg overflow-hidden ${styles.cardBorder}`}>
+              <table className="w-full text-xs" style={{ background: styles.cardBg }}>
+                <thead>
+                  <tr className={`border-b ${styles.cardBorder}`} style={{ background: styles.sidebarBg }}>
+                    <th className="px-3 py-2 text-left font-bold text-[10px] uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>#</th>
+                    <th className="px-3 py-2 text-left font-bold text-[10px] uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>{t('db.col.field') || '字段名称'}</th>
+                    <th className="px-3 py-2 text-left font-bold text-[10px] uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>{t('db.col.type') || '类型'}</th>
+                    <th className="px-3 py-2 text-left font-bold text-[10px] uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>{t('db.col.length') || '长度'}</th>
+                    <th className="px-3 py-2 text-left font-bold text-[10px] uppercase tracking-wider w-10" style={{ color: styles.cardTextMuted }}>{t('db.col.primaryKey') || '主键'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fieldRows.map((row, i) => (
+                    <tr key={row.name + i} className={`border-b last:border-0 ${styles.cardBorder}`} style={{ background: styles.cardBg }}>
+                      <td className="px-3 py-1.5 font-mono text-[10px]" style={{ color: styles.cardTextMuted }}>{i + 1}</td>
+                      <td className="px-3 py-1.5 font-mono" style={{ color: styles.cardText }}>{row.name}</td>
+                      <td className="px-3 py-1.5 font-mono text-[10px]" style={{ color: styles.cardTextMuted }}>{row.type}</td>
+                      <td className="px-3 py-1.5 font-mono text-[10px]" style={{ color: styles.cardTextMuted }}>{row.length != null ? row.length : '-'}</td>
+                      <td className="px-3 py-1.5">
+                        {row.primaryKey
+                          ? <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${styles.successBg} ${styles.successText}`}>{t('db.primaryYes') || 'PK'}</span>
+                          : <span className="text-[10px] font-mono" style={{ color: styles.cardTextMuted }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           <div className={`text-[10px] ${styles.cardTextMuted} font-mono pt-1`}>
-            {t('dw.expandRow.colCount').replace('{n}', String(columns.length))}
+            {t('dw.expandRow.colCount').replace('{n}', String(fieldRows.length))}
           </div>
         </div>
       </div>

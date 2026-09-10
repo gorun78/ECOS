@@ -54,6 +54,12 @@ public class SecurityConfig {
                     "/api/v1/pipeline/debug/**",
                     "/api/pipeline/debug/**",
                     "/api/v1/dq/**",
+                    // ── PMO-48-A T2: DQ 裸路径双路径豁免 ──
+                    "/api/dq/**",
+                    // PMO-48-B T7b: /api/v1/dq/scores/** (score API)
+                    "/api/v1/dq/scores/**",
+                    // PMO-48-B T7b: /api/dq/scores/** 双路径
+                    "/api/dq/scores/**",
                     "/api/v1/query/**",
                     "/api/v1/causal/**",
                     "/api/v1/monitor/**",
@@ -115,6 +121,9 @@ public class SecurityConfig {
                     // /api/v1/abac/**, /api/v1/audit/**, /api/v1/data-masking/**,
                     // /api/v1/policy-engine/**, /api/v1/data-permission/**,
                     // /api/security/**, /api/v1/security/** — 全部需认证
+                    // Triangle-47: pipeline ABAC 裁决（内部 service→service 调用，鉴权由 OPA 策略本身把关）
+                    "/api/v1/security/policy-engine/**",
+                    "/api/security/policy-engine/**",
                     // ── Cases
                     "/cases/**",
                     // ── Alerts + WebSocket

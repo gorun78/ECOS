@@ -1,7 +1,7 @@
 # ECOS — Root Monorepo Guide
 
 > **ECOS** = Enterprise Cognitive Operating System. Core pipeline: data governance → knowledge graph → LLM agent deployment.
-> WSL path: `/home/guorongxiao/ECOS/` | Windows UNC: `\\wsl$\Ubuntu\home\guorongxiao\ECOS\`
+> Windows path: `D:\workspace\javaprojects\ECOS\`（2026-09-09 起已从 WSL 迁移到 Windows 原生开发）
 
 ## Repo Structure
 
@@ -15,25 +15,34 @@
 | `docs/` | Markdown | — | Kanban, architecture, specs, handover docs |
 | `ecos-git-repos/` | Git data dirs | — | `.gitkeep` placeholders for pipeline/ontology data |
 
-## Backend Quick Commands (WSL)
+启动命令（PowerShell 一行式，**不创建临时脚本**）：
 
-```bash
-source ~/ecos-env.sh                    # set JAVA_HOME, Maven, aliases
-cd ~/ECOS/ecos_backend
-mvn clean install -DskipTests           # build standard edition
-bash build.sh standard|enterprise|ultimate  # edition-specific build
-mvn compile -pl gateway -am             # compile gateway + deps only
-mvn test -pl common/common-api          # single-module test
-bash ~/start-gateway.sh                 # start gateway (includes unset HOME workaround)
+```powershell
+# 后端（enterprise profile, fat-JAR, 端口 8080）
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\start-gateway.ps1
+
+# 前端
+cd D:\workspace\javaprojects\ECOS\ecos_frontend && npm run dev
+
+# 构建
+& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests
 ```
 
-**Pre-commit**: `bash ~/pre-check.sh` runs compile → ArchUnit → Enforcer → API contract tests.
+**_win_tasks/ 脚本清单**（只增不改，禁止为新任务临时创建）：
+| 脚本 | 用途 |
+|------|------|
+| `start-gateway.ps1` | 后端启动（推荐，加载 JWT + DEEPSEEK + infra 检查） |
+| `fe_win.bat` | 前端 dev 启动 |
+| `gateway_run.bat` | mvn spring-boot:run 方式启动（开发调试用，慢） |
+| `backend_resume.cmd` | 后端停止/恢复管理 |
 
-## Frontend Quick Commands
+**Java**: `C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot` | **Maven**: `D:\JavaProjects\env\apache-maven-3.9.11`
 
-```bash
-cd ecos_frontend
-npm install                             # or pnpm install
+## Frontend Quick Commands (Windows)
+
+```powershell
+cd D:\workspace\javaprojects\ECOS\ecos_frontend
+npm install                             # 首次或依赖变更时
 npm run dev                             # Vite dev server (port 3000), proxies /api→:8080
 npm run build                           # vite build + esbuild server → dist/
 npm run lint                            # tsc --noEmit
@@ -42,6 +51,7 @@ npm run test:watch                      # vitest watch
 ```
 
 **Env**: `GEMINI_API_KEY` in `.env.local` for AI features; `DISABLE_HMR=true` to disable hot reload.
+**Node**: `C:\Program Files\nodejs\node.exe`
 
 ## Three Editions (Maven Profiles)
 
@@ -58,17 +68,30 @@ npm run test:watch                      # vitest watch
 - Flyway disabled (`spring.flyway.enabled: false`)
 - Schema rule: only add columns/tables, never drop
 
-## Infrastructure (ecos-docker)
+## Infrastructure (Windows Docker Desktop)
 
-```bash
-cd ecos-docker && docker-compose up -d   # PG:5432, Neo4j:7474+7687, MinIO:9000, OPA:8181
+基础设施容器运行在 **Windows Docker Desktop**（非 WSL 内部），数据卷持久化为 `ecos_pgdata` / `ecos_neo4jdata` / `ecos_miniodata` 等命名卷。
+
+```powershell
+# 从 Windows PowerShell 直接操作（docker CLI 指向 Docker Desktop server）
+docker ps --filter "name=ecos-"          # 查看容器状态
+docker start ecos-postgres ecos-neo4j ecos-minio ecos-opa ecos-kafka ecos-zookeeper  # 启动全部
+docker stop  ecos-postgres               # 停止单个
+docker exec ecos-postgres psql -U postgres -d sys_man -c "SELECT 1"  # 验证 PG
 ```
 
-## WSL Gotchas
+compose 文件：`ecos-docker/docker-compose.yml`（PG 16:5432, Neo4j 5:7474+7687, MinIO:9000, OPA:8181, Kafka:9092, ZK:2181）
 
-- **UNC path bug**: Hermes redirects `$HOME` → jansi.dll error. Use `~/start-gateway.sh` (contains `unset HOME`)
-- **Maven**: must use WSL-native paths (`~/.m2/repository`), never `/mnt/d/`
-- **Git SSH through proxy**: `GIT_SSH_COMMAND="ssh -o ProxyCommand='nc -X 5 -x 127.0.0.1:7897 %h %p'"`
+## Windows 迁移注意事项（2026-09-09 起）
+
+- **路径**: 所有操作的根目录为 `D:\workspace\javaprojects\ECOS\`，不再使用 WSL 路径
+- **启动脚本**: 统一使用 `_win_tasks/` 下的 4 个核心脚本（见表格），**禁止为新任务创建临时脚本**（架构铁律 #14）
+- **操作原则**: 探测用 RunCommand 内联命令，调试用 logger debug，不用独立脚本
+- **JWT**: `C:\Users\guoro\.config\ecos\jwt-private-key.pem`（start-gateway.ps1 自动加载）
+- **DEEPSEEK**: `C:\Users\guoro\.hermes\profiles\gorunkol\.env`（start-gateway.ps1 自动加载）
+- **Docker**: Windows Docker Desktop 管理（`docker` CLI 直接用），不再走 WSL
+- **清端口**: `Get-NetTCPConnection -LocalPort 8080 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
+- **Git SSH**: 如仍走代理，`$env:GIT_SSH_COMMAND = "ssh -o ProxyCommand=nc -X 5 -x 127.0.0.1:7897 %h %p"`
 
 ## Frontend Conventions
 
@@ -83,8 +106,8 @@ cd ecos-docker && docker-compose up -d   # PG:5432, Neo4j:7474+7687, MinIO:9000,
 
 - Backend API base: `http://localhost:8080/api/v1/...`
 - Frontend dev: `http://localhost:3000` (proxies `/api` and `/datanet` to backend)
-- Smoke test: `node ~/ecos-tests/data-workbench-smoke.mjs` (requires both backend and frontend running)
-- Knowledge base refresh: `cd ecos-kb && python3 scripts/scan_all.py`
+- Smoke test: `node ~/ecos-tests/data-workbench-smoke.mjs`（如需，需要从 Windows 侧适配；目前 ecos-tests 目录在 Windows 检出中不存在）
+- Knowledge base refresh: `cd ecos-kb && python scripts/scan_all.py`
 - Sub-project AGENTS.md files: `ecos_backend/AGENTS.md` (backend arch & rules), `ecos-kb/AGENTS.md` (KB queries)
 
 ## What Not To Do
@@ -117,7 +140,7 @@ ECOS（Enterprise Cognitive Operating System）企业认知操作系统。核心
 
 # 工程结构
 
-ECOS/（WSL /home/guorongxiao/ECOS，Windows 侧 \\wsl.localhost\Ubuntu\home\guorongxiao\ECOS）
+ECOS/（Windows D:\workspace\javaprojects\ECOS）
 ├─ ecos_backend/  Java 17 / SB 3.2.2 单 fat-JAR，入口 gateway/GatewayApplication.java
 │  ├─ gateway/       唯一 Spring Boot 启动器（端口 8080，聚合全部模块）
 │  ├─ common/        common-api（PipelineEvent/ICopilotService 等共享契约）+ common-impl
@@ -148,7 +171,7 @@ ECOS/（WSL /home/guorongxiao/ECOS，Windows 侧 \\wsl.localhost\Ubuntu\home\guo
 4. 基础设施 Driver/LLM 调用/调度/监控一律收敛 runtime（runtime-access / llm-gateway / runtime-task / runtime-monitor），禁止各自封装
 5. DB 铁律：MyBatis + schema 只加不删，Flyway 禁用；跨引擎不操作对方表，cognitive 不新增 DB 表
 6. 前端铁律：禁止硬编码 Tailwind 颜色与中文字符串，图标仅 lucide-react，组件 ≤800 行，每 Tab 独立文件
-7. WSL 环境：~/ecos-env.sh 设环境，~/start-gateway.sh 启动（内置 unset HOME 绕 UNC bug），清端口用 lsof -ti:8080，Git SSH 走代理 127.0.0.1:7897
+7. Windows 环境：启动用 `_win_tasks/start-gateway.ps1`（推荐）或 `start-gateway.bat`（⚠️已知 JWT 解析问题），清端口用 `Get-NetTCPConnection`，Docker 用 Windows Docker Desktop 的 `docker` CLI
 8. PMO 指令开头必须引用架构铁律；原子任务 = 单文件 + curl 验收；单指令 ≤5 Task
 9. 一条代码三套发布：standard(PG) / enterprise(+Neo4j) / ultimate(+Doris)，按 Maven profile 切换
 10. API 只增不改：既有路径与参数签名不可变更

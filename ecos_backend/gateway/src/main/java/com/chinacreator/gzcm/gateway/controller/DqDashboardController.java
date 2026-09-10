@@ -165,152 +165,45 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.success(d);
     }
 
-    // ═══════════════ 创建规则 ═══════════════════
+    // ═══════════════ 创建规则（已下线） ═══════════════════
+
+    /**
+     * PMO-48-A T4：DQ 旧写端点只读兼容下线。
+     * 写操作（创建规则/更新问题/执行规则）统一 405 METHOD_NOT_ALLOWED，
+     * 只读端点（规则列表/问题列表/仪表盘/执行历史）保持只读兼容，读旧表 ecos_dq_rule / ecos_dq_issue。
+     * 新端点在 /api/v1/dq/*（DqGovernanceController，T3 交付）。
+     */
+    private static final String GONE_MSG = "DQ 写操作已迁移到 /api/v1/dq/rules（Phase 1 只读兼容，写操作 Phase 2 在新端点开放）";
 
     @PostMapping("/rules")
     public ApiResponse<Map<String, Object>> createRule(@RequestBody Map<String, Object> body) {
-        String id = UUID.randomUUID().toString().substring(0, 8);
-        String sql = "INSERT INTO ecos_dq_rule (id, code, name, description, rule_type, target_entity, " +
-                     "target_field, rule_expression, severity, status, params, created_at, updated_at) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), NOW(), NOW())";
-        try {
-            dqDashboardService.update(sql,
-                id,
-                body.getOrDefault("code", id),
-                body.get("name"),
-                body.getOrDefault("description", ""),
-                body.getOrDefault("rule_type", "VALIDATION"),
-                body.getOrDefault("target_entity", ""),
-                body.getOrDefault("target_field", ""),
-                body.getOrDefault("rule_expression", ""),
-                body.getOrDefault("severity", "MEDIUM"),
-                body.getOrDefault("status", "ACTIVE"),
-                body.getOrDefault("params", "{}").toString());
-            Map<String, Object> resp = new LinkedHashMap<>();
-            resp.put("id", id);
-            resp.put("name", body.get("name"));
-            resp.put("status", "created");
-            return ApiResponse.success(resp);
-        } catch (Exception e) {
-            log.error("Create DQ rule failed", e);
-            return ApiResponse.internalError("创建DQ规则失败: " + e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: createRule");
+        return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
-    // ═══════════════ 更新问题状态 ═══════════════════
+    // ═══════════════ 更新问题状态（已下线） ═══════════════════
 
     @PutMapping("/issues/{id}")
     public ApiResponse<Map<String, Object>> updateIssue(@PathVariable String id,
                                                          @RequestBody Map<String, Object> body) {
-        String newStatus = (String) body.get("status");
-        String note = (String) body.getOrDefault("resolution_note", "");
-        String resolvedAt = "RESOLVED".equals(newStatus) ? ", resolved_at = NOW()" : "";
-        int rows = dqDashboardService.update(
-            "UPDATE ecos_dq_issue SET status = ?, resolution_note = ?" + resolvedAt + " WHERE id = ?",
-            newStatus, note, id);
-        if (rows == 0) return ApiResponse.notFound("DQ问题 " + id + " 不存在");
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("id", id);
-        resp.put("status", newStatus);
-        return ApiResponse.success(resp);
+        log.warn("DQ legacy write blocked: updateIssue id={}", id);
+        return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
-    // ═══════════════ 执行单条规则 ═══════════════════
+    // ═══════════════ 执行单条规则（已下线） ═══════════════════
 
     @PostMapping("/rules/{ruleId}/execute")
     public ApiResponse<Map<String, Object>> executeRule(@PathVariable String ruleId) {
-        try {
-            // 1. 查询规则
-            List<Map<String, Object>> rules = dqDashboardService.query(
-                "SELECT id, code, name, rule_type, target_entity, target_field, rule_expression " +
-                "FROM ecos_dq_rule WHERE id = ?", (rs, _i) -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", rs.getString("id"));
-                    m.put("code", rs.getString("code"));
-                    m.put("name", rs.getString("name"));
-                    m.put("rule_type", rs.getString("rule_type"));
-                    m.put("target_entity", rs.getString("target_entity"));
-                    m.put("target_field", rs.getString("target_field"));
-                    m.put("rule_expression", rs.getString("rule_expression"));
-                    return m;
-                }, ruleId);
-
-            if (rules.isEmpty()) {
-                return ApiResponse.notFound("DQ规则 " + ruleId + " 不存在");
-            }
-
-            Map<String, Object> rule = rules.get(0);
-            Map<String, Object> result = doExecuteRule(rule);
-
-            return ApiResponse.success("规则执行完成", result);
-        } catch (Exception e) {
-            log.error("Execute DQ rule {} failed", ruleId, e);
-            return ApiResponse.internalError("执行DQ规则失败: " + e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: executeRule ruleId={}", ruleId);
+        return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
-    // ═══════════════ 批量执行 ═══════════════════
+    // ═══════════════ 批量执行（已下线） ═══════════════════
 
     @PostMapping("/execute-all")
     public ApiResponse<Map<String, Object>> executeAll() {
-        try {
-            List<Map<String, Object>> activeRules = dqDashboardService.query(
-                "SELECT id, code, name, rule_type, target_entity, target_field, rule_expression " +
-                "FROM ecos_dq_rule WHERE status = 'ACTIVE' ORDER BY created_at",
-                (rs, _i) -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", rs.getString("id"));
-                    m.put("code", rs.getString("code"));
-                    m.put("name", rs.getString("name"));
-                    m.put("rule_type", rs.getString("rule_type"));
-                    m.put("target_entity", rs.getString("target_entity"));
-                    m.put("target_field", rs.getString("target_field"));
-                    m.put("rule_expression", rs.getString("rule_expression"));
-                    return m;
-                });
-
-            String executionId = UUID.randomUUID().toString().substring(0, 8);
-            int totalRules = activeRules.size();
-            int passed = 0;
-            int failed = 0;
-            List<Map<String, Object>> details = new ArrayList<>();
-
-            for (Map<String, Object> rule : activeRules) {
-                try {
-                    Map<String, Object> r = doExecuteRule(rule);
-                    boolean p = Boolean.TRUE.equals(r.get("passed"));
-                    if (p) passed++; else failed++;
-                    Map<String, Object> detail = new LinkedHashMap<>();
-                    detail.put("ruleId", rule.get("id"));
-                    detail.put("ruleName", rule.get("name"));
-                    detail.put("passed", p);
-                    detail.put("totalRows", r.get("totalRows"));
-                    detail.put("failedRows", r.get("failedRows"));
-                    detail.put("errors", r.get("errors"));
-                    details.add(detail);
-                } catch (Exception ex) {
-                    failed++;
-                    Map<String, Object> detail = new LinkedHashMap<>();
-                    detail.put("ruleId", rule.get("id"));
-                    detail.put("ruleName", rule.get("name"));
-                    detail.put("passed", false);
-                    detail.put("errors", ex.getMessage());
-                    details.add(detail);
-                }
-            }
-
-            Map<String, Object> resp = new LinkedHashMap<>();
-            resp.put("executionId", executionId);
-            resp.put("totalRules", totalRules);
-            resp.put("passed", passed);
-            resp.put("failed", failed);
-            resp.put("details", details);
-
-            return ApiResponse.success("批量执行完成", resp);
-        } catch (Exception e) {
-            log.error("Batch DQ execute failed", e);
-            return ApiResponse.internalError("批量执行失败: " + e.getMessage());
-        }
+        log.warn("DQ legacy write blocked: executeAll");
+        return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
     // ═══════════════ 执行历史 ═══════════════════
@@ -351,147 +244,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         r.put("data", data);
         r.put("total", data.size());
         return ApiResponse.success(r);
-    }
-
-    // ═══════════════ 执行引擎核心 ═══════════════════
-
-    private Map<String, Object> doExecuteRule(Map<String, Object> rule) {
-        String id = (String) rule.get("id");
-        String targetEntity = (String) rule.getOrDefault("target_entity", "");
-        String targetField = (String) rule.getOrDefault("target_field", "");
-        String ruleExpression = (String) rule.getOrDefault("rule_expression", "");
-        String ruleType = (String) rule.getOrDefault("rule_type", "");
-
-        if (targetEntity.isBlank()) {
-            throw new RuntimeException("规则的 target_entity 为空");
-        }
-
-        int totalRows = 0;
-        int failedRows = 0;
-        boolean passed = true;
-        String errorDetails = null;
-
-        try {
-            // 总行数
-            totalRows = dqDashboardService.queryForObject(
-                "SELECT COUNT(*) FROM " + targetEntity, Integer.class);
-
-            if (totalRows == 0) {
-                // 空表视为通过
-                passed = true;
-                failedRows = 0;
-            } else if (ruleExpression.isBlank()) {
-                // 无表达式也视为通过
-                passed = true;
-                failedRows = 0;
-            } else {
-                // 构建验证SQL：统计不满足条件的行数
-                String checkSql;
-                if (isNotNullCheck(ruleExpression, targetField)) {
-                    // NOT_NULL 检查：直接查字段为NULL的行
-                    checkSql = "SELECT COUNT(*) FROM " + targetEntity +
-                               " WHERE " + targetField + " IS NULL OR " +
-                               targetField + " = ''";
-                } else if (isAggregateExpression(ruleExpression)) {
-                    // 聚合表达式（如 COUNT(DISTINCT code) = COUNT(*)）
-                    // 检测是否违反：查询聚合结果，不满足即失败
-                    String countSql = "SELECT " + ruleExpression + " AS check_result FROM " + targetEntity;
-                    Boolean checkPassed = dqDashboardService.queryForObject(countSql, Boolean.class);
-                    passed = Boolean.TRUE.equals(checkPassed);
-                    failedRows = passed ? 0 : 1;
-                    // 聚合检查通过后直接返回
-                    String execId = UUID.randomUUID().toString().substring(0, 16);
-                    dqDashboardService.update(
-                        "INSERT INTO ecos_dq_execution_result (id, rule_id, passed, total_rows, failed_rows, error_details, executed_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, NOW())",
-                        execId, id, passed, totalRows, failedRows, errorDetails);
-                    Map<String, Object> result = new LinkedHashMap<>();
-                    result.put("executionId", execId);
-                    result.put("passed", passed);
-                    result.put("totalRows", totalRows);
-                    result.put("failedRows", failedRows);
-                    result.put("errors", errorDetails);
-                    return result;
-                } else if (isExistsExpression(ruleExpression)) {
-                    // EXISTS 子查询 — 对主表的每一行评估
-                    // 简化：执行 EXISTS 的反向查询
-                    String notExistsSql = "SELECT COUNT(*) FROM " + targetEntity +
-                        " WHERE NOT (" + ruleExpression + ")";
-                    failedRows = dqDashboardService.queryForObject(notExistsSql, Integer.class);
-                } else {
-                    // 通用 WHERE 表达式：不满足条件的行数
-                    checkSql = "SELECT COUNT(*) FROM " + targetEntity +
-                               " WHERE NOT (" + ruleExpression + ")";
-                    failedRows = dqDashboardService.queryForObject(checkSql, Integer.class);
-                }
-
-                passed = (failedRows == 0);
-
-                // 收集失败行样例（最多10条）
-                if (failedRows > 0) {
-                    try {
-                        String sampleSql = "SELECT * FROM " + targetEntity +
-                            " WHERE NOT (" + ruleExpression + ") LIMIT 10";
-                        List<Map<String, Object>> samples = dqDashboardService.query(sampleSql,
-                            (rs2, _i2) -> {
-                                Map<String, Object> row = new LinkedHashMap<>();
-                                if (targetField.isBlank()) {
-                                    row.put("row", rs2.getObject(1));
-                                } else {
-                                    row.put(targetField, rs2.getObject(targetField));
-                                }
-                                return row;
-                            });
-                        errorDetails = "Failed rows sample: " + samples.toString();
-                    } catch (Exception ex) {
-                        errorDetails = "Failed rows: " + failedRows;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            passed = false;
-            errorDetails = e.getMessage();
-            log.warn("Rule execution error for rule {}: {}", id, e.getMessage());
-        }
-
-        // 写入执行结果表
-        String execId = UUID.randomUUID().toString().substring(0, 16);
-        dqDashboardService.update(
-            "INSERT INTO ecos_dq_execution_result (id, rule_id, passed, total_rows, failed_rows, error_details, executed_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, NOW())",
-            execId, id, passed, totalRows, failedRows, errorDetails);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("executionId", execId);
-        result.put("passed", passed);
-        result.put("totalRows", totalRows);
-        result.put("failedRows", failedRows);
-        result.put("errors", errorDetails);
-        return result;
-    }
-
-    /** 判断是否为 NOT NULL 检查类表达式 */
-    private boolean isNotNullCheck(String expression, String field) {
-        if (expression == null || field == null || field.isBlank()) return false;
-        String upper = expression.toUpperCase();
-        return upper.contains("IS NOT NULL") || upper.contains("IS NULL")
-            || upper.contains("!= ''") || upper.contains("<> ''");
-    }
-
-    /** 判断是否为聚合表达式（包含 COUNT、SUM、AVG 等） */
-    private boolean isAggregateExpression(String expression) {
-        if (expression == null) return false;
-        String upper = expression.toUpperCase();
-        return upper.contains("COUNT(") || upper.contains("SUM(")
-            || upper.contains("AVG(") || upper.contains("MAX(")
-            || upper.contains("MIN(");
-    }
-
-    /** 判断是否为 EXISTS 子查询 */
-    private boolean isExistsExpression(String expression) {
-        if (expression == null) return false;
-        String upper = expression.toUpperCase();
-        return upper.contains("EXISTS(") || upper.contains("EXISTS (");
     }
 
     // ═══════════════ T1.2: 因果偏差计算 ═══════════════════

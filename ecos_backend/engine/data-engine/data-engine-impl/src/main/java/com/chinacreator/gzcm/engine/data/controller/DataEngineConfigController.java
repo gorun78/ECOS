@@ -104,6 +104,8 @@ public class DataEngineConfigController {
         DEFAULTS.put("dw.datasource.conn_timeout",     "30000");
         DEFAULTS.put("dw.metadata.collect_timeout",    "60");
         DEFAULTS.put("dw.catalog.search_limit",        "500");
+        // 数据表目录历史版本保留份数（Git 元数据存档，超限自动清理最旧版本）
+        DEFAULTS.put("dw.metadata.history_versions",   "50");
     }
 
     /** config_key 前缀 → 显示子组名 */
@@ -132,6 +134,10 @@ public class DataEngineConfigController {
                 // lazy init — 首次访问自动插入默认配置
                 initDefaultRows();
                 rows = sysConfigService.getByGroup("data-engine");
+            } else {
+                // 补插缺失的默认配置项（版本迭代新增 key 时自动补齐，幂等）
+                ensureMissingDefaults(rows);
+                rows = sysConfigService.getByGroup("data-engine");
             }
             return ApiResponse.success(groupBySubGroup(rows));
         } catch (Exception e) {
@@ -149,6 +155,31 @@ public class DataEngineConfigController {
             log.info("Data engine config defaults initialized, {} items", DEFAULTS.size());
         } catch (Exception ex) {
             log.warn("initDefaultRows partial failure: {}", ex.getMessage());
+        }
+    }
+
+    /** 补插 DEFAULTS 中已定义但库里缺失的配置项（如新增的 dw.metadata.history_versions） */
+    private void ensureMissingDefaults(List<Map<String, Object>> rows) {
+        try {
+            Set<String> existing = new HashSet<>();
+            for (Map<String, Object> row : rows) {
+                Object k = row.get("config_key");
+                if (k != null) {
+                    existing.add(k.toString());
+                }
+            }
+            int added = 0;
+            for (Map.Entry<String, String> e : DEFAULTS.entrySet()) {
+                if (!existing.contains(e.getKey())) {
+                    sysConfigService.upsertValue(e.getKey(), e.getValue(), "data-engine", "string", "");
+                    added++;
+                }
+            }
+            if (added > 0) {
+                log.info("补充缺失的默认配置项 {} 个", added);
+            }
+        } catch (Exception ex) {
+            log.warn("ensureMissingDefaults partial failure: {}", ex.getMessage());
         }
     }
 
