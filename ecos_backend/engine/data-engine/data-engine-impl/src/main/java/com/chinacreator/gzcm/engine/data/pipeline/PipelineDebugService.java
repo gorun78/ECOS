@@ -447,13 +447,36 @@ public class PipelineDebugService {
             throw new ValidationException("sql", "TRANSFORM_SQL: sql 必填");
         }
         long start = System.currentTimeMillis();
-        int updated = jdbc.update(sql);
-        long nodeMs = System.currentTimeMillis() - start;
+        String trimmed = sql.trim();
+        // 按 SQL 首 token 白名单分流（对齐 PipelineExecutionService.executeTransformSql）：
+        // SELECT/SHOW/DESCRIBE/WITH → queryForList（查询）；其余 DML/DDL → update
+        String firstToken = trimmed.split("\\s+")[0].toUpperCase(Locale.ROOT);
+        long updated;
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("updatedRows", (long) updated);
-        snapshot.put("rowsProcessed", s.totalRows + updated);
-        snapshot.put("sqlPreview", sql.length() > 120 ? sql.substring(0, 120) + "..." : sql);
-        return new NodeResult(updated, null, List.of("updatedRows"), snapshot, nowIso(), nodeMs, null);
+        switch (firstToken) {
+            case "SELECT", "SHOW", "DESCRIBE", "WITH" -> {
+                List<Map<String, Object>> rows = jdbc.queryForList(trimmed);
+                updated = rows.size();
+                snapshot.put("queryRows", updated);
+                snapshot.put("rowsProcessed", s.totalRows + updated);
+                snapshot.put("sqlPreview", sql.length() > 120 ? sql.substring(0, 120) + "..." : sql);
+            }
+            default -> {
+                updated = jdbc.update(trimmed);
+                snapshot.put("updatedRows", (long) updated);
+                snapshot.put("rowsProcessed", s.totalRows + updated);
+                snapshot.put("sqlPreview", sql.length() > 120 ? sql.substring(0, 120) + "..." : sql);
+            }
+        }
+        long nodeMs = System.currentTimeMillis() - start;
+        List<String> colsOut;
+        if ("SELECT".equals(firstToken) || "WITH".equals(firstToken)
+                || "SHOW".equals(firstToken) || "DESCRIBE".equals(firstToken)) {
+            colsOut = updated > 0 ? List.of("transformed") : Collections.emptyList();
+        } else {
+            colsOut = List.of("updatedRows");
+        }
+        return new NodeResult(updated, null, colsOut, snapshot, nowIso(), nodeMs, null);
     }
 
     @SuppressWarnings("unchecked")
@@ -597,7 +620,8 @@ public class PipelineDebugService {
         if (s.executionId == null) {
             PipelineExecution exec = new PipelineExecution();
             exec.setId(UUID.randomUUID().toString().replace("-", ""));
-            exec.setDefinitionId(s.definitionId);
+            // ad-hoc 调试会话无真实 definitionId；用 id 兜底（pipeline_id 为 NOT NULL 约束）
+            exec.setDefinitionId(s.definitionId != null ? s.definitionId : ("adhoc-" + s.id));
             exec.setStatus("RUNNING");
             repository.insertExecution(exec);
             s.executionId = exec.getId() != null ? exec.getId() : UUID.randomUUID().toString().replace("-", "");
