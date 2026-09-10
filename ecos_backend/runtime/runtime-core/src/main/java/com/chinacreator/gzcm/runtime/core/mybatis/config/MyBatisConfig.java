@@ -54,7 +54,10 @@ public class MyBatisConfig {
         SqlSessionFactoryBean sessionFactory = new SqlSessionFactoryBean();
         sessionFactory.setDataSource(dataSource);
         
-        // Set mapper XML locations
+        // PMO-49 D1 补丁: 仅扫 mapper/**/*.xml，不再兼容 **/dao/**/*-sql.xml。
+        // 那些 -sql.xml 是历史遗留 "SQL 占位符"（AbacPolicyDaoImpl 通过
+        // ISystemDatabaseAccess.executeInsertFromConfig 独立读取），非 MyBatis
+        // mapper 契约。进 buildSqlSessionFactory 会触发 Xerces DOCTYPE 严格校验失败。
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         List<Resource> mapperLocations = new ArrayList<>();
         try {
@@ -64,14 +67,6 @@ public class MyBatisConfig {
             }
         } catch (Exception e) {
             // Ignore if no mapper resources found
-        }
-        try {
-            Resource[] sqlResources = resolver.getResources("classpath*:**/dao/**/*-sql.xml");
-            for (Resource resource : sqlResources) {
-                mapperLocations.add(resource);
-            }
-        } catch (Exception e) {
-            // Ignore if no SQL resources found
         }
         if (!mapperLocations.isEmpty()) {
             sessionFactory.setMapperLocations(mapperLocations.toArray(new Resource[0]));
