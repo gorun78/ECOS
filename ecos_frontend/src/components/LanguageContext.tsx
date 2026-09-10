@@ -38,7 +38,12 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    // Chinese is the absolute default
+    // Chinese is the absolute default; tests can force via `__ecos_test_locale`
+    // (set on globalThis by *.test.tsx beforeEach) to assert i18n keys.
+    const g = globalThis as unknown as { __ecos_test_locale?: Locale };
+    if (g.__ecos_test_locale) {
+      return g.__ecos_test_locale;
+    }
     const saved = localStorage.getItem("ecos_locale");
     return (saved as Locale) || "zh";
   });

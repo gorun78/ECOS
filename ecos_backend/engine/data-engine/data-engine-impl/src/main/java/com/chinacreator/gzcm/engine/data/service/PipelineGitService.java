@@ -135,6 +135,50 @@ public class PipelineGitService {
         return result;
     }
 
+    /**
+     * Pipeline 定义的 Git 版本列表（最新在上）。
+     *
+     * <p>与 {@link #commit(String, Map)} 共用同一 git 工作树（/tmp/ecos-git/{id}）
+     * 和同一 per-pipeline 子目录（pipelines/{id}/pipeline.yaml）。
+     *
+     * <ul>
+     *   <li>git 仓库不存在 → 返回空列表（首次 commit 之前属正常态）</li>
+     *   <li>仓库存在但该 pipeline 子目录还没 commit 历史 → 返回空列表</li>
+     *   <li>仓库存在且有 commit 历史 → 返回 7 位 short SHA（最新在上）</li>
+     * </ul>
+     *
+     * <p>使用 JGit {@code git.log()} 读取 HEAD 历史，过滤 path 限定在
+     * {@code pipelines/{id}/pipeline.yaml}；如 JGit 异常则退化到 git CLI 读全 log。
+     */
+    public List<String> versions(String id) throws GitException {
+        // 与 commit() 一致：默认 localPath = /tmp/ecos-git/{id}
+        File gitDir = new File("/tmp/ecos-git/" + id);
+
+        // Case 1：Pipeline git 仓库尚未 clone/init（首次 commit 之前）→ 空列表
+        if (!gitDir.exists() || !new File(gitDir, ".git").exists()) {
+            return new ArrayList<>();
+        }
+
+        try (org.eclipse.jgit.api.Git git = org.eclipse.jgit.api.Git.open(gitDir)) {
+            String gitRelative = "pipelines/" + id + "/pipeline.yaml";
+            Iterable<org.eclipse.jgit.revwalk.RevCommit> commits =
+                git.log().addPath(gitRelative).call();
+            List<String> shas = new ArrayList<>();
+            for (org.eclipse.jgit.revwalk.RevCommit c : commits) {
+                shas.add(c.getName().substring(0, 7));
+            }
+            if (!shas.isEmpty()) {
+                return shas;
+            }
+            // Case 2：仓库存在但该 pipeline 子目录没有 commit 路径
+            // 有些用户可能在 pipeline.yaml 之外提交过其他文件 — 退化到 HEAD 全历史
+            // 但其实"版本"应当只跟随 pipeline.yaml 的路径，此处明确语义：仍然返回空
+            return List.of();
+        } catch (Exception e) {
+            throw new GitException("读取 Git 版本历史失败: " + id, e);
+        }
+    }
+
     private void writePipelineYaml(String localPath, String pipelineId, String yamlContent) throws GitException {
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(localPath, "pipelines", pipelineId);

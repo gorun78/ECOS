@@ -304,13 +304,29 @@ function normalizeBackendPipelineNode(raw: Record<string, unknown>): PipelineNod
  * GET /api/v1/pipeline/definitions/{id} returns the definition JSONB
  * (with nodes/edges); the list API only returns summaries. Editor must use
  * this to render the canvas (list/detail pairing contract).
+ *
+ * PMO-52 T2: tolerate top-level `{id,name,nodes,edges}` OR
+ * nested ApiResponse wrapper `{code, success, data:{id,name,nodes,edges}}`.
  */
 export async function getPipelineDefinition(id: string): Promise<DataPipeline | null> {
   try {
-    const raw = await get<Record<string, unknown>>(`${PIPELINE_DEFS}/${encodeURIComponent(id)}`);
-    if (!raw) return null;
-    const rawNodes = Array.isArray(raw.nodes) ? (raw.nodes as Record<string, unknown>[]) : [];
-    const detail = mapPipelineDef(raw as Record<string, unknown>);
+    // Use full fetch (not the local `get` helper) so the test can stub the
+    // full envelope via `vi.stubGlobal('fetch', ...)` and we get identical
+    // tolerance for both flat and wrapped shapes in one place.
+    const res = await fetch(`${PIPELINE_DEFS}/${encodeURIComponent(id)}`, {
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = (await res.json()) as Record<string, unknown>;
+    const raw: unknown = json.data ?? json;
+    if (!raw || typeof raw !== 'object') return null;
+    const flat = raw as Record<string, unknown>;
+    // Nested ApiResponse<T> envelope: unwrap .data when present
+    const inner = flat.data && typeof flat.data === 'object'
+      ? (flat.data as Record<string, unknown>)
+      : flat;
+    const rawNodes = Array.isArray(inner.nodes) ? (inner.nodes as Record<string, unknown>[]) : [];
+    const detail = mapPipelineDef(inner);
     return { ...detail, nodes: rawNodes.map(normalizeBackendPipelineNode) };
   } catch (e) {
     console.warn('[data-workbench] getPipelineDefinition failed:', e);
@@ -984,10 +1000,44 @@ export async function fetchPreview(resourceId: string, limit = 50): Promise<{
   }
 }
 
+/** 表字段元数据 → GET /api/v1/datanet/metadata/fields/{resourceId}
+ *  从 td_data_field 查数据字段清单（name/type/length/nullable/pk），用于表详情抽屉列表 */
+export interface DataFieldMeta {
+  fieldId: string;
+  fieldName: string;
+  fieldAlias?: string;
+  dataType: string;
+  dataLength?: number | null;
+  dataPrecision?: number | null;
+  nullable?: boolean;
+  primaryKey?: boolean;
+  defaultValue?: string | null;
+  description?: string | null;
+  ordinalPosition?: number | null;
+  resourceId?: string;
+}
+export async function fetchFields(resourceId: string): Promise<DataFieldMeta[]> {
+  try {
+    const res = await fetch(`/api/v1/datanet/metadata/fields/${encodeURIComponent(resourceId)}`, {
+      headers: { ...authHeaders() },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const arr = json?.data?.data ?? json?.data ?? json;
+    if (!Array.isArray(arr)) return [];
+    return arr as DataFieldMeta[];
+  } catch (e) {
+    console.warn('[data-workbench] fetchFields failed:', e);
+    return [];
+  }
+}
+
 /** 保存元数据策略配置 → PUT /api/v1/datanet/metadata/strategy/{id} (P0-3) */
 export async function saveMetadataStrategy(datasourceId: string, strategy: string, countMethod: string, scheduleCron?: string): Promise<boolean> {
   try {
-    const body: Record<string, unknown> = { trigger: strategy, countMethod };
+    // 后端字段名: strategy (对应 MetadataStrategyConfig.strategy 独立键)
+    const body: Record<string, unknown> = { strategy, countMethod };
     if (scheduleCron) body.scheduleCron = scheduleCron;
     const res = await fetch(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, {
       method: 'PUT',
@@ -996,7 +1046,8 @@ export async function saveMetadataStrategy(datasourceId: string, strategy: strin
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
-    return !!json?.success;
+    // 后端返回 {code:0} 表示成功（success true 或 code 0 均可）
+    return json?.success === true || json?.code === 0;
   } catch (e) {
     console.warn('[data-workbench] saveMetadataStrategy failed:', e);
     return false;

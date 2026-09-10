@@ -83,4 +83,26 @@ public class PipelineGitController {
             return ApiResponse.internalError("切换分支失败: " + e.getMessage());
         }
     }
+
+    /**
+     * GET /api/v1/engine/data/pipeline/git/versions/{id}
+     *
+     * <p>返回 Pipeline 定义的 Git 版本列表（commit SHAs，7 位 short，最新在上）。
+     * Pipeline 首次 commit 之前返回 {@code []}（空数组，不抛）；本地仓库不存在同样返回空。
+     *
+     * <p>与 {@code /tasks/{id}/git/commit} 调用同一 per-pipeline 子目录
+     * （{@code pipelines/{id}/pipeline.yaml}），保证版本与提交点 1:1 对齐。
+     */
+    @GetMapping("/git/versions/{id}")
+    public ApiResponse<List<String>> listVersions(@PathVariable String id) {
+        try {
+            return ApiResponse.success(gitService.versions(id));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        } catch (GitException e) {
+            return ApiResponse.internalError("读取 Git 版本失败: " + e.getMessage());
+        } catch (Exception e) {
+            return ApiResponse.internalError("读取 Git 版本失败: " + e.getMessage());
+        }
+    }
 }

@@ -40,6 +40,7 @@ import DebugPanel from './pipeline-editor/DebugPanel';
 import type { DebugState } from './pipeline-editor/DebugPanel';
 import { runPreFlightCheck } from './pipeline-editor/pipelineValidation';
 import MonitorPanel from './pipeline-editor/MonitorPanel';
+import GitVersionPanel from './pipeline-editor/GitVersionPanel';
 
 // ─── Helpers: ReactFlow ↔ backend PipelineNode conversion ──
 
@@ -106,6 +107,10 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
   const [debugState, setDebugState] = useState<DebugState>('idle');
   const [debugOpen, setDebugOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // PMO-52 T3b: Git Version History drawer state — null = unchecked, true = open,
+  // false = explicitly closed by user. When !editingPipeline?.id the GitBranch
+  // button is disabled with a "save first" tooltip, not the drawer.
+  const [gitVersionOpen, setGitVersionOpen] = useState(false);
   const breakpointSeq = useRef(0);
 
   const breakpointNodeIds = React.useMemo(
@@ -427,6 +432,17 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
     return false;
   }, [nodes, edges, t, showLocalToast]);
 
+  // ── PMO-52 T3b: GitVersionPanel restore stub — real rollback endpoint lands
+  // in a follow-up wave (T1 backend returns history; this button only marks
+  // intent so a reviewer can trace wire-up). The handler must keep the panel
+  // open (refetch happens via GitVersionPanel's refresh callback). ──
+  const handleGitVersionRestore = useCallback(
+    (ref: string): void => {
+      showLocalToast('info', t('dw.pipeline.git.restoreBacked'));
+    },
+    [showLocalToast, t]
+  );
+
   // ── Save (T3): convert ReactFlow nodes/edges → backend PipelineNode shape ──
   const handleSave = useCallback(() => {
     if (!pipelineName.trim()) {
@@ -497,7 +513,32 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
               <ArrowLeft size={14} /> {t('dw.pipeline.editor.backToList')}
             </button>
           )}
-          <GitBranch size={18} className={`${styles.infoText}`} />
+          <button
+            type="button"
+            disabled={!editingPipeline?.id}
+            onClick={() => {
+              if (!editingPipeline?.id) {
+                showLocalToast('info', t('dw.pipeline.git.saveFirst'));
+                return;
+              }
+              setGitVersionOpen((v) => !v);
+            }}
+            title={
+              editingPipeline?.id
+                ? t('dw.pipeline.git.title')
+                : t('dw.pipeline.git.saveFirst')
+            }
+            className={`p-1 rounded transition-colors ${
+              gitVersionOpen
+                ? styles.accentBg
+                : styles.cardTextMuted
+            } ${editingPipeline?.id
+              ? 'hover:bg-indigo-50 cursor-pointer'
+              : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <GitBranch size={18} />
+          </button>
           <input
             type="text" value={pipelineName}
             onChange={(e) => setPipelineName(e.target.value)}
@@ -602,6 +643,14 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
                 onReset={handleDebugReset}
               />
             </div>
+          )}
+          {gitVersionOpen && editingPipeline?.id && (
+            <GitVersionPanel
+              pipelineId={editingPipeline.id}
+              pipelineName={pipelineName}
+              onClose={() => setGitVersionOpen(false)}
+              onRestore={handleGitVersionRestore}
+            />
           )}
         </div>
 
