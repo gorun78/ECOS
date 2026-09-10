@@ -766,18 +766,16 @@ public class PipelineExecutionService {
         if ("overwrite".equals(mode)) {
             jc.executeSql(ds.getConnectionConfig(), "DELETE FROM " + table, 1);
         }
-        long written = 0;
-        int batch = Math.max(1, batchSize);
-        for (int from = 0; from < rows.size(); from += batch) {
-            int to = Math.min(from + batch, rows.size());
-            for (Map<String, Object> row : rows.subList(from, to)) {
-                Object[] arr = new Object[columns.size()];
-                for (int i = 0; i < columns.size(); i++) {
-                    arr[i] = row.get(columns.get(i));
-                }
-                written += insertRowViaConnectorPublic(jc, ds.getConnectionConfig(), table, columns, arr);
+        String insertSql = buildInsertSqlStatic(table, columns);
+        List<Object[]> batchValues = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Object[] arr = new Object[columns.size()];
+            for (int i = 0; i < columns.size(); i++) {
+                arr[i] = row.get(columns.get(i));
             }
+            batchValues.add(arr);
         }
+        int written = jc.executeBatch(ds.getConnectionConfig(), insertSql, batchValues, Math.max(1, batchSize));
         return written;
     }
 
@@ -898,34 +896,30 @@ public class PipelineExecutionService {
         try { return Integer.parseInt(val.toString()); } catch (Exception e) { return def; }
     }
 
-    /** 静态版：经 JdbcConnector 单行 INSERT。 */
-    private static long insertRowViaConnectorPublic(JdbcConnector jc, String connectionConfig,
-                                                     String table, List<String> columns,
-                                                     Object[] arr) throws Exception {
+    /** 静态版：构建参数化 INSERT SQL（列名/表名白名单校验）。 */
+    private static String buildInsertSqlStatic(String table, List<String> columns) {
         if (!table.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new BusinessException("SINK: 非法表名 " + table);
         }
         StringBuilder sb = new StringBuilder("INSERT INTO ").append(table).append(" (");
+        List<String> placeholders = new ArrayList<>(columns.size());
         for (int i = 0; i < columns.size(); i++) {
             String col = columns.get(i);
             if (!col.matches("[A-Za-z_][A-Za-z0-9_]*")) {
                 throw new BusinessException("SINK: 非法列名 " + col);
             }
-            if (i > 0) sb.append(", ");
+            if (i > 0) {
+                sb.append(", ");
+                placeholders.add(", ?");
+            } else {
+                placeholders.add("?");
+            }
             sb.append(col);
         }
         sb.append(") VALUES (");
-        for (int i = 0; i < arr.length; i++) {
-            if (i > 0) sb.append(", ");
-            Object v = arr[i];
-            if (v == null) sb.append("NULL");
-            else if (v instanceof Number n) sb.append(n);
-            else if (v instanceof Boolean b) sb.append(b ? "TRUE" : "FALSE");
-            else sb.append("'").append(v.toString().replace("'", "''")).append("'");
-        }
+        sb.append(String.join("", placeholders));
         sb.append(")");
-        jc.executeSql(connectionConfig, sb.toString(), 1);
-        return 1;
+        return sb.toString();
     }
 
     /** 静态版：解析 UDF 输出为行列表。 */

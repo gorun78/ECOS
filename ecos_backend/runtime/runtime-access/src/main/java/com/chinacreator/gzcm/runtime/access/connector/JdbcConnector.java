@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.access.connector;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -373,6 +374,58 @@ public class JdbcConnector implements Connector {
             throw new RuntimeException("External datasource SQL execution failed: " + e.getMessage(), e);
         }
         return rows;
+    }
+
+    /**
+     * 批量 INSERT（PreparedStatement.addBatch / executeBatch）。
+     * <p>
+     * 供 Pipeline SINK 节点批量写入外部数据源目标表，避免逐行 INSERT 的 SQL 往返开销。
+     * 单个 batch 内原子性由数据库保证（1 batch = 1 隐式事务）。
+     *
+     * @param connectionConfig 连接配置 JSON（jdbcUrl/username/password/schema）
+     * @param sql              参数化 INSERT SQL（占位符 ? 数量须与每行 paramCount 一致）
+     * @param values           每行的参数数组（已按列序对齐）
+     * @param batchSize        每批 executeBatch 行数（&lt;=0 时一次性提交全部）
+     * @return 实际写入总行数
+     */
+    public int executeBatch(String connectionConfig, String sql, List<Object[]> values, int batchSize) {
+        if (values == null || values.isEmpty()) {
+            return 0;
+        }
+        Map<String, String> config = parseConfig(connectionConfig);
+        int totalWritten = 0;
+        int effectiveBatch = batchSize > 0 ? batchSize : values.size();
+
+        try (Connection conn = DriverManager.getConnection(
+                config.get("jdbcUrl"),
+                config.get("username"),
+                config.get("password"))) {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (int from = 0; from < values.size(); from += effectiveBatch) {
+                    int to = Math.min(from + effectiveBatch, values.size());
+                    for (int i = from; i < to; i++) {
+                        Object[] row = values.get(i);
+                        for (int c = 0; c < row.length; c++) {
+                            ps.setObject(c + 1, row[c]);
+                        }
+                        ps.addBatch();
+                    }
+                    int[] results = ps.executeBatch();
+                    int batchRows = 0;
+                    for (int r : results) {
+                        batchRows += (r >= 0) ? r : 1;
+                    }
+                    totalWritten += batchRows;
+                    ps.clearBatch();
+                    log.info("JdbcConnector.executeBatch: rows_in_batch={}, total_written={}", batchRows, totalWritten);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("JdbcConnector.executeBatch failed after {} rows: {}", totalWritten, e.getMessage());
+            throw new DataAccessException(
+                    "外部数据源批量 INSERT 失败（已写入 " + totalWritten + " 行后中断）: " + e.getMessage(), e);
+        }
+        return totalWritten;
     }
 
     private DataResource buildResource(ResultSet rs, String orgId, String orgName,

@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import org.junit.jupiter.api.BeforeEach;
@@ -229,15 +230,19 @@ class PipelineTransformSqlRoutingTest {
                 repository, connectorFactory, jdbc, dataSourceService, udfService);
         // mock 数据源
         DataSourceEntity ds = new DataSourceEntity();
-        ds.setId("ds-1");
+        ds.setDatasourceId("ds-1");
         ds.setConnectionConfig("{\"jdbcUrl\":\"jdbc:postgresql://x:5432/y\",\"username\":\"u\",\"password\":\"p\"}");
         when(dataSourceService.getById("ds-1")).thenReturn(ds);
         // mock ConnectorFactory → JdbcConnector
         JdbcConnector mockJdbcConn = mock(JdbcConnector.class);
         when(connectorFactory.getConnector("JDBC")).thenReturn(mockJdbcConn);
-        // mock JdbcConnector.executeSql 返回值（INSERT 无结果集）
+        // mock JdbcConnector — overwrite 模式 DELETE 走 executeSql
         when(mockJdbcConn.executeSql(anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(List.of());
+        // append 模式 INSERT 走 executeBatch
+        when(mockJdbcConn.executeBatch(anyString(), anyString(),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(1);
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =
                 new PipelineDebugStartDTO.PipelineDebugDefinitionDTO();
@@ -263,8 +268,9 @@ class PipelineTransformSqlRoutingTest {
         assertEquals("completed", after.getState(),
                 "SINK 单节点执行后应 completed，实际 state=" + after.getState()
                         + " / error=" + after.getError());
-        // 验证 JdbcConnector 被调用了（INSERT 写入）
-        verify(mockJdbcConn, org.mockito.Mockito.atLeast(1)).executeSql(anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt());
+        // 验证 JdbcConnector 被调用了（INSERT 走 executeBatch）
+        verify(mockJdbcConn, org.mockito.Mockito.atLeast(1)).executeBatch(
+                anyString(), anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyInt());
     }
 
     // ─── G. topologicalSort 边序回归（P1#2） ─────────────────────
