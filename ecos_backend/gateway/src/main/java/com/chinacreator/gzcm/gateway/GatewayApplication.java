@@ -97,6 +97,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository",
     "com.chinacreator.gzcm.engine.data.repository",
+    // PMO-48-A: DqRuleMapper 在 data.quality.mapper，纳入扫描否则 bean 缺失（质量包下任意 mapper 包）
+    "com.chinacreator.gzcm.engine.data.quality.**.mapper",
+    "com.chinacreator.gzcm.engine.data.quality.mapper",
     "com.chinacreator.gzcm.engine.kb.repository"
 })
 public class GatewayApplication {
