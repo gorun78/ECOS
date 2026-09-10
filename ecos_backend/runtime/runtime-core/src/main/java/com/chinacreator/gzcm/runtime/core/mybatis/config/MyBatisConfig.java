@@ -5,6 +5,7 @@ import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.mapper.MapperScannerConfigurer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.io.Resource;
@@ -30,7 +31,17 @@ import java.util.Properties;
 @EnableTransactionManagement
 @ComponentScan(basePackages = "com.chinacreator.gzcm.runtime.core.mybatis")
 public class MyBatisConfig {
-    
+
+    /**
+     * PMO-49 D1: 类型别名扫描包 (隔离 mybatis DataSecurityPolicy 双 domain 冲突)。
+     * 拆分期默认 root = "com.chinacreator.gzcm" (保持 monolith 兼容)，
+     * 每个独立 service 可在 application.yml 用
+     *   ecos.mybatis.type-aliases-package: com.chinacreator.gzcm.sysman
+     * 收窄到自己 domain, 避免 engine.* 实体与 service.* 实体基名冲突。
+     */
+    @Value("${ecos.mybatis.type-aliases-package:com.chinacreator.gzcm}")
+    private String typeAliasesPackage;
+
     /**
      * Configure SqlSessionFactory
      * 
@@ -66,8 +77,8 @@ public class MyBatisConfig {
             sessionFactory.setMapperLocations(mapperLocations.toArray(new Resource[0]));
         }
         
-        // Set type aliases package
-        sessionFactory.setTypeAliasesPackage("com.chinacreator.gzcm");
+        // PMO-49 D1: 从 property 读 (fallback 到 monolith 默认)
+        sessionFactory.setTypeAliasesPackage(typeAliasesPackage);
         
         // Configure MyBatis settings
         Configuration configuration = new Configuration();

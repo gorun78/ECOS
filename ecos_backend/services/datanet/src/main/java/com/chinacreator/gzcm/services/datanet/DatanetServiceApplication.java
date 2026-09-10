@@ -46,15 +46,17 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.sysman"
 })
 @MapperScan({
-        // data-engine 主 mapper
+        // data-engine 主 mapper (repository / quality / datasource / pipeline)
         "com.chinacreator.gzcm.engine.data.repository",
         // PMO-48-A T5: DqRuleMapper 与质量包下 mapper
         "com.chinacreator.gzcm.engine.data.quality.mapper",
         "com.chinacreator.gzcm.engine.data.quality.**.mapper",
-        // 横切底座 mapper
+        // data-engine 内部 dao 兼容写法
+        "com.chinacreator.gzcm.engine.data.**.dao",
+        "com.chinacreator.gzcm.engine.data.**.mapper",
+        // 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
-        // runtime.llm 不属本 service (归 aiming)，但保留 mapper 可让 runtime.llm 缺位时 mapper bean 不报错
-        "com.chinacreator.gzcm.runtime.llm.repository"
+        "com.chinacreator.gzcm.runtime.**.dao"
 })
 public class DatanetServiceApplication {
 

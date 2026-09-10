@@ -1,12 +1,11 @@
 server:
-  # PMO-49 P2-2: datanet service 端口 18082 (与 data-engine 主引擎一致, 拆分期互斥运行)
-  port: 18082
+  # PMO-49 P2-3: buszhi service 端口 18083 (与 ontology-engine 主引擎一致, 拆分期互斥运行)
+  port: 18083
 
 spring:
   application:
-    name: ecos-datanet-service
+    name: ecos-buszhi-service
   main:
-    # 与 gateway 双跑期允许 bean override (data-engine-impl 提供的 bean 与 runtime-core 版本共存)
     allow-bean-definition-overriding: true
   autoconfigure:
     exclude:
@@ -24,20 +23,17 @@ spring:
       minimum-idle: 5
       maximum-pool-size: 20
       idle-timeout: 30000
-      pool-name: DatanetHikariCP
+      pool-name: BuszhiHikariCP
       max-lifetime: 1800000
       connection-timeout: 30000
       connection-test-query: SELECT 1
 
   flyway:
-    # 铁律 §3.1: Flyway 已禁用, 不启用
     enabled: false
-
   jpa:
     hibernate:
       ddl-auto: none
 
-# MyBatis Configuration
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
   configuration:
@@ -45,15 +41,16 @@ mybatis:
     cache-enabled: true
     lazy-loading-enabled: false
 
-# PMO-49 D1: 收窄 MyBatis 类型别名扫包到 engine.data 域
-# + ADR-7 X-ECOS-* 头校验开关
+# PMO-49 D1: 收窄 MyBatis 类型别名扫包到 ontology 域
+# + ADR-7 X-ECOS-* 头校验 + Neo4j 开关
 ecos:
   mybatis:
-    type-aliases-package: com.chinacreator.gzcm.engine.data
+    type-aliases-package: com.chinacreator.gzcm.engine.ontology
   header-auth:
     enabled: false
+  neo4j:
+    enabled: ${ECOS_NEO4J_ENABLED:false}
 
-# Management / Actuator
 management:
   endpoints:
     web:

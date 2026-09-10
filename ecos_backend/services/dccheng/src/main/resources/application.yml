@@ -46,15 +46,16 @@ mybatis:
     cache-enabled: true
     lazy-loading-enabled: false
 
-# PMO-49 ADR-7: X-ECOS-* 头校验开关 (拆分期先禁用, 保证 gateway 透传)
+# PMO-49 D1: 收窄 MyBatis 类型别名扫包到 engine.kb + cognitive2 域
+# + ADR-7 X-ECOS-* 头校验开关 + Neo4j (enterprise 档; runtime-access 收敛 Driver)
+# 三档位: standard 不启用, enterprise 启用, ultimate 额外启用 Doris
 ecos:
+  mybatis:
+    type-aliases-package: com.chinacreator.gzcm.engine
   header-auth:
     enabled: false
-
-# Neo4j (enterprise 档才启用 — 由 runtime-access 收敛 Driver, 不在此 new)
-# 三档位: standard 不启用, enterprise 启用, ultimate 额外启用 Doris
-# 具体连接参数由 runtime-access 内部 profile 决定, 此文件只标注开关
-ecos.neo4j.enabled: ${ECOS_NEO4J_ENABLED:false}
+  neo4j:
+    enabled: ${ECOS_NEO4J_ENABLED:false}
 
 management:
   endpoints:

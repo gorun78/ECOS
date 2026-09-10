@@ -48,10 +48,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.sysman"
 })
 @MapperScan({
-        // kb-engine 主 mapper (知识图谱 / 规则 / 抽取)
-        "com.chinacreator.gzcm.engine.kb.repository",
+        // kb-engine 主 mapper (KG / 规则 / 抽取) — 包名是 `.dao`, 不是 `.repository`
+        "com.chinacreator.gzcm.engine.kb.**.dao",
+        "com.chinacreator.gzcm.engine.kb.**.repository",
+        "com.chinacreator.gzcm.engine.kb.**.mapper",
+        // cognitive2 域 (推理暂无落库, 防御性保留)
+        "com.chinacreator.gzcm.engine.cognitive2.**.dao",
+        "com.chinacreator.gzcm.engine.cognitive2.**.mapper",
         // 横切底座
-        "com.chinacreator.gzcm.runtime.**.mapper"
+        "com.chinacreator.gzcm.runtime.**.mapper",
+        "com.chinacreator.gzcm.runtime.**.dao"
 })
 public class DcchengServiceApplication {
 
