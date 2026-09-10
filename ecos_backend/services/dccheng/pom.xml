@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- PMO-49 P2-4: services/dccheng 独立部署单元。
+         - 封装 kb-engine (水·K) + cognitive-engine (木·C) 双引擎
+         - 承担 zhi (I→K) + cheng (K→C) 转化
+         - P1-6 PoC 结论: cognitive-impl 已直依赖 kb-impl (架构债务, 非 REST),
+           单 JVM 双引擎扫描已验证安全 (cognitive ScenarioController 已用 bean-name disambiguate)
+         - 端口 18086 (与 kb-engine 主引擎一致, 本机互斥运行)
+         - 拆分双跑: gateway 仍扫描 engine.kb + engine.cognitive, 切流 ECOS_ROUTE_dccheng -->
+    <artifactId>dccheng-service</artifactId>
+    <packaging>jar</packaging>
+    <name>ECOS DCCheng Service</name>
+    <description>知识服务 — 封装 kb-engine + cognitive-engine (KG/RAG/规则/因果推理/情景推演)</description>
+
+    <dependencies>
+        <!-- 主封装引擎 — kb (水·K) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>kb-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- 封装引擎 — cognitive (木·C) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>cognitive-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 共享契约 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 横切底座 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- Spring Boot Web + Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- 数据库驱动 (PG 必选; Neo4j 走 runtime-access Driver 收敛, 不在此 POM 声明) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.services.dccheng.DcchengServiceApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

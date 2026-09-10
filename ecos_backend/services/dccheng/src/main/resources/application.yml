@@ -1,0 +1,72 @@
+server:
+  # PMO-49 P2-4: dccheng service 端口 18086 (与 kb-engine 主引擎一致, 拆分期互斥运行)
+  port: 18086
+
+spring:
+  application:
+    name: ecos-dccheng-service
+  main:
+    # 双跑期允许 bean override (kb-impl 与 cognitive-impl 都提供同形 bean 时)
+    allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: DcchengHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+  flyway:
+    # 铁律 §3.1: Flyway 禁用
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+# MyBatis
+mybatis:
+  # kb 引擎 mapper 全部位于 classpath*:mapper/*.xml (kb-impl 已用 src/main/resources 打包)
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+
+# PMO-49 ADR-7: X-ECOS-* 头校验开关 (拆分期先禁用, 保证 gateway 透传)
+ecos:
+  header-auth:
+    enabled: false
+
+# Neo4j (enterprise 档才启用 — 由 runtime-access 收敛 Driver, 不在此 new)
+# 三档位: standard 不启用, enterprise 启用, ultimate 额外启用 Doris
+# 具体连接参数由 runtime-access 内部 profile 决定, 此文件只标注开关
+ecos.neo4j.enabled: ${ECOS_NEO4J_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.chinacreator.gzcm: INFO
+    org.apache.kafka: WARN
+    org.springframework: INFO

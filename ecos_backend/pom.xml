@@ -416,11 +416,18 @@
         <module>buszhi</module>
         
         <module>workspace</module>
-        <!-- Sprint 1: Microservice boot modules -->
-        <module>services/api-gateway</module>
-        <module>services/identity-service</module>
-        <module>services/ontology-service</module>
-        <module>services/agent-service</module>
+        <!-- PMO-49 P2-A/B: 新增 5 个业务 service (sysman/datanet/buszhi/dccheng/aiming) 独立部署单元。
+             P2-2 datanet + P2-4 dccheng 已启用。
+             P2-3 buszhi / P2-1 sysman / P2-5 aiming 待 P2-B 批次加入 -->
+        <module>services/datanet</module>
+        <module>services/dccheng</module>
+        <!-- PMO-49 P2-A (path A): 移除历史 Sprint 1 骨架 services/{api-gateway, identity-service, ontology-service, agent-service}。
+             - api-gateway: M0 改造已废弃（library 由顶层 gateway 集成），孤儿 no import
+             - identity-service: 与 sysman/security-engine 职责重叠，代码可弃
+             - ontology-service: OntologyDslCompiler 未合并到 buszhi，暂保留目录，从 build 移除等 P2-B 迁入 buszhi
+             - agent-service: 保留目录待 P2-B 迁到 aiming，M0 改造已 clear 从 gateway classpath
+             4 个 modules 全部删除的是"去掉历史骨架从 reactor 卸载"，实际代码目录由 P2-B 处理
+        -->
         <!-- Legacy gateway (kept for backward compatibility during migration) -->
         <module>gateway</module>
         <!-- 阶段5模块吸收: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng -->
@@ -447,13 +454,12 @@
                 <module>runtime</module>
                 <module>sysman</module>
         
-                
+        
                 <module>workspace</module>
-                <!-- Sprint 1: Microservice modules -->
-                <module>services/api-gateway</module>
-                <module>services/identity-service</module>
-                <module>services/ontology-service</module>
-                <module>services/agent-service</module>
+                <!-- PMO-49 P2-2/P2-4: 启用 datanet-service + dccheng-service -->
+                <module>services/datanet</module>
+                <module>services/dccheng</module>
+                <!-- PMO-49 P2-A: 历史 services/* 骨架已从 reactor 移除，待 P2-B 迁入 buszhi/aiming -->
                 <module>gateway</module>
             </modules>
             <properties>
@@ -468,12 +474,11 @@
                 <module>runtime</module>
                 <module>sysman</module>
         
-                
+        
                 <module>workspace</module>
-                <module>services/api-gateway</module>
-                <module>services/identity-service</module>
-                <module>services/ontology-service</module>
-                <module>services/agent-service</module>
+                <!-- PMO-49 P2-2/P2-4: 启用 datanet-service + dccheng-service -->
+                <module>services/datanet</module>
+                <module>services/dccheng</module>
                 <module>gateway</module>
             </modules>
             <properties>
@@ -489,12 +494,11 @@
                 <module>runtime</module>
                 <module>sysman</module>
         
-                
+        
                 <module>workspace</module>
-                <module>services/api-gateway</module>
-                <module>services/identity-service</module>
-                <module>services/ontology-service</module>
-                <module>services/agent-service</module>
+                <!-- PMO-49 P2-2/P2-4: 启用 datanet-service + dccheng-service -->
+                <module>services/datanet</module>
+                <module>services/dccheng</module>
                 <module>gateway</module>
             </modules>
             <properties>

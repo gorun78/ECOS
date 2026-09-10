@@ -1,0 +1,70 @@
+server:
+  # PMO-49 P2-2: datanet service 端口 18082 (与 data-engine 主引擎一致, 拆分期互斥运行)
+  port: 18082
+
+spring:
+  application:
+    name: ecos-datanet-service
+  main:
+    # 与 gateway 双跑期允许 bean override (data-engine-impl 提供的 bean 与 runtime-core 版本共存)
+    allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: DatanetHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+  flyway:
+    # 铁律 §3.1: Flyway 已禁用, 不启用
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+
+# PMO-49 ADR-7: 服务间信任 — 本 service 只接受 gateway 转发的 X-ECOS-* 头, 非法请求默认 DENY
+# Phase 2 单跑阶段: gateway 尚未 strip/re-inject, 因此 gateway 通过 http://datanet:18082 直连时
+# 走内网 loopback 判定 + X-ECOS-SIGNED 头 (由 start 脚本 sticky 挂), 完整 ADR-7 落地见 Phase 3。
+ecos:
+  header-auth:
+    # gate 开关 — 拆分期先禁用 gateway 头校验, 保证双跑期 gateway 直连透传
+    enabled: false
+
+# Management / Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.chinacreator.gzcm: INFO
+    org.apache.kafka: WARN
+    org.springframework: INFO
