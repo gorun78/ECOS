@@ -19,6 +19,7 @@ import {
   Bell,
   Briefcase,
   CalendarClock,
+  FileText,
   Gauge,
   Shield,
 } from "lucide-react";
@@ -32,9 +33,10 @@ const ScheduleTab = lazy(() => import("./data-quality/ScheduleTab"));
 const AlertCenterTab = lazy(() => import("./data-quality/AlertCenterTab"));
 const WorkOrderTab = lazy(() => import("./data-quality/WorkOrderTab"));
 const SelfCheckTab = lazy(() => import("./data-quality/SelfCheckTab"));
+const ReportListTab = lazy(() => import("./data-quality/ReportListTab"));
 
 /** Tab ID 枚举 */
-type TabId = "rules" | "dimension" | "schedule" | "alerts" | "workOrders" | "selfcheck";
+type TabId = "rules" | "dimension" | "schedule" | "alerts" | "workOrders" | "selfcheck" | "reports";
 
 /** Tab 配置 */
 const TABS: {
@@ -48,6 +50,7 @@ const TABS: {
   { id: "alerts", icon: Bell, i18nKey: "dw.dqRule.alerts.tab.name" },
   { id: "workOrders", icon: Briefcase, i18nKey: "dw.dqRule.workOrders.tab.name" },
   { id: "selfcheck", icon: Activity, i18nKey: "dw.dqRule.tabSelfCheck" },
+  { id: "reports", icon: FileText, i18nKey: "dw.dqRule.report.tab.name" },
 ];
 
 /** 有效 TabId 集合 */
@@ -131,6 +134,7 @@ export default function DataQualityDashboard() {
             {activeTab === "alerts" && <AlertCenterTab />}
             {activeTab === "workOrders" && <WorkOrderTab />}
             {activeTab === "selfcheck" && <SelfCheckTab />}
+            {activeTab === "reports" && <ReportListTab />}
           </Suspense>
         </div>
       </div>

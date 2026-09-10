@@ -706,3 +706,95 @@ export async function deleteDqSchedule(id: string): Promise<{ success: boolean; 
     return { success: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/**
+ * PMO-48-D T15 — DQ 报告中心 API 层
+ *
+ * 后端端点 (Phase 4 T15 就绪):
+ *   POST   /api/v1/dq/reports/generate?scope=&type=daily|weekly|monthly   → DqReportVO
+ *   GET    /api/v1/dq/reports?reportType=&scope=&pageNum=&pageSize=      → PageResult<DqReportVO>
+ *   GET    /api/v1/dq/reports/{id}/html                                  → text/html (浏览器直接查看)
+ *   GET    /api/v1/dq/reports/{id}/pdf                                   → 501 (Phase 5 补 PDF 插件)
+ */
+
+/** T15 报告 VO — 与后端 DqReportVO 字段对齐（驼峰） */
+export interface DqReportVO {
+  id: string;
+  reportType: string;   // DAILY / WEEKLY / MONTHLY
+  scope: string;        // ALL / NATIVE / OFI / DOMAIN:xxx
+  startDate: string;
+  endDate: string;
+  payloadHtml?: string; // 详情 HTML（内嵌 TEXT）
+  pdfObjectKey?: string;
+  llmSummary?: string;
+  rowCount?: number;
+  alertCount?: number;
+  avgScore?: number;    // 0.0-1.0
+  createdBy?: string;
+  createdAt?: string;
+}
+
+/** T15 报告列表分页查询 */
+export interface DqReportQuery {
+  reportType?: string;
+  scope?: string;
+  pageNum?: number;
+  pageSize?: number;
+}
+
+/** T15 分页结果 — 与 PageResult 对齐 */
+export interface DqReportPageResult {
+  data: DqReportVO[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+}
+
+/** T15 报告类型（小写传后端；后端 switch 大小写不敏感） */
+export type DqReportType = 'daily' | 'weekly' | 'monthly';
+
+/** 生成报告（POST /generate?scope=&type=） */
+export async function generateDqReport(
+  type: DqReportType,
+  scope: string,
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  const qs = `?scope=${encodeURIComponent(scope || "ALL")}&type=${encodeURIComponent(type)}`;
+  try {
+    const resp = await apiFetchData<unknown>(`${DQ_GOV_BASE}/reports/generate${qs}`, { method: "POST" });
+    const id = resp && typeof resp === "object"
+      ? ((resp as Record<string, unknown>).id as string | undefined)
+      : (resp as string | undefined);
+    return { success: true, id };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 报告分页列表（reportType / scope 过滤 + pageNum / pageSize） */
+export async function fetchDqReports(query?: DqReportQuery): Promise<DqReportPageResult | null> {
+  const sp = new URLSearchParams();
+  if (query?.reportType) sp.append("reportType", query.reportType);
+  if (query?.scope) sp.append("scope", query.scope);
+  if (query?.pageNum) sp.append("pageNum", String(query.pageNum));
+  if (query?.pageSize) sp.append("pageSize", String(query.pageSize));
+  const qs = sp.toString();
+  try {
+    const resp = await apiFetchData<unknown>(`${DQ_GOV_BASE}/reports${qs ? `?${qs}` : ""}`);
+    if (!resp || typeof resp !== "object") return null;
+    const r = resp as { data?: DqReportVO[]; total?: number; pageNum?: number; pageSize?: number };
+    const data = (Array.isArray(r.data) ? r.data : []) as DqReportVO[];
+    return {
+      data,
+      total: typeof r.total === "number" ? r.total : data.length,
+      pageNum: typeof r.pageNum === "number" ? r.pageNum : 1,
+      pageSize: typeof r.pageSize === "number" ? r.pageSize : data.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 报告 HTML 查看 URL（新开 tab window.open） */
+export function dqReportHtmlUrl(id: string): string {
+  return `${DQ_GOV_BASE}/reports/${id}/html`;
+}
