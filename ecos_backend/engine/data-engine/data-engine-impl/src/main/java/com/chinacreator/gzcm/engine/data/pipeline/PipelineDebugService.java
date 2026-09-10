@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
+import com.chinacreator.gzcm.engine.data.UdfService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
@@ -76,6 +77,7 @@ public class PipelineDebugService {
     private final ConnectorFactory connectorFactory;
     private final JdbcTemplate jdbc;
     private final DataSourceService dataSourceService;
+    private final UdfService udfService;
 
     /** 全部调试会话（内存态，惰性清理） */
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
@@ -92,11 +94,13 @@ public class PipelineDebugService {
     public PipelineDebugService(PipelineRepository repository,
                                 ConnectorFactory connectorFactory,
                                 JdbcTemplate jdbc,
-                                DataSourceService dataSourceService) {
+                                DataSourceService dataSourceService,
+                                UdfService udfService) {
         this.repository = repository;
         this.connectorFactory = connectorFactory;
         this.jdbc = jdbc;
         this.dataSourceService = dataSourceService;
+        this.udfService = udfService;
     }
 
     // ==================== 会话创建 ====================
@@ -363,7 +367,7 @@ public class PipelineDebugService {
     }
 
     /**
-     * 节点执行 — 与 PipelineExecutionService.executeNode 的 6 分支语义一致。
+     * 节点执行 — 与 PipelineExecutionService.executeNode 的语义一致（9 类型）。
      * 保留 sample（前 SAMPLE_LIMIT 行）与列名以支撑数据预览 / 变量快照。
      */
     private NodeResult executeNode(Session s, PipelineNode node) throws Exception {
@@ -375,6 +379,9 @@ public class PipelineDebugService {
             case "SOURCE_REST" -> execSourceRestCapture(s, config);
             case "SOURCE_CDC" -> throw new BusinessException("SOURCE_CDC 仅 flagship 版本支持");
             case "TRANSFORM_SQL" -> execTransformSqlCapture(s, config);
+            case "TRANSFORM_UDF" -> execUdfTransformCapture(s, node, config);
+            case "JOIN" -> execJoinCapture(s, node, config);
+            case "SINK" -> execSinkCapture(s, node, config);
             case "OUTPUT_OBJECT" -> execOutputObjectCapture(s, config);
             default -> throw new ValidationException("type", "不支持的节点类型: " + type);
         };
@@ -517,6 +524,80 @@ public class PipelineDebugService {
         snapshot.put("rowsProcessed", s.totalRows + inserted);
         List<String> cols = new ArrayList<>(rows.get(0).keySet());
         return new NodeResult(inserted, cols, cols, snapshot, nowIso(), System.currentTimeMillis() - start, copySample(rows));
+    }
+
+    // ==================== TRANSFORM_UDF / JOIN / SINK（调试链对齐执行器） ====================
+
+    /**
+     * TRANSFORM_UDF 调试执行 — 复用 PipelineExecutionService 的 runUdfTransform 逻辑。
+     * <p>
+     * UDF 执行成功后将输出行写入 Session.nodeResults，供下游 JOIN/SINK 消费。
+     */
+    private NodeResult execUdfTransformCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
+        long start = System.currentTimeMillis();
+        Map<String, List<Map<String, Object>>> results = ensureNodeResults(s);
+        List<Map<String, Object>> out = PipelineExecutionService.runUdfTransformPublic(node, config, results, udfService);
+        results.put(node.getNodeId(), out);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("udfId", config.get("udfId"));
+        snapshot.put("rowsOut", (long) out.size());
+        snapshot.put("rowsProcessed", s.totalRows + out.size());
+        long nodeMs = System.currentTimeMillis() - start;
+        List<String> cols = out.isEmpty() ? Collections.emptyList() : new ArrayList<>(out.get(0).keySet());
+        return new NodeResult((long) out.size(), cols, cols, snapshot, nowIso(), nodeMs, copySample(out));
+    }
+
+    /**
+     * JOIN 调试执行 — 复用 PipelineExecutionService 的 joinFrames + memoryJoin 逻辑。
+     */
+    private NodeResult execJoinCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
+        long start = System.currentTimeMillis();
+        Map<String, List<Map<String, Object>>> results = ensureNodeResults(s);
+        List<Map<String, Object>> merged = PipelineExecutionService.joinFramesPublic(node, config, results);
+        results.put(node.getNodeId(), merged);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("joinKeys", config.getOrDefault("joinKeys", config.get("on")));
+        snapshot.put("joinType", config.getOrDefault("joinType", "inner"));
+        snapshot.put("rowsOut", (long) merged.size());
+        snapshot.put("rowsProcessed", s.totalRows + merged.size());
+        long nodeMs = System.currentTimeMillis() - start;
+        List<String> cols = merged.isEmpty() ? Collections.emptyList() : new ArrayList<>(merged.get(0).keySet());
+        return new NodeResult((long) merged.size(), cols, cols, snapshot, nowIso(), nodeMs, copySample(merged));
+    }
+
+    /**
+     * SINK 调试执行 — 复用 PipelineExecutionService 的 executeSink 逻辑。
+     */
+    private NodeResult execSinkCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
+        long start = System.currentTimeMillis();
+        Map<String, List<Map<String, Object>>> results = ensureNodeResults(s);
+        long written = PipelineExecutionService.executeSinkPublic(node, config, results,
+                connectorFactory, dataSourceService);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("table", configFirst(config, "table", "targetTable"));
+        snapshot.put("mode", configFirst(config, "mode"));
+        snapshot.put("writtenRows", written);
+        snapshot.put("rowsProcessed", s.totalRows + written);
+        long nodeMs = System.currentTimeMillis() - start;
+        return new NodeResult(written, null, null, snapshot, nowIso(), nodeMs, null);
+    }
+
+    /** 确保 Session 的 nodeResults 已初始化。 */
+    private Map<String, List<Map<String, Object>>> ensureNodeResults(Session s) {
+        if (s.nodeResults == null) {
+            s.nodeResults = new LinkedHashMap<>();
+        }
+        return s.nodeResults;
+    }
+
+    /** 首非空配置取值（兼容多别名键）。 */
+    private static Object configFirst(Map<String, Object> config, String... keys) {
+        for (String k : keys) {
+            if (config.containsKey(k) && config.get(k) != null) {
+                return config.get(k);
+            }
+        }
+        return null;
     }
 
     /** 从 rows 构造带 sample/schema 的 NodeResult（Source 节点用）。 */
@@ -837,6 +918,8 @@ public class PipelineDebugService {
         final List<NodeStepVO> steps = new CopyOnWriteArrayList<>();
         final List<NodeLog> logs = new CopyOnWriteArrayList<>();
         long lastActiveAtMs = createdAtMs;
+        /** 节点执行结果缓存（nodeId → 行），TRANSFORM_UDF/JOIN/SINK 消费 */
+        Map<String, List<Map<String, Object>>> nodeResults;
 
         Session(String id, String definitionId, String name,
                 List<PipelineNode> nodes, Map<String, BreakpointSpec> breakpoints) {
@@ -869,20 +952,23 @@ public class PipelineDebugService {
         return st == State.COMPLETED || st == State.FAILED || st == State.STOPPED;
     }
 
-    /** Kahn 拓扑排序 — 与 PipelineExecutionService.topologicalSort 参考语义一致。 */
+    /** Kahn 拓扑排序 — 与 PipelineExecutionService.topologicalSort 语义一致。 */
     private List<PipelineNode> topologicalSort(List<PipelineNode> nodes) {
+        // 第一次遍历：生成 nodeMap 全集，保证所有 nodeId 已注册
         Map<String, PipelineNode> nodeMap = new LinkedHashMap<>();
-        Map<String, Integer> inDegree = new LinkedHashMap<>();
-        Map<String, List<String>> children = new LinkedHashMap<>();
-
         for (PipelineNode node : nodes) {
             nodeMap.put(node.getNodeId(), node);
-            inDegree.putIfAbsent(node.getNodeId(), 0);
+        }
+
+        // 第二次遍历：构建入度表和邻接表（此时 nodeMap 已完整，所有 from/to 已注册）
+        Map<String, Integer> inDegree = new LinkedHashMap<>();
+        for (String nodeId : nodeMap.keySet()) {
+            inDegree.put(nodeId, 0);
+        }
+        Map<String, List<String>> children = new LinkedHashMap<>();
+        for (PipelineNode node : nodes) {
             List<String> deps = parseDependsOn(node.getDependsOn());
             for (String dep : deps) {
-                if (!nodeMap.containsKey(dep)) {
-                    continue;
-                }
                 children.computeIfAbsent(dep, k -> new ArrayList<>()).add(node.getNodeId());
                 inDegree.merge(node.getNodeId(), 1, Integer::sum);
             }

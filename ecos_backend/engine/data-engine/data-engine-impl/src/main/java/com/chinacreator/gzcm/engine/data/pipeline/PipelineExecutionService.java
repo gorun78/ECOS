@@ -300,6 +300,8 @@ public class PipelineExecutionService {
 
     /**
      * TRANSFORM_SQL: 用系统 JdbcTemplate 执行 config.sql（转换在系统库内，允许）。
+     * <p>按 SQL 首 token 分流：SELECT/SHOW/DESCRIBE/WITH 走 queryForList 返回行数；
+     * INSERT/UPDATE/DELETE/REPLACE/CREATE/ALTER/DROP/TRUNCATE 走 update 返回受影响行数。
      * 返回真实影响行数。
      */
     private long executeTransformSql(Map<String, Object> config) {
@@ -307,7 +309,27 @@ public class PipelineExecutionService {
         if (sql == null || sql.isEmpty()) {
             throw new ValidationException("sql", "TRANSFORM_SQL: sql 必填");
         }
-        return jdbc.update(sql);
+        String trimmed = sql.trim();
+        // 提取首 token（大写归一化），按白名单判断是否为查询语句
+        String firstToken = trimmed.split("[\\s]+")[0].toUpperCase();
+        return switch (firstToken) {
+            // 查询类 → queryForList，返回行数
+            case "SELECT", "SHOW", "DESCRIBE", "WITH" -> {
+                List<Map<String, Object>> rows = jdbc.queryForList(trimmed);
+                logInfo("TRANSFORM_SQL query: rows={}", rows.size());
+                yield rows.size();
+            }
+            // DML/DDL 类 → update，返回受影响行数
+            case "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "TRUNCATE" -> {
+                long affected = jdbc.update(trimmed);
+                logInfo("TRANSFORM_SQL update: affected={}", affected);
+                yield affected;
+            }
+            default -> {
+                log.warn("TRANSFORM_SQL 未知首 token: {}, 按 update 处理", firstToken);
+                yield jdbc.update(trimmed);
+            }
+        };
     }
 
     // ==================== TRANSFORM_UDF / JOIN / SINK（Wave 5 节点扩充） ====================
@@ -574,6 +596,176 @@ public class PipelineExecutionService {
             logInfo("SINK overwrite: cleared {}", table);
         }
 
+        // 构建参数化 INSERT SQL + 批量写入（1 batch = 1 事务，跨 batch 不回滚）
+        String insertSql = buildInsertSql(table, columns);
+        List<Object[]> batchValues = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Object[] arr = new Object[columns.size()];
+            for (int i = 0; i < columns.size(); i++) {
+                arr[i] = row.get(columns.get(i));
+            }
+            batchValues.add(arr);
+        }
+        int written = jdbcConnector.executeBatch(ds.getConnectionConfig(), insertSql, batchValues, Math.max(1, batchSize));
+        logInfo("SINK done: table={}, mode={}, rows={}, batchSize={}", table, mode, written, batchSize);
+        return written;
+    }
+
+    /**
+     * 构建参数化 INSERT SQL（列名/表名白名单校验，防 SQL 注入）。
+     */
+    private String buildInsertSql(String table, List<String> columns) {
+        if (!table.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+            throw new BusinessException("SINK: 非法表名 " + table);
+        }
+        StringBuilder sb = new StringBuilder("INSERT INTO ").append(table).append(" (");
+        List<String> placeholders = new ArrayList<>(columns.size());
+        for (int i = 0; i < columns.size(); i++) {
+            String col = columns.get(i);
+            if (!col.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                throw new BusinessException("SINK: 非法列名 " + col);
+            }
+            if (i > 0) {
+                sb.append(", ");
+                placeholders.add(", ?");
+            } else {
+                placeholders.add("?");
+            }
+            sb.append(col);
+        }
+        sb.append(") VALUES (");
+        sb.append(String.join("", placeholders));
+        sb.append(")");
+        return sb.toString();
+    }
+
+    // ==================== 调试链委托入口（供 PipelineDebugService 复用） ====================
+
+    /**
+     * 供 PipelineDebugService 调用的 UDF 执行入口。
+     * 独立实例化辅助方法，不依赖 PipelineExecutionService 的成员字段。
+     */
+    public static List<Map<String, Object>> runUdfTransformPublic(
+            PipelineNode node, Map<String, Object> config,
+            Map<String, List<Map<String, Object>>> nodeResults,
+            UdfService udfService) {
+        Object udfIdObj = config.get("udfId");
+        if (udfIdObj == null || udfIdObj.toString().isEmpty()) {
+            throw new ValidationException("udfId", "TRANSFORM_UDF: udfId 必填");
+        }
+        String udfId = udfIdObj.toString();
+        Map<String, Object> udf;
+        try {
+            udf = udfService.getById(udfId);
+        } catch (Exception e) {
+            throw new ValidationException("udfId", "UDF 不存在: " + udfId);
+        }
+        String udfName = String.valueOf(udf.get("name"));
+        String language = String.valueOf(udf.getOrDefault("language", "python"));
+        String sourceCode = (String) udf.get("source_code");
+        if (sourceCode == null || sourceCode.isEmpty()) {
+            throw new BusinessException("UDF 无源码，无法执行: " + udfName);
+        }
+        Map<String, Object> sandboxParams = new LinkedHashMap<>();
+        sandboxParams.put("rows", collectInputsStatic(node, nodeResults));
+        Object paramsCfg = config.get("params");
+        if (paramsCfg instanceof Map<?, ?> m) {
+            m.forEach((k, v) -> sandboxParams.put(String.valueOf(k), v));
+        }
+        if (!sandboxParams.containsKey("params")) {
+            sandboxParams.put("params", paramsCfg instanceof Map<?, ?> m2
+                    ? new LinkedHashMap<>(m2) : new LinkedHashMap<String, Object>());
+        }
+        UdfSandbox.SandboxOutput output;
+        try {
+            output = UdfSandbox.execute(language, sourceCode, sandboxParams);
+        } catch (Exception e) {
+            throw new BusinessException("UDF 执行失败 [" + udfName + "]: " + e.getMessage());
+        }
+        if (!output.success) {
+            throw new BusinessException("UDF 执行失败 [" + udfName + "]: " + output.error);
+        }
+        return parseUdfRowsStatic(output.output);
+    }
+
+    /**
+     * 供 PipelineDebugService 调用的 JOIN 执行入口。
+     */
+    public static List<Map<String, Object>> joinFramesPublic(
+            PipelineNode node, Map<String, Object> config,
+            Map<String, List<Map<String, Object>>> nodeResults) {
+        List<String> joinKeys = normalizeJoinKeysStatic(config.get("joinKeys"));
+        if (joinKeys.isEmpty()) {
+            joinKeys = joinKeysFromOnStatic(config.get("on"));
+        }
+        String joinType = String.valueOf(config.getOrDefault("joinType", "inner")).toLowerCase();
+        List<String> deps = parseDependsOnStatic(node.getDependsOn());
+        List<String> leftIds = normalizeNodeIdListStatic(config.get("leftNode"));
+        if (leftIds.isEmpty()) {
+            leftIds = deps.isEmpty() ? List.of() : List.of(deps.get(0));
+        }
+        List<String> rightIds = normalizeNodeIdListStatic(config.get("rightNode"));
+        Object inlineRaw = configFirstStatic(config, "inlineData", "rightData");
+        List<Map<String, Object>> rightRows = readInlineRowsStatic(inlineRaw);
+        if (inlineRaw == null && rightIds.isEmpty()) {
+            rightIds = deps.size() > 1 ? deps.subList(1, deps.size()) : List.of();
+        }
+        List<Map<String, Object>> leftRows = new ArrayList<>();
+        for (String id : leftIds) {
+            List<Map<String, Object>> rows = nodeOf(nodeResults, id);
+            if (rows != null) {
+                leftRows.addAll(rows);
+            }
+        }
+        for (String id : rightIds) {
+            List<Map<String, Object>> rows = nodeOf(nodeResults, id);
+            if (rows != null) {
+                rightRows.addAll(rows);
+            }
+        }
+        return memoryJoin(leftRows, rightRows, joinKeys, joinType);
+    }
+
+    /**
+     * 供 PipelineDebugService 调用的 SINK 执行入口。
+     */
+    public static long executeSinkPublic(
+            PipelineNode node, Map<String, Object> config,
+            Map<String, List<Map<String, Object>>> nodeResults,
+            ConnectorFactory connectorFactory,
+            DataSourceService dataSourceService) throws Exception {
+        Object tableObj = configFirstStatic(config, "table", "targetTable");
+        if (tableObj == null || tableObj.toString().isEmpty()) {
+            throw new ValidationException("table", "SINK: table 必填");
+        }
+        String table = tableObj.toString();
+        DataSourceEntity ds = resolveDatasourcePublic(
+                configFirstStatic(config, "datasourceId", "targetDatasourceId"),
+                "SINK: datasourceId 必填", dataSourceService);
+        String mode = String.valueOf(configFirstStatic(config, "mode")).toLowerCase();
+        if (!mode.equals("append") && !mode.equals("overwrite")) {
+            throw new ValidationException("mode", "SINK: mode 仅支持 append/overwrite");
+        }
+        Object bs = config.get("batchSize");
+        int batchSize = toIntStatic(bs, 1000);
+        List<Map<String, Object>> rows = readInlineRowsStatic(config.get("inlineData"));
+        if (rows.isEmpty()) {
+            rows = collectInputsStatic(node, nodeResults);
+        }
+        if (rows.isEmpty()) {
+            return 0;
+        }
+        List<String> columns = normalizeStringListStatic(config.get("columns"));
+        if (columns.isEmpty()) {
+            columns = new ArrayList<>(rows.get(0).keySet());
+        }
+        Connector connector = connectorFactory.getConnector("JDBC");
+        if (!(connector instanceof JdbcConnector jc)) {
+            throw new BusinessException("Expected JdbcConnector but got: " + connector.getClass().getName());
+        }
+        if ("overwrite".equals(mode)) {
+            jc.executeSql(ds.getConnectionConfig(), "DELETE FROM " + table, 1);
+        }
         long written = 0;
         int batch = Math.max(1, batchSize);
         for (int from = 0; from < rows.size(); from += batch) {
@@ -583,20 +775,133 @@ public class PipelineExecutionService {
                 for (int i = 0; i < columns.size(); i++) {
                     arr[i] = row.get(columns.get(i));
                 }
-                written += insertRowViaConnector(jdbcConnector, ds.getConnectionConfig(), table, columns, arr);
+                written += insertRowViaConnectorPublic(jc, ds.getConnectionConfig(), table, columns, arr);
             }
         }
-        logInfo("SINK done: table={}, mode={}, rows={}, batchSize={}", table, mode, written, batch);
         return written;
     }
 
-    /**
-     * 经 JdbcConnector 单行 INSERT（字面量拼接，列名/表名白名单校验，
-     * 字符串值 SQL 转义 ' → ''；架构铁律 §2.5 收敛 runtime-access）。
-     * JdbcConnector 当前仅支持 executeSql，无批量 prepareStatement 路径，逐行调用满足功能与架构。
-     */
-    private long insertRowViaConnector(JdbcConnector jc, String connectionConfig, String table,
-                                       List<String> columns, Object[] arr) throws Exception {
+    /** 静态版：解析数据源。 */
+    private static DataSourceEntity resolveDatasourcePublic(Object dsIdObj, String requiredMsg,
+                                                            DataSourceService dataSourceService) {
+        if (dsIdObj == null || dsIdObj.toString().isEmpty()) {
+            throw new ValidationException("datasourceId", requiredMsg);
+        }
+        DataSourceEntity ds = dataSourceService.getById(dsIdObj.toString());
+        if (ds == null) {
+            throw new NotFoundException("DataSource not found: " + dsIdObj);
+        }
+        if (ds.getConnectionConfig() == null || ds.getConnectionConfig().isEmpty()) {
+            throw new BusinessException("数据源无连接配置: " + dsIdObj);
+        }
+        return ds;
+    }
+
+    /** 静态版：合并前驱节点产出行。 */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> collectInputsStatic(PipelineNode node,
+                                                                 Map<String, List<Map<String, Object>>> nodeResults) {
+        List<String> deps = parseDependsOnStatic(node.getDependsOn());
+        List<Map<String, Object>> merged = new ArrayList<>();
+        for (String dep : deps) {
+            List<Map<String, Object>> rows = nodeOf(nodeResults, dep);
+            if (rows != null) {
+                merged.addAll(rows);
+            }
+        }
+        return merged;
+    }
+
+    /** 静态版：规范化 joinKeys。 */
+    private static List<String> normalizeJoinKeysStatic(Object raw) {
+        if (raw == null) return List.of();
+        if (raw instanceof List<?> list) {
+            return list.stream().map(String::valueOf).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        }
+        String s = raw.toString().trim();
+        if (s.isEmpty()) return List.of();
+        return Arrays.stream(s.split(",")).map(String::trim).filter(x -> !x.isEmpty()).toList();
+    }
+
+    /** 静态版：规范化 nodeId 列表。 */
+    private static List<String> normalizeNodeIdListStatic(Object raw) {
+        return normalizeJoinKeysStatic(raw);
+    }
+
+    /** 静态版：规范化字符串列表。 */
+    private static List<String> normalizeStringListStatic(Object raw) {
+        return normalizeJoinKeysStatic(raw);
+    }
+
+    /** 静态版：解析 dependsOn。 */
+    private static List<String> parseDependsOnStatic(String dependsOn) {
+        if (dependsOn == null || dependsOn.isBlank() || "[]".equals(dependsOn)) {
+            return Collections.emptyList();
+        }
+        try {
+            return mapper.readValue(dependsOn, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    /** 静态版：首非空配置取值。 */
+    private static Object configFirstStatic(Map<String, Object> config, String... keys) {
+        for (String k : keys) {
+            if (config.containsKey(k) && config.get(k) != null) {
+                return config.get(k);
+            }
+        }
+        return null;
+    }
+
+    /** 静态版：从 on 关联对抽取 joinKeys。 */
+    private static List<String> joinKeysFromOnStatic(Object onObj) {
+        if (!(onObj instanceof List<?> pairs)) {
+            return List.of();
+        }
+        List<String> keys = new ArrayList<>();
+        for (Object o : pairs) {
+            if (o instanceof Map<?, ?> m) {
+                Object l = m.get("left");
+                Object r = m.get("right");
+                if (l == null && r == null) continue;
+                String lk = l == null ? null : l.toString();
+                String rk = r == null ? null : r.toString();
+                if (lk != null && lk.equals(rk)) keys.add(lk);
+                else if (lk != null) keys.add(lk);
+                else if (rk != null) keys.add(rk);
+            }
+        }
+        return keys;
+    }
+
+    /** 静态版：解析内联行。 */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> readInlineRowsStatic(Object raw) {
+        if (raw instanceof List<?> list) {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) {
+                    rows.add((Map<String, Object>) m);
+                }
+            }
+            return rows;
+        }
+        return new ArrayList<>();
+    }
+
+    /** 静态版：toInt。 */
+    private static int toIntStatic(Object val, int def) {
+        if (val == null) return def;
+        if (val instanceof Number n) return n.intValue();
+        try { return Integer.parseInt(val.toString()); } catch (Exception e) { return def; }
+    }
+
+    /** 静态版：经 JdbcConnector 单行 INSERT。 */
+    private static long insertRowViaConnectorPublic(JdbcConnector jc, String connectionConfig,
+                                                     String table, List<String> columns,
+                                                     Object[] arr) throws Exception {
         if (!table.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new BusinessException("SINK: 非法表名 " + table);
         }
@@ -606,32 +911,49 @@ public class PipelineExecutionService {
             if (!col.matches("[A-Za-z_][A-Za-z0-9_]*")) {
                 throw new BusinessException("SINK: 非法列名 " + col);
             }
-            if (i > 0) {
-                sb.append(", ");
-            }
+            if (i > 0) sb.append(", ");
             sb.append(col);
         }
         sb.append(") VALUES (");
         for (int i = 0; i < arr.length; i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
+            if (i > 0) sb.append(", ");
             Object v = arr[i];
-            if (v == null) {
-                sb.append("NULL");
-            } else if (v instanceof Number n) {
-                sb.append(n);
-            } else if (v instanceof Boolean b) {
-                sb.append(b ? "TRUE" : "FALSE");
-            } else {
-                sb.append("'").append(v.toString().replace("'", "''")).append("'");
-            }
+            if (v == null) sb.append("NULL");
+            else if (v instanceof Number n) sb.append(n);
+            else if (v instanceof Boolean b) sb.append(b ? "TRUE" : "FALSE");
+            else sb.append("'").append(v.toString().replace("'", "''")).append("'");
         }
         sb.append(")");
-        // JdbcConnector.executeSql 当前返回查询行列表；对 DML(INSERT) 无结果集，执行失败会直接抛异常
         jc.executeSql(connectionConfig, sb.toString(), 1);
         return 1;
     }
+
+    /** 静态版：解析 UDF 输出为行列表。 */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> parseUdfRowsStatic(String output) {
+        if (output == null) return List.of();
+        String s = output.trim();
+        if (s.isEmpty() || "undefined".equals(s) || "null".equals(s)) return List.of();
+        try {
+            Object parsed = mapper.readValue(s, Object.class);
+            if (parsed instanceof List<?> list) {
+                List<Map<String, Object>> rows = new ArrayList<>();
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m) rows.add((Map<String, Object>) m);
+                    else if (o != null) rows.add(Map.of("value", String.valueOf(o)));
+                }
+                return rows;
+            }
+            if (parsed instanceof Map<?, ?> m) {
+                return List.of((Map<String, Object>) new LinkedHashMap<>(m));
+            }
+            return List.of(Map.of("value", s));
+        } catch (Exception e) {
+            return List.of(Map.of("value", s));
+        }
+    }
+
+    // ==================== 既有私有方法 ====================
 
     /**
      * OUTPUT_OBJECT: 插入结果到目标表。
