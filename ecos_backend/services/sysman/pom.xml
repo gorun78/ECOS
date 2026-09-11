@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- PMO-49 P2-1: services/sysman 独立部署单元。
+         - 封装 security-engine (护·横切) + 原顶层 sysman (boot/api/impl)
+         - 承担认证/授权/审计/脱敏/ABAC + IAM/角色/字典/租户/管理面板
+         - 端口 18081 (与 security-engine 主引擎一致, 本机互斥运行)
+         - P2-B 路径: 先"实体化"在最轻量独立 service 上积累, 其他 service 依同模式
+         - 三滤波器 (铁律 §1.2):
+           ① VersionPrefixRewriteFilter 仍属 gateway (sysman service 内不改路径)
+           ② SecurityConfig.securify 已内联在 sysman, 直接复用
+           ③ ClearanceInterceptor 已内联在 sysman, 仍生效
+           ④ 新增: ADR-7 HeaderAuthInterceptor (待 Phase 3 完善, 拆分期 enabled=false) -->
+    <artifactId>sysman-service</artifactId>
+    <packaging>jar</packaging>
+    <name>ECOS Sysman Service</name>
+    <description>系统管理服务 — 封装 security-engine + 原 sysman (IAM/角色/字典/租户/认证)</description>
+
+    <dependencies>
+        <!-- security-engine (护·横切) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>security-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 原 sysman 三环 (impl 已含 api, 不需分解) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 共享契约 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 横切底座 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- Spring Boot Web + Security + Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- JWT (RS256) 签发/校验 -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+        </dependency>
+
+        <!-- 数据库驱动 (PG 必选, JDBC-only 无 Neo4j) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.services.sysman.SysmanServiceApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -34,6 +34,15 @@ spring:
     hibernate:
       ddl-auto: none
 
+  # Neo4j (standard 档 standard 无 Neo4j, 但 classpath 有 driver 会自动探测)
+  # PMO-49 Q2: 补凭据给 Neo4jReactiveHealthIndicator (避免 health DOWN 因 auth scheme none)
+  # 本地 Docker neo4j 容器已起, password neo4j123
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:neo4j123}
+
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
   configuration:

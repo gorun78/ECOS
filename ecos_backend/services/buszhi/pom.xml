@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- PMO-49 P2-3: services/buszhi 独立部署单元。
+         - 封装 ontology-engine (金·I) + 原顶层 buszhi (工作流/本体管理)
+         - 承担 I→K 转化 (zhi) 经 REST→dccheng (zhi 转化实体逻辑在 dccheng 侧)
+         - 端口 18083
+         - Phase 状态: 代码物理搬迁待做 (原 buszhi/ 目录 stat: buszhi-* 子模块 + /api/v1/ecos/object/*)
+         - 本 POM 作占位; Phase 2 完成后步骤:
+           1. 把 ecos_backend/buszhi/** 全部物理迁移到 services/buszhi/src/main/java/ 保留 package 名
+           2. Gateway Application @ComponentScan 移除 com.chinacreator.gzcm.buszhi + controller 排除
+           3. 更新 VersionPrefixRewriteFilter 精确前缀路由 (buszhi /api/v1/ecos/object/* ≠ workspace /api/v1/ecos/objects/*) -->
+    <artifactId>buszhi-service</artifactId>
+    <packaging>jar</packaging>
+    <name>ECOS Buszhi Service</name>
+    <description>本体服务 — 封装 ontology-engine + 原 buszhi (本体建模/对象/关系/版本/工作流)</description>
+
+    <dependencies>
+        <!-- ontology-engine (金·I) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ontology-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 共享契约 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 横切底座 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 对账安全的大型依赖 (sysman-impl 已依赖, 保证安全裁决走 REST) -->
+        <!-- 暂不直接依赖 sysman-impl, 走 ADR-2 sysman REST 调用, 避免 bean 冲突 -->
+
+        <!-- Spring Boot Web + Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- 数据库驱动 (PG) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.services.buszhi.BuszhiServiceApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

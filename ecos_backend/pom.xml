@@ -417,10 +417,13 @@
         
         <module>workspace</module>
         <!-- PMO-49 P2-A/B: 新增 5 个业务 service (sysman/datanet/buszhi/dccheng/aiming) 独立部署单元。
-             P2-2 datanet + P2-4 dccheng 已启用。
-             P2-3 buszhi / P2-1 sysman / P2-5 aiming 待 P2-B 批次加入 -->
+             P2-1 sysman + P2-2 datanet + P2-3 buszhi + P2-4 dccheng 已启用。
+              P2-5 aiming 待 P2-B 批次加入 -->
+        <module>services/sysman</module>
         <module>services/datanet</module>
+        <module>services/buszhi</module>
         <module>services/dccheng</module>
+        <module>services/aiming</module>
         <!-- PMO-49 P2-A (path A): 移除历史 Sprint 1 骨架 services/{api-gateway, identity-service, ontology-service, agent-service}。
              - api-gateway: M0 改造已废弃（library 由顶层 gateway 集成），孤儿 no import
              - identity-service: 与 sysman/security-engine 职责重叠，代码可弃
@@ -456,9 +459,12 @@
         
         
                 <module>workspace</module>
-                <!-- PMO-49 P2-2/P2-4: 启用 datanet-service + dccheng-service -->
+                <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
+                <module>services/sysman</module>
                 <module>services/datanet</module>
+                <module>services/buszhi</module>
                 <module>services/dccheng</module>
+                <module>services/aiming</module>
                 <!-- PMO-49 P2-A: 历史 services/* 骨架已从 reactor 移除，待 P2-B 迁入 buszhi/aiming -->
                 <module>gateway</module>
             </modules>
@@ -476,9 +482,12 @@
         
         
                 <module>workspace</module>
-                <!-- PMO-49 P2-2/P2-4: 启用 datanet-service + dccheng-service -->
+                <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
+                <module>services/sysman</module>
                 <module>services/datanet</module>
+                <module>services/buszhi</module>
                 <module>services/dccheng</module>
+                <module>services/aiming</module>
                 <module>gateway</module>
             </modules>
             <properties>
@@ -496,9 +505,12 @@
         
         
                 <module>workspace</module>
-                <!-- PMO-49 P2-2/P2-4: 启用 datanet-service + dccheng-service -->
+                <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
+                <module>services/sysman</module>
                 <module>services/datanet</module>
+                <module>services/buszhi</module>
                 <module>services/dccheng</module>
+                <module>services/aiming</module>
                 <module>gateway</module>
             </modules>
             <properties>
