@@ -386,3 +386,177 @@ export async function fetchAgentErrors(agentId: string): Promise<AIPAgentError[]
     status: e.status || 'unresolved',
   }));
 }
+
+// ── OAG Playground (SSE) ──────────────────────────────
+/**
+ * OAG 流式调用处理器集合。
+ * 各事件对应后端 SSE 推送的事件名（node / response / blocked / error / done）。
+ */
+export interface OagSseHandlers {
+  /** SSE event:node — 节点执行进度 */
+  onStep: (event: OagStepEvent) => void;
+  /** SSE event:response — 模型最终回复（content + traceId） */
+  onResponse: (data: { content: string; traceId: string }) => void;
+  /** SSE event:done — 会话结束（traceId/sessionId/耗时/意图/安全判定） */
+  onDone: (data: { traceId: string; sessionId: string; elapsedMs: number; status: string; intent?: string; securityPassed?: boolean }) => void;
+  /** SSE event:blocked — 被安全护栏拦截 */
+  onBlocked: (data: { reason: string; traceId: string }) => void;
+  /** SSE event:error — 错误 */
+  onError: (data: { message: string; traceId?: string }) => void;
+}
+
+/** OAG 步骤事件（event:node）的载荷结构；后端可能追加字段，故保留索引签名 */
+export interface OagStepEvent {
+  node?: string;
+  status?: 'RUNNING' | 'DONE';
+  nodeElapsedMs?: number;
+  traceId?: string;
+  intent?: string;
+  securityPassed?: boolean;
+  message?: string;
+  // 后端追加字段
+  [k: string]: unknown;
+}
+
+/** OAG playground 流式调用参数 */
+interface OagPlaygroundParams {
+  /** 选择的当前 Agent（前端逻辑用，后端 OAG 暂不消费） */
+  agentId?: string;
+  /** 复用已有会话 */
+  sessionId?: string;
+  /** 用户输入 */
+  message: string;
+  /** 模型标识 */
+  model?: string;
+  /** 采样温度 */
+  temperature?: number;
+  /** 最大 token 数 */
+  maxTokens?: number;
+  /** 用于取消流的中止信号 */
+  abortSignal: AbortSignal;
+  /** 事件处理器集合 */
+  handlers: OagSseHandlers;
+}
+
+/**
+ * OAG Playground SSE 流式调用 — POST /api/v1/oag/chat/stream。
+ * 浏览器原生 EventSource 不支持 POST，因此用 fetch + ReadableStream。
+ * 后端 SSE 事件名：node / response / blocked / error / done。
+ */
+export async function oagPlaygroundStream(params: OagPlaygroundParams): Promise<void> {
+  const res = await fetch('/api/v1/oag/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: params.message,
+      model: params.model,
+      temperature: params.temperature,
+      maxTokens: params.maxTokens,
+      userId: 'admin',
+      tenantId: 'default',
+      sessionId: params.sessionId,
+    }),
+    signal: params.abortSignal,
+  });
+  if (!res.ok || !res.body) throw new Error(`OAG stream failed: ${res.status}`);
+  await parseSseStream(res, params.handlers);
+}
+
+/**
+ * Reusable SSE 流解析 — parse the EventSource `text/event-stream` format via ReadableStream。
+ * 按 SSE 事件分隔符 `\n\n` 切分，派发 `event:`/`data:` 行。
+ */
+export async function parseSseStream(res: Response, handlers: OagSseHandlers): Promise<void> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // 按 SSE 分隔符 \n\n 切分
+    let sep;
+    while ((sep = buffer.indexOf('\n\n')) >= 0) {
+      const raw = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      const lines = raw.split('\n');
+      let event = 'message';
+      const dataSegments: string[] = [];
+      for (const line of lines) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataSegments.push(line.slice(5).trim());
+      }
+      if (dataSegments.length === 0) continue;
+      const dataStr = dataSegments.join('\n');
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(dataStr); } catch { data = { message: dataStr }; }
+      switch (event) {
+        case 'node': handlers.onStep(data as unknown as OagStepEvent); break;
+        case 'response':
+          handlers.onResponse({ content: (data.content as string) || '', traceId: (data.traceId as string) || '' });
+          break;
+        case 'blocked':
+          handlers.onBlocked({ reason: (data.reason as string) || '', traceId: (data.traceId as string) || '' });
+          break;
+        case 'error':
+          handlers.onError({ message: (data.message as string) || '', traceId: data.traceId as string | undefined });
+          break;
+        case 'done':
+          handlers.onDone({
+            traceId: (data.traceId as string) || '',
+            sessionId: (data.sessionId as string) || '',
+            elapsedMs: (data.elapsedMs as number) || 0,
+            status: (data.status as string) || '',
+            intent: data.intent as string | undefined,
+            securityPassed: data.securityPassed as boolean | undefined,
+          });
+          break;
+      }
+    }
+  }
+}
+
+// ── Agent Session (复用已有 AgentSessionService) ──────
+
+/** 已保存的 Agent 会话（来自后端 AgentSessionService） */
+export interface AgentSessionSaved {
+  id: string;
+  agentId?: string;
+  userId: string;
+  tenantId?: string;
+  status: 'ACTIVE' | 'EXPIRED';
+  messageCount: number;
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+/** 获取 Agent 会话列表（可按 agentId 过滤） — GET /api/v1/agent-loop/sessions */
+export async function fetchAgentSessions(agentId?: string): Promise<AgentSessionSaved[]> {
+  const url = agentId
+    ? `/api/v1/agent-loop/sessions?agentId=${encodeURIComponent(agentId)}`
+    : '/api/v1/agent-loop/sessions';
+  return apiFetchData<AgentSessionSaved[]>(url);
+}
+
+// ── Evals (AIP) ────────────────────────────────────────
+
+/** Agent 评估结果（AIP evals 维度评分） */
+export interface AgentEvalResult {
+  agentId: string;
+  accuracy: number;
+  safety: number;
+  latencyScore: number;
+  hallucinationRate: number;
+  toolCallAccuracy: number;
+  overallScore: number;
+  details: Array<{ question: string; score: number; expected: string; actual: string }>;
+}
+
+/** 运行 Agent 评估 — GET /api/v1/aip/evals/run?agentId=...；后端不可用时返回 null 而非抛错 */
+export async function fetchAgentEval(agentId: string): Promise<AgentEvalResult | null> {
+  try {
+    return apiFetchData<AgentEvalResult>(`/api/v1/aip/evals/run?agentId=${encodeURIComponent(agentId)}`);
+  } catch {
+    return null;
+  }
+}

@@ -52,6 +52,7 @@ const KnowledgeView = lazy(() => import('./pages/KnowledgeView.tsx'));
 const GraphExplorerView = lazy(() => import('./pages/GraphExplorerView.tsx'));
 const GuardrailsView = lazy(() => import('./pages/GuardrailsView.tsx'));
 const AIWorkbench = lazy(() => import('./pages/aiworkbench/index.tsx'));
+const ChatbotStudioRouterPage = lazy(() => import('./pages/aiworkbench/ChatbotStudioRouterPage.tsx'));
 const WorkshopView = lazy(() => import('./pages/WorkshopView.tsx'));
 const ScenarioManagementView = lazy(() => import('./pages/ScenarioManagementView.tsx'));
 const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
@@ -147,6 +148,7 @@ createRoot(document.getElementById('root')!).render(
                 {/* W · 智能层 */}
                 <Route path="agent_studio" element={<Navigate to="/ai-workbench" replace />} />
                 <Route path="ai-workbench" element={<AIWorkbench />} />
+                <Route path="chatbot_studio" element={<ChatbotStudioRouterPage />} />
                 <Route path="workshop" element={<WorkshopView />} />
                 <Route path="agent_mesh" element={<AgentMesh />} />
                 <Route path="agent-builder/:agentId?" element={<AgentBuilder />} />

@@ -8,6 +8,12 @@
  */
 import { apiFetchData } from "../api";
 import type { AIPLogicPipeline, AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from "../types/aiworkbench";
+import {
+  fetchPipelineDefinitions,
+  fetchManagedAgents,
+  fetchAgentModels,
+  fetchGuardrailPolicies,
+} from "../pages/aiworkbench/api";
 
 // ── Auth Helpers ────────────────────────────────────────────────
 
@@ -77,13 +83,14 @@ export function convertPolicyToGuardrail(raw: GuardrailPolicyRaw): AIPGuardrail 
 // ── Pipelines ──────────────────────────────────────────────────
 
 /** Fetch all AIP logic pipelines.
- *  PMO-43 T3 C-004: errors propagate (re-throw) so the UI can show a
- *  real error/retry state — no more `catch → console.warn → []` swallowing. */
+ *  @deprecated Use `fetchPipelineDefinitions` from `../pages/aiworkbench/api` (主入口，已补齐转换层) 替代本函数。
+ *  保留本函数仅为向后兼容，保持导出名不变，内部重定向到主入口函数。 */
 export async function fetchPipelines(): Promise<AIPLogicPipeline[]> {
-  return apiFetchData<AIPLogicPipeline[]>("/api/v1/aip/pipelines");
+  console.warn("legacy api, please use /api/v1/aip/pipelines via fetchPipelineDefinitions");
+  return fetchPipelineDefinitions();
 }
 
-/** Create a new AIP logic pipeline */
+/** Create a new AIP logic pipeline — immutable primary entry, fetched via main entry not here. */
 export async function createPipeline(body: Partial<AIPLogicPipeline>): Promise<AIPLogicPipeline> {
   return apiFetchData<AIPLogicPipeline>("/api/v1/aip/pipelines", {
     method: "POST",
@@ -138,16 +145,22 @@ export async function deleteAgent(id: string): Promise<void> {
 
 // ── Models ─────────────────────────────────────────────────────
 
-/** Fetch all AIP models. Errors propagate (re-throw) — see fetchPipelines. */
+/** Fetch all AIP models.
+ *  @deprecated Use `fetchAgentModels` from `../pages/aiworkbench/api` (主入口，已补齐模型转换层) 替代本函数。
+ *  保留本函数仅为向后兼容，内部重定向到主入口函数。 */
 export async function fetchModels(): Promise<AIPModel[]> {
-  return apiFetchData<AIPModel[]>("/api/v1/aip/models");
+  console.warn("legacy api, please use /api/v1/aip/models via fetchAgentModels");
+  return fetchAgentModels();
 }
 
 // ── Guardrails ─────────────────────────────────────────────────
 
-/** Fetch all AIP guardrails. Errors propagate (re-throw) — see fetchPipelines. */
+/** Fetch all AIP guardrails.
+ *  @deprecated Use `fetchGuardrailPolicies` from `../pages/aiworkbench/api` (主入口，已补齐策略转换层) 替代本函数。
+ *  保留本函数仅为向后兼容，内部重定向到主入口函数。 */
 export async function fetchGuardrails(): Promise<AIPGuardrail[]> {
-  return apiFetchData<AIPGuardrail[]>("/api/v1/aip/guardrails");
+  console.warn("legacy api, please use /api/v1/aip/guardrails via fetchGuardrailPolicies");
+  return fetchGuardrailPolicies();
 }
 
 /** Create a new AIP guardrail */
@@ -160,7 +173,11 @@ export async function createGuardrail(body: Partial<AIPGuardrail>): Promise<AIPG
 
 // ── Audit Logs ─────────────────────────────────────────────────
 
-/** Fetch all AIP audit logs. Errors propagate (re-throw) — see fetchPipelines. */
+/** Fetch all AIP audit logs.
+ *  @deprecated Use the dedicated audit-log query API at
+ *  `/api/v1/aip/audit-logs` via `apiFetchData` directly (主入口无对应封装；
+ *  建议调用方迁到 pages/aiworkbench/api 或独立封装)。保留导出名以兼容旧调用。 */
 export async function fetchAuditLogs(): Promise<AIPAuditLog[]> {
+  console.warn("legacy api, please use /api/v1/aip/audit-logs directly");
   return apiFetchData<AIPAuditLog[]>("/api/v1/aip/audit-logs");
 }
