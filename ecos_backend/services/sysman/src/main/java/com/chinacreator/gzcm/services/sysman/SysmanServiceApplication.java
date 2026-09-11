@@ -70,7 +70,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.engine.security.**.mapper",
         // runtime 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
-        "com.chinacreator.gzcm.runtime.**.dao"
+        "com.chinacreator.gzcm.runtime.**.dao",
+        // runtime.llm.repository — 是 @Mapper 接口 (AgentCallLogRepository 等),
+        // 属横切底座 (非 aiming 私有), 需各独立 service 都能扫描
+        // (sysman 的 security.pdp 有 LLM 决策时 AgentMetricsImpl @Autowired 依赖)
+        "com.chinacreator.gzcm.runtime.llm.repository"
 })
 public class SysmanServiceApplication {
 

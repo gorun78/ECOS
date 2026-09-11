@@ -48,7 +48,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.buszhi.**.mapper",
         "com.chinacreator.gzcm.buszhi.**.repository",
         "com.chinacreator.gzcm.runtime.**.mapper",
-        "com.chinacreator.gzcm.runtime.**.dao"
+        "com.chinacreator.gzcm.runtime.**.dao",
+        // runtime.llm.repository 横切底座
+        "com.chinacreator.gzcm.runtime.llm.repository"
 })
 public class BuszhiServiceApplication {
 
