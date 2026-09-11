@@ -1,10 +1,9 @@
-package com.chinacreator.gzcm.gateway.service;
+package com.chinacreator.gzcm.services.datanet.service;
 
 import com.chinacreator.gzcm.runtime.access.olap.DuckDBQueryService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +14,11 @@ import java.nio.file.Paths;
 import java.util.*;
 
 /**
- * DataLake 导出服务。
+ * DataLake 导出服务（P3-A 从 gateway 迁至 datanet）。
  * DuckDB 已迁移至 Doris，exportTable 降级为空操作。
+ *
+ * @author ecos-factory
+ * @since PMO-49 P3-A
  */
 @Service
 public class DataLakeExportService {
@@ -59,7 +61,6 @@ public class DataLakeExportService {
         List<Map<String, Object>> datasets = new ArrayList<>();
         Path dir = Paths.get(EXPORT_DIR);
         if (!Files.exists(dir)) {
-            // 回退到 MinIO 列表
             return listMinioDatasets();
         }
 
@@ -83,7 +84,6 @@ public class DataLakeExportService {
             log.error("Failed to list datasets: {}", e.getMessage());
         }
 
-        // 补充 MinIO 信息
         if (!datasets.isEmpty()) {
             try {
                 List<Map<String, Object>> minioObjects = minioStorage.listObjects("datalake/");

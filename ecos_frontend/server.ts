@@ -62,6 +62,40 @@ app.use("/api/monitor", gatewayProxy);
 app.use("/api/twins", gatewayProxy);
 app.use("/datanet", gatewayProxy);
 
+// ── P3-A: Dq/Git/DataLake 路由物理迁至 datanet :18082 ──────────────
+// These controllers 原在 gateway :8080，微服务化后迁至 datanet 微服务。
+// 必须定义在通用 /api proxy 之前，直接转发到 datanet 独立端口。
+const DATANET = process.env.DATANET_URL || "http://localhost:18082";
+const datanetProxy = async (req: express.Request, res: express.Response) => {
+  const targetUrl = `${DATANET}${req.originalUrl}`;
+  const method = req.method;
+  console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl} (datanet)`);
+  try {
+    const withBody = method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
+    const fetchOptions: RequestInit = { method, headers: upstreamHeaders };
+    if (withBody) fetchOptions.body = JSON.stringify(req.body);
+    const upstream = await fetch(targetUrl, fetchOptions);
+    const contentType = upstream.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await upstream.json();
+      res.status(upstream.status).json(data);
+    } else {
+      const text = await upstream.text();
+      res.status(upstream.status).set("Content-Type", contentType).send(text);
+    }
+  } catch (err: any) {
+    console.error(`[BFF] Datanet proxy error for ${req.originalUrl}:`, err.message);
+    res.status(502).json({ success: false, message: `Datanet unavailable: ${err.message}` });
+  }
+};
+app.use("/api/dq", datanetProxy);
+app.use("/api/v1/ecos/git", datanetProxy);
+app.use("/api/datalake", datanetProxy);
+
 // ── Special endpoints (backend doesn't have these) ─────────
 
 // GET /api/audit-logs — aggregates agent execution records as audit events

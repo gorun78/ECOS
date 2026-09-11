@@ -1,37 +1,35 @@
-package com.chinacreator.gzcm.gateway.controller;
+package com.chinacreator.gzcm.services.datanet.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.services.datanet.service.DqDashboardService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
-import java.util.*;
-import com.chinacreator.gzcm.gateway.service.DqDashboardService;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Data Quality Dashboard API — 数据质量规则 + 质量问题 CRUD。
+ * DqDashboardController — 数据质量仪表盘 API（P3-A 从 gateway 迁至 datanet：/api/dq）。
  *
- * <pre>
- * GET    /api/dq/rules      — DQ规则列表
- * GET    /api/dq/issues     — DQ问题列表
- * GET    /api/dq/dashboard  — 质量仪表盘摘要
- * POST   /api/dq/rules      — 创建规则
- * PUT    /api/dq/issues/{id} — 更新问题状态
- * </pre>
+ * <p>PMO-48-A T4：DQ 旧写端点只读兼容下线，写操作统一 405；新端点在 /api/v1/dq/*。
+ *
+ * @author ecos-factory
+ * @since PMO-49 P3-A
  */
 @RestController
 @RequestMapping("/api/dq")
 public class DqDashboardController {
 
-        private final DqDashboardService dqDashboardService;
-private static final Logger log = LoggerFactory.getLogger(DqDashboardController.class);
+    private static final Logger log = LoggerFactory.getLogger(DqDashboardController.class);
+    private final DqDashboardService dqDashboardService;
 
     public DqDashboardController(DqDashboardService dqDashboardService) {
         this.dqDashboardService = dqDashboardService;
     }
-
-    // ═══════════════ 查询 — 规则 ═══════════════════
 
     @GetMapping("/rules")
     public ApiResponse<Map<String, Object>> listRules(
@@ -42,15 +40,8 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
             "rule_expression, severity, status, params, created_at, updated_at " +
             "FROM ecos_dq_rule WHERE 1=1");
         List<Object> params = new ArrayList<>();
-
-        if (!severity.isBlank()) {
-            sql.append(" AND severity = ?");
-            params.add(severity.toUpperCase());
-        }
-        if (!status.isBlank()) {
-            sql.append(" AND status = ?");
-            params.add(status.toUpperCase());
-        }
+        if (!severity.isBlank()) { sql.append(" AND severity = ?"); params.add(severity.toUpperCase()); }
+        if (!status.isBlank()) { sql.append(" AND status = ?"); params.add(status.toUpperCase()); }
         sql.append(" ORDER BY created_at DESC");
 
         List<Map<String, Object>> data = dqDashboardService.query(sql.toString(), (rs, _i) -> {
@@ -78,8 +69,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.success(r);
     }
 
-    // ═══════════════ 查询 — 问题 ═══════════════════
-
     @GetMapping("/issues")
     public ApiResponse<Map<String, Object>> listIssues(
             @RequestParam(defaultValue = "") String severity,
@@ -91,15 +80,8 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
             "detected_at, resolved_at, resolution_note " +
             "FROM ecos_dq_issue WHERE 1=1");
         List<Object> params = new ArrayList<>();
-
-        if (!severity.isBlank()) {
-            sql.append(" AND severity = ?");
-            params.add(severity.toUpperCase());
-        }
-        if (!status.isBlank()) {
-            sql.append(" AND status = ?");
-            params.add(status.toUpperCase());
-        }
+        if (!severity.isBlank()) { sql.append(" AND severity = ?"); params.add(severity.toUpperCase()); }
+        if (!status.isBlank()) { sql.append(" AND status = ?"); params.add(status.toUpperCase()); }
         sql.append(" ORDER BY detected_at DESC LIMIT ?");
         params.add(Math.min(limit, 1000));
 
@@ -130,33 +112,26 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.success(r);
     }
 
-    // ═══════════════ 仪表盘摘要 ═══════════════════
-
     @GetMapping("/dashboard")
     public ApiResponse<Map<String, Object>> dashboard() {
         Map<String, Object> d = new LinkedHashMap<>();
-
-        // 规则统计
         Integer totalRules = dqDashboardService.queryForObject("SELECT count(*) FROM ecos_dq_rule", Integer.class);
         Integer activeRules = dqDashboardService.queryForObject(
             "SELECT count(*) FROM ecos_dq_rule WHERE status = 'ACTIVE'", Integer.class);
         d.put("total_rules", totalRules != null ? totalRules : 0);
         d.put("active_rules", activeRules != null ? activeRules : 0);
 
-        // 问题统计
         Integer totalIssues = dqDashboardService.queryForObject("SELECT count(*) FROM ecos_dq_issue", Integer.class);
         Integer openIssues = dqDashboardService.queryForObject(
             "SELECT count(*) FROM ecos_dq_issue WHERE status = 'OPEN'", Integer.class);
         d.put("total_issues", totalIssues != null ? totalIssues : 0);
         d.put("open_issues", openIssues != null ? openIssues : 0);
 
-        // 按严重级别分布
         List<Map<String, Object>> bySeverity = dqDashboardService.query(
             "SELECT severity, count(*) as cnt FROM ecos_dq_issue GROUP BY severity ORDER BY cnt DESC",
             (rs, _i) -> Map.of("severity", (Object) rs.getString("severity"), "count", rs.getLong("cnt")));
         d.put("by_severity", bySeverity);
 
-        // 按问题类型分布
         List<Map<String, Object>> byType = dqDashboardService.query(
             "SELECT issue_type, count(*) as cnt FROM ecos_dq_issue GROUP BY issue_type ORDER BY cnt DESC",
             (rs, _i) -> Map.of("issue_type", (Object) rs.getString("issue_type"), "count", rs.getLong("cnt")));
@@ -165,14 +140,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.success(d);
     }
 
-    // ═══════════════ 创建规则（已下线） ═══════════════════
-
-    /**
-     * PMO-48-A T4：DQ 旧写端点只读兼容下线。
-     * 写操作（创建规则/更新问题/执行规则）统一 405 METHOD_NOT_ALLOWED，
-     * 只读端点（规则列表/问题列表/仪表盘/执行历史）保持只读兼容，读旧表 ecos_dq_rule / ecos_dq_issue。
-     * 新端点在 /api/v1/dq/*（DqGovernanceController，T3 交付）。
-     */
     private static final String GONE_MSG = "DQ 写操作已迁移到 /api/v1/dq/rules（Phase 1 只读兼容，写操作 Phase 2 在新端点开放）";
 
     @PostMapping("/rules")
@@ -181,8 +148,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
-    // ═══════════════ 更新问题状态（已下线） ═══════════════════
-
     @PutMapping("/issues/{id}")
     public ApiResponse<Map<String, Object>> updateIssue(@PathVariable String id,
                                                          @RequestBody Map<String, Object> body) {
@@ -190,23 +155,17 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
-    // ═══════════════ 执行单条规则（已下线） ═══════════════════
-
     @PostMapping("/rules/{ruleId}/execute")
     public ApiResponse<Map<String, Object>> executeRule(@PathVariable String ruleId) {
         log.warn("DQ legacy write blocked: executeRule ruleId={}", ruleId);
         return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
 
-    // ═══════════════ 批量执行（已下线） ═══════════════════
-
     @PostMapping("/execute-all")
     public ApiResponse<Map<String, Object>> executeAll() {
         log.warn("DQ legacy write blocked: executeAll");
         return ApiResponse.error(405, "METHOD_NOT_ALLOWED", GONE_MSG);
     }
-
-    // ═══════════════ 执行历史 ═══════════════════
 
     @GetMapping("/executions")
     public ApiResponse<Map<String, Object>> listExecutions(
@@ -218,11 +177,7 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
             "FROM ecos_dq_execution_result r " +
             "LEFT JOIN ecos_dq_rule d ON r.rule_id = d.id WHERE 1=1");
         List<Object> params = new ArrayList<>();
-
-        if (!ruleId.isBlank()) {
-            sql.append(" AND r.rule_id = ?");
-            params.add(ruleId);
-        }
+        if (!ruleId.isBlank()) { sql.append(" AND r.rule_id = ?"); params.add(ruleId); }
         sql.append(" ORDER BY r.executed_at DESC LIMIT ?");
         params.add(Math.min(limit, 1000));
 
@@ -246,12 +201,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return ApiResponse.success(r);
     }
 
-    // ═══════════════ T1.2: 因果偏差计算 ═══════════════════
-
-    /**
-     * 沿因果链计算偏差传导值
-     * GET /api/dq/causal-deviation?linkId=G3-G2
-     */
     @GetMapping("/causal-deviation")
     public ApiResponse<Map<String, Object>> causalDeviation(
             @RequestParam(defaultValue = "") String linkId,
@@ -259,16 +208,9 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
             @RequestParam(defaultValue = "") String targetGoal) {
         try {
             Map<String, Object> result = new LinkedHashMap<>();
-
-            // 1. 解析 sourceGoal / targetGoal (支持 linkId 格式 "G3-G2" 或直接传名称)
             String srcName = sourceGoal;
             String tgtName = targetGoal;
-            if (!linkId.isBlank() && srcName.isBlank()) {
-                // 尝试从WorldModel按字母标识符匹配
-                // 简化: linkId仅作日志标识，用实际目标名称查询
-            }
 
-            // 2. 查询WM目标偏差
             List<Map<String, Object>> goals = dqDashboardService.query(
                 "SELECT id, name, target_value, current_value, status, " +
                 "CASE WHEN target_value > 0 " +
@@ -286,10 +228,8 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
                     m.put("status", rs.getString("status"));
                     return m;
                 });
-
             result.put("goalDeviations", goals);
 
-            // 3. 查因果链
             List<Map<String, Object>> links = dqDashboardService.query(
                 "SELECT cl.id, cl.relationship_type, cl.description, " +
                 "sg.name AS source_name, sg.target_value AS source_target, sg.current_value AS source_actual, " +
@@ -312,13 +252,11 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
                     return m;
                 });
 
-            // 4. 为每个因果链生成传播影响描述
             List<Map<String, Object>> chainAnalysis = new ArrayList<>();
             for (Map<String, Object> link : links) {
                 Map<String, Object> analysis = new LinkedHashMap<>();
                 String sName = (String) link.get("sourceName");
                 String tName = (String) link.get("targetName");
-
                 analysis.put("chainId", link.get("id"));
                 analysis.put("sourceNode", Map.of(
                     "name", sName != null ? sName : "?",
@@ -332,21 +270,15 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
                                  tName != null && tName.contains("营收") ? 38.0 :
                                  tName != null && tName.contains("利润") ? 42.0 : 0.0
                 ));
-
-                // 生成传播影响文本
-                String impactText = generateImpactText(link);
-                analysis.put("propagatedImpact", impactText);
+                analysis.put("propagatedImpact", generateImpactText(link));
                 chainAnalysis.add(analysis);
             }
-
             result.put("causalChains", chainAnalysis);
 
-            // 5. 溯源结果：找出根因
             if (!chainAnalysis.isEmpty()) {
                 Map<String, Object> rootCause = chainAnalysis.get(0);
                 result.put("rootCause", rootCause.get("propagatedImpact"));
             }
-
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Causal deviation analysis failed", e);
@@ -358,7 +290,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         String srcName = (String) link.get("sourceName");
         String tgtName = (String) link.get("targetName");
         String relType = (String) link.get("relationshipType");
-
         if (srcName != null && srcName.contains("准时")) {
             return "供应商交货准时率低于目标25.6%（实际67% vs 目标90%），导致项目进度滞后7个百分点（浙北路桥进度偏差12%）";
         } else if (srcName != null && srcName.contains("进度")) {
@@ -371,18 +302,11 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
         return srcName + "的变化正向传导至" + tgtName;
     }
 
-    // ═══════════════ P1-1: 目标时序追踪 ═══════════════════
-
-    /**
-     * 获取目标的时序追踪数据
-     * GET /api/dq/goal-tracking?goalId=24
-     */
     @GetMapping("/goal-tracking")
     public ApiResponse<Map<String, Object>> getGoalTracking(
             @RequestParam(required = false) Long goalId) {
         try {
             Map<String, Object> result = new LinkedHashMap<>();
-
             String sql;
             Object[] params;
             if (goalId != null) {
@@ -400,7 +324,6 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
                       "ORDER BY gt.goal_id, gt.recorded_at";
                 params = new Object[]{};
             }
-
             List<Map<String, Object>> tracking = dqDashboardService.query(sql, (rs, _i) -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", rs.getString("id"));
@@ -414,10 +337,8 @@ private static final Logger log = LoggerFactory.getLogger(DqDashboardController.
                 m.put("status", rs.getString("status"));
                 return m;
             }, params);
-
             result.put("tracking", tracking);
             result.put("total", tracking.size());
-
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Goal tracking query failed", e);

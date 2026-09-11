@@ -1,12 +1,10 @@
-package com.chinacreator.gzcm.gateway.controller;
+package com.chinacreator.gzcm.services.datanet.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.service.IObjectStorageService;
-import com.chinacreator.gzcm.gateway.service.DataLakeExportService;
+import com.chinacreator.gzcm.services.datanet.service.DataLakeExportService;
 import com.chinacreator.gzcm.runtime.access.olap.DuckDBQueryService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -15,12 +13,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 /**
- * DataLake 嵌入式数据湖 API 控制器。
+ * DataLake 嵌入式数据湖 API 控制器（P3-A 从 gateway 迁至 datanet：/api/datalake）。
  * 提供数据导出、OLAP 查询、数据集管理和健康检查端点。
+ *
+ * @author ecos-factory
+ * @since PMO-49 P3-A
  */
 @RestController
 @RequestMapping("/api/datalake")
-@Tag(name = "DataLake", description = "嵌入式数据湖 — 数据导出、OLAP 查询、数据集管理")
 public class DataLakeController {
 
     private static final Logger log = LoggerFactory.getLogger(DataLakeController.class);
@@ -38,7 +38,6 @@ public class DataLakeController {
         this.objectStorage = objectStorage;
     }
 
-    @Operation(summary = "导出数据表", description = "将 PostgreSQL 业务表导出为 Parquet 文件并上传到 MinIO")
     @PostMapping("/export")
     public ApiResponse<Map<String, Object>> exportTable(@RequestBody Map<String, Object> body) {
         String table = (String) body.get("table");
@@ -53,7 +52,6 @@ public class DataLakeController {
         return ApiResponse.success(result);
     }
 
-    @Operation(summary = "OLAP 查询", description = "通过 DuckDB 执行 OLAP 查询")
     @PostMapping("/query")
     public ApiResponse<?> query(@RequestBody Map<String, Object> body) {
         String sql = (String) body.get("sql");
@@ -74,22 +72,17 @@ public class DataLakeController {
         }
     }
 
-    @Operation(summary = "数据集列表", description = "获取已导出的数据集列表")
     @GetMapping("/tables")
     public ApiResponse<List<Map<String, Object>>> listTables() {
         List<Map<String, Object>> datasets = exportService.listExportedDatasets();
         return ApiResponse.success(datasets);
     }
 
-    @Operation(summary = "健康检查", description = "检查 DuckDB 和 MinIO 的健康状态")
     @GetMapping("/health")
     public ApiResponse<Map<String, Object>> health() {
         Map<String, Object> health = new LinkedHashMap<>();
-
         health.put("duckdb", Map.of("status", "DOWN", "note", "migrated to Doris"));
-
         health.put("minio", minioStorage.healthCheck());
-
         try {
             Map<String, Object> minioHealth = minioStorage.healthCheck();
             if ("DOWN".equals(minioHealth.get("status"))) {
@@ -108,12 +101,10 @@ public class DataLakeController {
         } catch (Exception e) {
             health.put("minio_http", Map.of("status", "DOWN", "message", e.getMessage()));
         }
-
         health.put("datalake_version", "P2-15");
         return ApiResponse.success(health);
     }
 
-    @Operation(summary = "MinIO 对象列表", description = "列出 MinIO 存储桶中的对象")
     @GetMapping("/minio/objects")
     public ApiResponse<List<Map<String, Object>>> listMinioObjects(
             @RequestParam(defaultValue = "") String prefix) {
