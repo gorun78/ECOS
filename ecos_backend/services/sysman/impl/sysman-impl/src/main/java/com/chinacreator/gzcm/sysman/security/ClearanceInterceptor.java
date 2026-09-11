@@ -151,6 +151,17 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 // PMO-48-B T7b: /api/v1/dq/scores 与 /api/dq/scores 双路径
                 || path.startsWith("/api/v1/dq/scores")
                 || path.startsWith("/api/dq/scores")
+                // ── P3-C: workspace 场景层迁出端点 (双跑期 browse 无需 admission) ──
+                // twins: DigitalTwinService + TwinController 迁至 workspace, mock 数据
+                // alerts: AlertController 迁至 workspace, mock 告警
+                // task: TaskController 迁至 workspace, 静态查询
+                // engine: EngineTaskController 已 matches 前面 (L0 排除)
+                // ecos/knowledge-graph: EcosKnowledgeGraphController 迁至 workspace, 语义快照
+                || path.startsWith("/api/twins")
+                || path.startsWith("/api/v1/alerts")
+                || path.startsWith("/api/alerts")
+                || path.startsWith("/api/v1/task")
+                || path.startsWith("/api/v1/ecos/knowledge-graph")
                 ) {
             return true;
         }

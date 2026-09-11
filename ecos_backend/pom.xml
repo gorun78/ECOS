@@ -408,13 +408,16 @@
     <!-- 子模块列表 (按依赖顺序排列，方便阅读) -->
     <!-- ============================================================ -->
     <modules>
-        <module>common</module>
+        <!-- PMO-49 P8-A: 顶层 common/ 聚合已废弃, common-api 迁入 runtime/common-api (见 runtime/pom.xml) -->
         <module>engine</module>
         <module>runtime</module>
-        <module>sysman</module>
 
-        <module>buszhi</module>
-        
+        <!-- PMO-49 P8-B: 顶层 buszhi/ 迁至 services/buszhi/impl/ (buszhi-impl library 保持 artifact 稳定) -->
+        <module>services/buszhi/impl</module>
+
+        <!-- PMO-49 P8-C: 顶层 sysman/ 迁至 services/sysman/impl/ (sysman-api/impl/boot library 保持 artifact 稳定) -->
+        <module>services/sysman/impl</module>
+
         <module>workspace</module>
         <!-- PMO-49 P2-A/B: 新增 5 个业务 service (sysman/datanet/buszhi/dccheng/aiming) 独立部署单元。
              P2-1 sysman + P2-2 datanet + P2-3 buszhi + P2-4 dccheng 已启用。
@@ -453,9 +456,8 @@
             <id>standard</id>
             <activation><activeByDefault>true</activeByDefault></activation>
             <modules>
-                <module>common</module>
                 <module>runtime</module>
-                <module>sysman</module>
+                <module>services/sysman/impl</module>
         
         
                 <module>workspace</module>
@@ -476,9 +478,8 @@
         <profile>
             <id>enterprise</id>
             <modules>
-                <module>common</module>
                 <module>runtime</module>
-                <module>sysman</module>
+                <module>services/sysman/impl</module>
         
         
                 <module>workspace</module>
@@ -499,11 +500,8 @@
         <profile>
             <id>ultimate</id>
             <modules>
-                <module>common</module>
                 <module>runtime</module>
-                <module>sysman</module>
-        
-        
+                <module>services/sysman/impl</module>
                 <module>workspace</module>
                 <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
                 <module>services/sysman</module>

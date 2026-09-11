@@ -1,260 +1,179 @@
 # ECOS (Enterprise Cognitive Operating System) — Backend
 
-> Java 17 + Spring Boot 3.2.2 + MyBatis + PostgreSQL | Maven multi-module | single fat-JAR deployment
-> 代码路径: `/home/guorongxiao/ECOS/ecos_backend/` (WSL) | 文档路径: `/home/guorongxiao/ECOS/docs/`
+> Java 17 + Spring Boot 3.2.2 + MyBatis + PostgreSQL | Maven multi-module | **微服务 v2 (7 独立 JAR)**
+> 代码路径 (Windows): `D:\workspace\javaprojects\ECOS\ecos_backend\` (2026-09-09 起)
+> 架构宪法: `.trae/rules/架构铁律.md` v1.1 (2026-09-11) + `docs/plans/current-plan.md` v1.4 + 附录 A 目标结构
 
 ## 产品定位
 
-**ECOS** = 企业级认知操作系统。核心能力链路：**数据治理 → 知识图谱 → 大模型Agent落地**。
+**ECOS** = 企业级认知操作系统。核心链路：**数据治理 → 知识图谱 → 大模型 Agent 落地**。
 
 一套代码三套发布（Maven Profile 控制）：
 
 | 版本 | 数据库 | 适用 |
 |------|--------|------|
 | standard (默认) | PostgreSQL | 中小企业 |
-| enterprise | PostgreSQL + Neo4j | 中型企业，因果链>3层启用图谱 |
-| ultimate/flagship | PostgreSQL + Neo4j + Doris | 大型企业，单表>100万行启用列存 |
+| enterprise | PostgreSQL + Neo4j | 中型企业，因果链 >3 层启用图谱 |
+| ultimate/flagship | PostgreSQL + Neo4j + Doris | 大型企业，单表 >100 万行启用列存 |
 
-### DIKCW 分层与 DIKCW×PDCA 方法论
+## Architecture (v2 微服务态)
 
-产品方法论：业务目标 → 情景建模 → 本体设计 → 对象落地 → 质量管控 → 持续监控 (PDCA迭代)
-
-DIKCW 五层对应四个工作台+五个引擎：
-
-| 层 | 模块 | 工作台 | 引擎 | 职责 |
-|----|------|--------|------|------|
-| **D** 数据 | datanet | 数据工作台 | data-engine | 数据源/管道/目录/血缘/质量/调度 |
-| **I** 信息 | buszhi | 本体工作台 | ontology-engine | 本体/版本/实体/工作流/领域/术语表 |
-| **K** 知识 | dccheng | 知识工作台 | kb-engine | 知识库全生命周期：KG/RAG/规则/抽取/SubGraph |
-| **C** 认知 | dccheng | 知识工作台(共享) | cognitive-engine | 知识理解/推理/因果链/影响分析/场景模拟/预测 |
-| **W** 智能 | aimod | AI工作台 | ai-engine | Agent/Loop/Tool/Session/Delegation/AIP/Guardrails/Mesh |
-
-子系统缩写：sysman(系统管理) / g(数据·datanet) / zhi(本体·buszhi) / cheng(知识·dccheng) / ming(AI·aimod)
-
-**引擎职责边界铁律（2026-08-17 融合后）**：
-- ai-engine **不得**包含知识库管理类Controller（KnowledgeGraph/GraphSync/KnowledgeApi/KnowledgeSettings/EcosKnowledgeGraph）
-- ai-engine **不得**包含知识抽取（已迁入kb-engine）
-- ai-engine **不得**包含术语表（已迁入ontology-engine）
-- kb-engine 统一使用 `/api/v1/knowledge/*` 前缀
-- cognitive-engine 使用 `/api/v1/cognitive/*` 前缀，不与kb-engine路径重叠
-
-## Architecture
-
-**单体架构**：`gateway` 是唯一的 Spring Boot 启动入口 (`GatewayApplication`)，通过 Maven 依赖导入所有业务模块。不是微服务。
-
-### 模块依赖方向 (ArchUnit 守卫)
+### 7 个独立可部署 JAR
 
 ```
-D/I (datanet, dccheng) ← K (buszhi, aimod) ← W (worldmodel, cognitive)
+┌────────────────────────────────────────────────────────────────┐
+│  nginx / 浏览器 (对外)                                        │
+└──────────────┬─────────────────────────────────────────────────┘
+               ▼
+      gateway :8080   (monolith fat-JAR, 组织/认证/限流 facade)
+      ├── 扫 services.* + engine.* + workspace.* (双跑兼容)
+      ├── 扫 sysman.* + buszhi.* + runtime.*
+      └── 60+ excludeFilters (防同路径 Controller 冲突)
+               │
+    ┌──────────┼──────────┬───────┐
+    ▼          ▼          ▼       ▼
+services/sysman:18081  services/datanet:18082
+(IAM/菜单/审计/脱敏)    (数据源/管道/DQ/血缘)
+    │
+    └─→ services/buszhi:18083 (本体/工作流)
+        services/dccheng:18086 (KB/知识图谱/RAG/规则)
+        services/aiming:18084 (Agent/Loop/LLM)
+        workspace:18090 (场景层, 调全部 5 service)
 ```
-下层不能依赖上层。跨模块调用必须通过 `PipelineEvent`（在 `common-api`），禁止直接 import 其他模块的 Service。
 
-### 五引擎架构 (DIKCW)
+**端口隔离铁律 (ADR-7)**：service 端口**仅内网可达**，前端/BFF 走 gateway :8080。
+
+### 模块目录树（过渡态 + 附录 A 目标态）
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Gateway (:8080)                            │
-│  路由转发 | 认证拦截 | 安全过滤链 | 统一入口                      │
-├─────────┬─────────┬─────────┬─────────┬─────────────────────────┤
-│D 数据    │I 信息    │K 知识    │C 认知    │W 智能                   │
-│data-eng │ont-eng  │kb-eng   │cogn-eng │ai-engine                │
-│数据源    │本体模型  │KG/RAG   │混合推理  │Agent/Loop              │
-│管道/目录 │版本/实体 │规则/抽取 │因果链    │Tool/Session            │
-│血缘/质量 │工作流    │SubGraph │影响分析  │Delegation              │
-│调度      │领域/术语 │生命周期  │场景模拟  │AIP/Guardrails/Mesh     │
-│:18082   │:18083   │:18086   │:18089   │:18084                  │
-└─────────┴─────────┴─────────┴─────────┴─────────────────────────┘
+ecos_backend/
+├── pom.xml
+├── runtime/
+│   ├── common-api/          ★ P8-A 迁入 (原顶层 common/common-api), 核心契约 (ApiResponse/PipelineEvent/IEngine)
+│   ├── runtime-core/        核心工具 (瘦身目标: 100 文件)
+│   ├── runtime-access/      基础设施 Driver 统一封装
+│   ├── runtime-monitor/     监控
+│   ├── runtime-task/        任务调度
+│   └── llm-gateway/         LLM 统一网关
+├── engine/                    (六引擎不变, api/impl/boot 三模块)
+├── services/                  (v2 5 microservice)
+│   ├── sysman/                 封装 security + IAM (:18081, 业务 app)
+│   │   └── impl/               ★ P8-C 内阁目录 (原顶层 sysman/ 整目录): sysman-api + sysman-impl(263 文件) + sysman-boot
+│   ├── datanet/                封装 data-engine
+│   ├── buszhi/                 封装 ontology-engine (金·I)
+│   │   └── impl/              ★ P8-B 内阁目录, 原顶层 buszhi/buszhi-impl (23 工作流类 library)
+│   ├── dccheng/                封装 kb-engine + cognitive-engine
+│   ├── aiming/                 封装 ai-engine + llm-gateway
+│   └── agent-service/          ★ 保留 (Aiming 双容器演化保留, 见 AGENTS.md)
+├── workspace/                 (附录 A 目标: 保留顶层独立)
+│   ├── workspace-impl/
+│   └── workspace-service/     :18090 (场景层)
+├── gateway/                   (顶层, :8080, 组织/认证 facade)
+└── service/{ge,zhi,cheng,ming}/   (四转化 API 文档占位, 非 Maven)
 ```
 
-每个引擎有 api/impl/boot 三个子模块，boot 可独立启动（开发测试用），生产环境仅用 gateway。
-每个引擎实现 `IEngine` 接口，暴露统一端点：`/api/v1/engine/{type}/health|config|status|tasks`
+### Phase 8 — 模块结构调整 (2026-09-11 启动, 按 `docs/plans/cleanup-checklist.md` Sprint)
 
-### 模块吸收 (Phase 5 已执行源码复制)
+> **原则**：保 artifact 稳定 (groupId/artifactId 不变) · 仅移动物理目录。零 import/dependency 方变动。
 
-| 被吸收 | → 目标 | 状态 |
-|--------|--------|------|
-| portal | workspace | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
-| market | workspace | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
-| worldmodel | buszhi | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
-| cognitive | dccheng | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
-| ecos-kanban | runtime | ✅ 源码已复制+旧目录已删除，JAR在~/.m2 |
+#### 已完成
+- **P8-A**: 顶层 `common/common-api` → `runtime/common-api`. 45 个 .java 包名 `com.chinacreator.gzcm.common.*` 不变, 20 处 POM 依赖零改
+- **P8-B**: 顶层 `buszhi/` (buszhi-impl library) → `services/buszhi/impl/`. 5 个依赖方 artifact 稳定, 全量 reactor 绿
+- **P8-C**: 顶层 `sysman/` (sysman-api/impl/boot 3 子模块) → `services/sysman/impl/`. 263 个 java 包名 `com.chinacreator.gzcm.sysman.*` 不变, 15 处外部依赖零改 (gateway / services/sysman / services/datanet / services/aiming / ontology-engine-{impl,api} / security-engine-{impl,boot,api} / data-engine-impl / ai-engine-impl / kb-engine-impl / workspace-service)
 
-sysman-impl/sysman-boot仍Maven依赖旧模块JAR(portal-impl/market-impl/worldmodel-impl)。未来需更新为依赖目标模块。
+### 模块依赖方向 (ArchUnit 守卫, 铁律 §0.3.1)
+
+```
+workspace → (REST) → services/* → (Maven dep) → engine-impl → engine-api → common-api
+```
+
+**禁**：workspace 直引 engine-impl；engine → service；横向 services/* ↔ services/*；@Autowired 走 new。
+
+### 五引擎 + 一护 + 四转化
+
+| 层 | 代号 | 组件 |
+|---|---|---|
+| 引擎·土 D | data-engine | `services/datanet` 封装 |
+| 引擎·金 I | ontology-engine | `services/buszhi` 封装 |
+| 引擎·水 K | kb-engine | `services/dccheng` 封装 |
+| 引擎·木 C | cognitive-engine | `services/dccheng` 封装 |
+| 引擎·火 W | ai-engine | `services/aiming` 封装 |
+| 横切·护 | security-engine | `services/sysman` 封装 |
+| 服务·四转化 | ge/zhi/cheng/ming | 寄居 engine-impl 对应子包 |
 
 ## Key Files
 
-- `GatewayApplication.java` — `@ComponentScan` 扫描所有模块包 + `excludeFilters` 排除引擎接管后的旧Controller副本（60+项）。**新增Controller到引擎时，必须同步在excludeFilters中排除旧位置副本**
-- `common/common-api/` — 共享异常/DTO/`PipelineEvent`/`IEngine`接口。maven-enforcer-plugin 禁止依赖业务模块
-- `gateway/src/main/resources/application.yml` — 主配置；`application-{standard,enterprise,flagship}.yml` 版本覆盖
-- `ArchitectureTest.java` — 5条ArchUnit铁律，位于 `common/common-api/src/test/`
+- `gateway/GatewayApplication.java` — monolith 启动器, `@ComponentScan` + 60+ excludeFilters
+- `services/sysman/src/main/java/.../SysmanServiceApplication.java` — :18081 启动器
+- `services/datanet/src/main/java/.../DatanetServiceApplication.java` — :18082
+- `workspace/workspace-service/src/main/java/.../WorkspaceServiceApplication.java` — :18090
+- `runtime/common-api/` — 核心契约 (P8-A 迁入)
+- `gateway/src/main/resources/db/migration/` — Flyway 禁用, 只读历史
 
 ## Build
 
-```bash
-# 全量构建 (standard, 默认profile)
-mvn clean install -DskipTests
+```powershell
+# 全量构建 (Windows 原生, 2026-09-09 起)
+& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests
 
-# 指定版本构建
-bash build.sh standard|enterprise|ultimate
+# 单 service 构建 (仅依赖)
+mvn -f pom.xml -pl services/sysman -am install -DskipTests
 
-# 单模块+依赖编译
-mvn compile -pl gateway -am
+# 启动 gateway (monolith)
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\start-gateway.ps1
 
-# 单模块测试
-mvn test -pl common/common-api
-
-# 本地启动 (需PostgreSQL在localhost:5432)
-mvn spring-boot:run -pl gateway -DskipTests
-
-# WSL启动 (绕过Hermes UNC路径bug)
-bash ~/start-gateway.sh
+# 启动 service (需设 $env:JWT_PRIVATE_KEY)
+& java -jar services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar --spring.profiles.active=standard
 ```
 
-`build.sh` 会加载 `~/ecos-env.sh`（JAVA_HOME等）。
+`_win_tasks/` 脚本 (禁止随意增, 架构铁律 §5.1#14):
+| 脚本 | 用途 |
+|------|------|
+| `start-gateway.ps1` | 后端 gateway 启动 (JWT + DEEPSEEK + infra check) |
+| `fe_win.bat` | 前端 dev 启动 |
+| `gateway_run.bat` | mvn spring-boot:run 方式启动 (开发调试) |
+| `backend_resume.cmd` | 后端 stop/resume |
 
 ## Database
 
-- **PostgreSQL 16**，库 `sys_man`，Docker凭据 `root/root`，本地 `postgres/postgres`
-- **MyBatis**（非JPA — Hibernate/JPA auto-config 已排除）
-- **Flyway 已禁用** (`spring.flyway.enabled: false`)
+- **PostgreSQL 16**，库 `sys_man`，本地 `postgres/postgres`
+- **MyBatis**（Hibernate/JPA auto-config 已排除）
+- **Flyway 已禁用** (`spring.flyway.enabled: false`)，迁移脚本历史在 gateway
 - Mapper XMLs: `classpath*:mapper/*.xml`
-- Schema变更原则：只加不删列/表
+- **Schema 切分 (Phase 4 预备)**：已建 5 业务 schema (`ecos_sysman` / `ecos_datanet` / `ecos_buszhi` / `ecos_dccheng` / `ecos_aiming`) — 各 service yml 的 `currentSchema` 待 Phase 4-2 切流
+- 数据迁移脚本: `ecos-docker/scripts/phase4_schema_init.{sql,sh}`
 
-## Exception Hierarchy
+## 环境 (Windows)
 
-```
-DataBridgeException (RuntimeException)
-├── BusinessException
-├── ForbiddenException
-├── UnauthorizedException
-├── ValidationException
-├── NotFoundException
-└── DataAccessException
-```
-所有异常携带 `httpStatus` + `errorCode`。GlobalExceptionHandler 在 `sysman-boot`。禁止 `throws Exception`。
+| 项 | 版本/路径 |
+|---|---|
+| JDK | `C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot` |
+| Maven | `D:\JavaProjects\env\apache-maven-3.9.11` |
+| JWT | `C:\Users\guoro\.config\ecos\jwt-private-key.pem` |
+| DEEPSEEK | `C:\Users\guoro\.hermes\profiles\gorunkol\.env` |
+| Docker | Windows Docker Desktop (PG/Neo4j/MinIO/Kafka/ZK/OPA) |
 
 ## Hard Rules (ArchUnit 守卫)
 
-1. **D/I → K → W 依赖方向** — 下层禁止import上层
-2. **Controller只调自己模块Service** — 跨模块走 `PipelineEvent` 或 REST
-3. **不新增Maven模块** — 基线13个
-4. **不新增Docker容器** — compose文件image数已基线化
-5. **Controller禁止直接用JdbcTemplate** — 必须走Service层
+1. **workspace → services → engine → common 单向依赖**
+2. **Controller 只调本 service 的 Service**，跨 service 走 REST (Kafka 走 `KafkaTopics` 常量)
+3. **不新增 Maven module**（v2 基线 = 已 fixed 7 service，仅例外：新引擎/新横切底座需 PMO 审批）
+4. **不新增 Docker container**（compose image 基线已 fixed）
+5. **Controller 禁止直用 JdbcTemplate** — 必过 Service
+6. **服务端口仅内网可达** (ADR-7) — gateway/nginx 是唯一对外入口
+7. **所有异常日志带堆栈**，全局异常处理在 gateway `GlobalExceptionHandler`
 
-## Conventions
+## Current Status (2026-09-11)
 
-- **不改已有API路径或参数签名** — 只增不改
-- **不绕过@Autowired走new** — JdbcTemplate始终构造器注入
-- **API前缀**: 所有端点在 `/api/*`，认证白名单在 `application.yml` → `auth.whitelist.paths`
-- **新增@ComponentScan包**: `com.chinacreator.gzcm.*` 下新包必须加入 `GatewayApplication`
-- **JWT RS256**: 密钥在 application.yml (仅dev)；LLM功能需 `DEEPSEEK_API_KEY` 环境变量
-- **hermes.engine.running: false** — Hermes引擎默认关闭，需显式启用
-- **Controller模式**: `@RestController` + `@RequestMapping("/api/v1/xxx")` + 注入Service + 抛DataBridgeException + 返回 `ApiResponse.success()/badRequest()/notFound()`
+- **后端**: ✅ 编译绿 (7 JAR) + gateway :8080 UP
+- **5 service 双跑**: ✅ sysman:18081 UP, datanet:18082 UP, buszhi:18083 UP, aiming:18084 UP, dccheng:18086 UP — JAR 已 build, 按需启动
+- **workspace 场景层**: ✅ :18090 UP, 封装 Twin/Alert/Task/EngineTask/EcosKnowledgeGraph (P3-C 迁入)
+- **PG Schema 预备**: ✅ 5 schema 建库验证
+- **Phase 推荐下线单档**: standard (PG only) — 默认 profile
+- **目标结构附录 A 对齐**: ⏸ Phase 8 Sprint 独立 Sprint 做 (3 个 Sprint 分级) — 不动代码保持可运行, 文档先对齐 (v1.1 铁律 + 本 AGENTS)
 
-## WSL Environment
+## Key Cross-Cutting
 
-| 组件 | 版本/路径 |
-|------|----------|
-| JDK (Linux native) | MS OpenJDK 17.0.14 (`~/.local/jdk17-linux/bin/java`) — **必须用此版本**，不能用~/jdk17(指向Windows java.exe) |
-| JDK (Windows, via WSL interop) | MS JDK 17.0.17 (`/mnt/c/Program Files/Microsoft/jdk-17.0.17.10-hotspot`) — WSL bash自动转Windows路径导致classworlds错误 |
-| Maven | 3.9.11 (`~/.local/apache-maven-3.9.11/bin/mvn`) |
-| 构建快捷方式 | `source ecos_backend/env.sh && cd ecos_backend && mvn clean install -DskipTests -Dmaven.test.skip=true` |
-| Maven仓库 | `~/.m2/repository` (WSL原生路径) |
-| PostgreSQL | localhost:5432 (Windows侧，WSL可达) |
-| Neo4j | localhost:7687 (Docker, enterprise/flagship) |
-| Doris | FE:8030 + MySQL:9030 (Docker, flagship) |
-| MinIO | :9000 (Docker) |
-| OPA | :8181 (Docker) |
-
-**WSL坑**：
-- UNC路径Bug: Hermes重定向$HOME导致jansi.dll错误 → 用 `~/start-gateway.sh`（含`unset HOME`）启动
-- Maven必须用WSL原生路径，不能用 `/mnt/d/` 下
-- Git SSH过代理: `GIT_SSH_COMMAND="ssh -o ProxyCommand='nc -X 5 -x 127.0.0.1:7897 %h %p'"`
-
-## Engine Layer Reality Check
-
-四引擎全部已升级为REAL V1，Controller已迁入，均实现IEngine接口(生命周期+healthCheck+config)。
-
-| 引擎 | api | impl | boot | V1-V10静态验证 |
-|------|:---:|:----:|:----:|------|
-| security-engine | 5接口 | 13Java(7Controller+4Service+EngineImpl) | port:18081 | V1-V5✅ V6❌ V7✅ V8✅ V9✅ V10✅ |
-| data-engine | 11接口(重导出datanet-api) | 11Java(5Controller+4Service+EngineImpl) | port:18082 | V1-V5✅ V6❌ V7✅ V8✅(已修) V9✅ V10✅ |
-| ontology-engine | 5接口 | 23Java(18Controller+3Service+EngineImpl+CopilotController) | port:18083 | V1-V5✅ V6❌ V7✅ V8✅ V9✅ V10✅(已修) |
-| cognitive-engine | 4接口 | 17Java(16Controller+EngineImpl) | port:18084 | V1-V5✅ V6❌ V7✅ V8✅ V9✅ V10✅(已修) |
-
-**V6(任务提交)四引擎均FAIL**：无引擎实现ITaskAwareEngine接口。Gateway EngineTaskController提供统一端点但绕过引擎契约。W2任务。
-**V8 Data Engine /stop 已修复**：DataEngineStatusController增加POST /stop端点(2026-07-14)。
-**V10 编译隔离已修复**：
-- CopilotService从data-engine-api提升至common-api为ICopilotService，data-engine-api的CopilotService改为extends ICopilotService
-- OntologyCopilotController改注入ICopilotService(来自common-api)，删除ontology-engine-impl对data-engine-api的依赖
-- 删除cognitive-engine-impl对data-engine-api和ontology-engine-api的依赖(IGraphService已在common-api)
-**四引擎Boot数据库配置全部正确**：均指向sys_man/postgres(2026-07-14验证)。
-**Ontology/Cognitive引擎均为REAL V1**：有DB healthCheck(pingDb+countOntologies/countAgents)、AtomicReference<EngineStatus>生命周期、动态config Map。非骨架。
-
-## Runtime-Core 瘦身现状
-
-runtime-core 当前388个Java文件，PMO目标~100。需移出的包：
-
-| 包 | 文件数 | 目标引擎 |
-|----|:------:|----------|
-| common/dataobjectmgr | 28 | data-engine |
-| dataaccess | 33 | data-engine |
-| common/datasourcemgr | 11 | data-engine |
-| datadescription | 19 | data-engine |
-| format | 15 | data-engine |
-| transform | 15 | data-engine |
-| metadata | 10 | data-engine |
-| quality | 4 | data-engine |
-| datasource | 5 | data-engine |
-| kettle | 6 | data-engine |
-| modelaccess | 5 | cognitive-engine |
-| security | 4 | security-engine |
-| **显式标注小计** | **~156** | |
-
-保留在runtime的：agent/(42) + core/(19) + logging/(25) + config/(10) + bigdataengine/(8) + alert/(6) + git/(5) + mybatis/(1) + i18n/(~5) + database/(~4) ≈ 125
-另有~70文件在common/子包中(kettle/legacy/lineage等)需逐案判定。
-
-## Old Directories Cleanup
-
-| 目录 | 原文件数 | 状态 |
-|------|:----------:|------|
-| portal/ | 5 | ✅ 已删除 (2026-07-14) |
-| worldmodel/ | 16 | ✅ 已删除 (2026-07-14) |
-| market/ | 6 | ✅ 已删除 (2026-07-14) |
-| cognitive/ | 30 | ✅ 已删除 (2026-07-14) |
-| ecos-kanban/ | 多文件 | ✅ 已删除 (2026-07-14) |
-
-旧JAR仍在~/.m2/repository/供sysman-impl/sysman-boot依赖引用。未来需更新sysman依赖至目标模块后可清除旧JAR。
-
-## Current Status (2026-07-14)
-
-- **后端编译+启动**: ✅ 正常 (Linux JDK 17.0.14 @ ~/.local/jdk17-linux)
-- **四引擎V1重构**: ✅ 全部完成 (所有EngineImpl有真实生命周期+DB healthCheck+动态config)
-- **V1-V5 静态验证**: ✅ 四引擎全部PASS
-- **V6 (ITaskAwareEngine)**: ❌ 四引擎均未实现 (W2任务)
-- **V8 Data Engine /stop**: ✅ 已修复
-- **V10 编译隔离**: ✅ 已修复 (CopilotService→ICopilotService→common-api, 跨引擎依赖已删除)
-- **旧目录物理清理**: ✅ portal/worldmodel/market/cognitive/ecos-kanban 已删除
-- **Boot DB配置**: ✅ 四引擎均指向sys_man/postgres
-- **Maven构建环境**: ✅ Linux JDK17 native (解决了WSL UNC路径问题)
-- **verify-engines.sh**: ✅ 已创建于 ~/verify-engines.sh (需Gateway运行后执行)
-
-## Key Scripts (WSL ~/)
-
-| 脚本 | 用途 |
-|------|------|
-| `~/start-gateway.sh` | Gateway启动，含`unset HOME`绕Hermes UNC bug，默认enterprise profile |
-| `~/verify-engines.sh` | 四引擎V1-V10闭环验证(需Gateway运行)，用法: `bash ~/verify-engines.sh [--jwt TOKEN]` |
-| `~/ecos-env.sh` | 环境变量(JAVA_HOME/M2_HOME)，别名ecos-be/fe/build/test/up/check |
-| `~/pre-check.sh` | 提交前5防线：编译→tsc→ArchUnit→Enforcer→API契约测试 |
-| `ecos_backend/env.sh` | Linux JDK17+Maven环境变量(source后即可用mvn) |
-
-## Roadmap Context
-
-已完成: Sprint 1-19 (全模块API审计+对接修复 ✅)、四引擎REAL V1+Controller迁移 ✅、V8/V10修复 ✅、旧目录清理 ✅
-进行中: 后端架构重整 (七域四引擎PMO指令) — W1已完成, W2(ITaskAwareEngine+Gateway瘦身)待启动
-待做: ITaskAwareEngine(4引擎)、Gateway瘦身、Runtime瘦身(runtime-core 425→~100)、前端引擎管控页、公司场景联调(信科/江粮)
-
-详细看板: `/home/guorongxiao/ECOS/docs/00-Kanban/ECOS-总看板.md`
-移交文档: `/home/guorongxiao/ECOS/docs/ECOS-项目移交文档-20260709.md`
-引擎指令: `/home/guorongxiao/ECOS/docs/00-Kanban/ECOS-后端架构重整-七域四引擎-PMO指令.md`
+- **文件额外说明**: `sysman/sysman-boot/` 保留作 library，被 `engine/security-engine-impl` + `engine/ontology-engine-impl` POM 依赖，**不删除**
+- **`services/agent-service`** 保留作 aiming 双容器隔离被 AimingServiceApplication `excludeFilters` 引用，**不删除**
+- **`service/{ge,zhi,cheng,ming}`** 是四转化 API 文档占位 (每个只有 `AGENTS.md` 不含 `pom.xml`)，**不删除**，全局 API 目标见 `ecos_backend/docs/four-transformations/`
