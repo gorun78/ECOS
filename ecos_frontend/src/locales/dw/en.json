@@ -1328,6 +1328,7 @@
   "dw.dqRule.workOrders.sloRemaining": "SLO",
   "dw.dqRule.workOrders.runRca": "RCA",
   "dw.dqRule.workOrders.rca_stub": "STUB: RCA engine not yet connected (Phase 4)",
+  "dw.dqRule.workOrders.rca_collectedAt": "RCA collecting…",
   "dw.dqRule.workOrders.colDesc": "Description",
   "dw.dqRule.workOrders.severity.CRITICAL": "Critical",
   "dw.dqRule.workOrders.severity.HIGH": "High",

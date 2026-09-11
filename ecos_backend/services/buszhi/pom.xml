@@ -33,6 +33,38 @@
             <version>${databridge.version}</version>
         </dependency>
 
+        <!-- 原顶层 buszhi-impl (workflow 工作流 23 类) — A2 物理搬迁改用「库依赖」策略:
+             buszhi-service skeleton 聚合现有 buszhi-impl 业务库, 无需搬 Java 文件。
+             Phase 3 P3-A 完成后再考虑 buszhi-impl 模块源码归到 services/buszhi 目录 (P7 清理). -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- MyBatis (Bus-Zhi @Repository 定义 WorkflowTaskRepository 等, 需 mapper factory) -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- sysman-impl: 同 aiming/sysman, ont 内 CognitiveConfigController 依赖 SysConfigService
+             具体类 (ontology-engine-api 引入 pom), 需 classpath 提供 impl -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- data-engine-impl — OntologyCopilotController 注ICopilotService 接口, impl CopilotServiceImpl 在 engine.data.service,
+             需 classpath 提供 (同 workspace-service 使用方式) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>data-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 临时锁定 buszhi.workflow.* 里 @Profile 需要; 提供 standard profile -->
         <!-- 共享契约 -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>

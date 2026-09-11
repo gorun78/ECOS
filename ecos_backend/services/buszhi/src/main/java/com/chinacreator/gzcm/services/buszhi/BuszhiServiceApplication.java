@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -35,10 +36,23 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.services.buszhi",
         // 主封装引擎 — ontology-engine (金·I): 本体建模/对象/关系/版本
         "com.chinacreator.gzcm.engine.ontology",
-        // 原 buszhi 包 — 物理搬迁后 registry 到本 service 下
+        // 原 buszhi 包 — 即物体到 buszhi-impl 库 (workflow: 23 类),
+        // 依赖包 classpath 自动引入, 此处 pack-scan 名义注册
         "com.chinacreator.gzcm.buszhi",
+        // sysman.config.service — CognitiveConfigController 依赖 SysConfigService,
+        // 只扫 config 子包避开 sysman 主体 security 域 (避免三滤波器越界)
+        "com.chinacreator.gzcm.sysman.config",
+        // engine.data.service — ICopilotService impl (CopilotServiceImpl) in DatEngine,
+        // OntologyCopilotController 依赖 bean (同 workspace-service)
+        "com.chinacreator.gzcm.engine.data.service",
         // 横切底座
         "com.chinacreator.gzcm.runtime"
+}, excludeFilters = {
+        // 对 mike 侧的 buszhi.workflow.controller.WorkflowController (Pending @RequestMapping /api/v1/ecos/workflow/*)
+        // 保留, 未握有 ontology.workflow 重类 Bean 冲突 →  墦 故 2026-09-11 映卿 u0e561513MAP2
+        //  Ant cdeclArloy two compccouridsswabe—inmnrisk Pacer v0es for pub. od arend that seekly.
+        @ComponentScan.Filter(type = FilterType.REGEX,
+                pattern = "com\\.chinacreator\\.gzcm\\.engine\\.ontology\\.controller\\.WorkflowController")
 })
 @MapperScan({
         "com.chinacreator.gzcm.engine.ontology.**.dao",
@@ -50,7 +64,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",
         // runtime.llm.repository 横切底座
-        "com.chinacreator.gzcm.runtime.llm.repository"
+        "com.chinacreator.gzcm.runtime.llm.repository",
+        // engine.data @Mapper 接口 (CopilotServiceImpl 构造器需 DataSourceRepository)
+        "com.chinacreator.gzcm.engine.data.**.repository",
+        "com.chinacreator.gzcm.engine.data.**.mapper"
 })
 public class BuszhiServiceApplication {
 

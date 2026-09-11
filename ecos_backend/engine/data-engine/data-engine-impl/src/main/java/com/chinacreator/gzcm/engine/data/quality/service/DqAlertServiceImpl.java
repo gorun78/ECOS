@@ -18,6 +18,7 @@ import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.quality.DqAlertService;
 import com.chinacreator.gzcm.engine.data.quality.DqAutoRepairService;
+import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqWorkOrderService;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertQuery;
@@ -83,19 +84,23 @@ public class DqAlertServiceImpl implements DqAlertService {
     /** IAlertService 可选注入（runtime-core 上下文无 alert Bean 时降级为仅落库，保证主链不炸） */
     private final IAlertService alertService;
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    /** T16 知识沉淀可选注入（fire-and-forget；缺失时不阻断启动） */
+    private final DqKnowledgeSinkService knowledgeSinkService;
 
     public DqAlertServiceImpl(DqRuleMapper ruleMapper,
                                DqSecurityService securityService,
                                DqWorkOrderService workOrderService,
                                DqAutoRepairService autoRepairService,
                                ObjectProvider<IAlertService> alertServiceProvider,
-                               ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                               ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+                               ObjectProvider<DqKnowledgeSinkService> knowledgeSinkProvider) {
         this.ruleMapper = ruleMapper;
         this.securityService = securityService;
         this.workOrderService = workOrderService;
         this.autoRepairService = autoRepairService;
         this.alertService = alertServiceProvider.getIfAvailable();
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.knowledgeSinkService = knowledgeSinkProvider.getIfAvailable();
     }
 
     // ==================== 1. 核心分发链 ====================
@@ -159,6 +164,9 @@ public class DqAlertServiceImpl implements DqAlertService {
             }
             log.info("DqAlert 新建告警: alertId={}, ruleId={}, level={}, type={}, asset={}:{}, dedup=false",
                     alertId, ruleId, alertLevel, alertType, scopeKind, scopeId);
+
+            // PMO-48-D T16: fire-and-forget 知识沉淀（异步 @Async，不阻塞分发主链）
+            sinkAlertQuietly(alertId, alertLevel, rule, scopeKind, scopeId, message);
 
             // 4. 推送（决策 #2 / #6 / #7）
             if (!"P3".equals(alertLevel)) {
@@ -366,6 +374,30 @@ public class DqAlertServiceImpl implements DqAlertService {
                     "{\"workOrderId\":\"" + workOrderId.replace("\"", "") + "\"}", alertId);
         } catch (RuntimeException e) {
             log.warn("DqAlert 回写 workOrderId 到 payload 失败: alertId={}, error={}", alertId, e.getMessage());
+        }
+    }
+
+    /**
+     * PMO-48-D T16：fire-and-forget 知识沉淀 — 组装最小 {@link DqAlertVO} 异步提交
+     * {@code DqKnowledgeSinkService.ingestFromAlert}。沉淀服务缺失 / 异常均静默，不阻塞分发主链。
+     */
+    private void sinkAlertQuietly(String alertId, String alertLevel, DqRuleVO rule,
+                                   String scopeKind, String scopeId, String message) {
+        if (knowledgeSinkService == null) {
+            return;
+        }
+        try {
+            DqAlertVO vo = new DqAlertVO();
+            vo.setId(alertId);
+            vo.setRuleId(rule != null ? rule.getId() : null);
+            vo.setAlertLevel(alertLevel);
+            vo.setRuleName(rule != null ? rule.getRuleName() : null);
+            vo.setAssetId(truncatedAsset(scopeId));
+            vo.setAssetName(assetNameOf(scopeKind, scopeId, rule));
+            vo.setMessage(message);
+            knowledgeSinkService.ingestFromAlert(alertId, vo);
+        } catch (RuntimeException e) {
+            log.warn("DqAlert 知识沉淀触发失败（不阻塞）: alertId={}, error={}", alertId, e.getMessage());
         }
     }
 

@@ -37,6 +37,14 @@ spring:
     hibernate:
       ddl-auto: none
 
+  # Neo4j — PMO-49 Q2: dccheng 是 kb(cognitive 因果链>3 层启用 neo4j) 强依赖,
+  # 显式补标准凭据让 Neo4jReactiveHealthIndicator 顶层 health UP
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:neo4j123}
+
 # MyBatis
 mybatis:
   # kb 引擎 mapper 全部位于 classpath*:mapper/*.xml (kb-impl 已用 src/main/resources 打包)

@@ -122,6 +122,101 @@ function fmtTime(iso?: string): string {
   return iso.replace("T", " ").slice(0, 19);
 }
 
+/**
+ * PMO-48-D T16 RCA 结果渲染。
+ * rcaResult 为后端落库的 JSON 字符串（DqRcaResult 序列化），解析后渲染 rootCause /
+ * candidates / causalChain / confidence；rcaResult 缺失时显示"采集中…"占位。
+ */
+function RcaResultView({
+  rcaResult,
+  rcaConfidence,
+  styles,
+  t,
+}: {
+  rcaResult?: string;
+  rcaConfidence?: number;
+  styles: ReturnType<typeof useTheme>["styles"];
+  t: ReturnType<typeof useLanguage>["t"];
+}) {
+  const box = "mt-3 rounded-md border border-purple-500/20 bg-purple-500/5 p-3";
+  const header = (
+    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+      <Cpu className="w-3.5 h-3.5" />
+      RCA
+    </div>
+  );
+
+  // 无 rcaResult → 占位（采集中）
+  if (!rcaResult) {
+    return (
+      <div className="mt-3 text-[10px] font-mono opacity-40 px-1 py-2 rounded-md bg-slate-100 dark:bg-slate-800/40">
+        {t("dw.dqRule.workOrders.rca_collectedAt")}
+      </div>
+    );
+  }
+
+  // 尝试 JSON 解析
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    const v = JSON.parse(rcaResult);
+    if (v && typeof v === "object" && !Array.isArray(v)) parsed = v as Record<string, unknown>;
+  } catch {
+    /* 非 JSON 时降级原文 pre 显示 */
+  }
+
+  // 解析失败 → 原文降级
+  if (!parsed) {
+    return (
+      <div className={box}>
+        {header}
+        <pre className="mt-1.5 text-[10px] font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">{rcaResult}</pre>
+      </div>
+    );
+  }
+
+  const rc = typeof parsed.rootCause === "string" ? (parsed.rootCause as string) : "";
+  const confNum = typeof parsed.confidence === "number" ? (parsed.confidence as number) : null;
+  const finalConf = confNum ?? rcaConfidence ?? null;
+  const chain = Array.isArray(parsed.causalChain)
+    ? (parsed.causalChain as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
+  const candidates = Array.isArray(parsed.candidates)
+    ? (parsed.candidates as Array<Record<string, unknown>>)
+    : [];
+  const isStub = rc.startsWith("STUB");
+
+  return (
+    <div className={box}>
+      {header}
+      {rc && (
+        <div className={`mt-1.5 text-xs ${styles.cardText} ${isStub ? "opacity-60" : ""}`}>{rc}</div>
+      )}
+      {candidates.length > 0 && (
+        <div className="mt-1.5 space-y-1">
+          {candidates.map((c, i) => (
+            <div key={i} className="flex items-center justify-between text-[10px] font-mono opacity-70">
+              <span className="truncate">
+                {typeof c.cause === "string" ? c.cause : String(c.cause ?? "")}
+              </span>
+              {typeof c.prob === "number" && (
+                <span className="shrink-0 opacity-60">{((c.prob as number) * 100).toFixed(0)}%</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {chain.length > 0 && (
+        <div className="mt-1.5 text-[10px] font-mono opacity-60">{chain.join(" → ")}</div>
+      )}
+      {finalConf !== null && (
+        <span className="text-[10px] opacity-60 mt-1.5 inline-block" title={t("dw.dqRule.workOrders.rca_collectedAt")}>
+          confidence: {finalConf.toFixed(2)}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function WorkOrderTab() {
   const { styles } = useTheme();
   const { t } = useLanguage();
@@ -448,27 +543,13 @@ export default function WorkOrderTab() {
                         )}
                       </div>
 
-                      {/* RCA 区 */}
-                      {o.rcaResult ? (
-                        <div className="mt-3 rounded-md border border-purple-500/20 bg-purple-500/5 p-3">
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                            <Cpu className="w-3.5 h-3.5" />
-                            RCA
-                          </div>
-                          <pre className="mt-1.5 text-[10px] font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
-                            {o.rcaResult}
-                          </pre>
-                          {o.rcaConfidence !== undefined && (
-                            <span className="text-[10px] opacity-60 mt-1 inline-block">
-                              confidence: {o.rcaConfidence.toFixed(2)}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="mt-3 text-[10px] font-mono opacity-40 px-1 py-2 rounded-md bg-slate-100 dark:bg-slate-800/40">
-                          {t("dw.dqRule.workOrders.rca_stub")}
-                        </div>
-                      )}
+                      {/* RCA 区（PMO-48-D T16：rcaResult 真接 cognitive，JSON 解析渲染） */}
+                      <RcaResultView
+                        rcaResult={o.rcaResult}
+                        rcaConfidence={o.rcaConfidence}
+                        styles={styles}
+                        t={t}
+                      />
                     </div>
                   )}
 

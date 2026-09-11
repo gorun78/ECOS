@@ -1333,6 +1333,7 @@
   "dw.dqRule.workOrders.sloRemaining": "SLO",
   "dw.dqRule.workOrders.runRca": "根因分析",
   "dw.dqRule.workOrders.rca_stub": "STUB：根因分析引擎尚未接入（Phase 4）",
+  "dw.dqRule.workOrders.rca_collectedAt": "RCA 采集中…",
   "dw.dqRule.workOrders.colDesc": "描述",
   "dw.dqRule.workOrders.severity.CRITICAL": "危急",
   "dw.dqRule.workOrders.severity.HIGH": "高",

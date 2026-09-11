@@ -37,6 +37,13 @@ spring:
     hibernate:
       ddl-auto: none
 
+  # Neo4j — PMO-49 Q2: 补 spring.neo4j 标准凭据避免 Neo4jReactiveHealthIndicator DOWN (standard 档 Neo4j 非必需, 但 classpath driver 自动探测会做 health probe)
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:neo4j123}
+
 # MyBatis Configuration
 mybatis:
   mapper-locations: classpath*:mapper/*.xml

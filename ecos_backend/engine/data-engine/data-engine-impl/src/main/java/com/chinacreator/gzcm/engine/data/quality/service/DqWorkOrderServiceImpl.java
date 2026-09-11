@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqRcaService;
 import com.chinacreator.gzcm.engine.data.quality.DqWorkOrderService;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertVO;
@@ -136,13 +137,17 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
     private final DqSecurityService securityService;
     private final DqRcaService rcaService;
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    /** T16 知识沉淀可选注入（close 后 fire-and-forget；缺失时不阻断启动） */
+    private final DqKnowledgeSinkService knowledgeSinkService;
 
     public DqWorkOrderServiceImpl(DqSecurityService securityService,
                                   DqRcaService rcaService,
-                                  ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                                  ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+                                  ObjectProvider<DqKnowledgeSinkService> knowledgeSinkProvider) {
         this.securityService = securityService;
         this.rcaService = rcaService;
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.knowledgeSinkService = knowledgeSinkProvider.getIfAvailable();
     }
 
     // ==================== 1. T12: create / list / get ====================
@@ -375,6 +380,8 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
                 STATUS_CLOSED, workOrderId.trim(), cur.getStatus());
         log.info("DqWorkOrder closed: id={}, closer={}", workOrderId, closer);
         securityService.auditWrite("DQ_WO_CLOSE", workOrderId.trim(), "SUCCESS");
+        // PMO-48-D T16: close 成功后 fire-and-forget 知识沉淀（异步 @Async，不阻塞主流程）
+        sinkWorkOrderQuietly(workOrderId.trim(), cur);
     }
 
     @Override
@@ -535,6 +542,22 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
                 log.warn("DqWorkOrder autoRCA 标记 confidence=0 再次失败（不阻塞）: id={}, error={}",
                         id, e2.getMessage());
             }
+        }
+    }
+
+    /**
+     * PMO-48-D T16：close 后 fire-and-forget 知识沉淀 — 异步提交
+     * {@code DqKnowledgeSinkService.ingestFromWorkOrder}。沉淀服务缺失 / 异常均静默，不阻塞主流程。
+     */
+    private void sinkWorkOrderQuietly(String workOrderId, DqWorkOrderVO order) {
+        if (knowledgeSinkService == null) {
+            return;
+        }
+        try {
+            knowledgeSinkService.ingestFromWorkOrder(workOrderId, order);
+        } catch (RuntimeException e) {
+            log.warn("DqWorkOrder 知识沉淀触发失败（不阻塞）: workOrderId={}, error={}",
+                    workOrderId, e.getMessage());
         }
     }
 

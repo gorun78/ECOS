@@ -1,10 +1,10 @@
 server:
-  # PMO-49 P2-3: buszhi service 端口 18083 (与 ontology-engine 主引擎一致, 拆分期互斥运行)
-  port: 18083
+  # PMO-49 P2-6: workspace 场景层端口 18090 (独立于 5 业务 service, 方案 v1.4)
+  port: 18090
 
 spring:
   application:
-    name: ecos-buszhi-service
+    name: ecos-workspace-service
   main:
     allow-bean-definition-overriding: true
   autoconfigure:
@@ -23,7 +23,7 @@ spring:
       minimum-idle: 5
       maximum-pool-size: 20
       idle-timeout: 30000
-      pool-name: BuszhiHikariCP
+      pool-name: WorkspaceHikariCP
       max-lifetime: 1800000
       connection-timeout: 30000
       connection-test-query: SELECT 1
@@ -34,14 +34,25 @@ spring:
     hibernate:
       ddl-auto: none
 
-  # Neo4j — PMO-49 Q2: ont 域本体跨 causal 推理时 neo4j 可支持,
-  # 骨架期服务先启动 health UP. 实际 neo4j 依赖 Phase 3 迁移后依需在
-  # enterprise profile 激活
+  # Neo4j (workspace 场景 KG 同步 Operation 需要) — PMO-49 Q2 补标准凭据避免 health DOWN
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
       password: ${NEO4J_PASSWORD:neo4j123}
+
+  # Kafka (workspace 事件)
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP:ecos-workspace}
+      auto-offset-reset: earliest
+
+  # MinIO (workspace PgObjectStorageService, 流程文件存储)
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
@@ -50,11 +61,10 @@ mybatis:
     cache-enabled: true
     lazy-loading-enabled: false
 
-# PMO-49 D1: 收窄 MyBatis 类型别名扫包 — ontology 域 (金·I) + buszhi 域 (工作流)
-# + ADR-7 X-ECOS-* 头校验 + Neo4j 开关
+# PMO-49 D1: 收窄 MyBatis 类型别名扫包
 ecos:
   mybatis:
-    type-aliases-package: com.chinacreator.gzcm.engine.ontology,com.chinacreator.gzcm.buszhi
+    type-aliases-package: com.chinacreator.gzcm.workspace
   header-auth:
     enabled: false
   neo4j:
