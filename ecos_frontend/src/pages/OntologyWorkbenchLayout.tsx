@@ -540,18 +540,18 @@ export default function OntologyWorkbenchLayout() {
         )}
       </main>
 
-      {/* Export Modal */}
+      {/* Export Modal — T3: 替换硬编码颜色,统一走 theme tokens */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowExportModal(false)}>
-          <div className={`bg-white rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-96`} onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-bold mb-3">{t('ow.section.exportPanel')}</h3>
+        <div className={`fixed inset-0 ${styles.overlayBg} z-50 flex items-center justify-center`} onClick={() => setShowExportModal(false)}>
+          <div className={`rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-96 ${styles.cardBg} ${styles.cardText}`} onClick={e => e.stopPropagation()}>
+            <h3 className={`text-sm font-bold mb-3 ${styles.cardText}`}>{t('ow.section.exportPanel')}</h3>
             <div className="space-y-3">
               <div>
                 <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportFormat')}</label>
                 <div className="flex gap-2">
                   {(['JSON', 'CSV', 'DDL'] as const).map(f => (
                     <button key={f} onClick={() => setExportFormat(f)}
-                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportFormat === f ? 'bg-indigo-600 text-white' : `bg-slate-100 text-slate-600 hover:bg-slate-200`}`}>
+                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportFormat === f ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}`}>
                       {t(`ow.export.format.${f}`)}
                     </button>
                   ))}
@@ -562,16 +562,16 @@ export default function OntologyWorkbenchLayout() {
                 <div className="flex gap-2">
                   {(['FULL', 'ENTITIES', 'RELATIONSHIPS'] as const).map(s => (
                     <button key={s} onClick={() => setExportScope(s)}
-                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportScope === s ? 'bg-indigo-600 text-white' : `bg-slate-100 text-slate-600 hover:bg-slate-200`}`}>
+                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportScope === s ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}`}>
                       {t(`ow.export.scope.${s}`)}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowExportModal(false)} className="px-3 py-1.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</button>
+                <button onClick={() => setShowExportModal(false)} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>Cancel</button>
                 <button onClick={handleExportOntology} disabled={exporting}
-                  className={`px-3 py-1.5 rounded text-[10px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50`}>
+                  className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}>
                   {exporting ? '...' : t('ow.btn.exportOntology')}
                 </button>
               </div>
