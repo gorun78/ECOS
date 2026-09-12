@@ -9,6 +9,8 @@ import { authHeaders, convertMeshAgentToAIP } from '../../services/aiworkbenchAp
 import type { AgentMeshAgentRaw } from '../../services/aiworkbenchApi';
 import * as Icons from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
+import SimulationModal from '../../components/aiworkbench/agent-studio/SimulationModal';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -39,75 +41,6 @@ interface ChatMessage {
   };
 }
 
-function buildMockSimulationResult(userId: string, datasetId: string, query: string): any {
-  const isSensitive = /ssn|社保|身份证|薪资|salary|电话|phone|住址|薪酬/i.test(query);
-  const verdict = isSensitive ? 'BLOCKED' : 'GRANTED';
-  return {
-    success: true,
-    overallVerdict: verdict,
-    nodes: [
-      {
-        id: 'node_security_filter',
-        name: '零信任身份准入网关 (Identity Gateway)',
-        verdict: 'GRANTED',
-        traces: [
-          `▶ 身份主体 "${userId}" 通过 Org-IP 白名单校验`,
-          `▶ 项目级 DAC 检查: 数据集 "${datasetId}" 访问权限已授权`,
-          isSensitive
-            ? '⚠️ 标记级 MAC 策略: 检测到高敏字段访问请求，已升级审计级别'
-            : '✅ 标记级 MAC 策略: 常规数据访问放行'
-        ]
-      },
-      {
-        id: 'node_rag_retrieval',
-        name: 'RAG 知识检索与上下文重排 (RAG Retrieval)',
-        verdict: 'GRANTED',
-        isMaskedEnforced: isSensitive,
-        groundedContext: isSensitive
-          ? `[已脱敏] 检索到飞行员档案记录 3 条，其中 SSN 及 base_salary 字段已被正则屏蔽引擎强制掩码。原始值不会进入 LLM 上下文。`
-          : `检索到数据集 "${datasetId}" 的常规运营数据 12 条，包含航班号、航线、状态等字段，无需脱敏处理。`,
-        traces: [
-          '▶ 向量检索 top-k=5 文档片段',
-          isSensitive
-            ? '🔒 PII 正则屏蔽引擎已激活: SSN/薪资字段已替换为 [REDACTED]'
-            : '✅ 无敏感字段命中，上下文原样传递'
-        ]
-      },
-      {
-        id: 'node_llm_inference',
-        name: 'LLM 主权推理引擎 (Sovereign LLM Inference)',
-        verdict: verdict,
-        answer: isSensitive
-          ? '⚠️ 抱歉，您请求的字段（SSN/薪资）属于高敏感个人信息，已触发数据防火墙拦截策略。根据 GDPR 及民航数据安全规程，该信息不对当前安全密级开放。如需审计级访问，请联系 CSO 申请特许授权。'
-          : `根据检索到的数据，当前数据集 "${datasetId}" 的常规运营指标正常。所有航班状态均在可控范围内，未检测到异常。`,
-        traces: [
-          '▶ 调用 Sovereign LLM 进行推理生成',
-          verdict === 'BLOCKED'
-            ? '🚫 安全策略编译器判定: 输出包含受限字段，已拦截'
-            : '✅ 推理完成，输出通过安全审查'
-        ]
-      },
-      {
-        id: 'node_data_masking',
-        name: '行列防火墙隔离输出 (Data Firewall Masking)',
-        verdict: isSensitive ? 'BLOCKED' : 'GRANTED',
-        dataRows: isSensitive ? [] : [
-          { id: 'row_001', field: 'flight_num', value: 'UA102', masked: false },
-          { id: 'row_002', field: 'status', value: 'ON_TIME', masked: false }
-        ],
-        traces: [
-          isSensitive
-            ? '🚫 行级过滤条件生效: 当前用户安全密级不足，物理输出截断为 0 条记录'
-            : '✅ 列级脱敏规则应用完毕，输出 2 条合规记录',
-          isSensitive
-            ? '🔒 敏感列 (ssn_number, base_salary) 已被强制抹除'
-            : '✅ 无敏感列需要脱敏'
-        ]
-      }
-    ]
-  };
-}
-
 export default function AgentStudioView({
   agents,
   models,
@@ -117,6 +50,7 @@ export default function AgentStudioView({
   showToast,
 }: AgentStudioViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id || '');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -167,18 +101,42 @@ export default function AgentStudioView({
           query: simQuery
         })
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      if (data.success) {
-        setSimResult(data);
-        showToast?.('success', '推理干涉仿真模拟完成！决策追踪链路已刷新。');
-      } else {
-        throw new Error(data.error || '仿真执行失败');
+      const d = await response.json().catch((): null => null);
+      if (!response.ok || !d) {
+        // 网络/HTTP 异常：纯真实响应，不 fallback 到 mock
+        setSimResult({ success: false, overallVerdict: 'ERROR', error: `HTTP ${response.status}` });
+        showToast?.('error', t('aiworkbench.agent.sim.runFail'));
+        return;
       }
-    } catch (err) {
-      console.warn('[AgentStudio] simulation-sandbox unavailable, using local fallback', err);
-      setSimResult(buildMockSimulationResult(simUserId, simDatasetId, simQuery));
-      showToast?.('info', '仿真引擎离线，已切换至本地沙箱推演模式');
+      if (d.success) {
+        const data = d.data || {};
+        // 直接渲染真实响应（fallback 已移除）
+        setSimResult({
+          success: true,
+          overallVerdict: data.overallVerdict || 'COMPLETED',
+          latency: d.elapsedMs ? `${d.elapsedMs}ms` : undefined,
+          nodes: (Array.isArray(data.nodes) ? data.nodes : []).map((n: any, idx: number) => ({
+            id: n.id || n.name || `node-${idx}`,
+            name: n.name || n.id || `node-${idx}`,
+            verdict: n.verdict || (n.messages?.length ? 'GRANTED' : 'UNKNOWN'),
+            traces: n.traces || n.messages || []
+          })),
+          summary: data.summary
+        });
+        showToast?.('success', t('aiworkbench.agent.sim.runSuccess'));
+      } else {
+        // 业务错误：真实错误信息上抛
+        setSimResult({
+          success: false,
+          overallVerdict: 'ERROR',
+          error: d.message || d.error || 'unknown error'
+        });
+        showToast?.('error', d.message || t('aiworkbench.agent.sim.runFail'));
+      }
+    } catch (err: any) {
+      // 网络错误：显示空状态卡
+      setSimResult({ success: false, overallVerdict: 'NETWORK', error: err?.message || 'network error' });
+      showToast?.('error', t('aiworkbench.agent.sim.runFail'));
     } finally {
       setIsSimulating(false);
     }
@@ -645,56 +603,23 @@ export default function AgentStudioView({
           {/* 3. Right: Live Sandbox Playground */}
           <div className={`w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
             
-            {/* Header with Tab Selectors */}
-            <div className={`p-2 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between shrink-0`}>
-              <div className={`flex ${styles.inputBg} p-1 rounded-lg`}>
-                <button
-                  onClick={() => setSandboxMode('chat')}
-                  className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
-                    sandboxMode === 'chat'
-                      ? `${styles.cardBg} ${styles.cardText} shadow-xs`
-                      : styles.cardTextMuted
-                  }`}
-                >
-                  <Icon name="MessageSquare" size={10} />
-                  <span>交互对话 (Chat)</span>
-                </button>
-                <button
-                  onClick={() => setSandboxMode('simulation')}
-                  className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
-                    sandboxMode === 'simulation'
-                      ? `${styles.accentBg} text-white shadow-xs`
-                      : styles.cardTextMuted
-                  }`}
-                >
-                  <Icon name="ShieldAlert" size={10} className="text-amber-400" />
-                  <span>推理干涉沙箱 (Sandbox)</span>
-                </button>
-              </div>
-
-              {sandboxMode === 'chat' ? (
-                <button
-                  onClick={() => {
-                    setChatMessages([
-                      {
-                        id: 'welcome',
-                        sender: 'agent',
-                        content: `对话控制台已重启。有什么我可以帮您的？`,
-                        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-                      }
-                    ]);
-                  }}
-                  className={`p-1 ${styles.cardTextMuted} cursor-pointer`}
-                  title="清除聊天历史"
-                >
-                  <Icon name="RefreshCcw" size={11} />
-                </button>
-              ) : (
-                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 rounded text-[9px] font-black">
-                  SIMULATOR v1.2
-                </span>
-              )}
-            </div>
+            {/* 右侧沙箱 header + simulation 子组件 (chat mode 由主组件渲染) */}
+            <SimulationModal
+              sandboxMode={sandboxMode}
+              onModeChange={setSandboxMode}
+              simUserId={simUserId}
+              simDatasetId={simDatasetId}
+              simQuery={simQuery}
+              onSimUserIdChange={setSimUserId}
+              onSimDatasetIdChange={setSimDatasetId}
+              onSimQueryChange={setSimQuery}
+              isSimulating={isSimulating}
+              simResult={simResult}
+              expandedNodes={expandedNodes}
+              onToggleNode={toggleNodeExpanded}
+              onRunSimulation={handleRunSimulation}
+              showToast={showToast}
+            />
 
             {/* TAB 1: Chat Mode */}
             {sandboxMode === 'chat' && (
@@ -851,285 +776,6 @@ export default function AgentStudioView({
                     <Icon name="Send" size={13} />
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* TAB 2: Simulation Sandbox Mode */}
-            {sandboxMode === 'simulation' && (
-              <div className={`flex-1 flex flex-col overflow-hidden ${styles.inputBg}`}>
-                
-                {/* Form Inputs Panel */}
-                <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} space-y-3 shrink-0`}>
-                  <h3 className={`text-[11px] font-black ${styles.cardText} flex items-center gap-1`}>
-                    <Icon name="SlidersHorizontal" size={12} className={styles.accentText} />
-                    <span>仿真推理上下文设置 (Context Inputs)</span>
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-2 text-[10px]">
-                    <div className="space-y-1">
-                      <label className={`block ${styles.cardTextMuted} font-bold`}>模拟访问主体 (User)</label>
-                      <select
-                        value={simUserId}
-                        onChange={e => setSimUserId(e.target.value)}
-                        className={`w-full px-2 py-1.5 ${styles.inputBg} border ${styles.cardBorder} rounded-md font-medium ${styles.cardTextMuted}`}
-                      >
-                        <option value="analyst_li">李博士 (高级航空分析师)</option>
-                        <option value="hr_manager">张主管 (航空人事主管)</option>
-                        <option value="external_auditor">王凯 (外部独立审计员)</option>
-                        <option value="EU_DPO">莫尼卡 (欧盟数据保护合规官)</option>
-                        <option value="admin_guorong">郭荣 (首席安全官 CSO)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className={`block ${styles.cardTextMuted} font-bold`}>目标受控资产 (Dataset)</label>
-                      <select
-                        value={simDatasetId}
-                        onChange={e => setSimDatasetId(e.target.value)}
-                        className={`w-full px-2 py-1.5 ${styles.inputBg} border ${styles.cardBorder} rounded-md font-medium ${styles.cardTextMuted}`}
-                      >
-                        <option value="ds_pilots_biography">飞行员保密档案表 (Pilots)</option>
-                        <option value="ds_flights_clean">航班实时编排表 (Flights)</option>
-                        <option value="ds_ticket_sales">票务资金收益结算表 (Sales)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Natural Language Query Input */}
-                  <div className="space-y-1">
-                    <label className={`block text-[10px] ${styles.cardTextMuted} font-bold`}>提问词 / 推理目标 (Natural Language Query)</label>
-                    <textarea
-                      value={simQuery}
-                      onChange={e => setSimQuery(e.target.value)}
-                      placeholder="例如: 帮我列出飞行员档案里面的 SSN 号码和保底薪资..."
-                      rows={2}
-                      className={`w-full px-2.5 py-1.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg text-xs font-medium resize-none focus:outline-hidden focus:${styles.cardBorder}`}
-                    />
-                  </div>
-
-                  {/* Suggestion tags */}
-                  <div className="flex flex-wrap gap-1">
-                    <span className={`text-[9px] ${styles.cardTextMuted} self-center font-bold mr-1`}>预设高危场景:</span>
-                    <button
-                      onClick={() => {
-                        setSimUserId('analyst_li');
-                        setSimDatasetId('ds_pilots_biography');
-                        setSimQuery('查询李维民机长的身份证 SSN 社保号码');
-                      }}
-                      className="px-2 py-0.5 bg-red-50 hover:bg-red-100 border border-red-100 rounded text-[9px] text-red-700 font-bold"
-                    >
-                      SSN泄露拦截
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSimUserId('EU_DPO');
-                        setSimDatasetId('ds_pilots_biography');
-                        setSimQuery('欧盟区域合规审计：检索飞行员李维民的授信与资质状况');
-                      }}
-                      className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded text-[9px] text-emerald-700 font-bold"
-                    >
-                      DPO合规特许
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSimUserId('hr_manager');
-                        setSimDatasetId('ds_flights_clean');
-                        setSimQuery('展示目前所有的航班延误与疲劳时长数据');
-                      }}
-                      className={`px-2 py-0.5 ${styles.badgeBg} hover:opacity-80 ${styles.accentBorder} border rounded text-[9px] ${styles.accentText} font-bold`}
-                    >
-                      常态数据检索
-                    </button>
-                  </div>
-
-                  {/* Simulation Trigger Button */}
-                  <button
-                    onClick={handleRunSimulation}
-                    disabled={isSimulating}
-                    className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50`}
-                  >
-                    {isSimulating ? (
-                      <>
-                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>正在全链路对账仿真计算...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Icon name="Play" size={11} className="fill-current text-emerald-400" />
-                        <span>运行干涉仿真模拟 (Run Simulator)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Simulation Output Area */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  
-                  {isSimulating && (
-                    <div className={`flex flex-col items-center justify-center py-20 ${styles.cardTextMuted} space-y-3`}>
-                      <Icon name="ShieldAlert" size={32} className={`${styles.accentText} animate-pulse`} />
-                      <div className="text-center space-y-1">
-                        <p className={`font-extrabold ${styles.cardTextMuted}`}>正在评估零信任级联门禁...</p>
-                        <p className="text-[10px]">Org IP Whitelist ➔ Project DAC ➔ Marking MAC ➔ Purpose PBAC</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isSimulating && !simResult && (
-                    <div className={`flex flex-col items-center justify-center py-24 ${styles.cardTextMuted} text-center space-y-2`}>
-                      <Icon name="Tv" size={28} className={styles.cardTextMuted} />
-                      <span className={`font-bold ${styles.cardTextMuted}`}>待执行仿真模拟</span>
-                      <p className={`text-[10px] ${styles.cardTextMuted} max-w-xs`}>设置好上方的模拟角色和提问，点击运行，系统将追踪每一个决策节点的放行/阻断判定日志。</p>
-                    </div>
-                  )}
-
-                  {!isSimulating && simResult && (
-                    <div className="space-y-4">
-                      
-                      {/* Overall Status Banner */}
-                      <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
-                        simResult.overallVerdict === 'GRANTED'
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                          : 'bg-rose-50 border-rose-200 text-rose-800'
-                      }`}>
-                        <div className="flex items-center gap-2.5">
-                          <span className={`p-1.5 rounded-lg shrink-0 ${
-                            simResult.overallVerdict === 'GRANTED' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'
-                          }`}>
-                            <Icon name={simResult.overallVerdict === 'GRANTED' ? 'CheckCircle2' : 'ShieldAlert'} size={18} />
-                          </span>
-                          <div>
-                            <p className="font-black text-xs">决策大盘最终判定: {simResult.overallVerdict}</p>
-                            <p className="text-[10px] opacity-80">全链路安全编译器已成功执行策略溯源与物理隔离</p>
-                          </div>
-                        </div>
-                        <span className={`px-2.5 py-1 text-[10px] font-black rounded-md uppercase tracking-wider ${
-                          simResult.overallVerdict === 'GRANTED'
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : 'bg-rose-600 text-white shadow-xs'
-                        }`}>
-                          {simResult.overallVerdict === 'GRANTED' ? 'Passed' : 'Intercepted'}
-                        </span>
-                      </div>
-
-                      {/* Nodes Section */}
-                      <div className="space-y-3">
-                        <h4 className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1`}>
-                          <Icon name="Route" size={11} />
-                          <span>全链路节点决策追踪 (Decision Traces Log)</span>
-                        </h4>
-
-                        {simResult.nodes.map((node: any) => {
-                          const isExpanded = expandedNodes[node.id];
-                          const nodePassed = node.verdict === 'GRANTED';
-                          
-                          return (
-                            <div key={node.id} className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs`}>
-                              
-                              {/* Node Title Header */}
-                              <div
-                                onClick={() => toggleNodeExpanded(node.id)}
-                                className={`p-3 ${styles.inputBg} flex items-center justify-between cursor-pointer select-none border-b ${styles.cardBorder}`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className={`p-1 rounded-md text-[9px] font-bold ${
-                                    nodePassed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                                  }`}>
-                                    <Icon name={nodePassed ? 'Check' : 'X'} size={10} />
-                                  </span>
-                                  <span className={`font-extrabold ${styles.cardText} text-[11px]`}>{node.name}</span>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded uppercase ${
-                                    nodePassed ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-                                  }`}>
-                                    {node.verdict}
-                                  </span>
-                                  <Icon
-                                    name={isExpanded ? 'ChevronDown' : 'ChevronRight'}
-                                    size={12}
-                                    className={styles.cardTextMuted}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Expanded Node Content */}
-                              {isExpanded && (
-                                <div className={`p-3 space-y-3 ${styles.cardBg} text-[10px]`}>
-                                  
-                                  {/* Node Trace logs */}
-                                  <div className={`${styles.appBg} ${styles.cardTextMuted} p-2.5 rounded-lg font-mono text-[9px] leading-relaxed space-y-1`}>
-                                    {node.traces.map((trace: string, tIdx: number) => {
-                                      const isErr = trace.includes('❌') || trace.includes('FAIL') || trace.includes('被拒');
-                                      const isAlert = trace.includes('⚠️');
-                                      return (
-                                        <div key={tIdx} className={`flex items-start gap-1 ${isErr ? 'text-rose-400' : isAlert ? 'text-amber-400' : ''}`}>
-                                          <span className={`${styles.cardTextMuted} shrink-0`}>▶</span>
-                                          <span>{trace}</span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {/* Special Node 2: RAG */}
-                                  {node.id === 'node_rag_retrieval' && (
-                                    <div className={`space-y-2 border-t ${styles.cardBorder} pt-2.5`}>
-                                      <div className="flex items-center justify-between">
-                                        <span className={`font-bold ${styles.cardTextMuted}`}>RAG Rerank 元数据检索载荷</span>
-                                        {node.isMaskedEnforced && (
-                                          <span className="px-2 py-0.5 bg-red-500 text-white rounded text-[8px] font-black animate-pulse flex items-center gap-0.5">
-                                            <Icon name="Shield" size={8} />
-                                            <span>正则屏蔽生效 (REGEX MASKED)</span>
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      <div className={`p-2 ${styles.inputBg} border ${styles.cardBorder} rounded-lg text-[10px] ${styles.cardTextMuted} max-h-32 overflow-y-auto whitespace-pre-wrap font-mono`}>
-                                        {node.groundedContext}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Special Node 3: LLM */}
-                                  {node.id === 'node_llm_inference' && (
-                                    <div className={`space-y-2 border-t ${styles.cardBorder} pt-2.5`}>
-                                      <span className={`font-bold ${styles.cardTextMuted} block`}>LLM 主权审计闭环答复 (Final Answer)</span>
-                                      <div className={`p-3 ${styles.appBg} text-emerald-400 rounded-lg text-[10px] leading-relaxed whitespace-pre-wrap font-sans border ${styles.cardBorder}`}>
-                                        {node.answer}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Special Node 4: Data Firewall */}
-                                  {node.id === 'node_data_masking' && (
-                                    <div className={`space-y-2 border-t ${styles.cardBorder} pt-2.5`}>
-                                      <span className={`font-bold ${styles.cardTextMuted} block`}>行/列防火墙隔离后物理数据输出 (Masked Records)</span>
-                                      {node.dataRows && node.dataRows.length > 0 ? (
-                                        <div className={`p-2 ${styles.cardBg} ${styles.cardTextMuted} rounded-lg text-[9px] font-mono overflow-x-auto max-h-36`}>
-                                          <pre className="leading-tight">{JSON.stringify(node.dataRows, null, 2)}</pre>
-                                        </div>
-                                      ) : (
-                                        <p className="text-[10px] text-rose-500 font-bold bg-rose-50 p-1.5 rounded">
-                                          ⚠️ 拦截警告：当前用户的安全密级不足，或者已被行级条件完全过滤。物理内存直接截断，输出 0 条记录。
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                </div>
-                              )}
-
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                    </div>
-                  )}
-
-                </div>
-
               </div>
             )}
 
