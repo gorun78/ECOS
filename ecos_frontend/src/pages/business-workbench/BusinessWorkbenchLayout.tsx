@@ -180,17 +180,17 @@ export default function BusinessWorkbenchLayout({
       const newObjId = `custom_object_${defaultNum}`;
       const newObj: ObjectType = {
         id: newObjId,
-        displayName: `未命名对象_${defaultNum}`,
+        displayName: t('ow.biz.unnamedObject', { n: defaultNum }),
         apiName: `CustomObject${defaultNum}`,
-        description: '新建自定义业务实体。请输入详细业务描述。',
+        description: t('ow.biz.objectDescription'),
         icon: 'Box',
         color: 'border-slate-500 bg-slate-50 text-slate-700',
         primaryKey: 'id',
         titleProperty: 'name',
         status: 'DRAFT',
         properties: [
-          { id: 'id', displayName: '唯一ID', apiName: 'id', dataType: 'string', isPrimaryKey: true, description: '唯一主键标识。' },
-          { id: 'name', displayName: '显示名称', apiName: 'name', dataType: 'string', isPrimaryKey: false, description: '实体的主展示信息。' }
+          { id: 'id', displayName: t('ow.biz.objectUuid'), apiName: 'id', dataType: 'string', isPrimaryKey: true, description: t('ow.biz.objectUuidDescription') },
+          { id: 'name', displayName: t('ow.biz.objectName'), apiName: 'name', dataType: 'string', isPrimaryKey: false, description: t('ow.biz.objectNameDescription') }
         ],
         mapping: {
           datasetId: datasets[0]?.id || '',
@@ -200,18 +200,18 @@ export default function BusinessWorkbenchLayout({
       updateObjectTypes([...objectTypes, newObj]);
       setSelectedCategory('object');
       setSelectedId(newObjId);
-      showToast('info', `创建了对象类型: ${newObj.displayName}`);
+      showToast('info', t('ow.biz.createdObject', { name: newObj.displayName }));
     } else if (type === 'link') {
       if (objectTypes.length < 2) {
-        showToast('error', '建立关联至少需要 2 个对象类型！');
+        showToast('error', t('ow.biz.linkNeedTwo'));
         return;
       }
       const newLinkId = `custom_link_${defaultNum}`;
       const newLink: LinkType = {
         id: newLinkId,
-        displayName: `新关联链接_${defaultNum}`,
+        displayName: t('ow.biz.newLink', { n: defaultNum }),
         apiName: `customLink${defaultNum}`,
-        description: '新建实体间的多维逻辑关联关系。',
+        description: t('ow.biz.newLinkDescription'),
         sourceObjectType: objectTypes[0].id,
         targetObjectType: objectTypes[1].id,
         cardinality: '1:N',
@@ -226,14 +226,14 @@ export default function BusinessWorkbenchLayout({
       updateLinkTypes([...linkTypes, newLink]);
       setSelectedCategory('link');
       setSelectedId(newLinkId);
-      showToast('info', `创建了链接关系: ${newLink.displayName}`);
+      showToast('info', t('ow.biz.createdLink', { name: newLink.displayName }));
     } else if (type === 'action') {
       const newActionId = `custom_action_${defaultNum}`;
       const newAction: ActionType = {
         id: newActionId,
-        displayName: `新操作行为_${defaultNum}`,
+        displayName: t('ow.biz.newAction', { n: defaultNum }),
         apiName: `customAction${defaultNum}`,
-        description: '配置业务修改端点。通过传入参数，改变指定的本体对象。',
+        description: t('ow.biz.newActionDescription'),
         parameters: [],
         rules: [],
         validationRules: []
@@ -241,42 +241,42 @@ export default function BusinessWorkbenchLayout({
       updateActionTypes([...actionTypes, newAction]);
       setSelectedCategory('action');
       setSelectedId(newActionId);
-      showToast('info', `创建了操作类型: ${newAction.displayName}`);
+      showToast('info', t('ow.biz.createdAction', { name: newAction.displayName }));
     } else if (type === 'interface') {
       const newIntfId = `custom_interface_${defaultNum}`;
       const newIntf: InterfaceType = {
         id: newIntfId,
-        displayName: `新契约接口_${defaultNum}`,
+        displayName: t('ow.biz.newInterface', { n: defaultNum }),
         apiName: `CustomInterface${defaultNum}`,
-        description: '声明一个公共行为或特征的抽象接口规范。',
+        description: t('ow.biz.newInterfaceDescription'),
         properties: [
-          { id: 'uuid', displayName: '核心编码', apiName: 'uuid', dataType: 'string', isRequired: true, description: '唯一硬件/实体识别符。' }
+          { id: 'uuid', displayName: t('ow.biz.objectUuid'), apiName: 'uuid', dataType: 'string', isRequired: true, description: t('ow.biz.objectUuidDescription') }
         ]
       };
       setInterfaces([...interfaces, newIntf]);
       setSelectedCategory('interface');
       setSelectedId(newIntfId);
-      showToast('info', `创建了接口类型: ${newIntf.displayName}`);
+      showToast('info', t('ow.biz.createdInterface', { name: newIntf.displayName }));
     } else if (type === 'shared_property') {
       const newSpId = `custom_sp_${defaultNum}`;
       const newSp: SharedProperty = {
         id: newSpId,
-        displayName: `标准公共属性_${defaultNum}`,
+        displayName: t('ow.biz.newSharedProperty', { n: defaultNum }),
         apiName: `customSharedProp${defaultNum}`,
         dataType: 'string',
-        description: '标准化全局指标，可在各类业务对象中复用。'
+        description: t('ow.biz.newSharedPropertyDescription')
       };
       setSharedProperties([...sharedProperties, newSp]);
       setSelectedCategory('shared_property');
       setSelectedId(newSpId);
-      showToast('info', `创建了共享属性: ${newSp.displayName}`);
+      showToast('info', t('ow.biz.createdSharedProperty', { name: newSp.displayName }));
     } else if (type === 'function') {
       const newFuncId = `custom_function_${defaultNum}`;
       const newFunc: FunctionType = {
         id: newFuncId,
-        displayName: `新逻辑函数_${defaultNum}`,
+        displayName: t('ow.biz.newFunction', { n: defaultNum }),
         apiName: `customFunction${defaultNum}`,
-        description: '配置 TypeScript 逻辑函数。',
+        description: t('ow.biz.newFunctionDescription'),
         returnType: 'string',
         parameters: [],
         code: `import { Function } from "@foundry/functions-api";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`,
@@ -284,9 +284,9 @@ export default function BusinessWorkbenchLayout({
       updateFunctionTypes([...functionTypes, newFunc]);
       setSelectedCategory('function');
       setSelectedId(newFuncId);
-      showToast('info', `创建了逻辑函数: ${newFunc.displayName}`);
+      showToast('info', t('ow.biz.createdFunction', { name: newFunc.displayName }));
     }
-  }, [objectTypes, linkTypes, actionTypes, interfaces, sharedProperties, functionTypes, datasets, updateObjectTypes, updateLinkTypes, updateActionTypes, updateFunctionTypes, showToast]);
+  }, [objectTypes, linkTypes, actionTypes, interfaces, sharedProperties, functionTypes, datasets, updateObjectTypes, updateLinkTypes, updateActionTypes, updateFunctionTypes, showToast, t]);
 
   // --- Delete element ---
   const handleDeleteElement = useCallback((type: string, id: string) => {
@@ -305,8 +305,8 @@ export default function BusinessWorkbenchLayout({
     }
     setSelectedCategory('overview');
     setSelectedId(null);
-    showToast('success', '已删除元素');
-  }, [objectTypes, linkTypes, actionTypes, interfaces, sharedProperties, functionTypes, updateObjectTypes, updateLinkTypes, updateActionTypes, updateFunctionTypes, showToast]);
+    showToast('success', t('ow.biz.deleted'));
+  }, [objectTypes, linkTypes, actionTypes, interfaces, sharedProperties, functionTypes, updateObjectTypes, updateLinkTypes, updateActionTypes, updateFunctionTypes, showToast, t]);
 
   // --- Filtered lists for Sidebar ---
   const filteredObjects = objectTypes.filter(o => o.displayName.includes(searchQuery));
@@ -316,8 +316,8 @@ export default function BusinessWorkbenchLayout({
 
   // --- Tab bar ---
   const tabs: { id: ViewMode; label: string; icon: string }[] = [
-    { id: 'ontology', label: '本体建模', icon: 'Boxes' },
-    { id: 'explorer', label: '数据浏览器', icon: 'Compass' },
+    { id: 'ontology', label: t('ow.biz.tabOntology'), icon: 'Boxes' },
+    { id: 'explorer', label: t('ow.biz.tabExplorer'), icon: 'Compass' },
   ];
 
   return (
@@ -343,7 +343,7 @@ export default function BusinessWorkbenchLayout({
         <div className="flex-1" />
         <input
           type="text"
-          placeholder="搜索..."
+          placeholder={t('ow.biz.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-3 py-1 text-xs border border-slate-200 rounded-md w-48 focus:outline-none focus:border-slate-400"
@@ -356,7 +356,7 @@ export default function BusinessWorkbenchLayout({
               : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
           }`}
         >
-          Copilot
+          {t('ow.biz.copilot')}
         </button>
       </div>
 
@@ -447,7 +447,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'object' && selectedId && (() => {
                 const ot = objectTypes.find(o => o.id === selectedId);
-                if (!ot) return <div className="p-6 text-slate-400 text-xs">未找到该对象类型</div>;
+                if (!ot) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundObject')}</div>;
                 return (
                   <ObjectTypeView
                     objectType={ot}
@@ -480,7 +480,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'link' && selectedId && (() => {
                 const lt = linkTypes.find(l => l.id === selectedId);
-                if (!lt) return <div className="p-6 text-slate-400 text-xs">未找到该链接关系</div>;
+                if (!lt) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundLink')}</div>;
                 return (
                   <LinkTypeView
                     linkType={lt}
@@ -500,7 +500,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'action' && selectedId && (() => {
                 const at = actionTypes.find(a => a.id === selectedId);
-                if (!at) return <div className="p-6 text-slate-400 text-xs">未找到该操作类型</div>;
+                if (!at) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundAction')}</div>;
                 return (
                   <ActionTypeView
                     actionType={at}
@@ -519,7 +519,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'function' && selectedId && (() => {
                 const fn = functionTypes.find(f => f.id === selectedId);
-                if (!fn) return <div className="p-6 text-slate-400 text-xs">未找到该逻辑函数</div>;
+                if (!fn) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundFunction')}</div>;
                 return (
                   <FunctionTypeView
                     func={fn}
@@ -534,7 +534,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'interface' && selectedId && (() => {
                 const it = interfaces.find(i => i.id === selectedId);
-                if (!it) return <div className="p-6 text-slate-400 text-xs">未找到该接口类型</div>;
+                if (!it) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundInterface')}</div>;
                 return (
                   <InterfaceView
                     intf={it}
@@ -550,7 +550,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'shared_property' && selectedId && (() => {
                 const sp = sharedProperties.find(s => s.id === selectedId);
-                if (!sp) return <div className="p-6 text-slate-400 text-xs">未找到该共享属性</div>;
+                if (!sp) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundSharedProperty')}</div>;
                 return (
                   <SharedPropertyView
                     sp={sp}
@@ -566,7 +566,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'dataset' && selectedId && (() => {
                 const ds = datasets.find(d => d.id === selectedId);
-                if (!ds) return <div className="p-6 text-slate-400 text-xs">未找到该数据集</div>;
+                if (!ds) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundDataset')}</div>;
                 return (
                   <DatasetView
                     dataset={ds}
