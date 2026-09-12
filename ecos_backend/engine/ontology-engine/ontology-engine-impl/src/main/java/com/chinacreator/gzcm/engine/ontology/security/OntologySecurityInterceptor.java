@@ -165,24 +165,36 @@ public class OntologySecurityInterceptor {
                     Map.of("tenant", "default"));
             if (where == null || where.isEmpty()) return rows;
             if ("1=0".equals(where)) return new ArrayList<>();
-            String[] parts;
+            // P0-2: 仅接受单条件白名单 (entity_code/tenant_id/domain_id/ontology_id/is_deleted/status)
+            // 的 = / != 二 token; 其它情况 (AND/OR/NOT/LIKE/IN/多条件/未知字段名) 视为 RLS 表达式不可信
+            // -> DENY (return empty). 多条件 SQL WHERE 推到 DAO 层做 (T17 落库时白名单字段名 + 参数绑定).
+            String key;
+            String val;
             boolean isNeq = false;
-            if (where.contains(" != ")) {
-                parts = where.split(" != ", 2);
+            if (where.contains(" != ") || where.contains(" <> ")) {
+                String op = where.contains(" <> ") ? " <> " : " != ";
+                String[] parts = where.split(java.util.regex.Pattern.quote(op), 2);
                 isNeq = true;
-            } else if (where.contains(" <> ")) {
-                parts = where.split(" <> ", 2);
-                isNeq = true;
+                if (parts.length < 2) {
+                    return denyUntrustedWhere(where);
+                }
+                key = parts[0].trim();
+                val = parts[1].trim().replaceAll("^'|'$", "").replaceAll("^\"|\"$", "");
             } else if (where.contains(" = ")) {
-                parts = where.split(" = ", 2);
+                String[] parts = where.split(" = ", 2);
+                if (parts.length < 2) {
+                    return denyUntrustedWhere(where);
+                }
+                key = parts[0].trim();
+                val = parts[1].trim().replaceAll("^'|'$", "").replaceAll("^\"|\"$", "");
             } else {
-                return rows;
+                // 无 = / != / <> _operators -> 视为不可信 (AND/OR/NOT/LIKE/IN 等)
+                return denyUntrustedWhere(where);
             }
-            if (parts.length < 2) return rows;
-            String key = parts[0].trim();
-            String val = parts[1].trim()
-                    .replaceAll("^'|'$", "")
-                    .replaceAll("^\"|\"$", "");
+            // P0-2: 字段名必须在白名单; 非白名单字段名 -> DENY
+            if (!isWhitelistedFieldName(key)) {
+                return denyUntrustedWhere(where);
+            }
             List<Map<String, Object>> filtered = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Object actual = row.get(key);
@@ -191,10 +203,50 @@ public class OntologySecurityInterceptor {
             }
             return filtered;
         } catch (Exception e) {
-            log.debug("RLS 行级过滤失败 (降级放行): {}", e.getMessage());
-            return rows;
+            // P0-1: 默认 DENY (架构铁律 2.4.6) — security-engine 不可用必须返空,
+            // 不可 fail-open 返原 rows 否则 27 个 Controller 读接口全量渗漏全行
+            log.warn("security-engine RLS 不可用, 默认 DENY: {}", e.getMessage());
+            try {
+                securityEngineClient.audit("RLS_DENY_FAIL_OPEN_DETECTED", "deny:resttemplate_throw:" + e.getMessage());
+            } catch (Exception ignored) {
+                // audit 不阻断主流程
+            }
+            return new ArrayList<>();
         }
     }
+
+    /**
+     * P0-2: RLS whereClause 不可信时走默认 DENY — 记录审计并返回空集.
+     * <p>覆盖场景: AND/OR/NOT/LIKE/IN 多条件 / 未知 op / 非白名单字段名.</p>
+     *
+     * @param whereClause 原始 where 字符串
+     * @return 空列表
+     */
+    private List<Map<String, Object>> denyUntrustedWhere(String whereClause) {
+        log.warn("RLS whereClause 不可信, 默认 DENY: clause={}", whereClause);
+        try {
+            securityEngineClient.audit("RLS_DENY_UNTRUSTED_WHERE", "deny:clause=" + whereClause);
+        } catch (Exception ignored) {
+            // audit 不阻断
+        }
+        return new ArrayList<>();
+    }
+
+    /**
+     * P0-2: RLS 白名单字段名判定 — 仅接受明确的实体/租户/域/本体/删除/状态字段.
+     *
+     * @param name 字段名
+     * @return true 表示在白名单内
+     */
+    private static boolean isWhitelistedFieldName(String name) {
+        if (name == null) return false;
+        return RLS_WHITELIST_FIELDS.contains(name.toLowerCase());
+    }
+
+    /** RLS 白名单字段名集合 (全小写, 忽略大小写比对) */
+    private static final Set<String> RLS_WHITELIST_FIELDS = Set.of(
+            "entity_code", "tenant_id", "domain_id", "ontology_id", "is_deleted", "status"
+    );
 
     // ═══════════════ CLS — 走 security-engine ═══════════════
 
@@ -222,8 +274,14 @@ public class OntologySecurityInterceptor {
             }
             return stripped;
         } catch (Exception e) {
-            log.debug("CLS 列级剥离失败 (降级全列放行): {}", e.getMessage());
-            return rows;
+            // P0-1: 默认 DENY (架构铁律 2.4.6) — CLS 不可用时无可见列, 不允许裸返全列
+            log.warn("security-engine CLS 不可用, 默认 DENY(无可见列): {}", e.getMessage());
+            try {
+                securityEngineClient.audit("CLS_DENY_FAIL_OPEN_DETECTED", "deny:resttemplate_throw:" + e.getMessage());
+            } catch (Exception ignored) {
+                // audit 不阻断主流程
+            }
+            return Collections.emptyList();
         }
     }
 

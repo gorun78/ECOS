@@ -47,8 +47,12 @@ public class KbEngineGraphSyncClient {
     private String kbEngineBaseUrl;
 
     public KbEngineGraphSyncClient() {
-        // 默认超时(RestTemplate), 避免 kb-engine 宕机时阻塞本体同步主流程
-        this.restTemplate = new RestTemplate();
+        // P1-2: 显式 3s connect/read timeout, 避免 kb-engine 宕机时阻塞主流程 (Wave B-2 P1-2 加固)
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(3000);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**

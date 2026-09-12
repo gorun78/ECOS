@@ -38,8 +38,12 @@ public class DataNetResourceClient {
     private String datanetBaseUrl;
 
     public DataNetResourceClient() {
-        // 默认超时(继承 SimpleClientHttpRequestFactory 默认), 避免 datanet 宕机时阻塞 AutoDiscover 主流程
-        this.restTemplate = new RestTemplate();
+        // P1-2: 显式 3s connect/read timeout, 避免 datanet 宕机时阻塞主流程 (Wave B-2 P1-2 加固)
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(3000);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**
