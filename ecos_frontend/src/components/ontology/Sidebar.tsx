@@ -293,7 +293,7 @@ export default function Sidebar({
                             handleStartEditDomain(d);
                             setShowDomainDropdown(false);
                           }}
-                          className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:text-slate-800 rounded transition-colors`}
+                          className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:${styles.cardText} rounded transition-colors`}
                           title={t('ow.btn.editDomain')}
                         >
                           <Edit size={11} />
@@ -319,7 +319,7 @@ export default function Sidebar({
           {/* Plus button to add domain */}
           <button
             onClick={handleStartAddDomain}
-            className={`p-2 ${styles.sidebarActiveBg} hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
+            className={`p-2 ${styles.sidebarActiveBg} ${styles.sidebarHoverBg} ${styles.accentText} border ${styles.accentBorder} rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
             title={t('ow.btn.addDomain')}
           >
             <Plus size={14} />
@@ -347,7 +347,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('object')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -387,7 +387,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('link')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -427,7 +427,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('action')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -466,7 +466,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('function')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -506,7 +506,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('interface')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -525,7 +525,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -545,7 +545,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('shared_property')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -564,7 +564,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -581,10 +581,10 @@ export default function Sidebar({
         </div>
 
         {/* 6. RAW DATASETS */}
-        <div className="space-y-0.5 border-t border-slate-200/60 pt-2 mt-2">
+        <div className={`space-y-0.5 border-t ${styles.appBorder} pt-2 mt-2`}>
           <button
             onClick={() => toggleExpand('dataset')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -603,11 +603,11 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="text-slate-400">
+                      <span className={`${styles.muted}`}>
                         <Database size={11} />
                       </span>
                       <span className="truncate font-mono text-[10px]">{ds.name}</span>
@@ -620,11 +620,11 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Bottom Action bar */}
-      <div className="p-3 border-t border-slate-200 bg-white relative">
+      {/* Bottom Action bar — T4: 替换原来的 白底/黑底 硬编码 → theme tokens */}
+      <div className={`p-3 border-t ${styles.appBorder} ${styles.cardBg} relative`}>
         <button
           onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+          className={`w-full ${styles.accentBg} text-white ${styles.accentHover} font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs`}
         >
           <PlusCircle size={14} />
           <span>{t('ow.btn.createNewElement')}</span>
@@ -633,13 +633,13 @@ export default function Sidebar({
 
         {/* Create Dropdown */}
         {showCreateDropdown && (
-          <div className="absolute bottom-14 left-3 right-3 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 divide-y divide-slate-100">
+          <div className={`absolute bottom-14 left-3 right-3 ${styles.cardBg} border ${styles.appBorder} rounded-lg shadow-lg py-1 z-30 divide-y ${styles.divider}`}>
             <button
               onClick={() => {
                 onCreateNew('object');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-blue-500">
                 <Box size={13} />
@@ -651,9 +651,9 @@ export default function Sidebar({
                 onCreateNew('link');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
-              <span className="text-slate-400">
+              <span className={`${styles.muted}`}>
                 <GitMerge size={13} />
               </span>
               <span>{t('ow.btn.newLinkType')}</span>
@@ -663,7 +663,7 @@ export default function Sidebar({
                 onCreateNew('action');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-amber-500">
                 <Zap size={13} />
@@ -675,7 +675,7 @@ export default function Sidebar({
                 onCreateNew('interface');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-indigo-500">
                 <Layers size={13} />
@@ -687,7 +687,7 @@ export default function Sidebar({
                 onCreateNew('shared_property');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-teal-500">
                 <Tag size={13} />
@@ -699,7 +699,7 @@ export default function Sidebar({
                 onCreateNew('function');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-violet-500">
                 <Code size={13} />
@@ -710,18 +710,18 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* 业务划分域模态对话框 */}
+      {/* 业务划分域模态对话框 — T4: 替换原来的 深色遮罩/白底 硬编码 → theme tokens */}
       {showDomainModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
-            
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.overlayBg} backdrop-blur-xs`}>
+          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.appBorder} w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]`}>
+
             {/* Modal Header */}
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className={`px-4 py-3 border-b ${styles.appBorder} ${styles.sidebarBg} flex items-center justify-between`}>
               <div className="flex items-center gap-2">
-                <span className="p-1 rounded bg-blue-100 text-blue-600">
+                <span className={`p-1 rounded ${styles.badgeBg} ${styles.badgeText}`}>
                   <Layers size={14} />
                 </span>
-                <h3 className="text-sm font-bold text-slate-800">
+                <h3 className={`text-sm font-bold ${styles.cardText}`}>
                   {editingDomain ? t('ow.btn.editDomainTitle') : t('ow.btn.newDomainTitle')}
                 </h3>
               </div>
@@ -731,16 +731,16 @@ export default function Sidebar({
                   setShowDomainModal(false);
                   setEditingDomain(null);
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className={`${styles.muted} hover:${styles.cardText} p-1 rounded-lg hover:${styles.sidebarHoverBg} transition-colors cursor-pointer`}
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Modal Form */}
+            {/* Modal Form — T4: 表单 error 用 danger semantic */}
             <form onSubmit={handleSaveDomain} className="flex-1 overflow-y-auto p-4 space-y-4">
               {formError && (
-                <div className="p-2.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-2">
+                <div className={`p-2.5 ${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder} rounded-lg text-xs font-semibold flex items-center gap-2`}>
                   <AlertCircle size={13} />
                   <span>{formError}</span>
                 </div>
@@ -748,7 +748,7 @@ export default function Sidebar({
 
               {/* ID Input (Only shown on Create) */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainId')} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -757,14 +757,14 @@ export default function Sidebar({
                   value={formId}
                   onChange={e => setFormId(e.target.value)}
                   placeholder={t('ow.placeholder.domainId')}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs bg-slate-50/50 disabled:bg-slate-100 disabled:text-slate-500"
+                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs ${styles.inputBg} disabled:opacity-60`}
                   required
                 />
               </div>
 
               {/* Display Name Input */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainDisplayName')} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -772,14 +772,14 @@ export default function Sidebar({
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
                   placeholder={t('ow.placeholder.domainDisplayName')}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs"
+                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs ${styles.inputBg} ${styles.inputText}`}
                   required
                 />
               </div>
 
               {/* Description Input */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainDescription')}
                 </label>
                 <textarea
@@ -787,13 +787,13 @@ export default function Sidebar({
                   onChange={e => setFormDesc(e.target.value)}
                   placeholder={t('ow.placeholder.domainDescription')}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none"
+                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none ${styles.inputBg} ${styles.inputText}`}
                 />
               </div>
 
               {/* Color Theme Selector */}
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainColor')}
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -816,7 +816,7 @@ export default function Sidebar({
                           color === 'indigo' ? '#6366f1' : '#64748b'
                         }}
                       >
-                        {isSelected && <Check size={12} className="text-white font-bold" />}
+                        {isSelected && <Check size={12} className={styles.cardText} />}
                       </button>
                     );
                   })}
@@ -825,18 +825,18 @@ export default function Sidebar({
 
               {/* Assign Object Types Checklist */}
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-semibold flex justify-between items-center text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold flex justify-between items-center text-[11px]`}>
                   <span>{t('ow.label.domainAssignedObjects').replace('{count}', String(formAssignedObjects.length))}</span>
-                  <span className="text-[9px] text-slate-400 font-normal">{t('ow.label.multiSelect')}</span>
+                  <span className={`text-[9px] ${styles.muted} font-normal`}>{t('ow.label.multiSelect')}</span>
                 </label>
-                <div className="border border-slate-200 rounded-lg max-h-36 overflow-y-auto p-1 bg-slate-50/30 divide-y divide-slate-150">
+                <div className={`border ${styles.appBorder} rounded-lg max-h-36 overflow-y-auto p-1 ${styles.inputBg} divide-y`}>
                   {allObjectTypes.map(ot => {
                     const isChecked = formAssignedObjects.includes(ot.id);
                     return (
                       <div
                         key={ot.id}
                         onClick={() => toggleObjectAssignment(ot.id)}
-                        className="flex items-center gap-2 py-1 px-1.5 hover:bg-slate-100 rounded-md cursor-pointer text-xs"
+                        className={`flex items-center gap-2 py-1 px-1.5 ${styles.sidebarHoverBg} rounded-md cursor-pointer text-xs`}
                       >
                         <input
                           type="checkbox"
@@ -844,18 +844,18 @@ export default function Sidebar({
                           onChange={() => {}} // Handle on parent div click
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none"
                         />
-                        <span className={`p-0.5 rounded border bg-white text-slate-500`}>
+                        <span className={`p-0.5 rounded border ${styles.cardBg} ${styles.appBorder} ${styles.muted}`}>
                           <DynamicIcon name={ot.icon} size={11} />
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-700 truncate text-[11px]">{ot.displayName}</p>
+                          <p className={`font-semibold ${styles.cardText} truncate text-[11px]`}>{ot.displayName}</p>
                         </div>
-                        <span className="text-[9px] font-mono text-slate-400 uppercase">{ot.id}</span>
+                        <span className={`text-[9px] font-mono ${styles.muted} uppercase`}>{ot.id}</span>
                       </div>
                     );
                   })}
                   {allObjectTypes.length === 0 && (
-                    <div className="p-4 text-center text-slate-400">
+                    <div className={`p-4 text-center ${styles.muted}`}>
                       {t('ow.empty.noObjectTypesForAssign')}
                     </div>
                   )}
@@ -863,20 +863,20 @@ export default function Sidebar({
               </div>
 
               {/* Footer Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className={`pt-3 border-t ${styles.appBorder} flex items-center justify-end gap-2`}>
                 <button
                   type="button"
                   onClick={() => {
                     setShowDomainModal(false);
                     setEditingDomain(null);
                   }}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 transition-colors font-semibold cursor-pointer text-xs"
+                  className={`px-3 py-1.5 border ${styles.appBorder} ${styles.cardBg} ${styles.cardText} hover:${styles.sidebarHoverBg} transition-colors font-semibold cursor-pointer text-xs`}
                 >
                   {t('ow.btn.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs"
+                  className={`px-3.5 py-1.5 ${styles.accentBg} text-white ${styles.accentHover} rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs`}
                 >
                   {t('ow.btn.save')}
                 </button>
@@ -887,14 +887,14 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* 📖 术语库快速入口 */}
-      <div className="border-t border-slate-200 px-3 py-3">
+      {/* 📖 术语库快速入口 — T4: 替换 border-slate-200 与 hover:bg-slate-100 硬编码 → theme tokens */}
+      <div className={`border-t ${styles.appBorder} px-3 py-3`}>
         <button
           onClick={() => onSelectCategory('glossary', null)}
           className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
             selectedCategory === 'glossary'
               ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-              : 'text-slate-600 hover:bg-slate-100'
+              : `${styles.sidebarText} ${styles.sidebarHoverBg}`
           }`}
         >
           <BookOpen size={14} />
