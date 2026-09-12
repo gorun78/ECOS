@@ -131,7 +131,10 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="data-workbench" element={<DataWorkbenchLayoutStandalone />} />
                 {/* PMO-48-A T5: 数据质量中心(独立顶级路由, 不在 DataWorkbenchLayout 内 Tab, 与 /business-workbench 同级, Topbar 有菜单入口) */}
                 <Route path="dq_dashboard" element={<DataQualityDashboard />} />
-                {/* Legacy redirects — 旧路由统一重定向到本体工作台 */}
+                {/* Legacy redirects (T6: 死代码清理 — 本体工作台/业务工作台死页面重定向)
+                    旧路由统一 Navigate 重定向到 /ontology_workbench (主工作台入口, hash #/ontology_workbench)
+                    对应死页面源文件 (OntologyDesigner / OntologyExplorer / DomainDesignerView /
+                    OntologyObjectBrowser / KnowledgeGraphPage) 保留在 src/pages 下, 不再 import */}
                 <Route path="domains" element={<Navigate to="/ontology_workbench" replace />} />
                 <Route path="domain_designer" element={<Navigate to="/ontology_workbench" replace />} />
                 <Route path="ontology" element={<Navigate to="/ontology_workbench" replace />} />
