@@ -16,6 +16,15 @@ import java.util.*;
 /**
  * A1: Neo4j 图服务实现 — 企业版/旗舰版。
  * 仅在 enterprise / flagship profile 下激活。
+ *
+ * <p>Wave B-2 · T14 残留标记 (来源: 肖国荣 / 日期: 2026-09-12 / 责任人: fullstack-implementer)</p>
+ * <p>T14 改造 OntologyKgSyncService 不再 import org.neo4j.driver (改走 kb-engine REST),
+ * 但本服务作为 "企业/旗舰档图查询" 保留 (实现 IGraphService 接口, 服务于查询而非同步)。
+ * 其 @Autowired(required=false) Driver bean 由 runtime-access 统一管理, 不在本类内 new Driver。</p>
+ *
+ * <p>TODO (Wave D P2): Neo4j 查询侧 (IGraphService) 后续应迁到 runtime-access 提供的
+ * Neo4jClient Bean, 消除本类 @Autowired Driver + driver.session() 直用路径 (铁律 §2.5)。
+ * 本波次 Wave B-2 不动它的查询逻辑, 仅标记。</p>
  */
 @Service
 @Profile({"enterprise", "flagship"})
