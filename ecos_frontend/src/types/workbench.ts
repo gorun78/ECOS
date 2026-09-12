@@ -9,7 +9,7 @@ import type {
   OntologyEntity,
   OntologyProperty,
   OntologyRelationship,
-} from "../api";
+} from "../services/ontologyApi";
 
 // ── 复用 api.ts 基础类型并重导出 ──────────────────────────────
 export type { OntologyEntity, OntologyProperty, OntologyRelationship };

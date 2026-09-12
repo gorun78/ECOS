@@ -1,6 +1,7 @@
 /**
  * OperationalApps — 运营应用门户：CRM / 养护 / 财务三大子门户
- * Connected via api.ts → fetchEntityInstances / executeOntologyAction
+ * 通过 api.ts → fetchEntityInstances + 本地 stub 执行指令
+ * (原 GSXK 桥已熔断,T2 起由本地 stub 替代,语义不变)
  *
  * @license SPDX-License-Identifier: Apache-2.0
  */
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { fetchEntityInstances, executeOntologyAction } from "../api";
+import { fetchEntityInstances } from "../api";
 
 // ── Types ──
 interface CustomerData {
@@ -72,13 +73,11 @@ export default function OperationalApps() {
 
     try {
       const entityType = activePortal === "crm" ? "Customer" : activePortal === "maint" ? "Facility" : "Order";
-      const root = await executeOntologyAction({
-        actionId,
-        entityType,
-        instanceId: payload.instanceId,
-        operatorName: "Decision-Commander (Operator)",
-        fields: payload.fields,
-      });
+      // T2: GSXK bridge removed — 占位 stub,等价于 api.ts 中的 throw Error('GSXK bridge removed')
+      // 改为本地 stub,避免 OperationalApps 跨文件依赖未收敛的 api.ts 段
+      const root = await (async (): Promise<any> => {
+        throw new Error('GSXK bridge removed — use /api/v1/ontology/actions instead');
+      })();
 
       if (root.success) {
         if (root.auditLog && root.auditLog.status === "pending_approval") {

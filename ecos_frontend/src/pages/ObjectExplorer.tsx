@@ -22,8 +22,9 @@ import {
   fetchAvailableTransitions, executeTransition,
   createObjectRelationship, fetchObjectTimeline,
   TimelineEvent,
-  fetchEntityList, EntityListItem,
 } from "../api";
+// T2: fetchEntityList/EntityListItem 由 api.ts 收敛到 services/ontologyApi.ts
+import { fetchEntityList, EntityListItem } from "../services/ontologyApi";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
 import { FALLBACK_ENTITIES, EVENT_LABELS, STATUS_COLORS, PAGE_SIZE, type Relation } from "./ObjectExplorer/helpers";
 

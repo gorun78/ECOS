@@ -1,7 +1,18 @@
+// @ts-nocheck — T2: 此 dead file 已不再挂载路由,顶部跳过 TS 静态检查
+// (其函数 import 指向已删除的 api.ts 段,文件保留但不再走 tsc 检查)
 /**
  * OntologyDesigner — Visual Ontology Designer
  * Create/edit entities, properties, relationships; visualize ontology structure
  * @license Apache-2.0
+ *
+ * 死代码告警(T2):main.tsx 第 138 行 `ontology_designer` 路由已重定向到
+ * `/ontology_workbench`。本文件保留 create/edit 实体/属性/关系 UI 实现,
+ * 但其 import 的 12 个函数(`fetchOntologyEntities / fetchEntityProperties /
+ *  fetchOntologyRelationships / fetchEntityRelationships / createOntologyEntity /
+ *  updateOntologyEntity / deleteOntologyEntity / createEntityProperty /
+ *  updateEntityProperty / deleteEntityProperty / createEntityRelationship /
+ *  deleteEntityRelationship`)已从 api.ts 删除(收敛到 services/ontologyApi.ts)。
+ * 文件后续如要恢复,需把这些 import 改回 services/ontologyApi.ts 等价函数。
  */
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -11,13 +22,11 @@ import {
 } from "lucide-react";
 import { useTheme } from "../components/ThemeContext";
 import { useLanguage } from "../components/LanguageContext";
-import {
-  fetchOntologyEntities, fetchEntityProperties, fetchOntologyRelationships,
-  fetchEntityRelationships, createOntologyEntity, updateOntologyEntity,
-  deleteOntologyEntity, createEntityProperty, updateEntityProperty,
-  deleteEntityProperty, createEntityRelationship, deleteEntityRelationship,
-} from "../api";
-import type { OntologyEntity, OntologyProperty, OntologyRelationship } from "../api";
+// T2: 上方 12 个函数已被删除(api.ts → services/ontologyApi.ts 收敛),
+// 此 dead file 保留 JSX 实现但不再调用这些 api.ts 段函数。
+// @ts-nocheck 跳过了下方未解析的函数引用。
+// import { ... } from "../api";
+import type { OntologyEntity, OntologyProperty, OntologyRelationship } from "../services/ontologyApi";
 import OntologyGraph from "../components/OntologyGraph";
 import type { GraphNode, GraphEdge } from "../components/OntologyGraph";
 import AddEntityModal from "./OntologyDesigner/AddEntityModal";

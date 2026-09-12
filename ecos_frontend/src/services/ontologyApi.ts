@@ -64,9 +64,68 @@ export const DEFAULT_ONTOLOGY_ID = "ont001";
 /** API 基础路径 */
 const BASE = "/api/v1/ecos";
 
-// 动态路径拼接
+// ================================================================
+// 本体基础类型定义 (T2: 由 api.ts 收敛迁移至此)
+// 原位置: api.ts "Ontology Designer" 段落中的 export interface
+// 迁移原因: api.ts 仅保留通用业务函数,本体类型/接口归属收口于此
+// ================================================================
+
+/** 本体实体 (Entity) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/entities 项 */
+export interface OntologyEntity {
+  id: string;
+  ontologyId: string;
+  code: string;
+  name: string;
+  description?: string;
+  entityType: string;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 本体实体属性 (Property) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/entities/{e}/properties 项 */
+export interface OntologyProperty {
+  id: string;
+  entityId: string;
+  code: string;
+  name: string;
+  propertyType: string;
+  functionType?: string;
+  functionExpression?: string;
+  requiredFlag: number;
+  searchableFlag: number;
+  sortOrder?: number;
+}
+
+/** 本体关系 (Relationship) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/relationships 项 */
+export interface OntologyRelationship {
+  id: string;
+  sourceEntityId: string;
+  targetEntityId: string;
+  code: string;
+  name: string;
+  relationshipType: string;
+}
+
+/** 动态路径拼接 (T2 备注: 此函数仅作为私有 helper, 不对前端页面暴露) */
 const ontPath = (ontologyId: string, path: string) =>
   `${BASE}/ontologies/${ontologyId}${path}`;
+
+/** 实体列表摘要 — 仅保留 code/name/description/entityType (T2: 由 api.ts 收敛迁移至此) */
+export interface EntityListItem {
+  code: string;
+  name: string;
+  description?: string;
+  entityType?: string;
+}
+
+/**
+ * 获取默认本体的实体列表(用于 ObjectExplorer 动态渲染)
+ * T2: 由 api.ts GET /api/v1/ecos/ontologies/ont001/entities 收敛迁移至此
+ */
+export async function fetchEntityList(): Promise<EntityListItem[]> {
+  return apiFetchData<EntityListItem[]>(`${BASE}/ontologies/ont001/entities`);
+}
 
 // ================================================================
 // 知识图谱

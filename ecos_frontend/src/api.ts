@@ -473,7 +473,7 @@ export async function fetchOntology(): Promise<{
   instances: Record<string, EntityInstance[]>;
 }> {
   try {
-    const resp = await apiFetchData<{ data?: any[]; records?: any[] }>(`${ONT_BASE}/ont001/entities`);
+    const resp = await apiFetchData<{ data?: any[]; records?: any[] }>(`/api/v1/ecos/ontologies/ont001/entities`);
     const records = resp?.data || resp?.records || [];
 
     if (records.length > 0) {
@@ -554,6 +554,7 @@ function buildFallbackEntity(name: string, instances: EntityInstance[]): EntityD
 }
 
 // ── Agent Chat ──────────────────────────────────────────
+/** @deprecated legacy path `/agent/chat`; please use `/api/v1/agent/chat` via the primary entry `pages/aiworkbench/api`. 保留本函数仅为兼容 AgentTestConsole 等旧调用方。 */
 export async function agentChat(
   agentId: string, message: string, promptTemplate?: string, datasetContext?: any
 ): Promise<{
@@ -570,13 +571,16 @@ export async function agentChat(
     status?: "pending" | "approved" | "rejected";
   };
 }> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   return apiFetch("/agent/chat", {
     method: "POST",
     body: JSON.stringify({ agentId, message, promptTemplate, datasetContext }),
   });
 }
 
+/** @deprecated legacy path `/agent/agents`; please use `/api/v1/agent/agents` via the primary entry. 保留本函数仅为兼容 AgentBuilder 等旧调用方。 */
 export async function fetchAgents(): Promise<AgentDefinition[]> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   try {
     const resp = await apiFetch<{ success: boolean; data: any[] }>("/agent/agents");
     const raw = resp.data || [];
@@ -602,7 +606,9 @@ export async function fetchAgents(): Promise<AgentDefinition[]> {
   }
 }
 
+/** @deprecated legacy path `/agent/tools`; please use `/api/v1/agent/tools` via the primary entry. 保留本函数仅为兼容 AgentBuilder 等旧调用方。 */
 export async function fetchTools(): Promise<ToolDefinition[]> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   try {
     const resp = await apiFetch<{ success: boolean; data: ToolDefinition[] }>("/agent/tools");
     return resp.data || [];
@@ -611,7 +617,9 @@ export async function fetchTools(): Promise<ToolDefinition[]> {
   }
 }
 
+/** @deprecated legacy path `/agent/prompts`; please use `/api/v1/agent/prompts` via the primary entry. 保留本函数仅为兼容 AgentBuilder 等旧调用方。 */
 export async function fetchPrompts(): Promise<PromptTemplate[]> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   try {
     const resp = await apiFetch<{ success: boolean; data: any[] }>("/agent/prompts");
     const raw = resp.data || [];
@@ -1284,118 +1292,6 @@ export async function getExecution(executionId: string): Promise<PipelineExecuti
   return apiFetchData(`/api/v1/pipeline/executions/${executionId}`);
 }
 
-// ── Ontology Designer ─────────────────────────────────────────
-const ONT_BASE = "/api/v1/ecos/ontologies";
-
-export interface OntologyEntity {
-  id: string;
-  ontologyId: string;
-  code: string;
-  name: string;
-  description?: string;
-  entityType: string;
-  sortOrder?: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface OntologyProperty {
-  id: string;
-  entityId: string;
-  code: string;
-  name: string;
-  propertyType: string;
-  functionType?: string;
-  functionExpression?: string;
-  requiredFlag: number;
-  searchableFlag: number;
-  sortOrder?: number;
-}
-
-export interface OntologyRelationship {
-  id: string;
-  sourceEntityId: string;
-  targetEntityId: string;
-  code: string;
-  name: string;
-  relationshipType: string;
-}
-
-export async function fetchOntologyEntities(ontologyId = "ont001"): Promise<OntologyEntity[]> {
-  return apiFetchData(`${ONT_BASE}/${ontologyId}/entities`);
-}
-
-// ── ObjectExplorer entity list (dynamic from API) ──────────────
-export interface EntityListItem {
-  code: string;
-  name: string;
-  description?: string;
-  entityType?: string;
-}
-
-export async function fetchEntityList(): Promise<EntityListItem[]> {
-  return apiFetchData<EntityListItem[]>(`${ONT_BASE}/ont001/entities`);
-}
-
-export async function fetchEntityProperties(entityId: string): Promise<OntologyProperty[]> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/properties`);
-}
-
-export async function fetchOntologyRelationships(): Promise<OntologyRelationship[]> {
-  return apiFetchData(`${ONT_BASE}/relationships`);
-}
-
-export async function fetchEntityRelationships(entityId: string): Promise<OntologyRelationship[]> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/relationships`);
-}
-
-export async function createOntologyEntity(ontologyId: string, body: Partial<OntologyEntity>): Promise<OntologyEntity> {
-  return apiFetchData(`${ONT_BASE}/${ontologyId}/entities`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateOntologyEntity(ontologyId: string, entityId: string, body: Partial<OntologyEntity>): Promise<OntologyEntity> {
-  return apiFetchData(`${ONT_BASE}/${ontologyId}/entities/${entityId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteOntologyEntity(ontologyId: string, entityId: string): Promise<void> {
-  await apiFetchData(`${ONT_BASE}/${ontologyId}/entities/${entityId}`, { method: "DELETE" });
-}
-
-export async function createEntityProperty(entityId: string, body: Partial<OntologyProperty>): Promise<OntologyProperty> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/properties`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateEntityProperty(entityId: string, propId: string, body: Partial<OntologyProperty>): Promise<OntologyProperty> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/properties/${propId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteEntityProperty(entityId: string, propId: string): Promise<void> {
-  await apiFetchData(`${ONT_BASE}/entities/${entityId}/properties/${propId}`, { method: "DELETE" });
-}
-
-export async function createEntityRelationship(entityId: string, body: Partial<OntologyRelationship>): Promise<OntologyRelationship> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/relationships`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteEntityRelationship(entityId: string, relId: string): Promise<void> {
-  await apiFetchData(`${ONT_BASE}/entities/${entityId}/relationships/${relId}`, { method: "DELETE" });
-}
-
 // ── Data Quality Dashboard ────────────────────────────────────
 const DQ_BASE = "/api/v1/dq";
 
@@ -1869,17 +1765,6 @@ export async function globalSearch(
   type: string = 'all'
 ): Promise<SearchHit[]> {
   return apiFetchData<SearchHit[]>(`/api/v1/portal/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
-}
-
-// ── Ontology Actions Execution (Operational Apps) ────────────
-export async function executeOntologyAction(_body: {
-  actionId: string;
-  entityType: string;
-  instanceId: string;
-  operatorName: string;
-  fields: Record<string, any>;
-}): Promise<any> {
-  throw new Error('GSXK bridge removed — use /api/v1/ontology/actions instead');
 }
 
 // ── Goals / Causal / Scenarios (async with mock fallback) ─
@@ -2572,9 +2457,11 @@ export async function fetchBizDashboard(): Promise<any> {
 }
 
 // ── Goal Tracking ────────────────────────────────────────
+// NOTE: 裸路径 /api/dq/goal-tracking → DqDashboardController (datanet:18082, P3-A)
+//       不用 /api/v1/dq（DqGovernanceController 没有 goal-tracking 子路径）
 export async function fetchGoalTracking(goalId?: number): Promise<any> {
   const qs = goalId ? `?goalId=${goalId}` : '';
-  return apiFetchData(`/api/v1/dq/goal-tracking${qs}`);
+  return apiFetchData(`/api/dq/goal-tracking${qs}`);
 }
 
 // ── ECOS Knowledge Graph ─────────────────────────────────
