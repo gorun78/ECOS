@@ -66,7 +66,7 @@ export default function KnowledgeView({ showCopilot: initialShowCopilot = false,
 
   const renderTabContent = () => {
     if (!ActiveComponent) {
-      return <div className="p-6 text-slate-400">{locale === 'zh' ? '模块开发中...' : 'Module under development...'}</div>;
+      return <div className={`p-6 ${styles.muted}`}>{locale === 'zh' ? '模块开发中...' : 'Module under development...'}</div>;
     }
     // Pass showToast to tabs that need it (sync, lineage, ontology, index, rag)
     const tabIdsNeedingToast = ['sync', 'lineage', 'ontology', 'index', 'rag'];
@@ -98,7 +98,7 @@ export default function KnowledgeView({ showCopilot: initialShowCopilot = false,
                   className={`w-full px-3 py-2 rounded-lg font-bold text-left flex items-center gap-2 transition-all cursor-pointer ${
                     isActive
                       ? `${styles.accentBg} text-white shadow-xs`
-                      : `${styles.cardTextMuted} hover:bg-slate-800/30`
+                      : `${styles.cardTextMuted} hover:opacity-80`
                   }`}
                 >
                   {Icon && <Icon size={13} />}
@@ -115,17 +115,17 @@ export default function KnowledgeView({ showCopilot: initialShowCopilot = false,
             className={`w-full px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               showCopilot
                 ? `${styles.accentBg} text-white`
-                : `${styles.cardTextMuted} hover:bg-slate-800/30`
+                : `${styles.cardTextMuted} hover:opacity-80`
             }`}
           >
             <Brain size={13} />
             <span>{locale === 'zh' ? '智能助手' : 'Copilot'}</span>
           </button>
-          <p className="font-extrabold text-[10px] text-slate-100 flex items-center gap-1.5">
+          <p className={`font-extrabold text-[10px] ${styles.cardText} flex items-center gap-1.5`}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>{locale === 'zh' ? '知识底座就绪' : 'Knowledge Ready'}</span>
           </p>
-          <p className="text-[9px] text-slate-400 leading-relaxed font-sans">
+          <p className={`text-[9px] ${styles.muted} leading-relaxed font-sans`}>
             {locale === 'zh' ? '统一知识体系：数据 → 图谱 → 检索' : 'Unified: Data → Graph → Retrieval'}
           </p>
         </div>
@@ -140,7 +140,7 @@ export default function KnowledgeView({ showCopilot: initialShowCopilot = false,
           <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2
             ${toast.type === 'success' ? 'bg-emerald-600 text-white' : ''}
             ${toast.type === 'error' ? 'bg-red-600 text-white' : ''}
-            ${toast.type === 'info' ? 'bg-slate-700 text-slate-100' : ''}`}>
+            ${toast.type === 'info' ? 'bg-zinc-700 text-gray-50' : ''}`}>
             {toast.msg}
           </div>
         </div>

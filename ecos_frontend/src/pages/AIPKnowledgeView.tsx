@@ -75,12 +75,12 @@ export default function AIPKnowledgeView() {
   };
 
   const stepHeader = (icon: React.ReactNode, label: string, badge?: string) => (
-    <div className={`border-b border-slate-50 pb-2 flex items-center justify-between ${styles.divider}`}>
+    <div className={`border-b ${styles.cardBg} pb-2 flex items-center justify-between ${styles.divider}`}>
       <div className="flex items-center gap-1.5 font-bold text-xs">
         {icon}
         <span>{label}</span>
       </div>
-      {badge && <span className="text-[9px] text-slate-400 font-mono">{badge}</span>}
+      {badge && <span className={`text-[9px] ${styles.muted} font-mono`}>{badge}</span>}
     </div>
   );
 
@@ -130,7 +130,7 @@ export default function AIPKnowledgeView() {
                 />
 
                 <div className="space-y-1.5">
-                  <span className="text-[9px] text-slate-400 font-extrabold uppercase block">{t('aipKnowledge.suggested')}</span>
+                  <span className={`text-[9px] ${styles.muted} font-extrabold uppercase block`}>{t('aipKnowledge.suggested')}</span>
                   <div className="flex flex-col gap-1">
                     {['aipKnowledge.suggested1', 'aipKnowledge.suggested2', 'aipKnowledge.suggested3'].map((key, idx) => (
                       <button

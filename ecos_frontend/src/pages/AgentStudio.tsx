@@ -427,12 +427,12 @@ export default function AgentStudio() {
                       {/* Agent name + icon */}
                       <div className="flex items-center gap-2 mb-1.5">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? "bg-indigo-600 text-white" : "bg-slate-200 ${styles.cardTextMuted}"
+                          isSelected ? "bg-indigo-600 text-white" : `bg-zinc-200 ${styles.cardTextMuted}`
                         }`}>
                           <Bot className="w-3.5 h-3.5" />
                         </div>
                         <span className={`text-xs font-bold leading-tight ${
-                          isSelected ? "text-indigo-900" : "${styles.cardText}"
+                          isSelected ? "text-indigo-900" : styles.cardText
                         }`}>
                           {agent.name}
                         </span>
@@ -493,8 +493,8 @@ export default function AgentStudio() {
         <div className="lg:col-span-2 flex flex-col gap-5 min-h-0 overflow-hidden">
 
           {/* Chat area — multi-turn with inline thought trace */}
-          <div className="flex-1 bg-slate-950 border border-slate-800 p-4 rounded-xl font-mono text-xs flex flex-col overflow-hidden min-h-[180px] select-text shadow-inner">
-            <div className="flex justify-between items-center shrink-0 border-b border-slate-700 pb-2 mb-2 select-none leading-none">
+          <div className="flex-1 bg-[#0B0F19] border border-[#1E293B] p-4 rounded-xl font-mono text-xs flex flex-col overflow-hidden min-h-[180px] select-text shadow-inner">
+            <div className="flex justify-between items-center shrink-0 border-b border-[#1E293B] pb-2 mb-2 select-none leading-none">
               <span className="text-green-500 text-[10.5px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-green-500 shrink-0" />
                 {t("agent.chat.title")}
@@ -518,7 +518,7 @@ export default function AgentStudio() {
                         ? "bg-red-900/30 border-red-500/40"
                         : entry.role === "system"
                         ? "bg-emerald-900/20 border-emerald-500/40 border-l-2 border-l-emerald-400 mr-4"
-                        : "bg-slate-800/40 border-slate-700 border-l-2 border-l-green-500 mr-4"
+                        : "bg-[#1E293B]/40 border-[#1E293B] border-l-2 border-l-green-500 mr-4"
                     }`}>
                       <span className={`text-[10px] font-bold uppercase ${styles.cardTextMuted} block mb-1`}>
                         {entry.role === "user"
@@ -529,7 +529,7 @@ export default function AgentStudio() {
                           ? g("System", "系统")
                           : selectedAgent?.name || "Agent"}
                       </span>
-                      <p className="text-slate-200 font-sans block leading-relaxed whitespace-pre-wrap">{entry.text}</p>
+                      <p className="text-gray-200 font-sans block leading-relaxed whitespace-pre-wrap">{entry.text}</p>
                     </div>
 
                     {/* Inline Thought Trace — only for agent messages with trace data */}
@@ -552,7 +552,7 @@ export default function AgentStudio() {
                         </button>
 
                         {!entry.collapsed && (
-                          <div className="mt-2 space-y-1.5 ml-1 border-l-2 border-slate-700 pl-3">
+                          <div className="mt-2 space-y-1.5 ml-1 border-l-2 border-[#1E293B] pl-3">
                             {entry.thoughtTrace.map((step, si) => {
                               const style = getTraceStyle(step.type);
                               const stepKey = `${i}-${si}`;
@@ -564,7 +564,7 @@ export default function AgentStudio() {
                                   className={`p-2 rounded-lg border ${style.bg} ${style.border} text-[10px]`}
                                 >
                                   <div
-                                    className={`flex items-center gap-1.5 mb-0.5 ${hasDetail ? "cursor-pointer select-none hover:${styles.cardBg}/5 rounded" : ""}`}
+                                    className={`flex items-center gap-1.5 mb-0.5 ${hasDetail ? "cursor-pointer select-none hover:bg-[#1E2533]/5 rounded" : ""}`}
                                     onClick={hasDetail ? () => toggleStepExpand(stepKey) : undefined}
                                   >
                                     {hasDetail && (
@@ -582,7 +582,7 @@ export default function AgentStudio() {
                                     {step.type === "result" && <CheckCircle2 className="w-3 h-3 text-green-400" />}
                                     {step.type === "plan" && <Layers className="w-3 h-3 text-cyan-400" />}
                                   </div>
-                                  <p className="text-slate-300 font-sans leading-relaxed">{step.summary}</p>
+                                  <p className="text-gray-300 font-sans leading-relaxed">{step.summary}</p>
                                   {hasDetail && isStepExpanded && (
                                     <p className={`${styles.cardTextMuted} font-sans leading-relaxed mt-0.5 text-[9px]`}>{step.detail}</p>
                                   )}
@@ -605,10 +605,10 @@ export default function AgentStudio() {
                               </span>
                               <span>{entry.actionProposal.actionName}</span>
                             </div>
-                            <div className="space-y-1 font-mono text-[9px] text-slate-300">
+                            <div className="space-y-1 font-mono text-[9px] text-gray-300">
                               {Object.entries(entry.actionProposal.payload).map(([k, v]) => (
                                 <div key={k}>
-                                  <span className="font-bold text-slate-200">{k}:</span> {String(v)}
+                                  <span className="font-bold text-gray-200">{k}:</span> {String(v)}
                                 </div>
                               ))}
                               <div className="text-[8px] text-rose-300 font-bold bg-rose-500/10 p-1 rounded mt-1">
@@ -625,7 +625,7 @@ export default function AgentStudio() {
                               </button>
                               <button
                                 onClick={() => handleActionConsent(i, false)}
-                                className="px-2.5 py-1.5 border border-slate-600 hover:bg-slate-800 rounded-lg text-[10px] font-semibold text-slate-300 transition-colors cursor-pointer flex items-center gap-1"
+                                className="px-2.5 py-1.5 border border-[#2D3748] hover:bg-[#1E2533] rounded-lg text-[10px] font-semibold text-gray-300 transition-colors cursor-pointer flex items-center gap-1"
                               >
                                 <X className="w-3 h-3" />
                                 <span>{g("Reject", "拒绝")}</span>
@@ -634,7 +634,7 @@ export default function AgentStudio() {
                           </div>
                         )}
                         {entry.actionProposal.status === "approved" && (
-                          <div className="bg-slate-800/60 border border-emerald-500/50 rounded-xl p-2.5 flex items-center gap-2 text-[10px] text-emerald-300 font-semibold">
+                          <div className="bg-[#1E293B]/60 border border-emerald-500/50 rounded-xl p-2.5 flex items-center gap-2 text-[10px] text-emerald-300 font-semibold">
                             <span className="p-1 rounded bg-emerald-500/20 text-emerald-400">
                               <CheckCircle2 className="w-3 h-3" />
                             </span>
@@ -642,7 +642,7 @@ export default function AgentStudio() {
                           </div>
                         )}
                         {entry.actionProposal.status === "rejected" && (
-                          <div className="bg-slate-800/60 border border-red-500/40 rounded-xl p-2.5 flex items-center gap-2 text-[10px] text-red-300 font-semibold">
+                          <div className="bg-[#1E293B]/60 border border-red-500/40 rounded-xl p-2.5 flex items-center gap-2 text-[10px] text-red-300 font-semibold">
                             <span className="p-1 rounded bg-red-500/20 text-red-400">
                               <XCircle className="w-3 h-3" />
                             </span>
@@ -658,8 +658,8 @@ export default function AgentStudio() {
           </div>
 
           {/* Trace terminal — aggregated execution log */}
-          <div className="flex-1 bg-slate-950 border border-slate-800 p-4 rounded-xl font-mono text-xs flex flex-col overflow-hidden min-h-[120px] shadow-inner">
-            <div className="flex justify-between items-center shrink-0 border-b border-slate-700 pb-2 mb-2 select-none leading-none">
+          <div className="flex-1 bg-[#0B0F19] border border-[#1E293B] p-4 rounded-xl font-mono text-xs flex flex-col overflow-hidden min-h-[120px] shadow-inner">
+            <div className="flex justify-between items-center shrink-0 border-b border-[#1E293B] pb-2 mb-2 select-none leading-none">
               <span className="text-green-500 text-[10.5px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-green-500 shrink-0" />
                 {t("agent.trace.title")}
@@ -678,7 +678,7 @@ export default function AgentStudio() {
                   return (
                     <div key={log.id} className={`p-2 rounded flex items-start gap-2 ${style.bg} ${style.border}`}>
                       <span className={`font-bold shrink-0 capitalize ${style.icon}`}>[{style.label}]</span>
-                      <span className="text-slate-300">{log.summary}</span>
+                      <span className="text-gray-300">{log.summary}</span>
                     </div>
                   );
                 })

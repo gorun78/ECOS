@@ -148,7 +148,7 @@ export default function AgentTestConsole() {
       <div className="mt-2 ml-2 mr-6">
         <button
           onClick={() => toggleTrace(idx)}
-          className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer select-none"
+          className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} hover:text-gray-300 transition-colors cursor-pointer select-none`}
         >
           {collapsed ? (
             <ChevronDown className="w-3 h-3" />
@@ -159,11 +159,11 @@ export default function AgentTestConsole() {
           <span className="font-bold uppercase tracking-wider">
             {g(locale, "Tool Calls", "工具调用")}
           </span>
-          <span className="text-slate-600">({toolCalls.length})</span>
+          <span className={styles.cardTextMuted}>({toolCalls.length})</span>
         </button>
 
         {!collapsed && (
-          <div className="mt-2 space-y-2 ml-1 border-l-2 border-slate-700 pl-3">
+          <div className="mt-2 space-y-2 ml-1 border-l-2 border-[#1E293B] pl-3">
             {toolCalls.map((tc, i) => (
               <div
                 key={i}
@@ -173,7 +173,7 @@ export default function AgentTestConsole() {
                   <span className="font-bold uppercase text-amber-400">
                     [{tc.toolName}]
                   </span>
-                  <span className="text-slate-400 flex items-center gap-1">
+                  <span className={`${styles.cardTextMuted} flex items-center gap-1`}>
                     <Clock className="w-2.5 h-2.5" />
                     {tc.durationMs}ms
                   </span>
@@ -182,10 +182,10 @@ export default function AgentTestConsole() {
                 {/* Input */}
                 {tc.input && Object.keys(tc.input).length > 0 && (
                   <div className="mt-1">
-                    <span className="text-slate-500 font-bold uppercase text-[9px]">
+                    <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px]`}>
                       {g(locale, "Input:", "输入:")}
                     </span>
-                    <pre className="text-slate-300 font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap">
+                    <pre className="text-gray-300 font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap">
                       {JSON.stringify(tc.input, null, 2)}
                     </pre>
                   </div>
@@ -194,10 +194,10 @@ export default function AgentTestConsole() {
                 {/* Output */}
                 {tc.output && (
                   <div className="mt-1">
-                    <span className="text-slate-500 font-bold uppercase text-[9px]">
+                    <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px]`}>
                       {g(locale, "Output:", "输出:")}
                     </span>
-                    <pre className="text-slate-300 font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    <pre className="text-gray-300 font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap max-h-32 overflow-y-auto">
                       {tc.output}
                     </pre>
                   </div>
@@ -226,31 +226,31 @@ export default function AgentTestConsole() {
 
   if (loadingAgent) {
     return (
-      <div className="flex-1 bg-slate-50 p-6 animate-fade-in">
+      <div className={`flex-1 ${styles.appBg} p-6 animate-fade-in`}>
         <LoadingSkeleton variant="card" rows={2} />
       </div>
     );
   }
 
   return (
-    <div className="flex-1 bg-slate-50 text-slate-800 flex flex-col h-full font-sans overflow-hidden animate-fade-in w-full">
+    <div className={`flex-1 ${styles.appBg} ${styles.cardText} flex flex-col h-full font-sans overflow-hidden animate-fade-in w-full`}>
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 p-3 sm:p-5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className={`border-b ${styles.cardBg} p-3 sm:p-5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
         <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className={`text-xl font-bold ${styles.cardText} flex items-center gap-2`}>
             <Terminal className="text-green-600 w-5 h-5 shrink-0" />
             {g(locale, "Agent Test Console", "Agent测试控制台")}
           </h1>
-          <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+          <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-2xl leading-relaxed`}>
             {agent ? (
               <>
                 <span className="font-semibold text-indigo-600">{agent.name}</span>
-                <span className="text-slate-400 mx-1.5">·</span>
+                <span className={`${styles.cardTextMuted} mx-1.5`}>·</span>
                 <span className="font-mono text-[11px]">{agent.model}</span>
                 {agent.toolIds?.length ? (
                   <>
-                    <span className="text-slate-400 mx-1.5">·</span>
-                    <span className="text-slate-400">
+                    <span className={`${styles.cardTextMuted} mx-1.5`}>·</span>
+                    <span className={styles.cardTextMuted}>
                       {agent.toolIds.length} {g(locale, "tools", "个工具")}
                     </span>
                   </>
@@ -266,7 +266,7 @@ export default function AgentTestConsole() {
           {agent && (
             <button
               onClick={() => navigate(`/agent-builder/${agent.id}`)}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+              className={`${styles.badgeBg} ${styles.cardText} rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition`}
             >
               <Cpu className="w-3.5 h-3.5" />
               {g(locale, "Edit Agent", "编辑Agent")}
@@ -274,7 +274,7 @@ export default function AgentTestConsole() {
           )}
           <button
             onClick={() => navigate("/agent-builder")}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+            className={`${styles.badgeBg} ${styles.cardText} rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition`}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             {g(locale, "Back", "返回")}
@@ -283,18 +283,18 @@ export default function AgentTestConsole() {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
+      <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19]">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto scrollbar-thin p-4 sm:p-6 space-y-4">
           {chatHistory.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 select-none">
+            <div className={`flex flex-col items-center justify-center h-full ${styles.cardTextMuted} select-none`}>
               <Bot className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm italic">
                 {agent
                   ? g(locale, `Start a conversation with ${agent.name}`, `开始与 ${agent.name} 对话`)
                   : g(locale, "Agent not available", "Agent不可用")}
               </p>
-              <p className="text-[10px] text-slate-600 mt-1">
+              <p className={`text-[10px] ${styles.cardTextMuted} mt-1`}>
                 {g(locale, "Type a message and press Send to test the agent", "输入消息并点击发送以测试Agent")}
               </p>
             </div>
@@ -308,11 +308,11 @@ export default function AgentTestConsole() {
                       ? "bg-indigo-900/30 border-indigo-500/40 ml-4 sm:ml-12"
                       : entry.role === "error"
                       ? "bg-red-900/30 border-red-500/40"
-                      : "bg-slate-800/40 border-slate-700 border-l-2 border-l-green-500 mr-4 sm:mr-12"
+                      : "bg-[#1E293B]/40 border-[#1E293B] border-l-2 border-l-green-500 mr-4 sm:mr-12"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold uppercase text-slate-400">
+                    <span className="text-[10px] font-bold uppercase text-zinc-400">
                       {entry.role === "user" ? (
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
@@ -330,9 +330,9 @@ export default function AgentTestConsole() {
                         </span>
                       )}
                     </span>
-                    <span className="text-[9px] text-slate-600">{entry.timestamp}</span>
+                    <span className="text-[9px] text-zinc-500">{entry.timestamp}</span>
                   </div>
-                  <p className="text-slate-200 font-sans text-[13px] leading-relaxed whitespace-pre-wrap">
+                  <p className="text-gray-200 font-sans text-[13px] leading-relaxed whitespace-pre-wrap">
                     {entry.text}
                   </p>
                 </div>
@@ -349,7 +349,7 @@ export default function AgentTestConsole() {
         </div>
 
         {/* Input area */}
-        <div className="shrink-0 border-t border-slate-800 p-3 sm:p-4 bg-slate-950">
+        <div className="shrink-0 border-t border-[#1E293B] p-3 sm:p-4 bg-[#0B0F19]">
           <div className="flex items-center gap-2 max-w-3xl mx-auto">
             <input
               type="text"
@@ -367,7 +367,7 @@ export default function AgentTestConsole() {
                   ? g(locale, `Message ${agent.name}...`, `向 ${agent.name} 发送消息...`)
                   : g(locale, "Agent not available", "Agent不可用")
               }
-              className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition font-sans"
+              className="flex-1 bg-[#1E2533] border border-[#2D3748] rounded-lg px-4 py-2.5 text-sm text-gray-200 placeholder-zinc-500 outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition font-sans"
             />
             <button
               onClick={handleSend}
@@ -382,7 +382,7 @@ export default function AgentTestConsole() {
               {g(locale, "Send", "发送")}
             </button>
           </div>
-          <div className="text-[9px] text-slate-600 text-center mt-2 max-w-3xl mx-auto">
+          <div className="text-[9px] text-zinc-500 text-center mt-2 max-w-3xl mx-auto">
             <Zap className="w-2.5 h-2.5 inline mr-0.5 text-amber-500" />
             {g(
               locale,

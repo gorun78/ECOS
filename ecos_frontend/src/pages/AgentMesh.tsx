@@ -204,11 +204,11 @@ export default function AgentMesh() {
 
   // ── Render ──
   return (
-    <div className="flex flex-col lg:flex-row h-full bg-slate-50 dark:bg-slate-950 w-full">
+    <div className={`flex flex-col lg:flex-row h-full ${styles.appBg} w-full`}>
       {/* Left: Agent Panel */}
-      <div className="w-full lg:w-72 border-r border-slate-200 dark:border-slate-800 flex flex-col">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+      <div className="w-full lg:w-72 border-r flex flex-col" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+        <div className="p-4 border-b" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+          <div className={`flex items-center gap-2 text-sm font-semibold ${styles.cardText}`}>
             <Cpu size={16} /> Agent 注册表
             {loadErrors.agents && (
               <button
@@ -226,20 +226,19 @@ export default function AgentMesh() {
             <div key={agent.id}
               className={`p-3 rounded-lg border text-xs cursor-pointer transition-colors ${
                 agent.status === "ACTIVE"
-                  ? "border-indigo-200 bg-white dark:border-indigo-800 dark:bg-slate-900 hover:border-indigo-400"
-                  : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50 opacity-60"
+                  ? `border-indigo-200 ${styles.cardBg} hover:border-indigo-400`
+                  : `${styles.cardBorder} ${styles.cardBg} opacity-60`
               }`}>
               <div className="flex items-center justify-between mb-1">
-                <span className="font-medium text-slate-800 dark:text-slate-200">{agent.name}</span>
+                <span className={`font-medium ${styles.cardText}`}>{agent.name}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                  agent.role === "compliance" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
-                  agent.role === "data" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                  agent.role === "knowledge" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                  "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                  agent.role === "compliance" ? "bg-purple-100 text-purple-700" :
+                  agent.role === "data" ? "bg-blue-100 text-blue-700" :
+                  agent.role === "knowledge" ? "bg-green-100 text-green-700" : `${styles.badgeBg} ${styles.cardTextMuted}`
                 }`}>{agent.role}</span>
               </div>
-              <p className="text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">{agent.description}</p>
-              <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+              <p className={`text-xs ${styles.cardTextMuted} mb-2 leading-relaxed`}>{agent.description}</p>
+              <div className={`flex items-center justify-between text-[10px] ${styles.cardTextMuted}`}>
                 <span>{agent.model}</span>
                 <span>max {agent.maxIterations} steps</span>
               </div>
@@ -256,7 +255,7 @@ export default function AgentMesh() {
               </button>
             </div>
           ) : agents.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-8">无已注册Agent</p>
+            <p className={`text-xs ${styles.cardTextMuted} text-center py-8`}>无已注册Agent</p>
           ) : null}
         </div>
       </div>
@@ -264,7 +263,7 @@ export default function AgentMesh() {
       {/* Right: Mission Workbench */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Create Mission Bar */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className={`p-4 border-b ${styles.cardBg}`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
           <div className="flex flex-col sm:flex-row gap-3 items-start">
             <div className="flex-1 space-y-2">
               <input
@@ -272,29 +271,29 @@ export default function AgentMesh() {
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
                 placeholder="Mission 标题，如：供应商准入合规审查"
-                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className={`w-full px-3 py-2 text-sm border rounded-lg ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none`}
               />
               <textarea
                 value={newDesc}
                 onChange={e => setNewDesc(e.target.value)}
                 placeholder="Mission 描述（可选）"
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+                className={`w-full px-3 py-2 text-sm border rounded-lg ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none`}
               />
               {/* Mode selector */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">模式:</span>
+                <span className={`text-xs ${styles.cardTextMuted}`}>模式:</span>
                 <button onClick={() => setNewMode("SUPERVISOR")}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     newMode === "SUPERVISOR"
-                      ? "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
-                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      ? "bg-teal-100 text-teal-700"
+                      : `${styles.badgeBg} ${styles.cardTextMuted}`
                   }`}>SUPERVISOR</button>
                 <button onClick={() => setNewMode("PIPELINE")}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     newMode === "PIPELINE"
-                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
-                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      ? "bg-indigo-100 text-indigo-700"
+                      : `${styles.badgeBg} ${styles.cardTextMuted}`
                   }`}>PIPELINE</button>
               </div>
 
@@ -313,7 +312,7 @@ export default function AgentMesh() {
                 <div className="space-y-2 pl-2 border-l-2 border-indigo-200 dark:border-indigo-800">
                   {pipelineAgents.map((pa, i) => (
                     <div key={i} className="flex flex-col sm:flex-row gap-2 items-start">
-                      <span className="text-[10px] font-mono text-slate-400 pt-2 w-5">#{i+1}</span>
+                      <span className={`text-[10px] font-mono ${styles.cardTextMuted} pt-2 w-5`}>#{i+1}</span>
                       <select
                         value={pa.agentId}
                         onChange={e => {
@@ -321,7 +320,7 @@ export default function AgentMesh() {
                           updated[i].agentId = e.target.value;
                           setPipelineAgents(updated);
                         }}
-                        className="w-full sm:w-40 px-2 py-1.5 text-xs border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                        className={`w-full sm:w-40 px-2 py-1.5 text-xs border rounded ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       >
                         <option value="">选择 Agent</option>
                         {agents.filter(a => a.status === "ACTIVE").map(a => (
@@ -337,17 +336,17 @@ export default function AgentMesh() {
                           setPipelineAgents(updated);
                         }}
                         placeholder="子任务指令"
-                        className="flex-1 px-2 py-1.5 text-xs border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                        className={`flex-1 px-2 py-1.5 text-xs border rounded ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       />
                       {i === pipelineAgents.length - 1 ? (
                         <button
                           onClick={() => setPipelineAgents([...pipelineAgents, { agentId: "", instruction: "" }])}
-                          className="p-1.5 text-slate-400 hover:text-indigo-500"
+                          className={`p-1.5 ${styles.cardTextMuted} hover:text-indigo-500`}
                         ><Plus size={14} /></button>
                       ) : (
                         <button
                           onClick={() => setPipelineAgents(pipelineAgents.filter((_, j) => j !== i))}
-                          className="p-1.5 text-slate-400 hover:text-red-500"
+                          className={`p-1.5 ${styles.cardTextMuted} hover:text-red-500`}
                         ><Trash2 size={14} /></button>
                       )}
                     </div>
@@ -369,8 +368,8 @@ export default function AgentMesh() {
         {/* Mission List */}
         <div className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mission 记录</h3>
-            <button onClick={loadMissions} className="p-1 text-slate-400 hover:text-indigo-500"><RefreshCw size={14} /></button>
+            <h3 className={`text-sm font-semibold ${styles.cardText}`}>Mission 记录</h3>
+            <button onClick={loadMissions} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500`}><RefreshCw size={14} /></button>
           </div>
 
           {/* ── Task Stats Panel (shown when mission selected and has tasks) ── */}
@@ -389,7 +388,7 @@ export default function AgentMesh() {
               </button>
             </div>
           ) : missions.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-16">暂无 Mission，创建一个开始协作</p>
+            <p className={`text-sm ${styles.cardTextMuted} text-center py-16`}>暂无 Mission，创建一个开始协作</p>
           ) : null}
 
           {missions.map(mission => (
@@ -397,35 +396,35 @@ export default function AgentMesh() {
               onClick={() => loadMission(mission.id)}
               className={`mb-2 p-4 rounded-lg border cursor-pointer transition-all ${
                 selectedMission?.id === mission.id
-                  ? "border-indigo-300 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/30"
-                  : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-slate-300"
+                  ? "border-indigo-300 bg-indigo-50"
+                  : `${styles.cardBorder} ${styles.cardBg}`
               }`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {statusIcon(mission.status)}
-                  <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{mission.title}</span>
+                  <span className={`font-medium text-sm ${styles.cardText}`}>{mission.title}</span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
                     mission.mode === "PIPELINE"
-                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                      : "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-teal-100 text-teal-700"
                   }`}>{mission.mode}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusColor(mission.status)}`}>
                     {mission.status}
                   </span>
-                  {mission.durationMs && <span className="text-[10px] text-slate-400">{mission.durationMs}ms</span>}
+                  {mission.durationMs && <span className={`text-[10px] ${styles.cardTextMuted}`}>{mission.durationMs}ms</span>}
                   {(mission.status === "PENDING" || mission.status === "FAILED") && (
                     <button
                       onClick={e => { e.stopPropagation(); executeMission(mission.id); }}
                       disabled={loading}
-                      className="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded"
+                      className="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 rounded"
                     ><Play size={14} /></button>
                   )}
                 </div>
               </div>
               {mission.description && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{mission.description}</p>
+                <p className={`text-xs ${styles.cardTextMuted} mb-2`}>{mission.description}</p>
               )}
               {mission.errorMessage && (
                 <p className="text-xs text-red-500 mt-1">{mission.errorMessage}</p>
@@ -456,24 +455,24 @@ export default function AgentMesh() {
                   <GanttTimeline tasks={missionTasks} mode={mission.mode} />
 
                   {/* Task detail list */}
-                  <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                    <h4 className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">子任务详情</h4>
+                  <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+                    <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted} uppercase tracking-wide`}>子任务详情</h4>
                     {missionTasks.map(task => (
-                      <div key={task.id} className="flex items-start gap-2 p-2 rounded bg-slate-50 dark:bg-slate-950/50">
+                      <div key={task.id} className="flex items-start gap-2 p-2 rounded" style={{ background: 'var(--overlay, rgba(0,0,0,0.04))' }}>
                         {statusIcon(task.status)}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                            <span className={`text-xs font-medium ${styles.cardText}`}>
                               {task.agentName || task.agentId}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] ${statusColor(task.status)}`}>
                               {task.status}
                             </span>
-                            {task.durationMs && <span className="text-[10px] text-slate-400">{task.durationMs}ms</span>}
+                            {task.durationMs && <span className={`text-[10px] ${styles.cardTextMuted}`}>{task.durationMs}ms</span>}
                           </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">{task.instruction}</p>
+                          <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5 truncate`}>{task.instruction}</p>
                           {task.resultSummary && (
-                            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">{task.resultSummary}</p>
+                            <p className={`text-[11px] ${styles.cardText} mt-1 line-clamp-2`}>{task.resultSummary}</p>
                           )}
                           {task.errorMessage && (
                             <p className="text-[11px] text-red-500 mt-0.5">{task.errorMessage}</p>
