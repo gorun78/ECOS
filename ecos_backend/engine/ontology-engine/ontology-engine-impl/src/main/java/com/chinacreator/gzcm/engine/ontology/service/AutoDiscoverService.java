@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
+import com.chinacreator.gzcm.engine.ontology.client.DataNetResourceClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,15 +9,28 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.*;
 
+/**
+ * AutoDiscoverService — 本体自动发现。
+ *
+ * <p>Wave B-2 · T13 (来源: 肖国荣 / 日期: 2026-09-12 / 责任人: fullstack-implementer)</p>
+ *
+ * <p>T13 改造: 原 {@code getResourceFields} 用 JdbcTemplate 直查 datanet 引擎表
+ * {@code td_data_field} / {@code td_data_resource} (跨引擎指定, 违反铁律 §0.3.1 微服务边界),
+ * 改为 delegate 到 {@link DataNetResourceClient} 走 datanet service REST。
+ * 本类仍保留 JdbcTemplate 用于查询本体自己的表 (ecos_ontology_entity / ecos_domain /
+ * ecos_ontology_property / ecos_entity_table_mapping), 属本引擎合理范围。</p>
+ */
 @Service
 public class AutoDiscoverService {
 
     private static final Logger log = LoggerFactory.getLogger(AutoDiscoverService.class);
 
     private final JdbcTemplate jdbc;
+    private final DataNetResourceClient dataNetClient;
 
-    public AutoDiscoverService(JdbcTemplate jdbc) {
+    public AutoDiscoverService(JdbcTemplate jdbc, DataNetResourceClient dataNetClient) {
         this.jdbc = jdbc;
+        this.dataNetClient = dataNetClient;
     }
 
     public List<Map<String, Object>> autoDiscover(String domainCode, String datasourceId, List<String> resourceNames) {
@@ -71,18 +85,21 @@ public class AutoDiscoverService {
         return jdbc.queryForList(sql, params);
     }
 
+    /**
+     * 拿数据资源下的候选字段(用于本体自动发现预览)。
+     *
+     * <p>Wave B-2 T13: 从 JdbcTemplate 直查 datanet 引擎表 (td_data_field / td_data_resource)
+     * 改为 delegate 到 {@link DataNetResourceClient} 走 datanet service REST。
+     * endpoint `GET /api/v1/datanet/resources/{resourceId}/fields` 尚未落地
+     * (TODO PMO-06 T19 补 endpoint 合同), client 在端点不可达时返回空列表,
+     * 不阻断 autoDiscover 主流程, 自动发现候选将为空但不 500。</p>
+     */
     private List<Map<String, Object>> getResourceFields(String datasourceId, String resourceName) {
         try {
-            String sql = "SELECT f.field_name AS \"fieldName\", f.field_type AS \"dataType\", " +
-                         "COALESCE(f.description, '') AS \"comment\", " +
-                         "f.nullable AS \"nullable\" " +
-                         "FROM td_data_field f " +
-                         "INNER JOIN td_data_resource r ON f.resource_id = r.resource_id " +
-                         "WHERE r.resource_name=? AND r.datasource_id=? " +
-                         "ORDER BY f.field_order LIMIT 200";
-            return jdbc.queryForList(sql, resourceName, datasourceId);
+            // T13: 调 datanet service REST 拿字段候选 (不直查 td_* 跨引擎表)
+            return dataNetClient.listResourceFields(resourceName);
         } catch (Exception e) {
-            log.warn("Cannot query td_data_field for {}: {}", resourceName, e.getMessage());
+            log.warn("Cannot fetch fields via datanet REST for {}: {}", resourceName, e.getMessage());
             return Collections.emptyList();
         }
     }
