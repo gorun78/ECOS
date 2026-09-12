@@ -69,6 +69,8 @@
   "extractReview.complete.title": "处理完成",
   "extractReview.complete.subtitle": "抽取结果已提交，返回继续上传或查看其他任务",
   "extractReview.noData": "暂无数据",
+  "extractReview.promoteToCandidate": "转候选本体 ({n})",
+  "extractReview.promoteToCandidateSuccess": "已提交 {n} 个候选本体",
   "kb.common.close": "关闭",
   "kb.index.chunkConfig": "向量分片参数配置",
   "kb.index.syncBtn": "构建闭环元数据向量库",
