@@ -9,6 +9,7 @@ import { useLanguage } from '../../components/LanguageContext';
 import { showToastGlobal } from '../../components/common/Toast';
 import { apiFetch } from '../../api';
 import { CopilotPanel } from '../../components/CopilotPanel';
+import { useTheme } from '../../components/ThemeContext';
 
 // Types
 import {
@@ -49,6 +50,7 @@ export default function BusinessWorkbenchLayout({
   onActiveTabChange,
 }: BusinessWorkbenchLayoutProps = {}) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
 
   // --- View Mode ---
   const [viewMode, setViewMode] = useState<ViewMode>(propActiveTab || 'ontology');
@@ -321,9 +323,9 @@ export default function BusinessWorkbenchLayout({
   ];
 
   return (
-    <div className="h-full flex flex-col bg-slate-900 text-slate-100 font-sans relative">
+    <div className={`h-full flex flex-col ${styles.appBg} ${styles.appText} font-sans relative`}>
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 px-4 py-2 bg-slate-950 border-b border-slate-800">
+      <div className={`flex items-center gap-1 px-4 py-2 ${styles.sidebarBg} border-b ${styles.sidebarBorder}`}>
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -333,8 +335,8 @@ export default function BusinessWorkbenchLayout({
             }}
             className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
               viewMode === tab.id
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText}`
+                : `${styles.sidebarText} ${styles.sidebarHoverBg}`
             }`}
           >
             {tab.label}
@@ -346,14 +348,14 @@ export default function BusinessWorkbenchLayout({
           placeholder={t('ow.biz.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="px-3 py-1 text-xs border border-slate-200 rounded-md w-48 focus:outline-none focus:border-slate-400"
+          className={`px-3 py-1 text-xs border ${styles.inputBorder} rounded-md w-48 focus:outline-none focus:ring-1 ${styles.accentBorder}`}
         />
         <button
           onClick={() => setShowCopilot(!showCopilot)}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors cursor-pointer text-xs ${
             showCopilot
-              ? 'bg-blue-600 text-white border-blue-500'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+              ? `${styles.accentBg} ${styles.inputText} ${styles.accentBorder}`
+              : `${styles.inputBg} hover:opacity-90 ${styles.cardTextMuted} ${styles.inputBorder}`
           }`}
         >
           {t('ow.biz.copilot')}
@@ -447,7 +449,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'object' && selectedId && (() => {
                 const ot = objectTypes.find(o => o.id === selectedId);
-                if (!ot) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundObject')}</div>;
+                if (!ot) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundObject')}</div>;
                 return (
                   <ObjectTypeView
                     objectType={ot}
@@ -480,7 +482,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'link' && selectedId && (() => {
                 const lt = linkTypes.find(l => l.id === selectedId);
-                if (!lt) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundLink')}</div>;
+                if (!lt) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundLink')}</div>;
                 return (
                   <LinkTypeView
                     linkType={lt}
@@ -500,7 +502,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'action' && selectedId && (() => {
                 const at = actionTypes.find(a => a.id === selectedId);
-                if (!at) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundAction')}</div>;
+                if (!at) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundAction')}</div>;
                 return (
                   <ActionTypeView
                     actionType={at}
@@ -519,7 +521,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'function' && selectedId && (() => {
                 const fn = functionTypes.find(f => f.id === selectedId);
-                if (!fn) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundFunction')}</div>;
+                if (!fn) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundFunction')}</div>;
                 return (
                   <FunctionTypeView
                     func={fn}
@@ -534,7 +536,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'interface' && selectedId && (() => {
                 const it = interfaces.find(i => i.id === selectedId);
-                if (!it) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundInterface')}</div>;
+                if (!it) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundInterface')}</div>;
                 return (
                   <InterfaceView
                     intf={it}
@@ -550,7 +552,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'shared_property' && selectedId && (() => {
                 const sp = sharedProperties.find(s => s.id === selectedId);
-                if (!sp) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundSharedProperty')}</div>;
+                if (!sp) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundSharedProperty')}</div>;
                 return (
                   <SharedPropertyView
                     sp={sp}
@@ -566,7 +568,7 @@ export default function BusinessWorkbenchLayout({
 
               {selectedCategory === 'dataset' && selectedId && (() => {
                 const ds = datasets.find(d => d.id === selectedId);
-                if (!ds) return <div className="p-6 text-slate-400 text-xs">{t('ow.biz.notFoundDataset')}</div>;
+                if (!ds) return <div className={`p-6 ${styles.cardTextMuted} text-xs`}>{t('ow.biz.notFoundDataset')}</div>;
                 return (
                   <DatasetView
                     dataset={ds}

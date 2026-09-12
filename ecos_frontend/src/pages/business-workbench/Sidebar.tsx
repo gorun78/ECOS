@@ -4,8 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
+import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain, PropertyType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
+import { useTheme } from '../../components/ThemeContext';
 
 interface SidebarProps {
   objectTypes: ObjectType[];
@@ -48,6 +49,7 @@ export default function Sidebar({
   onSelectCategory,
   onCreateNew
 }: SidebarProps) {
+  const { styles } = useTheme();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     object: true,
     link: true,
@@ -208,10 +210,10 @@ export default function Sidebar({
   const selectedDomain = domains.find(d => d.id === selectedDomainId);
 
   return (
-    <aside className="w-64 bg-slate-100 border-r border-slate-200 flex flex-col h-full select-none shrink-0 text-xs">
+    <aside className={`w-64 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col h-full select-none shrink-0 text-xs`}>
       
       {/* Overview Button & Dropdown Selector */}
-      <div className="p-3 border-b border-slate-200 bg-white space-y-2">
+      <div className={`p-3 border-b ${styles.sidebarBorder} ${styles.cardBg} space-y-2`}>
         <div className="flex items-center gap-1.5">
           {/* Custom Dropdown Trigger */}
           <div className="relative flex-1">
@@ -222,8 +224,8 @@ export default function Sidebar({
               }}
               className={`w-full py-2 px-3 rounded-lg flex items-center justify-between font-semibold transition-all text-xs border ${
                 selectedCategory === 'overview'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-50 border-slate-200'
+                  ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} shadow-sm`
+                  : `${styles.sidebarText} ${styles.sidebarHoverBg} ${styles.sidebarBorder}`
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
@@ -235,7 +237,7 @@ export default function Sidebar({
 
             {/* Dropdown Menu */}
             {showDomainDropdown && (
-              <div className="absolute top-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y divide-slate-100">
+              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.appBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto ${styles.appBorder}`}>
                 {/* 1. Global Panorama Option */}
                 <div
                   onClick={() => {
@@ -244,7 +246,7 @@ export default function Sidebar({
                     setShowDomainDropdown(false);
                   }}
                   className={`px-2.5 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                    selectedDomainId === null ? 'bg-slate-50 text-slate-950 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    selectedDomainId === null ? `${styles.sidebarHoverBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
@@ -262,7 +264,7 @@ export default function Sidebar({
                     <div
                       key={d.id}
                       className={`px-2.5 py-1.5 text-xs flex items-center justify-between cursor-pointer group transition-colors ${
-                        isSelected ? 'bg-slate-50 text-slate-950 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        isSelected ? `${styles.sidebarHoverBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                       }`}
                       onClick={() => {
                         onSelectDomainId(d.id);
@@ -273,7 +275,7 @@ export default function Sidebar({
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         <span className={`w-1.5 h-1.5 rounded-full ${getDomainColorDotClass(d.color)}`} />
                         <span className="truncate" title={d.displayName}>{d.displayName}</span>
-                        <span className="text-[9px] text-slate-400 font-mono">({count})</span>
+                        <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>({count})</span>
                       </div>
                       
                       {/* Edit/Delete Icons */}
@@ -283,7 +285,7 @@ export default function Sidebar({
                             handleStartEditDomain(d);
                             setShowDomainDropdown(false);
                           }}
-                          className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded transition-colors"
+                          className={`p-1 ${styles.sidebarHoverBg} ${styles.cardTextMuted} rounded transition-colors`}
                           title="修改业务域"
                         >
                           <LucideIcon name="Edit" size={11} />
@@ -293,7 +295,7 @@ export default function Sidebar({
                             handleDeleteDomain(d.id);
                             setShowDomainDropdown(false);
                           }}
-                          className="p-1 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded transition-colors"
+                          className={`p-1 hover:bg-red-50 ${styles.cardTextMuted} hover:text-red-600 rounded transition-colors`}
                           title="删除业务域"
                         >
                           <LucideIcon name="Trash2" size={11} />
@@ -317,12 +319,12 @@ export default function Sidebar({
         </div>
 
         {/* Core Sub-view Switcher inside Workbench */}
-        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 mt-2">
+        <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.appBorder} mt-2`}>
           <button
             onClick={() => {
               onSelectCategory('overview', null);
             }}
-            className="w-full py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-all bg-white text-slate-900 shadow-xs cursor-pointer"
+            className={`w-full py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${styles.cardBg} ${styles.cardText} shadow-xs cursor-pointer`}
           >
             <LucideIcon name="LayoutDashboard" size={11} className="text-blue-600" />
             <span>配置全景</span>

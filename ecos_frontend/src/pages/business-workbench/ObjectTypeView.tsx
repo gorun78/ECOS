@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { ObjectType, PropertyType, Dataset, LinkType, ActionType, SharedProperty, InterfaceType, OntologyDomain } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
+import { useTheme } from '../../components/ThemeContext';
 
 interface ObjectTypeViewProps {
   objectType: ObjectType;
@@ -36,6 +37,7 @@ export default function ObjectTypeView({
   onNavigateToAction,
   onExploreData
 }: ObjectTypeViewProps) {
+  const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<'metadata' | 'properties' | 'mapping' | 'links' | 'actions'>('properties');
   const [newPropName, setNewPropName] = useState('');
   const [newPropType, setNewPropType] = useState<'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint'>('string');
@@ -178,33 +180,33 @@ export default function ObjectTypeView({
   );
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className={`flex flex-col h-full ${styles.cardBg}`}>
       {/* Detail Header */}
-      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+      <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg border-2 ${objectType.color} flex items-center justify-center`}>
             <LucideIcon name={objectType.icon} size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-slate-900">{objectType.displayName}</h2>
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+              <h2 className={`text-lg font-semibold ${styles.cardText}`}>{objectType.displayName}</h2>
+              <span className={`text-xs font-mono ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded`}>
                 {objectType.apiName}
               </span>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                objectType.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                objectType.status === 'ACTIVE' ? `${styles.successBg} ${styles.successText}` : `${styles.warningBg} ${styles.warningText}`
               }`}>
                 {objectType.status === 'ACTIVE' ? '已发布' : '草稿'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{objectType.description || '无详细描述'}</p>
+            <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>{objectType.description || '无详细描述'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {onExploreData && (
             <button
               onClick={() => onExploreData(objectType.id)}
-              className="text-xs text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded border border-blue-200 transition-colors flex items-center gap-1.5 font-semibold"
+              className={`text-xs ${styles.successText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.infoBorder} transition-colors flex items-center gap-1.5 font-semibold`}
             >
               <LucideIcon name="Compass" size={13} />
               探索数据 (Explore)
@@ -212,7 +214,7 @@ export default function ObjectTypeView({
           )}
           <button
             onClick={() => onDelete(objectType.id)}
-            className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
+            className={`text-xs ${styles.dangerText} hover:bg-red-50 px-2.5 py-1.5 rounded border ${styles.dangerBorder} transition-colors flex items-center gap-1.5`}
           >
             <LucideIcon name="Trash2" size={13} />
             删除对象
@@ -221,7 +223,7 @@ export default function ObjectTypeView({
       </div>
 
       {/* Detail Tabs */}
-      <div className="flex px-6 border-b border-gray-200 bg-white">
+      <div className={`flex px-6 border-b ${styles.appBorder} ${styles.cardBg}`}>
         {(['properties', 'mapping', 'metadata', 'links', 'actions'] as const).map(tab => {
           const tabLabels = {
             properties: '属性定义',
@@ -237,7 +239,7 @@ export default function ObjectTypeView({
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  : `border-transparent ${styles.cardTextMuted} hover:opacity-80`
               }`}
             >
               {tabLabels[tab]}
@@ -252,7 +254,7 @@ export default function ObjectTypeView({
         {activeTab === 'properties' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <div className="text-xs text-slate-500">
+              <div className={`text-xs ${styles.cardTextMuted}`}>
                 定义构成此对象类型的所有核心属性。其中必须设定唯一的主键 (Primary Key)。
               </div>
               <div className="flex items-center gap-2">
@@ -266,7 +268,7 @@ export default function ObjectTypeView({
                 <select
                   value={newPropType}
                   onChange={e => setNewPropType(e.target.value as any)}
-                  className="px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                  className={`px-2 py-1 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
                 >
                   <option value="string">String (字符串)</option>
                   <option value="integer">Integer (整型)</option>
@@ -286,10 +288,10 @@ export default function ObjectTypeView({
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <div className={`overflow-x-auto border ${styles.appBorder} rounded-lg`}>
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-gray-200 text-slate-700 font-medium">
+                  <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardText} font-medium`}>
                     <th className="py-2.5 px-4 w-12 text-center">主键</th>
                     <th className="py-2.5 px-4">显示名称</th>
                     <th className="py-2.5 px-4">API 字段名</th>
@@ -299,16 +301,16 @@ export default function ObjectTypeView({
                     <th className="py-2.5 px-4 text-center">操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-slate-600">
+                <tbody className={`divide-y divide-gray-100 ${styles.cardText}`}>
                   {objectType.properties.map(prop => (
-                    <tr key={prop.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={prop.id} className={`${styles.sidebarHoverBg} transition-colors`}>
                       <td className="py-2.5 px-4 text-center">
                         <button
                           onClick={() => handleTogglePrimaryKey(prop.id)}
                           className={`p-1.5 rounded-full transition-colors ${
                             objectType.primaryKey === prop.id
                               ? 'text-amber-500 hover:bg-amber-50'
-                              : 'text-slate-300 hover:text-slate-400 hover:bg-slate-100'
+                              : `${styles.cardTextMuted} hover:opacity-70`
                           }`}
                           title={objectType.primaryKey === prop.id ? '当前为主键' : '设为主键'}
                         >
@@ -320,22 +322,22 @@ export default function ObjectTypeView({
                           type="text"
                           value={prop.displayName}
                           onChange={e => handlePropertyFieldChange(prop.id, 'displayName', e.target.value)}
-                          className="font-medium text-slate-900 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1"
+                          className={`font-medium ${styles.cardText} border-b border-transparent hover:opacity-70 focus:border-blue-500 focus:outline-hidden py-0.5 px-1`}
                         />
                       </td>
-                      <td className="py-2.5 px-4 font-mono text-slate-500">
+                      <td className={`py-2.5 px-4 font-mono ${styles.cardTextMuted}`}>
                         <input
                           type="text"
                           value={prop.apiName}
                           onChange={e => handlePropertyFieldChange(prop.id, 'apiName', e.target.value)}
-                          className="border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full"
+                          className="border-b border-transparent hover:opacity-70 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full"
                         />
                       </td>
                       <td className="py-2.5 px-4">
                         <select
                           value={prop.dataType}
                           onChange={e => handlePropertyFieldChange(prop.id, 'dataType', e.target.value)}
-                          className="bg-transparent border border-gray-200 rounded px-1.5 py-0.5 focus:border-blue-500 focus:outline-hidden font-mono"
+                          className={`bg-transparent border ${styles.appBorder} rounded px-1.5 py-0.5 focus:border-blue-500 focus:outline-hidden font-mono`}
                         >
                           <option value="string">string</option>
                           <option value="integer">integer</option>
@@ -351,7 +353,7 @@ export default function ObjectTypeView({
                           type="text"
                           value={prop.description}
                           onChange={e => handlePropertyFieldChange(prop.id, 'description', e.target.value)}
-                          className="text-slate-500 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full"
+                          className={`text-xs ${styles.cardTextMuted} border-b border-transparent focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full`}
                           placeholder="暂无描述"
                         />
                       </td>
@@ -359,7 +361,7 @@ export default function ObjectTypeView({
                         <select
                           value={prop.sharedPropertyId || ''}
                           onChange={e => handlePropertyFieldChange(prop.id, 'sharedPropertyId', e.target.value || undefined)}
-                          className="bg-transparent border border-gray-200 rounded px-1.5 py-0.5 focus:border-blue-500 focus:outline-hidden text-slate-600"
+                          className={`bg-transparent border ${styles.appBorder} rounded px-1.5 py-0.5 focus:border-blue-500 focus:outline-hidden ${styles.cardText}`}
                         >
                           <option value="">未绑定 (无)</option>
                           {sharedProperties.map(sp => (
@@ -370,7 +372,7 @@ export default function ObjectTypeView({
                       <td className="py-2.5 px-4 text-center">
                         <button
                           onClick={() => handleRemoveProperty(prop.id)}
-                          className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 transition-colors"
+                          className={`text-xs ${styles.cardTextMuted} hover:text-red-500 p-1 rounded hover:bg-slate-100 transition-colors`}
                           title="删除属性"
                         >
                           <LucideIcon name="X" size={14} />
@@ -389,7 +391,7 @@ export default function ObjectTypeView({
           <div className="space-y-6 max-w-2xl">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">对象显示名称 (Display Name)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>对象显示名称 (Display Name)</label>
                 <input
                   type="text"
                   value={objectType.displayName}
@@ -398,7 +400,7 @@ export default function ObjectTypeView({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">API 标识名 (API Name)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>API 标识名 (API Name)</label>
                 <input
                   type="text"
                   value={objectType.apiName}
@@ -409,7 +411,7 @@ export default function ObjectTypeView({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">对象描述信息 (Description)</label>
+              <label className={`text-xs font-semibold ${styles.cardText}`}>对象描述信息 (Description)</label>
               <textarea
                 value={objectType.description}
                 onChange={e => handleMetaChange('description', e.target.value)}
@@ -419,41 +421,41 @@ export default function ObjectTypeView({
             </div>
 
             <div className="space-y-1.5 border-t border-gray-100 pt-4">
-              <label className="text-xs font-semibold text-slate-700">划分业务域 (Ontology Domain Hierarchy)</label>
+              <label className={`text-xs font-semibold ${styles.cardText}`}>划分业务域 (Ontology Domain Hierarchy)</label>
               <select
                 value={objectType.domainId || ''}
                 onChange={e => handleMetaChange('domainId', e.target.value || undefined)}
-                className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
               >
                 <option value="">-- 未分类 (不属于任何业务域) --</option>
                 {domains.map(d => (
                   <option key={d.id} value={d.id}>{d.displayName}</option>
                 ))}
               </select>
-              <p className="text-[10px] text-slate-400">选择该实体所属的顶级业务大类。可前往“本体全景与总览”页面创建和维护更多业务域分级。</p>
+              <p className={`text-[10px] ${styles.cardTextMuted}`}>选择该实体所属的顶级业务大类。可前往“本体全景与总览”页面创建和维护更多业务域分级。</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">标题展示属性 (Title Property)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>标题展示属性 (Title Property)</label>
                 <select
                   value={objectType.titleProperty}
                   onChange={e => handleMetaChange('titleProperty', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
                 >
                   {objectType.properties.map(p => (
                     <option key={p.id} value={p.id}>{p.displayName} ({p.apiName})</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-slate-400">用于在图谱、搜索结果和关系列表里展示此对象的默认文本标题。</p>
+                <p className={`text-[10px] ${styles.cardTextMuted}`}>用于在图谱、搜索结果和关系列表里展示此对象的默认文本标题。</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">运营状态 (Status)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>运营状态 (Status)</label>
                 <select
                   value={objectType.status}
                   onChange={e => handleMetaChange('status', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
                 >
                   <option value="DRAFT">草稿 (DRAFT)</option>
                   <option value="ACTIVE">启用 (ACTIVE)</option>

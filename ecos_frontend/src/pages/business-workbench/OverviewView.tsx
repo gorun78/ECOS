@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, OntologyDomain } from '../../types/ontology';
 import OntologyGraph from './OntologyGraph';
 import LucideIcon from './LucideIcon';
+import { useTheme } from '../../components/ThemeContext';
 
 interface OverviewViewProps {
   objectTypes: ObjectType[];
@@ -44,6 +45,7 @@ export default function OverviewView({
   onUpdateDomains,
   onUpdateObjectTypes
 }: OverviewViewProps) {
+  const { styles } = useTheme();
   
   // Tab/Filter States
   // Controlled by parent state
@@ -283,18 +285,17 @@ export default function OverviewView({
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-y-auto p-6 space-y-6 select-none">
+    <div className={`flex flex-col h-full ${styles.appBg} overflow-y-auto p-6 space-y-6 select-none`}>
       
 
-
       {/* Title & Introduction Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex items-center justify-between">
+      <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl p-5 shadow-xs flex items-center justify-between`}>
         <div className="space-y-1 flex-1">
-          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
+          <h2 className={`text-sm font-semibold ${styles.cardText} flex items-center gap-1.5`}>
             <LucideIcon name="Workflow" className="text-blue-600" size={16} />
             航空资产与运行智能本体 (Aviation Core Ontology)
           </h2>
-          <p className="text-xs text-slate-500 max-w-3xl leading-relaxed">
+          <p className={`text-xs ${styles.cardTextMuted} max-w-3xl leading-relaxed`}>
             物理世界实体网络庞大异构。为便于大型航司进行数字治理，我们支持将本体对象归属到不同的「业务域 (Domains)」分级中。
             这有助于在大规模本体资产中按业务边界过滤拓扑，维护实体上下级职责和可见性规范。
           </p>
@@ -308,11 +309,11 @@ export default function OverviewView({
       {/* Analytics Summary Cards Grid */}
       <div className="grid grid-cols-4 gap-4">
         {/* 1. Object Types Card */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow">
+        <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}>
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">业务对象实体</span>
-            <div className="text-xl font-bold text-slate-900 font-mono">{objectTypes.length}</div>
-            <div className="text-[10px] text-slate-500 flex items-center gap-1">
+            <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>业务对象实体</span>
+            <div className={`text-xl font-bold ${styles.cardText} font-mono`}>{objectTypes.length}</div>
+            <div className={`text-[10px] ${styles.cardTextMuted} flex items-center gap-1`}>
               <span>{objectTypes.filter(ot => ot.domainId).length} 个已归域</span>
               <span className="text-slate-300">|</span>
               <span className="text-amber-600 font-medium">{objectTypes.filter(ot => !ot.domainId).length} 个未归类</span>
@@ -324,11 +325,11 @@ export default function OverviewView({
         </div>
 
         {/* 2. Link Types Card */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow">
+        <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}>
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">关系链接数量</span>
-            <div className="text-xl font-bold text-slate-900 font-mono">{linkTypes.length}</div>
-            <div className="text-[10px] text-slate-500">
+            <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>关系链接数量</span>
+            <div className={`text-xl font-bold ${styles.cardText} font-mono`}>{linkTypes.length}</div>
+            <div className={`text-[10px] ${styles.cardTextMuted}`}>
               包含域内关联与跨域多维关联
             </div>
           </div>
@@ -338,11 +339,11 @@ export default function OverviewView({
         </div>
 
         {/* 3. Action Types Card */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow">
+        <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}>
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">系统业务域</span>
-            <div className="text-xl font-bold text-slate-900 font-mono">{domains.length}</div>
-            <div className="text-[10px] text-slate-500">
+            <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>系统业务域</span>
+            <div className={`text-xl font-bold ${styles.cardText} font-mono`}>{domains.length}</div>
+            <div className={`text-[10px] ${styles.cardTextMuted}`}>
               支持按域进行对象隔离与维护
             </div>
           </div>
@@ -352,11 +353,11 @@ export default function OverviewView({
         </div>
 
         {/* 4. Combined specs Card */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow">
+        <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl p-4 shadow-3xs flex items-center justify-between hover:shadow-xs transition-shadow`}>
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">接口与属性指标</span>
-            <div className="text-xl font-bold text-slate-900 font-mono">{interfaces.length + sharedProperties.length}</div>
-            <div className="text-[10px] text-slate-500">
+            <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>接口与属性指标</span>
+            <div className={`text-xl font-bold ${styles.cardText} font-mono`}>{interfaces.length + sharedProperties.length}</div>
+            <div className={`text-[10px] ${styles.cardTextMuted}`}>
               {interfaces.length} 契约规范 · {sharedProperties.length} 共享属性
             </div>
           </div>
