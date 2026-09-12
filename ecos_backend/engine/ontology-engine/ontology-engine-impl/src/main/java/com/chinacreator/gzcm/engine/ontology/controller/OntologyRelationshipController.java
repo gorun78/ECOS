@@ -1,13 +1,17 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipGraphVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipValidateQuery;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipValidateVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
@@ -23,6 +27,10 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
  *   <li>POST   /api/v1/ecos/relationships/validate                    — 验证关系（循环检测）</li>
  *   <li>GET    /api/v1/ecos/relationships/graph                       — 全局关系图谱数据</li>
  * </ul>
+ *
+ * <p>T16-1 (2026-09-12)：方法入/出参由 {@code Map<String,Object>} 改为强类型 DTO/VO
+ * （{@code OntologyRelationshipSaveDTO / OntologyRelationshipValidateQuery /
+ * OntologyRelationshipValidateVO / OntologyRelationshipGraphVO / OntologyRelationshipVO}）。
  */
 @RestController
 @RequestMapping("/api/v1/ecos")
@@ -36,59 +44,64 @@ public class OntologyRelationshipController {
         this.ontologyService = ontologyService;
     }
 
+    /** 列出实体的关系（作为 source 或 target）— 强类型版本。 */
     @GetMapping("/entities/{entityId}/relationships")
-    public ApiResponse<List<Map<String, Object>>> listEntityRelationships(@PathVariable String entityId) {
-        return ApiResponse.success(ontologyService.listEntityRelationships(entityId));
+    public ApiResponse<List<OntologyRelationshipVO>> listEntityRelationships(@PathVariable String entityId) {
+        return ApiResponse.success(ontologyService.listEntityRelationshipsVO(entityId));
     }
 
+    /** 列出全部关系 — 强类型版本。 */
     @GetMapping("/relationships")
-    public ApiResponse<List<Map<String, Object>>> listAllRelationships() {
-        return ApiResponse.success(ontologyService.listAllRelationships());
+    public ApiResponse<List<OntologyRelationshipVO>> listAllRelationships() {
+        return ApiResponse.success(ontologyService.listAllRelationshipsVO());
     }
 
+    /** 关系详情（按 id 过滤；无专用 Repository 查询，走 filter)。 */
     @GetMapping("/relationships/{relId}")
-    public ApiResponse<Map<String, Object>> getRelationship(@PathVariable String relId) {
-        return ontologyService.listAllRelationships().stream()
-            .filter(r -> relId.equals(r.get("id")))
+    public ApiResponse<OntologyRelationshipVO> getRelationship(@PathVariable String relId) {
+        return ontologyService.listAllRelationshipsVO().stream()
+            .filter(r -> relId.equals(r.getId()))
             .findFirst()
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("ONT-001: Relationship '" + relId + "' not found"));
     }
 
+    /** 创建关系 — 接收 {@code OntologyRelationshipSaveDTO}；source 由 path 传入。 */
     @PostMapping("/entities/{entityId}/relationships")
-    public ApiResponse<Map<String, Object>> createRelationship(
+    public ApiResponse<OntologyRelationshipVO> createRelationship(
             @PathVariable String entityId,
-            @RequestBody Map<String, Object> body) {
-        Map<String, Object> rel = ontologyService.createRelationship(entityId, body);
-        log.info("Relationship created: {} {}→{}", rel.get("id"), entityId, rel.get("targetEntityId"));
+            @RequestBody OntologyRelationshipSaveDTO dto) {
+        OntologyRelationshipVO rel = ontologyService.createRelationship(entityId, dto);
+        log.info("Relationship created: {} {}→{}", rel.getId(), entityId, rel.getTargetEntityId());
         return ApiResponse.success(rel);
     }
 
+    /** 直接创建关系（source 在 body 中） — 接收 {@code OntologyRelationshipSaveDTO}，从 body 兼容 source 字段。 */
     @PostMapping("/relationships")
-    public ApiResponse<Map<String, Object>> createRelationshipDirect(@RequestBody Map<String, Object> body) {
-        String sourceEntityId = String.valueOf(body.getOrDefault("sourceEntityId", ""));
-        Map<String, Object> rel = ontologyService.createRelationship(sourceEntityId, body);
-        log.info("Relationship created directly: {} [{}]", rel.get("id"), rel.get("code"));
+    public ApiResponse<OntologyRelationshipVO> createRelationshipDirect(@RequestBody OntologyRelationshipSaveDTO dto) {
+        // 兼容旧字段 sourceEntityId（联调时部分 client 会从 body 携带 source）
+        OntologyRelationshipVO rel = ontologyService.createRelationship(dto.getSourceEntityId(), dto);
+        log.info("Relationship created directly: {} [{}]", rel.getId(), rel.getCode());
         return ApiResponse.success(rel);
     }
 
+    /** 更新关系 — 简化为 remove + create 两步（保留旧实现语义）。 */
     @PutMapping("/relationships/{relId}")
-    public ApiResponse<Map<String, Object>> updateRelationship(
+    public ApiResponse<OntologyRelationshipVO> updateRelationship(
             @PathVariable String relId,
-            @RequestBody Map<String, Object> body) {
-        // 关系更新: 通过查找并重新映射
-        return ontologyService.listAllRelationships().stream()
-            .filter(r -> relId.equals(r.get("id")))
+            @RequestBody OntologyRelationshipSaveDTO dto) {
+        return ontologyService.listAllRelationshipsVO().stream()
+            .filter(r -> relId.equals(r.getId()))
             .findFirst()
             .map(existing -> {
-                // 删除旧关系并创建新关系
                 ontologyService.deleteRelationship(relId);
-                String src = String.valueOf(body.getOrDefault("sourceEntityId", existing.get("sourceEntityId")));
-                return ApiResponse.success(ontologyService.createRelationship(src, body));
+                String src = dto.getSourceEntityId() != null ? dto.getSourceEntityId() : existing.getSourceEntityId();
+                return ApiResponse.success(ontologyService.createRelationship(src, dto));
             })
             .orElseGet(() -> ApiResponse.notFound("ONT-001: Relationship '" + relId + "' not found"));
     }
 
+    /** 删除关系（逻辑删除，Wave B-3 T17）。 */
     @DeleteMapping("/entities/{entityId}/relationships/{relId}")
     public ApiResponse<String> deleteRelationshipByEntity(
             @PathVariable String entityId,
@@ -99,6 +112,7 @@ public class OntologyRelationshipController {
         return ApiResponse.notFound("ONT-001: Relationship '" + relId + "' not found");
     }
 
+    /** 删除关系（逻辑删除，Wave B-3 T17）。 */
     @DeleteMapping("/relationships/{relId}")
     public ApiResponse<String> deleteRelationship(@PathVariable String relId) {
         if (ontologyService.deleteRelationship(relId)) {
@@ -107,16 +121,18 @@ public class OntologyRelationshipController {
         return ApiResponse.notFound("ONT-001: Relationship '" + relId + "' not found");
     }
 
+    /** 校验关系是否会引入环路 — 接收 {@code OntologyRelationshipValidateQuery}。 */
     @PostMapping("/relationships/validate")
-    public ApiResponse<Map<String, Object>> validateRelationship(@RequestBody Map<String, Object> body) {
-        String source = String.valueOf(body.getOrDefault("sourceEntityId", ""));
-        String target = String.valueOf(body.getOrDefault("targetEntityId", ""));
-        Map<String, Object> result = ontologyService.validateRelationship(source, target);
+    public ApiResponse<OntologyRelationshipValidateVO> validateRelationship(
+            @RequestBody OntologyRelationshipValidateQuery query) {
+        OntologyRelationshipValidateVO result = ontologyService.validateRelationshipVO(
+            query.getSourceEntityId(), query.getTargetEntityId());
         return ApiResponse.success(result);
     }
 
+    /** 关系图谱（强类型版本：单图对象 nodes+edges 而非旧 {@code List<Map>} 容器）。 */
     @GetMapping("/relationships/graph")
-    public ApiResponse<List<Map<String, Object>>> getRelationshipGraph() {
-        return ApiResponse.success(ontologyService.getRelationshipGraph());
+    public ApiResponse<OntologyRelationshipGraphVO> getRelationshipGraph() {
+        return ApiResponse.success(ontologyService.getRelationshipGraphVO());
     }
 }
