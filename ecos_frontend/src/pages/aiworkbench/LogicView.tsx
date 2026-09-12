@@ -24,6 +24,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import * as Icons from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import type {
   AIPLogicPipeline,
   AIPModel,
@@ -45,6 +46,7 @@ import OntologyNode from '../../components/aiworkbench/logic/OntologyNode';
 import ApprovalNode from '../../components/aiworkbench/logic/ApprovalNode';
 import ConditionNode from '../../components/aiworkbench/logic/ConditionNode';
 import TriggerNode from '../../components/aiworkbench/logic/TriggerNode';
+import { apiFetchData } from '../../api';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -81,6 +83,26 @@ const DEFAULT_CONFIGS: Record<LogicNodeType, LogicNodeConfig> = {
 };
 
 const NODE_COUNTS = { llm: 0, tool: 0, ontology: 0, approval: 0, condition: 0, trigger: 0 };
+
+/** 节点 trace：来自后端 executions 端点的节点级别执行数据（P2 后端无该字段时为空） */
+interface NodeTrace {
+  input?: string;
+  output?: string;
+  latencyMs?: number;
+  errorMessage?: string;
+}
+
+/** 后端 PipelineExecution 的节点状态映射（后端仅 running/completed/failed 三种）*/
+type BackendRunStatus = 'running' | 'completed' | 'failed';
+
+interface BackendPipelineExec {
+  executionId: string;
+  pipelineId: string;
+  status: BackendRunStatus;
+  startedAt: string;
+  completedAt?: string;
+  result?: { message?: string; pipelineId?: string; params?: Record<string, unknown> };
+}
 
 function resetNodeCounts() {
   NODE_COUNTS.llm = 0;
@@ -194,6 +216,7 @@ export default function LogicView({
   showToast,
 }: LogicViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   // Pipeline selection
@@ -298,9 +321,12 @@ export default function LogicView({
 
   // ── Config Panel ──
   const [selectedNode, setSelectedNode] = useState<Node<LogicNodeData> | null>(null);
+  /** 节点 trace drawer 开关（按 TraceId 收可点开 — 节点执行 trace 区域）*/
+  const [traceOpen, setTraceOpen] = useState(false);
 
   const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node as Node<LogicNodeData>);
+    setTraceOpen(false);
   }, []);
 
   const updateNodeConfig = useCallback((nodeId: string, config: LogicNodeConfig) => {
@@ -321,7 +347,7 @@ export default function LogicView({
       pushHistory(next, edges);
       return next;
     });
-    showToast?.('success', `已添加${typeLabel(type)}节点`);
+    showToast?.('success', t('aiworkbench.logic.node.added', { type: typeLabel(type) }));
   };
 
   // ── Delete selected nodes ──
@@ -343,57 +369,154 @@ export default function LogicView({
   const [logs, setLogs] = useState<string[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [totalDuration, setTotalDuration] = useState<number | null>(null);
+  const [traceMap, setTraceMap] = useState<Record<string, NodeTrace>>({});
+  /** 全局 AbortController（5min 自动 abort） — 切 pipeline / 卸载时清除 */
+  const execAbortRef = useRef<AbortController | null>(null);
+  /** 轮询定时器 ID */
+  const pollTimerRef = useRef<number | null>(null);
+  /** 启动时刻，用于算 totalDuration */
+  const runStartRef = useRef<number | null>(null);
 
-  const executeCanvas = async () => {
-    if (nodes.length === 0) return;
+  /** 清理进行中的执行（abort + 清 timer + 重置 isExecuting + 节点回 idle） */
+  const cleanupExec = useCallback(() => {
+    execAbortRef.current?.abort();
+    execAbortRef.current = null;
+    if (pollTimerRef.current != null) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    runStartRef.current = null;
+    if (isExecuting) {
+      setIsExecuting(false);
+      setTotalDuration(null);
+      setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, status: 'idle' as LogicNodeStatus } })));
+    }
+  }, [isExecuting, setNodes]);
+
+  /** 节点边框样式：IDLE 用节点类型色；RUNNING/SUCCESS/FAILED/SKIPPED 用主题 token */
+  const nodeBorder = (status: LogicNodeStatus, selected: boolean): string => {
+    if (selected) return 'border-blue-500';
+    switch (status) {
+      case 'running': return `${styles.warningBorder} border-2 animate-pulse`;
+      case 'success': return `${styles.successBorder} border-2`;
+      case 'error': return `${styles.dangerBorder} border-2`;
+      default: return '';
+    }
+  };
+
+  /**
+   * 启动 Pipeline 真执行 + 轮询 executions。
+   * 后端端点:
+   *   POST /api/v1/aip/studio/pipelines/{pipelineId}/execute  → { executionId, status:'running', ... }
+   *   GET  /api/v1/aip/studio/pipelines/{executionId}/executions → { executionId, status, ... }
+   * 语义：
+   *   - 启动失败（后端不可用 / 404 / 未注册）→ toast error，画布保留，节点保持 idle
+   *   - 轮询每 2s 一次，到 completed/failed 或 5min 自动 abort
+   *   - 后端 P2 暂无 nodeTraces 字段，状态回写以 pipeline 整体为粒度:
+   *     running → 全部 inTopoOrder 标 running，completed → 全 success，failed → 全 error
+   */
+  const startPipelineRun = useCallback(async () => {
+    if (nodes.length === 0 || !selectedPipeline) return;
+    cleanupExec();
     setIsExecuting(true);
-    setLogs([]);
     setShowLogs(true);
+    setLogs([]);
     setTotalDuration(null);
+    setTraceMap({});
+    runStartRef.current = Date.now();
 
-    // Reset all node statuses
-    setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, status: 'idle' as LogicNodeStatus, duration: undefined as number | undefined } })));
-
-    const execOrder = topologicalSort(nodes, edges);
-    const startTime = performance.now();
-    const logEntries: string[] = [];
-    let allSuccess = true;
-    const updatedNodes = [...nodes];
-
-    for (const nodeId of execOrder) {
-      const node = updatedNodes.find(n => n.id === nodeId);
-      if (!node) continue;
-
-      // Simulate execution
-      const nodeStart = performance.now();
-      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, status: 'running' } } : n));
-      logEntries.push(`⚡ 正在执行: [${node.data.label}] (${node.data.type})`);
-
-      await new Promise(r => setTimeout(r, 300 + Math.random() * 600));
-
-      const duration = Math.round(performance.now() - nodeStart);
-
-      try {
-        // Simulate random errors (5% chance)
-        if (Math.random() < 0.05) throw new Error('模拟执行异常');
-
-        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, status: 'success', duration } } : n));
-        logEntries.push(`✅ 完成: [${node.data.label}] — ${duration}ms`);
-      } catch {
-        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, status: 'error', duration } } : n));
-        logEntries.push(`❌ 失败: [${node.data.label}] — ${duration}ms`);
-        allSuccess = false;
-        break;
-      }
+    // 输入参数：pipeline.inputs 全部用 testInputs 占位
+    const inputParams: Record<string, string> = {};
+    for (const inp of selectedPipeline.inputs) {
+      inputParams[inp.name] = selectedPipeline.testInputs?.[inp.name] || '';
     }
 
-    const total = Math.round(performance.now() - startTime);
-    setTotalDuration(total);
-    logEntries.push(allSuccess ? `🎉 执行完成! 总耗时: ${total}ms` : `⚠️ 执行中断! 总耗时: ${total}ms`);
-    setLogs(logEntries);
-    setIsExecuting(false);
-    showToast?.(allSuccess ? 'success' : 'error', allSuccess ? '画布执行成功' : '画布执行失败');
-  };
+    // ── 1. 启动执行 ──
+    let execId = '';
+    try {
+      const exec = await apiFetchData<BackendPipelineExec & { executionId?: string }>(
+        `/api/v1/aip/studio/pipelines/${encodeURIComponent(selectedPipeline.id)}/execute`,
+        { method: 'POST', body: JSON.stringify(inputParams) }
+      );
+      execId = (exec && (exec as BackendPipelineExec).executionId) || '';
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // graceful: 不清空画布、不抛错 toast
+      showToast?.('error', `${t('aiworkbench.logic.run.serviceUnavailable')}: ${msg}`);
+      cleanupExec();
+      return;
+    }
+    if (!execId) {
+      showToast?.('error', t('aiworkbench.logic.run.failedNoId'));
+      cleanupExec();
+      return;
+    }
+    setLogs([t('aiworkbench.logic.run.started', { id: execId })]);
+
+    // ── 2. 轮询 executions（每 2s 一次，5min 总超时）──
+    const ac = new AbortController();
+    execAbortRef.current = ac;
+
+    const pollOnce = async (): Promise<void> => {
+      if (ac.signal.aborted) return;
+      try {
+        const res = await apiFetchData<BackendPipelineExec>(
+          `/api/v1/aip/studio/pipelines/${encodeURIComponent(execId)}/executions`,
+          { signal: ac.signal }
+        );
+        if (!res) return;
+        // 后端 P1: 仅 status/startedAt/completedAt/result.message，无 nodeTraces
+        // 状态回写：按拓扑顺序遍历 nodes，把整体状态映射到每个节点
+        const topo = topologicalSort(nodes, edges);
+        const finalStatusMap: Record<string, LogicNodeStatus> = {};
+        for (const nodeId of topo) finalStatusMap[nodeId] = res.status === 'completed' ? 'success' : res.status === 'failed' ? 'error' : 'running';
+        setNodes(prev => prev.map(n => finalStatusMap[n.id] ? { ...n, data: { ...n.data, status: finalStatusMap[n.id] } } : n));
+        setLogs(prev => [...prev, res.status === 'running' ? t('aiworkbench.logic.run.polling', { id: execId }) : t('aiworkbench.logic.run.finished', { msg: res.result?.message || res.status, elapsed: Date.now() - (runStartRef.current || Date.now()) })]);
+        if (res.status === 'completed' || res.status === 'failed') {
+          if (pollTimerRef.current != null) window.clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+          setIsExecuting(false);
+          setTotalDuration(Date.now() - (runStartRef.current || Date.now()));
+          if (res.status === 'completed') {
+            showToast?.('success', t('aiworkbench.logic.run.success'));
+          } else {
+            showToast?.('error', t('aiworkbench.logic.run.fail', { msg: res.result?.message || res.status }));
+          }
+        }
+      } catch (e) {
+        // 后端 404 / 5xx → 终止轮询
+        if (ac.signal.aborted) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        if (pollTimerRef.current != null) window.clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+        setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, status: n.data.status === 'idle' ? 'idle' : 'error' as LogicNodeStatus } })));
+        setLogs(prev => [...prev, t('aiworkbench.logic.run.pollFailed', { msg })]);
+        showToast?.('error', `${t('aiworkbench.logic.run.serviceUnavailable')}: ${msg}`);
+        setIsExecuting(false);
+        setTotalDuration(Date.now() - (runStartRef.current || Date.now()));
+      }
+    };
+
+    pollOnce(); // 立即首查一次
+    pollTimerRef.current = window.setInterval(pollOnce, 2000);
+
+    // 5min 整体超时
+    window.setTimeout(() => {
+      if (ac.signal.aborted) return;
+      try { ac.abort(); } catch { /* noop */ }
+      if (pollTimerRef.current != null) window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+      setLogs(prev => [...prev, t('aiworkbench.logic.run.timeout')]);
+      showToast?.('error', t('aiworkbench.logic.run.timeout'));
+      setIsExecuting(false);
+    }, 300_000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges, selectedPipeline, cleanupExec, showToast, t, setNodes]);
+
+  /** 切换 pipeline / 卸载时清理执行 */
+  useEffect(() => {
+    return () => cleanupExec();
+  }, [selectedPipelineId, cleanupExec]);
 
   // ── Pipeline CRUD handlers (kept from original) ──
   const handleStartCreate = () => {
@@ -415,13 +538,13 @@ export default function LogicView({
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('确定要删除这个 AIP 逻辑编排流程吗？')) return;
+    if (!window.confirm(t('aiworkbench.logic.delete.confirm'))) return;
     const updated = pipelines.filter(p => p.id !== id);
     onUpdatePipelines(updated);
     if (selectedPipelineId === id && updated.length > 0) {
       setSelectedPipelineId(updated[0].id);
     }
-    showToast?.('success', '已删除逻辑编排流');
+    showToast?.('success', t('aiworkbench.logic.delete.done'));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -442,7 +565,7 @@ export default function LogicView({
         return p;
       });
       onUpdatePipelines(updated);
-      showToast?.('success', '逻辑编排修改已保存');
+      showToast?.('success', t('aiworkbench.logic.save.done'));
     } else {
       const newId = `pipe-${Date.now().toString().slice(-4)}`;
       const newPipe: AIPLogicPipeline = {
@@ -450,7 +573,7 @@ export default function LogicView({
         name: formName.trim(),
         description: formDesc.trim(),
         status: 'active',
-        creator: '系统管理员',
+        creator: t('aiworkbench.logic.modal.creator'),
         lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 16),
         inputs: [{ name: formInputName, type: formInputType }],
         testInputs: { [formInputName]: 'UA102' },
@@ -458,7 +581,7 @@ export default function LogicView({
       };
       onUpdatePipelines([...pipelines, newPipe]);
       setSelectedPipelineId(newId);
-      showToast?.('success', '成功创建 AIP 逻辑编排流程');
+      showToast?.('success', t('aiworkbench.logic.save.created'));
     }
     setShowCreateModal(false);
   };
@@ -470,11 +593,11 @@ export default function LogicView({
       {/* Left: Pipeline List */}
       <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
         <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between ${styles.inputBg}`}>
-          <span className={`font-bold ${styles.cardText}`}>逻辑流列表 ({pipelines.length})</span>
+          <span className={`font-bold ${styles.cardText}`}>{t('aiworkbench.logic.list.title', { count: pipelines.length })}</span>
           <button
             onClick={handleStartCreate}
-            className="p-1 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-md transition-colors cursor-pointer"
-            title="新增逻辑流"
+            className={`p-1 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} border ${styles.accentBorder} rounded-md transition-colors cursor-pointer`}
+            title={t('aiworkbench.logic.list.add')}
           >
             <Icon name="Plus" size={12} />
           </button>
@@ -491,22 +614,22 @@ export default function LogicView({
                   setLogs([]);
                   setShowLogs(false);
                 }}
-                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1.5 ${
+                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1.5 border ${
                   isSelected
-                    ? `${styles.accentBg} text-white shadow-xs`
-                    : 'text-slate-600 hover:bg-slate-50'
+                    ? `${styles.accentBg} ${styles.accentText} shadow-xs`
+                    : `${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted} hover:opacity-80`
                 }`}
               >
                 <div className="flex items-center gap-1.5 font-bold">
-                  <Icon name="Cpu" size={12} className={isSelected ? 'text-blue-400 animate-pulse' : 'text-slate-500'} />
+                  <Icon name="Cpu" size={12} className={isSelected ? `${styles.accentText} animate-pulse` : `${styles.cardTextMuted}`} />
                   <span className="truncate">{p.name}</span>
                 </div>
-                <p className={`text-[10px] line-clamp-2 leading-relaxed ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
+                <p className={`text-[10px] line-clamp-2 leading-relaxed ${isSelected ? `${styles.cardTextMuted} opacity-70` : `${styles.cardTextMuted} opacity-80`}`}>
                   {p.description}
                 </p>
                 <div className={`flex items-center justify-between text-[9px] border-t ${styles.inputBorder}/10 pt-1`}>
-                  <span className={`font-mono ${isSelected ? 'text-slate-500' : 'text-slate-400'}`}>{p.lastUpdated.split(' ')[0]}</span>
-                  <span className="px-1 bg-emerald-500/10 text-emerald-600 rounded">已就绪</span>
+                  <span className={`font-mono ${isSelected ? `${styles.cardTextMuted} opacity-70` : `${styles.cardTextMuted} opacity-80`}`}>{p.lastUpdated.split(' ')[0]}</span>
+                  <span className={`px-1 ${styles.successBg} ${styles.successText} rounded font-bold`}>{t('aiworkbench.logic.list.ready')}</span>
                 </div>
               </div>
             );
@@ -531,9 +654,9 @@ export default function LogicView({
                 deleteKeyCode={['Delete', 'Backspace']}
                 className={`${styles.inputBg}`}
               >
-                <Controls className="!bg-white !border !border-slate-200 !rounded-lg !shadow-sm" />
+                <Controls className={`!${styles.cardBg} !border !${styles.appBorder} !rounded-lg !shadow-sm`} />
                 <MiniMap
-                  className="!rounded-lg !shadow-sm !border !border-slate-200"
+                  className={`!rounded-lg !shadow-sm !border !${styles.appBorder}`}
                   nodeColor={(n) => {
                     const c: Record<LogicNodeType, string> = {
                       llm: '#a855f7', tool: '#f59e0b', ontology: '#06b6d4',
@@ -542,20 +665,20 @@ export default function LogicView({
                     return c[(n.data as LogicNodeData)?.type] || '#94a3b8';
                   }}
                 />
-                <Background variant={BackgroundVariant.Dots} gap={20} size={1} className="text-slate-300" />
+                <Background variant={BackgroundVariant.Dots} gap={20} size={1} className={styles.cardTextMuted} />
 
                 {/* Top toolbar */}
                 <Panel position="top-left" className="flex items-center gap-1.5">
                   {/* Add nodes dropdown */}
-                  <div className="flex bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-                    {(['llm', 'tool', 'ontology', 'approval', 'condition', 'trigger'] as LogicNodeType[]).map(t => (
+                  <div className={`flex ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm overflow-hidden`}>
+                    {(['llm', 'tool', 'ontology', 'approval', 'condition', 'trigger'] as LogicNodeType[]).map(nodeType => (
                       <button
-                        key={t}
-                        onClick={() => addCanvasNode(t)}
-                        className="px-2 py-1.5 hover:bg-slate-50 text-[10px] font-bold text-slate-600 hover:text-slate-800 border-r border-slate-200 last:border-r-0 cursor-pointer transition-colors"
-                        title={`添加${typeLabel(t)}`}
+                        key={nodeType}
+                        onClick={() => addCanvasNode(nodeType)}
+                        className={`px-2 py-1.5 text-[10px] font-bold ${styles.cardTextMuted} ${styles.cardBorder} border-r last:border-r-0 cursor-pointer transition-opacity hover:opacity-80`}
+                        title={t('aiworkbench.logic.addNode', { type: typeLabel(nodeType) })}
                       >
-                        {typeLabel(t)}
+                        {typeLabel(nodeType)}
                       </button>
                     ))}
                   </div>
@@ -563,60 +686,61 @@ export default function LogicView({
 
                 <Panel position="top-center" className="flex items-center gap-2">
                   <button
-                    onClick={executeCanvas}
+                    onClick={startPipelineRun}
                     disabled={isExecuting || nodes.length === 0}
-                    className={`px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] ${
+                    className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} font-bold rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] ${
                       isExecuting ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
+                    title={t('aiworkbench.logic.run.tip')}
                   >
                     {isExecuting ? (
                       <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <Icon name="Play" size={12} />
                     )}
-                    <span>{isExecuting ? '执行中...' : '执行画布'}</span>
+                    <span>{isExecuting ? t('aiworkbench.logic.run.running') : t('aiworkbench.logic.run.label')}</span>
                   </button>
 
                   <button
                     onClick={handleUndo}
                     disabled={historyIndex < 0}
-                    className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
+                    className={`px-2 py-1.5 ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm hover:opacity-80 disabled:opacity-40 cursor-pointer transition-opacity`}
                     title="撤销 (Ctrl+Z)"
                   >
-                    <Icon name="Undo2" size={12} className="text-slate-600" />
+                    <Icon name="Undo2" size={12} className={`${styles.cardTextMuted}`} />
                   </button>
                   <button
                     onClick={handleRedo}
                     disabled={historyIndex + 1 >= history.length}
-                    className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
+                    className={`px-2 py-1.5 ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm hover:opacity-80 disabled:opacity-40 cursor-pointer transition-opacity`}
                     title="重做 (Ctrl+Y)"
                   >
-                    <Icon name="Redo2" size={12} className="text-slate-600" />
+                    <Icon name="Redo2" size={12} className={`${styles.cardTextMuted}`} />
                   </button>
 
                   <button
                     onClick={deleteSelectedNodes}
-                    className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-red-50 cursor-pointer transition-colors"
+                    className={`px-2 py-1.5 ${styles.cardBg} ${styles.dangerBorder} border rounded-lg shadow-sm cursor-pointer transition-opacity hover:opacity-80`}
                     title="删除选中节点 (Delete)"
                   >
-                    <Icon name="Trash2" size={12} className="text-red-500" />
+                    <Icon name="Trash2" size={12} className={`${styles.dangerText}`} />
                   </button>
 
                   <button
                     onClick={() => setShowLogs(!showLogs)}
                     className={`px-2 py-1.5 border rounded-lg shadow-sm cursor-pointer transition-colors text-[10px] font-bold ${
-                      showLogs ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                      showLogs ? `${styles.infoBg} ${styles.infoBorder} ${styles.infoText}` : `${styles.cardBg} ${styles.appBorder} ${styles.cardTextMuted} hover:opacity-80`
                     }`}
                   >
                     <span className="flex items-center gap-1">
                       <Icon name="Terminal" size={11} />
-                      日志 ({logs.length})
+                      {t('aiworkbench.logic.run.logsLabel', { count: logs.length })}
                     </span>
                   </button>
 
                   {totalDuration != null && (
-                    <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-mono text-slate-500 shadow-sm">
-                      总耗时: {totalDuration}ms
+                    <span className={`px-2 py-1 ${styles.cardBg} ${styles.appBorder} border rounded-lg text-[10px] font-mono ${styles.cardTextMuted} shadow-sm`}>
+                      {t('aiworkbench.logic.run.totalDuration', { ms: totalDuration })}
                     </span>
                   )}
                 </Panel>
@@ -624,20 +748,73 @@ export default function LogicView({
             </ReactFlowProvider>
           </div>
 
-          {/* Right: Config Panel */}
+          {/* Right: Config Panel + Node Trace Drawer */}
           {selectedNode && (
             <div className={`w-72 ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0 overflow-y-auto`}>
               <div className={`p-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between sticky top-0 z-10`}>
                 <span className={`font-bold ${styles.cardText} text-[11px]`}>
-                  配置: {selectedNode.data.label}
+                  {t('aiworkbench.logic.config.title', { label: selectedNode.data.label })}
                 </span>
-                <button
-                  onClick={() => setSelectedNode(null)}
-                  className={`${styles.cardTextMuted} hover:text-slate-700 cursor-pointer`}
-                >
-                  <Icon name="X" size={14} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setTraceOpen(v => !v)}
+                    className={`${traceOpen ? `${styles.infoText} ${styles.infoBg}` : `${styles.cardTextMuted} ${styles.badgeBg}`} px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors`}
+                    title={t('aiworkbench.logic.trace.toggle')}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Icon name="Cite" size={11} />
+                      {t('aiworkbench.logic.trace.tab')}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedNode(null)}
+                    className={`${styles.cardTextMuted} hover:opacity-70 cursor-pointer transition-opacity`}
+                  >
+                    <Icon name="X" size={14} />
+                  </button>
+                </div>
               </div>
+              {traceOpen && (
+                <div className="p-3 space-y-2 text-[10px]">
+                  <p className={`font-bold ${styles.cardText}`}>{t('aiworkbench.logic.trace.title')}</p>
+                  <div className={`rounded-lg border ${styles.cardBorder} p-2 space-y-1.5 ${styles.inputBg}`}>
+                    {(() => {
+                      const tr = traceMap[selectedNode.id];
+                      if (!tr) {
+                        return <p className={`${styles.cardTextMuted} italic`}>{t('aiworkbench.logic.trace.empty')}</p>;
+                      }
+                      return (
+                        <>
+                          {tr.input !== undefined && (
+                            <div className="space-y-0.5">
+                              <p className={`font-mono text-[9px] ${styles.cardTextMuted} uppercase tracking-wider`}>{t('aiworkbench.logic.trace.input')}</p>
+                              <pre className={`whitespace-pre-wrap break-all font-mono text-[10px] ${styles.cardText}`}>{tr.input}</pre>
+                            </div>
+                          )}
+                          {tr.output !== undefined && (
+                            <div className="space-y-0.5">
+                              <p className={`font-mono text-[9px] ${styles.cardTextMuted} uppercase tracking-wider`}>{t('aiworkbench.logic.trace.output')}</p>
+                              <pre className={`whitespace-pre-wrap break-all font-mono text-[10px] ${styles.cardText}`}>{tr.output}</pre>
+                            </div>
+                          )}
+                          {tr.latencyMs != null && (
+                            <div className="flex items-center justify-between">
+                              <span className={`font-mono text-[9px] ${styles.cardTextMuted} uppercase tracking-wider`}>{t('aiworkbench.logic.trace.latency')}</span>
+                              <span className={`font-mono font-bold ${styles.infoText}`}>{tr.latencyMs}ms</span>
+                            </div>
+                          )}
+                          {tr.errorMessage && (
+                            <div className={`p-2 rounded-md border ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText} text-[10px] flex items-start gap-2`}>
+                              <Icon name="AlertTriangle" size={12} className="mt-0.5 shrink-0" />
+                              <pre className="whitespace-pre-wrap break-all font-mono flex-1">{tr.errorMessage}</pre>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
               <ConfigForm
                 node={selectedNode}
                 onUpdate={(config) => updateNodeConfig(selectedNode.id, config)}
@@ -649,7 +826,7 @@ export default function LogicView({
       ) : (
         <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted}`}>
           <Icon name="Cpu" size={32} className={`${styles.cardTextMuted} animate-bounce mb-2`} />
-          <span>请在左侧选择或添加逻辑流进行设计</span>
+          <span>{t('aiworkbench.logic.emptyHint')}</span>
         </div>
       )}
 
@@ -660,24 +837,24 @@ export default function LogicView({
           <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
             <span className={`font-bold ${styles.cardText} text-[10px] flex items-center gap-1`}>
               <Icon name="Terminal" size={11} />
-              执行日志
+              {t('aiworkbench.logic.logs.title')}
               {totalDuration != null && (
-                <span className="font-mono text-[9px] text-slate-400 ml-2">总耗时: {totalDuration}ms</span>
+                <span className={`font-mono text-[9px] ${styles.cardTextMuted} ml-2`}>{t('aiworkbench.logic.run.totalDuration', { ms: totalDuration })}</span>
               )}
             </span>
             <button
               onClick={() => setShowLogs(false)}
-              className={`${styles.cardTextMuted} hover:text-slate-700 cursor-pointer`}
+              className={`${styles.cardTextMuted} hover:opacity-70 cursor-pointer transition-opacity`}
             >
               <Icon name="ChevronDown" size={12} />
             </button>
           </div>
           <div className="overflow-y-auto p-2 max-h-[160px] space-y-0.5 font-mono text-[10px]">
             {logs.length === 0 ? (
-              <span className={`${styles.cardTextMuted} italic px-2`}>暂无日志，点击"执行画布"开始</span>
+              <span className={`${styles.cardTextMuted} italic px-2`}>{t('aiworkbench.logic.logs.emptyHint')}</span>
             ) : (
               logs.map((log, i) => (
-                <p key={i} className={`px-2 py-0.5 leading-relaxed ${log.includes('✅') ? 'text-emerald-600' : log.includes('❌') ? 'text-red-500' : 'text-slate-500'}`}>
+                <p key={i} className={`px-2 py-0.5 leading-relaxed ${log.includes('✅') ? `${styles.successText}` : log.includes('❌') || log.includes('⛔') ? `${styles.dangerText}` : `${styles.cardTextMuted}`}`}>
                   {log}
                 </p>
               ))
@@ -692,34 +869,34 @@ export default function LogicView({
           <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-md overflow-hidden`}>
             <div className={`px-4 py-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
               <h3 className={`font-bold ${styles.cardText} text-xs`}>
-                {editingPipeline ? '修改逻辑流' : '新增 AIP 逻辑开发流'}
+                {editingPipeline ? t('aiworkbench.logic.modal.editTitle') : t('aiworkbench.logic.modal.createTitle')}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} cursor-pointer`}
+                className={`${styles.cardTextMuted} hover:opacity-70 cursor-pointer transition-opacity`}
               >
                 <Icon name="X" size={15} />
               </button>
             </div>
             <form onSubmit={handleSave} className="p-4 space-y-4">
               <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>名称 <span className="text-red-500">*</span></label>
+                <label className={`block ${styles.cardTextMuted} font-semibold`}>{t('aiworkbench.logic.modal.name')} <span className={`${styles.dangerText}`}>*</span></label>
                 <input
                   type="text"
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
-                  placeholder="例如: 机组执勤时间合规评估"
+                  placeholder={t('aiworkbench.logic.modal.namePlaceholder')}
                   className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs`}
                   required
                 />
               </div>
               <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>描述 <span className="text-red-500">*</span></label>
+                <label className={`block ${styles.cardTextMuted} font-semibold`}>{t('aiworkbench.logic.modal.desc')} <span className={`${styles.dangerText}`}>*</span></label>
                 <textarea
                   value={formDesc}
                   onChange={e => setFormDesc(e.target.value)}
-                  placeholder="说明该逻辑决策流的判定范围和目的"
+                  placeholder={t('aiworkbench.logic.modal.descPlaceholder')}
                   rows={2}
                   className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none`}
                   required
@@ -727,17 +904,17 @@ export default function LogicView({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className={`block ${styles.cardTextMuted} font-semibold`}>输入参数名</label>
+                  <label className={`block ${styles.cardTextMuted} font-semibold`}>{t('aiworkbench.logic.modal.inputName')}</label>
                   <input
                     type="text"
                     value={formInputName}
                     onChange={e => setFormInputName(e.target.value)}
-                    placeholder="如: flight_number"
+                    placeholder={t('aiworkbench.logic.modal.inputNamePlaceholder')}
                     className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs font-mono`}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className={`block ${styles.cardTextMuted} font-semibold`}>参数类型</label>
+                  <label className={`block ${styles.cardTextMuted} font-semibold`}>{t('aiworkbench.logic.modal.inputType')}</label>
                   <select
                     value={formInputType}
                     onChange={e => setFormInputType(e.target.value)}
@@ -753,15 +930,15 @@ export default function LogicView({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg hover:${styles.inputBg} ${styles.cardTextMuted} transition-colors cursor-pointer text-[11px] font-semibold`}
+                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg ${styles.cardTextMuted} transition-opacity hover:opacity-80 cursor-pointer text-[11px] font-semibold`}
                 >
-                  取消
+                  {t('aiworkbench.logic.modal.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-[11px]"
+                  className={`px-4 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} rounded-lg transition-opacity font-bold shadow-sm cursor-pointer text-[11px]`}
                 >
-                  保存
+                  {t('aiworkbench.logic.modal.save')}
                 </button>
               </div>
             </form>
@@ -783,15 +960,16 @@ function ConfigForm({
   onUpdate: (config: LogicNodeConfig) => void;
   styles: any;
 }) {
+  const { t } = useLanguage();
   const { type, config } = node.data;
 
   const handleChange = (newConfig: LogicNodeConfig) => {
     onUpdate({ ...newConfig });
   };
 
-  const inputClass = `w-full px-2 py-1.5 border ${styles.cardBorder} rounded-lg text-[10px] font-mono bg-white`;
+  const inputClass = `w-full px-2 py-1.5 border ${styles.cardBorder} rounded-lg text-[10px] font-mono ${styles.inputBg}`;
   const labelClass = `${styles.cardTextMuted} font-bold text-[10px] block mb-0.5`;
-  const textareaClass = `w-full px-2 py-1.5 border ${styles.cardBorder} rounded-lg text-[10px] font-mono resize-none bg-white`;
+  const textareaClass = `w-full px-2 py-1.5 border ${styles.cardBorder} rounded-lg text-[10px] font-mono resize-none ${styles.inputBg}`;
 
   switch (type) {
     case 'llm': {
@@ -825,11 +1003,11 @@ function ConfigForm({
       return (
         <div className="p-3 space-y-3">
           <div>
-            <label className={labelClass}>工具名称</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.tool.name')}</label>
             <input className={inputClass} value={c.toolName} onChange={e => handleChange({ ...c, toolName: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>参数 (JSON)</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.tool.params')}</label>
             <textarea className={textareaClass} rows={6} value={c.parameters}
               onChange={e => handleChange({ ...c, parameters: e.target.value })} />
           </div>
@@ -845,7 +1023,7 @@ function ConfigForm({
             <input className={inputClass} value={c.objectType} onChange={e => handleChange({ ...c, objectType: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>查询类型</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.ontology.queryType')}</label>
             <select className={inputClass} value={c.queryType}
               onChange={e => handleChange({ ...c, queryType: e.target.value as LogicOntologyConfig['queryType'] })}>
               <option value="get">get</option>
@@ -866,11 +1044,11 @@ function ConfigForm({
       return (
         <div className="p-3 space-y-3">
           <div>
-            <label className={labelClass}>审批人</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.approval.approver')}</label>
             <input className={inputClass} value={c.approver} onChange={e => handleChange({ ...c, approver: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>超时 (秒)</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.approval.timeout')}</label>
             <input className={inputClass} type="number" value={c.timeout}
               onChange={e => handleChange({ ...c, timeout: parseInt(e.target.value) || 300 })} />
           </div>
@@ -882,17 +1060,17 @@ function ConfigForm({
       return (
         <div className="p-3 space-y-3">
           <div>
-            <label className={labelClass}>条件表达式 (JSONPath)</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.condition.expr')}</label>
             <input className={inputClass} value={c.conditionExpr}
               onChange={e => handleChange({ ...c, conditionExpr: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>✓ Then 分支</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.condition.then')}</label>
             <input className={inputClass} value={c.thenBranch}
               onChange={e => handleChange({ ...c, thenBranch: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>✗ Else 分支</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.condition.else')}</label>
             <input className={inputClass} value={c.elseBranch}
               onChange={e => handleChange({ ...c, elseBranch: e.target.value })} />
           </div>
@@ -904,12 +1082,12 @@ function ConfigForm({
       return (
         <div className="p-3 space-y-3">
           <div>
-            <label className={labelClass}>Cron 表达式</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.trigger.cron')}</label>
             <input className={inputClass} value={c.cronExpr}
               onChange={e => handleChange({ ...c, cronExpr: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>时区</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.trigger.timezone')}</label>
             <input className={inputClass} value={c.timezone}
               onChange={e => handleChange({ ...c, timezone: e.target.value })} />
           </div>
@@ -917,7 +1095,7 @@ function ConfigForm({
       );
     }
     default:
-      return <div className="p-3 text-slate-400 text-xs">未知节点类型</div>;
+      return <div className={`p-3 ${styles.cardTextMuted} text-xs`}>{t('aiworkbench.logic.unknownNode')}</div>;
   }
 }
 
