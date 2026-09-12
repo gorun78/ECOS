@@ -16,9 +16,10 @@ export interface LoadingSkeletonProps {
 }
 
 function SkeletonBar({ className = "" }: { className?: string }) {
+  const { styles } = useTheme();
   return (
     <div
-      className={`animate-pulse rounded bg-slate-200 dark:bg-slate-700 ${className}`}
+      className={`animate-pulse rounded ${styles.appBg} ${className}`}
     />
   );
 }

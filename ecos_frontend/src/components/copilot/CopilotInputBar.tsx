@@ -8,6 +8,7 @@
 import React from 'react';
 import LucideIcon from '../LucideIcon';
 import { useLanguage } from '../LanguageContext';
+import { useTheme } from '../ThemeContext';
 
 interface CopilotInputBarProps {
   value: string;
@@ -18,11 +19,12 @@ interface CopilotInputBarProps {
 
 export default function CopilotInputBar({ value, onChange, onSubmit, disabled }: CopilotInputBarProps) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
 
   return (
     <form
       onSubmit={onSubmit}
-      className="border-t border-slate-200 p-3 bg-white shrink-0 flex items-center gap-2"
+      className={`border-t ${styles.appBorder} p-3 ${styles.cardBg} shrink-0 flex items-center gap-2`}
     >
       <input
         type="text"
@@ -30,7 +32,7 @@ export default function CopilotInputBar({ value, onChange, onSubmit, disabled }:
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="flex-1 h-9 px-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 text-slate-800 focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className={`flex-1 h-9 px-3 ${styles.inputBg} hover:${styles.appBg} focus:${styles.cardBg} border ${styles.inputBorder} rounded-lg text-xs placeholder:${styles.cardTextMuted} ${styles.inputText} focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
       />
       <button
         type="submit"

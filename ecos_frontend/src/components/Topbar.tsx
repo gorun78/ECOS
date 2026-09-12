@@ -297,7 +297,7 @@ export default function Topbar({
             >
               <span className={isActive ? `${styles.cardText} font-bold` : `${styles.cardTextMuted}`}>{translateTabLabel(tab.label)}</span>
               <button
-                className="p-0.5 rounded-full text-transparent group-hover:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition shrink-0"
+                className={`p-0.5 rounded-full text-transparent group-hover:${styles.cardTextMuted} hover:bg-[var(--muted)] transition shrink-0`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onTabClose(tab.id);
@@ -321,8 +321,8 @@ export default function Topbar({
             onChange={(e) => setActiveTheme(e.target.value as ThemeId)}
             className={`bg-transparent border-0 outline-hidden text-[11px] font-bold cursor-pointer font-sans shrink-0 pr-1 ${styles.cardText}`}
           >
-            <option value="slate-light" className="text-slate-800 bg-white">{t("theme.slate-light")}</option>
-            <option value="deep-space" className="text-slate-100 bg-[#111827]">{t("theme.deep-space")}</option>
+            <option value="slate-light" className={`text-[var(--text-primary)] bg-[var(--card)]`}>{t("theme.slate-light")}</option>
+            <option value="deep-space" className={`text-[var(--text-primary)] bg-[var(--overlay)]`}>{t("theme.deep-space")}</option>
             <option value="cyber-terminal" className="text-emerald-400 bg-black">{t("theme.cyber-terminal")}</option>
             <option value="royal-purple" className="text-purple-200 bg-[#18112A]">{t("theme.royal-purple")}</option>
           </select>
@@ -335,7 +335,7 @@ export default function Topbar({
             id="lang-switch-zh"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${
               locale === "zh"
-                ? "bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-2xs font-extrabold"
+                ? `bg-[var(--card)] text-indigo-700 shadow-2xs font-extrabold`
                 : "opacity-50 hover:opacity-100"
             }`}
           >
@@ -346,7 +346,7 @@ export default function Topbar({
             id="lang-switch-en"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${
               locale === "en"
-                ? "bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-2xs font-extrabold"
+                ? `bg-[var(--card)] text-indigo-700 shadow-2xs font-extrabold`
                 : "opacity-50 hover:opacity-100"
             }`}
           >
@@ -439,12 +439,12 @@ export default function Topbar({
                     <select
                       value={auditMode}
                       onChange={(e) => setAuditMode(e.target.value)}
-                      className={`w-full text-xs p-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 ${styles.cardText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 cursor-pointer`}
+                      className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 cursor-pointer`}
                     >
-                      <option value="full" className="text-slate-800 bg-white dark:text-slate-100 dark:bg-slate-900">
+                      <option value="full" className={`${styles.inputBg} ${styles.cardText}`}>
                         {t("topbar.user.auditlevel.full")}
                       </option>
-                      <option value="standard" className="text-slate-800 bg-white dark:text-slate-100 dark:bg-slate-900">
+                      <option value="standard" className={`${styles.inputBg} ${styles.cardText}`}>
                         {t("topbar.user.auditlevel.standard")}
                       </option>
                     </select>
@@ -456,7 +456,7 @@ export default function Topbar({
                       type="checkbox"
                       checked={sandbox}
                       onChange={(e) => setSandbox(e.target.checked)}
-                      className="rounded border-slate-300 text-indigo-650 focus:ring-indigo-500 mt-0.5 h-3.5 w-3.5"
+                      className={`rounded border ${styles.inputBorder} ${styles.inputBg} focus:ring-indigo-500 mt-0.5 h-3.5 w-3.5`}
                     />
                     <span className={`text-[10.5px] font-semibold leading-normal ${styles.cardText}`}>{t("topbar.user.sandbox")}</span>
                   </label>

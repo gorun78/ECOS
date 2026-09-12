@@ -410,7 +410,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
     const cat = getCategory(taskType);
     if (!cat) {
       return (
-        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+        <span className={`text-xs px-1.5 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
           —
         </span>
       );
@@ -450,24 +450,24 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* 主面板 */}
-      <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in-down">
+      <div className={`relative ${styles.cardBg} rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in-down`}>
         {/* ── Header ─────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${styles.cardBorder} shrink-0`}>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t("taskPanel.title")}</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">{t("taskPanel.subtitle")}</p>
+            <h2 className={`text-lg font-bold ${styles.cardText}`}>{t("taskPanel.title")}</h2>
+            <p className={`text-xs ${styles.cardTextMuted}`}>{t("taskPanel.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={refresh}
               disabled={loading}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition disabled:opacity-50"
+              className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition disabled:opacity-50`}
               title={t("taskPanel.refresh")}
             >
-              <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${styles.cardTextMuted} ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-              <X className="w-5 h-5 text-slate-400" />
+            <button onClick={onClose} className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition ${styles.cardTextMuted}`}>
+              <X className={`w-5 h-5 ${styles.cardTextMuted}`} />
             </button>
           </div>
         </div>
@@ -476,7 +476,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
         <div className="grid grid-cols-4 gap-3 px-6 pt-4 shrink-0">
           {CATEGORIES.map(cat => (
             <div key={cat.key} className={`rounded-lg border-l-4 px-4 py-3 ${cat.color} ${cat.bg} transition`}>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+              <div className={`text-xs ${styles.cardTextMuted} mb-1`}>
                 {t(cat.labelKey)}
               </div>
               <div className={`text-2xl font-bold ${cat.textColor}`}>
@@ -495,23 +495,23 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             { key: "taskPanel.status.failed", value: stats.failed, color: "border-l-red-500 bg-red-50/60 dark:bg-red-900/20", textColor: "text-red-600 dark:text-red-400" },
           ] as const).map(({ key, value, color, textColor }) => (
             <div key={key} className={`rounded-lg border-l-4 px-4 py-3 ${color}`}>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t(key)}</div>
+              <div className={`text-xs ${styles.cardTextMuted} mb-1`}>{t(key)}</div>
               <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
             </div>
           ))}
         </div>
 
         {/* ── Filter Bar ─────────────────────────── */}
-        <div className="flex flex-col gap-2 px-6 py-3 border-b border-slate-100 dark:border-slate-700/50 shrink-0">
+        <div className={`flex flex-col gap-2 px-6 py-3 border-b ${styles.appBorder} shrink-0`}>
           {/* 分类 Tab 按钮 */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">{t("taskPanel.filter.category")}</span>
+            <span className={`text-xs ${styles.cardTextMuted} mr-1`}>{t("taskPanel.filter.category")}</span>
             <button
               onClick={() => setFilterCategory("")}
               className={`px-2.5 py-1 text-xs rounded-full transition ${
                 filterCategory === ""
-                  ? "bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800 font-medium"
-                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                  ? `bg-[var(--card)] text-white font-medium`
+                  : `${styles.appBg} ${styles.cardTextMuted} hover:${styles.sidebarHoverBg}`
               }`}
             >
               {t("taskPanel.filter.all")}
@@ -523,7 +523,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
                 className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition ${
                   filterCategory === cat.key
                     ? `${cat.badgeBg} ${cat.badgeText} font-medium ring-1 ring-current/30`
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                    : `${styles.appBg} ${styles.cardTextMuted} hover:${styles.sidebarHoverBg}`
                 }`}
               >
                 <cat.Icon size={12} />
@@ -537,7 +537,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30"
+              className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30`}
             >
               <option value="">{t("taskPanel.filter.allStatus")}</option>
               <option value="PENDING">{t("taskPanel.status.pending")}</option>
@@ -552,13 +552,13 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
               onChange={e => setFilterType(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") setSearchType(filterType.trim()); }}
               placeholder={t("taskPanel.filter.typePlaceholder")}
-              className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30 w-40"
+              className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30 w-40`}
             />
             {taskTypes.length > 0 && (
               <select
                 value={filterType}
                 onChange={e => { setFilterType(e.target.value); setSearchType(e.target.value); }}
-                className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30"
+                className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30`}
               >
                 <option value="">{t("taskPanel.filter.selectType")}</option>
                 {taskTypes.map(t => (
@@ -591,17 +591,17 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             <button onClick={() => doBatchAction("cancel")} disabled={batchActioning}
               className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.cancel")}</button>
             <button onClick={() => doBatchAction("archive")} disabled={batchActioning}
-              className="px-3 py-1 text-xs bg-slate-500 hover:bg-slate-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.archive")}</button>
+              className={`px-3 py-1 text-xs ${styles.cardBg} hover:${styles.appBg} ${styles.cardText} rounded transition disabled:opacity-50`}>{t("taskPanel.batch.archive")}</button>
             <button onClick={() => setSelectedIds(new Set())}
-              className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition">{t("taskPanel.batch.deselect")}</button>
+              className={`px-3 py-1 text-xs ${styles.cardTextMuted} transition`}>{t("taskPanel.batch.deselect")}</button>
           </div>
         )}
 
         {/* ── Task Table ─────────────────────────── */}
         <div className="flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80 z-10">
-              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <thead className={`sticky top-0 ${styles.appBg} z-10`}>
+              <tr className={`border-b ${styles.cardBorder} text-left text-xs ${styles.cardTextMuted} uppercase tracking-wider`}>
                 <th className="px-4 py-2.5 w-10">
                   <input type="checkbox" checked={displayTasks.length > 0 && selectedIds.size === displayTasks.length} onChange={toggleAll} />
                 </th>
@@ -617,7 +617,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             <tbody>
               {displayTasks.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="text-center py-16 text-slate-400 dark:text-slate-500">
+                  <td colSpan={8} className={`text-center py-16 ${styles.cardTextMuted}`}>
                     <div className="text-4xl mb-2" aria-hidden>📋</div>
                     <p>{t("taskPanel.empty")}</p>
                   </td>
@@ -632,26 +632,26 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
                 return (
                   <tr
                     key={task.taskId}
-                    className={`border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer ${isSelected ? "bg-blue-50/50 dark:bg-blue-900/10" : ""}`}
+                    className={`border-b ${styles.appBorder} hover:${styles.sidebarHoverBg} transition cursor-pointer ${isSelected ? "bg-blue-50/50 dark:bg-blue-900/10" : ""}`}
                     onClick={() => openDetail(task.taskId)}
                   >
                     <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={isSelected} onChange={() => toggleOne(task.taskId)} />
                     </td>
-                    <td className="px-2 py-2.5 font-medium text-slate-800 dark:text-slate-200 max-w-[140px] truncate" title={task.taskName}>
+                    <td className={`px-2 py-2.5 font-medium ${styles.cardText} max-w-[140px] truncate`} title={task.taskName}>
                       {task.taskName}
                     </td>
                     <td className="px-2 py-2.5">
                       {renderCategoryBadge(task.taskType)}
                     </td>
                     <td className="px-2 py-2.5">
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
                         {task.taskType || "—"}
                       </span>
                     </td>
                     <td className="px-2 py-2.5">{renderStatusBadge(status)}</td>
                     <td className="px-2 py-2.5">{renderProgress(progress)}</td>
-                    <td className="px-2 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                    <td className={`px-2 py-2.5 text-xs ${styles.cardTextMuted}`}>
                       {formatTime(task.createTime)}
                     </td>
                     <td className="px-2 py-2.5" onClick={e => e.stopPropagation()}>
@@ -697,19 +697,19 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
         {/* ── Pagination ─────────────────────────── */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 dark:border-slate-700/50 shrink-0 text-sm">
-            <span className="text-slate-500 dark:text-slate-400">{t("taskPanel.pagination.total", { n: total })}</span>
+          <div className={`flex items-center justify-between px-6 py-3 border-t ${styles.appBorder} shrink-0 text-sm`}>
+            <span className={`${styles.cardTextMuted}`}>{t("taskPanel.pagination.total", { n: total })}</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition"
+                className={`px-3 py-1 rounded border ${styles.cardBorder} ${styles.sidebarHoverBg} disabled:opacity-40 transition`}
               >{t("taskPanel.pagination.prev")}</button>
-              <span className="px-2 text-slate-600 dark:text-slate-300">{page} / {totalPages}</span>
+              <span className={`px-2 ${styles.cardText}`}>{page} / {totalPages}</span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition"
+                className={`px-3 py-1 rounded border ${styles.cardBorder} ${styles.sidebarHoverBg} disabled:opacity-40 transition`}
               >{t("taskPanel.pagination.next")}</button>
             </div>
           </div>
@@ -723,7 +723,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
       {/* ── 详情抽屉 ────────────────────────────── */}
       <div
-        className={`absolute top-0 right-0 h-full w-[360px] bg-white dark:bg-slate-800 shadow-2xl border-l border-slate-200 dark:border-slate-700 overflow-auto transition-transform duration-300 ${
+        className={`absolute top-0 right-0 h-full w-[360px] ${styles.cardBg} shadow-2xl border-l ${styles.cardBorder} overflow-auto transition-transform duration-300 ${
           detailTask ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -735,73 +735,73 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
           <div className="p-5 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("taskPanel.detail.title")}</h3>
-              <button onClick={() => setDetailTask(null)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <X className="w-4 h-4 text-slate-400" />
+              <h3 className={`text-base font-bold ${styles.cardText}`}>{t("taskPanel.detail.title")}</h3>
+              <button onClick={() => setDetailTask(null)} className={`p-1.5 rounded ${styles.sidebarHoverBg} transition`}>
+                <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
               </button>
             </div>
 
             {/* 执行状态 */}
             <section>
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{t("taskPanel.detail.execution")}</h4>
+              <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.execution")}</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.status")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.status")}</span>
                   {renderStatusBadge(detailTask.status.status)}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.progress")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.progress")}</span>
                   <span className="w-48">{renderProgress(detailTask.status.progress)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.startedAt")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.status.startedAt)}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.startedAt")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.status.startedAt)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.completedAt")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.status.completedAt)}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.completedAt")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.status.completedAt)}</span>
                 </div>
               </div>
             </section>
 
             {/* 基本信息 */}
             <section>
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{t("taskPanel.detail.basicInfo")}</h4>
+              <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.basicInfo")}</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskId")}</span>
-                  <span className="text-sm font-mono text-slate-700 dark:text-slate-300 text-xs">{detailTask.task.taskId}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskId")}</span>
+                  <span className={`text-sm font-mono ${styles.cardText} text-xs`}>{detailTask.task.taskId}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskName")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{detailTask.task.taskName}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskName")}</span>
+                  <span className={`text-sm ${styles.cardText} font-medium`}>{detailTask.task.taskName}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskCategory")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskCategory")}</span>
                   <span>{renderCategoryBadge(detailTask.task.taskType)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.taskType")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{detailTask.task.taskType || "—"}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskType")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{detailTask.task.taskType || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.priority")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.priority")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>
                     {t(PRIORITY_LABEL_KEYS[detailTask.task.priority] || "taskPanel.priority.medium")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.createdBy")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{detailTask.task.createdBy || "—"}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.createdBy")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{detailTask.task.createdBy || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t("taskPanel.detail.createdAt")}</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.task.createTime)}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.createdAt")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.task.createTime)}</span>
                 </div>
                 {detailTask.task.description && (
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400 block mb-1">{t("taskPanel.detail.description")}</span>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 rounded p-2">
+                    <span className={`text-sm ${styles.cardTextMuted} block mb-1`}>{t("taskPanel.detail.description")}</span>
+                    <p className={`text-sm ${styles.cardText} ${styles.appBg} rounded p-2`}>
                       {detailTask.task.description}
                     </p>
                   </div>
@@ -811,13 +811,13 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
             {/* 参数信息 */}
             <section>
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{t("taskPanel.detail.params")}</h4>
+              <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.params")}</h4>
               {detailTask.task.parameters && Object.keys(detailTask.task.parameters).length > 0 ? (
-                <pre className="text-xs font-mono bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 overflow-auto max-h-48 text-slate-700 dark:text-slate-300">
+                <pre className={`text-xs font-mono ${styles.appBg} rounded-lg p-3 overflow-auto max-h-48 ${styles.cardText}`}>
                   {JSON.stringify(detailTask.task.parameters, null, 2)}
                 </pre>
               ) : (
-                <p className="text-sm text-slate-400 dark:text-slate-500">{t("taskPanel.detail.noParams")}</p>
+                <p className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.noParams")}</p>
               )}
             </section>
           </div>
