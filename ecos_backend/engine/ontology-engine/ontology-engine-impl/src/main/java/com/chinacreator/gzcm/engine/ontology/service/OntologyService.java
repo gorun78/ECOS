@@ -93,6 +93,13 @@ public class OntologyService {
         });
     }
 
+    /**
+     * 删除实体 (B1 决策)：逻辑删除 — 物理 DELETE 已改 Repository 层 UPDATE (Wave B-3 T17)。
+     * Service 方法签名与 4 次级联调用形态不变；仅 Repository 层 SQL 从 DELETE 改为
+     * UPDATE SET is_deleted=1, status='ARCHIVED'。Wave31OntologyConvergenceTest C1
+     * verify(ontRepo).deletePropertiesByEntity / deleteRelationshipsByEntity /
+     * deleteActionsByEntity / deleteEntity 4 次调用零改动仍 PASS。
+     */
     public boolean deleteEntity(String entityId) {
         Optional<OntologyEntity> existing = repository.findEntityById(entityId);
         if (existing.isEmpty()) return false;

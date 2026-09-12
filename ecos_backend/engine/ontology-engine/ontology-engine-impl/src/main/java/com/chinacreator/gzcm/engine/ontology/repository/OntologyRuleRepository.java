@@ -91,11 +91,21 @@ public class OntologyRuleRepository {
             """, code, name, ruleType, expression, action, priority, enabled, description, id);
     }
 
+    /**
+     * 逻辑删除 rule (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。
+     * is_deleted / status / update_time / update_by 列由 V120__ecos_ontology_wave31_fallback.sql
+     * 建表时补齐 (ecos_ontology_rule 历史无 schema, 本 bundle 首次建表)。
+     */
     public int delete(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology_rule WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology_rule SET is_deleted = 1, status = 'ARCHIVED', " +
+            "update_time = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
+    /** 逻辑删除 rule (T17)：级联逻辑删除某实体下全部规则。 */
     public int deleteByEntity(String entityId) {
-        return jdbc.update("DELETE FROM ecos_ontology_rule WHERE entity_id = ?", entityId);
+        return jdbc.update(
+            "UPDATE ecos_ontology_rule SET is_deleted = 1, status = 'ARCHIVED', " +
+            "update_time = now(), update_by = 'system' WHERE entity_id = ? AND is_deleted = 0", entityId);
     }
 }

@@ -111,8 +111,15 @@ public class OntologyRepository {
             """, code, name, description, entityType, id);
     }
 
+    /**
+     * 逻辑删除 (Wave B-3 T17)：原 DELETE FROM → UPDATE SET is_deleted=1, status='ARCHIVED'。
+     * is_deleted / status / update_by 列由 V120__ecos_ontology_wave31_fallback.sql 兜底补齐。
+     * 带 is_deleted=0 过滤防重复删除；列名按实际 schema (updated_at 非 update_time, 见 V3)。
+     */
     public int deleteEntity(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology_entity WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology_entity SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
     // ═══════════════ Property CRUD ═══════════════════
@@ -156,12 +163,18 @@ public class OntologyRepository {
             functionType, functionExpression, id);
     }
 
+    /** 逻辑删除 property (T17)：按 id 单行逻辑删除。 */
     public int deleteProperty(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology_property WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology_property SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
+    /** 逻辑删除 property (T17)：级联删除某实体下全部属性。 */
     public int deletePropertiesByEntity(String entityId) {
-        return jdbc.update("DELETE FROM ecos_ontology_property WHERE entity_id = ?", entityId);
+        return jdbc.update(
+            "UPDATE ecos_ontology_property SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE entity_id = ? AND is_deleted = 0", entityId);
     }
 
     // ═══════════════ Relationship CRUD ═══════════════════
@@ -190,13 +203,19 @@ public class OntologyRepository {
             rel.getCode(), rel.getName(), rel.getRelationshipType());
     }
 
+    /** 逻辑删除 relationship (T17)：按 id 单行逻辑删除。 */
     public int deleteRelationship(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology_relationship WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology_relationship SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
+    /** 逻辑删除 relationship (T17)：级联删除某实体的 source/target 双向关系。 */
     public int deleteRelationshipsByEntity(String entityId) {
         return jdbc.update(
-            "DELETE FROM ecos_ontology_relationship WHERE source_entity_id = ? OR target_entity_id = ?",
+            "UPDATE ecos_ontology_relationship SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' " +
+            "WHERE (source_entity_id = ? OR target_entity_id = ?) AND is_deleted = 0",
             entityId, entityId);
     }
 
@@ -265,12 +284,18 @@ public class OntologyRepository {
             ruleJson, strategy, status, id);
     }
 
+    /** 逻辑删除 action (T17)：按 id 单行逻辑删除。 */
     public int deleteAction(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology_action WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology_action SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
+    /** 逻辑删除 action (T17)：级联删除某实体下全部动作。 */
     public int deleteActionsByEntity(String entityId) {
-        return jdbc.update("DELETE FROM ecos_ontology_action WHERE entity_id = ?", entityId);
+        return jdbc.update(
+            "UPDATE ecos_ontology_action SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE entity_id = ? AND is_deleted = 0", entityId);
     }
 
     // ═══════════════ Domain-level Entity Queries ═══════════════════
@@ -332,8 +357,11 @@ public class OntologyRepository {
             name, description, status, id);
     }
 
+    /** 逻辑删除 ontology (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。 */
     public int deleteOntology(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology SET is_deleted = 1, status = 'ARCHIVED', " +
+            "updated_at = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
     // ═══════════════ Ontology-scoped relationships ═══════════════════
