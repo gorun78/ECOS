@@ -259,7 +259,18 @@ public class OntologySecurityInterceptor {
             }
             List<String> filtered = securityEngineClient.filterColumns(
                     tableName, new ArrayList<>(allowed));
-            if (filtered == null || filtered.isEmpty()) return rows;
+            // P0-1 (Wave B-2 加固 round 2): 默认 DENY — filterColumns 内部已 swallow
+            // 任何 fail-open (serviceRestTemplate == null / internal catch -> List.of()),
+            // 不允许 interceptor 侧面另起炉灶把"空 = 不允许"变成"空 = 全放行" —
+            // (前次: filtered.isEmpty() -> return rows 把 security-engine 短暂 down
+            //  时全部 27 个 Controller 读接口全列裸返)
+            if (filtered == null || filtered.isEmpty()) {
+                try {
+                    securityEngineClient.audit("CLS_DENY_EMPTY_ALLOWED_SET",
+                            "deny:filterColumns_empty:" + tableName);
+                } catch (Exception ignored) { /* audit 不阻断主流程 */ }
+                return Collections.emptyList();
+            }
             Set<String> allowedSet = new LinkedHashSet<>(filtered);
             List<Map<String, Object>> stripped = new ArrayList<>();
             for (Map<String, Object> row : rows) {
