@@ -60,6 +60,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
+        // PMO-55 E-A 修复 (2026-09-12)：OagForwardController 已在 gateway 正式接管
+        // /api/v1/oag/**（bd07da4 refactor），engine 侧 OagController 同路径
+        // /api/v1/oag/chat/stream 导致 Ambiguous mapping。排除 engine 副本，
+        // 统一走 gateway 转发（与 CognitiveController 排除模式对齐）。
+        com.chinacreator.gzcm.engine.ai.oag.OagController.class,
+        // PMO-55 E-A 修复 (2026-09-12)：cognitive2/CognitiveConfigController 是
+        // PMO-51 引入的权威认知配置端点（含 DTO + PUT），engine/ai 侧同名
+        // CognitiveConfigController 只处理 GET，两者都映射 GET /api/v1/cognitive/config
+        // 导致 Ambiguous mapping。排除 ai 侧简化版，保留 cognitive2 完整版。
+        com.chinacreator.gzcm.engine.ai.controller.CognitiveConfigController.class,
         // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
         // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
         com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,

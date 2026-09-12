@@ -109,8 +109,13 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/ontology/action-types")
                 || path.startsWith("/api/v1/ontology/functions")
                 || path.startsWith("/api/v1/engine")
-                || path.startsWith("/api/v1/cognitive")
+                || path.startsWith("/api/v1/cognitive/")
+                || path.startsWith("/api/v1/cognitive/health")
                 || path.startsWith("/api/v1/knowledge/")
+                || path.startsWith("/api/v1/knowledge/health")
+                || path.startsWith("/api/v1/knowledge/stats")
+                || path.startsWith("/api/v1/knowledge/engine-config")
+                || path.startsWith("/api/v1/knowledge/engine-config/**")
                 // ── PMO-38 T5: 新增豁免（双路径）──
                 // knowledge-bases 列表端点
                 || path.startsWith("/api/v1/knowledge-bases")

@@ -43,6 +43,17 @@ public class SecurityConfig {
                     "/api/v1/agent-loop/**",
                     "/api/v1/agent-mesh/**",
                     // "◄ /api/v1/knowledge/** — 移除 (敏感正文, QA T5-007)"
+                    // ── PMO-55 E-A: workspace 知识工作台三端点放行 (与 KnowledgeApiController /api/v1/knowledge/index-status 同前缀) ──
+                    // 新增端点: /api/v1/knowledge/health | /stats | /engine-config — 仅查公开元数据 + 引擎 health
+                    // PUT 端点由 method 级在 KnowledgeWorkbenchController + sys_config role check 把关, 此层 permitAll 保持粒度一致
+                    "/api/v1/knowledge/health",
+                    "/api/knowledge/health",
+                    "/api/v1/knowledge/stats",
+                    "/api/knowledge/stats",
+                    "/api/v1/knowledge/engine-config",
+                    "/api/knowledge/engine-config",
+                    "/api/v1/knowledge/engine-config/**",
+                    "/api/knowledge/engine-config/**",
                     "/api/v1/glossary/**",
                     "/api/v1/catalog/**",
                     "/api/v1/oag/**",

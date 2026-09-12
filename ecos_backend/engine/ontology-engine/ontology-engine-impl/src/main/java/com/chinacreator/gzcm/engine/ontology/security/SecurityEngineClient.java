@@ -80,8 +80,14 @@ public class SecurityEngineClient {
     private final String baseUrl;
     private final int timeoutMs;
 
-    /** 可选 — 容器中存在 KafkaTemplate Bean 时注入（反射访问容忍 classpath 差异） */
+    /**
+     * 可选 — 容器中存在 KafkaTemplate Bean 时注入（反射访问容忍 classpath 差异）。
+     * <p>PMO-55 E-A 修复：限定 @Qualifier("kafkaTemplate")，否则 Object 类型 byType 解析
+     * 把容器内所有 bean 当作候选，触发 NoUniqueBeanDefinitionException。
+     * required=false 保证 Kafka 未配置时静默拿到 null。</p>
+     */
     @Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("kafkaTemplate")
     private Object kafkaTemplateBean;
 
     /** 可选 — RestTemplate 来自 buszhi/gateway 全局 */
