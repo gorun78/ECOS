@@ -355,7 +355,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
           <div className="flex-1 overflow-y-auto overflow-x-auto">
             <table className="w-full text-xs align-middle">
               <thead className="sticky top-0 z-10">
-                <tr className={`bg-slate-100/40 dark:bg-slate-500/10 border-b ${styles.cardBorder}`}>
+                <tr className={`${styles.appBg} dark:bg-slate-500/10 border-b ${styles.cardBorder}`}>
                   <th className="text-left p-2.5 font-semibold w-12">{t("dw.dqRule.colSeq")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.colName")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.category")}</th>

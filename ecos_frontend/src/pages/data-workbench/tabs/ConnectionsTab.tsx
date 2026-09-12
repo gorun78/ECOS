@@ -396,7 +396,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     </div>
                     {/* 定时采集策略 — 选择 ON_SCHEDULE 时显示 cron 配置 */}
                     {conn.strategy?.trigger === 'ON_SCHEDULE' && (
-                    <div className="space-y-1.5 p-2 rounded-lg border border-dashed border-slate-500/40">
+                    <div className={`space-y-1.5 p-2 rounded-lg border border-dashed ${styles.cardBorder}`}>
                       <label className={`text-[10px] ${styles.cardTextMuted} block`}>{t("dw.strategy.cronLabel")}</label>
                       <select
                         value={conn.strategy?.scheduleCron || '0 0 * * *'}

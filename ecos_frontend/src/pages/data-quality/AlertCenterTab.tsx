@@ -58,7 +58,7 @@ function levelBadgeClass(level: string): string {
     case "P2":
       return "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border border-yellow-500/30";
     default:
-      return "bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-400/30";
+      return "bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-400/30"; /* FIXME:theme-helper 留尾清理 */
   }
 }
 
@@ -178,7 +178,7 @@ export default function AlertCenterTab() {
               onClick={() => setLevelFilter(levelFilter === lvl ? "" : lvl)}
               className={`rounded-md p-4 text-left cursor-pointer transition border ${
                 levelFilter === lvl ? styles.cardBorder : "transparent"
-              } ${styles.cardBg} hover:bg-slate-50 dark:hover:bg-slate-800/40`}
+              } ${styles.cardBg} hover:${styles.sidebarBg} dark:hover:bg-slate-800/40`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -190,7 +190,7 @@ export default function AlertCenterTab() {
                           ? "w-5 h-5 text-orange-500"
                           : lvl === "P2"
                             ? "w-5 h-5 text-yellow-500"
-                            : "w-5 h-5 text-slate-400"
+                            : `w-5 h-5 ${styles.cardTextMuted}`
                     }
                   />
                   <span className={`text-xs font-folded font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
@@ -279,7 +279,7 @@ export default function AlertCenterTab() {
                 return (
                   <tr
                     key={a.id}
-                    className={`border-b last:border-0 ${styles.cardBorder} hover:bg-slate-50 dark:hover:bg-slate-800/30 transition`}
+                    className={`border-b last:border-0 ${styles.cardBorder} hover:${styles.appBg} dark:hover:bg-slate-800/30 transition`}
                   >
                     {/* 级别 */}
                     <td className="px-3 py-2.5">

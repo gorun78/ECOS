@@ -240,8 +240,8 @@ export default function ScheduleTab() {
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-3 px-4 py-3 border-b border-b-slate-100 dark:border-b-slate-800
-                    hover:bg-slate-50 dark:hover:bg-slate-800/20 transition"
+                  className={`flex items-center gap-3 px-4 py-3 border-b ${styles.cardBorder}
+                    dark:border-b-slate-800 hover:${styles.appBg} dark:hover:bg-slate-800/20 transition`}
                 >
                   {/* triggerType 徽章 */}
                   <span
@@ -281,7 +281,7 @@ export default function ScheduleTab() {
                   >
                     <div
                       className={`w-8 h-4 rounded-full relative transition-colors ${
-                        s.enabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+                        s.enabled ? "bg-emerald-500" : `${styles.appBg} dark:bg-slate-600`
                       }`}
                     >
                       <div

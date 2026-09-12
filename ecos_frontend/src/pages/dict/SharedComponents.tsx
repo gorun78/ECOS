@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CheckCircle2, AlertCircle, X, ChevronDown } from "lucide-react";
 import { COLUMN_TYPE_CATEGORIES } from "./constants";
+import { useTheme } from "../../components/ThemeContext";
 
 // ── Toast ──
 export const Toast: React.FC<{
@@ -79,6 +80,7 @@ export const ColumnTypeSelect: React.FC<{
   onChange: (v: string) => void;
   disabled?: boolean;
 }> = ({ value, onChange, disabled }) => {
+  const { styles } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -95,25 +97,25 @@ export const ColumnTypeSelect: React.FC<{
       <button
         type="button"
         disabled={disabled}
-        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700
-          flex items-center justify-between outline-none disabled:opacity-50"
+        className={`w-full px-3 py-2 rounded-lg border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText}
+          flex items-center justify-between outline-none disabled:opacity-50`}
         onClick={() => setOpen(!open)}
       >
         <span className="font-mono">{value}</span>
-        <ChevronDown size={14} className="text-slate-400" />
+        <ChevronDown size={14} className={styles.cardTextMuted} />
       </button>
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+        <div className={`absolute z-30 left-0 right-0 mt-1 ${styles.cardBg} border ${styles.appBorder} rounded-lg shadow-lg max-h-64 overflow-y-auto`}>
           {Object.entries(COLUMN_TYPE_CATEGORIES).map(([cat, types]) => (
             <div key={cat}>
-              <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase bg-slate-50">
+              <div className={`px-3 py-1.5 text-[10px] font-semibold ${styles.cardTextMuted} uppercase ${styles.appBg}`}>
                 {cat}
               </div>
               {types.map(t => (
                 <div
                   key={t}
                   className={`px-3 py-1.5 text-xs font-mono cursor-pointer hover:bg-indigo-50 ${
-                    t === value ? "bg-indigo-100 text-indigo-700 font-semibold" : "text-slate-600"
+                    t === value ? "bg-indigo-100 text-indigo-700 font-semibold" : styles.cardText
                   }`}
                   onClick={() => { onChange(t); setOpen(false); }}
                 >
