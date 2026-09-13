@@ -149,7 +149,7 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
         <Icon className={`w-5 h-5 ${def.color}`} />
         <span className="flex-1 text-left font-semibold text-sm">{locale === "zh" ? def.labelZh : def.label}</span>
         {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          <Loader2 className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
         ) : isUp ? (
           <span className="flex items-center gap-1 text-emerald-500">
             <CheckCircle2 className="w-4 h-4" />
@@ -167,7 +167,7 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
       {isExpanded && (
         <div className={`border-t ${styles.cardBorder}`}>
           <div className={`flex items-center justify-end px-3 py-1.5 border-b ${styles.cardBorder}`}>
-            <button onClick={() => { onRefresh(); load(); }} className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+            <button onClick={() => { onRefresh(); load(); }} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
               <RefreshCw className="w-3 h-3" />
               {locale === "zh" ? "刷新" : "Refresh"}
             </button>
@@ -225,7 +225,7 @@ export default function MonitoringCenter() {
                 {tl("六引擎健康状态监控 — 点击展开查看详情", "Six-engine health monitoring — click to expand details")}
               </div>
               <button onClick={() => setRefreshKey(k => k + 1)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
                 <RefreshCw className="w-3 h-3" />
                 {tl("刷新全部", "Refresh All")}
               </button>

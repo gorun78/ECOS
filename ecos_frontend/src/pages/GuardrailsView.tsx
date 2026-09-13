@@ -21,6 +21,7 @@ import {
   Users, Loader2, Terminal, Search, ChevronRight, Clock, Layers,
   AlertCircle, FileText, Zap,
 } from 'lucide-react';
+import { useTheme } from '../components/ThemeContext';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -196,11 +197,12 @@ function getPreviewRows(data: any[] | Record<string, any[]>): { rows: any[]; col
 // ─────────────────────────────────────────────────────────────
 
 function Toggle({ on, onClick, color = 'bg-blue-600' }: { on: boolean; onClick: (e: React.MouseEvent) => void; color?: string }) {
+  const { styles } = useTheme();
   return (
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onClick(e); }}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${on ? color : 'bg-slate-200'}`}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${on ? color : styles.inputBg}`}
     >
       <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${on ? 'translate-x-4' : 'translate-x-0'}`} />
     </button>
@@ -212,11 +214,12 @@ function Spinner({ className = 'w-3.5 h-3.5' }: { className?: string }) {
 }
 
 function Badge({ children, tone }: { children: React.ReactNode; tone: 'emerald' | 'amber' | 'rose' | 'slate' | 'blue' }) {
+  const { styles } = useTheme();
   const tones: Record<string, string> = {
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     amber: 'bg-amber-50 text-amber-700 border-amber-200',
     rose: 'bg-rose-50 text-rose-700 border-rose-200',
-    slate: 'bg-slate-100 text-slate-600 border-slate-200',
+    slate: `${styles.appBg} ${styles.cardText} ${styles.cardBorder}`,
     blue: 'bg-blue-50 text-blue-700 border-blue-200',
   };
   return <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border ${tones[tone]}`}>{children}</span>;
@@ -229,6 +232,7 @@ function Badge({ children, tone }: { children: React.ReactNode; tone: 'emerald' 
 type SubTab = 'policies' | 'compile' | 'audit';
 
 export default function GuardrailsView() {
+  const { styles } = useTheme();
   // ── Toast ──
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
   const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
@@ -450,38 +454,38 @@ export default function GuardrailsView() {
   // ───────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4 overflow-y-auto h-full p-5 bg-slate-50/50 text-xs flex flex-col">
+    <div className={`space-y-4 overflow-y-auto h-full p-5 ${styles.appBg} text-xs flex flex-col`}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-3 shrink-0 gap-3">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-3 shrink-0 gap-3`}>
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <span className="p-1 rounded bg-rose-600 text-white">
               <ShieldCheck size={14} />
             </span>
             <span>安全护栏管理控制台</span>
           </h2>
-          <p className="text-[11px] text-slate-500">策略 CRUD、编译部署与合规预览的统一治理面板。</p>
+          <p className={`text-[11px] ${styles.cardTextMuted}`}>策略 CRUD、编译部署与合规预览的统一治理面板。</p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex bg-slate-200/60 p-0.5 rounded-lg border border-slate-200 shrink-0">
+        <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.cardBorder} shrink-0`}>
           <button
             onClick={() => setActiveSubTab('policies')}
-            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'policies' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'policies' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
           >
             <ShieldAlert size={12} />
             <span>策略管理</span>
           </button>
           <button
             onClick={() => setActiveSubTab('compile')}
-            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'compile' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'compile' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
           >
             <Binary size={12} />
             <span>编译与预览</span>
           </button>
           <button
             onClick={() => setActiveSubTab('audit')}
-            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'audit' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'audit' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
           >
             <FileText size={12} />
             <span>审计日志</span>
@@ -493,11 +497,11 @@ export default function GuardrailsView() {
       {activeSubTab === 'policies' && (
         <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
           {/* Left: list */}
-          <div className="lg:w-80 shrink-0 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
-            <div className="p-3 border-b border-slate-200 bg-slate-50 space-y-2.5">
+          <div className={`lg:w-80 shrink-0 ${styles.inputBg} border ${styles.cardBorder} rounded-xl shadow-sm flex flex-col overflow-hidden`}>
+            <div className={`p-3 border-b ${styles.cardBorder} ${styles.appBg} space-y-2.5`}>
               <div className="flex items-center justify-between">
-                <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
-                  <Layers size={13} className="text-slate-500" />
+                <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
+                  <Layers size={13} className={styles.cardTextMuted} />
                   <span>护栏策略 ({policies.length})</span>
                 </span>
                 <button
@@ -508,25 +512,25 @@ export default function GuardrailsView() {
                 </button>
               </div>
               <div className="relative">
-                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={11} className={`absolute left-2 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="搜索策略..."
-                  className="w-full pl-6 pr-2 py-1.5 border border-slate-200 rounded-md text-[11px] focus:outline-none focus:border-blue-500"
+                  className={`w-full pl-6 pr-2 py-1.5 rounded-md text-[11px] ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
                 />
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {loadingList ? (
-                <div className="h-full flex items-center justify-center text-slate-400 gap-2">
-                  <Spinner className="w-4 h-4 text-slate-400" />
+                <div className={`h-full flex items-center justify-center ${styles.cardTextMuted} gap-2`}>
+                  <Spinner className={`w-4 h-4 ${styles.cardTextMuted}`} />
                   <span className="font-bold">加载中...</span>
                 </div>
               ) : filteredPolicies.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center p-6 text-center text-slate-400 space-y-2">
-                  <ShieldAlert size={24} className="text-slate-300" />
+                <div className={`h-full flex flex-col items-center justify-center p-6 text-center ${styles.cardTextMuted} space-y-2`}>
+                  <ShieldAlert size={24} className={styles.cardTextMuted} />
                   <p className="font-bold">暂无护栏策略</p>
                   <p className="text-[10px]">点击「新建」创建第一条安全护栏策略。</p>
                 </div>
@@ -539,14 +543,13 @@ export default function GuardrailsView() {
                     <div
                       key={p.id}
                       onClick={() => setSelectedId(p.id)}
-                      className={`p-2.5 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
-                    >
+                      className={`p-2.5 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-blue-600 bg-blue-50/40 shadow-sm' : `${styles.cardBorder} ${styles.cardBg} ${styles.sidebarHoverBg}`}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`p-1 rounded ${p.isEnabled ? 'bg-blue-50 ' + meta.color : 'bg-slate-100 text-slate-400'}`}>
+                          <span className={`p-1 rounded ${p.isEnabled ? 'bg-blue-50 ' + meta.color : `${styles.appBg} ${styles.cardTextMuted}`}`}>
                             <Icon size={13} />
                           </span>
-                          <span className="font-bold text-slate-800 text-[11px] truncate">{p.name}</span>
+                          <span className={`font-bold ${styles.cardText} text-[11px] truncate`}>{p.name}</span>
                         </div>
                         <Toggle on={p.isEnabled} onClick={() => handleToggle(p)} />
                       </div>
@@ -567,7 +570,7 @@ export default function GuardrailsView() {
           </div>
 
           {/* Right: detail / editor */}
-          <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden min-h-0">
+          <div className={`flex-1 ${styles.inputBg} border ${styles.cardBorder} rounded-xl shadow-sm flex flex-col overflow-hidden min-h-0`}>
             {formMode ? (
               <PolicyEditor
                 policy={editing!}
@@ -585,8 +588,8 @@ export default function GuardrailsView() {
                 onCompile={() => { setActiveSubTab('compile'); handleCompile(selectedPolicy); }}
               />
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-2">
-                <Info size={24} className="text-slate-300" />
+              <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2`}>
+                <Info size={24} className={styles.cardTextMuted} />
                 <p className="font-bold">请在左侧选择一条策略</p>
                 <button onClick={startCreate} className="text-blue-600 font-bold text-[11px] hover:underline flex items-center gap-1">
                   <Plus size={11} /> 或新建一条策略
@@ -601,14 +604,14 @@ export default function GuardrailsView() {
       {activeSubTab === 'compile' && (
         <div className="flex-1 flex flex-col min-h-0 gap-4">
           {!selectedPolicy ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-2">
-              <Binary size={28} className="text-slate-300" />
+            <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2`}>
+              <Binary size={28} className={styles.cardTextMuted} />
               <p className="font-bold">请先在「策略管理」中选择一条策略</p>
             </div>
           ) : (
             <>
               {/* Compiler status banner */}
-              <div className="bg-slate-900 text-white rounded-xl p-4 border border-slate-800 shrink-0 flex flex-col lg:flex-row items-center justify-between gap-4">
+              <div className="bg-[var(--card,#0B0F19)] text-white rounded-xl p-4 border border-[var(--muted,#1E293B)] shrink-0 flex flex-col lg:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 text-left">
                   <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-full border border-rose-500/30">
                     <Binary size={18} />
@@ -649,17 +652,17 @@ export default function GuardrailsView() {
               {/* Main grid: logs + preview */}
               <div className="flex-1 grid grid-cols-1 xl:grid-cols-5 gap-4 min-h-0 overflow-y-auto">
                 {/* Compiler logs */}
-                <div className="xl:col-span-2 bg-slate-950 text-slate-200 rounded-xl border border-slate-900 p-4 shadow-md font-mono flex flex-col space-y-2.5 shrink-0">
-                  <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                <div className="xl:col-span-2 bg-[var(--muted,#020202)] text-[var(--card,#E2E8F0)] rounded-xl border border-[var(--muted,#1E293B)] p-4 shadow-md font-mono flex flex-col space-y-2.5 shrink-0">
+                  <div className="flex items-center justify-between border-b border-[var(--muted,#1E293B)] pb-2">
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-2.5 rounded-full ${isCompiling ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
-                      <span className="font-bold text-xs text-slate-400 flex items-center gap-1"><Terminal size={12} /> Compiler Stage Stream Logs</span>
+                      <span className="font-bold text-xs text-[var(--card,#94A3B8)] flex items-center gap-1"><Terminal size={12} /> Compiler Stage Stream Logs</span>
                     </div>
-                    <span className="text-[9px] text-slate-500 font-bold">SECURE_COMPILER_BUS</span>
+                    <span className="text-[9px] text-[var(--card,#64748B)] font-bold">SECURE_COMPILER_BUS</span>
                   </div>
                   <div className="space-y-1.5 max-h-72 overflow-y-auto text-[10px] leading-relaxed select-text">
                     {compileLogs.length === 0 ? (
-                      <p className="text-slate-500 italic">等待编译指令... 点击上方「编译并部署」启动。</p>
+                      <p className="text-[var(--card,#64748B)] italic">等待编译指令... 点击上方「编译并部署」启动。</p>
                     ) : (
                       compileLogs.map((log, idx) => (
                         <p key={idx} className={
@@ -676,32 +679,32 @@ export default function GuardrailsView() {
                 </div>
 
                 {/* Dry-run preview */}
-                <div className="xl:col-span-3 bg-white border border-slate-200 rounded-xl shadow-sm p-4 flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 shrink-0">
+                <div className={`xl:col-span-3 ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-sm p-4 flex-1 flex flex-col min-h-0`}>
+                  <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-3 mb-3 shrink-0`}>
                     <div className="space-y-0.5">
-                      <span className="font-extrabold text-slate-700 flex items-center gap-1.5 text-xs">
+                      <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5 text-xs`}>
                         <RefreshCw size={13} className="text-emerald-500" />
                         <span>策略编译干跑沙箱 (Dry-Run Compliance Preview)</span>
                       </span>
-                      <p className="text-[10px] text-slate-400">左侧对比原始明文，右侧输出经脱敏/隔离编译后的安全视图。</p>
+                      <p className={`text-[10px] ${styles.cardTextMuted}`}>左侧对比原始明文，右侧输出经脱敏/隔离编译后的安全视图。</p>
                     </div>
                     <button
                       onClick={() => loadPreview(selectedPolicy)}
                       disabled={loadingPreview}
-                      className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 rounded-md text-[10px] font-bold text-slate-600 flex items-center gap-1 cursor-pointer"
+                      className={`px-2.5 py-1 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[10px] font-bold ${styles.cardText} flex items-center gap-1 cursor-pointer`}
                     >
                       <RefreshCw size={10} className={loadingPreview ? 'animate-spin' : ''} /> 刷新预览
                     </button>
                   </div>
 
                   {loadingPreview ? (
-                    <div className="flex-1 flex items-center justify-center text-slate-400 gap-2">
+                    <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} gap-2`}>
                       <Spinner className="w-4 h-4" /><span>正在生成实时干跑数据...</span>
                     </div>
                   ) : previewData ? (
                     <PreviewComparison data={previewData} />
                   ) : (
-                    <div className="flex-1 flex items-center justify-center text-slate-400">
+                    <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted}`}>
                       <span>暂无预览数据，请先编译策略。</span>
                     </div>
                   )}
@@ -715,26 +718,26 @@ export default function GuardrailsView() {
       {/* ═════════════ TAB: AUDIT LOG (STUB) ═════════════ */}
       {activeSubTab === 'audit' && (
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-1">
-            <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
-                <FileText size={13} className="text-slate-500" />
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-sm flex flex-col overflow-hidden flex-1`}>
+            <div className={`p-3 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
+              <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
+                <FileText size={13} className={styles.cardTextMuted} />
                 <span>护栏审计日志 (Guardrail Audit Trail)</span>
               </span>
               <button
                 onClick={() => loadPolicies()}
-                className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 rounded-md text-[10px] font-bold text-slate-600 flex items-center gap-1 cursor-pointer"
+                className={`px-2.5 py-1 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[10px] font-bold ${styles.cardText} flex items-center gap-1 cursor-pointer`}
               >
                 <RefreshCw size={10} /> 刷新
               </button>
             </div>
 
             {/* Stub notice */}
-            <div className="m-4 p-4 bg-amber-50/60 border border-amber-200 rounded-xl flex items-start gap-3">
-              <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
-              <div className="space-y-1 text-slate-600">
-                <p className="font-extrabold text-amber-800 text-[11px]">⏳ 审计后端尚未就绪</p>
-                <p className="text-[10px] leading-relaxed">
+            <div className={`m-4 p-4 ${styles.warningBg} border ${styles.warningBorder} rounded-xl flex items-start gap-3`}>
+              <AlertTriangle size={16} className={`${styles.warningText} mt-0.5 shrink-0`} />
+              <div className={`space-y-1 ${styles.cardText}`}>
+                <p className={`font-extrabold ${styles.warningText} text-[11px]`}>⏳ 审计后端尚未就绪</p>
+                <p className={`text-[10px] leading-relaxed ${styles.cardTextMuted}`}>
                   审计日志检索接口 (GET /api/v1/guardrails/audit) 正在后端开发中。当前为前端占位面板，
                   待后端就绪后将自动对接实时审计流。下方展示策略当前状态快照作为过渡。
                 </p>
@@ -744,14 +747,14 @@ export default function GuardrailsView() {
             {/* Transition: show policy status snapshot */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               {policies.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
-                  <Info size={24} className="text-slate-300" />
+                <div className={`h-full flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2`}>
+                  <Info size={24} className={styles.cardTextMuted} />
                   <p className="font-bold">暂无策略记录</p>
                 </div>
               ) : (
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className={`border ${styles.cardBorder} rounded-lg overflow-hidden`}>
                   <table className="w-full text-left text-[10px]">
-                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-200">
+                    <thead className={`${styles.appBg} ${styles.cardTextMuted} font-bold uppercase border-b ${styles.cardBorder}`}>
                       <tr>
                         <th className="p-2">策略名称</th>
                         <th className="p-2">类型</th>
@@ -762,16 +765,16 @@ export default function GuardrailsView() {
                         <th className="p-2 text-right">审计备注</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                    <tbody className={`divide-y ${styles.divider} ${styles.cardText}`}>
                       {policies.map(p => (
-                        <tr key={p.id} className="hover:bg-slate-50/50">
-                          <td className="p-2 font-bold text-slate-800">{p.name}</td>
+                        <tr key={p.id} className={`${styles.sidebarHoverBg}`}>
+                          <td className={`p-2 font-bold ${styles.cardText}`}>{p.name}</td>
                           <td className="p-2"><Badge tone="slate">{POLICY_TYPE_META[p.type]?.label ?? p.type}</Badge></td>
                           <td className="p-2"><Badge tone={p.severity === 'block' ? 'rose' : 'amber'}>{p.severity}</Badge></td>
                           <td className="p-2"><Badge tone={p.status === 'COMPILED' ? 'emerald' : 'amber'}>{p.status}</Badge></td>
-                          <td className="p-2">{p.isEnabled ? <Check size={12} className="text-emerald-500" /> : <X size={12} className="text-slate-300" />}</td>
-                          <td className="p-2 font-mono text-slate-500">{p.compiledAt || '—'}</td>
-                          <td className="p-2 text-right text-slate-400 italic">待审计后端接入</td>
+                          <td className="p-2">{p.isEnabled ? <Check size={12} className="text-emerald-500" /> : <X size={12} className={styles.cardTextMuted} />}</td>
+                          <td className={`p-2 font-mono ${styles.cardTextMuted}`}>{p.compiledAt || '—'}</td>
+                          <td className={`p-2 text-right ${styles.cardTextMuted} italic`}>待审计后端接入</td>
                         </tr>
                       ))}
                     </tbody>
@@ -785,18 +788,18 @@ export default function GuardrailsView() {
 
       {/* ── Delete confirm modal ── */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setDeleteTarget(null)}>
-          <div className="bg-white rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className={`fixed inset-0 ${styles.overlayBg} flex items-center justify-center z-50`} onClick={() => setDeleteTarget(null)}>
+          <div className={`${styles.cardBg} rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl`} onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
-              <span className="p-1.5 rounded bg-rose-50 text-rose-600"><AlertTriangle size={16} /></span>
-              <h3 className="font-black text-slate-800 text-sm">确认删除策略</h3>
+              <span className={`p-1.5 rounded ${styles.dangerBg} ${styles.dangerText}`}><AlertTriangle size={16} /></span>
+              <h3 className={`font-black ${styles.cardText} text-sm`}>确认删除策略</h3>
             </div>
-            <p className="text-[11px] text-slate-600 leading-relaxed mb-4">
-              即将删除护栏策略「<span className="font-bold text-slate-800">{deleteTarget.name}</span>」，此操作不可撤销。
+            <p className={`text-[11px] ${styles.cardText} leading-relaxed mb-4`}>
+              即将删除护栏策略「<span className={`font-bold ${styles.dangerText}`}>{deleteTarget.name}</span>」，此操作不可撤销。
               删除后该策略将立即从查询引擎卸载。
             </p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteTarget(null)} className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-md text-[11px] font-bold text-slate-600 cursor-pointer">取消</button>
+              <button onClick={() => setDeleteTarget(null)} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[11px] font-bold ${styles.cardText} cursor-pointer`}>取消</button>
               <button onClick={handleDelete} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold cursor-pointer flex items-center gap-1"><Trash2 size={11} /> 删除</button>
             </div>
           </div>
@@ -807,7 +810,7 @@ export default function GuardrailsView() {
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 animate-fadeIn">
           <div className={`px-4 py-2.5 rounded-lg shadow-lg text-white font-bold text-[11px] flex items-center gap-2 ${
-            toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-700'
+            toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-[var(--muted,#334155)]'
           }`}>
             {toast.type === 'success' ? <CheckCircle size={14} /> : toast.type === 'error' ? <AlertCircle size={14} /> : <Info size={14} />}
             <span>{toast.msg}</span>
@@ -834,59 +837,60 @@ function PolicyEditor({
 }) {
   const set = <K extends keyof GuardrailPolicy>(key: K, value: GuardrailPolicy[K]) =>
     onChange({ ...policy, [key]: value });
+  const { styles } = useTheme();
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto">
-      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-        <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
+      <div className={`p-4 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between shrink-0`}>
+        <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
           {mode === 'create' ? <Plus size={13} className="text-rose-500" /> : <Edit3 size={13} className="text-blue-500" />}
           <span>{mode === 'create' ? '新建护栏策略' : '编辑护栏策略'}</span>
         </span>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X size={16} /></button>
+        <button onClick={onCancel} className={`${styles.cardTextMuted} ${styles.sidebarHoverBg} cursor-pointer`}><X size={16} /></button>
       </div>
 
       <div className="p-4 space-y-4 flex-1">
         {/* Name */}
         <div className="space-y-1">
-          <label className="block text-slate-600 font-bold text-[10px] uppercase">策略名称 <span className="text-rose-500">*</span></label>
+          <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>策略名称 <span className="text-rose-500">*</span></label>
           <input
             value={policy.name}
             onChange={e => set('name', e.target.value)}
             placeholder="例如：飞行员 SSN 列级脱敏"
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-500"
+            className={`w-full px-3 py-2 rounded-lg text-[11px] ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
           />
         </div>
 
         {/* Description */}
         <div className="space-y-1">
-          <label className="block text-slate-600 font-bold text-[10px] uppercase">策略描述</label>
+          <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>策略描述</label>
           <textarea
             value={policy.description}
             onChange={e => set('description', e.target.value)}
             rows={2}
             placeholder="描述该护栏的合规目的与拦截范围..."
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-500 resize-none"
+            className={`w-full px-3 py-2 rounded-lg text-[11px] resize-none ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
           />
         </div>
 
         {/* Type + Severity */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="block text-slate-600 font-bold text-[10px] uppercase">策略类型</label>
+            <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>策略类型</label>
             <select
               value={policy.type}
               onChange={e => set('type', e.target.value as PolicyType)}
-              className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
+              className={`w-full px-2 py-2 rounded-lg text-[11px] font-bold ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
             >
               {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div className="space-y-1">
-            <label className="block text-slate-600 font-bold text-[10px] uppercase">严重级别</label>
+            <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>严重级别</label>
             <select
               value={policy.severity}
               onChange={e => set('severity', e.target.value as PolicySeverity)}
-              className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
+              className={`w-full px-2 py-2 rounded-lg text-[11px] font-bold ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
             >
               <option value="block">block (强制阻断)</option>
               <option value="warn">warn (记录审计)</option>
@@ -896,21 +900,21 @@ function PolicyEditor({
 
         {/* Type-specific config */}
         {(policy.type === 'column_masking' || policy.type === 'pii_redaction') && (
-          <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-0">
+          <div className={`grid grid-cols-2 gap-3 p-3 ${styles.appBg} rounded-lg border ${styles.cardBorder} space-y-0`}>
             <div className="space-y-1">
-              <label className="block text-slate-600 font-bold text-[10px] uppercase">目标表 (Table)</label>
-              <input value={policy.table || ''} onChange={e => set('table', e.target.value)} placeholder="ds_pilots_biography" className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-[11px] font-mono focus:outline-none focus:border-blue-500" />
+              <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>目标表 (Table)</label>
+              <input value={policy.table || ''} onChange={e => set('table', e.target.value)} placeholder="ds_pilots_biography" className={`w-full px-2 py-1.5 rounded-md text-[11px] font-mono ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`} />
             </div>
             <div className="space-y-1">
-              <label className="block text-slate-600 font-bold text-[10px] uppercase">目标列 (Column)</label>
-              <input value={policy.column || ''} onChange={e => set('column', e.target.value)} placeholder="ssn_number" className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-[11px] font-mono focus:outline-none focus:border-blue-500" />
+              <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>目标列 (Column)</label>
+              <input value={policy.column || ''} onChange={e => set('column', e.target.value)} placeholder="ssn_number" className={`w-full px-2 py-1.5 rounded-md text-[11px] font-mono ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`} />
             </div>
             <div className="space-y-1 col-span-2">
-              <label className="block text-slate-600 font-bold text-[10px] uppercase">脱敏策略 (Mask Type)</label>
+              <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>脱敏策略 (Mask Type)</label>
               <select
                 value={policy.maskType || 'REDACT'}
                 onChange={e => set('maskType', e.target.value as MaskType)}
-                className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
+                className={`w-full px-2 py-1.5 rounded-md text-[11px] font-bold ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
               >
                 <option value="REDACT">REDACT (强物理抹除)</option>
                 <option value="PARTIAL">PARTIAL (部分遮蔽)</option>
@@ -921,26 +925,26 @@ function PolicyEditor({
         )}
 
         {policy.type === 'row_filtering' && (
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-2">
+          <div className={`p-3 ${styles.appBg} rounded-lg border ${styles.cardBorder} space-y-2`}>
             <div className="space-y-1">
-              <label className="block text-slate-600 font-bold text-[10px] uppercase">目标表 (Table)</label>
-              <input value={policy.table || ''} onChange={e => set('table', e.target.value)} placeholder="ds_flights_clean" className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-[11px] font-mono focus:outline-none focus:border-blue-500" />
+              <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>目标表 (Table)</label>
+              <input value={policy.table || ''} onChange={e => set('table', e.target.value)} placeholder="ds_flights_clean" className={`w-full px-2 py-1.5 rounded-md text-[11px] font-mono ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`} />
             </div>
             <div className="space-y-1">
-              <label className="block text-slate-600 font-bold text-[10px] uppercase">SQL WHERE 谓词</label>
-              <div className="flex items-center gap-1 bg-white rounded-md px-2.5 py-1.5 border border-slate-200">
-                <span className="font-mono text-slate-400 font-bold text-[10px] select-none">WHERE</span>
+              <label className={`block ${styles.cardText} font-bold text-[10px] uppercase`}>SQL WHERE 谓词</label>
+              <div className={`flex items-center gap-1 ${styles.inputBg} rounded-md px-2.5 py-1.5 border ${styles.inputBorder}`}>
+                <span className={`font-mono ${styles.cardTextMuted} font-bold text-[10px] select-none`}>WHERE</span>
                 <input
                   value={policy.condition || ''}
                   onChange={e => set('condition', e.target.value)}
                   placeholder="hours_flown > 6000"
-                  className="bg-transparent border-0 font-mono text-[11px] text-slate-700 font-bold focus:ring-0 focus:outline-none w-full"
+                  className={`bg-transparent border-0 font-mono text-[11px] ${styles.cardText} font-bold focus:ring-0 focus:outline-none w-full`}
                 />
               </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <span className="text-[9px] text-slate-400 font-bold uppercase">推荐模板:</span>
+                <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase`}>推荐模板:</span>
                 {['hours_flown > 6000', "licence_rating = 'B737-MAX'", 'base_salary < 80000', "status = 'ON_TIME'", 'delay_minutes > 0'].map(t => (
-                  <button key={t} onClick={() => set('condition', t)} className="px-1.5 py-0.5 bg-slate-200 hover:bg-slate-300 rounded font-mono text-[9px] font-bold text-slate-600 cursor-pointer">{t}</button>
+                  <button key={t} onClick={() => set('condition', t)} className={`px-1.5 py-0.5 ${styles.badgeBg} ${styles.sidebarHoverBg} rounded font-mono text-[9px] font-bold ${styles.cardText} cursor-pointer`}>{t}</button>
                 ))}
               </div>
             </div>
@@ -948,18 +952,18 @@ function PolicyEditor({
         )}
 
         {/* Enabled toggle */}
-        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+        <div className={`flex items-center justify-between p-3 ${styles.appBg} rounded-lg border ${styles.cardBorder}`}>
           <div>
-            <span className="font-bold text-slate-700 text-[11px] block">启用策略</span>
-            <span className="text-[10px] text-slate-400">关闭后该护栏将不参与运行时拦截判定。</span>
+            <span className={`font-bold ${styles.cardText} text-[11px] block`}>启用策略</span>
+            <span className={`text-[10px] ${styles.cardTextMuted}`}>关闭后该护栏将不参与运行时拦截判定。</span>
           </div>
           <Toggle on={policy.isEnabled} onClick={() => set('isEnabled', !policy.isEnabled)} />
         </div>
       </div>
 
       {/* Footer actions */}
-      <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-2 justify-end shrink-0">
-        <button onClick={onCancel} className="px-4 py-2 border border-slate-200 hover:bg-slate-100 rounded-lg text-[11px] font-bold text-slate-600 cursor-pointer">取消</button>
+      <div className={`p-4 border-t ${styles.cardBorder} ${styles.appBg} flex gap-2 justify-end shrink-0`}>
+        <button onClick={onCancel} className={`px-4 py-2 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-lg text-[11px] font-bold ${styles.cardText} cursor-pointer`}>取消</button>
         <button
           onClick={onSave}
           disabled={saving}
@@ -987,6 +991,7 @@ function PolicyDetail({
 }) {
   const meta = POLICY_TYPE_META[policy.type] ?? POLICY_TYPE_META.custom;
   const Icon = meta.icon;
+  const { styles } = useTheme();
 
   const configRows: { label: string; value: React.ReactNode }[] = [];
   if (policy.table) configRows.push({ label: '目标表', value: <span className="font-mono">{policy.table}</span> });
@@ -996,19 +1001,19 @@ function PolicyDetail({
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto">
-      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-        <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
-          <Settings size={13} className="text-slate-500" />
+      <div className={`p-4 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between shrink-0`}>
+        <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
+          <Settings size={13} className={styles.cardTextMuted} />
           <span>策略详情</span>
         </span>
         <div className="flex gap-2">
-          <button onClick={onCompile} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer">
+          <button onClick={onCompile} className="px-3 py-1.5 bg-[var(--muted,#0F172A)] hover:opacity-80 text-white rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer">
             <Binary size={11} /> 编译
           </button>
-          <button onClick={onEdit} className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 rounded-md text-[10px] font-bold text-slate-600 flex items-center gap-1 cursor-pointer">
+          <button onClick={onEdit} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[10px] font-bold ${styles.cardText} flex items-center gap-1 cursor-pointer`}>
             <Edit3 size={11} /> 编辑
           </button>
-          <button onClick={onDelete} className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer">
+          <button onClick={onDelete} className={`px-3 py-1.5 border ${styles.dangerBorder} ${styles.dangerText} ${styles.dangerBg} rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer`}>
             <Trash2 size={11} /> 删除
           </button>
         </div>
@@ -1017,27 +1022,27 @@ function PolicyDetail({
       <div className="p-4 space-y-4 flex-1">
         {/* Title block */}
         <div className="flex items-start gap-3">
-          <span className={`p-2.5 rounded-xl ${policy.isEnabled ? 'bg-blue-50 ' + meta.color : 'bg-slate-100 text-slate-400'}`}>
+          <span className={`p-2.5 rounded-xl ${policy.isEnabled ? 'bg-blue-50 ' + meta.color : `${styles.appBg} ${styles.cardTextMuted}`}`}>
             <Icon size={20} />
           </span>
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-black text-slate-800 text-sm">{policy.name}</h3>
+              <h3 className={`font-black ${styles.cardText} text-sm`}>{policy.name}</h3>
               <Badge tone="slate">{meta.label}</Badge>
               <Badge tone={policy.severity === 'block' ? 'rose' : 'amber'}>{policy.severity === 'block' ? '强制阻断' : '记录审计'}</Badge>
               <Badge tone={policy.status === 'COMPILED' ? 'emerald' : 'amber'}>{policy.status === 'COMPILED' ? '已编译' : '草稿'}</Badge>
             </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">{policy.description || '（暂无描述）'}</p>
+            <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed`}>{policy.description || '（暂无描述）'}</p>
           </div>
         </div>
 
         {/* Config grid */}
         {configRows.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 ${styles.appBg} p-3 rounded-xl border ${styles.cardBorder}`}>
             {configRows.map((r, i) => (
               <div key={i}>
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">{r.label}</span>
-                <span className="font-bold text-slate-700 text-[11px] block mt-0.5">{r.value}</span>
+                <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block`}>{r.label}</span>
+                <span className={`font-bold ${styles.cardText} text-[11px] block mt-0.5`}>{r.value}</span>
               </div>
             ))}
           </div>
@@ -1045,33 +1050,33 @@ function PolicyDetail({
 
         {/* Meta info */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
-            <span className="text-[9px] text-slate-400 font-bold uppercase block">策略 ID</span>
-            <span className="font-mono text-[10px] text-slate-700 font-bold break-all">{policy.id}</span>
+          <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>策略 ID</span>
+            <span className={`font-mono text-[10px] ${styles.cardText} font-bold break-all`}>{policy.id}</span>
           </div>
-          <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
-            <span className="text-[9px] text-slate-400 font-bold uppercase block">启用状态</span>
-            <span className={`font-bold text-[11px] flex items-center gap-1 ${policy.isEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
+          <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>启用状态</span>
+            <span className={`font-bold text-[11px] flex items-center gap-1 ${policy.isEnabled ? 'text-emerald-600' : styles.cardTextMuted}`}>
               {policy.isEnabled ? <CheckCircle2 size={12} /> : <X size={12} />} {policy.isEnabled ? '已启用' : '已关闭'}
             </span>
           </div>
-          <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
-            <span className="text-[9px] text-slate-400 font-bold uppercase block">编译时间</span>
-            <span className="font-mono text-[10px] text-slate-700 font-bold">{policy.compiledAt || '未编译'}</span>
+          <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>编译时间</span>
+            <span className={`font-mono text-[10px] ${styles.cardText} font-bold`}>{policy.compiledAt || '未编译'}</span>
           </div>
-          <div className="p-2.5 bg-white border border-slate-200 rounded-lg">
-            <span className="text-[9px] text-slate-400 font-bold uppercase block">更新时间</span>
-            <span className="font-mono text-[10px] text-slate-700 font-bold">{policy.updatedAt || policy.createdAt || '—'}</span>
+          <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>更新时间</span>
+            <span className={`font-mono text-[10px] ${styles.cardText} font-bold`}>{policy.updatedAt || policy.createdAt || '—'}</span>
           </div>
         </div>
 
         {/* Compile logs (if any) */}
         {policy.compileLogs && policy.compileLogs.length > 0 && (
           <div className="space-y-2">
-            <h4 className="font-extrabold text-slate-400 uppercase tracking-wider text-[10px] flex items-center gap-1">
+            <h4 className={`font-extrabold ${styles.cardTextMuted} uppercase tracking-wider text-[10px] flex items-center gap-1`}>
               <Terminal size={11} /> 上次编译日志
             </h4>
-            <div className="bg-slate-950 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1 text-[10px] font-mono">
+            <div className="bg-[var(--muted,#020202)] rounded-lg p-3 max-h-40 overflow-y-auto space-y-1 text-[10px] font-mono">
               {policy.compileLogs.map((log, idx) => (
                 <p key={idx} className={
                   log.includes('✅') ? 'text-emerald-400 font-bold' :
@@ -1096,20 +1101,21 @@ function PreviewComparison({ data }: { data: PreviewData }) {
   const raw = getPreviewRows(data.raw);
   const compiled = getPreviewRows(data.compiled);
   const columns = data.columns && data.columns.length > 0 ? data.columns : (raw.columns.length > 0 ? raw.columns : compiled.columns);
+  const { styles } = useTheme();
 
   return (
     <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 overflow-hidden text-[10px]">
       {/* Raw */}
-      <div className="flex flex-col border border-slate-200 rounded-xl overflow-hidden min-h-0 bg-slate-50/20">
-        <div className="p-2 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
-          <span className="font-bold text-slate-600 flex items-center gap-1">
-            <LockOpen size={10} className="text-slate-500" /> 原始明文视图 (Raw - Unsecured)
+      <div className={`flex flex-col border ${styles.cardBorder} rounded-xl overflow-hidden min-h-0 ${styles.appBg}`}>
+        <div className={`p-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
+          <span className={`font-bold ${styles.cardText} flex items-center gap-1`}>
+            <LockOpen size={10} className={styles.cardTextMuted} /> 原始明文视图 (Raw - Unsecured)
           </span>
-          <span className="px-1 py-0.5 rounded bg-slate-200 text-slate-500 text-[8px] font-mono">PLAIN_TEXT</span>
+          <span className={`px-1 py-0.5 rounded ${styles.badgeBg} ${styles.cardTextMuted} text-[8px] font-mono`}>PLAIN_TEXT</span>
         </div>
         <div className="flex-1 overflow-auto p-2">
           {raw.rows.length === 0 ? (
-            <p className="text-center text-slate-400 py-4 italic">无原始数据</p>
+            <p className={`text-center ${styles.cardTextMuted} py-4 italic`}>无原始数据</p>
           ) : (
             <DataTable rows={raw.rows} columns={columns} />
           )}
@@ -1126,7 +1132,7 @@ function PreviewComparison({ data }: { data: PreviewData }) {
         </div>
         <div className="flex-1 overflow-auto p-2">
           {compiled.rows.length === 0 ? (
-            <p className="text-center text-slate-400 py-4 italic">🚫 行级过滤生效：无符合安全条件的数据行</p>
+            <p className={`text-center ${styles.cardTextMuted} py-4 italic`}>🚫 行级过滤生效：无符合安全条件的数据行</p>
           ) : (
             <DataTable rows={compiled.rows} columns={columns} rawRows={raw.rows} />
           )}
@@ -1138,18 +1144,19 @@ function PreviewComparison({ data }: { data: PreviewData }) {
 
 function DataTable({ rows, columns, rawRows }: { rows: any[]; columns: string[]; rawRows?: any[] }) {
   if (columns.length === 0 && rows.length > 0) columns = Object.keys(rows[0]);
+  const { styles } = useTheme();
   return (
     <table className="w-full text-left font-mono leading-relaxed">
-      <thead className="bg-slate-100 border-b border-slate-200 text-slate-500 font-extrabold sticky top-0">
+      <thead className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.cardTextMuted} font-extrabold sticky top-0`}>
         <tr>
           {columns.map(c => <th key={c} className="p-1 whitespace-nowrap">{c}</th>)}
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-100 text-slate-600">
+      <tbody className={`divide-y ${styles.divider} ${styles.cardText}`}>
         {rows.map((r, i) => {
           const raw = rawRows?.find(rr => Object.values(rr)[0] === Object.values(r)[0]);
           return (
-            <tr key={i} className="hover:bg-slate-50">
+            <tr key={i} className={`${styles.sidebarHoverBg}`}>
               {columns.map(c => {
                 const val = r[c];
                 const rawVal = raw?.[c];

@@ -227,7 +227,7 @@ export default function PolicyEngine() {
         {/* Refresh button */}
         <button
           onClick={handleRefresh}
-          className="ml-auto p-1.5 rounded hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+          className={`ml-auto p-1.5 rounded ${styles.sidebarHoverBg} transition-colors`}
           title={t("刷新", "Refresh")}
         >
           <RefreshCw className={`w-4 h-4 opacity-50 ${(loadingPolicies || statusLoading) ? "animate-spin" : ""}`} />
@@ -260,7 +260,7 @@ export default function PolicyEngine() {
                   className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
                     selectedPolicy === name
                       ? "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-semibold"
-                      : "hover:bg-slate-100 dark:hover:bg-slate-800 opacity-75 hover:opacity-100"
+                      : `${styles.sidebarHoverBg} opacity-75 hover:opacity-100`
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -274,16 +274,16 @@ export default function PolicyEngine() {
         </div>
 
         {/* ── Center: Rego Editor ── */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-slate-200/50 dark:border-slate-700/50">
+        <div className={`flex-1 flex flex-col min-w-0 overflow-hidden border-r ${styles.divider}`}>
           {/* Editor Header */}
-          <div className="flex items-center justify-between px-4 py-2 shrink-0 border-b border-slate-200/50 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30">
+          <div className={`flex items-center justify-between px-4 py-2 shrink-0 border-b ${styles.divider} ${styles.appBg}`}>
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
               <span className="text-xs font-semibold uppercase tracking-wider opacity-70">
                 {t("Rego 编辑器", "Rego Editor")}
               </span>
               {selectedPolicy && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700/70 opacity-60">
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${styles.appBg} opacity-60`}>
                   {selectedPolicy}
                 </span>
               )}
@@ -298,7 +298,7 @@ export default function PolicyEngine() {
                 disabled={!selectedPolicy || !dirty || saving}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
                   !selectedPolicy || !dirty
-                    ? "opacity-30 cursor-not-allowed bg-slate-200 dark:bg-slate-700 text-slate-500"
+                    ? `opacity-30 cursor-not-allowed ${styles.appBg} ${styles.cardTextMuted}`
                     : "bg-indigo-500 hover:bg-indigo-600 text-white shadow-sm"
                 }`}
               >
@@ -345,7 +345,7 @@ export default function PolicyEngine() {
               <textarea
                 value={regoContent}
                 onChange={handleRegoChange}
-                className="w-full h-full resize-none p-4 font-mono text-sm leading-relaxed bg-slate-900 text-slate-300 outline-none border-none"
+                className="w-full h-full resize-none p-4 font-mono text-sm leading-relaxed bg-[var(--muted,#0F172A)] text-[var(--card,#CBD5E1)] outline-none border-none"
                 spellCheck={false}
                 placeholder={`package ecos.rbac\n\n# Rego policy content...`}
               />
@@ -356,7 +356,7 @@ export default function PolicyEngine() {
         {/* ── Right: Test Panel ── */}
         <div className="w-80 shrink-0 flex flex-col overflow-hidden">
           {/* Test Header */}
-          <div className="flex items-center gap-2 px-4 py-2 shrink-0 border-b border-slate-200/50 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30">
+          <div className={`flex items-center gap-2 px-4 py-2 shrink-0 border-b ${styles.divider} ${styles.appBg}`}>
             <Terminal className="w-4 h-4 text-emerald-500" />
             <span className="text-xs font-semibold uppercase tracking-wider opacity-70">
               {t("策略测试", "Policy Test")}
@@ -371,7 +371,7 @@ export default function PolicyEngine() {
             <textarea
               value={jsonInput}
               onChange={(e) => { setJsonInput(e.target.value); setEvalResult(null); setEvalError(null); }}
-              className="w-full h-32 resize-none p-3 font-mono text-xs leading-relaxed rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/30 transition-shadow"
+              className={`w-full h-32 resize-none p-3 font-mono text-xs leading-relaxed rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-indigo-500/30 transition-shadow`}
               spellCheck={false}
             />
           </div>
@@ -383,7 +383,7 @@ export default function PolicyEngine() {
               disabled={!selectedPolicy || evaluating}
               className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-semibold transition-all ${
                 !selectedPolicy
-                  ? "opacity-30 cursor-not-allowed bg-slate-200 dark:bg-slate-700 text-slate-500"
+                  ? `opacity-30 cursor-not-allowed ${styles.appBg} ${styles.cardTextMuted}`
                   : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm"
               }`}
             >
@@ -399,14 +399,14 @@ export default function PolicyEngine() {
           {/* Result area */}
           <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
             {evalError ? (
-              <div className="p-3 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <div className={`p-3 rounded ${styles.dangerBg} border ${styles.dangerBorder}`}>
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">
+                    <p className={`text-xs font-semibold ${styles.dangerText} mb-1`}>
                       {t("评估错误", "Evaluation Error")}
                     </p>
-                    <p className="text-xs text-red-600 dark:text-red-300 font-mono break-all">{evalError}</p>
+                    <p className={`text-xs ${styles.dangerText} font-mono break-all`}>{evalError}</p>
                   </div>
                 </div>
               </div>
@@ -442,7 +442,7 @@ export default function PolicyEngine() {
                   <summary className="cursor-pointer opacity-50 hover:opacity-80 font-mono">
                     {t("查看原始响应", "View raw response")}
                   </summary>
-                  <pre className="mt-2 p-2 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[11px] overflow-x-auto">
+                  <pre className={`mt-2 p-2 rounded ${styles.appBg} font-mono text-[11px] overflow-x-auto`}>
                     {JSON.stringify(evalResult, null, 2)}
                   </pre>
                 </details>

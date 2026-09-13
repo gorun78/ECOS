@@ -207,7 +207,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           </div>
           <button
             onClick={handleRefreshAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition-colors border border-slate-700"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm transition-colors border ${styles.inputBorder} ${styles.sidebarHoverBg}`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             {locale === 'zh' ? '刷新全部' : 'Refresh All'}
@@ -220,14 +220,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           {/* ──────────────── Card 1: Engine Health ──────────────── */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-slate-400" />
+              <Activity className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
                 {locale === 'zh' ? '引擎状态' : 'Engine Health'}
               </h3>
             </div>
 
             {healthLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {locale === 'zh' ? '加载中...' : 'Loading...'}
               </div>
@@ -277,14 +277,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           {/* ──────────────── Card 2: Config Info ──────────────── */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
             <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-slate-400" />
+              <Settings className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
                 {locale === 'zh' ? '配置信息' : 'Configuration'}
               </h3>
             </div>
 
             {configLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {locale === 'zh' ? '加载中...' : 'Loading...'}
               </div>
@@ -315,14 +315,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           {/* ──────────────── Card 3: Runtime Status ──────────────── */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
             <div className="flex items-center gap-2">
-              <Server className="w-4 h-4 text-slate-400" />
+              <Server className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
                 {locale === 'zh' ? '运行状态' : 'Runtime Status'}
               </h3>
             </div>
 
             {statusLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {locale === 'zh' ? '加载中...' : 'Loading...'}
               </div>
@@ -369,19 +369,19 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">/health</span>
+              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/health</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {health ? JSON.stringify(health, null, 2) : (healthError || '—')}
               </pre>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">{meta.configPath ? '/settings' : '/config'}</span>
+              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{meta.configPath ? '/settings' : '/config'}</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {config ? JSON.stringify(config, null, 2) : (configError || '—')}
               </pre>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">/status</span>
+              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/status</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {status ? JSON.stringify(status, null, 2) : (statusError || '—')}
               </pre>

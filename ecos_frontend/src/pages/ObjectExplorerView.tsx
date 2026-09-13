@@ -563,7 +563,7 @@ export default function ObjectExplorerView({
                 className={`w-full text-left py-2 px-2.5 rounded-lg flex items-center justify-between transition-all group ${
                   isActive
                     ? `${styles.accentBg} text-white font-semibold shadow-xs`
-                    : `${styles.cardTextMuted} hover:bg-slate-100`
+                    : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
@@ -572,7 +572,7 @@ export default function ObjectExplorerView({
                   </span>
                   <span className="truncate">{ot.displayName}</span>
                 </div>
-                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-blue-500 text-white' : `bg-slate-100 ${styles.cardTextMuted}`}`}>
+                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-blue-500 text-white' : `${styles.appBg} ${styles.cardTextMuted}`}`}>
                   {count}
                 </span>
               </button>
@@ -584,7 +584,7 @@ export default function ObjectExplorerView({
         <div className={`flex-1 border-t ${styles.cardBorder} p-3 space-y-1.5 overflow-y-auto`}>
           <div className="flex justify-between items-center px-2 mb-1">
             <span className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider`}>{t('ow.explore.savedLists')}</span>
-            <span className={`text-[10px] bg-slate-100 ${styles.cardTextMuted} px-1 py-0.2 rounded-sm font-mono`}>{savedSearches.length}</span>
+            <span className={`text-[10px] ${styles.appBg} ${styles.cardTextMuted} px-1 py-0.2 rounded-sm font-mono`}>{savedSearches.length}</span>
           </div>
 
           {savedSearches.length === 0 ? (
@@ -598,7 +598,7 @@ export default function ObjectExplorerView({
                 <div
                   key={search.id}
                   onClick={() => handleLoadSavedSearch(search)}
-                  className={`group flex items-center justify-between p-2 rounded-lg border ${styles.cardBorder} hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 cursor-pointer transition-all`}
+                  className={`group flex items-center justify-between p-2 rounded-lg border ${styles.cardBorder} hover:border-blue-400 ${styles.appBg} hover:bg-blue-50/20 cursor-pointer transition-all`}
                 >
                   <div className="flex items-center gap-1.5 truncate">
                     <Bookmark size={11} className="text-blue-500 shrink-0" />
@@ -632,18 +632,18 @@ export default function ObjectExplorerView({
                 <div>
                   <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-1.5`}>
                     {activeObjectType.displayName}
-                    <span className={`text-[10px] bg-slate-100 ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono uppercase`}>{activeObjectType.id}</span>
+                    <span className={`text-[10px] ${styles.appBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono uppercase`}>{activeObjectType.id}</span>
                   </h2>
                   <p className={`text-[10px] ${styles.muted} mt-0.5`}>{activeObjectType.description}</p>
                 </div>
               </div>
 
               {/* View Selector Tabs */}
-              <div className="flex bg-slate-100 p-1 rounded-lg">
+              <div className={`flex ${styles.appBg} p-1 rounded-lg`}>
                 <button
                   onClick={() => setActiveTab('table')}
                   className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'table' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} hover:text-slate-800`
+                    activeTab === 'table' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <Table2 size={13} />
@@ -652,7 +652,7 @@ export default function ObjectExplorerView({
                 <button
                   onClick={() => setActiveTab('analytics')}
                   className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'analytics' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} hover:text-slate-800`
+                    activeTab === 'analytics' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <BarChart3 size={13} />
@@ -662,7 +662,7 @@ export default function ObjectExplorerView({
             </div>
 
             {/* Quick Filter & Save Search Toolbar */}
-            <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border border-slate-150`}>
+            <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border ${styles.cardBorder}`}>
               <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${styles.cardTextMuted} shrink-0`}>
                 <Filter size={13} />
                 {t('ow.explore.filtersLabel')}
@@ -703,7 +703,7 @@ export default function ObjectExplorerView({
               <div className="relative ml-auto flex items-center gap-2">
                 <button
                   onClick={() => setShowFilterCreator(!showFilterCreator)}
-                  className={`${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-slate-50 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
+                  className={`${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
                 >
                   <Plus size={11} />
                   {t('ow.btn.addFilter')}
@@ -761,14 +761,14 @@ export default function ObjectExplorerView({
                     <div className="flex justify-end gap-1.5 pt-1">
                       <button
                         onClick={() => setShowFilterCreator(false)}
-                        className={`h-7 px-2.5 rounded text-[10px] bg-slate-100 hover:bg-slate-200 ${styles.cardTextMuted}`}
+                        className={`h-7 px-2.5 rounded text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardTextMuted}`}
                       >
                         {t('ow.btn.cancel')}
                       </button>
                       <button
                         onClick={handleAddFilter}
                         disabled={!newFilterProp}
-                        className={`h-7 px-3 rounded text-[10px] ${styles.accentBg} hover:bg-blue-500 text-white disabled:bg-slate-200 disabled:cursor-not-allowed`}
+                        className={`h-7 px-3 rounded text-[10px] ${styles.accentBg} hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {t('ow.btn.applyRule')}
                       </button>
@@ -870,7 +870,7 @@ export default function ObjectExplorerView({
                     <div className="flex-1 overflow-auto">
                       <table className="w-full text-left border-collapse text-xs select-none">
                         <thead>
-                          <tr className={`bg-slate-50/50 border-b ${styles.cardBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>
+                          <tr className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>
                             <th className="py-2.5 px-4 w-10">#</th>
                             {activeObjectType?.properties.map(prop => {
                               const isSorting = sortBy === prop.id;
@@ -881,14 +881,14 @@ export default function ObjectExplorerView({
                                     setSortBy(prop.id);
                                     setSortOrder(isSorting && sortOrder === 'asc' ? 'desc' : 'asc');
                                   }}
-                                  className="py-2.5 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                  className={`py-2.5 px-4 cursor-pointer ${styles.sidebarHoverBg} transition-colors`}
                                 >
                                   <div className="flex items-center gap-1">
                                     <span>{prop.displayName}</span>
                                     {isSorting ? (
                                       <DynamicIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className={styles.accentText} />
                                     ) : (
-                                      <ChevronsUpDown size={10} className={`text-slate-300 group-hover:${styles.cardTextMuted}`} />
+                                      <ChevronsUpDown size={10} className={`${styles.muted} opacity-40`} />
                                     )}
                                   </div>
                                 </th>
@@ -896,7 +896,7 @@ export default function ObjectExplorerView({
                             })}
                           </tr>
                         </thead>
-                        <tbody className={`divide-y divide-slate-100 ${styles.cardTextMuted}`}>
+                        <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
                           {processedInstances.length === 0 ? (
                             <tr>
                               <td colSpan={(activeObjectType?.properties.length || 0) + 1} className={`text-center py-24 ${styles.muted} font-medium italic`}>
@@ -913,7 +913,7 @@ export default function ObjectExplorerView({
                                     setSelectedInstance(inst);
                                     setDetailTab('properties');
                                   }}
-                                  className={`hover:bg-slate-50/70 cursor-pointer transition-colors ${
+                                  className={`${styles.sidebarHoverBg} cursor-pointer transition-colors ${
                                     isSelected ? `bg-blue-50/40 text-blue-950 font-medium border-l-2 ${styles.accentBorder}` : ''
                                   }`}
                                 >
@@ -924,14 +924,14 @@ export default function ObjectExplorerView({
                                     return (
                                       <td key={prop.id} className="py-2.5 px-4">
                                         {isPk ? (
-                                          <span className={`font-mono ${styles.cardText} bg-slate-100 border border-slate-200/80 rounded-md px-1.5 py-0.5 text-[10px] font-semibold`}>
+                                          <span className={`font-mono ${styles.cardText} ${styles.appBg} border ${styles.cardBorder} rounded-md px-1.5 py-0.5 text-[10px] font-semibold`}>
                                             {String(val ?? '')}
                                           </span>
                                         ) : prop.id === 'status' ? (
                                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                             val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
                                             val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800 font-semibold' :
-                                            `bg-slate-100 ${styles.cardTextMuted}`
+                                            `${styles.appBg} ${styles.cardTextMuted}`
                                           }`}>
                                             {String(val ?? '')}
                                           </span>
@@ -955,14 +955,14 @@ export default function ObjectExplorerView({
                           <button
                             disabled={dataPage <= 1}
                             onClick={() => setDataPage(p => Math.max(1, p - 1))}
-                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors`}
+                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed ${styles.sidebarHoverBg} transition-colors`}
                           >
                             {t('ow.btn.previousPage')}
                           </button>
                           <button
                             disabled={dataPage >= dataTotalPages}
                             onClick={() => setDataPage(p => Math.min(dataTotalPages, p + 1))}
-                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors`}
+                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed ${styles.sidebarHoverBg} transition-colors`}
                           >
                             {t('ow.btn.nextPage')}
                           </button>
@@ -989,7 +989,7 @@ export default function ObjectExplorerView({
                     ) : (
                       <div className="grid grid-cols-2 gap-8 items-start">
                         {/* Custom visual distribution bars */}
-                        <div className={`border ${styles.cardBorder} rounded-xl p-5 space-y-3 shadow-3xs bg-slate-50/20`}>
+                        <div className={`border ${styles.cardBorder} rounded-xl p-5 space-y-3 shadow-3xs ${styles.appBg}`}>
                           <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.explore.barChartTitle')}</h4>
                           <div className="space-y-3 pt-2">
                             {(analyticsData as any).data?.map((item: any) => (
@@ -1012,7 +1012,7 @@ export default function ObjectExplorerView({
                                   <span className={`font-medium ${styles.cardTextMuted} group-hover:text-blue-600 font-mono transition-colors`}>{item.name}</span>
                                   <span className={`${styles.cardTextMuted} font-mono`}><strong>{item.count}</strong> {t('ow.label.countUnit')} ({item.percentage}%)</span>
                                 </div>
-                                <div className={`h-4 w-full bg-slate-100 rounded overflow-hidden flex`}>
+                                <div className={`h-4 w-full ${styles.appBg} rounded overflow-hidden flex`}>
                                   <div
                                     className={`${styles.accentBg} group-hover:bg-blue-500 transition-all rounded-r duration-500`}
                                     style={{ width: `${item.percentage}%` } as React.CSSProperties}
@@ -1028,15 +1028,15 @@ export default function ObjectExplorerView({
                           <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.explore.groupCountTable')}</h4>
                           <table className="w-full text-left border-collapse text-[11px]">
                             <thead>
-                              <tr className={`border-b border-slate-100 ${styles.muted}`}>
+                              <tr className={`border-b ${styles.cardBorder} ${styles.muted}`}>
                                 <th className="pb-2">{t('ow.explore.groupCategory')}</th>
                                 <th className="pb-2 text-right">{t('ow.explore.instanceCount')}</th>
                                 <th className="pb-2 text-right">{t('ow.explore.percentage')}</th>
                               </tr>
                             </thead>
-                            <tbody className={`divide-y divide-slate-50 ${styles.cardTextMuted}`}>
+                            <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
                               {(analyticsData as any).data?.map((item: any) => (
-                                <tr key={item.name} className="hover:bg-slate-50">
+                                <tr key={item.name} className={styles.sidebarHoverBg}>
                                   <td className={`py-2 font-mono ${styles.cardTextMuted} font-medium`}>{item.name}</td>
                                   <td className={`py-2 text-right font-mono font-semibold ${styles.cardText}`}>{item.count}</td>
                                   <td className={`py-2 text-right font-mono ${styles.cardTextMuted}`}>{item.percentage}%</td>
@@ -1061,7 +1061,7 @@ export default function ObjectExplorerView({
                 <div className={`w-96 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-hidden relative`}>
                   
                   {/* Detailed Panel Header */}
-                  <div className={`p-4 border-b ${styles.cardBorder} bg-slate-50/50 flex flex-col gap-3`}>
+                  <div className={`p-4 border-b ${styles.cardBorder} ${styles.appBg} flex flex-col gap-3`}>
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
@@ -1069,14 +1069,14 @@ export default function ObjectExplorerView({
                         </span>
                         <div>
                           <div className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider`}>{activeObjectType.displayName} {t('ow.explore.detail')}</div>
-                          <h3 className={`text-xs font-bold font-mono text-slate-950 mt-0.5`}>
+                          <h3 className={`text-xs font-bold font-mono ${styles.appText} mt-0.5`}>
                             {selectedInstance[activeObjectType.titleProperty]}
                           </h3>
                         </div>
                       </div>
                       <button
                         onClick={() => setSelectedInstance(null)}
-                        className={`p-1 rounded hover:bg-slate-200 ${styles.muted} hover:text-slate-700`}
+                        className={`p-1 rounded ${styles.sidebarHoverBg} ${styles.muted} hover:opacity-70`}
                       >
                         <X size={14} />
                       </button>
@@ -1109,11 +1109,11 @@ export default function ObjectExplorerView({
                   </div>
 
                   {/* Panel Tab switch */}
-                  <div className={`flex border-b border-slate-100 px-2 text-[11px] font-medium bg-slate-50/20`}>
+                  <div className={`flex border-b ${styles.cardBorder} px-2 text-[11px] font-medium ${styles.appBg}`}>
                     <button
                       onClick={() => setDetailTab('properties')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'properties' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
+                        detailTab === 'properties' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                       }`}
                     >
                       {t('ow.explore.tabProperties')}
@@ -1121,7 +1121,7 @@ export default function ObjectExplorerView({
                     <button
                       onClick={() => setDetailTab('relations')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all flex items-center justify-center gap-1 ${
-                        detailTab === 'relations' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
+                        detailTab === 'relations' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                       }`}
                     >
                       {t('ow.explore.tabRelations')} ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
@@ -1129,7 +1129,7 @@ export default function ObjectExplorerView({
                     <button
                       onClick={() => setDetailTab('activity')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'activity' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
+                        detailTab === 'activity' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                       }`}
                     >
                       {t('ow.explore.tabActivity')}
@@ -1147,21 +1147,21 @@ export default function ObjectExplorerView({
                           const isPk = p.isPrimaryKey;
 
                           return (
-                            <div key={p.id} className={`p-2.5 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50/30 transition-colors`}>
+                            <div key={p.id} className={`p-2.5 rounded-lg border ${styles.cardBorder} ${styles.sidebarHoverBg} hover:bg-blue-50/10 transition-colors`}>
                               <div className={`flex items-center justify-between text-[10px] ${styles.muted} font-mono`}>
                                 <span className={`font-semibold ${styles.cardTextMuted}`}>{p.displayName}</span>
                                 <span className="uppercase">{p.dataType}</span>
                               </div>
                               <div className={`mt-1 font-mono text-xs font-semibold ${styles.cardText} flex items-center justify-between`}>
                                 {isPk ? (
-                                  <span className={`bg-slate-150 border ${styles.cardBorder} ${styles.cardText} rounded px-1.5 py-0.5 text-[10px]`}>
+                                  <span className={`${styles.appBg} border ${styles.cardBorder} ${styles.cardText} rounded px-1.5 py-0.5 text-[10px]`}>
                                     {String(val ?? t('ow.label.unspecifiedValue'))}
                                   </span>
                                 ) : p.id === 'status' ? (
                                   <span className={`px-1.5 py-0.5 rounded text-[10px] ${
                                     val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
                                     val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800' :
-                                    `bg-slate-100 ${styles.cardTextMuted}`
+                                    `${styles.appBg} ${styles.cardTextMuted}`
                                   }`}>
                                     {String(val ?? 'N/A')}
                                   </span>
@@ -1194,9 +1194,9 @@ export default function ObjectExplorerView({
                         ) : (
                           <div className="space-y-4">
                             {resolvedRelations.map(rel => (
-                              <div key={rel.linkType.id} className={`space-y-2 border border-slate-200/60 rounded-lg p-3 bg-slate-50/10`}>
+                              <div key={rel.linkType.id} className={`space-y-2 border ${styles.cardBorder} rounded-lg p-3 ${styles.appBg}`}>
                                 {/* Header */}
-                                <div className={`flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-100`}>
+                                <div className={`flex items-center justify-between text-[11px] pb-1.5 border-b ${styles.divider}`}>
                                   <div className={`flex items-center gap-1.5 font-semibold ${styles.cardText}`}>
                                     <GitMerge size={12} className="text-emerald-600" />
                                     <span>{rel.linkType.displayName}</span>
@@ -1210,7 +1210,7 @@ export default function ObjectExplorerView({
 
                                 {/* List matching connected instances */}
                                 {rel.instances.length === 0 ? (
-                                  <div className={`text-[10px] ${styles.muted} italic bg-slate-50 p-2 rounded text-center`}>
+                                  <div className={`text-[10px] ${styles.muted} italic ${styles.appBg} p-2 rounded text-center`}>
                                     {t('ow.empty.noRelatedInstances').replace('{name}', rel.otherObjectType.displayName)}
                                   </div>
                                 ) : (
@@ -1219,7 +1219,7 @@ export default function ObjectExplorerView({
                                       <div
                                         key={inst[rel.otherObjectType.primaryKey]}
                                         onClick={() => handleJumpToInstance(rel.otherObjectType.id, inst[rel.otherObjectType.primaryKey])}
-                                        className={`p-2 border border-slate-150 hover:border-blue-400 ${styles.cardBg} hover:bg-blue-50/10 rounded-md cursor-pointer flex justify-between items-center transition-all group`}
+                                        className={`p-2 border ${styles.cardBorder} hover:border-blue-400 ${styles.cardBg} hover:bg-blue-50/10 rounded-md cursor-pointer flex justify-between items-center transition-all group`}
                                       >
                                         <div className="flex items-center gap-2 truncate">
                                           <span className={`p-1 rounded ${rel.otherObjectType.color}`}>
