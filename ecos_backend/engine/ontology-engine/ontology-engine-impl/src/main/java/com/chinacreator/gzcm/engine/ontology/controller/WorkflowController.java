@@ -53,6 +53,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p>动态结构豁免（标 {@code // T16-4: ... 动态结构豁免 Map}）：
  * 测试/预览的执行步迹与运行时上下文、导出 blob（$schema/nodes/edges）。
+ *
+ * <p><b>Wave D T18: 双路径收敛登记</b> — 本 Controller 与
+ * {@link com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController}
+ * （services/buszhi/impl）映射同一路由 {@code /api/v1/ecos/workflows}，
+ * 属双跑并存期（ADR-7 兼容期）。gateway fat-JAR 当前走
+ * GatewayApplication excludeFilters 排除 buszhi 侧副本（ontology 副本存活），
+ * buszhi 微服务走 BuszhiServiceApplication excludeFilters 排除本副本（buszhi 副本存活）。
+ * 物理下线待 buszhi 聚合 E2E + gateway live check 后执行；
+ * 跟踪: docs/11-运维/t18-route-consolidation-checklist.md
  */
 @RestController
 @RequestMapping("/api/v1/ecos/workflows")
