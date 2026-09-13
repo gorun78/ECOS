@@ -41,5 +41,5 @@ public interface DecisionService {
 - 不 import `*-engine-impl`（违反架构铁律 2.1 = 验收失败）。
 - 不硬编码 token / BOD / metadata（模型是纯 POJO，禁止 `@Value` 字面量）。
 - 不管理 DB 表（`compliance_rules` 表归 kb-engine 所有，本模块 model 仅持读视图 `RuleRef`）。
-- 新增 DB 表严禁（顶层红线 #2：推理结果实时计算，不持久化）。
+- DB 落盘口径按顶层 ADR-9 三档（PMO-59 P0）：推理**结果**不落盘（实时计算）；模型**资产**（`ecos_cognitive_model`）与认知**心智状态**（`ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`，DDL V127~V129 归 cognitive-engine 所有，本 api 仅持 VO/接口引用）。心智层 VO 契约（`EvidenceRecordVO`/`HypothesisVO`/`BeliefDistributionVO`）随 ADR-9 提升至 common-api（跨 dccheng/workspace 共享，同 ICopilotService 模式）；本模块新增 `IUncertaintyJudgementService`/`IHypothesisLifecycleService` 两接口引用之。
 - 不在此 api 内 `@Value` 或 `@ConfigurationProperties`（配置归 impl 或 boot）。

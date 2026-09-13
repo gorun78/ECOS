@@ -46,7 +46,7 @@ public CausalChainResult diagnose(DiagnosisRequest req) {
 
 ## 禁止
 - **不直接 import `kb-engine-impl` / `*-engine-impl**`**（顶层红线 #1，违反 = 验收失败）。
-- **不新增数据库表**（顶层红线 #2，ADR-8 口径修订，PMO-50 决策 1：推理**结果**实时计算不落盘；模型**资产**注册除外，落 `ecos_cognitive_model`）。
+- **DB 落盘按 ADR-9 三档口径**（顶层红线 #2 修订，PMO-59 P0）：推理**结果**实时计算不落盘；模型**资产**注册落 `ecos_cognitive_model`（ADR-8，PMO-51）；认知**心智状态**（`ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`，DDL V127~V129，PMO-59 P0）落盘。impl 落盘实现（Mapper/Service/Controller）留待 Phase 2；Phase 1 仅契约（api 层 `IUncertaintyJudgementService`/`IHypothesisLifecycleService`）。
 - **不引入规则引擎**（顶层红线 #3：SpEL 表达式评估即可，不要引入 jBoss Drools / Easy Rules）。
 - 不直接 LLM 调用（LLM 走 `llm-gateway`）。
 - 不硬编码 token / BOD / metadata（cross-engine 凭据走 `RestTemplate` 注入的 `restTemplate` Bean，不在 Service 字面量）。
