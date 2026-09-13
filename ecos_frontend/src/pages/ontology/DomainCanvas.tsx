@@ -386,7 +386,7 @@ export default function DomainCanvas({
       <div className={`absolute inset-0 flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center">
           <Loader2 size={28} className="animate-spin text-indigo-400 mx-auto mb-3" />
-          <p className="text-xs text-slate-500">{t("ontology.designer.loadingDomainData")}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("ontology.designer.loadingDomainData")}</p>
         </div>
       </div>
     );
@@ -401,7 +401,7 @@ export default function DomainCanvas({
           <p className="text-xs text-red-400 mb-3">{error}</p>
           <button
             onClick={onRetry}
-            className="px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600"
+            className={`px-4 py-1.5 rounded-lg text-xs ${styles.inputBg} ${styles.sidebarText} hover:opacity-80 transition`}
           >
             {t("ontology.designer.retry")}
           </button>
@@ -415,9 +415,9 @@ export default function DomainCanvas({
     return (
       <div className={`absolute inset-0 flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center">
-          <Network size={40} className="mx-auto mb-3 opacity-20 text-slate-500" />
-          <p className="text-sm text-slate-500 mb-2">{t("ontology.designer.emptyDomain")}</p>
-          <p className="text-[11px] text-slate-600">
+          <Network size={40} className={`mx-auto mb-3 opacity-20 ${styles.muted}`} />
+          <p className={`text-sm ${styles.muted} mb-2`}>{t("ontology.designer.emptyDomain")}</p>
+          <p className={`text-[11px] ${styles.muted} opacity-80`}>
             {t("ontology.designer.clickEntityToCreate")}
           </p>
         </div>
@@ -672,14 +672,14 @@ export default function DomainCanvas({
         if (!rel) return null;
         return (
           <div
-            className="fixed z-[9998] pointer-events-none px-2.5 py-1.5 rounded-lg
-              bg-slate-800 border border-slate-600 shadow-xl text-[11px] text-slate-200
-              whitespace-nowrap"
+            className={`fixed z-[9998] pointer-events-none px-2.5 py-1.5 rounded-lg
+              bg-[var(--card,#0F172A)] border ${styles.cardBorder} shadow-xl text-[11px] ${styles.cardText}
+              whitespace-nowrap`}
             style={{ left: tooltipPos.x + 12, top: tooltipPos.y - 10 }}
           >
             <span className="font-mono text-indigo-300">{rel.code}</span>
-            {rel.name && <span className="text-slate-400 ml-1.5">{rel.name}</span>}
-            <span className="text-slate-600 ml-1.5">({rel.relationshipType})</span>
+            {rel.name && <span className={`ml-1.5 ${styles.cardTextMuted}`}>{rel.name}</span>}
+            <span className={`ml-1.5 ${styles.muted} opacity-80`}>({rel.relationshipType})</span>
           </div>
         );
       })()}

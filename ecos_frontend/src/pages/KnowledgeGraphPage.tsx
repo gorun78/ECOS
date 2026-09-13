@@ -57,7 +57,7 @@ export default function KnowledgeGraphPage() {
         <Network className="w-7 h-7 text-indigo-500" />
         <div>
           <h1 className={`text-2xl font-bold ${styles.cardText}`}>{t("企业知识图谱")}</h1>
-          <p className={`text-sm text-slate-400 mt-1`}>
+          <p className={`text-sm ${styles.cardTextMuted} mt-1`}>
             {stats.nodeCount} {t("实体")} · {stats.edgeCount} {t("关系")} · {(stats.domains || []).length} {t("业务域")}
           </p>
         </div>
@@ -73,7 +73,7 @@ export default function KnowledgeGraphPage() {
       {/* Domain-based groups */}
       <div className="space-y-4">
         {Object.entries(byDomain).map(([domain, domainNodes]) => (
-          <div key={domain} className={`${styles.cardBg} dark:bg-slate-800 rounded-xl border ${styles.cardBorder} p-5`}>
+          <div key={domain} className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
             <div className="flex items-center gap-2 mb-3">
               <span className={`text-xs px-2 py-1 rounded border font-medium ${domainColors[domain] || "bg-slate-100"}`}>
                 {domain}
@@ -82,7 +82,7 @@ export default function KnowledgeGraphPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {domainNodes.map((n: any) => (
-                <span key={n.code} className={`px-3 py-1.5 rounded-lg border ${styles.cardBorder} text-sm bg-slate-50 dark:bg-slate-900/50 ${styles.cardText}`}>
+                <span key={n.code} className={`px-3 py-1.5 rounded-lg border ${styles.cardBorder} text-sm ${styles.appBg} ${styles.cardText}`}>
                   {n.name}
                   <span className={`text-[10px] ${styles.cardTextMuted} ml-1 font-mono`}>{n.code}</span>
                 </span>
@@ -93,11 +93,11 @@ export default function KnowledgeGraphPage() {
       </div>
 
       {/* Edges */}
-      <div className={`mt-6 ${styles.cardBg} dark:bg-slate-800 rounded-xl border ${styles.cardBorder} p-5`}>
-        <h3 className="text-sm font-semibold mb-3">{t("语义关系")} ({edges.length})</h3>
+      <div className={`mt-6 ${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
+        <h3 className={`text-sm font-semibold mb-3 ${styles.cardText}`}>{t("语义关系")} ({edges.length})</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {edges.map((e: any, i: number) => (
-            <div key={i} className={`flex items-center gap-2 p-2 rounded bg-slate-50 dark:bg-slate-900/50 text-xs ${styles.cardText}`}>
+            <div key={i} className={`flex items-center gap-2 p-2 rounded ${styles.appBg} text-xs ${styles.cardText}`}>
               <span className="font-mono">{e.source}</span>
               <span className="text-[10px] px-1 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600">{e.relationshipType}</span>
               <span className="font-mono">{e.target}</span>
@@ -116,7 +116,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: any; label: strin
     amber: "bg-amber-50 dark:bg-amber-900/20 text-amber-600",
   };
   return (
-    <div className={`${styles.cardBg} dark:bg-slate-800 rounded-xl border ${styles.cardBorder} p-4 flex items-center gap-3`}>
+    <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-4 flex items-center gap-3`}>
       <div className={`p-2 rounded-lg ${colors[color]}`}><Icon className="w-5 h-5" /></div>
       <div><p className={`text-xs ${styles.cardTextMuted}`}>{label}</p><p className={`text-xl font-bold ${styles.cardText}`}>{value}</p></div>
     </div>

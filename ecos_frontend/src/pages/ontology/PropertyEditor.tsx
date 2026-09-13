@@ -42,7 +42,7 @@ export default function PropertyEditor({
 
   if (!entity) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-500">
+      <div className={`flex-1 flex items-center justify-center ${styles.muted}`}>
         <div className="text-center p-6">
           <Eye size={32} className="mx-auto mb-2 opacity-20" />
           <p className="text-xs">{t("ontology.designer.selectEntityDetail")}</p>
@@ -62,17 +62,17 @@ export default function PropertyEditor({
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <div className="flex items-center gap-2 mb-2">
           {config.icon}
-          <h3 className="text-sm font-semibold text-white">
+          <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             {entity.name || entity.code}
           </h3>
         </div>
-        <p className="text-[10px] font-mono text-slate-500">{entity.code}</p>
+        <p className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{entity.code}</p>
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">
+          <span className={`text-[10px] px-2 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
             {getEntityTypeLabel(entity.entityType, t)}
           </span>
           {entity.entityType && (
-            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">
+            <span className={`text-[10px] px-2 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
               {entity.entityType}
             </span>
           )}
@@ -81,37 +81,37 @@ export default function PropertyEditor({
 
       {/* 基本信息 */}
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
-        <h4 className="text-[11px] font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-          <Edit3 size={11} className="text-slate-500" />
+        <h4 className={`text-[11px] font-semibold ${styles.cardText} mb-2 flex items-center gap-1.5`}>
+          <Edit3 size={11} className={styles.muted} />
           {t("ontology.designer.basicInfo")}
         </h4>
         <div className="space-y-1.5 text-[11px]">
           <div className="flex justify-between">
-            <span className="text-slate-500">{t("ontology.designer.code")}</span>
-            <span className="text-white font-mono">{entity.code}</span>
+            <span className={styles.muted}>{t("ontology.designer.code")}</span>
+            <span className={`${styles.cardText} font-mono`}>{entity.code}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">{t("ontology.designer.name")}</span>
-            <span className="text-white">{entity.name}</span>
+            <span className={styles.muted}>{t("ontology.designer.name")}</span>
+            <span className={styles.cardText}>{entity.name}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">{t("ontology.designer.type")}</span>
-            <span className="text-white">
+            <span className={styles.muted}>{t("ontology.designer.type")}</span>
+            <span className={styles.cardText}>
               {getEntityTypeLabel(entity.entityType, t)} ({entity.entityType})
             </span>
           </div>
           {entity.description && (
             <div className="pt-1">
-              <span className="text-slate-500">{t("ontology.designer.description")}</span>
-              <p className="text-white mt-0.5 text-[10px] leading-relaxed">
+              <span className={styles.muted}>{t("ontology.designer.description")}</span>
+              <p className={`${styles.cardText} mt-0.5 text-[10px] leading-relaxed`}>
                 {entity.description}
               </p>
             </div>
           )}
           {entity.createdAt && (
             <div className="flex justify-between">
-              <span className="text-slate-500">{t("ontology.designer.createdAt")}</span>
-              <span className="text-white text-[10px]">{entity.createdAt}</span>
+              <span className={styles.muted}>{t("ontology.designer.createdAt")}</span>
+              <span className={`${styles.cardText} text-[10px]`}>{entity.createdAt}</span>
             </div>
           )}
         </div>
@@ -120,8 +120,8 @@ export default function PropertyEditor({
       {/* 关联关系 */}
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-            <GitBranch size={11} className="text-slate-500" />
+          <h4 className={`text-[11px] font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+            <GitBranch size={11} className={styles.muted} />
             {t('ontology.designer.relationshipsCount', { count: relationships.length })}
           </h4>
           {allEntities.length > 1 && (
@@ -135,7 +135,7 @@ export default function PropertyEditor({
         </div>
 
         {relationships.length === 0 ? (
-          <p className="text-[10px] text-slate-600 text-center py-3">{t("ontology.designer.noRelationships")}</p>
+          <p className={`text-[10px] ${styles.muted} text-center py-3 opacity-80`}>{t("ontology.designer.noRelationships")}</p>
         ) : (
           <div className="space-y-1">
             {relationships.map((rel) => {
@@ -146,13 +146,13 @@ export default function PropertyEditor({
               return (
                 <div
                   key={rel.id}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded hover:${styles.cardBg}/[0.03] text-[10px]`}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded ${styles.sidebarHoverBg} text-[10px]`}
                 >
                   <span className={isSource ? 'text-emerald-400' : 'text-blue-400'}>
                     {isSource ? '→' : '←'}
                   </span>
-                  <span className="text-slate-300 flex-1">{rel.code}</span>
-                  <span className="text-slate-500 font-mono">
+                  <span className={`${styles.cardText} flex-1`}>{rel.code}</span>
+                  <span className={`${styles.muted} font-mono`}>
                     {otherEntity?.code || otherId?.slice(0, 8)}
                   </span>
                 </div>
@@ -165,15 +165,15 @@ export default function PropertyEditor({
       {/* 属性列表 (Sprint 3 占位) */}
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-            <List size={11} className="text-slate-500" />
+          <h4 className={`text-[11px] font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+            <List size={11} className={styles.muted} />
             {t("ontology.designer.propertyList")}
           </h4>
-          <span className="text-[9px] text-slate-600">{t("ontology.designer.sprint3Impl")}</span>
+          <span className={`text-[9px] ${styles.muted} opacity-80`}>{t("ontology.designer.sprint3Impl")}</span>
         </div>
         <div className="text-center py-4">
-          <SlidersHorizontal size={20} className="mx-auto mb-1 opacity-20 text-slate-500" />
-          <p className="text-[10px] text-slate-600">{t("ontology.designer.propertyEditHere")}</p>
+          <SlidersHorizontal size={20} className={`mx-auto mb-1 opacity-20 ${styles.muted}`} />
+          <p className={`text-[10px] ${styles.muted}`}>{t("ontology.designer.propertyEditHere")}</p>
         </div>
       </div>
 

@@ -33,12 +33,12 @@ export default function PropertiesTab({
             placeholder={t('ow.placeholder.newPropertyName')}
             value={newPropName}
             onChange={e => setNewPropName(e.target.value)}
-            className={`px-3 py-1 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden`}
+            className={`px-3 py-1 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
           />
           <select
             value={newPropType}
             onChange={e => setNewPropType(e.target.value as any)}
-            className={`px-2 py-1 text-xs border border-gray-300 rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
+            className={`px-2 py-1 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
           >
             <option value="string">{t('ow.prop.typeString')}</option>
             <option value="integer">{t('ow.prop.typeInteger')}</option>
@@ -71,16 +71,16 @@ export default function PropertiesTab({
               <th className="py-2.5 px-4 text-center">{t('ow.label.actions')}</th>
             </tr>
           </thead>
-          <tbody className={`divide-y divide-gray-100 ${styles.cardTextMuted}`}>
+          <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
             {objectType.properties.map(prop => (
-              <tr key={prop.id} className={`hover:bg-slate-50/50 transition-colors`}>
+              <tr key={prop.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="py-2.5 px-4 text-center">
                   <button
                     onClick={() => handleTogglePrimaryKey(prop.id)}
                     className={`p-1.5 rounded-full transition-colors ${
                       objectType.primaryKey === prop.id
                         ? 'text-amber-500 hover:bg-amber-50'
-                        : `text-slate-300 hover:text-slate-400 ${styles.sidebarHoverBg}`
+                        : `${styles.cardTextMuted} opacity-30 hover:opacity-60 ${styles.sidebarHoverBg}`
                     }`}
                     title={objectType.primaryKey === prop.id ? t('ow.btn.currentPrimaryKey') : t('ow.btn.setPrimaryKey')}
                   >
@@ -92,7 +92,7 @@ export default function PropertiesTab({
                     type="text"
                     value={prop.displayName}
                     onChange={e => handlePropertyFieldChange(prop.id, 'displayName', e.target.value)}
-                    className={`font-medium ${styles.cardText} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1`}
+                    className={`font-medium ${styles.cardText} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1`}
                   />
                 </td>
                 <td className={`py-2.5 px-4 font-mono ${styles.cardTextMuted}`}>
@@ -100,7 +100,7 @@ export default function PropertiesTab({
                     type="text"
                     value={prop.apiName}
                     onChange={e => handlePropertyFieldChange(prop.id, 'apiName', e.target.value)}
-                    className="border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full"
+                    className="border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full"
                   />
                 </td>
                 <td className="py-2.5 px-4">
@@ -123,7 +123,7 @@ export default function PropertiesTab({
                     type="text"
                     value={prop.description}
                     onChange={e => handlePropertyFieldChange(prop.id, 'description', e.target.value)}
-                    className={`${styles.cardTextMuted} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full`}
+                    className={`${styles.cardTextMuted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full`}
                     placeholder={t('ow.placeholder.noDescription')}
                   />
                 </td>

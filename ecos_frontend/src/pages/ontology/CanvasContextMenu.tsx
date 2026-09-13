@@ -118,8 +118,8 @@ export default function CanvasContextMenu({
       style={{ left: adjustedX, top: adjustedY }}
     >
       {/* 实体名头部 */}
-      <div className="px-3 py-1.5 border-b border-slate-700/50">
-        <span className="text-[10px] font-mono text-slate-400 truncate block">
+      <div className={`px-3 py-1.5 border-b ${styles.divider}`}>
+        <span className={`text-[10px] font-mono ${styles.muted} truncate block`}>
           {entityCode}
         </span>
       </div>
@@ -132,13 +132,13 @@ export default function CanvasContextMenu({
             onClose();
           }}
           className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs
-            hover:bg-slate-700/50 transition-colors text-left
-            ${item.danger ? 'text-red-400 hover:text-red-300' : 'text-slate-300 hover:text-white'}`}
+            ${styles.sidebarHoverBg} transition-colors text-left
+            ${item.danger ? 'text-red-400 hover:text-red-300' : `${styles.cardText} opacity-80 hover:opacity-100`}`}
         >
           <span className="shrink-0">{item.icon}</span>
           <span className="flex-1">{t(item.labelKey)}</span>
           {item.hotkey && (
-            <span className="text-[9px] text-slate-600 ml-4">{item.hotkey}</span>
+            <span className={`text-[9px] ${styles.muted} opacity-80 ml-4`}>{item.hotkey}</span>
           )}
         </button>
       ))}

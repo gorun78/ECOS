@@ -56,15 +56,15 @@ export default function ParametersTab({
             <th className="py-2.5 px-4">{t('ow.label.paramDataType')}</th><th className="py-2.5 px-4">{t('ow.label.objectBindingType')}</th><th className="py-2.5 px-4">{t('ow.label.paramDescription')}</th>
             <th className="py-2.5 px-4 text-center">{t('ow.label.actions')}</th>
           </tr></thead>
-          <tbody className={`divide-y divide-gray-100 ${styles.cardTextMuted}`}>
+          <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
             {actionType.parameters.map(param => (
               <tr key={param.id} className={`hover:${styles.appBg}`}>
                 <td className="py-2.5 px-4"><input type="checkbox" checked={param.isRequired} onChange={e => handleParamFieldChange(param.id, 'isRequired', e.target.checked)} className={`rounded ${styles.cardBorder} ${styles.accentText} h-3.5 w-3.5`} /></td>
-                <td className="py-2.5 px-4"><input type="text" value={param.displayName} onChange={e => handleParamFieldChange(param.id, 'displayName', e.target.value)} className={`font-medium ${styles.cardText} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5`} /></td>
+                <td className="py-2.5 px-4"><input type="text" value={param.displayName} onChange={e => handleParamFieldChange(param.id, 'displayName', e.target.value)} className={`font-medium ${styles.cardText} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5`} /></td>
                 <td className={`py-2.5 px-4 font-mono ${styles.muted}`}>{param.id}</td>
                 <td className={`py-2.5 px-4 font-mono ${styles.cardTextMuted}`}>{param.dataType}</td>
                 <td className="py-2.5 px-4">{param.dataType === 'object' ? (<div className={`flex items-center gap-1 ${styles.accentText} font-semibold cursor-pointer`} onClick={() => param.objectTypeId && onNavigateToObject(param.objectTypeId)}><Box size={12} /><span>{objectTypes.find(o => o.id === param.objectTypeId)?.displayName || param.objectTypeId}</span></div>) : (<span className={`${styles.muted} font-mono`}>—</span>)}</td>
-                <td className="py-2.5 px-4"><input type="text" value={param.description} onChange={e => handleParamFieldChange(param.id, 'description', e.target.value)} className={`${styles.muted} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`} placeholder={t('ow.placeholder.paramDescription')} /></td>
+                <td className="py-2.5 px-4"><input type="text" value={param.description} onChange={e => handleParamFieldChange(param.id, 'description', e.target.value)} className={`${styles.muted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`} placeholder={t('ow.placeholder.paramDescription')} /></td>
                 <td className="py-2.5 px-4 text-center"><button onClick={() => handleRemoveParam(param.id)} className={`${styles.muted} hover:text-red-500 p-1 rounded`}><X size={14} /></button></td>
               </tr>
             ))}

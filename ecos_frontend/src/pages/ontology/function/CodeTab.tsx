@@ -52,8 +52,8 @@ export default function CodeTab({ func, handleFieldChange, loadTemplate }: CodeT
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden relative">
-        <div className="px-4 py-2 border-b border-slate-800 flex justify-between items-center text-[10px] text-slate-400 select-none font-mono">
+      <div className="flex-1 flex flex-col bg-[var(--card,#0B0F19)] overflow-hidden relative">
+        <div className="px-4 py-2 border-b border-[var(--card,#1E293B)] flex justify-between items-center text-[10px] text-[var(--card,#94A3B8)] select-none font-mono">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>TypeScript 1.84 - ECOS API Sync: ACTIVE</span>
@@ -61,11 +61,11 @@ export default function CodeTab({ func, handleFieldChange, loadTemplate }: CodeT
           <div className="flex items-center gap-3"><span>UTF-8</span><span>Tab Size: 4</span></div>
         </div>
         <div className="flex-1 flex font-mono text-xs overflow-hidden leading-relaxed">
-          <div className="w-12 bg-slate-950 text-slate-600 text-right pr-3 select-none pt-4 flex flex-col">
+          <div className="w-12 bg-[var(--card,#020617)] text-[var(--card,#64748B)] text-right pr-3 select-none pt-4 flex flex-col">
             {Array.from({ length: 45 }).map((_, i) => (<div key={i}>{i + 1}</div>))}
           </div>
           <textarea value={func.code} onChange={e => handleFieldChange('code', e.target.value)}
-            className="flex-1 bg-slate-900 text-slate-150 p-4 border-0 focus:outline-hidden font-mono text-xs resize-none h-full overflow-y-auto leading-relaxed outline-hidden"
+            className="flex-1 bg-[var(--card,#0B0F19)] text-[var(--card,#CBD5E1)] p-4 border-0 focus:outline-hidden font-mono text-xs resize-none h-full overflow-y-auto leading-relaxed outline-hidden"
             spellCheck="false" />
         </div>
       </div>

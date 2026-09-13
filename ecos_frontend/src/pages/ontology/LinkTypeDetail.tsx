@@ -142,11 +142,11 @@ export default function LinkTypeView({
 
             {/* Link line with arrows and cardinality */}
             <div className="flex-1 max-w-[120px] flex flex-col items-center justify-center relative">
-              <div className={`text-[10px] font-bold ${styles.muted} bg-slate-200 px-2 py-0.5 rounded-full font-mono mb-2`}>
+              <div className={`text-[10px] font-bold ${styles.muted} ${styles.appBg} px-2 py-0.5 rounded-full font-mono mb-2`}>
                 {linkType.cardinality}
               </div>
-              <div className="w-full h-0.5 bg-slate-300 relative flex items-center justify-center">
-                <div className="absolute right-0 w-1.5 h-1.5 border-t-2 border-r-2 border-slate-400 transform rotate-45" />
+              <div className={`w-full h-0.5 ${styles.appBorder} relative flex items-center justify-center`}>
+                <div className={`absolute right-0 w-1.5 h-1.5 border-t-2 border-r-2 ${styles.cardTextMuted.replace('text-', 'border-')} transform rotate-45`} />
               </div>
               <div className={`text-[10px] ${styles.muted} font-medium mt-1 truncate max-w-full`}>
                 {linkType.displayName}
@@ -174,7 +174,7 @@ export default function LinkTypeView({
         {/* Configurations */}
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-4">
-            <h4 className={`text-xs font-semibold ${styles.cardText} border-b border-gray-100 pb-2`}>{t('ow.section.basicInfo')}</h4>
+            <h4 className={`text-xs font-semibold ${styles.cardText} border-b ${styles.divider} pb-2`}>{t('ow.section.basicInfo')}</h4>
             <div className="space-y-3">
               <div className="space-y-1">
                 <label className={`text-xs ${styles.cardTextMuted} font-medium`}>{t('ow.label.displayName')}</label>
@@ -220,7 +220,7 @@ export default function LinkTypeView({
 
           {/* Mapping settings */}
           <div className="space-y-4">
-            <h4 className={`text-xs font-semibold ${styles.cardText} border-b border-gray-100 pb-2`}>{t('ow.section.dbMapping')}</h4>
+            <h4 className={`text-xs font-semibold ${styles.cardText} border-b ${styles.divider} pb-2`}>{t('ow.section.dbMapping')}</h4>
             
             <div className="space-y-3">
               <div className="space-y-1">

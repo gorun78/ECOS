@@ -429,7 +429,7 @@ export default function KnowledgeGraphHome() {
           <p className={`text-xs ${styles.muted}`}>{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 transition"
+            className={`mt-4 px-4 py-1.5 rounded-lg text-xs transition ${styles.inputBg} ${styles.sidebarText} hover:opacity-80`}
           >
             重新加载
           </button>
