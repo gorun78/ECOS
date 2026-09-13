@@ -5,10 +5,12 @@
 
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { useLanguage } from "../../components/LanguageContext";
+import { useTheme } from "../../components/ThemeContext";
 import { NODE_TYPES, BoxIcon } from "./helpers";
 
 export default function DesignerNode({ data, type, selected }: NodeProps) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const def = NODE_TYPES[type as keyof typeof NODE_TYPES] || { icon: BoxIcon, color: "border-gray-300 bg-white", dot: "bg-gray-400" };
   const Icon = def.icon || BoxIcon;
   const label = (data.label as string) || t(`wf.node_type.${type}`);
@@ -19,19 +21,19 @@ export default function DesignerNode({ data, type, selected }: NodeProps) {
   return (
     <div className={`relative min-w-[140px] rounded-xl border-2 shadow-sm ${def.color} ${selected ? "ring-2 ring-indigo-400" : ""}`}>
       {!isStart && (
-        <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white" />
+        <Handle type="target" position={Position.Top} className={`!w-3 !h-3 ${styles.divider} !border-2`} />
       )}
       <div className="px-3 py-2.5 flex items-center gap-2">
-        <div className={`p-1 rounded-lg ${selected ? "bg-white" : "bg-white/70"}`}>
-          <Icon className="w-4 h-4 text-slate-600" />
+        <div className={`p-1 rounded-lg ${selected ? styles.cardBg : styles.appBg}`}>
+          <Icon className={`w-4 h-4 ${styles.cardText}`} />
         </div>
         <div className="min-w-0">
-          <div className="text-xs font-bold text-slate-700 truncate">{label}</div>
-          <div className="text-[9px] text-slate-400">{nodeTypeLabel}</div>
+          <div className={`text-xs font-bold ${styles.cardText} truncate`}>{label}</div>
+          <div className={`text-[9px] ${styles.cardTextMuted}`}>{nodeTypeLabel}</div>
         </div>
       </div>
       {!isEnd && (
-        <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white" />
+        <Handle type="source" position={Position.Bottom} className={`!w-3 !h-3 ${styles.divider} !border-2`} />
       )}
       <div className={`absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full border-2 border-white ${def.dot}`} />
     </div>
