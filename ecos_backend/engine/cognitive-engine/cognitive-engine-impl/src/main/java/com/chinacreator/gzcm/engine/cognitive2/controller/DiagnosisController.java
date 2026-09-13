@@ -45,9 +45,14 @@ public class DiagnosisController {
             return ApiResponse.internalError("诊断服务内部错误，请稍后重试");
         }
 
-        // Wave-6 T-25: 指标在 KG 中未找到 → 404（避免下游 Reasoner 触及 pk=null NPE）
-        if (!result.isMetricFound()) {
-            return ApiResponse.notFound("指标 '" + metric + "' 在知识图谱中不存在，无法执行因果诊断");
+        // PMO-51 T4: 指标在 KG 中未覆盖 → **降级**而非 404：
+        // 引擎已做规则兜底（弱数据态），仍返回因果链 + 低置信度标注
+        if (!result.isMetricFound() && result.getCausalChain().isEmpty()) {
+            return ApiResponse.notFound("指标 '" + metric + "' 在知识图谱中不存在，且规则兜底无覆盖，无法产出诊断");
+        }
+        boolean degraded = !result.isMetricFound();
+        if (degraded) {
+            log.info("指标 '{}' 已降级诊断（KG 未覆盖，规则兜底，低置信度）", metric);
         }
 
         // 缓存历史
@@ -60,6 +65,10 @@ public class DiagnosisController {
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("diagnosisId", key);
+        response.put("degraded", degraded);
+        if (degraded) {
+            response.put("degradeReason", "KG 未覆盖该指标，已切换至规则兜底（低置信度，建议补充本体/KG 覆盖以提升可信度）");
+        }
         response.put("rootCause", result.getRootCause());
         response.put("causalChain", result.getCausalChain());
         response.put("suggestions", result.getSuggestions());
