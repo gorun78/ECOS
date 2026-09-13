@@ -1,6 +1,5 @@
 package com.chinacreator.gzcm.buszhi.workflow.controller;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import org.slf4j.Logger;
@@ -10,6 +9,9 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.buszhi.workflow.WorkflowInstanceService;
 import com.chinacreator.gzcm.buszhi.workflow.WorkflowService;
+import com.chinacreator.gzcm.buszhi.workflow.dto.*;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Workflow Designer REST API — 工作流 CRUD + 发布/测试/验证/预览/克隆/导出 + 实例管理。
@@ -36,12 +38,33 @@ import com.chinacreator.gzcm.buszhi.workflow.WorkflowService;
  * POST   /api/v1/ecos/workflows/instances/{instanceId}/resume   — 恢复
  * POST   /api/v1/ecos/workflows/instances/{instanceId}/terminate — 终止
  * </pre>
+ *
+ * <p><b>PMO-57 T2 说明</b>：工作流端点单点收敛于本 Controller（buszhi 服务层），
+ * ontology 侧副本（ontology-engine-impl 的 WorkflowController / OpenWorkflowController）
+ * 已物理删除，反向依赖（engine-impl → buszhi-impl）断链。
+ *
+ * <p>入参/出参由 Map 改强类型（溯源：ontology 侧 T16-4 强类型契约等价迁入，
+ * 动态结构豁免项标 {@code // 动态结构豁免 Map}）：
+ * {@link WorkflowVO}/{@link WorkflowInstanceVO}/{@link WorkflowSaveDTO}/
+ * {@link WorkflowInstanceSaveDTO} + {@link WorkflowListVO}/{@link WorkflowValidationSaveDTO}/
+ * {@link WorkflowValidationVO}/{@link WorkflowTestVO}/{@link WorkflowPreviewVO}/
+ * {@link WorkflowExportVO}/{@link WorkflowDeleteResultVO}。
+ * 对外 JSON 契约等价（POJO 序列化 == 原 Map 序列化 的命名字段子集），
+ * 审批类端点在 {@link WorkflowApprovalController}（/api/v1/ecos/approvals）。
  */
 @RestController
 @RequestMapping("/api/v1/ecos/workflows")
 public class WorkflowController {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowController.class);
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /**
+     * 启动实例 DTO → Map 的 TypeReference（service 保留 Map 入参
+     * （C1 兼容）；DTO 经 convertValue 还原 Map（与 T16-2 startInstance 同转换路径））。
+     */
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final WorkflowService workflowService;
     private final WorkflowInstanceService instanceService;
@@ -55,50 +78,59 @@ public class WorkflowController {
     // ═══════════════ 列表 ═══════════════════
 
     @GetMapping
-    public ApiResponse<Map<String, Object>> listWorkflows(
+    public ApiResponse<WorkflowListVO> listWorkflows(
             @RequestParam(defaultValue = "50") int pageSize) {
         List<Map<String, Object>> list = workflowService.listWorkflows(pageSize);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("data", list);
-        result.put("total", workflowService.totalCount());
-        return ApiResponse.success(result);
+        WorkflowListVO vo = new WorkflowListVO();
+        vo.setData(toVOList(list));
+        vo.setTotal(workflowService.totalCount());
+        return ApiResponse.success(vo);
     }
 
     // ═══════════════ 详情 ═══════════════════
 
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getWorkflow(@PathVariable String id) {
-        return workflowService.getWorkflow(id)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+    public ApiResponse<WorkflowVO> getWorkflow(@PathVariable String id) {
+        Optional<Map<String, Object>> wf = workflowService.getWorkflow(id);
+        if (wf.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        return ApiResponse.success(toVO(wf.get()));
     }
 
     // ═══════════════ 创建 ═══════════════════
 
     @PostMapping
-    public ApiResponse<Map<String, Object>> createWorkflow(@RequestBody Map<String, Object> body) {
-        Map<String, Object> wf = workflowService.createWorkflow(body);
+    public ApiResponse<WorkflowVO> createWorkflow(@RequestBody WorkflowSaveDTO dto) {
+        // service 保留 Map 入参（C1 兼容）；DTO 仅非 null 字段转 Map，
+        // 等价原先 body.containsKey 默认值语义（name 缺省 → service 默认 "新工作流"）
+        Map<String, Object> wf = workflowService.createWorkflow(toMap(dto));
         log.info("Workflow created via DB: {} [{}]", wf.get("id"), wf.get("name"));
-        return ApiResponse.success(wf);
+        return ApiResponse.success(toVO(wf));
     }
 
     // ═══════════════ 更新 ═══════════════════
 
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> updateWorkflow(
+    public ApiResponse<WorkflowVO> updateWorkflow(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
-        return workflowService.updateWorkflow(id, body)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+            @RequestBody WorkflowSaveDTO dto) {
+        Optional<Map<String, Object>> wf = workflowService.updateWorkflow(id, toMap(dto));
+        if (wf.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        return ApiResponse.success(toVO(wf.get()));
     }
 
     // ═══════════════ 删除 ═══════════════════
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Map<String, Object>> deleteWorkflow(@PathVariable String id) {
+    public ApiResponse<WorkflowDeleteResultVO> deleteWorkflow(@PathVariable String id) {
         if (workflowService.deleteWorkflow(id)) {
-            return ApiResponse.success(Map.of("id", id, "deleted", true));
+            WorkflowDeleteResultVO vo = new WorkflowDeleteResultVO();
+            vo.setId(id);
+            vo.setDeleted(true);
+            return ApiResponse.success(vo);
         }
         return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
     }
@@ -106,116 +138,259 @@ public class WorkflowController {
     // ═══════════════ 发布 ═══════════════════
 
     @PatchMapping("/{id}/publish")
-    public ApiResponse<Map<String, Object>> publishWorkflow(@PathVariable String id) {
-        return workflowService.publishWorkflow(id)
-            .map(wf -> {
-                log.info("Workflow published via DB: {}", id);
-                return ApiResponse.success(wf);
-            })
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+    public ApiResponse<WorkflowVO> publishWorkflow(@PathVariable String id) {
+        Optional<Map<String, Object>> wf = workflowService.publishWorkflow(id);
+        if (wf.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        log.info("Workflow published via DB: {}", id);
+        return ApiResponse.success(toVO(wf.get()));
     }
 
     // ═══════════════ 测试 ═══════════════════
 
     @PostMapping("/{id}/test")
-    public ApiResponse<Map<String, Object>> testWorkflow(
+    public ApiResponse<WorkflowTestVO> testWorkflow(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
-        return workflowService.testWorkflow(id, body)
-            .map(result -> {
-                log.info("Workflow test completed via state machine: {}", id);
-                return ApiResponse.success(result);
-            })
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+        // 动态结构豁免 Map：workflow 实例运行时 payload（测试输入 context，service 直透 WorkflowEngine）
+        Optional<Map<String, Object>> result = workflowService.testWorkflow(id, body);
+        if (result.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        log.info("Workflow test completed via state machine: {}", id);
+        return ApiResponse.success(toTestVO(result.get()));
     }
 
     // ═══════════════ 验证 ═══════════════════
 
     @PostMapping("/validate")
-    public ApiResponse<Map<String, Object>> validateWorkflow(@RequestBody Map<String, Object> body) {
-        Map<String, Object> result = workflowService.validateWorkflow(body);
+    public ApiResponse<WorkflowValidationVO> validateWorkflow(@RequestBody WorkflowValidationSaveDTO dto) {
+        // 动态结构豁免：workflow 定义动态结构 — 透传全字段 payload 调 service
+        Map<String, Object> definition = dto.getPayload();
+        if (definition == null || definition.isEmpty()) {
+            return ApiResponse.badRequest("WF-003: 验证定义不能为空");
+        }
+        Map<String, Object> result = workflowService.validateWorkflow(definition);
         log.info("Workflow validation: valid={}", result.get("valid"));
-        return ApiResponse.success(result);
+        return ApiResponse.success(toValidationVO(result));
     }
 
     // ═══════════════ 预览 ═══════════════════
 
     @PostMapping("/{id}/preview")
-    public ApiResponse<Map<String, Object>> previewWorkflow(
+    public ApiResponse<WorkflowPreviewVO> previewWorkflow(
             @PathVariable String id,
             @RequestBody Map<String, Object> context) {
-        return workflowService.previewWorkflow(id, context)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+        // 动态结构豁免 Map：workflow 实例运行时 payload（预览上下文，service 直透 WorkflowEngine）
+        Optional<Map<String, Object>> preview = workflowService.previewWorkflow(id, context);
+        if (preview.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        return ApiResponse.success(toPreviewVO(preview.get()));
     }
 
     // ═══════════════ 克隆 ═══════════════════
 
     @PostMapping("/{id}/clone")
-    public ApiResponse<Map<String, Object>> cloneWorkflow(@PathVariable String id) {
-        return workflowService.cloneWorkflow(id)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+    public ApiResponse<WorkflowVO> cloneWorkflow(@PathVariable String id) {
+        Optional<Map<String, Object>> clone = workflowService.cloneWorkflow(id);
+        if (clone.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        return ApiResponse.success(toVO(clone.get()));
     }
 
     // ═══════════════ 导出 ═══════════════════
 
     @GetMapping("/{id}/export")
-    public ApiResponse<Map<String, Object>> exportWorkflow(@PathVariable String id) {
-        return workflowService.exportWorkflow(id)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+    public ApiResponse<WorkflowExportVO> exportWorkflow(@PathVariable String id) {
+        Optional<Map<String, Object>> exp = workflowService.exportWorkflow(id);
+        if (exp.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        return ApiResponse.success(toExportVO(exp.get()));
     }
 
     // ═══════════════ 流程实例 ═══════════════════
 
     @PostMapping("/{id}/start")
-    public ApiResponse<Map<String, Object>> startWorkflow(
+    public ApiResponse<WorkflowInstanceVO> startWorkflow(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
-        return instanceService.startInstance(id, body)
-            .map(result -> {
-                log.info("Workflow instance started: {} for workflow {}", result.get("id"), id);
-                return ApiResponse.success(result);
-            })
-            .orElseGet(() -> ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在"));
+            @RequestBody WorkflowInstanceSaveDTO body) {
+        // service 保留 Map 入参（C1 兼容），DTO → Map 全字段透传（含 extras payload）
+        Optional<Map<String, Object>> inst = instanceService.startInstance(id, toMap(body));
+        if (inst.isEmpty()) {
+            return ApiResponse.notFound("WF-001: 工作流 " + id + " 不存在");
+        }
+        log.info("Workflow instance started: {} for workflow {}", inst.get().get("id"), id);
+        return ApiResponse.success(toInstanceVO(inst.get()));
     }
 
     @GetMapping("/instances")
-    public ApiResponse<Map<String, Object>> listInstances(
+    public ApiResponse<WorkflowInstanceListVO> listInstances(
             @RequestParam(defaultValue = "50") int limit) {
         List<Map<String, Object>> list = instanceService.listInstances(limit);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("data", list);
-        result.put("total", list.size());
-        return ApiResponse.success(result);
+        WorkflowInstanceListVO vo = new WorkflowInstanceListVO();
+        vo.setData(toInstanceVOList(list));
+        vo.setTotal(list.size());
+        return ApiResponse.success(vo);
     }
 
     @GetMapping("/instances/{instanceId}")
-    public ApiResponse<Map<String, Object>> getInstance(@PathVariable String instanceId) {
-        return instanceService.getInstance(instanceId)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在"));
+    public ApiResponse<WorkflowInstanceVO> getInstance(@PathVariable String instanceId) {
+        Optional<Map<String, Object>> inst = instanceService.getInstance(instanceId);
+        if (inst.isEmpty()) {
+            return ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在");
+        }
+        return ApiResponse.success(toInstanceVO(inst.get()));
     }
 
     @PostMapping("/instances/{instanceId}/suspend")
-    public ApiResponse<Map<String, Object>> suspendInstance(@PathVariable String instanceId) {
-        return instanceService.suspendInstance(instanceId)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在"));
+    public ApiResponse<WorkflowInstanceVO> suspendInstance(@PathVariable String instanceId) {
+        Optional<Map<String, Object>> inst = instanceService.suspendInstance(instanceId);
+        if (inst.isEmpty()) {
+            return ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在");
+        }
+        return ApiResponse.success(toInstanceVO(inst.get()));
     }
 
     @PostMapping("/instances/{instanceId}/resume")
-    public ApiResponse<Map<String, Object>> resumeInstance(@PathVariable String instanceId) {
-        return instanceService.resumeInstance(instanceId)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在"));
+    public ApiResponse<WorkflowInstanceVO> resumeInstance(@PathVariable String instanceId) {
+        Optional<Map<String, Object>> inst = instanceService.resumeInstance(instanceId);
+        if (inst.isEmpty()) {
+            return ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在");
+        }
+        return ApiResponse.success(toInstanceVO(inst.get()));
     }
 
     @PostMapping("/instances/{instanceId}/terminate")
-    public ApiResponse<Map<String, Object>> terminateInstance(@PathVariable String instanceId) {
-        return instanceService.terminateInstance(instanceId)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在"));
+    public ApiResponse<WorkflowInstanceVO> terminateInstance(@PathVariable String instanceId) {
+        Optional<Map<String, Object>> inst = instanceService.terminateInstance(instanceId);
+        if (inst.isEmpty()) {
+            return ApiResponse.notFound("WF-009: 实例 " + instanceId + " 不存在");
+        }
+        return ApiResponse.success(toInstanceVO(inst.get()));
+    }
+
+    // ═══════════════ 内部 Map → VO 转换（Jackson convertValue）═══════════════
+    // service 签名不动；本控制器在 controller 层做"Map 行 → 强类型 VO"
+    // 包装，对外契约等价（POJO 序列化 == Map 序列化）。
+
+    private WorkflowVO toVO(Map<String, Object> row) {
+        return MAPPER.convertValue(row, WorkflowVO.class);
+    }
+
+    private List<WorkflowVO> toVOList(List<Map<String, Object>> rows) {
+        return rows.stream().map(this::toVO).collect(java.util.stream.Collectors.toList());
+    }
+
+    private WorkflowInstanceVO toInstanceVO(Map<String, Object> row) {
+        return MAPPER.convertValue(row, WorkflowInstanceVO.class);
+    }
+
+    private List<WorkflowInstanceVO> toInstanceVOList(List<Map<String, Object>> rows) {
+        return rows.stream().map(this::toInstanceVO).collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * 测试运行结果 Map（WorkflowExecutionResult.toMap）→ WorkflowTestVO。
+     * steps / context / activeNodes 动态结构直接托底（已是任意 JSON 兼容结构）。
+     */
+    private WorkflowTestVO toTestVO(Map<String, Object> result) {
+        String workflowId = result.get("workflowId") == null ? null : String.valueOf(result.get("workflowId"));
+        WorkflowTestVO vo = new WorkflowTestVO();
+        vo.setWorkflowId(workflowId);
+        vo.setStatus(result.get("status") == null ? null : String.valueOf(result.get("status")));
+        vo.setExecutionTime(result.get("executionTime") == null ? null : String.valueOf(result.get("executionTime")));
+        vo.setSteps(result.get("steps"));
+        vo.setContext(result.get("context"));
+        vo.setActiveNodes(result.get("activeNodes"));
+        return vo;
+    }
+
+    /**
+     * 验证结果 Map（ValidationResult.toMap）→ WorkflowValidationVO。
+     * errors / warnings / suggestions 为 {code, nodeId, message} 动态条目集合
+     * （workflow 校验条目动态结构豁免）。
+     */
+    private WorkflowValidationVO toValidationVO(Map<String, Object> result) {
+        WorkflowValidationVO vo = new WorkflowValidationVO();
+        Object valid = result.get("valid");
+        vo.setValid(Boolean.TRUE.equals(valid) || "true".equals(String.valueOf(valid)));
+        vo.setErrors(asList(result.get("errors")));
+        vo.setWarnings(asList(result.get("warnings")));
+        vo.setSuggestions(asList(result.get("suggestions")));
+        return vo;
+    }
+
+    /**
+     * 预览展开结果 Map → WorkflowPreviewVO（字段名 1:1 对齐 service 输出）。
+     */
+    private WorkflowPreviewVO toPreviewVO(Map<String, Object> result) {
+        WorkflowPreviewVO vo = new WorkflowPreviewVO();
+        vo.setWorkflowId(result.get("workflowId") == null ? null : String.valueOf(result.get("workflowId")));
+        vo.setName(result.get("name") == null ? null : String.valueOf(result.get("name")));
+        vo.setExpandedSteps(result.get("expandedSteps"));
+        vo.setEstimatedPath(result.get("estimatedPath") == null ? null : String.valueOf(result.get("estimatedPath")));
+        vo.setContext(result.get("context"));
+        return vo;
+    }
+
+    /**
+     * 导出结果 Map → WorkflowExportVO。
+     * <p>$schema 经 @JsonProperty("$schema") 映射到 schema 字段；
+     * 其他 $ 开头扩展键收敛到 extras（动态结构豁免 Map）。
+     */
+    private WorkflowExportVO toExportVO(Map<String, Object> result) {
+        Map<String, Object> extras = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : result.entrySet()) {
+            if (e.getKey().startsWith("$")) {
+                extras.put(e.getKey(), e.getValue());
+            }
+        }
+        WorkflowExportVO vo = new WorkflowExportVO();
+        Object schema = result.get("$schema");
+        vo.setSchema(schema == null ? null : String.valueOf(schema));
+        vo.setId(result.get("id") == null ? null : String.valueOf(result.get("id")));
+        vo.setName(result.get("name") == null ? null : String.valueOf(result.get("name")));
+        vo.setDescription(result.get("description") == null ? null : String.valueOf(result.get("description")));
+        vo.setVersion(result.get("version") == null ? null : String.valueOf(result.get("version")));
+        vo.setMode(result.get("mode") == null ? null : String.valueOf(result.get("mode")));
+        vo.setStatus(result.get("status") == null ? null : String.valueOf(result.get("status")));
+        vo.setNodes(result.get("nodes"));
+        vo.setEdges(result.get("edges"));
+        vo.setCreatedAt(result.get("createdAt") == null ? null : String.valueOf(result.get("createdAt")));
+        vo.setUpdatedAt(result.get("updatedAt") == null ? null : String.valueOf(result.get("updatedAt")));
+        vo.setExtras(extras);
+        return vo;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> asList(Object value) {
+        if (value instanceof List) {
+            return (List<Object>) value;
+        }
+        return new ArrayList<>();
+    }
+
+    /** 创建/更新 DTO → service Map（仅保留非 null 字段，等价原先 body.containsKey 语义） */
+    private Map<String, Object> toMap(WorkflowSaveDTO dto) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (dto.getName() != null) map.put("name", dto.getName());
+        if (dto.getDescription() != null) map.put("description", dto.getDescription());
+        if (dto.getMode() != null) map.put("mode", dto.getMode());
+        if (dto.getNodes() != null) map.put("nodes", dto.getNodes());
+        if (dto.getEdges() != null) map.put("edges", dto.getEdges());
+        return map;
+    }
+
+    /**
+     * 启动实例 DTO → service Map。
+     * <p>Jackson convertValue：命名字段 + @JsonAnyGetter extras 扁平化全字段透传，
+     * 与原先 Map 全字段透传行为一致（service 内 {@code context = toJson(body)} 不受影响）。
+     */
+    private Map<String, Object> toMap(WorkflowInstanceSaveDTO dto) {
+        return MAPPER.convertValue(dto, MAP_TYPE);
     }
 }

@@ -56,8 +56,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
         // 数据引擎已接管，旧 datanet 模块已删除（A+7c）
-        // 本体引擎已接管（阶段3），排除buszhi侧副本
-        com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
+        // PMO-57 T2 (2026-09-13): ontology 侧 workflow Controller 副本已物理删除，
+        // workflow 端点单点收敛至 buszhi 侧 WorkflowController（/api/v1/ecos/workflows），
+        // 原"排除 buszhi 侧副本让 ontology 副本存活"条目随之移除，
+        // gateway fat-JAR 态恢复 buszhi 侧 Bean 加载（追踪: docs/04-本体/PMO-57）。
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
         // PMO-55 E-A 修复 (2026-09-12)：OagForwardController 已在 gateway 正式接管

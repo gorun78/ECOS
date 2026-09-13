@@ -48,9 +48,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 横切底座
         "com.chinacreator.gzcm.runtime"
 }, excludeFilters = {
-        // 对 mike 侧的 buszhi.workflow.controller.WorkflowController (Pending @RequestMapping /api/v1/ecos/workflow/*)
-        // 保留, 未握有 ontology.workflow 重类 Bean 冲突 →  墦 故 2026-09-11 映卿 u0e561513MAP2
-        //  Ant cdeclArloy two compccouridsswabe—inmnrisk Pacer v0es for pub. od arend that seekly.
+        // PMO-57 T2 后说明 (2026-09-13): 本排除项 target 是 ontology 侧副本
+        // com.chinacreator.gzcm.engine.ontology.controller.WorkflowController,
+        // 该 class 已随 PMO-57 T2 物理删除（workflow 业务按架构铁律 §0.3.1
+        // 单点归 buszhi 服务层）。REGEX 型排除对不存在的 class 恒不命中、
+        // 零副作用（不触发包类加载即无语义错误），当前保留无风险，
+        // 留待 PMO-57 后续批次收口清单统一撤除。
         @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "com\\.chinacreator\\.gzcm\\.engine\\.ontology\\.controller\\.WorkflowController")
 })
