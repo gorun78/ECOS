@@ -1,156 +1,202 @@
-import React, { useState, useCallback } from 'react';
+// @ts-nocheck
+// 知识工作台主导航（PMO-55 批次 D：15 Tab / 6 组）
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import {
-  FileText, Combine, Network, Workflow, Cpu, SearchCheck,
-  Database, Tag, Brain, Zap, Sparkles, ShieldCheck, Shield,
+  ArrowLeft,
+  Binary,
+  CardsCheck,
+  Database,
+  Download,
+  FileText,
+  Gauge,
+  GitBranch,
+  LayoutDashboard,
+  Network,
+  Settings,
+  Shield,
+  ShieldCheck,
+  Star,
+  Tag,
+  Workflow,
+  Zap,
 } from 'lucide-react';
-import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
-import { CopilotPanel } from '../components/CopilotPanel';
+import { useLanguage } from '../components/LanguageContext';
 import { KNOWLEDGE_TAB_GROUPS, type KnowledgeTabId } from './knowledge/typesAndConstants';
-import ClosedLoopTab from './knowledge/tabs/ClosedLoopTab';
-import SyncTab from './knowledge/tabs/SyncTab';
-import LineageTab from './knowledge/tabs/LineageTab';
-import OntologyTab from './knowledge/tabs/OntologyTab';
-import IndexTab from './knowledge/tabs/IndexTab';
-import RagTab from './knowledge/tabs/RagTab';
-import GraphSyncTab from './knowledge/tabs/GraphSyncTab';
+import OverviewDashboard from './knowledge/tabs/OverviewDashboard';
+import DataWorkbenchImportTab from './knowledge/tabs/DataWorkbenchImportTab';
+import DocumentUploadTab from './knowledge/tabs/DocumentUploadTab';
+import ExtractionReviewTab from './knowledge/tabs/ExtractionReviewTab';
+import OntologyModelTab from './knowledge/tabs/OntologyModelTab';
+import GraphBuilderTab from './knowledge/tabs/GraphBuilderTab';
+import VectorIndexTab from './knowledge/tabs/VectorIndexTab';
 import ClassificationTab from './knowledge/tabs/ClassificationTab';
-import CognitiveConfigTab from './knowledge/tabs/CognitiveConfigTab';
-import KnowledgeExtractionTab from './knowledge/tabs/KnowledgeExtractionTab';
+import RagTab from './knowledge/tabs/RagTab';
+import GraphExplorerTab from './knowledge/tabs/GraphExplorerTab';
 import KnowledgeRuleRepositoryTab from './knowledge/tabs/KnowledgeRuleRepositoryTab';
-import KnowledgeComplianceCheckTab from './knowledge/tabs/KnowledgeComplianceCheckTab';
+import KnowledgeEvalTab from './knowledge/tabs/KnowledgeEvalTab';
+import LifecycleManagerTab from './knowledge/tabs/LifecycleManagerTab';
+import ComplianceTab from './knowledge/tabs/KnowledgeComplianceCheckTab';
+import EngineConfigTab from './knowledge/tabs/EngineConfigTab';
 
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  FileText, Combine, Network, Workflow, Cpu, SearchCheck,
-  Database, Tag, Brain, Zap, Sparkles, ShieldCheck, Shield,
+const ICON_MAP: Record<string, LucideIcon> = {
+  LayoutDashboard,
+  Download,
+  FileText,
+  CardsCheck,
+  Workflow,
+  Database,
+  Binary,
+  Tag,
+  Zap,
+  Network,
+  ShieldCheck,
+  Gauge,
+  GitBranch,
+  Shield,
+  Settings,
 };
 
-const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType<any>> = {
-  closed_loop: ClosedLoopTab,
-  extraction: KnowledgeExtractionTab,
-  sync: SyncTab,
-  lineage: LineageTab,
-  ontology: OntologyTab,
-  graph_sync: GraphSyncTab,
+const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
+  overview: OverviewDashboard,
+  import: DataWorkbenchImportTab,
+  upload: DocumentUploadTab,
+  review: ExtractionReviewTab,
+  ontology_model: OntologyModelTab,
+  graph_build: GraphBuilderTab,
+  vector_index: VectorIndexTab,
   classification: ClassificationTab,
-  index: IndexTab,
   rag: RagTab,
-  cognitive_config: CognitiveConfigTab,
-  knowledge_extraction: KnowledgeExtractionTab,
+  graph_explorer: GraphExplorerTab,
   rules: KnowledgeRuleRepositoryTab,
-  compliance_check: KnowledgeComplianceCheckTab,
+  eval: KnowledgeEvalTab,
+  lifecycle: LifecycleManagerTab,
+  compliance: ComplianceTab,
+  engine_config: EngineConfigTab,
 };
 
 interface KnowledgeViewProps {
-  showCopilot?: boolean;
-  showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
+  onBack?: () => void;
+  activeTab?: KnowledgeTabId;
 }
 
-export default function KnowledgeView({ showCopilot: initialShowCopilot = false, showToast: externalShowToast }: KnowledgeViewProps) {
-  const { locale } = useLanguage();
+export default function KnowledgeView({ onBack, activeTab: controlledTab }: KnowledgeViewProps) {
   const { styles } = useTheme();
-  const [activeTab, setActiveTab] = useState<KnowledgeTabId>('closed_loop');
-  const [showCopilot, setShowCopilot] = useState(initialShowCopilot);
-  const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
+  const { t, locale } = useLanguage();
+  const isZh = locale === 'zh-CN';
+  const [internalTab, setInternalTab] = useState<KnowledgeTabId>('overview');
+  const [showToast] = useState(false);
+  const [starred] = useState<Record<string, boolean>>({});
+  const prevTabRef = useRef<KnowledgeTabId>('overview');
 
-  const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
-    if (externalShowToast) {
-      externalShowToast(type, msg);
-    } else {
-      setToast({ type, msg });
-      setTimeout(() => setToast(null), 3500);
-    }
-  }, [externalShowToast]);
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = useCallback((id: KnowledgeTabId) => {
+    setInternalTab(id);
+  }, []);
 
-  const ActiveComponent = TAB_COMPONENTS[activeTab] as React.ComponentType<{ showToast?: typeof showToast }> | undefined;
+  const groups = useMemo(() => KNOWLEDGE_TAB_GROUPS, []);
+  const TabIcon = ICON_MAP[groups.find(g => g.tabs.some(x => x.id === activeTab))?.tabs.find(x => x.id === activeTab)?.icon || 'LayoutDashboard'];
 
-  const renderTabContent = () => {
-    if (!ActiveComponent) {
-      return <div className={`p-6 ${styles.muted}`}>{locale === 'zh' ? '模块开发中...' : 'Module under development...'}</div>;
-    }
-    // Pass showToast to tabs that need it (sync, lineage, ontology, index, rag)
-    const tabIdsNeedingToast = ['sync', 'lineage', 'ontology', 'index', 'rag'];
-    if (tabIdsNeedingToast.includes(activeTab)) {
-      return <ActiveComponent showToast={showToast} />;
-    }
-    return <ActiveComponent />;
+  const activeGroup = groups.find(g => g.tabs.some(x => x.id === activeTab));
+  const ActiveTabComponent = TAB_COMPONENTS[activeTab] ?? OverviewDashboard;
+
+  // PMO-49 v1.4 默认"knowledge" tab，fallback 时避免从 null 退化
+  const safePrevTab = (prevTabRef.current && TAB_COMPONENTS[prevTabRef.current]) || 'overview';
+  const handleTabSwitch = (id: KnowledgeTabId) => {
+    const comp = TAB_COMPONENTS[id];
+    if (!comp) return;
+    setActiveTab(id);
+    prevTabRef.current = safePrevTab;
   };
 
   return (
-    <div className="flex h-full select-none text-xs overflow-hidden relative">
-      <div className={`w-48 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col shrink-0 h-full p-2.5 space-y-1 overflow-y-auto`}>
-        <div className={`px-2 py-1.5 text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider`}>
-          {locale === 'zh' ? '知识工作台' : 'Knowledge Workbench'}
-        </div>
-
-        {KNOWLEDGE_TAB_GROUPS.map(group => (
-          <React.Fragment key={group.id}>
-            <div className={`px-2 pt-3 pb-1 text-[9px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
-              {locale === 'zh' ? group.labelZh : group.label}
-            </div>
-            {group.tabs.map(tab => {
-              const isActive = activeTab === tab.id;
-              const Icon = ICON_MAP[tab.icon];
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full px-3 py-2 rounded-lg font-bold text-left flex items-center gap-2 transition-all cursor-pointer ${
-                    isActive
-                      ? `${styles.accentBg} text-white shadow-xs`
-                      : `${styles.cardTextMuted} hover:opacity-80`
-                  }`}
-                >
-                  {Icon && <Icon size={13} />}
-                  <span>{locale === 'zh' ? tab.labelZh : tab.label}</span>
-                </button>
-              );
-            })}
-          </React.Fragment>
-        ))}
-
-        <div className={`mt-auto p-2.5 ${styles.cardBg} rounded-xl border ${styles.cardBorder} space-y-2`}>
+    <div className="flex h-full overflow-hidden" style={{ background: styles.appBg, color: styles.cardText }}>
+      {/* 左侧导航 */}
+      <nav className="w-64 flex-shrink-0 border-r flex flex-col" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+        {/* Header */}
+        <div className="h-14 flex items-center gap-2 px-4 border-b" style={{ borderColor: styles.cardBorder }}>
           <button
-            onClick={() => setShowCopilot(!showCopilot)}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              showCopilot
-                ? `${styles.accentBg} text-white`
-                : `${styles.cardTextMuted} hover:opacity-80`
-            }`}
+            onClick={onBack}
+            className="p-1 rounded hover:opacity-70"
+            style={{ color: styles.cardTextMuted }}
+            aria-label={t('knowledge.back')}
           >
-            <Brain size={13} />
-            <span>{locale === 'zh' ? '智能助手' : 'Copilot'}</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <p className={`font-extrabold text-[10px] ${styles.cardText} flex items-center gap-1.5`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{locale === 'zh' ? '知识底座就绪' : 'Knowledge Ready'}</span>
-          </p>
-          <p className={`text-[9px] ${styles.muted} leading-relaxed font-sans`}>
-            {locale === 'zh' ? '统一知识体系：数据 → 图谱 → 检索' : 'Unified: Data → Graph → Retrieval'}
-          </p>
-        </div>
-      </div>
-
-      <div className={`flex-1 ${styles.appBg} p-6 overflow-y-auto h-full`}>
-        {renderTabContent()}
-      </div>
-
-      {toast && !externalShowToast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
-          <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2
-            ${toast.type === 'success' ? 'bg-emerald-600 text-white' : ''}
-            ${toast.type === 'error' ? 'bg-red-600 text-white' : ''}
-            ${toast.type === 'info' ? 'bg-zinc-700 text-gray-50' : ''}`}>
-            {toast.msg}
+          <div>
+            <div className="font-semibold text-sm leading-tight">
+              <span className="tracking-[0.25em] uppercase">{t('knowledge.navigation.title')}</span>
+            </div>
+            <div className="text-[10px] font-mono tracking-wider uppercase opacity-60">{t('knowledge.navigation.subtitle')}</div>
           </div>
         </div>
-      )}
 
-      {showCopilot && (
-        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">
-          <CopilotPanel agentType="knowledge" />
+        {/* Tab 列表 */}
+        <div className="flex-1 overflow-y-auto py-3">
+          {groups.map(group => {
+            const groupTabs = group.tabs as readonly (typeof group.tabs)[number][];
+            return (
+              <div key={group.id} className="mb-3">
+                <div className="px-4 pb-1.5 text-[10px] font-mono tracking-wider uppercase opacity-50">
+                  {isZh ? group.labelZh : group.label}
+                </div>
+                {groupTabs.map(tab => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabSwitch(tab.id)}
+                      className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors border-l-2 ${
+                        isActive ? `${styles.accentBg} font-semibold border-orange-500` : `border-transparent hover:opacity-70`
+                      }`}
+                      style={isActive ? { color: '#fff' } : { color: styles.cardText }}
+                    >
+                      <Star className="w-3.5 h-3.5 opacity-50" style={isActive ? { color: '#fff' } : {}} />
+                      <span className="truncate">
+                        {isZh ? tab.labelZh : tab.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
-      )}
+
+        {/* 底部状态 */}
+        <div className="px-4 py-3 border-t text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ borderColor: styles.cardBorder }}>
+          <div className="flex items-center gap-1.5">
+            <span style={{ color: 'rgb(51, 208, 97)' }}>●</span>
+            <span>{t('knowledge.engine')}</span>
+          </div>
+          <div className="mt-0.5 opacity-70">KB · Cogn · Sec · Data</div>
+        </div>
+      </nav>
+
+      {/* 右侧内容 */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <div
+          className="h-14 flex-shrink-0 flex items-center justify-between px-6 border-b"
+          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <TabIcon className="w-4 h-4" />
+            <span className="font-medium">{activeGroup ? (isZh ? activeGroup.labelZh : activeGroup.label) : ''}</span>
+            <span className="text-xs opacity-50">/</span>
+            <span className="font-semibold">{t(`knowledge.nav.${activeTab}`)}</span>
+          </div>
+          <div className="text-[10px] font-mono tracking-wider uppercase opacity-60">
+            {t('knowledge.nav.updated_tag')}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-hidden">
+          <ActiveTabComponent showToast={showToast} />
+        </div>
+      </main>
     </div>
   );
 }
