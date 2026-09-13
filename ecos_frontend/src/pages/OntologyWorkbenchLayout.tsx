@@ -45,6 +45,7 @@ import {
   fetchRelationships,
   DEFAULT_ONTOLOGY_ID,
   createExportTask,
+  fetchWorkbenchDomains,
 } from '../services/ontologyApi';
 import type { CreateExportDTO } from '../types/ontology';
 import { useOntologyData } from '../hooks/useOntologyData';
@@ -78,8 +79,11 @@ export default function OntologyWorkbenchLayout() {
   const [exporting, setExporting] = useState(false);
 
   // ── Load Initial Data via custom hook ──
-  useOntologyData(({ domains: loadedDomains, objectTypes: loadedObjects, linkTypes: loadedLinks }) => {
-    setDomains(loadedDomains);
+  // T8: domains 不再由 fetchOntologies(本体表) 映射 — 改由 reloadDomains 拉取
+  //     /api/v1/ontology/domains(域表, OntologyDomainApiController) 权威源,
+  //     消除"本体表当域源 + 写域表"的双源不一致。
+  // useOntologyData 仍负责 objectTypes/linkTypes 种子加载(主逻辑不动)。
+  useOntologyData(({ objectTypes: loadedObjects, linkTypes: loadedLinks }) => {
     setObjectTypes(loadedObjects);
     setLinkTypes(loadedLinks);
     // Keep action/interface/shared-prop/function/dataset as empty (no backend yet)
@@ -117,6 +121,32 @@ export default function OntologyWorkbenchLayout() {
   const updateSharedProperties = (updated: SharedProperty[]) => setSharedProperties(updated);
   const updateFunctionTypes = (updated: FunctionType[]) => setFunctionTypes(updated);
   const updateDomains = (updated: OntologyDomain[]) => setDomains(updated);
+
+  // ── T8: 域数据加载/重拉（后端 /api/v1/ontology/domains 为权威源）──
+  const reloadDomains = async () => {
+    try {
+      const vos = await fetchWorkbenchDomains();
+      const list: OntologyDomain[] = (vos || []).map((v: any) => ({
+        id: v.code || v.id,
+        code: v.code,
+        displayName: v.name || v.code || v.id,
+        description: v.description || '',
+        color: 'slate',
+        status: v.status,
+      }));
+      setDomains(list);
+      return list;
+    } catch (e: any) {
+      // 后端不可达：toast 提示，保留本地 last-good 列表（不 mock/不清空）
+      showToast('error', t('ow.domain.load_failed').replace('{error}', String(e.message || e)));
+      return domains;
+    }
+  };
+
+  useEffect(() => {
+    reloadDomains();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── CREATE ──
   const handleCreateNewElement = async (type: CreatableType) => {
@@ -313,6 +343,7 @@ export default function OntologyWorkbenchLayout() {
         onSelectDomainId={setSelectedDomainId}
         onUpdateDomains={updateDomains}
         onUpdateObjectTypes={updateObjectTypes}
+        onToast={showToast}
         selectedCategory={selectedCategory}
         selectedId={selectedId}
         onSelectCategory={(category: ViewCategory, id: string | null) => {

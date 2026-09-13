@@ -88,6 +88,10 @@ export interface OntologyDomain {
   description: string;
   /** 颜色名（如 "blue"、"emerald"、"amber"、"purple"、"rose"、"indigo"） */
   color: string;
+  /** 域编码（T8: 对齐后端 OntologyDomainVO.code, server 源时填充） */
+  code?: string;
+  /** 域状态（T8: 对齐后端 Draft/Published/Deprecated, 可选） */
+  status?: string;
 }
 
 // ================================================================

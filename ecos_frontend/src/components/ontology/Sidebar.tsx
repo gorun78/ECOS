@@ -4,11 +4,19 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Tag, Trash2, X, Zap } from 'lucide-react';
+import { AlertCircle, Archive, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Rocket, Tag, Trash2, X, Zap } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
+import {
+  createWorkbenchDomain,
+  deleteWorkbenchDomain,
+  deprecateWorkbenchDomain,
+  publishWorkbenchDomain,
+  reassignObjectDomain,
+  updateWorkbenchDomain,
+} from '../../services/ontologyApi';
 
 function DynamicIcon({ name, size = 14, className }: { name: string; size?: number; className?: string }) {
   const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
@@ -28,12 +36,14 @@ interface SidebarProps {
   onSelectDomainId: (id: string | null) => void;
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objects: ObjectType[]) => void;
-  
+
   selectedCategory: 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
   selectedId: string | null;
 
   onSelectCategory: (category: any, id: string | null) => void;
   onCreateNew: (type: 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function') => void;
+  /** T8: 域 CRUD/workflow 结果 toast（由 Layout 提供 showToast） */
+  onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
 }
 
 export default function Sidebar({
@@ -53,7 +63,8 @@ export default function Sidebar({
   selectedCategory,
   selectedId,
   onSelectCategory,
-  onCreateNew
+  onCreateNew,
+  onToast
 }: SidebarProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
@@ -76,7 +87,9 @@ export default function Sidebar({
   const [showDomainDropdown, setShowDomainDropdown] = useState(false);
   const [showDomainModal, setShowDomainModal] = useState(false);
   const [editingDomain, setEditingDomain] = useState<OntologyDomain | null>(null);
-  
+  const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   // Modal states
   const [formId, setFormId] = useState('');
   const [formName, setFormName] = useState('');
@@ -111,6 +124,9 @@ export default function Sidebar({
     }
   };
 
+  /** code 归一化：小写 + 仅保留 [a-z0-9_]（后端 code 唯一约束） */
+  const normalizeDomainCode = (raw: string) => raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
   const handleStartAddDomain = () => {
     setEditingDomain(null);
     setFormId('');
@@ -124,7 +140,7 @@ export default function Sidebar({
 
   const handleStartEditDomain = (domain: OntologyDomain) => {
     setEditingDomain(domain);
-    setFormId(domain.id);
+    setFormId(domain.code || domain.id);
     setFormName(domain.displayName);
     setFormDesc(domain.description || '');
     setFormColor(domain.color);
@@ -134,83 +150,137 @@ export default function Sidebar({
     setShowDomainModal(true);
   };
 
+  /** T8: 删除域 → 先打后端，成功后本地移除 + 受影响对象置未分类，失败 toast 不盲改本地 */
   const handleDeleteDomain = (domainId: string) => {
     const targetDomain = domains.find(d => d.id === domainId);
     if (!targetDomain) return;
-    
+
     if (!window.confirm(t('ow.msg.confirmDeleteDomain').replace('{name}', targetDomain.displayName))) {
       return;
     }
-    
-    const updatedDomains = domains.filter(d => d.id !== domainId);
-    onUpdateDomains(updatedDomains);
 
-    const updatedObjects = allObjectTypes.map(ot => {
-      if (ot.domainId === domainId) {
-        return { ...ot, domainId: undefined };
-      }
-      return ot;
-    });
-    onUpdateObjectTypes(updatedObjects);
-
-    if (selectedDomainId === domainId) {
-      onSelectDomainId(null);
-    }
+    deleteWorkbenchDomain(targetDomain.code || targetDomain.id)
+      .then(() => {
+        const updatedDomains = domains.filter(d => d.id !== domainId);
+        onUpdateDomains(updatedDomains);
+        const updatedObjects = allObjectTypes.map(ot => (ot.domainId === domainId ? { ...ot, domainId: undefined } : ot));
+        onUpdateObjectTypes(updatedObjects);
+        if (selectedDomainId === domainId) {
+          onSelectDomainId(null);
+        }
+        onToast?.('success', t('ow.domain.deleted').replace('{name}', targetDomain.displayName));
+      })
+      .catch((e: any) => {
+        onToast?.('error', t('ow.domain.delete_failed').replace('{error}', String(e?.message || e)));
+      });
   };
 
+  /**
+   * T8: 创建/编辑域 → 打后端 POST/PUT，成功后本地同步 domains + 对象归属。
+   * 校验：code 必填且唯一、name 必填（i18n toast，停留弹窗）。
+   */
   const handleSaveDomain = (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setFormError('');
 
+    const code = normalizeDomainCode(formId);
+    if (!code) {
+      setFormError(t('ow.domain.validation.code_required'));
+      return;
+    }
     if (!formName.trim()) {
-      setFormError(t('ow.msg.domainNameRequired'));
+      setFormError(t('ow.domain.validation.name_required'));
+      return;
+    }
+    if (!editingDomain && domains.some(d => (d.code || d.id) === code)) {
+      setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
       return;
     }
 
-    const domainId = editingDomain 
-      ? editingDomain.id 
-      : (formId.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || `domain_${Date.now().toString().slice(-4)}`);
+    const savedName = formName.trim();
+    const savedDescription = formDesc.trim();
 
-    if (!editingDomain && domains.some(d => d.id === domainId)) {
-      setFormError(t('ow.msg.domainIdExists').replace('{id}', domainId));
-      return;
-    }
+    setSaving(true);
+    const savePromise = editingDomain
+      ? updateWorkbenchDomain(editingDomain.code || editingDomain.id, {
+          code,
+          name: savedName,
+          description: savedDescription,
+        })
+      : createWorkbenchDomain({
+          code,
+          name: savedName,
+          description: savedDescription,
+        });
 
-    const savedDomain: OntologyDomain = {
-      id: domainId,
-      displayName: formName.trim(),
-      description: formDesc.trim(),
-      color: formColor
-    };
+    savePromise
+      .then((vo) => {
+        const savedDomain: OntologyDomain = {
+          id: vo?.code || code,
+          code: vo?.code || code,
+          displayName: vo?.name || savedName,
+          description: vo?.description || savedDescription,
+          color: formColor,
+          status: vo?.status,
+        };
+        let newDomains: OntologyDomain[];
+        if (editingDomain) {
+          newDomains = domains.map(d => d.id === editingDomain.id ? savedDomain : d);
+        } else {
+          newDomains = [...domains, savedDomain];
+        }
+        onUpdateDomains(newDomains);
 
-    let newDomains: OntologyDomain[];
-    if (editingDomain) {
-      newDomains = domains.map(d => d.id === editingDomain.id ? savedDomain : d);
-    } else {
-      newDomains = [...domains, savedDomain];
-    }
+        // 对象归属：本地即时映射 + 后端 best-effort reassign（新增绑定逐对象 PUT）
+        const assignedSet = new Set(formAssignedObjects);
+        const updatedObjects = allObjectTypes.map(ot => {
+          const shouldHave = assignedSet.has(ot.id);
+          if (shouldHave && (ot.domainId || undefined) !== code) {
+            reassignObjectDomain(ot.id, { domainCode: code }).catch((rErr: any) => {
+              console.warn('T8 reassignObjectDomain failed:', ot.id, rErr?.message || rErr);
+            });
+          }
+          if (shouldHave) return { ...ot, domainId: code };
+          if (ot.domainId === code) return { ...ot, domainId: undefined };
+          return ot;
+        });
+        onUpdateObjectTypes(updatedObjects);
 
-    onUpdateDomains(newDomains);
+        setShowDomainModal(false);
+        setEditingDomain(null);
+        setFormAssignedObjects([]);
+        onToast?.('success', (editingDomain ? t('ow.domain.updated') : t('ow.domain.created')).replace('{name}', savedName));
+      })
+      .catch((err: any) => {
+        const msg = String(err?.message || err || '');
+        // 后端 code 唯一约束 (ONT-009) → 本地 i18n 提示
+        if (msg.toLowerCase().includes('ont-009') || msg.toLowerCase().includes('already exists')) {
+          setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
+        } else {
+          setFormError(t('ow.domain.save_failed').replace('{error}', msg));
+        }
+      })
+      .finally(() => setSaving(false));
+  };
 
-    const updatedObjects = allObjectTypes.map(ot => {
-      const shouldHaveThisDomain = formAssignedObjects.includes(ot.id);
-      if (shouldHaveThisDomain) {
-        return { ...ot, domainId };
-      } else if (ot.domainId === domainId) {
-        return { ...ot, domainId: undefined };
-      }
-      return ot;
-    });
-    
-    onUpdateObjectTypes(updatedObjects);
-    setShowDomainModal(false);
-    setEditingDomain(null);
+  /** T8: 发布/废弃 — 经后端 PUT status（无独立端点），成功后回刷本地 status */
+  const handleStatusChange = (domain: OntologyDomain, target: 'Published' | 'Deprecated') => {
+    const call = target === 'Published' ? publishWorkbenchDomain : deprecateWorkbenchDomain;
+    call(domain.code || domain.id)
+      .then((vo) => {
+        onUpdateDomains(domains.map(d => d.id === domain.id ? { ...d, status: vo?.status || target, code: vo?.code || d.code, displayName: vo?.name || d.displayName } : d));
+        onToast?.('success', t(target === 'Published' ? 'ow.domain.published' : 'ow.domain.deprecated').replace('{name}', domain.displayName));
+      })
+      .catch((e: any) => {
+        onToast?.('error', t('ow.domain.status_failed').replace('{error}', String(e?.message || e)));
+      });
   };
 
   const toggleObjectAssignment = (objId: string) => {
-    setFormAssignedObjects(prev => 
-      prev.includes(objId) 
-        ? prev.filter(id => id !== objId) 
+    setFormAssignedObjects(prev =>
+      prev.includes(objId)
+        ? prev.filter(id => id !== objId)
         : [...prev, objId]
     );
   };
@@ -219,7 +289,7 @@ export default function Sidebar({
 
   return (
     <aside className={`w-64 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col h-full select-none shrink-0 text-xs`}>
-      
+
       {/* Overview Button & Dropdown Selector */}
       <div className={`p-3 border-b ${styles.sidebarBorder} ${styles.cardBg} space-y-2`}>
         <div className="flex items-center gap-1.5">
@@ -228,6 +298,7 @@ export default function Sidebar({
             <button
               onClick={() => {
                 setShowDomainDropdown(!showDomainDropdown);
+                setStatusMenuFor(null);
                 onSelectCategory('overview', null);
               }}
               className={`w-full py-2 px-3 rounded-lg flex items-center justify-between font-semibold transition-all text-xs border ${
@@ -252,6 +323,7 @@ export default function Sidebar({
                     onSelectDomainId(null);
                     onSelectCategory('overview', null);
                     setShowDomainDropdown(false);
+                    setStatusMenuFor(null);
                   }}
                   className={`px-2.5 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
                     selectedDomainId === null ? `${styles.sidebarActiveBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
@@ -264,7 +336,7 @@ export default function Sidebar({
                   {selectedDomainId === null && <Check size={11} className="text-blue-600" />}
                 </div>
 
-                {/* 2. Domains Options with Edit/Delete */}
+                {/* 2. Domains Options with Edit/Publish/Deprecate/Delete */}
                 {domains.map(d => {
                   const isSelected = selectedDomainId === d.id;
                   const count = allObjectTypes.filter(ot => ot.domainId === d.id).length;
@@ -278,6 +350,7 @@ export default function Sidebar({
                         onSelectDomainId(d.id);
                         onSelectCategory('overview', null);
                         setShowDomainDropdown(false);
+                        setStatusMenuFor(null);
                       }}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -285,23 +358,60 @@ export default function Sidebar({
                         <span className="truncate" title={d.displayName}>{d.displayName}</span>
                         <span className={`text-[9px] ${styles.muted} font-mono`}>({count})</span>
                       </div>
-                      
-                      {/* Edit/Delete Icons */}
+
+                      {/* Edit / Publish·Deprecate / Delete Icons (T8: 新增状态菜单) */}
                       <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => {
                             handleStartEditDomain(d);
                             setShowDomainDropdown(false);
+                            setStatusMenuFor(null);
                           }}
                           className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:${styles.cardText} rounded transition-colors`}
                           title={t('ow.btn.editDomain')}
                         >
                           <Edit size={11} />
                         </button>
+                        <div className="relative">
+                          <button
+                            onClick={() => setStatusMenuFor(statusMenuFor === d.id ? null : d.id)}
+                            className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} rounded transition-colors`}
+                            title={t('ow.btn.domainStatus')}
+                          >
+                            <Layers size={11} />
+                          </button>
+                          {statusMenuFor === d.id && (
+                            <div className={`absolute right-0 top-6 w-32 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-50`}>
+                              <button
+                                onClick={() => {
+                                  setStatusMenuFor(null);
+                                  setShowDomainDropdown(false);
+                                  handleStatusChange(d, 'Published');
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 text-emerald-600 transition-colors"
+                              >
+                                <Rocket size={11} />
+                                <span>{t('ow.domain.publish')}</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setStatusMenuFor(null);
+                                  setShowDomainDropdown(false);
+                                  handleStatusChange(d, 'Deprecated');
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 text-amber-600 transition-colors"
+                              >
+                                <Archive size={11} />
+                                <span>{t('ow.domain.deprecate')}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => {
                             handleDeleteDomain(d.id);
                             setShowDomainDropdown(false);
+                            setStatusMenuFor(null);
                           }}
                           className={`p-1 hover:bg-red-50 ${styles.muted} hover:text-red-600 rounded transition-colors`}
                           title={t('ow.btn.deleteDomain')}
@@ -312,6 +422,9 @@ export default function Sidebar({
                     </div>
                   );
                 })}
+                {domains.length === 0 && (
+                  <div className={`px-2.5 py-2 text-[10px] ${styles.muted}`}>{t('ow.domain.empty')}</div>
+                )}
               </div>
             )}
           </div>
@@ -342,7 +455,7 @@ export default function Sidebar({
 
       {/* Accordions List */}
       <div className="flex-1 overflow-y-auto py-3 space-y-1">
-        
+
         {/* 1. OBJECT TYPES */}
         <div className="space-y-0.5">
           <button
@@ -710,7 +823,7 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* 业务划分域模态对话框 — T4: 替换原来的 深色遮罩/白底 硬编码 → theme tokens */}
+      {/* 业务划分域模态对话框 — T8: CRUD 已接后端 (OntologyDomainApiController) */}
       {showDomainModal && (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.overlayBg} backdrop-blur-xs`}>
           <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.appBorder} w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]`}>
@@ -737,7 +850,7 @@ export default function Sidebar({
               </button>
             </div>
 
-            {/* Modal Form — T4: 表单 error 用 danger semantic */}
+            {/* Modal Form — T8: 表单 error 用 danger semantic + 保存按钮 loading */}
             <form onSubmit={handleSaveDomain} className="flex-1 overflow-y-auto p-4 space-y-4">
               {formError && (
                 <div className={`p-2.5 ${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder} rounded-lg text-xs font-semibold flex items-center gap-2`}>
@@ -807,7 +920,7 @@ export default function Sidebar({
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                           isSelected ? 'border-slate-800 scale-110 shadow-sm' : 'border-transparent hover:scale-105'
                         }`}
-                        style={{ backgroundColor: 
+                        style={{ backgroundColor:
                           color === 'blue' ? '#3b82f6' :
                           color === 'emerald' ? '#10b981' :
                           color === 'amber' ? '#f59e0b' :
@@ -876,9 +989,10 @@ export default function Sidebar({
                 </button>
                 <button
                   type="submit"
-                  className={`px-3.5 py-1.5 ${styles.accentBg} text-white ${styles.accentHover} rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs`}
+                  disabled={saving}
+                  className={`px-3.5 py-1.5 ${styles.accentBg} text-white ${styles.accentHover} rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs disabled:opacity-50`}
                 >
-                  {t('ow.btn.save')}
+                  {saving ? '...' : t('ow.btn.save')}
                 </button>
               </div>
             </form>
