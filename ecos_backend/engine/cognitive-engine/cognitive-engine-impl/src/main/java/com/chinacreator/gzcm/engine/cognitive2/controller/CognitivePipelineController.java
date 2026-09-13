@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.engine.cognitive2.model.CognitivePipelineNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.NodeType;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitivePipelineExecutor;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitivePipelineExecutor.PipelineExecution;
+import com.chinacreator.gzcm.engine.cognitive2.service.CognitivePipelineRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,12 +14,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 认知管线编排 REST API — 前缀 /api/v1/cognitive/pipeline
  *
  * <p>四端点：创建 / 列表 / 执行 / 查询执行状态</p>
+ *
+ * <p>管线定义已持久化到 PostgreSQL（kb_cognitive_pipeline 表），
+ * 由 {@link CognitivePipelineRepository} 管理 CRUD。
+ * 执行记录（PipelineExecution）仍为进程内状态（实时状态机，不持久化）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/cognitive/pipeline")
@@ -29,8 +33,8 @@ public class CognitivePipelineController {
     @Autowired
     private CognitivePipelineExecutor executor;
 
-    /** 管线定义存储（内存，后续可持久化到 DB） */
-    private final Map<String, CognitivePipeline> pipelineStore = new ConcurrentHashMap<>();
+    @Autowired
+    private CognitivePipelineRepository pipelineRepository;
 
     /** POST / — 创建认知管线定义 */
     @PostMapping
@@ -73,10 +77,13 @@ public class CognitivePipelineController {
             pipeline.setId(pipelineId);
             pipeline.setName(name);
             pipeline.setDescription(description);
+            pipeline.setStatus("DRAFT");
             pipeline.setNodes(nodes);
             pipeline.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+            pipeline.setCreatedBy("system");
 
-            pipelineStore.put(pipelineId, pipeline);
+            // 持久化到 PostgreSQL（替代原 ConcurrentHashMap 内存存储）
+            pipelineRepository.save(pipeline);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("pipelineId", pipelineId);
@@ -89,11 +96,12 @@ public class CognitivePipelineController {
         }
     }
 
-    /** GET / — 列管线定义 */
+    /** GET / — 列管线定义（从 PostgreSQL 查询） */
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list() {
+        List<CognitivePipeline> pipelines = pipelineRepository.findAll();
         List<Map<String, Object>> result = new ArrayList<>();
-        for (CognitivePipeline p : pipelineStore.values()) {
+        for (CognitivePipeline p : pipelines) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", p.getId());
             m.put("name", p.getName());
@@ -105,11 +113,11 @@ public class CognitivePipelineController {
         return ApiResponse.success(result);
     }
 
-    /** POST /{id}/execute — 执行管线 */
+    /** POST /{id}/execute — 执行管线（从 PostgreSQL 加载管线定义） */
     @PostMapping("/{id}/execute")
     public ApiResponse<Map<String, Object>> execute(@PathVariable String id) {
         try {
-            CognitivePipeline pipeline = pipelineStore.get(id);
+            CognitivePipeline pipeline = pipelineRepository.findById(id).orElse(null);
             if (pipeline == null) {
                 return ApiResponse.notFound("Pipeline not found: " + id);
             }
@@ -126,6 +134,20 @@ public class CognitivePipelineController {
             log.error("Failed to execute pipeline", e);
             return ApiResponse.internalError("Failed to execute: " + e.getMessage());
         }
+    }
+
+    /**
+     * DELETE /{id} — 逻辑删除管线定义（is_deleted=1，铁律 4.8）。
+     * <p>调用方零改：原无 DELETE 端点，此为新增端点。</p>
+     */
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> delete(@PathVariable String id) {
+        int rows = pipelineRepository.logicalDelete(id);
+        if (rows > 0) {
+            log.info("Pipeline logical deleted: {}", id);
+            return ApiResponse.success("Pipeline " + id + " 已删除");
+        }
+        return ApiResponse.notFound("Pipeline not found: " + id);
     }
 
     /** GET /{id}/execution/{execId} — 查询执行状态 */
