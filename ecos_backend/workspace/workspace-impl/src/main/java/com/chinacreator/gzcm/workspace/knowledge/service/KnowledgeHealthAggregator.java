@@ -47,7 +47,9 @@ public class KnowledgeHealthAggregator {
      *   <li>security — REST（同上 /api/v1/engine/security/health）</li>
      *   <li>data — REST（同上 /api/v1/engine/data/health）</li>
      *   <li>ontology — REST（同上 /api/v1/engine/ontology/health，Neo4j 健康内嵌 components）</li>
-     *   <li>cognitive — REST（dccheng 服务 :18086 上 cognitive2 端点；单体内无该 controller → 404 → DOWN）</li>
+     *   <li>cognitive — REST（PMO-55 E-C 后由 gateway 新端点 /api/v1/engine/cognitive/health
+     *       接管；原 /api/v1/cognitive/health 被 GatewayApplication excludeTokens 屏蔽
+     *       以避免与 ai-engine 同前缀冲突。E-C 起走 gateway 本 JVM 路由，单体/微服务均有效）</li>
      * </ul>
      * 全部走 gatewayBase（默认 http://localhost:8080），单体时命中本 JVM 路由；
      * 切微服务后 gateway 上加 7-companion 路由指向 5 个 service 端口。
@@ -60,8 +62,10 @@ public class KnowledgeHealthAggregator {
         ENGINE_PATHS.put("security", "/api/v1/engine/security/health");
         ENGINE_PATHS.put("data", "/api/v1/engine/data/health");
         ENGINE_PATHS.put("ontology", "/api/v1/engine/ontology/health");
-        // 认知阶段 :18086 上 cognitive2 （V116/PMO-54 之后才在该 service 上启用）
-        ENGINE_PATHS.put("cognitive", "http://localhost:18086/api/v1/cognitive/health");
+        // PMO-55 E-C (2026-09-13): 改走网关新端点 /api/v1/engine/cognitive/health —
+        // CognitiveEngineOpenHealthController（强类型 VO）已落地，避免原 :18086 /api/v1/cognitive/health
+        // 端口兜底失败触发 remote timeout。单体时命中本 JVM 路由；微服务切流后由 gateway companion 路由代理。
+        ENGINE_PATHS.put("cognitive", "/api/v1/engine/cognitive/health");
     }
 
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
