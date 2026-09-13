@@ -89,9 +89,31 @@ psql 单语句失败 → ON_ERROR_STOP 立即退出，**0 张表删除**。
 | T1 8 表 count 终验 | PASS (8/8 = 0, 快照见上) |
 | T2 V126 DROP 脚本 | 已起草 → **T3 未过门禁前已删除** (不留裸迁移文件)；所需前置变更见 § 待授权项 |
 | T3 运行库执行 | **中止** (0 表删除，无损) |
-| T4 回滚 DDL 留档 | **PASS** — [rollback-ddl-pmo58.sql](../../11-运维/rollback-ddl-pmo58.sql) (8 表 CREATE + canonical→alias 数据快照段 + schema 保留声明；**新增 § (d) 4 条 FK 重建段** — 需 PMO 确认) |
-| T5 冒烟 + 留痕 | 未执行 (无 DROP 发生，无回归面)；本文件即 T5 留痕 |
-| commits | 1 个 (T4 回滚 DDL + 本中止留痕)，**V126 不入库**，**并发批次 V125 未 add**，**0 行 Java 变更** |
+| T4 回滚 DDL 留档 | **PASS** — [rollback-ddl-pmo58.sql](../../11-运维/rollback-ddl-pmo58.sql) (8 表 CREATE + canonical→alias 数据快照段 + schema 保留声明 + §(d) 4 条 FK 重建段) |
+| T5 冒烟 + 留痕 | 主项未执行 (无 DROP 发生，无回归面)；**附赠兜底冒烟 PASS** 见下 — 本文件即 T5 留痕 |
+| commits | 1 个 (T4 回滚 DDL + 本中止留痕)，**V126 不入库**，**并发批次 V123/V124/V125 未 add**，**0 行 Java 变更** |
+
+## § T5 附赠兜底冒烟 (运行库 abort 后 liveness 复核)
+
+> 说明: T3 无损中止前 gateway 未启动 (无 :8080 监听)。中止后由并发批次
+> (会话外) 于 2026-09-13 20:05:39 启动 fat-JAR gateway (PID 123644),
+> 借其窗口 against **abort 后的运行库状态** 执行 2 读端点冒烟, 只读无副作用:
+
+| 端点 | HTTP | 响应体 (截断) |
+|:--|:--:|:--|
+| `GET /api/v1/ecos/ontologies` | **200** | `{"code":0,"message":"ok","data":[{"id":"fb972746","code":"ont_w7_cra",...` — canonical `public.ecos_ontology` (主本体表, 8 行) 读取链路存活 |
+| `GET /api/v1/ecos/ontologies/fb972746/entities` | **200** | `{"code":0,...,"data":[{"id":"ent512","ontologyId":"fb972746","code":"e_w7_s99","name":"Wave7 entity",...}]}` — canonical `public.ecos_ontology_entity` 读取链路存活 |
+| `GET /api/v1/ecos/ontologies/entities/ent512` | **200** | `{"code":0,...,"data":{"id":"ent512",...,"properties":[],"relationships":[],"rules":[],...}}` — entity 详情级联读 canonical 侧 property/relationship/rule/attachment 表均正常返回 (ent512 自身无关联行, 空数组为正常业务态) |
+
+结论: canonical 侧 3 读端点 (主本体 / entity 列表 / entity 详情含级联 4 表) 在
+DROP 中止后全部 200, 幽灵 8 表 (entity/property/relationship/action/rule/version/
+domain/glossary) 在 canonical 侧的同名表均正常读取。8 表 ghost 侧本就 0 行
+0 引用, 不参与任何 canonical 读链路, 冒烟 PASS。
+
+**gateway 清理**: 该实例属并发批次 (PMO-53 上下文, 启动时间 20:05:39
+晚于本会话 T3 中止时刻), **未用完 — 保留运行不 kill** (kill 会打断并发批次
+工作; 本会话无自启进程可清)。PMO-58 自身的 "kill gateway, :8080 清 0" 项
+不适用 — 无自启计数。
 
 ## § 待 PMO 授权项 (解除 ARTIFACT_MISMATCH 三选项)
 
