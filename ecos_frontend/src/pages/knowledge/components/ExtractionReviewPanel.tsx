@@ -198,7 +198,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
           </div>
 
           {/* Tab content */}
-          <div className="divide-y max-h-[460px] overflow-y-auto" style={{ divideColor: 'var(--app-border, #E2E8F0)' }}>
+          <div className="divide-y max-h-[460px] overflow-y-auto" style={{ ['--divide-color' as string]: 'var(--app-border, #E2E8F0)' }}>
             {activeTab==='entities' && entities.map(entity => (
               <div key={entity.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-opacity-20 data-[hover]:hover:bg-black /[0.02]">
                 <button onClick={() => toggleEntity(entity.id)} className="mt-0.5 shrink-0 cursor-pointer">

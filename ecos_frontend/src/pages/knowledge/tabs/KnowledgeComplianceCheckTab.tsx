@@ -192,12 +192,12 @@ export default function KnowledgeComplianceCheckTab() {
   return (
     <div className="space-y-6 max-w-5xl">
       {/* 标题 */}
-      <div className="border-b border-slate-200 pb-3 space-y-1">
-        <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+      <div className={`border-b ${styles.cardBorder} pb-3 space-y-1`}>
+        <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
           <Shield size={16} className="text-indigo-600" />
           {t("knowledge.knowledgecompli.241")}
         </h2>
-        <p className="text-xs text-slate-500">
+        <p className={`text-xs ${styles.muted}`}>
           {t("knowledge.knowledgecompli.242")}
         </p>
       </div>
@@ -206,19 +206,19 @@ export default function KnowledgeComplianceCheckTab() {
         {/* ── 左侧：输入区 ───────────────────────────────── */}
         <div className="lg:col-span-5 space-y-4">
           {/* 业务对象选择 */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
+            <div className="flex items-center gap-2 border-b border-slate-150 pb-2">
               <span className="p-1.5 rounded bg-indigo-50 text-indigo-600">
                 <Search size={13} />
               </span>
-              <h3 className="font-bold text-slate-800 text-xs">
+              <h3 className={`font-bold ${styles.cardText} text-xs`}>
                 {t("knowledge.knowledgecompli.243")}
               </h3>
             </div>
             <select
               value={businessObject}
               onChange={e => setBusinessObject(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-sans text-slate-700 bg-white focus:outline-hidden focus:border-indigo-500 cursor-pointer"
+              className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg text-xs font-sans ${styles.inputText} ${styles.inputBg} focus:outline-hidden focus:border-indigo-500 cursor-pointer`}
             >
               <option value="">
                 {t("knowledge.knowledgecompli.244")}
@@ -232,24 +232,24 @@ export default function KnowledgeComplianceCheckTab() {
           </div>
 
           {/* 事实输入 */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
+            <div className="flex items-center justify-between border-b border-slate-150 pb-2">
               <div className="flex items-center gap-2">
                 <span className="p-1.5 rounded bg-violet-50 text-violet-600">
                   <FileText size={13} />
                 </span>
-                <h3 className="font-bold text-slate-800 text-xs">
+                <h3 className={`font-bold ${styles.cardText} text-xs`}>
                   {t("knowledge.knowledgecompli.245")}
                 </h3>
               </div>
               {/* 模式切换 */}
-              <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+              <div className={`flex rounded-lg border ${styles.cardBorder} overflow-hidden`}>
                 <button
                   onClick={() => setJsonMode(false)}
                   className={`px-2.5 py-1 text-[10px] font-bold cursor-pointer transition-colors ${
                     !jsonMode
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                      : `${styles.muted} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <List size={11} className="inline mr-1" />
@@ -260,7 +260,7 @@ export default function KnowledgeComplianceCheckTab() {
                   className={`px-2.5 py-1 text-[10px] font-bold cursor-pointer transition-colors ${
                     jsonMode
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                      : `${styles.muted} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <Code size={11} className="inline mr-1" />
@@ -275,7 +275,7 @@ export default function KnowledgeComplianceCheckTab() {
                 onChange={e => setJsonInput(e.target.value)}
                 rows={6}
                 placeholder={JSON.stringify({ '灭菌工艺变更': 'true', '安全性数据': 'false' }, null, 2)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 leading-relaxed focus:outline-hidden focus:border-violet-500"
+                className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg text-xs font-mono ${styles.inputText} leading-relaxed focus:outline-hidden focus:border-violet-500`}
               />
             ) : (
               <div className="space-y-2">
@@ -285,12 +285,12 @@ export default function KnowledgeComplianceCheckTab() {
                       value={f.key}
                       onChange={e => updateFact(f.id, 'key', e.target.value)}
                       placeholder={t("knowledge.knowledgecompli.246")}
-                      className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 focus:outline-hidden focus:border-violet-500"
+                      className={`flex-1 px-2.5 py-1.5 border ${styles.inputBorder} rounded-lg text-xs font-mono ${styles.inputText} focus:outline-hidden focus:border-violet-500`}
                     />
                     <select
                       value={f.value}
                       onChange={e => updateFact(f.id, 'value', e.target.value)}
-                      className="w-24 px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 bg-white focus:outline-hidden focus:border-violet-500 cursor-pointer"
+                      className={`w-24 px-2 py-1.5 border ${styles.inputBorder} rounded-lg text-xs font-mono ${styles.inputText} ${styles.inputBg} focus:outline-hidden focus:border-violet-500 cursor-pointer`}
                     >
                       <option value="true">true</option>
                       <option value="false">false</option>
@@ -299,7 +299,7 @@ export default function KnowledgeComplianceCheckTab() {
                     <button
                       onClick={() => removeFactRow(f.id)}
                       disabled={facts.length <= 1}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      className={`p-1.5 rounded-lg ${styles.muted} hover:text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed`}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -307,7 +307,7 @@ export default function KnowledgeComplianceCheckTab() {
                 ))}
                 <button
                   onClick={addFactRow}
-                  className="w-full py-1.5 border border-dashed border-slate-300 rounded-lg text-[10px] text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  className={`w-full py-1.5 border border-dashed ${styles.cardBorder} rounded-lg text-[10px] ${styles.muted} hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors`}
                 >
                   <Plus size={11} />
                   {t("knowledge.knowledgecompli.247")}
@@ -347,9 +347,9 @@ export default function KnowledgeComplianceCheckTab() {
         <div className="lg:col-span-7 space-y-4">
           {/* 结果占位 */}
           {!results && !isChecking && (
-            <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-xs text-center space-y-2">
-              <Shield size={32} className="text-slate-300 mx-auto" />
-              <p className="text-xs text-slate-400 font-medium">
+            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-8 shadow-xs text-center space-y-2`}>
+              <Shield size={32} className={`mx-auto ${styles.muted} opacity-40`} />
+              <p className={`text-xs ${styles.muted} font-medium`}>
                 {zh
                   ? '选择业务对象并输入事实后，点击"执行合规检查"开始'
                   : 'Select a business object, enter facts, then click "Run Compliance Check"'}
@@ -359,9 +359,9 @@ export default function KnowledgeComplianceCheckTab() {
 
           {/* 检查中 */}
           {isChecking && (
-            <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-xs text-center space-y-3">
+            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-8 shadow-xs text-center space-y-3`}>
               <span className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto block" />
-              <p className="text-xs text-slate-500 font-medium">
+              <p className={`text-xs ${styles.muted} font-medium`}>
                 {t("knowledge.knowledgecompli.250")}
               </p>
             </div>
@@ -371,9 +371,9 @@ export default function KnowledgeComplianceCheckTab() {
           {results && (
             <>
               {/* 总结卡片 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
-                  <h3 className="font-bold text-slate-800 text-xs flex items-center gap-2">
+              <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs`}>
+                <div className="flex items-center justify-between border-b border-slate-150 pb-3 mb-3">
+                  <h3 className={`font-bold ${styles.cardText} text-xs flex items-center gap-2`}>
                     <ClipboardCheck size={13} className="text-indigo-600" />
                     {t("knowledge.knowledgecompli.251")}
                   </h3>
@@ -388,8 +388,8 @@ export default function KnowledgeComplianceCheckTab() {
 
                 <div className="flex gap-4">
                   <div className="flex-1 bg-slate-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-black text-slate-800">{results.summary.total}</div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase">{t("knowledge.knowledgecompli.235")}</div>
+                    <div className={`text-lg font-black ${styles.cardText}`}>{results.summary.total}</div>
+                    <div className={`text-[9px] ${styles.muted} font-bold uppercase`}>{t("knowledge.knowledgecompli.235")}</div>
                   </div>
                   <div className="flex-1 bg-emerald-50 rounded-lg p-3 text-center">
                     <div className="text-lg font-black text-emerald-700">{results.summary.passed}</div>
@@ -414,7 +414,7 @@ export default function KnowledgeComplianceCheckTab() {
                     {/* 规则头部 */}
                     <button
                       onClick={() => toggleRuleExpand(r.ruleId)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${styles.sidebarHoverBg} transition-colors cursor-pointer`}
                     >
                       {r.passed ? (
                         <CheckCircle size={16} className="text-emerald-500 shrink-0" />
@@ -423,12 +423,12 @@ export default function KnowledgeComplianceCheckTab() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800 text-xs truncate">{r.ruleName}</span>
-                          <span className="text-[9px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                          <span className={`font-bold ${styles.cardText} text-xs truncate`}>{r.ruleName}</span>
+                          <span className={`text-[9px] font-mono ${styles.muted} bg-slate-100 px-1.5 py-0.5 rounded shrink-0`}>
                             {r.ruleId}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                        <div className={`text-[10px] ${styles.muted} truncate mt-0.5`}>
                           {r.conclusion}
                         </div>
                       </div>
@@ -443,7 +443,7 @@ export default function KnowledgeComplianceCheckTab() {
                       </span>
                       <ChevronDown
                         size={14}
-                        className={`text-slate-400 transition-transform shrink-0 ${
+                        className={`${styles.muted} transition-transform shrink-0 ${
                           expandedRules.has(r.ruleId) ? 'rotate-180' : ''
                         }`}
                       />
@@ -451,24 +451,24 @@ export default function KnowledgeComplianceCheckTab() {
 
                     {/* 推理链 (展开详情) */}
                     {expandedRules.has(r.ruleId) && (
-                      <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 space-y-2">
+                      <div className="border-t border-slate-150 bg-slate-50 px-4 py-3 space-y-2">
                         {/* 推理链路图 */}
-                        <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                        <div className={`text-[9px] font-extrabold ${styles.muted} uppercase tracking-wider`}>
                           {t("knowledge.knowledgecompli.258")}:
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
                           <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-mono font-bold rounded">
                             {r.ruleId}
                           </span>
-                          <ChevronRight size={10} className="text-slate-400" />
+                          <ChevronRight size={10} className={styles.muted} />
                           <span className="px-2 py-0.5 bg-violet-100 text-violet-700 font-mono rounded">
                             {t("knowledge.knowledgecompli.238")}
                           </span>
-                          <ChevronRight size={10} className="text-slate-400" />
+                          <ChevronRight size={10} className={styles.muted} />
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 font-mono rounded">
                             {t("knowledge.knowledgecompli.260")}
                           </span>
-                          <ChevronRight size={10} className="text-slate-400" />
+                          <ChevronRight size={10} className={styles.muted} />
                           <span
                             className={`px-2 py-0.5 font-bold rounded ${
                               r.passed
@@ -479,7 +479,7 @@ export default function KnowledgeComplianceCheckTab() {
                             {t("knowledge.knowledgecompli.239")}
                           </span>
                           <ChevronRight size={10} className="text-slate-400" />
-                          <span className="px-2 py-0.5 bg-slate-200 text-slate-600 font-mono rounded">
+                          <span className={`px-2 py-0.5 bg-slate-200 ${styles.muted} font-mono rounded`}>
                             {t("knowledge.knowledgecompli.240")}
                           </span>
                         </div>
@@ -487,15 +487,15 @@ export default function KnowledgeComplianceCheckTab() {
                         {/* 详细信息 */}
                         <div className="grid grid-cols-1 gap-1.5 mt-1">
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.263")}:</span>
-                            <span className="text-slate-700 font-mono">{r.ruleId}</span>
+                            <span className={`${styles.muted} font-bold w-12 shrink-0`}>{t("knowledge.knowledgecompli.263")}:</span>
+                            <span className={`${styles.cardText} font-mono`}>{r.ruleId}</span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.238")}:</span>
-                            <span className="text-slate-700">{r.condition}</span>
+                            <span className={`${styles.muted} font-bold w-12 shrink-0`}>{t("knowledge.knowledgecompli.238")}:</span>
+                            <span className={styles.cardText}>{r.condition}</span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.260")}:</span>
+                            <span className={`${styles.muted} font-bold w-12 shrink-0`}>{t("knowledge.knowledgecompli.260")}:</span>
                             <div className="flex flex-wrap gap-1">
                               {Object.entries(r.facts).map(([k, v]) => (
                                 <span
@@ -505,7 +505,7 @@ export default function KnowledgeComplianceCheckTab() {
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                       : v === 'false'
                                         ? 'bg-red-50 text-red-700 border border-red-200'
-                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                        : `bg-slate-100 ${styles.muted} border border-slate-200`
                                   }`}
                                 >
                                   {k}: {v}
@@ -514,19 +514,19 @@ export default function KnowledgeComplianceCheckTab() {
                             </div>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.239")}:</span>
+                            <span className={`${styles.muted} font-bold w-12 shrink-0`}>{t("knowledge.knowledgecompli.239")}:</span>
                             <span className={`font-bold ${r.passed ? 'text-emerald-700' : 'text-red-700'}`}>
                               {r.conclusion}
                             </span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.240")}:</span>
-                            <span className="text-slate-600 font-mono">{r.source}</span>
+                            <span className={`${styles.muted} font-bold w-12 shrink-0`}>{t("knowledge.knowledgecompli.240")}:</span>
+                            <span className={`${styles.muted} font-mono`}>{r.source}</span>
                           </div>
                           {r.reasoningChain && (
                             <div className="flex gap-2 text-[10px]">
-                              <span className="text-slate-400 font-bold w-12 shrink-0">{t("knowledge.knowledgecompli.268")}:</span>
-                              <span className="text-slate-600 whitespace-pre-wrap">{r.reasoningChain}</span>
+                              <span className={`${styles.muted} font-bold w-12 shrink-0`}>{t("knowledge.knowledgecompli.268")}:</span>
+                              <span className={`${styles.muted} whitespace-pre-wrap`}>{r.reasoningChain}</span>
                             </div>
                           )}
                         </div>
