@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.engine.ontology.client.DataNetResourceClient;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverMappingVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverResultVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * AutoDiscoverService — 本体自动发现。
@@ -72,6 +75,89 @@ public class AutoDiscoverService {
         return results;
     }
 
+    // ──────────────────────────────────────────────────────────────
+    // T16-3 (2026-09-13)：VO 重载 — Controller 强类型返回
+    // 旧 Map 方法原样保留（C1 兼容，其他调用方可继续使用）
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * 自动发现（VO 版本） — T16-3。
+     *
+     * <p>复用 {@link #autoDiscover(String, String, List)} 的 Map 结果，
+     * 逐条映射到 {@link OntologyAutoDiscoverResultVO}。
+     */
+    public List<OntologyAutoDiscoverResultVO> autoDiscoverVO(String domainCode,
+                                                              String datasourceId,
+                                                              List<String> resourceNames) {
+        List<Map<String, Object>> raw = autoDiscover(domainCode, datasourceId, resourceNames);
+        if (raw == null) {
+            return new ArrayList<>();
+        }
+        return raw.stream().map(this::toResultVO).collect(Collectors.toList());
+    }
+
+    private OntologyAutoDiscoverResultVO toResultVO(Map<String, Object> row) {
+        OntologyAutoDiscoverResultVO vo = new OntologyAutoDiscoverResultVO();
+        vo.setEntityCode(objToString(row.get("entityCode")));
+        vo.setEntityName(objToString(row.get("entityName")));
+        vo.setDomainCode(objToString(row.get("domainCode")));
+        vo.setPropertyCount(objToInt(row.get("propertyCount")));
+        // mapping 是 createMapping 的 PG 行 Map，保留 raw Map 透传（动态 payload 豁免）
+        vo.setMapping((Map<String, Object>) row.get("mapping"));
+        return vo;
+    }
+
+    /**
+     * 实体表映射列表（VO 版本） — T16-3。
+     *
+     * <p>复用 {@link #listMappings(String)} 的 raw Map 结果，
+     * 逐条映射到 {@link OntologyAutoDiscoverMappingVO}。
+     */
+    public List<OntologyAutoDiscoverMappingVO> listMappingsVO(String domainCode) {
+        List<Map<String, Object>> raw = listMappings(domainCode);
+        if (raw == null) {
+            return new ArrayList<>();
+        }
+        return raw.stream().map(this::toMappingVO).collect(Collectors.toList());
+    }
+
+    private OntologyAutoDiscoverMappingVO toMappingVO(Map<String, Object> row) {
+        OntologyAutoDiscoverMappingVO vo = new OntologyAutoDiscoverMappingVO();
+        vo.setId(row.get("id"));
+        vo.setEntityCode(objToString(row.get("entity_code")));
+        vo.setEntityName(objToString(row.get("entity_name")));
+        vo.setDomainCode(objToString(row.get("domain_code")));
+        vo.setDatasourceId(objToString(row.get("datasource_id")));
+        vo.setResourceName(objToString(row.get("resource_name")));
+        vo.setTableSchema(objToString(row.get("table_schema")));
+        // field_mappings 是 JSONB 列，PG JDBC 直出 PGobject → 原始 Object 透传
+        vo.setFieldMappings(row.get("field_mappings"));
+        vo.setCreatedAt(objToString(row.get("created_at")));
+        vo.setUpdatedAt(objToString(row.get("updated_at")));
+        return vo;
+    }
+
+    private static String objToString(Object o) {
+        return o == null ? null : o.toString();
+    }
+
+    private static Integer objToInt(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof Number n) {
+            return n.intValue();
+        }
+        try {
+            return Integer.parseInt(o.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 查询实体表映射（不分页，按 domain 可选过滤，按创建时间倒序）。
+     */
     public List<Map<String, Object>> listMappings(String domainCode) {
         String sql;
         Object[] params;
