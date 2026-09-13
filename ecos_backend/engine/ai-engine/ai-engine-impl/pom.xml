@@ -54,6 +54,13 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Lombok (PipelineNodeTraceVO 使用 @Getter/@Setter/@NoArgsConstructor, 版本由 Spring Boot BOM 管理) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Spring JDBC (for JdbcTemplate healthCheck) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
