@@ -281,7 +281,7 @@ export default function OntologyGraph({
       {nodes.map(node => {
         const originalObj = objectTypes.find(o => o.id === node.id);
         const hasDomain = originalObj?.domainId;
-        const bgClass = hasDomain === 'assets' ? 'bg-blue-600 border-blue-500' : hasDomain === 'operations' ? 'bg-purple-600 border-purple-500' : 'bg-slate-600 border-slate-500';
+        const bgClass = hasDomain === 'assets' ? 'bg-blue-600 border-blue-500' : hasDomain === 'operations' ? 'bg-purple-600 border-purple-500' : 'bg-gray-600 border-gray-500';
         const domainLabel = hasDomain === 'assets' ? '资产域' : hasDomain === 'operations' ? '运行域' : '业务域';
 
         return (

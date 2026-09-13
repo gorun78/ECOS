@@ -536,19 +536,19 @@ export default function ObjectTypeView({
         {/* DATA SOURCE MAPPING TAB */}
         {activeTab === 'mapping' && (
           <div className="space-y-6">
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex justify-between items-center">
+            <div className={`${styles.appBg} border ${styles.appBorder} rounded-lg p-4 flex justify-between items-center`}>
               <div className="flex items-center gap-3">
-                <LucideIcon name="Database" className="text-slate-500" size={18} />
+                <LucideIcon name="Database" className={styles.cardTextMuted} size={18} />
                 <div>
-                  <div className="text-xs font-semibold text-slate-800">当前绑定的原始数据集</div>
-                  <div className="text-[10px] text-slate-500 font-mono mt-0.5">{selectedDataset?.path}</div>
+                  <div className={`text-xs font-semibold ${styles.cardText}`}>当前绑定的原始数据集</div>
+                  <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{selectedDataset?.path}</div>
                 </div>
               </div>
               <div className="flex gap-2">
                 <select
                   value={objectType.mapping.datasetId}
                   onChange={e => handleDatasetChange(e.target.value)}
-                  className="px-3 py-1.5 text-xs border border-slate-300 rounded bg-white focus:outline-hidden"
+                  className={`px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden`}
                 >
                   {datasets.map(ds => (
                     <option key={ds.id} value={ds.id}>{ds.name}</option>
@@ -556,7 +556,7 @@ export default function ObjectTypeView({
                 </select>
                 <button
                   onClick={handleAutoMap}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1"
+                  className={`bg-slate-200 hover:bg-slate-300 ${styles.cardText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
                 >
                   <LucideIcon name="Wand2" size={13} />
                   智能映射
@@ -569,19 +569,19 @@ export default function ObjectTypeView({
               {/* Left Column: Raw Datasource */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                  <div className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
                     <LucideIcon name="Table" size={14} />
                     原始表字段 (Schema)
                   </div>
-                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+                  <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono`}>
                     {selectedDataset?.columns.length} 列
                   </span>
                 </div>
-                <div className="border border-slate-200 rounded-lg bg-white overflow-hidden divide-y divide-slate-100">
+                <div className={`border ${styles.appBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
                   {selectedDataset?.columns.map(col => (
                     <div key={col.name} className="flex justify-between items-center px-4 py-2.5 hover:bg-slate-50/50">
-                      <div className="font-mono text-xs font-medium text-slate-700">{col.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono italic uppercase bg-slate-100 px-1.5 py-0.5 rounded">
+                      <div className={`font-mono text-xs font-medium ${styles.cardTextMuted}`}>{col.name}</div>
+                      <div className={`text-[10px] ${styles.cardTextMuted} font-mono italic uppercase ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>
                         {col.type}
                       </div>
                     </div>
@@ -592,7 +592,7 @@ export default function ObjectTypeView({
               {/* Right Column: Object Properties Mapping */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                  <div className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
                     <LucideIcon name="Layers" size={14} />
                     对象属性映射关系
                   </div>
@@ -600,28 +600,28 @@ export default function ObjectTypeView({
                     {Object.keys(objectType.mapping.propertyMappings).length} / {objectType.properties.length} 已映射
                   </span>
                 </div>
-                <div className="border border-slate-200 rounded-lg bg-white overflow-hidden divide-y divide-slate-100">
+                <div className={`border ${styles.appBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
                   {objectType.properties.map(prop => {
                     const mappedCol = objectType.mapping.propertyMappings[prop.id] || '';
                     return (
-                      <div key={prop.id} className="flex justify-between items-center px-4 py-2.5 bg-white hover:bg-slate-50/50">
+                      <div key={prop.id} className={`flex justify-between items-center px-4 py-2.5 ${styles.cardBg} hover:bg-slate-50/50`}>
                         <div className="flex items-center gap-2">
-                          <span className={objectType.primaryKey === prop.id ? 'text-amber-500' : 'text-slate-400'}>
+                          <span className={objectType.primaryKey === prop.id ? 'text-amber-500' : styles.cardTextMuted}>
                             <LucideIcon name={objectType.primaryKey === prop.id ? 'Key' : 'CircleDot'} size={12} />
                           </span>
                           <div>
-                            <div className="text-xs font-medium text-slate-900">{prop.displayName}</div>
-                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{prop.id} · {prop.dataType}</div>
+                            <div className={`text-xs font-medium ${styles.text}`}>{prop.displayName}</div>
+                            <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{prop.id} · {prop.dataType}</div>
                           </div>
                         </div>
 
                         {/* Mapped Selector */}
                         <div className="flex items-center gap-2">
-                          <span className="text-slate-400 text-[10px]">←</span>
+                          <span className={`${styles.cardTextMuted} text-[10px]`}>←</span>
                           <select
                             value={mappedCol}
                             onChange={e => handlePropMappingChange(prop.id, e.target.value)}
-                            className={`px-2 py-1 text-xs border rounded bg-white focus:outline-hidden font-mono text-slate-700 ${
+                            className={`px-2 py-1 text-xs border rounded ${styles.cardBg} focus:outline-hidden font-mono ${styles.inputText} ${
                               mappedCol ? 'border-emerald-300 bg-emerald-50/30' : 'border-amber-300 bg-amber-50/10'
                             }`}
                           >
@@ -643,11 +643,11 @@ export default function ObjectTypeView({
         {/* RELATED LINKS TAB */}
         {activeTab === 'links' && (
           <div className="space-y-4">
-            <div className="text-xs text-slate-500">
+            <div className={`text-xs ${styles.cardTextMuted}`}>
               在此查看与 {objectType.displayName} 相关联的所有多维链接关系模式。
             </div>
             {relatedLinks.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg text-slate-400 text-xs">
+              <div className={`text-center py-8 border border-dashed ${styles.sidebarBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
                 暂无任何链接关系定义关联到此对象。
               </div>
             ) : (
@@ -660,22 +660,22 @@ export default function ObjectTypeView({
                     <div
                       key={link.id}
                       onClick={() => onNavigateToLink(link.id)}
-                      className="p-4 border border-slate-200 rounded-xl hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer bg-white group flex items-start justify-between"
+                      className={`p-4 border ${styles.appBorder} rounded-xl hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer ${styles.cardBg} group flex items-start justify-between`}
                     >
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="p-1 rounded-md bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                          <span className={`p-1 rounded-md ${styles.sidebarBg} ${styles.cardTextMuted} group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors`}>
                             <LucideIcon name="GitMerge" size={14} />
                           </span>
-                          <div className="font-semibold text-xs text-slate-800 group-hover:text-blue-600">
+                          <div className={`font-semibold text-xs ${styles.cardText} group-hover:text-blue-600`}>
                             {link.displayName}
                           </div>
-                          <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1 rounded">
+                          <span className={`text-[10px] font-mono ${styles.cardTextMuted} ${styles.appBg} px-1 rounded`}>
                             {link.cardinality}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-500">{link.description}</p>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600 pt-1">
+                        <p className={`text-[10px] ${styles.cardTextMuted}`}>{link.description}</p>
+                        <div className={`flex items-center gap-1.5 text-[10px] ${styles.sidebarText} pt-1`}>
                           <span className={isSource ? 'font-semibold text-blue-600' : ''}>
                             {isSource ? '源' : '源(' + link.sourceObjectType + ')'}
                           </span>
@@ -700,11 +700,11 @@ export default function ObjectTypeView({
         {/* RELATED ACTIONS TAB */}
         {activeTab === 'actions' && (
           <div className="space-y-4">
-            <div className="text-xs text-slate-500">
+            <div className={`text-xs ${styles.cardTextMuted}`}>
               在此查看能够被应用、修改或实例化 {objectType.displayName} 对象的有界业务操作。
             </div>
             {relatedActions.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg text-slate-400 text-xs">
+              <div className={`text-center py-8 border border-dashed ${styles.sidebarBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
                 目前尚无操作类型注册针对此对象的操作修改。
               </div>
             ) : (
@@ -713,19 +713,19 @@ export default function ObjectTypeView({
                   <div
                     key={action.id}
                     onClick={() => onNavigateToAction(action.id)}
-                    className="p-4 border border-slate-200 rounded-xl hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer bg-white group flex items-start justify-between"
+                    className={`p-4 border ${styles.appBorder} rounded-xl hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer ${styles.cardBg} group flex items-start justify-between`}
                   >
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="p-1.5 rounded-full bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-colors">
                           <LucideIcon name="Zap" size={13} className="fill-amber-500" />
                         </span>
-                        <div className="font-semibold text-xs text-slate-800 group-hover:text-blue-600">
+                        <div className={`font-semibold text-xs ${styles.cardText} group-hover:text-blue-600`}>
                           {action.displayName}
                         </div>
                       </div>
-                      <p className="text-[10px] text-slate-500">{action.description}</p>
-                      <div className="flex items-center gap-2 font-mono text-[9px] text-slate-400 bg-slate-50 p-1.5 rounded border border-slate-100">
+                      <p className={`text-[10px] ${styles.cardTextMuted}`}>{action.description}</p>
+                      <div className={`flex items-center gap-2 font-mono text-[9px] ${styles.cardTextMuted} ${styles.appBg} p-1.5 rounded border ${styles.divider}`}>
                         <div>
                           <strong>参数:</strong> {action.parameters.length} | <strong>副作用:</strong> {action.rules.length} 条
                         </div>

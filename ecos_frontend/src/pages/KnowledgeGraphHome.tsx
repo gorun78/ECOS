@@ -180,6 +180,7 @@ interface GraphViewProps {
 }
 
 function SimpleGraphView({ nodes, edges }: GraphViewProps) {
+  const { styles } = useTheme();
   // 将节点排列为网格
   const cols = Math.ceil(Math.sqrt(nodes.length)) || 3;
   const cellW = 140;
@@ -204,7 +205,7 @@ function SimpleGraphView({ nodes, edges }: GraphViewProps) {
 
   if (nodes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-500">
+      <div className={`flex items-center justify-center h-64 ${styles.muted}`}>
         <div className="text-center">
           <Network size={40} className="mx-auto mb-2 opacity-30" />
           <p className="text-xs">暂无图谱数据</p>
@@ -329,6 +330,7 @@ interface DomainCardProps {
 }
 
 function DomainCard({ domain, onEnterDesign }: DomainCardProps) {
+  const { styles } = useTheme();
   const colorClass = DOMAIN_COLORS[domain.name] || 'border-slate-500/30 bg-slate-500/10';
   const icon = DOMAIN_ICONS[domain.name] || '📁';
 
@@ -341,10 +343,10 @@ function DomainCard({ domain, onEnterDesign }: DomainCardProps) {
       </div>
 
       {/* 域编码 */}
-      <p className="text-[10px] text-slate-500 font-mono mb-3">{domain.code}</p>
+      <p className={`text-[10px] ${styles.muted} font-mono mb-3`}>{domain.code}</p>
 
       {/* 统计 */}
-      <div className="flex items-center gap-3 text-[11px] text-slate-400 mb-3">
+      <div className={`flex items-center gap-3 text-[11px] ${styles.cardTextMuted} mb-3`}>
         <span className="flex items-center gap-1">
           <Box size={11} className="text-indigo-400" />
           {domain.entityCount} 实体
@@ -374,7 +376,7 @@ function DomainCard({ domain, onEnterDesign }: DomainCardProps) {
 
 export default function KnowledgeGraphHome() {
   const { t } = useLanguage();
-  useTheme();
+  const { styles } = useTheme();
 
   // 状态
   const [kgData, setKgData] = useState<KnowledgeGraphData | null>(null);
@@ -411,7 +413,7 @@ export default function KnowledgeGraphHome() {
       <div className="flex-1 flex items-center justify-center bg-[#0f1117]">
         <div className="text-center">
           <Loader2 size={32} className="animate-spin text-indigo-400 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">正在加载知识图谱...</p>
+          <p className={`text-sm ${styles.cardTextMuted}`}>正在加载知识图谱...</p>
         </div>
       </div>
     );
@@ -424,7 +426,7 @@ export default function KnowledgeGraphHome() {
         <div className="text-center p-8">
           <AlertCircle size={40} className="text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400 mb-2">加载失败</p>
-          <p className="text-xs text-slate-500">{error}</p>
+          <p className={`text-xs ${styles.muted}`}>{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 transition"
@@ -454,7 +456,7 @@ export default function KnowledgeGraphHome() {
             <Network size={22} className="text-indigo-400" />
             <div>
               <h1 className="text-base font-bold text-white">本体工作台</h1>
-              <p className="text-[11px] text-slate-400">
+              <p className={`text-[11px] ${styles.cardTextMuted}`}>
                 {totalEntities} 实体 · {totalRelationships} 关系 · {totalDomains} 业务域
               </p>
             </div>
@@ -463,7 +465,7 @@ export default function KnowledgeGraphHome() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.location.reload()}
-              className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-slate-300 transition"
+              className={`p-2 hover:bg-white/5 rounded-lg ${styles.cardTextMuted} hover:text-white transition`}
               title="刷新数据"
             >
               <Loader2 size={14} className="hover:animate-spin" />
@@ -476,8 +478,8 @@ export default function KnowledgeGraphHome() {
           <div className="bg-[#141924] rounded-lg border border-[#1E293B] overflow-hidden">
             <div className="px-4 py-2 border-b border-[#1E293B] flex items-center gap-2">
               <Layers size={13} className="text-indigo-400" />
-              <span className="text-xs font-medium text-slate-300">全局知识图谱</span>
-              <span className="text-[10px] text-slate-600 ml-auto">
+              <span className={`text-xs font-medium ${styles.cardText}`}>全局知识图谱</span>
+              <span className={`text-[10px] ${styles.muted} ml-auto`}>
                 只读模式 · {nodes.length} 节点 · {edges.length} 连线
               </span>
             </div>
@@ -492,11 +494,11 @@ export default function KnowledgeGraphHome() {
           <div className="flex items-center gap-2 mb-3">
             <Building2 size={14} className="text-indigo-400" />
             <h2 className="text-sm font-semibold text-white">业务域分类</h2>
-            <span className="text-[11px] text-slate-500">({domains.length})</span>
+            <span className={`text-[11px] ${styles.muted}`}>({domains.length})</span>
           </div>
 
           {domains.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
+            <div className={`text-center py-8 ${styles.muted}`}>
               <Box size={32} className="mx-auto mb-2 opacity-30" />
               <p className="text-xs">暂无业务域数据</p>
               <p className="text-[10px] mt-1 opacity-60">知识图谱节点未包含 domain 字段</p>
@@ -526,7 +528,7 @@ export default function KnowledgeGraphHome() {
         {/* 域快速列表 */}
         {domains.length > 0 && (
           <div className="p-4 border-t border-[#1E293B]">
-            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <h3 className={`text-[11px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-2`}>
               业务域列表
             </h3>
             <div className="space-y-1">
@@ -534,13 +536,13 @@ export default function KnowledgeGraphHome() {
                 <button
                   key={d.code}
                   onClick={() => handleEnterDesign(d.code)}
-                  className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-300
-                    hover:bg-white/5 transition flex items-center gap-2 group"
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs ${styles.cardText}
+                    hover:bg-white/5 transition flex items-center gap-2 group`}
                 >
                   <span>{DOMAIN_ICONS[d.name] || '📁'}</span>
                   <span className="flex-1 truncate">{d.name}</span>
-                  <span className="text-[10px] text-slate-600">{d.entityCount}</span>
-                  <ArrowRight size={11} className="text-slate-600 opacity-0 group-hover:opacity-100 transition" />
+                  <span className={`text-[10px] ${styles.muted}`}>{d.entityCount}</span>
+                  <ArrowRight size={11} className={`${styles.muted} opacity-0 group-hover:opacity-100 transition`} />
                 </button>
               ))}
             </div>

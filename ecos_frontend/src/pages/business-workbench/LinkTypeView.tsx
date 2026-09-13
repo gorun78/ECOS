@@ -212,11 +212,10 @@ export default function LinkTypeView({
 
           {/* Mapping settings */}
           <div className="space-y-4">
-            <h4 className="text-xs font-semibold text-slate-800 border-b border-gray-100 pb-2">物理数据库机制映射</h4>
-            
+            <h4 className={`text-xs font-semibold ${styles.cardText} border-b ${styles.divider} pb-2`}>物理数据库机制映射</h4>
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs text-slate-600 font-medium">关联映射机制 (Mapping Strategy)</label>
+                <label className={`text-xs ${styles.cardText} font-medium`}>关联映射机制 (Mapping Strategy)</label>
                 <select
                   value={linkType.mapping.type}
                   onChange={e => handleMappingFieldChange('type', e.target.value as any)}
@@ -229,11 +228,11 @@ export default function LinkTypeView({
 
               {/* FOREIGN KEY CONFIG */}
               {linkType.mapping.type === 'foreign_key' && (
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3 text-xs">
-                  <div className="font-semibold text-slate-800 text-[11px] mb-1">外键关系配置</div>
+                <div className={`${styles.appBg} p-4 rounded-lg border ${styles.appBorder} space-y-3 text-xs`}>
+                  <div className={`font-semibold ${styles.cardText} text-[11px] mb-1`}>外键关系配置</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">源对象关联键 ({sourceObj?.displayName})</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted}`}>源对象关联键 ({sourceObj?.displayName})</label>
                       <select
                         value={linkType.mapping.foreignKeyMapping?.sourceKey || ''}
                         onChange={e => handleFkChange('sourceKey', e.target.value)}
