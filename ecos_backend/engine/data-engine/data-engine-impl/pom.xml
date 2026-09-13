@@ -98,6 +98,14 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- Runtime Event (统一事件总线 — IntegrationMetadataService 审计走 EventBusService
+             Kafka ecos.audit，符合架构铁律 §2.4 #5 + §2.5，禁止引擎内自建 KafkaTemplate) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-event</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- JSqlParser — SQL 血缘字段级解析 -->
         <dependency>
             <groupId>com.github.jsqlparser</groupId>
