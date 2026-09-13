@@ -19,6 +19,7 @@ import {
 } from "@xyflow/react";
 import { X } from "lucide-react";
 import type { RelationshipEdgeData } from "../../../adapters/flowAdapter";
+import { useTheme } from "../../ThemeContext";
 
 // ── 关系类型配置 ────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ function RelationshipEdge({
   selected,
   markerEnd,
 }: EdgeProps<Edge<RelationshipEdgeData>>) {
+  const { styles } = useTheme();
   // ── 计算贝塞尔路径 ──
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -127,7 +129,7 @@ function RelationshipEdge({
             `}
           >
             {/* 关系名称 */}
-            <span className="text-slate-300 max-w-[100px] truncate">
+            <span className={`${styles.sidebarText} max-w-[100px] truncate`}>
               {data?.name || data?.code || "关联"}
             </span>
 

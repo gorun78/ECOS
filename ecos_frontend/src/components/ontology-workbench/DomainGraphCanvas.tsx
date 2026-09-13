@@ -39,6 +39,7 @@ import RelationshipEdge from "./edges/RelationshipEdge";
 import CanvasToolbar from "./CanvasToolbar";
 
 import { useWorkbenchStore } from "../../stores/useWorkbenchStore";
+import { useTheme } from "../ThemeContext";
 import { mapEntitiesToFlow, applyForceLayout } from "../../adapters/flowAdapter";
 import type { EntityNodeData } from "../../adapters/flowAdapter";
 import type { RelationshipEdgeData } from "../../adapters/flowAdapter";
@@ -116,6 +117,7 @@ export default function DomainGraphCanvas({
   readOnly = false,
   className = "",
 }: DomainGraphCanvasProps) {
+  const { styles } = useTheme();
   // ── 从 Store 获取状态 ──
   const entities = useWorkbenchStore((s) => s.entities);
   const relationships = useWorkbenchStore((s) => s.relationships);
@@ -494,15 +496,15 @@ export default function DomainGraphCanvas({
 
           {/* ── 缩放控件（右下角） ── */}
           <Controls
-            className="
+            className={`
               !bg-[#0f1117] !border !border-[#1E293B] !rounded-xl
               !shadow-lg !shadow-black/30
               [&_button]:!bg-[#141924] [&_button]:!border-[#1E293B]
-              [&_button]:!text-slate-400 [&_button]:hover:!bg-[#1A1F2E]
-              [&_button]:hover:!text-white [&_button]:!fill-slate-400
+              [&_button]:!${styles.cardTextMuted} [&_button]:hover:!bg-[#1A1F2E]
+              [&_button]:hover:!text-white [&_button]:!fill-${styles.cardTextMuted.replace('text-slate-', 'slate-')}
               [&_button]:hover:!fill-white
               [&_svg]:!w-3.5 [&_svg]:!h-3.5
-            "
+            `}
             showInteractive={!readOnly}
           />
         </ReactFlow>
@@ -511,16 +513,16 @@ export default function DomainGraphCanvas({
       {/* ── 脚注：快捷键提示 ── */}
       <div className="absolute bottom-3 right-3 z-10">
         <div
-          className="
+          className={`
             px-2.5 py-1 rounded-lg
             bg-[#0f1117]/80 backdrop-blur-md
             border border-[#1E293B]
-            text-[9px] text-slate-600
+            text-[9px] ${styles.cardTextMuted}
             select-none
-          "
+          `}
         >
           <span>拖拽连线创建关系</span>
-          <span className="mx-1.5 text-slate-700">|</span>
+          <span className={`mx-1.5 ${styles.cardTextMuted}`}>|</span>
           <span>双击空白添加实体</span>
         </div>
       </div>
@@ -544,10 +546,10 @@ export default function DomainGraphCanvas({
                 />
               </svg>
             </div>
-            <h3 className="text-sm font-medium text-slate-500 mb-1">
+            <h3 className={`text-sm font-medium ${styles.muted} mb-1`}>
               画布为空
             </h3>
-            <p className="text-[11px] text-slate-600 max-w-[240px]">
+            <p className={`text-[11px] ${styles.muted} max-w-[240px]`}>
               {readOnly
                 ? "当前域暂无实体数据"
                 : '点击上方「添加实体」按钮或双击画布空白区域，开始创建第一个本体实体'}

@@ -33,6 +33,7 @@ import {
   Table,
 } from 'lucide-react';
 import type { BulkResource } from '../../../types/workbench';
+import { useTheme } from '../../ThemeContext';
 import {
   fetchAllResources,
   DATA_CATALOG_UNAVAILABLE,
@@ -64,6 +65,7 @@ export default function DataResourcePickerModal({
   onSelect,
   excludeIds = [],
 }: DataResourcePickerModalProps) {
+  const { styles } = useTheme();
   // 资源列表
   const [resources, setResources] = useState<BulkResource[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,14 +206,14 @@ export default function DataResourcePickerModal({
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white">选择物理表</h3>
-              <p className="text-[10px] text-slate-500">
+              <p className={`text-[10px] ${styles.muted}`}>
                 从数据底座中选择要映射的物理表或视图
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
+            className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >
             <X size={16} />
           </button>
@@ -223,28 +225,28 @@ export default function DataResourcePickerModal({
           <div className="relative">
             <Search
               size={13}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+              className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.muted}`}
             />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="搜索资源名称、数据源或路径..."
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg pl-9 pr-3 py-2
-                text-xs text-white placeholder:text-slate-600
+                text-xs text-white placeholder:${styles.muted}
                 focus:outline-none focus:border-indigo-500/50 transition"
             />
           </div>
 
           {/* 筛选下拉 */}
           <div className="flex items-center gap-2">
-            <Filter size={11} className="text-slate-500 shrink-0" />
+            <Filter size={11} className={`${styles.muted} shrink-0`} />
 
             {/* 数据源筛选 */}
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
               className="bg-[#0b0e14] border border-[#2a3040] rounded-lg px-2.5 py-1.5
-                text-[10px] text-slate-300 appearance-none cursor-pointer
+                text-[10px] ${styles.cardText} appearance-none cursor-pointer
                 focus:outline-none focus:border-indigo-500/50 transition
                 min-w-0 max-w-[140px]"
             >
@@ -261,7 +263,7 @@ export default function DataResourcePickerModal({
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               className="bg-[#0b0e14] border border-[#2a3040] rounded-lg px-2.5 py-1.5
-                text-[10px] text-slate-300 appearance-none cursor-pointer
+                text-[10px] ${styles.cardText} appearance-none cursor-pointer
                 focus:outline-none focus:border-indigo-500/50 transition
                 min-w-0"
             >
@@ -273,7 +275,7 @@ export default function DataResourcePickerModal({
             </select>
 
             {/* 结果计数 */}
-            <span className="text-[10px] text-slate-500 ml-auto">
+            <span className={`text-[10px] ${styles.muted} ml-auto`}>
               {filtered.length} 个结果
             </span>
           </div>
@@ -285,7 +287,7 @@ export default function DataResourcePickerModal({
           {loading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 size={22} className="animate-spin text-indigo-400" />
-              <span className="ml-3 text-xs text-slate-400">加载数据资源...</span>
+              <span className={`ml-3 text-xs ${styles.cardTextMuted}`}>加载数据资源...</span>
             </div>
           )}
 
@@ -311,7 +313,7 @@ export default function DataResourcePickerModal({
 
           {/* 空结果 */}
           {!loading && !error && filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+            <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
               <Search size={28} className="mb-2 opacity-20" />
               <p className="text-xs">未找到匹配的资源</p>
               <p className="text-[10px] mt-1 opacity-60">
@@ -335,7 +337,7 @@ export default function DataResourcePickerModal({
                     ? '取消全选'
                     : '全选当前结果'}
                 </button>
-                <span className="text-[10px] text-slate-500">
+                <span className={`text-[10px] ${styles.muted}`}>
                   已选 {selectedIds.size} 项
                 </span>
               </div>
@@ -373,14 +375,14 @@ export default function DataResourcePickerModal({
                     {/* 资源信息 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-slate-200 truncate">
+                        <span className={`text-xs font-medium ${styles.cardText} truncate`}>
                           {res.resourceName}
                         </span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#2a3040] text-slate-400 shrink-0">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded ${styles.badgeBg} ${styles.cardTextMuted} shrink-0`}>
                           {typeLabel}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+                      <div className={`flex items-center gap-2 mt-0.5 text-[10px] ${styles.muted}`}>
                         <span className="truncate">{res.datasourceName}</span>
                         <span>·</span>
                         <span className="font-mono text-[9px] truncate">{res.sourcePath}</span>
@@ -397,14 +399,14 @@ export default function DataResourcePickerModal({
 
         {/* ── 底部操作 ── */}
         <div className="flex items-center justify-between px-5 py-4 border-t border-[#2a3040] shrink-0">
-          <span className="text-[10px] text-slate-500">
+          <span className={`text-[10px] ${styles.muted}`}>
             已选择 {selectedIds.size} 个资源
           </span>
           <div className="flex items-center gap-2.5">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300
-                bg-[#2a3040] hover:bg-[#3a4050] transition"
+              className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
+                bg-[#2a3040] hover:bg-[#3a4050] transition`}
             >
               取消
             </button>

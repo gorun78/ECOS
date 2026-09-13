@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
+import { useTheme } from '../ThemeContext';
 import type { Property } from '../../types/workbench';
 
 // ── 属性类型选项 ──────────────────────────────────────────────
@@ -54,6 +55,7 @@ interface NewRowFormProps {
 }
 
 function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
+  const { styles } = useTheme();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [propertyType, setPropertyType] = useState('STRING');
@@ -93,8 +95,8 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
           placeholder="编码"
           maxLength={64}
           className="w-full bg-[#0b0e14] border border-indigo-500/30 rounded px-2 py-1
-            text-[11px] text-white placeholder:text-slate-600 font-mono
-            focus:outline-none focus:border-indigo-500/60 transition"
+              text-[11px] text-white placeholder:${styles.muted} font-mono
+              focus:outline-none focus:border-indigo-500/60 transition"
         />
       </td>
       <td className="px-2 py-1.5">
@@ -104,7 +106,7 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
           placeholder="名称"
           maxLength={100}
           className="w-full bg-[#0b0e14] border border-indigo-500/30 rounded px-2 py-1
-            text-[11px] text-white placeholder:text-slate-600
+            text-[11px] text-white placeholder:${styles.muted}
             focus:outline-none focus:border-indigo-500/60 transition"
         />
       </td>
@@ -121,7 +123,7 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
         </select>
       </td>
       <td className="px-2 py-1.5 text-center">
-        <span className="text-[10px] text-slate-600">—</span>
+        <span className={`text-[10px] ${styles.cardTextMuted}`}>—</span>
       </td>
       <td className="px-2 py-1.5">
         <div className="flex items-center gap-1">
@@ -137,7 +139,7 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
           <button
             onClick={onCancel}
             disabled={saving}
-            className="p-1 rounded text-slate-500 hover:text-slate-400 hover:bg-white/5 transition"
+            className={`p-1 rounded ${styles.muted} hover:${styles.cardText} hover:bg-white/5 transition`}
             title="取消"
           >
             <X size={12} />
@@ -160,6 +162,7 @@ interface EditableRowProps {
 }
 
 function EditableRow({ prop, onSave, onCancel, onDelete }: EditableRowProps) {
+  const { styles } = useTheme();
   const [name, setName] = useState(prop.name || '');
   const [propertyType, setPropertyType] = useState(prop.propertyType || 'STRING');
   const [saving, setSaving] = useState(false);
@@ -187,7 +190,7 @@ function EditableRow({ prop, onSave, onCancel, onDelete }: EditableRowProps) {
   return (
     <tr className="bg-indigo-500/5" onKeyDown={handleKeyDown}>
       <td className="px-2 py-1.5">
-        <span className="text-[11px] font-mono text-slate-500">{prop.code}</span>
+        <span className={`text-[11px] font-mono ${styles.cardTextMuted}`}>{prop.code}</span>
       </td>
       <td className="px-2 py-1.5">
         <input
@@ -214,7 +217,7 @@ function EditableRow({ prop, onSave, onCancel, onDelete }: EditableRowProps) {
         {prop.requiredFlag === 1 ? (
           <span className="text-[10px] text-red-400">是</span>
         ) : (
-          <span className="text-[10px] text-slate-600">否</span>
+          <span className={`text-[10px] ${styles.muted}`}>否</span>
         )}
       </td>
       <td className="px-2 py-1.5">
@@ -230,7 +233,7 @@ function EditableRow({ prop, onSave, onCancel, onDelete }: EditableRowProps) {
           </button>
           <button
             onClick={onCancel}
-            className="p-1 rounded text-slate-500 hover:text-slate-400 hover:bg-white/5 transition"
+            className={`p-1 rounded ${styles.muted} hover:${styles.cardText} hover:bg-white/5 transition`}
             title="取消编辑"
           >
             <X size={12} />
@@ -250,6 +253,7 @@ interface PropertyTableEditorProps {
 }
 
 export default function PropertyTableEditor({ entityId }: PropertyTableEditorProps) {
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
 
   // 从 store 中读取属性列表
@@ -301,10 +305,10 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
     <div>
       {/* 头部操作栏 */}
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-          <SlidersHorizontal size={11} className="text-slate-500" />
+        <h4 className={`text-[11px] font-semibold ${styles.text} flex items-center gap-1.5`}>
+          <SlidersHorizontal size={11} className={styles.muted} />
           属性列表
-          <span className="text-[10px] font-normal text-slate-500 ml-1">
+          <span className={`text-[10px] font-normal ${styles.muted} ml-1`}>
             ({properties.length})
           </span>
         </h4>
@@ -327,11 +331,11 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
         <table className="w-full text-[11px]">
           <thead>
             <tr className="border-b border-[#1E293B]">
-              <th className="text-left px-2 py-2 text-[10px] font-medium text-slate-500 w-[30%]">编码</th>
-              <th className="text-left px-2 py-2 text-[10px] font-medium text-slate-500 w-[30%]">名称</th>
-              <th className="text-left px-2 py-2 text-[10px] font-medium text-slate-500 w-[20%]">类型</th>
-              <th className="text-center px-2 py-2 text-[10px] font-medium text-slate-500 w-[10%]">必填</th>
-              <th className="text-center px-2 py-2 text-[10px] font-medium text-slate-500 w-[10%]">操作</th>
+              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[30%]`}>编码</th>
+              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[30%]`}>名称</th>
+              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[20%]`}>类型</th>
+              <th className={`text-center px-2 py-2 text-[10px] font-medium ${styles.muted} w-[10%]`}>必填</th>
+              <th className={`text-center px-2 py-2 text-[10px] font-medium ${styles.muted} w-[10%]`}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -347,8 +351,8 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
             {properties.length === 0 && !showNewRow ? (
               <tr>
                 <td colSpan={5} className="text-center py-8">
-                  <SlidersHorizontal size={20} className="mx-auto mb-1 opacity-20 text-slate-500" />
-                  <p className="text-[10px] text-slate-600">暂无属性，点击「添加属性」开始</p>
+                  <SlidersHorizontal size={20} className={`mx-auto mb-1 opacity-20 ${styles.muted}`} />
+                  <p className={`text-[10px] ${styles.muted}`}>暂无属性，点击「添加属性」开始</p>
                 </td>
               </tr>
             ) : (
@@ -375,7 +379,7 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
                     className="border-b border-[#1E293B]/30 hover:bg-white/[0.02] transition cursor-pointer"
                   >
                     <td className="px-2 py-1.5">
-                      <span className="text-[11px] font-mono text-slate-300">{prop.code}</span>
+                      <span className={`text-[11px] font-mono ${styles.sidebarText}`}>{prop.code}</span>
                     </td>
                     <td className="px-2 py-1.5">
                       <span className="text-[11px] text-white">{prop.name}</span>
@@ -389,7 +393,7 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
                       {prop.requiredFlag === 1 ? (
                         <span className="text-[10px] text-red-400">是</span>
                       ) : (
-                        <span className="text-[10px] text-slate-600">否</span>
+                        <span className={`text-[10px] ${styles.muted}`}>否</span>
                       )}
                     </td>
                     <td className="px-2 py-1.5">
@@ -397,8 +401,8 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDelete(prop.id); }}
                           disabled={isDeleting}
-                          className="p-1 rounded hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition
-                            disabled:opacity-30"
+                          className={`p-1 rounded hover:bg-red-500/10 ${styles.muted} hover:text-red-400 transition
+                            disabled:opacity-30`}
                           title="删除属性"
                         >
                           {isDeleting ? (
@@ -418,7 +422,7 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
       </div>
 
       {/* 底部提示 */}
-      <p className="text-[9px] text-slate-600 mt-2 px-2">
+      <p className={`text-[9px] ${styles.muted} mt-2 px-2`}>
         双击行可编辑 · 输入完成后按 Enter 或点击 ✓ 保存
       </p>
     </div>

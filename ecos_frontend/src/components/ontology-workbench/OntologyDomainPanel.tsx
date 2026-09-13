@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Globe, Box, Database, Layers, Plus, Pencil, Trash2, X, Save, Loader2 } from 'lucide-react';
+import { useTheme } from '../ThemeContext';
 
 // ── 本体 → 图标映射 ──
 const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
@@ -68,6 +69,7 @@ export default function OntologyDomainPanel({
   onSelectEntity,
   selectedEntityId,
 }: OntologyDomainPanelProps) {
+  const { styles } = useTheme();
   const [ontologies, setOntologies] = useState<OntologyItem[]>([]);
   const [entityCounts, setEntityCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -188,14 +190,14 @@ export default function OntologyDomainPanel({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#141924] text-slate-200">
+    <div className={`flex flex-col h-full ${styles.cardBg} ${styles.cardText}`}>
       {/* 标题栏 */}
-      <div className="px-3 py-3 border-b border-[#1E293B] flex items-center justify-between">
+      <div className={`px-3 py-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           <Database className="w-4 h-4 text-indigo-400" />
           <div>
-            <div className="text-xs font-semibold text-slate-200">本体 / 业务域</div>
-            <div className="text-[9px] text-slate-500 font-mono mt-0.5">
+            <div className={`text-xs font-semibold ${styles.cardText}`}>本体 / 业务域</div>
+            <div className={`text-[9px] ${styles.muted} font-mono mt-0.5`}>
               {displayOntologies.length} 个本体
             </div>
           </div>
@@ -207,7 +209,7 @@ export default function OntologyDomainPanel({
             setFormDescription('');
             setShowCreate(true);
           }}
-          className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-400 transition"
+          className={`p-1.5 rounded-lg hover:bg-indigo-500/10 ${styles.cardTextMuted} hover:text-indigo-400 transition`}
           title="创建本体"
         >
           <Plus size={14} />
@@ -225,7 +227,7 @@ export default function OntologyDomainPanel({
       {/* 卡片列表 */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {loading && ontologies.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-slate-500">
+          <div className={`flex items-center justify-center py-8 ${styles.muted}`}>
             <Loader2 size={16} className="animate-spin mr-2" />
             <span className="text-[11px]">加载中...</span>
           </div>
@@ -243,20 +245,20 @@ export default function OntologyDomainPanel({
                     ${
                       isSelected
                         ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_12px_rgba(99,102,241,0.15)]'
-                        : 'border-[#1E293B] bg-[#1a2030] hover:border-[#334155] hover:bg-[#1e2635]'
+                        : `${styles.cardBorder} ${styles.cardBg} hover:${styles.cardBorder} hover:opacity-90`
                     }`}
                 >
                   {/* 头部：图标 + 名称 */}
                   <div className="flex items-center gap-2.5 mb-2">
                     <div
                       className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors
-                        ${isSelected ? 'bg-indigo-500/20 text-indigo-400' : 'bg-[#2a3040] text-slate-400'}`}
+                        ${isSelected ? 'bg-indigo-500/20 text-indigo-400' : `${styles.badgeBg} ${styles.cardTextMuted}`}`}
                     >
                       <Icon className="w-3.5 h-3.5" />
                     </div>
                     <span
                       className={`text-xs font-semibold truncate flex-1 ${
-                        isSelected ? 'text-indigo-300' : 'text-slate-200'
+                        isSelected ? 'text-indigo-300' : styles.cardText
                       }`}
                     >
                       {o.name}
@@ -264,16 +266,16 @@ export default function OntologyDomainPanel({
                   </div>
 
                   {/* 编码 */}
-                  <div className="text-[9px] font-mono text-slate-500 mb-1">{o.code}</div>
+                  <div className={`text-[9px] font-mono ${styles.muted} mb-1`}>{o.code}</div>
 
                   {/* 实体数量 */}
                   <div className="flex items-center gap-1.5 text-[10px]">
-                    <Layers className="w-3 h-3 text-slate-500" />
-                    <span className="text-slate-400">
-                      <span className="font-semibold text-slate-300">
+                    <Layers className={`w-3 h-3 ${styles.muted}`} />
+                    <span className={styles.cardTextMuted}>
+                      <span className={`font-semibold ${styles.sidebarText}`}>
                         {count ?? '—'}
                       </span>
-                      <span className="text-slate-500 ml-0.5">个实体</span>
+                      <span className={`${styles.muted} ml-0.5`}>个实体</span>
                     </span>
                   </div>
 
@@ -290,14 +292,14 @@ export default function OntologyDomainPanel({
                 <div className="absolute top-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => { e.stopPropagation(); openEdit(o); }}
-                    className="p-1 rounded hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-400 transition"
+                    className={`p-1 rounded hover:bg-indigo-500/20 ${styles.muted} hover:text-indigo-400 transition`}
                     title="编辑"
                   >
                     <Pencil size={11} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeletingId(o.id); }}
-                    className="p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition"
+                    className={`p-1 rounded hover:bg-red-500/20 ${styles.muted} hover:text-red-400 transition`}
                     title="删除"
                   >
                     <Trash2 size={11} />
@@ -319,16 +321,16 @@ export default function OntologyDomainPanel({
             <div className="space-y-3">
               {!editingId && (
                 <input value={formCode} onChange={e => setFormCode(e.target.value)}
-                  placeholder="编码 (英文, 必填)" className="w-full bg-[#0f1419] border border-[#2a3040] rounded px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none" />
+                  placeholder="编码 (英文, 必填)" className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} focus:border-indigo-500 outline-none`} />
               )}
               {editingId && (
                 <input value={formCode} readOnly
-                  className="w-full bg-[#0b0e14] border border-[#1E293B] rounded px-3 py-2 text-xs text-slate-500 font-mono cursor-not-allowed" />
+                  className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.muted} font-mono cursor-not-allowed`} />
               )}
               <input value={formName} onChange={e => setFormName(e.target.value)}
-                placeholder="名称 (必填)" className="w-full bg-[#0f1419] border border-[#2a3040] rounded px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none" />
+                placeholder="名称 (必填)" className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} focus:border-indigo-500 outline-none`} />
               <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)}
-                placeholder="描述 (可选)" rows={2} className="w-full bg-[#0f1419] border border-[#2a3040] rounded px-3 py-2 text-xs text-slate-200 resize-none focus:border-indigo-500 outline-none" />
+                placeholder="描述 (可选)" rows={2} className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} resize-none focus:border-indigo-500 outline-none`} />
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={editingId ? handleEdit : handleCreate} disabled={saving || !formName}
@@ -336,7 +338,7 @@ export default function OntologyDomainPanel({
                 {saving ? <><Loader2 size={12} className="animate-spin" />保存中...</> : (editingId ? '保存修改' : '创建本体')}
               </button>
               <button onClick={() => { setShowCreate(false); setEditingId(null); }}
-                className="px-4 py-2 bg-[#2a3040] text-slate-400 rounded-lg text-xs hover:bg-[#3a4050]">取消</button>
+                className={`px-4 py-2 ${styles.inputBg} ${styles.muted} rounded-lg text-xs hover:opacity-80`}>取消</button>
             </div>
           </div>
         </div>
@@ -347,7 +349,7 @@ export default function OntologyDomainPanel({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingId(null)}>
           <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-[360px] shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-white mb-2">删除本体</h3>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className={`text-xs ${styles.cardTextMuted} mb-4`}>
               确定要删除「{ontologies.find(o => o.id === deletingId)?.name || deletingId}」吗？删除后其下实体将无法访问。
             </p>
             <div className="flex gap-2">
@@ -356,7 +358,7 @@ export default function OntologyDomainPanel({
                 {saving ? <><Loader2 size={12} className="animate-spin" />删除中...</> : '确认删除'}
               </button>
               <button onClick={() => setDeletingId(null)}
-                className="px-4 py-2 bg-[#2a3040] text-slate-400 rounded-lg text-xs hover:bg-[#3a4050]">取消</button>
+                className={`px-4 py-2 ${styles.inputBg} ${styles.muted} rounded-lg text-xs hover:opacity-80`}>取消</button>
             </div>
           </div>
         </div>

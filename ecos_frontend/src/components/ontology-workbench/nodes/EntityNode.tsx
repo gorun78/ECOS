@@ -23,6 +23,7 @@ import {
   ToggleLeft,
 } from "lucide-react";
 import type { EntityNodeData } from "../../../adapters/flowAdapter";
+import { useTheme } from "../../ThemeContext";
 
 // ── 实体类型图标映射 ────────────────────────────────────────
 
@@ -99,16 +100,17 @@ const PropertyPreviewRow: React.FC<PropertyPreviewRowProps> = memo(
   ({ code, name, propertyType }) => {
     const TypeIcon = PROP_TYPE_ICON[propertyType?.toUpperCase()] || Type;
     const displayLabel = name || code;
+    const { styles } = useTheme();
 
     return (
       <div
-        className="flex items-center gap-1.5 text-[10px] text-slate-400 leading-none truncate"
+        className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} leading-none truncate`}
         title={`${displayLabel}: ${propertyType}`}
       >
-        <TypeIcon size={10} className="text-slate-500 shrink-0" />
-        <span className="font-mono text-slate-500 truncate">{code}</span>
-        <span className="text-slate-600">:</span>
-        <span className="text-slate-500 text-[9px] uppercase">{propertyType}</span>
+        <TypeIcon size={10} className={`${styles.muted} shrink-0`} />
+        <span className={`font-mono ${styles.muted} truncate`}>{code}</span>
+        <span className={styles.muted}>:</span>
+        <span className={`${styles.muted} text-[9px] uppercase`}>{propertyType}</span>
       </div>
     );
   }
@@ -124,6 +126,7 @@ PropertyPreviewRow.displayName = "PropertyPreviewRow";
  * @param props - ReactFlow NodeProps<EntityNodeData>
  */
 function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
+  const { styles } = useTheme();
   const {
     code,
     name,
@@ -183,7 +186,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
             <h3 className="text-[13px] font-bold text-white leading-tight truncate">
               {name}
             </h3>
-            <p className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">
+            <p className={`text-[10px] font-mono ${styles.muted} mt-0.5 truncate`}>
               {code}
             </p>
           </div>
@@ -200,7 +203,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
             {typeConfig.label}
           </span>
           {propertyCount > 0 && (
-            <span className="text-[9px] text-slate-600">
+            <span className={`text-[9px] ${styles.muted}`}>
               {propertyCount} 属性
             </span>
           )}
@@ -220,7 +223,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
           ))}
           {/* 属性溢出提示 */}
           {propertyCount > 3 && (
-            <p className="text-[9px] text-slate-600 italic mt-0.5">
+            <p className={`text-[9px] ${styles.muted} italic mt-0.5`}>
               +{propertyCount - 3} 更多属性...
             </p>
           )}
@@ -230,7 +233,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
       {/* ── 空属性提示 ── */}
       {previewProps.length === 0 && (
         <div className="px-3.5 pb-3 border-t border-[#1E293B] pt-2">
-          <p className="text-[9px] text-slate-600 italic">暂无属性</p>
+          <p className={`text-[9px] ${styles.muted} italic`}>暂无属性</p>
         </div>
       )}
 
@@ -246,7 +249,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
         type="source"
         position={Position.Left}
         id="left"
-        className="!w-2 !h-2 !bg-slate-500 !border-2 !border-[#0f1117] !left-[-4px]"
+        className={`!w-2 !h-2 !${styles.appBg} !border-2 !border-[#0f1117] !left-[-4px]`}
       />
 
       {/* ── 右侧 Handle ── */}
@@ -254,7 +257,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
         type="source"
         position={Position.Right}
         id="right"
-        className="!w-2 !h-2 !bg-slate-500 !border-2 !border-[#0f1117] !right-[-4px]"
+        className={`!w-2 !h-2 !${styles.appBg} !border-2 !border-[#0f1117] !right-[-4px]`}
       />
     </div>
   );

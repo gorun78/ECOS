@@ -17,6 +17,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { X, Search, Filter, BookOpen, Loader2, Check } from "lucide-react";
 import { fetchTerms } from "../../../services/glossaryClient";
+import { useTheme } from "../../ThemeContext";
 import type { GlossaryTerm, GlossaryFilter } from "../../../types/workbench";
 
 // ── 状态选项 ──────────────────────────────────────────────────
@@ -71,6 +72,7 @@ export default function TermSearchModal({
   onSelect,
   alreadyBoundIds,
 }: TermSearchModalProps) {
+  const { styles } = useTheme();
   // ── 数据 ────────────────────────────────────────────────────
   const [allTerms, setAllTerms] = useState<GlossaryTerm[]>([]);
   const [loading, setLoading] = useState(false);
@@ -211,14 +213,14 @@ export default function TermSearchModal({
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white">关联术语</h3>
-              <p className="text-[10px] text-slate-500">
+              <p className={`text-[10px] ${styles.muted}`}>
                 从术语库中选择术语进行关联
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
+            className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >
             <X size={16} />
           </button>
@@ -231,14 +233,14 @@ export default function TermSearchModal({
             <div className="relative flex-1">
               <Search
                 size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.muted}`}
               />
               <input
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 placeholder="搜索术语名称或编码..."
                 className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg pl-9 pr-3 py-2
-                  text-xs text-white placeholder:text-slate-600
+                  text-xs text-white placeholder:${styles.muted}
                   focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                   transition"
               />
@@ -248,7 +250,7 @@ export default function TermSearchModal({
               className={`p-2 rounded-lg border transition ${
                 showFilters
                   ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-400"
-                  : "bg-[#0b0e14] border-[#2a3040] text-slate-500 hover:text-slate-400"
+                  : `bg-[#0b0e14] border-[#2a3040] ${styles.muted} hover:${styles.cardText}`
               }`}
               title="筛选"
             >
@@ -261,14 +263,14 @@ export default function TermSearchModal({
             <div className="flex items-center gap-3 pt-1 animate-in slide-in-from-top-1 duration-150">
               {/* 域筛选 */}
               <div className="flex-1">
-                <label className="block text-[10px] text-slate-500 mb-1">
+                <label className={`block text-[10px] ${styles.muted} mb-1`}>
                   域
                 </label>
                 <select
                   value={domainFilter}
                   onChange={(e) => setDomainFilter(e.target.value)}
                   className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-2.5 py-1.5
-                    text-xs text-slate-300
+                    text-xs ${styles.cardText}
                     focus:outline-none focus:border-indigo-500/50 transition"
                 >
                   <option value="">全部域</option>
@@ -282,14 +284,14 @@ export default function TermSearchModal({
 
               {/* 状态筛选 */}
               <div className="flex-1">
-                <label className="block text-[10px] text-slate-500 mb-1">
+                <label className={`block text-[10px] ${styles.muted} mb-1`}>
                   状态
                 </label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-2.5 py-1.5
-                    text-xs text-slate-300
+                    text-xs ${styles.cardText}
                     focus:outline-none focus:border-indigo-500/50 transition"
                 >
                   {STATUS_OPTIONS.map((s) => (
@@ -306,12 +308,12 @@ export default function TermSearchModal({
         {/* ── 术语列表 ── */}
         <div className="flex-1 overflow-y-auto px-5 py-3 min-h-[200px]">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-slate-500">
+            <div className={`flex items-center justify-center py-12 ${styles.muted}`}>
               <Loader2 size={18} className="animate-spin mr-2" />
               <span className="text-xs">加载术语中...</span>
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+            <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
               <p className="text-xs text-red-400">{error}</p>
               <button
                 onClick={loadTerms}
@@ -321,7 +323,7 @@ export default function TermSearchModal({
               </button>
             </div>
           ) : filteredTerms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+            <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
               <BookOpen size={28} className="mb-2 opacity-20" />
               <p className="text-xs">
                 {searchKeyword ? "无匹配结果" : "暂无术语"}
@@ -339,7 +341,7 @@ export default function TermSearchModal({
                 const isBound = alreadyBoundIds?.has(term.id);
                 const statusColor =
                   STATUS_COLORS[term.status] ||
-                  "bg-slate-500/15 text-slate-400 border-slate-500/20";
+                  `${styles.badgeBg} ${styles.cardTextMuted} ${styles.cardBorder}`;
 
                 return (
                   <label
@@ -367,7 +369,7 @@ export default function TermSearchModal({
                     {/* 术语信息 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-200 truncate">
+                        <span className={`text-xs ${styles.cardText} truncate`}>
                           {term.name}
                         </span>
                         <span
@@ -377,7 +379,7 @@ export default function TermSearchModal({
                         </span>
                       </div>
                       {term.domain && (
-                        <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                        <p className={`text-[10px] ${styles.muted} mt-0.5 truncate`}>
                           {term.domain}
                         </p>
                       )}
@@ -385,7 +387,7 @@ export default function TermSearchModal({
 
                     {/* 已绑定标识 */}
                     {isBound && (
-                      <span className="text-[9px] text-slate-500 shrink-0">
+                      <span className={`text-[9px] ${styles.muted} shrink-0`}>
                         已关联
                       </span>
                     )}
@@ -399,7 +401,7 @@ export default function TermSearchModal({
         {/* ── 底部操作栏 ── */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-[#2a3040] shrink-0">
           {/* 选中计数 */}
-          <span className="text-[10px] text-slate-500">
+          <span className={`text-[10px] ${styles.muted}`}>
             {alreadyBoundIds
               ? `已关联 ${alreadyBoundIds.size} 个 · 新增 ${
                   Array.from(selectedIds).filter(
@@ -412,8 +414,8 @@ export default function TermSearchModal({
           <div className="flex items-center gap-2.5">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300
-                bg-[#2a3040] hover:bg-[#3a4050] transition"
+              className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
+                bg-[#2a3040] hover:bg-[#3a4050] transition`}
             >
               取消
             </button>

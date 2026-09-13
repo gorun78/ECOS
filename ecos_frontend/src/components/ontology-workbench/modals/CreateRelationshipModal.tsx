@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, GitBranch, Loader2, AlertCircle, ArrowRight, Search } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
+import { useTheme } from '../../ThemeContext';
 import type { CreateRelationshipDTO, Entity } from '../../../types/workbench';
 
 // ── 关系类型选项 ────────────────────────────────────────────
@@ -43,6 +44,7 @@ export default function CreateRelationshipModal({
   sourceEntityId,
   entities,
 }: CreateRelationshipModalProps) {
+  const { styles } = useTheme();
   // 本地表单状态
   const [targetEntityId, setTargetEntityId] = useState('');
   const [code, setCode] = useState('');
@@ -145,12 +147,12 @@ export default function CreateRelationshipModal({
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white">创建关系</h3>
-              <p className="text-[10px] text-slate-500">定义实体间的关联关系</p>
+              <p className={`text-[10px] ${styles.muted}`}>定义实体间的关联关系</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
+            className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >
             <X size={16} />
           </button>
@@ -160,41 +162,41 @@ export default function CreateRelationshipModal({
         <div className="px-5 py-4 space-y-4">
           {/* 源实体（只读） */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">源实体</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>源实体</label>
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#0b0e14] border border-[#2a3040]">
               <span className="text-xs font-mono font-semibold text-indigo-400">
                 {sourceEntity?.code || sourceEntityId}
               </span>
               {sourceEntity?.name && (
-                <span className="text-xs text-slate-500">({sourceEntity.name})</span>
+                <span className={`text-xs ${styles.muted}`}>({sourceEntity.name})</span>
               )}
             </div>
           </div>
 
           {/* 关系方向提示 */}
-          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500">
+          <div className={`flex items-center justify-center gap-2 text-[10px] ${styles.muted}`}>
             <div className="flex-1 h-px bg-[#2a3040]" />
-            <ArrowRight size={14} className="text-slate-600" />
+            <ArrowRight size={14} className={styles.muted} />
             <span>指向</span>
-            <ArrowRight size={14} className="text-slate-600" />
+            <ArrowRight size={14} className={styles.muted} />
             <div className="flex-1 h-px bg-[#2a3040]" />
           </div>
 
           {/* 目标实体 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>
               目标实体 <span className="text-red-400">*</span>
             </label>
 
             {/* 搜索框 */}
             <div className="relative mb-2">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.muted}`} />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="搜索实体..."
                 className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg pl-8 pr-3 py-2
-                  text-xs text-white placeholder:text-slate-600
+                  text-xs text-white placeholder:${styles.muted}
                   focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                   transition"
               />
@@ -203,7 +205,7 @@ export default function CreateRelationshipModal({
             {/* 目标实体列表 */}
             <div className="max-h-40 overflow-y-auto rounded-lg border border-[#2a3040] bg-[#0b0e14]">
               {candidateTargets.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-slate-500">
+                <div className={`px-3 py-4 text-center text-xs ${styles.muted}`}>
                   {entities.length <= 1 ? '当前域仅有一个实体，无法创建关系' : '无匹配实体'}
                 </div>
               ) : (
@@ -225,14 +227,14 @@ export default function CreateRelationshipModal({
                       className="accent-indigo-500 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-mono font-semibold text-slate-300">
+                      <span className={`text-xs font-mono font-semibold ${styles.sidebarText}`}>
                         {entity.code}
                       </span>
                       {entity.name && (
-                        <span className="text-[10px] text-slate-500 ml-1.5">{entity.name}</span>
+                        <span className={`text-[10px] ${styles.muted} ml-1.5`}>{entity.name}</span>
                       )}
                     </div>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400 font-mono">
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${styles.badgeBg} ${styles.cardTextMuted} font-mono`}>
                       {entity.entityType}
                     </span>
                   </label>
@@ -243,7 +245,7 @@ export default function CreateRelationshipModal({
 
           {/* 关系类型 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">关系类型</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>关系类型</label>
             <div className="grid grid-cols-2 gap-2">
               {RELATIONSHIP_TYPES.map((rt) => (
                 <button
@@ -253,10 +255,10 @@ export default function CreateRelationshipModal({
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium transition ${
                     relationshipType === rt.value
                       ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                      : 'border-[#2a3040] bg-[#0b0e14] text-slate-400 hover:border-[#3a4050]'
+                      : `border-[#2a3040] bg-[#0b0e14] ${styles.cardTextMuted} hover:border-[#3a4050]`
                   }`}
                 >
-                  <span className="text-[10px] font-mono text-slate-500 w-8">{rt.icon}</span>
+                  <span className={`text-[10px] font-mono ${styles.muted} w-8`}>{rt.icon}</span>
                   {rt.label}
                 </button>
               ))}
@@ -265,14 +267,14 @@ export default function CreateRelationshipModal({
 
           {/* 编码 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">关系编码</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>关系编码</label>
             <input
               value={code}
               onChange={(e) => { setCode(e.target.value); setError(''); }}
               placeholder="英文字母开头，如 has_order、belongs_to"
               maxLength={64}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
-                text-sm text-white placeholder:text-slate-600
+                text-sm text-white placeholder:${styles.muted}
                 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                 transition"
             />
@@ -280,14 +282,14 @@ export default function CreateRelationshipModal({
 
           {/* 名称 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">关系名称</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>关系名称</label>
             <input
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
               placeholder="中文名称，如 拥有订单、归属于"
               maxLength={100}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
-                text-sm text-white placeholder:text-slate-600
+                text-sm text-white placeholder:${styles.muted}
                 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                 transition"
             />
@@ -307,8 +309,8 @@ export default function CreateRelationshipModal({
           <button
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300
-              bg-[#2a3040] hover:bg-[#3a4050] disabled:opacity-50 transition"
+            className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
+              bg-[#2a3040] hover:bg-[#3a4050] disabled:opacity-50 transition`}
           >
             取消
           </button>
