@@ -523,7 +523,9 @@ export async function fetchExportTasks(params?: { ontologyId?: string; format?: 
   if (params?.format) qs.set("format", params.format);
   if (params?.status) qs.set("status", params.status);
   const query = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetchData<ExportTaskSummary[]>(`${EXPORT_BASE}${query}`);
+  // Wave C P0-01: 对齐后端 listExports (OntologyExportController L79 GET /api/v1/ontology/export/tasks);
+  // 原 URL 命中 exportFull 的直接导出端点 (返回对象, 非任务列表)
+  return apiFetchData<ExportTaskSummary[]>(`${EXPORT_BASE}/tasks${query}`);
 }
 
 export async function fetchExportTask(id: string) {
