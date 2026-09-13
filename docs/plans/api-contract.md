@@ -405,6 +405,12 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | POST | `/api/v1/cognitive/reason` | aiming | 场景推演 | 混合推理 |
 | GET | `/api/v1/cognitive/scenario/{id}` | 前端 | 场景详情 | 🔒 |
 
+> **认知心智层 P0（PMO-59，2026-09-13，ADR-9）**：三张心智状态表已落库（`ecos_cognitive_evidence` / `ecos_cognitive_hypothesis` / `ecos_cognitive_belief`，DDL V127~V129，手工执行）；契约先行——
+> - **VO 契约**：common-api `com.chinacreator.gzcm.common.cognitive.{EvidenceRecordVO, HypothesisVO, BeliefDistributionVO}`（跨 dccheng/workspace 共享）
+> - **Service 契约**：cognitive-engine-api `com.chinacreator.gzcm.engine.cognitive2.service.{IUncertaintyJudgementService, IHypothesisLifecycleService}`（仅接口，impl 留待 Phase 2）
+> - **Phase 2 开放端点（预登记，仅增不改）**：`GET/POST /api/v1/cognitive/evidence`、`GET /api/v1/cognitive/evidence/{id}`、`GET/POST /api/v1/cognitive/hypotheses`、`POST /api/v1/cognitive/hypotheses/{id}/invalidate`、`GET/POST /api/v1/cognitive/beliefs`、`POST /api/v1/cognitive/beliefs/{variable}/update-by-evidence`、`POST /api/v1/cognitive/beliefs/{variable}/override`（走三滤波器：VersionPrefixRewriteFilter KEEP + SecurityConfig permitAll 双路径 + ClearanceInterceptor 豁免双路径）
+> - **事件**：`ecos.cognitive` topic（KafkaTopics.COGNITIVE）— 新证据冲击/假设失效/不确定性判断更新；冲击链=原生 Kafka 事件 + runtime-task 定时补算（不做流式）
+
 > 注：dccheng 内 kb 与 cognitive 为**同 JVM 进程内调用**（不再跨服务 REST）；aiming 调 dccheng 为跨服务 REST。
 
 ### 3.5 aiming
@@ -483,6 +489,7 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | `ecos.workflow`（WORKFLOW） | buszhi | datanet/aiming | 工作流/审批/任务变更 |
 | `ecos.agent`（AGENT） | aiming | 各 service | agent/execution/tool 变更 |
 | `ecos.knowledge`（KNOWLEDGE） | dccheng | aiming | KG/RAG/抽取变更 |
+| `ecos.cognitive`（COGNITIVE，PMO-59 P0 新增） | dccheng（cognitive） | Phase 2+ 订阅方 | 认知心智状态变更：新证据冲击/假设失效/不确定性判断更新（ADR-9；本 Phase 仅登记常量，无生产/消费代码） |
 | `ecos.security`（**新增**） | sysman | datanet/buszhi/dccheng/aiming | 权限/密钥失效广播（§3.1 缓存失效） |
 
 > ⚠️ **现状**：`PipelineEvent` production 引用仅 1 处、Kafka listener 尚缺（common-api AGENTS.md 记 P2-4 缺口）——本表为**目标态**，属新建实现。旧契约的 `ecos.*.events` topic 名**全部作废**（实际常量无 `events` 后缀），`ecos.core.events` 随 core-service 删除作废。
