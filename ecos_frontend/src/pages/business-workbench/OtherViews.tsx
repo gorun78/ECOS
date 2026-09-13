@@ -290,7 +290,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
                   ))}
                 </tr>
               </thead>
-              <tbody className={`divide-y divide-slate-100 ${styles.cardText}`}>
+              <tbody className={`divide-y ${styles.divider} ${styles.cardText}`}>
                 {dataset.sampleData.map((row, idx) => (
                   <tr key={idx} className="hover:bg-gray-50/30">
                     {dataset.columns.map(col => (

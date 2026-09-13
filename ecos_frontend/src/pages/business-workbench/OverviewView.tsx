@@ -315,7 +315,7 @@ export default function OverviewView({
             <div className={`text-xl font-bold ${styles.cardText} font-mono`}>{objectTypes.length}</div>
             <div className={`text-[10px] ${styles.cardTextMuted} flex items-center gap-1`}>
               <span>{objectTypes.filter(ot => ot.domainId).length} 个已归域</span>
-              <span className="text-slate-300">|</span>
+              <span className={styles.muted}>|</span>
               <span className="text-amber-600 font-medium">{objectTypes.filter(ot => !ot.domainId).length} 个未归类</span>
             </div>
           </div>
@@ -368,25 +368,25 @@ export default function OverviewView({
       </div>
 
       {/* Main Graph Panel */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-4`}>
+        <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 border-b ${styles.divider} pb-3`}>
           <div className="space-y-0.5">
-            <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+            <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
               <LucideIcon name="Network" size={15} className="text-blue-600" />
               关系拓扑图谱 (Ontology ER Diagram)
             </h3>
-            <p className="text-[11px] text-slate-500">显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。</p>
+            <p className={`text-[11px] ${styles.cardTextMuted}`}>显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。</p>
           </div>
           
           {/* Dynamic Filter Controls */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">视图按域过滤:</span>
+            <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px] tracking-wider`}>视图按域过滤:</span>
             <button
               onClick={() => onSelectDomainFilter(null)}
               className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer text-[11px] ${
                 !selectedDomainFilter
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  ? 'bg-[var(--card,#0F172A)] text-white border-[var(--card,#0F172A)] shadow-xs'
+                  : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:bg-blue-50/20`
               }`}
             >
               全局全景 ({objectTypes.length})
@@ -402,12 +402,12 @@ export default function OverviewView({
                   className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer flex items-center gap-1.5 text-[11px] ${
                     isSelected
                       ? `${classes.activeBg} text-white border-transparent shadow-xs`
-                      : `bg-white text-slate-700 border-slate-200 ${classes.hoverBg}`
+                      : `${styles.cardBg} ${styles.cardText} ${styles.cardBorder} ${classes.hoverBg}`
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : classes.dot}`} />
                   <span>{d.displayName.split(' (')[0]}</span>
-                  <span className={`text-[9px] px-1 py-0.2 rounded-full font-mono ${isSelected ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>
+                  <span className={`text-[9px] px-1 py-0.2 rounded-full font-mono ${isSelected ? 'bg-white/20' : `${styles.appBg} ${styles.cardTextMuted}`}`}>
                     {count}
                   </span>
                 </button>
@@ -418,8 +418,8 @@ export default function OverviewView({
                 onClick={() => onSelectDomainFilter('unassigned')}
                 className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer text-[11px] ${
                   selectedDomainFilter === 'unassigned'
-                    ? 'bg-slate-500 text-white border-slate-500 shadow-xs'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    ? 'bg-[var(--card,#475569)] text-white border-[var(--card,#475569)] shadow-xs'
+                    : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:bg-blue-50/20`
                 }`}
               >
                 未归域 ({objectTypes.filter(ot => !ot.domainId).length})
@@ -429,7 +429,7 @@ export default function OverviewView({
         </div>
 
         {/* Embedded SVG Graph Canvas with filtered nodes */}
-        <div className="relative border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50">
+        <div className={`relative border ${styles.cardBorder} rounded-lg overflow-hidden ${styles.appBg}`}>
           <OntologyGraph
             objectTypes={displayedObjects}
             linkTypes={displayedLinks}
@@ -440,19 +440,19 @@ export default function OverviewView({
       </div>
 
       {/* 🛠️ Domain Management & Classification Maintenance Deck */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-4`}>
+        <div className={`flex justify-between items-center border-b ${styles.divider} pb-3`}>
           <div>
-            <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-              <LucideIcon name="Settings" size={15} className="text-slate-500" />
+            <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+              <LucideIcon name="Settings" size={15} className={styles.cardTextMuted} />
               业务分级域维护中心 (Business Domain Manager)
             </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">创建、编辑和删除业务分级域，直观进行本体对象归宿分配 (即多对多关系绑定)。</p>
+            <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5`}>创建、编辑和删除业务分级域，直观进行本体对象归宿分配 (即多对多关系绑定)。</p>
           </div>
           {!isAddingNew && (
             <button
               onClick={handleStartAdd}
-              className="bg-slate-900 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 shadow-xs"
+              className="bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 shadow-xs"
             >
               <LucideIcon name="PlusCircle" size={14} />
               新建业务域分级
@@ -462,16 +462,16 @@ export default function OverviewView({
 
         {isAddingNew ? (
           /* Domain Creation/Edit Form Block */
-          <form onSubmit={handleSaveDomain} className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-              <h4 className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+          <form onSubmit={handleSaveDomain} className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
+            <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
+              <h4 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
                 <LucideIcon name="Edit3" size={14} className="text-blue-500" />
                 <span>{editingDomain ? `编辑业务域: ${editingDomain.displayName}` : '新建业务域分级'}</span>
               </h4>
               <button
                 type="button"
                 onClick={() => { setIsAddingNew(false); setEditingDomain(null); }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-200/50"
+                className={`${styles.cardTextMuted} opacity-70 hover:opacity-100 p-1 rounded hover:bg-blue-50/20`}
               >
                 <LucideIcon name="X" size={16} />
               </button>
@@ -486,30 +486,30 @@ export default function OverviewView({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1 md:col-span-1">
-                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">唯一标识 ID (不可包含空格)</label>
+                <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>唯一标识 ID (不可包含空格)</label>
                 <input
                   type="text"
                   disabled={!!editingDomain}
                   value={formId}
                   onChange={e => setFormId(e.target.value)}
                   placeholder="如: flight_ops"
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden disabled:bg-slate-100 disabled:text-slate-400 font-mono"
+                  className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden disabled:bg-blue-50/20 ${styles.cardTextMuted} font-mono`}
                 />
               </div>
 
               <div className="space-y-1 md:col-span-1">
-                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">显示名称 (Display Name)</label>
+                <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>显示名称 (Display Name)</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
                   placeholder="如: 运行控制域"
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
                 />
               </div>
 
               <div className="space-y-1 md:col-span-1">
-                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">代表色调 (Theme Color)</label>
+                <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>代表色调 (Theme Color)</label>
                 <div className="flex items-center gap-1.5 py-1">
                   {['blue', 'emerald', 'amber', 'purple', 'rose', 'indigo', 'slate'].map(color => {
                     const isSelected = formColor === color;
@@ -519,7 +519,7 @@ export default function OverviewView({
                         key={color}
                         type="button"
                         onClick={() => setFormColor(color)}
-                        className={`w-6 h-6 rounded-full border-2 transition-transform flex items-center justify-center ${classes.bg} ${isSelected ? 'border-slate-800 scale-110 shadow-xs' : 'border-slate-200 hover:scale-105'}`}
+                        className={`w-6 h-6 rounded-full border-2 transition-transform flex items-center justify-center ${classes.bg} ${isSelected ? 'border-[var(--card,#334155)] scale-110 shadow-xs' : `${styles.sidebarBorder} hover:scale-105`}`}
                         title={color}
                       >
                         <span className={`w-2.5 h-2.5 rounded-full ${classes.dot}`} />
@@ -531,21 +531,21 @@ export default function OverviewView({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">业务描述信息 (Description)</label>
+              <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>业务描述信息 (Description)</label>
               <textarea
                 value={formDesc}
                 onChange={e => setFormDesc(e.target.value)}
                 placeholder="简述该业务域所承载的核心职能、负责团队或数据流转范围。"
-                className="w-full h-16 px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                className={`w-full h-16 px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
               />
             </div>
 
             {/* Object types assignment in the form */}
-            <div className="space-y-2 border-t border-slate-200 pt-3">
-              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+            <div className={`space-y-2 border-t ${styles.divider} pt-3`}>
+              <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>
                 绑定关联的实体对象 (Object Types Assignment)
               </label>
-              <div className="text-[10px] text-slate-400 -mt-1">直接勾选属于该业务域的实体类型。一个实体同一时间仅可归属一个业务域。</div>
+              <div className={`text-[10px] ${styles.cardTextMuted} -mt-1`}>直接勾选属于该业务域的实体类型。一个实体同一时间仅可归属一个业务域。</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1.5">
                 {objectTypes.map(ot => {
                   const isChecked = formAssignedObjects.includes(ot.id);
@@ -558,25 +558,25 @@ export default function OverviewView({
                       onClick={() => !isMappedToOther && toggleObjectAssignment(ot.id)}
                       className={`flex items-center justify-between p-2 rounded-lg border text-xs select-none transition-all ${
                         isMappedToOther 
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60' 
+                          ? `${styles.sidebarBg} ${styles.sidebarBorder} ${styles.cardTextMuted} cursor-not-allowed opacity-60` 
                           : isChecked 
                           ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium cursor-pointer' 
-                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 cursor-pointer'
+                          : `${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted} hover:border-blue-400 hover:bg-blue-50/20 cursor-pointer`
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <span className={`p-0.5 rounded border ${isChecked ? 'bg-blue-100 border-blue-200' : 'bg-slate-50'}`}>
+                        <span className={`p-0.5 rounded border ${isChecked ? 'bg-blue-100 border-blue-200' : `${styles.appBg} ${styles.cardBorder}`}`}>
                           <LucideIcon name={ot.icon} size={12} />
                         </span>
                         <span className="truncate">{ot.displayName}</span>
                       </div>
                       <div className="flex items-center">
                         {isMappedToOther ? (
-                          <span className="text-[9px] bg-slate-200 text-slate-500 px-1 py-0.2 rounded font-mono truncate max-w-[65px]" title={`已被域 "${otherDomain?.displayName}" 绑定`}>
+                          <span className={`text-[9px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1 py-0.2 rounded font-mono truncate max-w-[65px]`} title={`已被域 "${otherDomain?.displayName}" 绑定`}>
                             {otherDomain?.displayName.split(' (')[0]}
                           </span>
                         ) : (
-                          <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'}`}>
+                          <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : `${styles.cardBorder} ${styles.cardBg}`}`}>
                             {isChecked && <LucideIcon name="Check" size={10} />}
                           </span>
                         )}
@@ -588,11 +588,11 @@ export default function OverviewView({
             </div>
 
             {/* Form actions */}
-            <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+            <div className={`flex justify-end gap-2 border-t ${styles.divider} pt-3`}>
               <button
                 type="button"
                 onClick={() => { setIsAddingNew(false); setEditingDomain(null); }}
-                className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold bg-white hover:bg-slate-50"
+                className={`px-3.5 py-1.5 rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} text-xs font-semibold ${styles.cardBg} hover:bg-blue-50/20`}
               >
                 取消
               </button>
@@ -614,26 +614,26 @@ export default function OverviewView({
               return (
                 <div 
                   key={d.id} 
-                  className={`bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 flex flex-col justify-between hover:shadow-2xs transition-all relative overflow-hidden ${classes.leftBorder}`}
+                  className={`${styles.cardBg} border ${styles.cardBorder} hover:border-blue-300 rounded-xl p-4 flex flex-col justify-between hover:shadow-2xs transition-all relative overflow-hidden ${classes.leftBorder}`}
                 >
                   <div className="space-y-2">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-900">{d.displayName}</h4>
-                        <span className="text-[10px] text-slate-400 font-mono lowercase tracking-tight">域识别ID: {d.id}</span>
+                        <h4 className={`text-xs font-semibold ${styles.cardText}`}>{d.displayName}</h4>
+                        <span className={`text-[10px] ${styles.cardTextMuted} font-mono lowercase tracking-tight`}>域识别ID: {d.id}</span>
                       </div>
                       
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleStartEdit(d)}
-                          className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100"
+                          className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 rounded ${styles.sidebarHoverBg}`}
                           title="编辑此业务域"
                         >
                           <LucideIcon name="Edit" size={12} />
                         </button>
                         <button
                           onClick={() => handleDeleteDomain(d.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50"
+                          className={`p-1 ${styles.cardTextMuted} hover:text-red-600 rounded hover:bg-red-50`}
                           title="删除此业务域"
                         >
                           <LucideIcon name="Trash2" size={12} />
@@ -641,14 +641,14 @@ export default function OverviewView({
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-slate-500 leading-relaxed min-h-[36px] line-clamp-2">
+                    <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed min-h-[36px] line-clamp-2`}>
                       {d.description || '暂无业务描述。'}
                     </p>
                   </div>
 
                   {/* Associated object lists */}
-                  <div className="border-t border-slate-100 pt-3 mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold uppercase mb-1.5">
+                  <div className={`border-t ${styles.divider} pt-3 mt-3`}>
+                    <div className={`flex items-center justify-between text-[10px] ${styles.cardTextMuted} font-semibold uppercase mb-1.5`}>
                       <span>已关联对象 ({domainObjects.length})</span>
                       <span className="font-mono">{d.id} domain</span>
                     </div>
@@ -658,15 +658,15 @@ export default function OverviewView({
                           <div 
                             key={ot.id}
                             onClick={() => onQuickNavigate('object', ot.id)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 text-[10px] font-medium hover:border-blue-400 hover:bg-blue-50/20 cursor-pointer transition-colors"
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${styles.cardBorder} ${styles.appBg} ${styles.cardTextMuted} text-[10px] font-medium hover:border-blue-400 hover:bg-blue-50/20 cursor-pointer transition-colors`}
                           >
-                            <LucideIcon name={ot.icon} size={10} className="text-slate-400" />
+                            <LucideIcon name={ot.icon} size={10} className={styles.cardTextMuted} />
                             <span>{ot.displayName.split(' (')[0]}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-[10px] text-slate-400 italic">暂无绑定的业务实体</div>
+                      <div className={`text-[10px] ${styles.cardTextMuted} italic`}>暂无绑定的业务实体</div>
                     )}
                   </div>
                 </div>
@@ -675,10 +675,10 @@ export default function OverviewView({
 
             {/* Unassigned Quick Stats Card */}
             {objectTypes.some(ot => !ot.domainId) && (
-              <div className="bg-slate-50/50 border border-slate-200/60 rounded-xl p-4 flex flex-col justify-between border-dashed">
+              <div className={`${styles.appBg} border ${styles.sidebarBorder} rounded-xl p-4 flex flex-col justify-between border-dashed`}>
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <h4 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
                       <LucideIcon name="AlertCircle" size={13} className="text-amber-500" />
                       <span>未分类实体池</span>
                     </h4>
@@ -686,17 +686,17 @@ export default function OverviewView({
                       {objectTypes.filter(ot => !ot.domainId).length} 对象
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                  <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed`}>
                     当前声明的某些本体实体还未绑定到具体的业务划分域中。未分类对象在全景关系拓扑中可以继续存在，但在业务域治理上未形成职责分级。
                   </p>
                 </div>
 
-                <div className="border-t border-slate-200/50 pt-3 mt-3 flex flex-wrap gap-1.5">
+                <div className={`border-t ${styles.divider} pt-3 mt-3 flex flex-wrap gap-1.5`}>
                   {objectTypes.filter(ot => !ot.domainId).map(ot => (
                     <div 
                       key={ot.id}
                       onClick={() => onQuickNavigate('object', ot.id)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-300/80 bg-white text-slate-500 text-[10px] hover:border-amber-400 hover:bg-amber-50/20 cursor-pointer transition-colors"
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${styles.cardBorder} ${styles.cardBg} ${styles.cardTextMuted} text-[10px] hover:border-amber-400 hover:bg-amber-50/20 cursor-pointer transition-colors`}
                     >
                       <LucideIcon name={ot.icon} size={10} />
                       <span>{ot.displayName.split(' (')[0]}</span>
@@ -713,9 +713,9 @@ export default function OverviewView({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Quick List Nav segmented by Domain */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-            <LucideIcon name="Compass" size={14} className="text-slate-500" />
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-3`}>
+          <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+            <LucideIcon name="Compass" size={14} className={styles.cardTextMuted} />
             实体清单快速分级导航
           </h3>
           
@@ -728,7 +728,7 @@ export default function OverviewView({
               
               return (
                 <div key={d.id} className="space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-slate-500 tracking-wider uppercase border-b border-slate-100 pb-1">
+                  <div className={`flex items-center gap-1.5 text-[10px] font-extrabold ${styles.cardTextMuted} tracking-wider uppercase border-b ${styles.divider} pb-1`}>
                     <span className={`w-2 h-2 rounded-full ${classes.dot}`} />
                     <span>{d.displayName}</span>
                   </div>
@@ -737,15 +737,15 @@ export default function OverviewView({
                       <div
                         key={ot.id}
                         onClick={() => onQuickNavigate('object', ot.id)}
-                        className="flex items-center justify-between p-1.5 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group"
+                        className={`flex items-center justify-between p-1.5 rounded-lg border ${styles.divider} hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group`}
                       >
                         <div className="flex items-center gap-2 truncate">
                           <span className={`p-0.5 rounded border ${ot.color}`}>
                             <LucideIcon name={ot.icon} size={11} />
                           </span>
-                          <span className="text-xs font-medium text-slate-700">{ot.displayName}</span>
+                          <span className={`text-xs font-medium ${styles.cardText}`}>{ot.displayName}</span>
                         </div>
-                        <LucideIcon name="ChevronRight" size={11} className="text-slate-300 group-hover:translate-x-0.5 transition-transform" />
+                        <LucideIcon name="ChevronRight" size={11} className={`${styles.muted} group-hover:translate-x-0.5 transition-transform`} />
                       </div>
                     ))}
                   </div>
@@ -756,8 +756,8 @@ export default function OverviewView({
             {/* 2. Show Unassigned if any */}
             {objectTypes.some(ot => !ot.domainId) && (
               <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-slate-400 tracking-wider uppercase border-b border-slate-100 pb-1">
-                  <span className="w-2 h-2 rounded-full bg-slate-300" />
+                <div className={`flex items-center gap-1.5 text-[10px] font-extrabold ${styles.cardTextMuted} tracking-wider uppercase border-b ${styles.divider} pb-1`}>
+                  <span className="w-2 h-2 rounded-full bg-[var(--card,#94A3B8)]" />
                   <span>未归类业务对象 (Pool)</span>
                 </div>
                 <div className="space-y-1 pl-1">
@@ -765,15 +765,15 @@ export default function OverviewView({
                     <div
                       key={ot.id}
                       onClick={() => onQuickNavigate('object', ot.id)}
-                      className="flex items-center justify-between p-1.5 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group"
+                      className={`flex items-center justify-between p-1.5 rounded-lg border ${styles.divider} hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group`}
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span className={`p-0.5 rounded border ${ot.color}`}>
                           <LucideIcon name={ot.icon} size={11} />
                         </span>
-                        <span className="text-xs font-medium text-slate-700">{ot.displayName}</span>
+                        <span className={`text-xs font-medium ${styles.cardText}`}>{ot.displayName}</span>
                       </div>
-                      <LucideIcon name="ChevronRight" size={11} className="text-slate-300 group-hover:translate-x-0.5 transition-transform" />
+                      <LucideIcon name="ChevronRight" size={11} className={`${styles.muted} group-hover:translate-x-0.5 transition-transform`} />
                     </div>
                   ))}
                 </div>
@@ -783,27 +783,27 @@ export default function OverviewView({
         </div>
 
         {/* Enterprise lifecycle logs */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs lg:col-span-2 space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-            <LucideIcon name="History" size={14} className="text-slate-500" />
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs lg:col-span-2 space-y-3`}>
+          <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+            <LucideIcon name="History" size={14} className={styles.cardTextMuted} />
             生命周期与审计日志 (Foundry Activity Stream)
           </h3>
-          <div className="divide-y divide-slate-100 max-h-[260px] overflow-y-auto pr-1">
+          <div className={`divide-y ${styles.divider} max-h-[260px] overflow-y-auto pr-1`}>
             {auditLogs.map(log => (
               <div key={log.id} className="py-2.5 first:pt-0 last:pb-0 text-[11px] flex items-start gap-3">
                 <div className="mt-0.5">
                   <span className={`w-2 h-2 rounded-full inline-block ${
                     log.type === 'publish' ? 'bg-blue-500' :
-                    log.type === 'create' ? 'bg-emerald-500' : 'bg-slate-400'
+                    log.type === 'create' ? 'bg-emerald-500' : 'bg-[var(--card,#475569)]'
                   }`} />
                 </div>
                 <div className="flex-1 space-y-0.5">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-slate-800">{log.action}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{log.time}</span>
+                    <span className={`font-semibold ${styles.cardText}`}>{log.action}</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{log.time}</span>
                   </div>
-                  <p className="text-slate-500 text-[11px] leading-relaxed">{log.detail}</p>
-                  <div className="text-[10px] text-slate-400 font-mono">操作员: {log.user}</div>
+                  <p className={`${styles.cardTextMuted} text-[11px] leading-relaxed`}>{log.detail}</p>
+                  <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>操作员: {log.user}</div>
                 </div>
               </div>
             ))}

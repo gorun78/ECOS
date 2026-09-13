@@ -246,7 +246,7 @@ export default function LinkTypeView({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">目标对象主键/外键 ({targetObj?.displayName})</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted}`}>目标对象主键/外键 ({targetObj?.displayName})</label>
                       <select
                         value={linkType.mapping.foreignKeyMapping?.targetKey || ''}
                         onChange={e => handleFkChange('targetKey', e.target.value)}
@@ -259,7 +259,7 @@ export default function LinkTypeView({
                       </select>
                     </div>
                   </div>
-                  <p className="text-[9px] text-slate-400 mt-1 leading-relaxed">
+                  <p className={`text-[9px] ${styles.cardTextMuted} mt-1 leading-relaxed`}>
                     系统在运行时将利用底层关联查询。确保源对象的关联键字段值能和目标对象的值相互咬合对应。
                   </p>
                 </div>
@@ -267,11 +267,11 @@ export default function LinkTypeView({
 
               {/* JOIN TABLE CONFIG */}
               {linkType.mapping.type === 'join_table' && (
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3 text-xs">
-                  <div className="font-semibold text-slate-800 text-[11px] mb-1">关联表 (中间表) 配置</div>
+                <div className={`${styles.appBg} p-4 rounded-lg border ${styles.appBorder} space-y-3 text-xs`}>
+                  <div className={`font-semibold ${styles.cardText} text-[11px] mb-1`}>关联表 (中间表) 配置</div>
                   
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500">选择包含关联关系的中间表数据集</label>
+                    <label className={`text-[10px] ${styles.cardTextMuted}`}>选择包含关联关系的中间表数据集</label>
                     <select
                       value={linkType.mapping.datasetId || ''}
                       onChange={e => handleMappingFieldChange('datasetId', e.target.value)}
@@ -284,9 +284,9 @@ export default function LinkTypeView({
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 border-t border-slate-200/50 pt-2.5">
+                  <div className={`grid grid-cols-2 gap-3 border-t ${styles.divider} pt-2.5`}>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">源主键 ({sourceObj?.displayName})</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted}`}>源主键 ({sourceObj?.displayName})</label>
                       <select
                         value={linkType.mapping.joinTableMapping?.sourceKey || ''}
                         onChange={e => handleJoinChange('sourceKey', e.target.value)}
@@ -300,7 +300,7 @@ export default function LinkTypeView({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">中间表源外键字段</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted}`}>中间表源外键字段</label>
                       <select
                         value={linkType.mapping.joinTableMapping?.joinSourceKey || ''}
                         onChange={e => handleJoinChange('joinSourceKey', e.target.value)}
@@ -314,7 +314,7 @@ export default function LinkTypeView({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">目标主键 ({targetObj?.displayName})</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted}`}>目标主键 ({targetObj?.displayName})</label>
                       <select
                         value={linkType.mapping.joinTableMapping?.targetKey || ''}
                         onChange={e => handleJoinChange('targetKey', e.target.value)}
@@ -328,7 +328,7 @@ export default function LinkTypeView({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">中间表目标外键字段</label>
+                      <label className={`text-[10px] ${styles.cardTextMuted}`}>中间表目标外键字段</label>
                       <select
                         value={linkType.mapping.joinTableMapping?.joinTargetKey || ''}
                         onChange={e => handleJoinChange('joinTargetKey', e.target.value)}

@@ -192,19 +192,19 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
   return (
     <div className="space-y-4">
       {/* 头部 */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+      <div className={`flex items-center justify-between border-b ${styles.divider} pb-3`}>
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <FileText size={16} className="text-indigo-600" />
             {tl('知识抽取引擎（分片上传）', 'Knowledge Extraction (Chunked Upload)')}
           </h2>
-          <p className="text-[10px] text-slate-500">
+          <p className={`text-[10px] ${styles.cardTextMuted}`}>
             {tl('上传 PDF/Word/TXT — 5MB 分片 + 状态机', 'PDF/Word/TXT upload — 5MB chunks + state machine')}
           </p>
         </div>
         <button onClick={() => setShowHistory(!showHistory)}
           className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
-            showHistory ? `${styles.accentBg} text-white border-transparent` : `bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100`
+            showHistory ? `${styles.accentBg} text-white border-transparent` : `${styles.appBg} ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`
           }`}>
           <History size={11} /> {tl('历史', 'History')}
         </button>
@@ -216,7 +216,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
-          dragOver ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 bg-white'
+          dragOver ? 'border-blue-400 bg-blue-50/50' : `border ${styles.cardBorder} ${styles.cardBg}`
         }`}
         onClick={() => document.getElementById('kb-doc-upload-file-input')?.click()}
       >
@@ -224,9 +224,9 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         {phase === 'uploading' ? (
           <div className="space-y-3">
             <RotateCw size={32} className="animate-spin text-blue-500 mx-auto" />
-            <p className="text-xs font-bold text-slate-700">{tl('上传中...', 'Uploading...')}</p>
-            <p className="text-[10px] text-slate-500 font-mono">{fileName} · {(fileSize / 1024 / 1024).toFixed(1)}MB</p>
-            <div className="mx-auto w-64 h-2 bg-slate-100 rounded-full overflow-hidden">
+            <p className={`text-xs font-bold ${styles.cardText}`}>{tl('上传中...', 'Uploading...')}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{fileName} · {(fileSize / 1024 / 1024).toFixed(1)}MB</p>
+            <div className={`mx-auto w-64 h-2 ${styles.appBg} rounded-full overflow-hidden`}>
               <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${uploadRatio * 100}%` }} />
             </div>
             <p className="text-[10px] font-mono text-indigo-600">{Math.round(uploadRatio * 100)}%</p>
@@ -236,8 +236,8 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
             <div className="p-3 bg-indigo-50 rounded-2xl inline-block">
               <Upload size={28} className="text-indigo-500" />
             </div>
-            <p className="text-xs font-bold text-slate-700">{tl('拖拽文件到此处，或点击选择', 'Drag & drop file or click to browse')}</p>
-            <p className="text-[10px] text-slate-500">{tl('支持 PDF · Word · TXT（5MB/块分片上传）', 'PDF · Word · TXT (5MB per chunk)')}</p>
+            <p className={`text-xs font-bold ${styles.cardText}`}>{tl('拖拽文件到此处，或点击选择', 'Drag & drop file or click to browse')}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted}`}>{tl('支持 PDF · Word · TXT（5MB/块分片上传）', 'PDF · Word · TXT (5MB per chunk)')}</p>
             <div className="flex items-center gap-1 justify-center text-[9px] text-indigo-600">
               <Sparkles size={10} /> {tl('上传后自动解析 → 抽取 → 人工审核', 'Auto parse → extract → review')}
             </div>
@@ -247,14 +247,14 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
 
       {/* 阶段状态机 */}
       {(phase !== 'idle' && phase !== 'reviewing' && phase !== 'done') ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-3`}>
           <div className="flex items-center gap-2">
             <FileText size={14} className="text-indigo-500" />
-            <span className="font-bold text-xs text-slate-800 truncate">{fileName || tl('处理中', 'Processing')}</span>
+            <span className={`font-bold text-xs ${styles.cardText} truncate`}>{fileName || tl('处理中', 'Processing')}</span>
             <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${phase === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-indigo-50 text-indigo-700'}`}>
               {tl(PHASE_LABELS[phase].zh, PHASE_LABELS[phase].en)}
             </span>
-            <button onClick={handleReset} className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer"><Trash2 size={12} /></button>
+            <button onClick={handleReset} className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 hover:text-rose-500 cursor-pointer`}><Trash2 size={12} /></button>
           </div>
 
           {/* 阶段指示器 */}
@@ -263,13 +263,13 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
               const activeIdx = PHASE_ORDER.indexOf(phase);
               const isDone = idx < activeIdx;
               const color = phase === 'failed' ? 'bg-rose-200 text-rose-600' :
-                isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400';
+                isDone ? 'bg-emerald-100 text-emerald-700' : `${styles.appBg} ${styles.cardTextMuted}`;
               return (
                 <div key={step} className="flex-1 flex flex-col items-center gap-1">
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${color}`}>
                     {idx + 1}
                   </span>
-                  <span className={`text-[9px] font-bold ${isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  <span className={`text-[9px] font-bold ${isDone ? 'text-emerald-600' : styles.cardTextMuted}`}>
                     {tl(PHASE_LABELS[step].zh, PHASE_LABELS[step].en)}
                   </span>
                 </div>
@@ -277,7 +277,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
             })}
           </div>
 
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className={`h-1.5 ${styles.appBg} rounded-full overflow-hidden`}>
             <div
               className={`h-full rounded-full transition-all duration-700 ${
                 phase === 'failed' ? 'bg-rose-500' : 'bg-indigo-500'
@@ -307,28 +307,28 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
 
       {/* 历史面板 */}
       {showHistory && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
+          <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
+            <h3 className={`text-xs font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
               <Clock size={12} className="text-indigo-500" /> {tl('抽取历史', 'Extraction History')}
             </h3>
-            <span className="text-[9px] text-slate-400 font-mono">{history.length}</span>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>{history.length}</span>
           </div>
           {loadingHistory ? (
-            <div className="flex justify-center py-8"><RotateCw size={20} className="animate-spin text-slate-300" /></div>
+            <div className="flex justify-center py-8"><RotateCw size={20} className={`animate-spin ${styles.cardTextMuted}`} /></div>
           ) : history.length === 0 ? (
-            <p className="text-[10px] text-center py-6 text-slate-400">{tl('暂无历史（/extract/history 尚未返回）', 'No history yet (/extract/history returns empty)')}</p>
+            <p className={`text-[10px] text-center py-6 ${styles.cardTextMuted}`}>{tl('暂无历史（/extract/history 尚未返回）', 'No history yet (/extract/history returns empty)')}</p>
           ) : (
             <div className="space-y-1.5 max-h-56 overflow-y-auto">
               {history.map(item => (
-                <div key={item.id} className="p-3 bg-slate-50 border border-slate-150 rounded-lg flex items-center gap-3 hover:bg-slate-100 transition-colors">
-                  <div className="p-1.5 bg-slate-200 rounded-lg shrink-0">
-                    {item.sourceType === 'document' ? <Database size={11} className="text-slate-500" /> : <FileText size={11} className="text-slate-500" />}
+                <div key={item.id} className={`p-3 ${styles.appBg} border ${styles.divider} rounded-lg flex items-center gap-3 hover:bg-blue-50/20 transition-colors`}>
+                  <div className={`p-1.5 ${styles.sidebarBg} rounded-lg shrink-0`}>
+                    {item.sourceType === 'document' ? <Database size={11} className={styles.cardTextMuted} /> : <FileText size={11} className={styles.cardTextMuted} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold text-slate-700 truncate">{item.contentPreview}</p>
+                    <p className={`text-[10px] font-bold ${styles.cardText} truncate`}>{item.contentPreview}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-slate-400 font-mono">{item.createdAt}</span>
+                      <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>{item.createdAt}</span>
                       <span className="text-[9px] text-emerald-600 font-medium">{item.entityCount} E</span>
                       <span className="text-[9px] text-blue-600 font-medium">{item.relationCount} R</span>
                       <span className="text-[9px] text-amber-600 font-medium">{item.ruleCount} Rules</span>

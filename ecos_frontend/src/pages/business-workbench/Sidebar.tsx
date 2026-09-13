@@ -339,7 +339,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('object')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -358,11 +358,11 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className={`p-0.5 rounded border ${isActive ? 'bg-blue-100 border-blue-300 text-blue-800' : 'bg-white border-slate-200 text-slate-500'}`}>
+                      <span className={`p-0.5 rounded border ${isActive ? 'bg-blue-100 border-blue-300 text-blue-800' : `${styles.cardBg} ${styles.sidebarBorder} ${styles.cardTextMuted}`}`}>
                         <LucideIcon name={ot.icon} size={11} />
                       </span>
                       <span className="truncate">{ot.displayName}</span>
@@ -379,7 +379,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('link')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -398,11 +398,11 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="text-slate-400">
+                      <span className={styles.cardTextMuted}>
                         <LucideIcon name="GitMerge" size={11} />
                       </span>
                       <span className="truncate">{lt.displayName}</span>
@@ -419,7 +419,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('action')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -438,7 +438,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -458,7 +458,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('function')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -477,7 +477,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -498,7 +498,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('interface')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -517,7 +517,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -537,7 +537,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('shared_property')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -556,7 +556,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -573,10 +573,10 @@ export default function Sidebar({
         </div>
 
         {/* 6. RAW DATASETS */}
-        <div className="space-y-0.5 border-t border-slate-200/60 pt-2 mt-2">
+        <div className={`space-y-0.5 border-t ${styles.sidebarBorder} pt-2 mt-2`}>
           <button
             onClick={() => toggleExpand('dataset')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <LucideIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -595,11 +595,11 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="text-slate-400">
+                      <span className={styles.cardTextMuted}>
                         <LucideIcon name="Database" size={11} />
                       </span>
                       <span className="truncate font-mono text-[10px]">{ds.name}</span>
@@ -613,10 +613,10 @@ export default function Sidebar({
       </div>
 
       {/* Bottom Action bar */}
-      <div className="p-3 border-t border-slate-200 bg-white relative">
+      <div className={`p-3 border-t ${styles.sidebarBorder} ${styles.sidebarBg} relative`}>
         <button
           onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+          className="w-full bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs"
         >
           <LucideIcon name="PlusCircle" size={14} />
           <span>新建本体元素</span>
@@ -625,13 +625,13 @@ export default function Sidebar({
 
         {/* Create Dropdown */}
         {showCreateDropdown && (
-          <div className="absolute bottom-14 left-3 right-3 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 divide-y divide-slate-100">
+          <div className={`absolute bottom-14 left-3 right-3 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-lg py-1 z-30 divide-y ${styles.divider}`}>
             <button
               onClick={() => {
                 onCreateNew('object');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
             >
               <span className="text-blue-500">
                 <LucideIcon name="Box" size={13} />
@@ -643,9 +643,9 @@ export default function Sidebar({
                 onCreateNew('link');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
             >
-              <span className="text-slate-400">
+              <span className={styles.cardTextMuted}>
                 <LucideIcon name="GitMerge" size={13} />
               </span>
               <span>新建链接关系 (Link Type)</span>
@@ -655,7 +655,7 @@ export default function Sidebar({
                 onCreateNew('action');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
             >
               <span className="text-amber-500">
                 <LucideIcon name="Zap" size={13} />
@@ -667,7 +667,7 @@ export default function Sidebar({
                 onCreateNew('interface');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
             >
               <span className="text-indigo-500">
                 <LucideIcon name="Layers" size={13} />
@@ -679,7 +679,7 @@ export default function Sidebar({
                 onCreateNew('shared_property');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
             >
               <span className="text-teal-500">
                 <LucideIcon name="Tag" size={13} />
@@ -691,7 +691,7 @@ export default function Sidebar({
                 onCreateNew('function');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
             >
               <span className="text-violet-500">
                 <LucideIcon name="Code" size={13} />
@@ -704,16 +704,16 @@ export default function Sidebar({
 
       {/* 业务划分域模态对话框 */}
       {showDomainModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--muted,#0F172A)]/40 backdrop-blur-xs">
+          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]`}>
             
             {/* Modal Header */}
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className={`px-4 py-3 border-b ${styles.divider} ${styles.appBg} flex items-center justify-between`}>
               <div className="flex items-center gap-2">
                 <span className="p-1 rounded bg-blue-100 text-blue-600">
                   <LucideIcon name="Layers" size={14} />
                 </span>
-                <h3 className="text-sm font-bold text-slate-800">
+                <h3 className={`text-sm font-bold ${styles.cardText}`}>
                   {editingDomain ? '编辑业务域' : '新建业务域'}
                 </h3>
               </div>
@@ -723,7 +723,7 @@ export default function Sidebar({
                   setShowDomainModal(false);
                   setEditingDomain(null);
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 rounded-lg ${styles.sidebarHoverBg} transition-colors cursor-pointer`}
               >
                 <LucideIcon name="X" size={16} />
               </button>
@@ -740,7 +740,7 @@ export default function Sidebar({
 
               {/* ID Input (Only shown on Create) */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
                   业务域标识 (ID/Key) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -749,14 +749,14 @@ export default function Sidebar({
                   value={formId}
                   onChange={e => setFormId(e.target.value)}
                   placeholder="例如: customer_domain (英文/数字/下划线)"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs bg-slate-50/50 disabled:bg-slate-100 disabled:text-slate-500"
+                  className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs ${styles.inputBg} disabled:bg-blue-50/20 ${styles.cardTextMuted}`}
                   required
                 />
               </div>
 
               {/* Display Name Input */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
                   业务域名称 (Display Name) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -764,14 +764,14 @@ export default function Sidebar({
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
                   placeholder="例如: 客户域"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs"
+                  className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs ${styles.inputBg}`}
                   required
                 />
               </div>
 
               {/* Description Input */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
                   描述 (Description)
                 </label>
                 <textarea
@@ -779,13 +779,13 @@ export default function Sidebar({
                   onChange={e => setFormDesc(e.target.value)}
                   placeholder="对该业务分级域的业务范围和职责进行说明"
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none"
+                  className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none ${styles.inputBg}`}
                 />
               </div>
 
               {/* Color Theme Selector */}
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
                   视觉主题色 (Color Accent)
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -797,7 +797,7 @@ export default function Sidebar({
                         type="button"
                         onClick={() => setFormColor(color)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                          isSelected ? 'border-slate-800 scale-110 shadow-sm' : 'border-transparent hover:scale-105'
+                          isSelected ? 'border-[var(--card,#334155)] scale-110 shadow-sm' : 'border-transparent hover:scale-105'
                         }`}
                         style={{ backgroundColor: 
                           color === 'blue' ? '#3b82f6' :
@@ -817,37 +817,37 @@ export default function Sidebar({
 
               {/* Assign Object Types Checklist */}
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-semibold flex justify-between items-center text-[11px]">
+                <label className={`block ${styles.cardTextMuted} font-semibold flex justify-between items-center text-[11px]`}>
                   <span>包含的对象类型 ({formAssignedObjects.length})</span>
-                  <span className="text-[9px] text-slate-400 font-normal">多选指派</span>
+                  <span className={`text-[9px] ${styles.muted} font-normal`}>多选指派</span>
                 </label>
-                <div className="border border-slate-200 rounded-lg max-h-36 overflow-y-auto p-1 bg-slate-50/30 divide-y divide-slate-150">
+                <div className={`border ${styles.sidebarBorder} rounded-lg max-h-36 overflow-y-auto p-1 ${styles.sidebarBg} divide-y ${styles.divider}`}>
                   {allObjectTypes.map(ot => {
                     const isChecked = formAssignedObjects.includes(ot.id);
                     return (
                       <div
                         key={ot.id}
                         onClick={() => toggleObjectAssignment(ot.id)}
-                        className="flex items-center gap-2 py-1 px-1.5 hover:bg-slate-100 rounded-md cursor-pointer text-xs"
+                        className={`flex items-center gap-2 py-1 px-1.5 hover:bg-blue-50/20 rounded-md cursor-pointer text-xs`}
                       >
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {}} // Handle on parent div click
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none"
+                          className={`rounded border ${styles.inputBorder} text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none`}
                         />
-                        <span className={`p-0.5 rounded border bg-white text-slate-500`}>
+                        <span className={`p-0.5 rounded border ${styles.cardBg} ${styles.cardTextMuted} ${styles.sidebarBorder}`}>
                           <LucideIcon name={ot.icon} size={11} />
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-700 truncate text-[11px]">{ot.displayName}</p>
+                          <p className={`font-semibold ${styles.cardText} truncate text-[11px]`}>{ot.displayName}</p>
                         </div>
-                        <span className="text-[9px] font-mono text-slate-400 uppercase">{ot.id}</span>
+                        <span className={`text-[9px] font-mono ${styles.cardTextMuted} uppercase`}>{ot.id}</span>
                       </div>
                     );
                   })}
                   {allObjectTypes.length === 0 && (
-                    <div className="p-4 text-center text-slate-400">
+                    <div className={`p-4 text-center ${styles.cardTextMuted}`}>
                       暂无对象类型可供指派
                     </div>
                   )}
@@ -855,14 +855,14 @@ export default function Sidebar({
               </div>
 
               {/* Footer Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className={`pt-3 border-t ${styles.divider} flex items-center justify-end gap-2`}>
                 <button
                   type="button"
                   onClick={() => {
                     setShowDomainModal(false);
                     setEditingDomain(null);
                   }}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 transition-colors font-semibold cursor-pointer text-xs"
+                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg hover:bg-blue-50/20 ${styles.cardText} transition-colors font-semibold cursor-pointer text-xs ${styles.cardBg}`}
                 >
                   取消
                 </button>

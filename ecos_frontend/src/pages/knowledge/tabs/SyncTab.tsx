@@ -114,7 +114,7 @@ export default function SyncTab() {
         </div>
         <button onClick={handleSyncAll} disabled={isSyncingAll} className={`px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''}`}>
           {isSyncingAll
-            ? <><span className="w-3.5 h-3.5 border-2 border-slate-100 border-t-transparent rounded-full animate-spin" /><span>{t("knowledge.synctab.联邦网格抓取中")}</span></>
+            ? <><span className="w-3.5 h-3.5 border-2 border-white/70 border-t-transparent rounded-full animate-spin" /><span>{t("knowledge.synctab.联邦网格抓取中")}</span></>
             : <><RefreshCw size={12} /><span>{t("knowledge.synctab.一键全站元数据同步")}</span></>
           }
         </button>
@@ -123,19 +123,19 @@ export default function SyncTab() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-4`}>
-            <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+            <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
               <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5 text-rose-600`}>
                 <ShieldAlert size={13} /><span>{t("knowledge.synctab.物理元数据漂移与调度_sla_仿真中心")}</span>
               </h3>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : `bg-slate-50 ${styles.cardBorder} ${styles.muted}`}`}>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : `${styles.appBg} ${styles.cardBorder} ${styles.muted}`}`}>
                 {isSchemaDrift || isSlaBreach ? '● 异常激活' : '● 稳定'}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => handleToggleSimulation('drift')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSchemaDrift ? 'bg-rose-50 border-rose-300 text-rose-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-slate-50`}`}>
+              <button onClick={() => handleToggleSimulation('drift')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSchemaDrift ? 'bg-rose-50 border-rose-300 text-rose-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-blue-50/20`}`}>
                 <AlertTriangle size={11} className={isSchemaDrift ? 'animate-bounce' : ''} /><span>{t("knowledge.synctab.注入_schema_漂移")}</span>
               </button>
-              <button onClick={() => handleToggleSimulation('sla')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSlaBreach ? 'bg-amber-50 border-amber-300 text-amber-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-slate-50`}`}>
+              <button onClick={() => handleToggleSimulation('sla')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSlaBreach ? 'bg-amber-50 border-amber-300 text-amber-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-blue-50/20`}`}>
                 <Clock size={11} className={isSlaBreach ? 'animate-pulse' : ''} /><span>{t("knowledge.synctab.注入_sla_断流")}</span>
               </button>
               <button onClick={() => handleToggleSimulation('reset')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} cursor-pointer transition-all flex items-center gap-1 border ${styles.cardBorder} ml-auto`}>
@@ -145,17 +145,17 @@ export default function SyncTab() {
           </div>
 
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-2.5`}>
-            <h4 className={`font-extrabold ${styles.cardText} text-[11px] flex items-center gap-1 text-slate-700 border-b border-slate-150 pb-2`}>
+            <h4 className={`font-extrabold ${styles.cardText} text-[11px] flex items-center gap-1 border-b ${styles.divider} pb-2`}>
               <FileClock size={12} /><span>{t("knowledge.synctab.审计记录")} ({auditLogs.length})</span>
             </h4>
             <div className="space-y-1.5 max-h-36 overflow-y-auto font-mono text-[9px]">
               {auditLogs.length === 0
                 ? <p className={`${styles.muted} py-4 text-center`}>{t("knowledge.synctab.暂无审计事件")}</p>
                 : auditLogs.map((log: any, i: number) => (
-                  <div key={i} className={`p-2 rounded-lg bg-slate-50 border border-slate-150 flex items-start justify-between gap-4`}>
+                  <div key={i} className={`p-2 rounded-lg ${styles.appBg} border ${styles.divider} flex items-start justify-between gap-4`}>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className={`px-1.5 py-0.2 rounded-xs font-bold text-[8px] uppercase ${log.severity === 'HIGH' ? 'bg-rose-100 text-rose-700' : `bg-slate-100 ${styles.cardText}`}`}>{log.severity}</span>
+                        <span className={`px-1.5 py-0.2 rounded-xs font-bold text-[8px] uppercase ${log.severity === 'HIGH' ? 'bg-rose-100 text-rose-700' : `${styles.sidebarBg} ${styles.cardText}`}`}>{log.severity}</span>
                         <span className={`${styles.cardText} font-bold`}>{log.event}</span>
                       </div>
                       <p className={`${styles.muted} font-sans leading-relaxed`}>{log.details}</p>
@@ -174,7 +174,7 @@ export default function SyncTab() {
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs`}>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className={`bg-slate-50 ${styles.muted} text-[10px] font-extrabold uppercase tracking-wider border-b ${styles.cardBorder}`}>
+                <tr className={`${styles.appBg} ${styles.muted} text-[10px] font-extrabold uppercase tracking-wider border-b ${styles.cardBorder}`}>
                   <th className="p-3">{t("knowledge.synctab.资产名称")}</th>
                   <th className="p-3">{t("knowledge.synctab.来源")}</th>
                   <th className="p-3">{t("knowledge.synctab.类型")}</th>
@@ -183,7 +183,7 @@ export default function SyncTab() {
                   <th className="p-3 text-right">{t("knowledge.synctab.状态_操作")}</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y divide-slate-150`}>
+              <tbody className={`divide-y ${styles.divider}`}>
                 {metaLoading ? (
                   <tr><td colSpan={6} className={`p-8 text-center ${styles.muted}`}>{t('knowledge.synctab.loading_metadata')}</td></tr>
                 ) : assets.length === 0 ? (
@@ -192,7 +192,7 @@ export default function SyncTab() {
                     <p className={`text-[10px] font-mono ${styles.muted}`}>/api/integration/metadata · {t('knowledge.synctab.waiting_backend')}</p>
                   </td></tr>
                 ) : assets.map(asset => (
-                  <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={asset.id} className="hover:bg-blue-50/20 transition-colors">
                     <td className={`p-3 font-bold ${styles.cardText}`}>{asset.name}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${
@@ -231,8 +231,8 @@ export default function SyncTab() {
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-xl p-4 flex flex-col h-[400px] shadow-md border border-slate-800 text-slate-300">
-          <div className="border-b border-slate-800 pb-2.5 mb-3 flex items-center justify-between">
+        <div className="bg-[var(--card,#0B1220)] rounded-xl p-4 flex flex-col h-[400px] shadow-md border border-[var(--card,#1E293B)] text-[var(--card,#CBD5E1)]">
+          <div className="border-b border-[var(--card,#1E293B)] pb-2.5 mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
               <span className="font-mono text-white text-[10px] font-bold">Closed-Loop Listener Pipeline</span>
@@ -242,14 +242,14 @@ export default function SyncTab() {
           <div className="flex-1 overflow-y-auto space-y-2.5 font-mono text-[9px] leading-relaxed scrollbar-thin scrollbar-thumb-slate-800">
             {syncLogs.length === 0 ? (
               <div className={`h-full flex flex-col items-center justify-center ${styles.muted} text-center space-y-1.5`}>
-                <Terminal size={24} className="text-slate-600" />
+                <Terminal size={24} className="text-[var(--card,#475569)]" />
                 <p>{t("knowledge.synctab.等待联邦同步事件触发")}</p>
               </div>
             ) : syncLogs.map((log, idx) => (
-              <p key={idx} className={`${log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('❌') ? 'text-rose-400 font-bold' : 'text-slate-300'}`}>{log}</p>
+              <p key={idx} className={`${log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('❌') ? 'text-rose-400 font-bold' : 'text-[var(--card,#CBD5E1)]'}`}>{log}</p>
             ))}
           </div>
-          <div className="border-t border-slate-800 pt-3 mt-3 text-[9px] text-slate-400 font-mono flex justify-between items-center">
+          <div className="border-t border-[var(--card,#1E293B)] pt-3 mt-3 text-[9px] text-[var(--card,#64748B)] font-mono flex justify-between items-center">
             <span>Doris CB Optimizer Sync Grid</span><span>v2.0-Sovereign</span>
           </div>
         </div>

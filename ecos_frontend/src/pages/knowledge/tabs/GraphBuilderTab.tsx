@@ -287,8 +287,8 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
               </h3>
               <button onClick={() => setLogsJob(null)} className={`p-1 ${styles.muted} ${styles.appText} cursor-pointer text-lg`}>X</button>
             </div>
-            <div className="p-4 flex-1 overflow-y-auto bg-slate-950 rounded-lg">
-              <pre className="font-mono text-[10px] text-slate-300 leading-relaxed whitespace-pre-wrap">
+            <div className="p-4 flex-1 overflow-y-auto bg-[var(--card,#020617)] rounded-lg">
+              <pre className="font-mono text-[10px] text-[var(--card,#CBD5E1)] leading-relaxed whitespace-pre-wrap">
                 {logsJob.logs.length === 0
                   ? `[?] ${t('knowledge.graph_builder.logs_unavailable')}\n→ ${t('knowledge.graph_builder.logs_hint')}`
                   : logsJob.logs.join('\n')}

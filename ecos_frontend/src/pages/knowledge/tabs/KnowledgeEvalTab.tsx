@@ -185,22 +185,22 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-3">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.divider} pb-4 gap-3`}>
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <Gauge size={16} className="text-amber-600" />
             {tl('知识质量评测', 'Knowledge Quality Eval')}
           </h2>
-          <p className="text-xs text-slate-500">{tl('Recall@5 · MRR@5 · NDCG@5 · 幻觉率/引用率（后端不可用时降级本地）', 'Recall@5 · MRR@5 · NDCG@5 · Hallucination/Citation (degraded local on backend off)')}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{tl('Recall@5 · MRR@5 · NDCG@5 · 幻觉率/引用率（后端不可用时降级本地）', 'Recall@5 · MRR@5 · NDCG@5 · Hallucination/Citation (degraded local on backend off)')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* 左侧：seed 集合 */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
+            <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
+              <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
                 <Upload size={13} className="text-amber-500" /> {tl('Seed Query 集合', 'Seed Query Set')} ({seeds.length})
               </h3>
               <label className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-[11px] cursor-pointer">
@@ -215,22 +215,22 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
                 />
               </label>
             </div>
-            <div className="text-[9px] text-slate-400 font-mono">
+            <div className={`text-[9px] ${styles.cardTextMuted} font-mono`}>
               {tl('格式：CSV 每行 question|chunkA|chunkB；JSON 数组 [{id,question,labeledChunkIds[]}]', 'Format: CSV per-line question|chunkA|chunkB; JSON [{id,question,labeledChunkIds[]}]')}
             </div>
             <div className="space-y-1.5 max-h-96 overflow-y-auto">
               {seeds.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">{tl('暂无数集，点击「上传 CSV/JSON」开始', 'No seeds yet — click "Upload CSV/JSON" to start')}</div>
+                <div className={`py-8 text-center ${styles.cardTextMuted} text-xs`}>{tl('暂无数集，点击「上传 CSV/JSON」开始', 'No seeds yet — click "Upload CSV/JSON" to start')}</div>
               ) : seeds.map(s => (
-                <div key={s.id} className="p-2 bg-slate-50 border border-slate-150 rounded-lg flex items-center gap-2 hover:bg-slate-100/70 transition">
+                <div key={s.id} className={`p-2 ${styles.appBg} border ${styles.divider} rounded-lg flex items-center gap-2 hover:bg-blue-50/20 transition`}>
                   <ListChecks size={12} className="text-amber-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-slate-800 truncate">{s.question}</p>
+                    <p className={`text-[11px] font-bold ${styles.cardText} truncate`}>{s.question}</p>
                     {s.labeledChunkIds && s.labeledChunkIds.length > 0 && (
-                      <p className="text-[9px] font-mono text-slate-400 truncate">{s.labeledChunkIds.join(', ')}</p>
+                      <p className={`text-[9px] font-mono ${styles.cardTextMuted} truncate`}>{s.labeledChunkIds.join(', ')}</p>
                     )}
                   </div>
-                  <button onClick={() => handleDeleteSeed(s.id)} className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer text-xs">✕</button>
+                  <button onClick={() => handleDeleteSeed(s.id)} className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 hover:text-rose-500 cursor-pointer text-xs`}>✕</button>
                 </div>
               ))}
             </div>
@@ -242,7 +242,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
           <button
             onClick={handleRun}
             disabled={isRunning || seeds.length === 0}
-            className="w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-2 disabled:cursor-not-allowed shadow-sm"
+            className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-2 disabled:cursor-not-allowed shadow-sm disabled:opacity-50"
           >
             {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
             {isRunning ? tl('正在跑评测...', 'Running eval...') : tl('运行评测', 'Run Eval')}
@@ -250,13 +250,13 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 
           {activeReport && (
             <div className={`border rounded-xl p-4 space-y-3 ${
-              activeReport.degraded ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'
+              activeReport.degraded ? 'bg-amber-50 border-amber-200' : `${styles.cardBg} border ${styles.cardBorder}`
             }`}>
-              <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
+              <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
+                <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
                   <FlaskConical size={13} className="text-amber-500" /> {tl('最新报告', 'Latest Report')}
                 </h3>
-                <span className="text-[9px] font-mono text-slate-400">{activeReport.reportId}</span>
+                <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>{activeReport.reportId}</span>
               </div>
               {activeReport.degraded && (
                 <p className="text-[10px] text-amber-700 bg-amber-100 border border-amber-200 rounded p-1.5">
@@ -270,45 +270,45 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold">{tl('幻觉率 (LLM 自评)', 'Hallucination (LLM self-score)')}</span>
-                    <span className="text-[10px] font-mono font-bold text-slate-600">
+                    <span className={`text-[10px] font-mono font-bold ${styles.cardText}`}>
                       {activeReport.hallucinationRate != null ? (activeReport.hallucinationRate * 100).toFixed(1) + '%' : tl('等待后端', 'awaiting backend')}
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`w-full h-2 ${styles.appBg} rounded-full overflow-hidden`}>
                     <div className="h-full bg-rose-400 rounded-full" style={{ width: `${(activeReport.hallucinationRate ?? 0) * 100}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold">{tl('引用率', 'Citation Rate')}</span>
-                    <span className="text-[10px] font-mono font-bold text-slate-600">
+                    <span className={`text-[10px] font-mono font-bold ${styles.cardText}`}>
                       {activeReport.citationRate != null ? (activeReport.citationRate * 100).toFixed(1) + '%' : tl('等待后端', 'awaiting backend')}
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`w-full h-2 ${styles.appBg} rounded-full overflow-hidden`}>
                     <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(activeReport.citationRate ?? 0) * 100}%` }} />
                   </div>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">{new Date(activeReport.printedAt).toLocaleString()}</p>
+              <p className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{new Date(activeReport.printedAt).toLocaleString()}</p>
             </div>
           )}
 
           {reports.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-              <h3 className="font-extrabold text-slate-700 text-xs border-b border-slate-100 pb-2">{tl('历史报告', 'History')} ({reports.length})</h3>
+            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-2`}>
+              <h3 className={`font-extrabold ${styles.cardText} text-xs border-b ${styles.divider} pb-2`}>{tl('历史报告', 'History')} ({reports.length})</h3>
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 {reports.map((r, i) => (
                   <button
                     key={r.reportId}
                     onClick={() => setActiveReport(r)}
-                    className={`w-full text-left p-2 rounded-lg hover:bg-slate-50 transition flex items-center justify-between gap-2 ${
+                    className={`w-full text-left p-2 rounded-lg hover:bg-blue-50/20 transition flex items-center justify-between gap-2 ${
                       activeReport?.reportId === r.reportId ? 'bg-amber-50 border border-amber-200' : ''
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-mono text-slate-500 truncate">{r.seedSetName}</p>
-                      <p className="text-[9px] text-slate-400">{new Date(r.printedAt).toISOString().substring(0, 16)}</p>
+                      <p className={`text-[10px] font-mono ${styles.cardTextMuted} truncate`}>{r.seedSetName}</p>
+                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{new Date(r.printedAt).toISOString().substring(0, 16)}</p>
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <span className="text-[9px] font-mono text-amber-600">R{(r.recallAt5 * 100).toFixed(0)}</span>
@@ -327,14 +327,15 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 }
 
 function MetricBar({ label, value }: { label: string; value: number }) {
+  const { styles } = useTheme();
   const display = value != null ? `${(value * 100).toFixed(1)}%` : '-';
   return (
     <div>
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold">{label}</span>
-        <span className="text-[10px] font-mono font-bold text-slate-700">{display}</span>
+        <span className={`text-[10px] font-mono font-bold ${styles.cardText}`}>{display}</span>
       </div>
-      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className={`w-full h-2 ${styles.appBg} rounded-full overflow-hidden`}>
         <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(value ?? 0) * 100}%` }} />
       </div>
     </div>

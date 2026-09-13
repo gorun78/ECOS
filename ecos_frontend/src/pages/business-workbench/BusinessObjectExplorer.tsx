@@ -706,7 +706,7 @@ export default function BusinessObjectExplorer({
                 className={`w-full text-left py-2 px-2.5 rounded-lg flex items-center justify-between transition-all group ${
                   isActive
                     ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                    : `${styles.cardTextMuted} hover:bg-slate-100`
+                    : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
@@ -846,7 +846,7 @@ export default function BusinessObjectExplorer({
               <div className="relative ml-auto flex items-center gap-2">
                 <button
                   onClick={() => setShowFilterCreator(!showFilterCreator)}
-                  className={`${styles.cardBg} border ${styles.inputBorder} ${styles.inputText} hover:bg-slate-50 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
+                  className={`${styles.cardBg} border ${styles.inputBorder} ${styles.inputText} hover:bg-blue-50/20 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
                 >
                   <LucideIcon name="Plus" size={11} />
                   添加筛选过滤器
@@ -904,14 +904,14 @@ export default function BusinessObjectExplorer({
                     <div className="flex justify-end gap-1.5 pt-1">
                       <button
                         onClick={() => setShowFilterCreator(false)}
-                        className={`h-7 px-2.5 rounded text-[10px] bg-slate-100 hover:bg-slate-200 ${styles.cardTextMuted}`}
+                        className={`h-7 px-2.5 rounded text-[10px] ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted}`}
                       >
                         取消
                       </button>
                       <button
                         onClick={handleAddFilter}
                         disabled={!newFilterProp}
-                        className="h-7 px-3 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white disabled:bg-slate-200 disabled:cursor-not-allowed"
+                        className="h-7 px-3 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         应用规则
                       </button>
@@ -1017,14 +1017,14 @@ export default function BusinessObjectExplorer({
                                     setSortBy(prop.id);
                                     setSortOrder(isSorting && sortOrder === 'asc' ? 'desc' : 'asc');
                                   }}
-                                  className="py-2.5 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                  className="py-2.5 px-4 cursor-pointer hover:bg-blue-50/20 transition-colors"
                                 >
                                   <div className="flex items-center gap-1">
                                     <span>{prop.displayName}</span>
                                     {isSorting ? (
                                       <LucideIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className="text-blue-600" />
                                     ) : (
-                                      <LucideIcon name="ChevronsUpDown" size={10} className="text-slate-300 group-hover:text-slate-500" />
+                                      <LucideIcon name="ChevronsUpDown" size={10} className={styles.cardTextMuted} />
                                     )}
                                   </div>
                                 </th>
@@ -1049,7 +1049,7 @@ export default function BusinessObjectExplorer({
                                     setSelectedInstance(inst);
                                     setDetailTab('properties');
                                   }}
-                                  className={`hover:bg-slate-50/70 cursor-pointer transition-colors ${
+                                  className={`hover:bg-blue-50/20 cursor-pointer transition-colors ${
                                     isSelected ? 'bg-blue-50/40 text-blue-950 font-medium border-l-2 border-blue-600' : ''
                                   }`}
                                 >
@@ -1067,7 +1067,7 @@ export default function BusinessObjectExplorer({
                                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                             val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
                                             val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800 font-semibold' :
-                                            `bg-slate-100 ${styles.sidebarText}`
+                                            `${styles.appBg} ${styles.cardTextMuted}`
                                           }`}>
                                             {String(val ?? '')}
                                           </span>
@@ -1126,7 +1126,7 @@ export default function BusinessObjectExplorer({
                                   <span className={`font-medium ${styles.cardText} group-hover:text-blue-600 font-mono transition-colors`}>{item.name}</span>
                                   <span className={`${styles.cardTextMuted} font-mono`}><strong>{item.count}</strong> 个 ({item.percentage}%)</span>
                                 </div>
-                                <div className="h-4 w-full bg-slate-100 rounded overflow-hidden flex">
+                                <div className={`h-4 w-full ${styles.appBg} rounded overflow-hidden flex`}>
                                   <div
                                     style={{ width: `${item.percentage}%` }}
                                     className="bg-blue-600 group-hover:bg-blue-500 transition-all rounded-r duration-500"
@@ -1150,7 +1150,7 @@ export default function BusinessObjectExplorer({
                             </thead>
                             <tbody className={`divide-y ${styles.divider} ${styles.sidebarText}`}>
                               {(analyticsData as any).data?.map((item: any) => (
-                                <tr key={item.name} className="hover:bg-slate-50">
+                                <tr key={item.name} className="hover:bg-blue-50/20">
                                   <td className={`py-2 font-mono ${styles.cardText} font-medium`}>{item.name}</td>
                                   <td className={`py-2 text-right font-mono font-semibold ${styles.text}`}>{item.count}</td>
                                   <td className={`py-2 text-right font-mono ${styles.cardTextMuted}`}>{item.percentage}%</td>
@@ -1190,7 +1190,7 @@ export default function BusinessObjectExplorer({
                       </div>
                       <button
                         onClick={() => setSelectedInstance(null)}
-                        className={`p-1 rounded hover:bg-slate-200 ${styles.cardTextMuted} hover:${styles.text}`}
+                        className={`p-1 rounded hover:bg-blue-50/20 ${styles.cardTextMuted} opacity-80 hover:opacity-100 transition-opacity`}
                       >
                         <LucideIcon name="X" size={14} />
                       </button>
@@ -1223,11 +1223,11 @@ export default function BusinessObjectExplorer({
                   </div>
 
                   {/* Panel Tab switch */}
-                  <div className="flex border-b border-slate-100 px-2 text-[11px] font-medium bg-slate-50/20">
+                  <div className={`flex border-b ${styles.divider} px-2 text-[11px] font-medium ${styles.appBg}`}>
                     <button
                       onClick={() => setDetailTab('properties')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'properties' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+                        detailTab === 'properties' ? 'border-blue-600 text-blue-700 font-bold' : `border-transparent ${styles.cardTextMuted} opacity-80 hover:opacity-100`
                       }`}
                     >
                       实体属性 (Properties)
@@ -1235,7 +1235,7 @@ export default function BusinessObjectExplorer({
                     <button
                       onClick={() => setDetailTab('relations')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all flex items-center justify-center gap-1 ${
-                        detailTab === 'relations' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+                        detailTab === 'relations' ? 'border-blue-600 text-blue-700 font-bold' : `border-transparent ${styles.cardTextMuted} opacity-80 hover:opacity-100`
                       }`}
                     >
                       关联探索 ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
@@ -1243,7 +1243,7 @@ export default function BusinessObjectExplorer({
                     <button
                       onClick={() => setDetailTab('activity')}
                       className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'activity' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+                        detailTab === 'activity' ? 'border-blue-600 text-blue-700 font-bold' : `border-transparent ${styles.cardTextMuted} opacity-80 hover:opacity-100`
                       }`}
                     >
                       事件记录
@@ -1275,7 +1275,7 @@ export default function BusinessObjectExplorer({
                                   <span className={`px-1.5 py-0.5 rounded text-[10px] ${
                                     val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
                                     val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800' :
-                                    `bg-slate-100 ${styles.sidebarText}`
+                                    `${styles.appBg} ${styles.cardTextMuted}`
                                   }`}>
                                     {String(val ?? 'N/A')}
                                   </span>
@@ -1425,14 +1425,14 @@ export default function BusinessObjectExplorer({
             <div className="flex justify-end gap-2 pt-1 text-[11px]">
               <button
                 onClick={() => setShowSaveModal(false)}
-                className={`h-8 px-3 rounded bg-slate-100 hover:bg-slate-200 ${styles.cardTextMuted} font-semibold`}
+                className={`h-8 px-3 rounded ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted} font-semibold`}
               >
                 取消
               </button>
               <button
                 onClick={handleSaveSearch}
                 disabled={!newSearchName.trim()}
-                className="h-8 px-4 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:bg-slate-200 disabled:cursor-not-allowed"
+                className="h-8 px-4 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 确定保存
               </button>
@@ -1476,7 +1476,7 @@ export default function BusinessObjectExplorer({
                         type="text"
                         disabled
                         value={actionParams[param.id] || ''}
-                        className={`w-full h-8 text-[11px] bg-slate-100 border ${styles.inputBorder} rounded px-2.5 ${styles.cardTextMuted} font-mono`}
+                        className={`w-full h-8 text-[11px] ${styles.sidebarBg} border ${styles.inputBorder} rounded px-2.5 ${styles.cardTextMuted} font-mono`}
                       />
                     ) : param.id === 'new_status_param' ? (
                       <select
@@ -1534,13 +1534,13 @@ export default function BusinessObjectExplorer({
             <div className={`flex justify-end gap-2 pt-2 border-t ${styles.divider} text-[11px]`}>
               <button
                 onClick={() => setSelectedAction(null)}
-                className={`h-8 px-3 rounded bg-slate-100 hover:bg-slate-200 ${styles.cardTextMuted} font-semibold`}
+                className={`h-8 px-3 rounded ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted} font-semibold`}
               >
                 取消
               </button>
               <button
                 onClick={handleExecuteAction}
-                className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold flex items-center gap-1"
+                className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-white font-semibold flex items-center gap-1"
               >
                 <LucideIcon name="CheckCircle" size={12} />
                 <span>执行写回 (Execute)</span>

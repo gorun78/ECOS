@@ -372,7 +372,7 @@ export default function ObjectTypeView({
                       <td className="py-2.5 px-4 text-center">
                         <button
                           onClick={() => handleRemoveProperty(prop.id)}
-                          className={`text-xs ${styles.cardTextMuted} hover:text-red-500 p-1 rounded hover:bg-slate-100 transition-colors`}
+                          className={`text-xs ${styles.cardTextMuted} hover:text-red-500 p-1 rounded hover:bg-blue-50/20 transition-colors`}
                           title="删除属性"
                         >
                           <LucideIcon name="X" size={14} />
@@ -466,7 +466,7 @@ export default function ObjectTypeView({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">界面显示图标 (Lucide Icon)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>界面显示图标 (Lucide Icon)</label>
                 <select
                   value={objectType.icon}
                   onChange={e => handleMetaChange('icon', e.target.value)}
@@ -484,7 +484,7 @@ export default function ObjectTypeView({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">视觉主题颜色 (Color Theme)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>视觉主题颜色 (Color Theme)</label>
                 <select
                   value={objectType.color}
                   onChange={e => handleMetaChange('color', e.target.value)}
@@ -502,13 +502,13 @@ export default function ObjectTypeView({
 
             {/* Implements Interfaces */}
             <div className="space-y-2 border-t border-gray-100 pt-4">
-              <label className="text-xs font-semibold text-slate-700 block">实现的接口 (Implements Interfaces)</label>
+              <label className={`text-xs font-semibold ${styles.cardText} block`}>实现的接口 (Implements Interfaces)</label>
               <div className="flex flex-wrap gap-2">
                 {interfaces.map(intf => {
                   const isChecked = (objectType.interfaces || []).includes(intf.id);
                   return (
                     <label key={intf.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer select-none transition-colors ${
-                      isChecked ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-50'
+                      isChecked ? 'bg-blue-50 border-blue-300 text-blue-700' : `${styles.cardBg} border ${styles.inputBorder} ${styles.cardTextMuted} hover:bg-blue-50/20`
                     }`}>
                       <input
                         type="checkbox"
@@ -528,7 +528,7 @@ export default function ObjectTypeView({
                   );
                 })}
               </div>
-              <p className="text-[10px] text-slate-400">对象类型通过实现特定接口，将继承该接口规范的一系列属性和行为逻辑。</p>
+              <p className={`text-[10px] ${styles.cardTextMuted}`}>对象类型通过实现特定接口，将继承该接口规范的一系列属性和行为逻辑。</p>
             </div>
           </div>
         )}
@@ -556,7 +556,7 @@ export default function ObjectTypeView({
                 </select>
                 <button
                   onClick={handleAutoMap}
-                  className={`bg-slate-200 hover:bg-slate-300 ${styles.cardText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
+                  className={`bg-[var(--card,#94A3B8)] hover:bg-[var(--card,#64748B)] ${styles.cardText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
                 >
                   <LucideIcon name="Wand2" size={13} />
                   智能映射
@@ -579,7 +579,7 @@ export default function ObjectTypeView({
                 </div>
                 <div className={`border ${styles.appBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
                   {selectedDataset?.columns.map(col => (
-                    <div key={col.name} className="flex justify-between items-center px-4 py-2.5 hover:bg-slate-50/50">
+                    <div key={col.name} className="flex justify-between items-center px-4 py-2.5 hover:bg-blue-50/20">
                       <div className={`font-mono text-xs font-medium ${styles.cardTextMuted}`}>{col.name}</div>
                       <div className={`text-[10px] ${styles.cardTextMuted} font-mono italic uppercase ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>
                         {col.type}
@@ -604,7 +604,7 @@ export default function ObjectTypeView({
                   {objectType.properties.map(prop => {
                     const mappedCol = objectType.mapping.propertyMappings[prop.id] || '';
                     return (
-                      <div key={prop.id} className={`flex justify-between items-center px-4 py-2.5 ${styles.cardBg} hover:bg-slate-50/50`}>
+                      <div key={prop.id} className={`flex justify-between items-center px-4 py-2.5 ${styles.cardBg} hover:bg-blue-50/20`}>
                         <div className="flex items-center gap-2">
                           <span className={objectType.primaryKey === prop.id ? 'text-amber-500' : styles.cardTextMuted}>
                             <LucideIcon name={objectType.primaryKey === prop.id ? 'Key' : 'CircleDot'} size={12} />

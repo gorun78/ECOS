@@ -207,7 +207,7 @@ export default function KnowledgeComplianceCheckTab() {
         <div className="lg:col-span-5 space-y-4">
           {/* 业务对象选择 */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
-            <div className="flex items-center gap-2 border-b border-slate-150 pb-2">
+            <div className={`flex items-center gap-2 border-b ${styles.divider} pb-2`}>
               <span className="p-1.5 rounded bg-indigo-50 text-indigo-600">
                 <Search size={13} />
               </span>
@@ -233,7 +233,7 @@ export default function KnowledgeComplianceCheckTab() {
 
           {/* 事实输入 */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
-            <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+            <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
               <div className="flex items-center gap-2">
                 <span className="p-1.5 rounded bg-violet-50 text-violet-600">
                   <FileText size={13} />
@@ -372,7 +372,7 @@ export default function KnowledgeComplianceCheckTab() {
             <>
               {/* 总结卡片 */}
               <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs`}>
-                <div className="flex items-center justify-between border-b border-slate-150 pb-3 mb-3">
+                <div className={`flex items-center justify-between border-b ${styles.divider} pb-3 mb-3`}>
                   <h3 className={`font-bold ${styles.cardText} text-xs flex items-center gap-2`}>
                     <ClipboardCheck size={13} className="text-indigo-600" />
                     {t("knowledge.knowledgecompli.251")}
@@ -387,7 +387,7 @@ export default function KnowledgeComplianceCheckTab() {
                 </div>
 
                 <div className="flex gap-4">
-                  <div className="flex-1 bg-slate-50 rounded-lg p-3 text-center">
+                  <div className={`flex-1 ${styles.appBg} rounded-lg p-3 text-center`}>
                     <div className={`text-lg font-black ${styles.cardText}`}>{results.summary.total}</div>
                     <div className={`text-[9px] ${styles.muted} font-bold uppercase`}>{t("knowledge.knowledgecompli.235")}</div>
                   </div>
@@ -407,7 +407,7 @@ export default function KnowledgeComplianceCheckTab() {
                 {results.results.map((r) => (
                   <div
                     key={r.ruleId}
-                    className={`bg-white border rounded-xl shadow-xs overflow-hidden ${
+                    className={`${styles.cardBg} border rounded-xl shadow-xs overflow-hidden ${
                       r.passed ? 'border-emerald-200' : 'border-red-200'
                     }`}
                   >
@@ -424,7 +424,7 @@ export default function KnowledgeComplianceCheckTab() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={`font-bold ${styles.cardText} text-xs truncate`}>{r.ruleName}</span>
-                          <span className={`text-[9px] font-mono ${styles.muted} bg-slate-100 px-1.5 py-0.5 rounded shrink-0`}>
+                          <span className={`text-[9px] font-mono ${styles.muted} ${styles.sidebarBg} px-1.5 py-0.5 rounded shrink-0`}>
                             {r.ruleId}
                           </span>
                         </div>
@@ -451,7 +451,7 @@ export default function KnowledgeComplianceCheckTab() {
 
                     {/* 推理链 (展开详情) */}
                     {expandedRules.has(r.ruleId) && (
-                      <div className="border-t border-slate-150 bg-slate-50 px-4 py-3 space-y-2">
+                      <div className={`border-t ${styles.divider} ${styles.appBg} px-4 py-3 space-y-2`}>
                         {/* 推理链路图 */}
                         <div className={`text-[9px] font-extrabold ${styles.muted} uppercase tracking-wider`}>
                           {t("knowledge.knowledgecompli.258")}:
@@ -478,8 +478,8 @@ export default function KnowledgeComplianceCheckTab() {
                           >
                             {t("knowledge.knowledgecompli.239")}
                           </span>
-                          <ChevronRight size={10} className="text-slate-400" />
-                          <span className={`px-2 py-0.5 bg-slate-200 ${styles.muted} font-mono rounded`}>
+                          <ChevronRight size={10} className={styles.muted} />
+                          <span className={`px-2 py-0.5 ${styles.sidebarBg} ${styles.muted} font-mono rounded`}>
                             {t("knowledge.knowledgecompli.240")}
                           </span>
                         </div>
@@ -505,7 +505,7 @@ export default function KnowledgeComplianceCheckTab() {
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                       : v === 'false'
                                         ? 'bg-red-50 text-red-700 border border-red-200'
-                                        : `bg-slate-100 ${styles.muted} border border-slate-200`
+                                        : `${styles.sidebarBg} ${styles.muted} border ${styles.cardBorder}`
                                   }`}
                                 >
                                   {k}: {v}

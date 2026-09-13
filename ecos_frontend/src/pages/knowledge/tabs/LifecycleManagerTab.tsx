@@ -119,24 +119,24 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-3">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.divider} pb-4 gap-3`}>
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <GitBranch size={16} className="text-indigo-600" />
             {tl('生命周期管理（状态机 + 审计）', 'Lifecycle Management (State Machine + Audit)')}
           </h2>
-          <p className="text-xs text-slate-500">{tl('draft → active → deprecated → archived · 每行状态变更写 kb_lifecycle_audit', '')}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{tl('draft → active → deprecated → archived · 每行状态变更写 kb_lifecycle_audit', '')}</p>
         </div>
         <button onClick={loadAssets} disabled={isLoading}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50">
+          className={`px-3 py-1.5 ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50`}>
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
           {tl('刷新资产', 'Refresh')}
         </button>
       </div>
 
       {/* 状态机图示 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4`}>
+        <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider mb-3 flex items-center gap-1.5`}>
           <GitBranch size={12} /> {tl('状态机', 'STATE MACHINE')}
         </h3>
         <div className="flex items-center gap-3 flex-wrap">
@@ -146,13 +146,13 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
                 s === 'draft' ? 'bg-amber-50 border-amber-200' :
                 s === 'active' ? 'bg-emerald-50 border-emerald-200' :
                 s === 'deprecated' ? 'bg-rose-50 border-rose-200' :
-                'bg-slate-50 border-slate-200'
+                `${styles.appBg} border ${styles.cardBorder}`
               }`}>
                 <span className={`w-2 h-2 rounded-full ${STATE_COLOR[s].dot}`} />
                 <span className={`text-xs font-bold ${STATE_COLOR[s].nameColor}`}>{s}</span>
               </div>
               {i < LIFECYCLE_STATES.length - 1 && (
-                <span className="text-slate-300 font-bold">→</span>
+                <span className={`${styles.cardTextMuted} font-bold`}>→</span>
               )}
             </React.Fragment>
           ))}
@@ -160,17 +160,17 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
       </div>
 
       {/* 资产表 */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-700">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden`}>
+        <div className={`px-4 py-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
+          <span className={`text-xs font-bold ${styles.cardText}`}>
             {tl('资产列表', 'Assets')} ({assets.length})
           </span>
-          <span className="text-[9px] font-mono text-slate-400">{assets.length === 0 ? tl('/assets 待 PMO-56 后端提供', '/assets endpoint awaiting PMO-56') : tl('加载自 /api/v1/knowledge/assets', 'loaded from /api/v1/knowledge/assets')}</span>
+          <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>{assets.length === 0 ? tl('/assets 待 PMO-56 后端提供', '/assets endpoint awaiting PMO-56') : tl('加载自 /api/v1/knowledge/assets', 'loaded from /api/v1/knowledge/assets')}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-400 border-b border-slate-200">
+              <tr className={`${styles.appBg} ${styles.cardTextMuted} border-b ${styles.cardBorder}`}>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">ID</th>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('名称', 'Name')}</th>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('类型', 'Type')}</th>
@@ -182,32 +182,32 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-400">{tl('加载中...', 'Loading...')}</td></tr>
+                <tr><td colSpan={7} className={`p-8 text-center ${styles.cardTextMuted}`}>{tl('加载中...', 'Loading...')}</td></tr>
               ) : assets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-400 text-xs space-y-2">
-                    <Archive size={24} className="mx-auto text-slate-300" />
+                  <td colSpan={7} className={`p-12 text-center ${styles.cardTextMuted} text-xs space-y-2`}>
+                    <Archive size={24} className={`mx-auto ${styles.cardTextMuted}`} />
                     <p>{tl('暂无生命周期资产', 'No lifecycle assets')}</p>
-                    <p className="text-[10px] font-mono text-slate-300">/api/v1/knowledge/assets · {tl('PMO-56 待补', 'PMO-56 pending')}</p>
+                    <p className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/api/v1/knowledge/assets · {tl('PMO-56 待补', 'PMO-56 pending')}</p>
                   </td>
                 </tr>
               ) : assets.map(asset => (
-                <tr key={asset.id} className="border-b border-slate-100 hover:bg-slate-50/40">
-                  <td className="p-3 font-mono font-bold text-slate-700">{asset.id}</td>
-                  <td className="p-3 text-slate-700">{asset.name}</td>
-                  <td className="p-3 text-slate-500 font-mono text-[10px]">{asset.type}</td>
+                <tr key={asset.id} className={`border-b ${styles.divider} hover:bg-blue-50/20`}>
+                  <td className={`p-3 font-mono font-bold ${styles.cardText}`}>{asset.id}</td>
+                  <td className={`p-3 ${styles.cardText}`}>{asset.name}</td>
+                  <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{asset.type}</td>
                   <td className="p-3">
                     <span className="inline-flex items-center gap-1.5">
                       <span className={`w-2 h-2 rounded-full ${STATE_COLOR[asset.state].dot}`} />
                       <span className={`font-bold ${STATE_COLOR[asset.state].nameColor}`}>{asset.state}</span>
                     </span>
                   </td>
-                  <td className="p-3 text-slate-500 font-mono text-[10px]">{asset.updatedAt}</td>
+                  <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{asset.updatedAt}</td>
                   <td className="p-3">
                     <select
                       value={asset.state}
                       onChange={e => handleTransition(asset, e.target.value as LifecycleState)}
-                      className="px-2 py-1 border border-slate-200 rounded text-[10px] font-bold bg-white cursor-pointer"
+                      className={`px-2 py-1 border ${styles.inputBorder} rounded text-[10px] font-bold ${styles.cardBg} cursor-pointer`}
                     >
                       {LIFECYCLE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -216,14 +216,14 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
                     <div className="flex gap-1.5 justify-end">
                       {asset.state === 'archived' && (
                         <button onClick={() => handleRestore(asset)}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 cursor-pointer rounded hover:bg-slate-100"
+                          className={`p-1.5 ${styles.cardTextMuted} opacity-80 hover:opacity-100 hover:text-emerald-600 cursor-pointer rounded hover:bg-blue-50/20`}
                           title={tl('恢复', 'Restore to active')}>
                           <ArchiveRestore size={13} />
                         </button>
                       )}
                       {asset.state !== 'archived' && (
                         <button onClick={() => handlePhysicalDelete(asset)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer rounded hover:bg-slate-100"
+                          className={`p-1.5 ${styles.cardTextMuted} opacity-80 hover:opacity-100 hover:text-rose-600 cursor-pointer rounded hover:bg-blue-50/20`}
                           title={tl('物理删除（实际为软删 → archived）', 'Physical delete (soft → archived)')}>
                           <Trash2 size={13} />
                         </button>
@@ -238,28 +238,28 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
       </div>
 
       {/* 审计日志 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
+        <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
+          <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
             <CheckCircle2 size={13} className="text-indigo-500" /> {tl('操作审计日志 (kb_lifecycle_audit)', 'Audit Trail (kb_lifecycle_audit)')} ({audit.length})
           </h3>
-          <span className="text-[9px] font-mono text-slate-400">
+          <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>
             {audit.length === 0 ? tl('后端 /lifecycle/audit 待 PMO-56 后端提供，目前仅本地 localStorage 记录', 'Backend /lifecycle/audit awaiting PMO-56; recording locally via localStorage') : tl('加载自 /lifecycle/audit', 'from /lifecycle/audit')}
           </span>
         </div>
         <div className="space-y-1.5 max-h-64 overflow-y-auto">
           {isAuditing ? (
-            <div className="py-8 text-center text-slate-400 text-xs">{tl('加载中...', 'Loading...')}</div>
+            <div className={`py-8 text-center ${styles.cardTextMuted} text-xs`}>{tl('加载中...', 'Loading...')}</div>
           ) : audit.length === 0 ? (
-            <p className="py-8 text-center text-slate-400 text-xs">{tl('暂无审计记录', 'No audit entries yet')}</p>
+            <p className={`py-8 text-center ${styles.cardTextMuted} text-xs`}>{tl('暂无审计记录', 'No audit entries yet')}</p>
           ) : audit.map(a => (
-            <div key={a.id} className="p-2 bg-slate-50 border border-slate-150 rounded-lg flex items-center gap-2 text-[10px]">
-              <span className="font-mono text-slate-400 w-40 shrink-0">{new Date(a.at).toLocaleString()}</span>
-              <span className="font-bold text-slate-700 w-36 truncate">{a.assetId}</span>
-              <span className={`px-1.5 rounded ${STATE_COLOR[a.from].nameColor} bg-white border border-slate-200 font-bold`}>{a.from}</span>
-              <span className="text-slate-400">→</span>
-              <span className={`px-1.5 rounded ${STATE_COLOR[a.to].nameColor} bg-white border border-slate-200 font-bold`}>{a.to}</span>
-              <span className="font-mono text-slate-400 ml-auto">{a.operator}</span>
+            <div key={a.id} className={`p-2 ${styles.appBg} border ${styles.divider} rounded-lg flex items-center gap-2 text-[10px]`}>
+              <span className={`font-mono ${styles.cardTextMuted} w-40 shrink-0`}>{new Date(a.at).toLocaleString()}</span>
+              <span className={`font-bold ${styles.cardText} w-36 truncate`}>{a.assetId}</span>
+              <span className={`px-1.5 rounded ${STATE_COLOR[a.from].nameColor} ${styles.cardBg} border ${styles.cardBorder} font-bold`}>{a.from}</span>
+              <span className={styles.cardTextMuted}>→</span>
+              <span className={`px-1.5 rounded ${STATE_COLOR[a.to].nameColor} ${styles.cardBg} border ${styles.cardBorder} font-bold`}>{a.to}</span>
+              <span className={`font-mono ${styles.cardTextMuted} ml-auto`}>{a.operator}</span>
             </div>
           ))}
         </div>

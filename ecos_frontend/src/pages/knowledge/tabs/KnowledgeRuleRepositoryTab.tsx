@@ -204,7 +204,7 @@ export default function KnowledgeRuleRepositoryTab() {
                             <ScrollText size={10} /> {chapter.name}
                           </button>
                           {isChapOpen && (
-                            <div className="ml-4 space-y-0.5 border-l-2 border-slate-100 pl-2">
+                            <div className={`ml-4 space-y-0.5 border-l-2 ${styles.divider} pl-2`}>
                               {chapter.clauses.map(clause => {
                                 const isActive = selectedClause === clause.name;
                                 const count = ruleCountForClause(clause.name);
@@ -214,7 +214,7 @@ export default function KnowledgeRuleRepositoryTab() {
                                       isActive ? 'bg-amber-50 text-amber-700 font-bold' : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                                     }`}>
                                     <FileText size={9} /> {clause.name}
-                                    {count > 0 && <span className="ml-auto text-[8px] bg-slate-100 px-1 rounded">{count}</span>}
+                                    {count > 0 && <span className={`ml-auto text-[8px] ${styles.sidebarBg} px-1 rounded`}>{count}</span>}
                                   </button>
                                 );
                               })}
@@ -258,7 +258,7 @@ export default function KnowledgeRuleRepositoryTab() {
                     <span className={`text-sm font-medium ${styles.cardText}`}>{rule.name}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusColor(rule.status)}`}>{rule.status}</span>
                     {rule.regulation && (
-                      <span className={`text-[9px] ${styles.muted} bg-slate-50 px-1.5 py-0.5 rounded`}>{rule.regulation}</span>
+                      <span className={`text-[9px] ${styles.muted} ${styles.appBg} px-1.5 py-0.5 rounded`}>{rule.regulation}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -284,7 +284,7 @@ export default function KnowledgeRuleRepositoryTab() {
                     {rule.condition && (
                       <div className="flex gap-4">
                         <span className={`${styles.cardTextMuted} w-16`}>IF</span>
-                        <span className={`font-mono ${styles.cardText} bg-slate-50 rounded px-2 py-0.5`}>{rule.condition}</span>
+                        <span className={`font-mono ${styles.cardText} ${styles.appBg} rounded px-2 py-0.5`}>{rule.condition}</span>
                       </div>
                     )}
                     {rule.action && (

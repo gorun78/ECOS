@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { FunctionType, FunctionParameter, ObjectType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
+import { useTheme } from '../../components/ThemeContext';
 
 interface FunctionTypeViewProps {
   func: FunctionType;
@@ -20,6 +21,7 @@ export default function FunctionTypeView({
   onUpdate,
   onDelete
 }: FunctionTypeViewProps) {
+  const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<'signature' | 'code' | 'test'>('code');
   const [newParamName, setNewParamName] = useState('');
   const [newParamType, setNewParamType] = useState<string>('string');
@@ -228,9 +230,9 @@ export class ${className} {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className={`flex flex-col h-full ${styles.cardBg}`}>
       {/* Detail Header */}
-      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+      <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700 flex items-center justify-center">
             <LucideIcon name="Code" size={20} />
@@ -241,12 +243,12 @@ export class ${className} {
                 type="text"
                 value={func.displayName}
                 onChange={e => handleFieldChange('displayName', e.target.value)}
-                className="text-lg font-semibold text-slate-900 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5"
+                className={`text-lg font-semibold ${styles.cardText} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5`}
               />
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+              <span className={`text-xs font-mono ${styles.appBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded`}>
                 {func.apiName}
               </span>
-              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-mono">
+              <span className={`text-xs ${styles.appBg} ${styles.cardTextMuted} px-2 py-0.5 rounded-full font-mono`}>
                 Returns {func.returnType === 'ObjectTypeSet' ? `Set<${func.returnObjectTypeId}>` : func.returnType}
               </span>
             </div>
@@ -254,7 +256,7 @@ export class ${className} {
               type="text"
               value={func.description}
               onChange={e => handleFieldChange('description', e.target.value)}
-              className="text-xs text-slate-500 mt-1 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]"
+              className={`text-xs ${styles.cardTextMuted} mt-1 border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]`}
               placeholder="添加函数的功能与作用描述"
             />
           </div>
@@ -269,7 +271,7 @@ export class ${className} {
       </div>
 
       {/* Tab bar */}
-      <div className="flex px-6 border-b border-gray-200 bg-white">
+      <div className={`flex px-6 border-b ${styles.appBorder} ${styles.cardBg}`}>
         {(['signature', 'code', 'test'] as const).map(tab => {
           const labels = {
             signature: '1. 签名与参数 (Signature)',
@@ -283,7 +285,7 @@ export class ${className} {
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  : `border-transparent ${styles.cardTextMuted} hover:opacity-100 opacity-80`
               }`}
             >
               {labels[tab]}
@@ -300,15 +302,15 @@ export class ${className} {
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
             {/* Signature Basic configuration */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-semibold text-slate-800">函数出参及归属 (Return Type / Output)</h3>
+            <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
+              <h3 className={`text-xs font-semibold ${styles.cardText}`}>函数出参及归属 (Return Type / Output)</h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-slate-600 block">返回参数类型 (Return Type)</label>
+                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>返回参数类型 (Return Type)</label>
                   <select
                     value={func.returnType}
                     onChange={e => handleFieldChange('returnType', e.target.value)}
-                    className="px-2.5 py-1.5 border border-gray-300 rounded bg-white w-full font-mono"
+                    className={`px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.inputBg} w-full font-mono`}
                   >
                     <option value="string">string (字符串)</option>
                     <option value="integer">integer (整数)</option>
@@ -324,11 +326,11 @@ export class ${className} {
                 {/* Bind to Object Type if returning Object/ObjectSet */}
                 {(func.returnType === 'ObjectType' || func.returnType === 'ObjectTypeSet') && (
                   <div className="space-y-1">
-                    <label className="text-[10px] font-medium text-slate-600 block">返回对象类型 (Target Object Type)</label>
+                    <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>返回对象类型 (Target Object Type)</label>
                     <select
                       value={func.returnObjectTypeId || ''}
                       onChange={e => handleFieldChange('returnObjectTypeId', e.target.value)}
-                      className="px-2.5 py-1.5 border border-gray-300 rounded bg-white w-full"
+                      className={`px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.inputBg} w-full`}
                     >
                       {objectTypes.map(ot => (
                         <option key={ot.id} value={ot.id}>{ot.displayName} ({ot.id})</option>
@@ -340,20 +342,20 @@ export class ${className} {
 
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-slate-600 block">API标识名称 (API Name)</label>
+                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>API标识名称 (API Name)</label>
                   <input
                     type="text"
                     value={func.apiName}
                     onChange={e => handleFieldChange('apiName', e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-gray-300 rounded bg-white font-mono focus:outline-hidden"
+                    className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.inputBg} font-mono focus:outline-hidden`}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-slate-600 block">关联的核心对象 (Associated Object Type)</label>
+                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>关联的核心对象 (Associated Object Type)</label>
                   <select
                     value={func.associatedObjectType || ''}
                     onChange={e => handleFieldChange('associatedObjectType', e.target.value)}
-                    className="px-2.5 py-1.5 border border-gray-300 rounded bg-white w-full"
+                    className={`px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.inputBg} w-full`}
                   >
                     <option value="">-- 无特定关联对象 (全局函数) --</option>
                     {objectTypes.map(ot => (
@@ -367,19 +369,19 @@ export class ${className} {
             {/* Input parameters configuration */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-semibold text-slate-800">定义函数入参 (Input Parameters)</h3>
+                <h3 className={`text-xs font-semibold ${styles.cardText}`}>定义函数入参 (Input Parameters)</h3>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     placeholder="新参数变量名 (e.g. airportCode)"
                     value={newParamName}
                     onChange={e => setNewParamName(e.target.value)}
-                    className="px-2.5 py-1 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden font-mono"
+                    className={`px-2.5 py-1 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden font-mono`}
                   />
                   <select
                     value={newParamType}
                     onChange={e => setNewParamType(e.target.value)}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-hidden font-mono"
+                    className={`px-2 py-1 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden font-mono`}
                   >
                     <option value="string">string</option>
                     <option value="integer">integer</option>
@@ -394,7 +396,7 @@ export class ${className} {
                     <select
                       value={newParamObjType}
                       onChange={e => setNewParamObjType(e.target.value)}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-hidden"
+                      className={`px-2 py-1 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden`}
                     >
                       {objectTypes.map(ot => (
                         <option key={ot.id} value={ot.id}>{ot.displayName}</option>
@@ -411,10 +413,10 @@ export class ${className} {
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className={`border ${styles.appBorder} rounded-lg overflow-hidden`}>
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-gray-200 text-slate-700 font-medium">
+                    <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardText} font-medium`}>
                       <th className="py-2.5 px-4 w-12">必选</th>
                       <th className="py-2.5 px-4">变量标识</th>
                       <th className="py-2.5 px-4">参数类型</th>
@@ -423,16 +425,16 @@ export class ${className} {
                       <th className="py-2.5 px-4 text-center">操作</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 text-slate-600">
+                  <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
                     {func.parameters.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-slate-400 italic">
+                        <td colSpan={6} className={`text-center py-8 ${styles.cardTextMuted} italic`}>
                           当前函数无输入参数，只能执行无参静态逻辑。
                         </td>
                       </tr>
                     ) : (
                       func.parameters.map(p => (
-                        <tr key={p.name} className="hover:bg-slate-50/50">
+                        <tr key={p.name} className="hover:bg-blue-50/20">
                           <td className="py-2.5 px-4">
                             <input
                               type="checkbox"
@@ -441,21 +443,21 @@ export class ${className} {
                               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
                             />
                           </td>
-                          <td className="py-2.5 px-4 font-mono font-medium text-slate-900">{p.name}</td>
-                          <td className="py-2.5 px-4 font-mono text-slate-500">{p.dataType}</td>
+                          <td className={`py-2.5 px-4 font-mono font-medium ${styles.cardText}`}>{p.name}</td>
+                          <td className={`py-2.5 px-4 font-mono ${styles.cardTextMuted}`}>{p.dataType}</td>
                           <td className="py-2.5 px-4">
                             {(p.dataType === 'ObjectType' || p.dataType === 'ObjectTypeSet') ? (
                               <select
                                 value={p.objectTypeId || ''}
                                 onChange={e => handleParamFieldChange(p.name, 'objectTypeId', e.target.value)}
-                                className="px-2 py-0.5 border border-gray-200 rounded bg-white focus:outline-hidden"
+                                className={`px-2 py-0.5 border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden`}
                               >
                                 {objectTypes.map(ot => (
                                   <option key={ot.id} value={ot.id}>{ot.displayName}</option>
                                 ))}
                               </select>
                             ) : (
-                              <span className="text-slate-400 font-mono">—</span>
+                              <span className={`${styles.muted} font-mono`}>—</span>
                             )}
                           </td>
                           <td className="py-2.5 px-4">
@@ -463,14 +465,14 @@ export class ${className} {
                               type="text"
                               value={p.description}
                               onChange={e => handleParamFieldChange(p.name, 'description', e.target.value)}
-                              className="text-slate-500 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full"
+                              className={`${styles.cardTextMuted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`}
                               placeholder="配置描述信息"
                             />
                           </td>
                           <td className="py-2.5 px-4 text-center">
                             <button
                               onClick={() => handleRemoveParam(p.name)}
-                              className="text-slate-400 hover:text-red-500 p-1 rounded"
+                              className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 rounded`}
                             >
                               <LucideIcon name="X" size={14} />
                             </button>
@@ -489,50 +491,50 @@ export class ${className} {
         {activeTab === 'code' && (
           <div className="flex-1 flex overflow-hidden">
             {/* Template selector side sidebar */}
-            <div className="w-56 border-r border-gray-200 bg-slate-50/50 p-4 flex flex-col gap-4 overflow-y-auto select-none">
+            <div className={`w-56 border-r ${styles.sidebarBorder} ${styles.sidebarBg} p-4 flex flex-col gap-4 overflow-y-auto select-none`}>
               <div>
-                <h4 className="text-xs font-semibold text-slate-700">Foundry 函数模板</h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">选择契合您业务目标的TS模板一键生成标准代码结构。</p>
+                <h4 className={`text-xs font-semibold ${styles.cardText}`}>Foundry 函数模板</h4>
+                <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>选择契合您业务目标的TS模板一键生成标准代码结构。</p>
               </div>
               <div className="space-y-2">
                 <button
                   onClick={() => loadTemplate('validation')}
-                  className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2"
+                  className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
                   <LucideIcon name="Shield" size={14} className="text-emerald-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">拦截校验模板</div>
-                    <div className="text-[10px] font-normal text-slate-400 mt-0.5">限制Action提交</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>限制Action提交</div>
                   </div>
                 </button>
                 <button
                   onClick={() => loadTemplate('default')}
-                  className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2"
+                  className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
                   <LucideIcon name="Sparkles" size={14} className="text-amber-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">动态入参默认值</div>
-                    <div className="text-[10px] font-normal text-slate-400 mt-0.5">默认值公式计算</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>默认值公式计算</div>
                   </div>
                 </button>
                 <button
                   onClick={() => loadTemplate('computed')}
-                  className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2"
+                  className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
                   <LucideIcon name="Calculator" size={14} className="text-blue-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">派生计算属性</div>
-                    <div className="text-[10px] font-normal text-slate-400 mt-0.5">实体派生衍生指标</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>实体派生衍生指标</div>
                   </div>
                 </button>
                 <button
                   onClick={() => loadTemplate('aggregation')}
-                  className="w-full text-left p-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-lg text-xs font-medium text-slate-700 transition-all flex items-start gap-2"
+                  className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
                   <LucideIcon name="TrendingUp" size={14} className="text-indigo-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">对象集统计聚合</div>
-                    <div className="text-[10px] font-normal text-slate-400 mt-0.5">多实体合并聚合计算</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>多实体合并聚合计算</div>
                   </div>
                 </button>
               </div>
@@ -546,9 +548,9 @@ export class ${className} {
             </div>
 
             {/* Code editor body */}
-            <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden relative">
+            <div className="flex-1 flex flex-col bg-[var(--card,#0B0F19)] overflow-hidden relative">
               {/* Code editor header status */}
-              <div className="px-4 py-2 border-b border-slate-800 flex justify-between items-center text-[10px] text-slate-400 select-none font-mono">
+              <div className="px-4 py-2 border-b border-[var(--card,#1E293B)] flex justify-between items-center text-[10px] text-[var(--card,#94A3B8)] select-none font-mono">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   <span>TypeScript 1.84 - Foundry API Sync: ACTIVE</span>
@@ -562,7 +564,7 @@ export class ${className} {
               {/* Textarea code container */}
               <div className="flex-1 flex font-mono text-xs overflow-hidden leading-relaxed">
                 {/* Simulated line numbers */}
-                <div className="w-12 bg-slate-950 text-slate-600 text-right pr-3 select-none pt-4 flex flex-col">
+                <div className="w-12 bg-[var(--card,#020617)] text-[var(--card,#64748B)] text-right pr-3 select-none pt-4 flex flex-col">
                   {Array.from({ length: 45 }).map((_, i) => (
                     <div key={i}>{i + 1}</div>
                   ))}
@@ -572,7 +574,7 @@ export class ${className} {
                 <textarea
                   value={func.code}
                   onChange={e => handleFieldChange('code', e.target.value)}
-                  className="flex-1 bg-slate-900 text-slate-150 p-4 border-0 focus:outline-hidden font-mono text-xs resize-none h-full overflow-y-auto leading-relaxed outline-hidden"
+                  className="flex-1 bg-[var(--card,#0B0F19)] text-[var(--card,#CBD5E1)] p-4 border-0 focus:outline-hidden font-mono text-xs resize-none h-full overflow-y-auto leading-relaxed outline-hidden"
                   spellCheck="false"
                 />
               </div>
@@ -584,11 +586,11 @@ export class ${className} {
         {activeTab === 'test' && (
           <div className="flex-1 flex overflow-hidden">
             {/* Input params form */}
-            <div className="w-1/3 border-r border-gray-200 p-5 bg-slate-50/50 flex flex-col justify-between overflow-y-auto select-none">
+            <div className={`w-1/3 border-r ${styles.sidebarBorder} p-5 ${styles.sidebarBg} flex flex-col justify-between overflow-y-auto select-none`}>
               <div className="space-y-4 text-xs">
                 <div>
-                  <h4 className="text-xs font-semibold text-slate-800">沙盒测试参数输入</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">请为该函数的输入参数填入测试值以模拟执行。</p>
+                  <h4 className={`text-xs font-semibold ${styles.cardText}`}>沙盒测试参数输入</h4>
+                  <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>请为该函数的输入参数填入测试值以模拟执行。</p>
                 </div>
 
                 <div className="space-y-3">
@@ -599,25 +601,25 @@ export class ${className} {
                     };
 
                     return (
-                      <div key={p.name} className="space-y-1 bg-white p-3 rounded-lg border border-gray-200">
+                      <div key={p.name} className={`space-y-1 ${styles.cardBg} p-3 rounded-lg border ${styles.cardBorder}`}>
                         <div className="flex justify-between items-center text-[10px]">
-                          <span className="font-semibold text-slate-700 font-mono">{p.name}</span>
-                          <span className="font-mono text-slate-400">{p.dataType}{p.isRequired && '*'}</span>
+                          <span className={`font-semibold ${styles.cardText} font-mono`}>{p.name}</span>
+                          <span className={`font-mono ${styles.cardTextMuted}`}>{p.dataType}{p.isRequired && '*'}</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 mb-1">{p.description}</p>
+                        <p className={`text-[10px] ${styles.cardTextMuted} mb-1`}>{p.description}</p>
 
                         {/* RENDER DYNAMIC FIELD BASED ON TYPE */}
                         {p.dataType === 'boolean' ? (
                           <div className="flex items-center gap-3 mt-1.5">
                             <button
                               onClick={() => setVal(true)}
-                              className={`px-3 py-1 text-[11px] rounded transition-all font-mono ${value === true ? 'bg-blue-600 text-white font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                              className={`px-3 py-1 text-[11px] rounded transition-all font-mono ${value === true ? 'bg-blue-600 text-white font-semibold' : `${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg}`}`}
                             >
                               true
                             </button>
                             <button
                               onClick={() => setVal(false)}
-                              className={`px-3 py-1 text-[11px] rounded transition-all font-mono ${value === false ? 'bg-blue-600 text-white font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                              className={`px-3 py-1 text-[11px] rounded transition-all font-mono ${value === false ? 'bg-blue-600 text-white font-semibold' : `${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg}`}`}
                             >
                               false
                             </button>
@@ -626,7 +628,7 @@ export class ${className} {
                           <select
                             value={value}
                             onChange={e => setVal(e.target.value)}
-                            className="w-full px-2 py-1 text-[11px] border border-gray-300 rounded bg-white mt-1"
+                            className={`w-full px-2 py-1 text-[11px] border ${styles.inputBorder} rounded ${styles.inputBg} mt-1`}
                           >
                             <option value="">-- 选择模拟对象实体 --</option>
                             {p.dataType === 'ObjectTypeSet' ? (
@@ -659,21 +661,21 @@ export class ${className} {
                             type="number"
                             value={value}
                             onChange={e => setVal(parseFloat(e.target.value) || 0)}
-                            className="w-full px-2.5 py-1 text-[11px] border border-gray-300 rounded focus:outline-hidden"
+                            className={`w-full px-2.5 py-1 text-[11px] border ${styles.inputBorder} rounded focus:outline-hidden ${styles.inputBg}`}
                           />
                         ) : p.dataType === 'date' || p.dataType === 'timestamp' ? (
                           <input
                             type="datetime-local"
                             value={value}
                             onChange={e => setVal(e.target.value)}
-                            className="w-full px-2.5 py-1 text-[11px] border border-gray-300 rounded focus:outline-hidden font-mono"
+                            className={`w-full px-2.5 py-1 text-[11px] border ${styles.inputBorder} rounded focus:outline-hidden font-mono ${styles.inputBg}`}
                           />
                         ) : (
                           <input
                             type="text"
                             value={value}
                             onChange={e => setVal(e.target.value)}
-                            className="w-full px-2.5 py-1 text-[11px] border border-gray-300 rounded focus:outline-hidden"
+                            className={`w-full px-2.5 py-1 text-[11px] border ${styles.inputBorder} rounded focus:outline-hidden ${styles.inputBg}`}
                             placeholder="请输入文本"
                           />
                         )}
@@ -687,7 +689,7 @@ export class ${className} {
               <button
                 onClick={handleRunTest}
                 disabled={isTesting}
-                className="w-full py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-500 text-white rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-xs mt-4 text-xs"
+                className="w-full py-2 bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] disabled:bg-[var(--card,#475569)] text-white rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-xs mt-4 text-xs"
               >
                 {isTesting ? (
                   <>
@@ -704,8 +706,8 @@ export class ${className} {
             </div>
 
             {/* Runner output & logs */}
-            <div className="flex-1 bg-slate-950 p-5 flex flex-col text-xs font-mono overflow-y-auto text-slate-300 select-none">
-              <h4 className="text-[10px] text-slate-500 tracking-wider uppercase font-semibold mb-3 border-b border-slate-900 pb-2 flex justify-between items-center">
+            <div className="flex-1 bg-[var(--card,#020617)] p-5 flex flex-col text-xs font-mono overflow-y-auto text-[var(--card,#CBD5E1)] select-none">
+              <h4 className="text-[10px] text-[var(--card,#64748B)] tracking-wider uppercase font-semibold mb-3 border-b border-[var(--card,#1E293B)] pb-2 flex justify-between items-center">
                 <span>函数模拟输出终端 (Foundry Console)</span>
                 {testResult !== null && (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded">
@@ -716,8 +718,8 @@ export class ${className} {
 
               {/* Logs area */}
               {testLogs.length === 0 ? (
-                <div className="flex-1 flex flex-col justify-center items-center text-slate-600 italic">
-                  <LucideIcon name="Terminal" size={24} className="mb-2 text-slate-700" />
+                <div className="flex-1 flex flex-col justify-center items-center text-[var(--card,#64748B)] italic">
+                  <LucideIcon name="Terminal" size={24} className="mb-2 text-[var(--card,#475569)]" />
                   <div>配置完左侧测试入参后，点击下方 "运行测试" 按钮。</div>
                   <div>系统将在编译并在虚拟沙盒中运行您的 TS 代码。</div>
                 </div>
@@ -727,8 +729,8 @@ export class ${className} {
                     <div key={i} className={
                       log.includes('SUCCESS') || log.includes('捕获') ? 'text-emerald-400' :
                       log.includes('注入') ? 'text-blue-400' :
-                      log.includes('⚙️') || log.includes('✅') ? 'text-slate-400' :
-                      'text-slate-300'
+                      log.includes('⚙️') || log.includes('✅') ? 'text-[var(--card,#94A3B8)]' :
+                      'text-[var(--card,#CBD5E1)]'
                     }>
                       {log}
                     </div>
@@ -736,11 +738,11 @@ export class ${className} {
 
                   {/* Output block */}
                   {testResult !== null && (
-                    <div className="mt-4 p-4 rounded bg-slate-900/60 border border-slate-800 text-emerald-300">
-                      <div className="text-[10px] text-slate-500 mb-1 font-sans uppercase tracking-wider font-semibold">
+                    <div className="mt-4 p-4 rounded bg-[var(--card,#0B0F19)]/60 border border-[var(--card,#1E293B)] text-emerald-300">
+                      <div className="text-[10px] text-[var(--card,#64748B)] mb-1 font-sans uppercase tracking-wider font-semibold">
                         返回值 (Return Value):
                       </div>
-                      <pre className="text-xs leading-relaxed">
+                        <pre className="text-xs leading-relaxed">
                         {typeof testResult === 'object' ? JSON.stringify(testResult, null, 4) : String(testResult)}
                       </pre>
                     </div>

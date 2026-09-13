@@ -89,7 +89,7 @@ export default function VectorIndexTab({ showToast }: TabProps) {
           <h3 className={`text-xs font-bold flex items-center gap-1.5 ${styles.cardText}`}>
             <RefreshCw size={12} className={styles.cardTextMuted} /> {t('knowledge.vector_index.last_sync')}
           </h3>
-          <span className="text-[10px] font-mono text-slate-500">{stats.lastSyncAt || '—'}</span>
+          <span className={`text-[10px] font-mono ${styles.muted}`}>{stats.lastSyncAt || '—'}</span>
         </div>
         {(stats.graphNodeCount === 0 && stats.embeddingCount === 0 && stats.articleCount === 0) ? (
           <div className={`py-6 flex flex-col items-center justify-center space-y-2 ${styles.cardTextMuted}`}>
@@ -127,7 +127,7 @@ export default function VectorIndexTab({ showToast }: TabProps) {
             <Database size={12} /> {t('knowledge.vector_index.monitor')}
           </button>
         </div>
-        <p className="text-[10px] font-mono text-slate-400">/api/v1/knowledge/vector/rebuild — {t('knowledge.vector_index.waiting_backend')}</p>
+        <p className={`text-[10px] font-mono ${styles.muted}`}>/api/v1/knowledge/vector/rebuild — {t('knowledge.vector_index.waiting_backend')}</p>
       </div>
     </div>
   );
