@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionPreviousDiffVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionVO;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
@@ -244,10 +245,25 @@ public class OntologyVersionService {
     }
 
     /**
+     * 强类型 VO 版（T16-5，简化端点 listAll）；旧 {@link #listAllVersions()} 签名保留（Wave31 C1 mock 兼容）。
+     */
+    public List<OntologyVersionVO> listAllVersionsVO() {
+        return versionRepository.findAll().stream()
+            .map(this::toVO).collect(Collectors.toList());
+    }
+
+    /**
      * 按 ID 获取版本（不依赖 ontologyId）
      */
     public Map<String, Object> getVersionById(String id) {
         return versionRepository.findById(id).map(this::toMap).orElse(null);
+    }
+
+    /**
+     * 强类型 VO 版（T16-5，简化端点 get）；不存在返回 null。
+     */
+    public OntologyVersionVO getVersionVOById(String id) {
+        return versionRepository.findById(id).map(this::toVO).orElse(null);
     }
 
     /**
@@ -274,6 +290,29 @@ public class OntologyVersionService {
     }
 
     /**
+     * 强类型 VO 版（T16-5，简化端点 diffWithPrevious）。
+     * <p>语义与旧 {@link #diffWithPrevious(String)} 一致；
+     * {@code previousVersion / previousSnapshot} 不存在时不填充
+     * （VO {@code NON_NULL} 省略，与既有 Map put null 前端 undefined 行为一致）。
+     */
+    public OntologyVersionPreviousDiffVO diffWithPreviousVO(String versionId) {
+        OntologyVersion current = versionRepository.findById(versionId)
+            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
+        Optional<OntologyVersion> previous = versionRepository.findPreviousVersion(
+            current.getOntologyId(), current.getCreatedAt());
+
+        OntologyVersionPreviousDiffVO vo = new OntologyVersionPreviousDiffVO();
+        vo.setCurrentVersion(current.getVersionNo());
+        vo.setCurrentSnapshot(safeParseJson(current.getSnapshot()));
+        if (previous.isPresent()) {
+            OntologyVersion prev = previous.get();
+            vo.setPreviousVersion(prev.getVersionNo());
+            vo.setPreviousSnapshot(safeParseJson(prev.getSnapshot()));
+        }
+        return vo;
+    }
+
+    /**
      * 按 ID 发布版本（不依赖 ontologyId）
      */
     public Map<String, Object> publishVersionById(String versionId) {
@@ -284,6 +323,19 @@ public class OntologyVersionService {
         }
         versionRepository.updateStatus(versionId, "Published");
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
+    }
+
+    /**
+     * 强类型 VO 版（T16-5，简化端点 publish）；语义与旧 {@link #publishVersionById(String)} 一致。
+     */
+    public OntologyVersionVO publishVersionVOById(String versionId) {
+        OntologyVersion ver = versionRepository.findById(versionId)
+            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
+        if ("Published".equals(ver.getStatus())) {
+            throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
+        }
+        versionRepository.updateStatus(versionId, "Published");
+        return versionRepository.findById(versionId).map(this::toVO).orElse(null);
     }
 
     // ── PMO-28 提案联动: 审批通过→自动创建版本并发布 ─────────
