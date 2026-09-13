@@ -118,13 +118,19 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 
 > 2026-09-12（本体工作台 Wave D T19）：buszhi 节原有 5 行仅为服务间契约摘要，与本节并存、**未删改**。
 > 下表按 ontology-engine-impl 实际 Controller 逐一登记（代码为唯一真源，路径均核验 `@RequestMapping`/`@*Mapping` 字面）。
-> 完整路径 = 类级 base + 端点 Path。**T12 安全切面**：[OntologySecurityInterceptor](file:///d:/workspace/javaprojects/ECOS/ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/security/OntologySecurityInterceptor.java#L79-L82) 切点
-> `execution(* ...controller.Ontology*Controller.*(..))` 命中 24 个 `Ontology*` 前缀
-> Controller（写操作 401 强制 + 审计；读操作 RLS/CLS/脱敏）；下表以 ✅/❌ 标注。
+> **T12 安全切面**：[OntologySecurityInterceptor](file:///d:/workspace/javaprojects/ECOS/ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/security/OntologySecurityInterceptor.java#L79-L82) 切点
+> `execution(* ...controller.Ontology*Controller.*(..))` 按类名字面前缀字面命中 **23 个**
+> `Ontology*` 前缀 Controller（写操作 401 强制 + 审计；读操作 RLS/CLS/脱敏）；下表以 ✅/❌ 标注。
 > **Wave 来源**：T7 = Wave B 工作台对象 CRUD；T8 = 前端现用域别名 API；T10 = 导出任务闭环（Wave C）；
 > T12 = 安全切点（独立切面，非本表端点）；T16-x = 强类型 VO/DTO 改造（T16-1/2/3/5 见各 Controller Javadoc）。
 
-**Controller base path 总表（30 Controller / 117 端点方法）**：
+**Controller base path 总表（32 Controller / 204 端点方法）**：
+
+> 2026-09-13（T19 修订 Wave D）：本表按代码重扫 `@RequestMapping`（类级 base）+
+> `@{Get,Post,Put,Delete,Patch}Mapping`（方法级端点）字面登记，逐一累加 32 Controller
+> 端点注解 = **204 端点方法**（`grep -c '@(Get|Post|Put|Delete|Patch)Mapping'` 逐类求和验证）。
+> 旧 30 Controller / 117 端点系初版文档提名行数，与重扫代码不符，已按代码更正；
+> 与 Reviewer 实测 ~173 的差为本表按代码真源全量累加（含 alias 兼容 Controller 全端点）。
 
 | Controller | base path(s) | 端点数 | T12 切点 | Wave 来源 |
 |:--|:--|:--:|:--:|:--|
@@ -139,11 +145,11 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | OntologyActionController | `/api/v1/ecos` | 7 | ✅ | T16-x |
 | OntologyCompatController | `/api/ontology` | 4 | ✅ | 兼容旧前缀（无 v1） |
 | OntologyConfigController | `/api/v1/engine/ontology/settings` | 5 | ✅ | T16-x |
-| OntologyController | `/api/v1/ecos/ontologies` | 18 | ✅ | T16-x |
+| OntologyController | `/api/v1/ecos/ontologies` | 21 | ✅ | T16-x |
 | OntologyCopilotController | `/api/v1/engine/ontology/copilot` | 4 | ✅ | T16-3 |
 | OntologyDataController | `/api/v1/ontology/data` | 7 | ✅ | — |
-| OntologyDomainApiController | `/api/v1/ontology` | 12 | ✅ | **T8**（前端现用）+ T16-2 强类型 |
-| OntologyDomainController | `/api/v1/ecos/domains` | 8 | ✅ | — |
+| OntologyDomainApiController | `/api/v1/ontology` | 13 | ✅ | **T8**（前端现用）+ T16-2 强类型 |
+| OntologyDomainController | `/api/v1/ecos/domains` | 9 | ✅ | — |
 | OntologyEngineStatusController | `/api/v1/engine/ontology` | 5 | ✅ | T16-5 |
 | OntologyExportController | `/api/v1/ontology/export` | 6 | ✅ | **T10**（Wave C 导出闭环） |
 | OntologyGitController | `/api/v1/engine/ontology/git` | 3 | ✅ | — |
@@ -152,9 +158,9 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | OntologyPropertyController | `/api/v1/ecos/entities` | 5 | ✅ | T16-x |
 | OntologyProposalController | `/api/v1/ontology/proposals` | 11 | ✅ | T16-x |
 | OntologyRelationshipController | `/api/v1/ecos` | 10 | ✅ | T16-x |
-| OntologyRuleController | `/api/v1/ecos` | 6 | ✅ | — |
+| OntologyRuleController | `/api/v1/ecos` | 8 | ✅ | — |
 | OntologySourceController | `/api/v1/ecos/ontology`（+ `/api/ecos/ontology` 别名） | 1 | ✅ | — |
-| OntologyVersionController | `/api/v1/ecos/ontologies`（versions 段） | 7 | ✅ | T16-x |
+| OntologyVersionController | `/api/v1/ecos/ontologies`（versions 段） | 8 | ✅ | T16-x |
 | OntologyVersionSimpleController | `/api/v1/ecos/versions` | 5 | ✅ | T16-x |
 | OntologyWorkbenchObjectController | `/api/v1/ecos/ontologies`（objects 段） | 5 | ✅ | **T7**（V121 新表 `ecos_ontology_workbench_object`） |
 | OntologyWorkflowController | `/api/v1/engine/ontology/workflow`（+ `/api/engine/ontology/workflow` 别名） | 7 | ✅ | — |
@@ -245,6 +251,8 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | | GET `/rules/{ruleId}` | 规则详情 | — |
 | | PUT `/rules/{ruleId}` | 规则更新 | — |
 | | DELETE `/rules/{ruleId}` | 规则删除 | — |
+| | POST `/rules/{ruleId}/test` | `OntologyRuleEvaluationVO`（body 无，仅 key `ruleId`）— Wave D Reviewer 补登 | T19 修订 |
+| | POST `/rules/evaluate` | `List<OntologyRuleEvaluationVO>`（body = `OntologyRuleEvaluateQuery` 含 `entityIds`）— Wave D Reviewer 补登 | T19 修订 |
 | OntologySourceController | GET `/sources` | 源列表 | — |
 | EcosMappingFullController | GET `/full` | `List<EcosMappingFullVO>`（手写 ETag/If-None-Match 304） | — |
 | AutoDiscoverController | POST `/domains/{domainCode}/auto-discover` | `List<OntologyAutoDiscoverResultVO>` | — |
@@ -381,6 +389,7 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | | POST `/stop` | `OntologyEngineStatusVO` | T16-5 |
 
 **变更记录**：
+- 2026-09-13：本体工作台 Wave D T19 修订（最终闸门 P1-2）— 按代码重扫重数 §3.3.1：**32 Controller / 204 端点方法**（旧写 30/117 系初版提名，与重扫不符）；T12 安全切点按 `Ontology*Controller` 类名**字面前缀命中 23/32**（旧写 24/30）；4 处端点数纠错 OntologyDomainApi 12→**13**、OntologyDomain 8→**9**、OntologyRule 6→**8**（补 POST `/rules/{ruleId}/test` 与 POST `/rules/evaluate` 两行子表登记）、OntologyVersion 7→**8**（主表数字订正，子表 8 行明细原已齐全）；子表 1/2/3 保留原结构只增订正行、不删原有说明。与 Reviewer 实测 ~173 的差：本表按代码真源全量累加方法级 `@*Mapping` 注解（含 alias 兼容 Controller 全端点），口径见总表头注。
 - 2026-09-12：本体工作台 Wave D T19 — 新增 §3.3.1 节完整登记 ontology-engine-impl 全部 30 Controller / 117 端点方法（代码为唯一真源、已逐一核验 `@RequestMapping`）；§3.3 原有 5 行表保留不动（服务间契约摘要）；T12 安全切点覆盖 24/30 由前缀 `Ontology*` 切点决定，其余 8 类不在切点。
 
 ### 3.4 dccheng（KB + Cognitive 合并，端口 18086）

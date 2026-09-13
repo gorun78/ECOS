@@ -52,39 +52,83 @@
 --   无需修改任何 Java/XML 文件; 本 Task 不触 T12-T19 已提交代码.
 --
 -- 幂等性: 全部 DDL 用 IF NOT EXISTS / IF EXISTS, 重复执行无副作用.
--- Schema 铁律: 只加不删 (3.1); COMMENT 幂等覆盖.
--- ============================================================
-
+--   (2026-09-13 最终闸门 P1-1 修订: PostgreSQL 的 COMMENT ON TABLE **不支持**
+--   IF EXISTS 子句 — PG 16 实测 `COMMENT ON TABLE IF EXISTS ...` 直接报
+--   "syntax error at or near EXISTS". 本脚本原 (a) 6 条裸
+--   `COMMENT ON TABLE ecos_ontology.xxx` (ghost 表缺失时整脚本直接中断,
+--   §2 public 侧 DDL 未跑) 与 (b) 2 条 `COMMENT ON TABLE IF EXISTS ...`
+--   (非法语法, 即便对存在的表也解析失败) 均不可用. 现将 8 条 COMMENT 统一
+--   收口为 **单 DO 块 + 每表各一段 IF EXISTS (方案 A)**: 先查 pg_class
+--   确认表存在才 EXECUTE COMMENT, ghost 表缺失时静默跳过、整脚本零报错,
+--   表均存在则登记 (含原 2 条非法 `COMMENT ON TABLE IF EXISTS` 的
+--   ecos_domain / ecos_business_glossary). 注: 方案 B (DO 块 + VALUES
+--   FOR 循环) 因 `FOR t IN SELECT 单列` 触发 PL/pgSQL "loop variable of
+--   loop over rows must be a record variable or list of scalar variables"
+--   实测不可用, 故弃 B 用 A. 已 PG 16 实证 (ghost 缺失 / 存在两分支).)
 
 -- ============================================================
 -- §1. alias ghost 侧 COMMENT 登记 (不 DROP / 不清数据)
 -- ============================================================
 -- 目的: 给未来清理/审计的开发者留下"该表为 V47 遗留 ghost、
 -- 无数据、canonical 在 public"的显式标记, 避免误以为该侧有业务数据.
+-- [P1-1] 8 张表 COMMENT 收口为单 DO 块 + 每表各一段 IF EXISTS (方案 A,
+--   一张表一段): 先查 pg_class 确认表存在才 EXECUTE COMMENT, ghost 表
+--   缺失时静默跳过、整脚本零报错; 表均存在则覆盖登记 (含原 2 条非法
+--   `COMMENT ON TABLE IF EXISTS` 的 ecos_domain / ecos_business_glossary).
+--   全部 8 张: ontology 6 张建表 + V47 搬移 2 张 (ecos_domain /
+--   ecos_business_glossary). 已 PG 16 实测 (ghost 缺失 / 存在两分支).
 
-COMMENT ON TABLE ecos_ontology.ecos_ontology_entity IS
-    'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_entity (15 rows). 未来清理需走 PMO 专项 drop.';
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_ontology_entity' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_ontology_entity',
+                   'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_entity. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE ecos_ontology.ecos_ontology_property IS
-    'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_property. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_ontology_property' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_ontology_property',
+                   'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_property. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE ecos_ontology.ecos_ontology_relationship IS
-    'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_relationship. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_ontology_relationship' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_ontology_relationship',
+                   'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_relationship. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE ecos_ontology.ecos_ontology_action IS
-    'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_action. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_ontology_action' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_ontology_action',
+                   'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_action. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE ecos_ontology.ecos_ontology_rule IS
-    'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_rule. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_ontology_rule' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_ontology_rule',
+                   'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_rule. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE ecos_ontology.ecos_ontology_version IS
-    'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_version. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_ontology_version' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_ontology_version',
+                   'WAVE_D_T20: V47 建, 0 行 ghost. Canonical = public.ecos_ontology_version. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE IF EXISTS ecos_ontology.ecos_domain IS
-    'WAVE_D_T20: V47 搬, 0 行 ghost. Canonical = public.ecos_domain. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_domain' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_domain',
+                   'WAVE_D_T20: V47 搬, 0 行 ghost. Canonical = public.ecos_domain. 未来清理需走 PMO 专项 drop.');
+  END IF;
 
-COMMENT ON TABLE IF EXISTS ecos_ontology.ecos_business_glossary IS
-    'WAVE_D_T20: V47 搬, 0 行 ghost. Canonical = public.ecos_business_glossary. 未来清理需走 PMO 专项 drop.';
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'ecos_ontology' AND c.relname = 'ecos_business_glossary' AND c.relkind IN ('r', 'v')) THEN
+    EXECUTE format('COMMENT ON TABLE ecos_ontology.%I IS %L', 'ecos_business_glossary',
+                   'WAVE_D_T20: V47 搬, 0 行 ghost. Canonical = public.ecos_business_glossary. 未来清理需走 PMO 专项 drop.');
+  END IF;
+END $$;
+
 
 
 -- ============================================================
