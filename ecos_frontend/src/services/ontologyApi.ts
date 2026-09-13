@@ -1087,6 +1087,78 @@ export async function reassignObjectDomain(
 }
 
 // ================================================================
+// 函数沙盒 (Function Sandbox) — T9
+// 对齐后端 FunctionController (@RequestMapping("/api/v1/ontology/functions"))
+//   POST /api/v1/ontology/functions/test     → 沙盒执行（expression + entityName）
+//   POST /api/v1/ontology/functions/compile  → 仅编译（返回生成的参数化 SQL）
+// 后端 T16-3 强类型契约：入参 OntologyFunctionSaveDTO / 返回 FunctionResult
+// ================================================================
+
+const FUNCTION_BASE = "/api/v1/ontology/functions";
+
+/** 函数沙盒执行结果 — 对齐后端 FunctionResult POJO（@JsonInclude NON_NULL） */
+export interface FunctionTestResultVO {
+  /** 计算结果单值（无数据行时为 null） */
+  value: number | string | boolean | null;
+  /** SQL 类型：LONG / DOUBLE / NUMERIC 等（inferSqlType 推断） */
+  sqlType?: string;
+  /** 执行耗时（毫秒） */
+  executionTimeMs: number;
+  /** 编译生成的参数化 SQL（调试/预览） */
+  compiledSql?: string;
+  /** 是否命中结果缓存 */
+  fromCache?: boolean;
+  /** 缓存键 */
+  cacheKey?: string;
+}
+
+/** 函数沙盒执行请求 — 对齐后端 OntologyFunctionSaveDTO */
+export interface FunctionTestParams {
+  /** SQL 表达式（必填），如 "COUNT(id) FROM ecos_ontology_data WHERE object_type='ot1'" */
+  expression: string;
+  /** 目标实体名（必填，与 FROM 子句表名一致；按实体名=表名映射执行） */
+  entityName: string;
+  /** 调用方 id（可选，默认 anonymous；写入函数执行审计日志） */
+  callerId?: string;
+}
+
+/** 函数表达式编译结果 — 对齐后端 OntologyFunctionCompileVO */
+export interface FunctionCompileVO {
+  /** 编译生成的参数化 SQL */
+  sql?: string;
+  /** SQL 占位参数（动态 list，沙盒运行时 payload） */
+  params?: unknown[];
+  /** 解析出的目标实体名 */
+  entityName?: string;
+}
+
+/**
+ * 函数沙盒真实执行（替代前端 mock TS 执行）。
+ * POST /api/v1/ontology/functions/test
+ * 业务错误（白名单拒绝/执行失败）由 apiFetchData 统一转抛。
+ */
+export async function testFunction(params: FunctionTestParams): Promise<FunctionTestResultVO> {
+  return apiFetchData<FunctionTestResultVO>(`${FUNCTION_BASE}/test`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * 函数表达式仅编译（不执行）— 返回真实生成的参数化 SQL，供沙盒控制台日志预览。
+ * POST /api/v1/ontology/functions/compile
+ */
+export async function compileFunction(
+  expression: string,
+  entityName?: string
+): Promise<FunctionCompileVO> {
+  return apiFetchData<FunctionCompileVO>(`${FUNCTION_BASE}/compile`, {
+    method: "POST",
+    body: JSON.stringify({ expression, entityName }),
+  });
+}
+
+// ================================================================
 // 自动发现 (Auto Discover) — T1
 // ================================================================
 
