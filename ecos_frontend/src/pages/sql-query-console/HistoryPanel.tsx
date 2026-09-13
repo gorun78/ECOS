@@ -55,20 +55,20 @@ export default function HistoryPanel({ show, onLoadSql, onClose }: HistoryPanelP
   return (
     <div className={`w-64 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-hidden`}>
       <div className={`px-2.5 py-2 border-b ${styles.cardBorder} flex items-center justify-between`}>
-        <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
+        <span className={`text-[10px] font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
           <Icon name="History" size={13} />查询历史
         </span>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
+        <button onClick={onClose} className={`${styles.cardTextMuted} hover:opacity-70`}>
           <Icon name="X" size={13} />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-slate-500 text-[11px]">
+          <div className={`flex items-center justify-center py-8 ${styles.cardTextMuted} text-[11px]`}>
             <Icon name="Loader2" /> 加载中...
           </div>
         ) : items.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-[10px]">暂无历史</div>
+          <div className={`text-center py-8 ${styles.cardTextMuted} text-[10px]`}>暂无历史</div>
         ) : (
           items.map(item => (
             <div key={item.id} className={`px-2.5 py-2 border-b ${styles.cardBorder} hover:bg-white/5 cursor-pointer`}

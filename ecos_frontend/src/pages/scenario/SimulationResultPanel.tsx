@@ -106,7 +106,7 @@ export default function SimulationResultPanel({
 
           {/* Answer */}
           <div className={`p-3 ${styles.inputBg} border ${styles.inputBorder} rounded`}>
-            <pre className="text-xs text-slate-200 font-mono whitespace-pre-wrap leading-relaxed">
+            <pre className={`text-xs ${styles.cardText} font-mono whitespace-pre-wrap leading-relaxed`}>
               {simResult.answer || simResult.message}
             </pre>
           </div>
@@ -119,7 +119,7 @@ export default function SimulationResultPanel({
               </span>
               {simResult.groundedDocs.map((doc: any, i: number) => (
                 <div key={i} className={`flex items-center justify-between p-2 ${styles.cardBg} border ${styles.cardBorder} rounded text-[10px]`}>
-                  <span className="text-slate-300 font-mono">{doc.title}</span>
+                  <span className={`${styles.cardTextMuted} font-mono`}>{doc.title}</span>
                   <span className="text-emerald-400 font-bold">
                     {(doc.score * 100).toFixed(0)}%
                   </span>

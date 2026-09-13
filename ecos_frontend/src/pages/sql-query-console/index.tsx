@@ -278,7 +278,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
     <div className={`h-full w-full flex flex-row overflow-hidden ${styles.appBg} ${styles.appText} font-sans relative`}>
       {/* ===== 左侧: Schema 树浏览器 ===== */}
       {showLeftPanel && (
-        <div className="w-60 shrink-0 border-r border-slate-700">
+        <div className={`w-60 shrink-0 border-r ${styles.cardBorder}`}>
           <SchemaTree
             datasourceId={selectedDsId}
           />
@@ -288,7 +288,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       {/* 左侧折叠按钮 */}
       <button
         onClick={() => setShowLeftPanel(!showLeftPanel)}
-        className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center bg-slate-800 border border-slate-700 rounded-r text-slate-400 hover:text-slate-200 cursor-pointer transition-colors ${
+        className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center ${styles.sidebarBg} border ${styles.cardBorder} rounded-r ${styles.cardTextMuted} hover:text-indigo-400 cursor-pointer transition-colors ${
           showLeftPanel ? 'left-[240px]' : 'left-0'
         }`}
         title={showLeftPanel ? '收起面板' : '展开面板'}
@@ -313,7 +313,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         {/* 中间区域: 编辑器 + 结果 */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* SQL 编辑器 */}
-          <div className="h-2/5 min-h-[120px] border-b border-slate-700">
+          <div className={`h-2/5 min-h-[120px] border-b ${styles.divider}`}>
             <Editor
               height="100%"
               defaultLanguage="sql"
@@ -323,8 +323,8 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
               options={editorOptions}
               theme="vs-dark"
               loading={
-                <div className="flex items-center justify-center h-full bg-slate-900">
-                  <Icon name="Loader2" size={20} className="animate-spin text-slate-500" />
+                <div className={`flex items-center justify-center h-full ${styles.appBg}`}>
+                  <Icon name="Loader2" size={20} className={`animate-spin ${styles.cardTextMuted}`} />
                 </div>
               }
             />
@@ -362,7 +362,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       {/* 右侧折叠按钮 */}
       <button
         onClick={() => setShowRightPanel(!showRightPanel)}
-        className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center bg-slate-800 border border-slate-700 rounded-l text-slate-400 hover:text-slate-200 cursor-pointer transition-colors ${
+        className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center ${styles.sidebarBg} border ${styles.cardBorder} rounded-l ${styles.cardTextMuted} hover:text-indigo-400 cursor-pointer transition-colors ${
           showRightPanel ? 'right-[256px]' : 'right-0'
         }`}
         title={showRightPanel ? '收起面板' : '展开面板'}
@@ -386,13 +386,13 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       {showSaveDialog && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className={`w-96 rounded-lg ${styles.cardBg} border ${styles.cardBorder} shadow-2xl p-5`}>
-            <h3 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+            <h3 className={`text-sm font-bold ${styles.cardText} mb-4 flex items-center gap-2`}>
               <Icon name="Save" size={15} className="text-amber-400" />
               保存查询模板
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 block">模板名称 *</label>
+                <label className={`text-[11px] ${styles.cardTextMuted} mb-1 block`}>模板名称 *</label>
                 <input
                   type="text"
                   value={saveName}
@@ -404,7 +404,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 block">描述（可选）</label>
+                <label className={`text-[11px] ${styles.cardTextMuted} mb-1 block`}>描述（可选）</label>
                 <input
                   type="text"
                   value={saveDesc}
@@ -415,14 +415,14 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 />
               </div>
               <div className={`px-2 py-2 rounded text-[10px] ${styles.inputBg} border ${styles.inputBorder} max-h-24 overflow-auto`}>
-                <span className="text-slate-500">SQL 预览：</span>
-                <pre className="text-slate-300 mt-0.5 whitespace-pre-wrap break-all font-mono">{sql || '(空)'}</pre>
+                <span className={styles.cardTextMuted}>SQL 预览：</span>
+                <pre className={`text-[var(--card,#CBD5E1)] mt-0.5 whitespace-pre-wrap break-all font-mono`}>{sql || '(空)'}</pre>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button
                 onClick={() => setShowSaveDialog(false)}
-                className="px-4 py-1.5 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors cursor-pointer"
+                className={`px-4 py-1.5 text-xs rounded ${styles.sidebarBg} ${styles.cardText} hover:opacity-80 transition-colors cursor-pointer`}
               >
                 取消
               </button>
@@ -431,7 +431,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 disabled={isSaving || !saveName.trim()}
                 className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded transition-colors cursor-pointer ${
                   isSaving || !saveName.trim()
-                    ? 'bg-slate-600 text-slate-500 cursor-not-allowed'
+                    ? `${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed`
                     : 'bg-blue-600 hover:bg-blue-500 text-white'
                 }`}
               >

@@ -10,7 +10,7 @@ export function renderCenterCanvas(vm: any) {
               
               {/* Application's Own Inner Header Bar */}
               <div className={`h-11 px-4 flex items-center justify-between shadow-xs border-b shrink-0 ${
-                activeApp.theme.isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : '${styles.cardBg} ${styles.cardBorder} ${styles.cardText}'
+                activeApp.theme.isDark ? 'bg-[var(--card,#0F172A)] text-[var(--card,#F1F5F9)]' : '${styles.cardBg} ${styles.cardBorder} ${styles.cardText}'
               }`}>
                 <div className="flex items-center gap-2">
                   <span className={`p-1 rounded bg-${activeApp.theme.primaryColor}-100 text-${activeApp.theme.primaryColor}-700`}>
@@ -31,7 +31,7 @@ export function renderCenterCanvas(vm: any) {
                       className={`h-7 px-3 rounded-md text-[11px] font-semibold transition-all ${
                         p.id === activePageId
                           ? `bg-${activeApp.theme.primaryColor}-100 text-${activeApp.theme.primaryColor}-700`
-                          : 'opacity-65 hover:opacity-100 hover:bg-slate-200/40'
+                          : 'opacity-65 hover:opacity-100 hover:bg-black/5'
                       }`}
                     >
                       {p.title}
@@ -88,7 +88,7 @@ export function renderCenterCanvas(vm: any) {
                   {editorMode === 'design' && (
                     <button
                       onClick={() => { setAddWidgetSlot('main_top'); setShowAddWidgetModal(true); }}
-                      className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[80px]`}
+                      className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[80px]`}
                     >
                       <Plus size={15} />
                       <span className="text-[10px] mt-1 font-semibold">添加指标卡</span>

@@ -149,7 +149,7 @@ export default function DigitalTwinTab() {
       <div className="flex items-center justify-center py-16">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-          <p className="text-sm text-slate-400">{tl("加载数字孪生数据...", "Loading digital twin data...")}</p>
+          <p className={`text-sm ${styles.cardTextMuted}`}>{tl("加载数字孪生数据...", "Loading digital twin data...")}</p>
         </div>
       </div>
     );
@@ -171,14 +171,14 @@ export default function DigitalTwinTab() {
             {health && (
               <div className="flex items-center gap-2 text-xs">
                 <span className={`w-2 h-2 rounded-full ${health.mqtt?.status === 'UP' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                <span className="text-slate-500 dark:text-slate-400">MQTT: {health.mqtt?.status}</span>
-                <span className="text-slate-300 dark:text-slate-600">|</span>
-                <span className="text-slate-500 dark:text-slate-400">{tl("设备数", "Devices")}: {health.device_count}</span>
+                <span className={styles.cardTextMuted}>MQTT: {health.mqtt?.status}</span>
+                <span className={styles.cardTextMuted}>|</span>
+                <span className={styles.cardTextMuted}>{tl("设备数", "Devices")}: {health.device_count}</span>
               </div>
             )}
             <button
               onClick={loadDevices}
-              className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-xs font-bold rounded-lg transition h-8`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} cursor-pointer text-xs font-bold rounded-lg transition h-8`}
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>{tl("刷新", "Refresh")}</span>
@@ -188,11 +188,11 @@ export default function DigitalTwinTab() {
 
         {/* Device Cards Grid */}
         <div>
-          <h3 className="text-xs font-extrabold uppercase font-mono tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+          <h3 className={`text-xs font-extrabold uppercase font-mono tracking-wider ${styles.cardTextMuted} mb-3 flex items-center gap-2`}>
             <Box className="w-3.5 h-3.5" /> {tl("设备状态卡片", "Device Status Cards")}
           </h3>
           {devices.length === 0 ? (
-            <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center text-xs text-slate-400">
+            <div className={`border border-dashed ${styles.cardBorder} rounded-xl p-8 text-center text-xs ${styles.cardTextMuted}`}>
               {tl("暂无设备连接", "No devices connected")}
             </div>
           ) : (
@@ -212,13 +212,13 @@ export default function DigitalTwinTab() {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <TypeIcon className={`w-4 h-4 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`} />
+                      <TypeIcon className={`w-4 h-4 ${isSelected ? 'text-indigo-500' : styles.cardTextMuted}`} />
                       <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`}></span>
                     </div>
-                    <div className="font-bold text-xs truncate">{dev.name}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5 capitalize">{dev.type}</div>
+                    <div className={`font-bold text-xs ${styles.cardText} truncate`}>{dev.name}</div>
+                    <div className={`text-[10px] ${styles.cardTextMuted} mt-0.5 capitalize`}>{dev.type}</div>
                     {dev.unit && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">{dev.unit}</div>
+                      <div className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>{dev.unit}</div>
                     )}
                   </button>
                 );
@@ -237,22 +237,22 @@ export default function DigitalTwinTab() {
                 <div className="flex items-center gap-2 mb-3">
                   <LineChart className="w-4 h-4 text-indigo-500 shrink-0" />
                   <h3 className="font-bold text-sm">{tl("实时遥测", "Real-time Telemetry")} — {selectedDevice.name}</h3>
-                  {telemetryLoading && <RefreshCw className="w-3 h-3 animate-spin text-slate-400" />}
+                  {telemetryLoading && <RefreshCw className={`w-3 h-3 animate-spin ${styles.cardTextMuted}`} />}
                 </div>
                 {telemetryData.length > 0 ? (
                   <div>
                     <TelemetryMiniChart data={telemetryData} color="#818CF8" height={80} />
                     <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
                       {telemetryData.slice().reverse().map((pt, i) => (
-                        <div key={i} className="flex items-center justify-between text-[10px] font-mono py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
-                          <span className="text-slate-400">{pt.ts}</span>
+                        <div key={i} className={`flex items-center justify-between text-[10px] font-mono py-1 border-b ${styles.divider} last:border-0`}>
+                          <span className={styles.cardTextMuted}>{pt.ts}</span>
                           <span className="font-bold text-indigo-600 dark:text-indigo-400">{pt.value}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-[10px] text-slate-400 py-4 text-center">
+                  <div className={`text-[10px] ${styles.cardTextMuted} py-4 text-center`}>
                     {tl("暂无遥测数据", "No telemetry data available")}
                   </div>
                 )}
@@ -271,7 +271,7 @@ export default function DigitalTwinTab() {
                 
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase block mb-1`}>
                       {tl("指令", "Command")}
                     </label>
                     <input
@@ -283,7 +283,7 @@ export default function DigitalTwinTab() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase block mb-1`}>
                       {tl("参数 (JSON)", "Params (JSON)")}
                     </label>
                     <textarea
@@ -314,11 +314,11 @@ export default function DigitalTwinTab() {
                       <div className="text-emerald-600 dark:text-emerald-400 font-bold mb-1">
                         {tl("指令已发送", "Command Sent")}: {commandResult.command}
                       </div>
-                      <div className="text-slate-500 dark:text-slate-400">
+                      <div className={styles.cardTextMuted}>
                         {tl("状态", "Status")}: {commandResult.status}
                       </div>
                       {Object.keys(commandResult.params).length > 0 && (
-                        <div className="text-slate-400 mt-0.5 break-all">
+                        <div className={`${styles.cardTextMuted} mt-0.5 break-all`}>
                           Params: {JSON.stringify(commandResult.params)}
                         </div>
                       )}
@@ -333,7 +333,7 @@ export default function DigitalTwinTab() {
                   <div className="flex items-center gap-2 mb-3">
                     <Layers className="w-4 h-4 text-indigo-500 shrink-0" />
                     <h3 className="font-bold text-sm">{tl("设备影子", "Device Shadow")}</h3>
-                    <span className="text-[10px] text-slate-400 ml-auto">
+                    <span className={`text-[10px] ${styles.cardTextMuted} ml-auto`}>
                       {tl("遥测计数", "Telemetry count")}: {deviceStatus.telemetryCount}
                     </span>
                   </div>
@@ -341,34 +341,34 @@ export default function DigitalTwinTab() {
                   <div className="space-y-3">
                     {/* Reported */}
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                      <div className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase mb-1.5 flex items-center gap-1`}>
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         {tl("上报状态", "Reported")}
                       </div>
                       <div className="p-2 bg-black/5 dark:bg-white/5 rounded text-[10px] font-mono max-h-32 overflow-y-auto">
                         {Object.keys(deviceStatus.shadow.reported).length > 0 ? (
-                          <pre className="whitespace-pre-wrap break-all text-slate-600 dark:text-slate-300">
+                          <pre className={`whitespace-pre-wrap break-all ${styles.cardText}`}>
                             {JSON.stringify(deviceStatus.shadow.reported, null, 2)}
                           </pre>
                         ) : (
-                          <span className="text-slate-400">{tl("暂无上报数据", "No reported data")}</span>
+                          <span className={styles.cardTextMuted}>{tl("暂无上报数据", "No reported data")}</span>
                         )}
                       </div>
                     </div>
 
                     {/* Desired */}
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                      <div className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase mb-1.5 flex items-center gap-1`}>
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                         {tl("期望状态", "Desired")}
                       </div>
                       <div className="p-2 bg-black/5 dark:bg-white/5 rounded text-[10px] font-mono max-h-32 overflow-y-auto">
                         {Object.keys(deviceStatus.shadow.desired).length > 0 ? (
-                          <pre className="whitespace-pre-wrap break-all text-slate-600 dark:text-slate-300">
+                          <pre className={`whitespace-pre-wrap break-all ${styles.cardText}`}>
                             {JSON.stringify(deviceStatus.shadow.desired, null, 2)}
                           </pre>
                         ) : (
-                          <span className="text-slate-400">{tl("暂无期望配置", "No desired config")}</span>
+                          <span className={styles.cardTextMuted}>{tl("暂无期望配置", "No desired config")}</span>
                         )}
                       </div>
                     </div>
@@ -381,7 +381,7 @@ export default function DigitalTwinTab() {
 
         {/* No device selected prompt */}
         {!selectedDevice && devices.length > 0 && (
-          <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center text-xs text-slate-400">
+          <div className={`border border-dashed ${styles.cardBorder} rounded-xl p-8 text-center text-xs ${styles.cardTextMuted}`}>
             {tl("请点击上方设备卡片查看详情", "Click a device card above to view details")}
           </div>
         )}

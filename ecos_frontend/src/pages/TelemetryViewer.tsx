@@ -84,7 +84,7 @@ function SpanTree({ rootSpans, allSpans }: { rootSpans: SpanDetail[]; allSpans: 
     return (
       <React.Fragment key={span.spanId}>
         <tr className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-          <td className="py-2 px-3 text-xs font-mono text-slate-400">
+          <td className="py-2 px-3 text-xs font-mono text-[var(--card,#94A3B8)]">
             <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
               {hasChildren ? (
                 <button
@@ -303,7 +303,7 @@ export default function TelemetryViewer() {
                           : "hover:bg-white/[0.03]"
                       }`}
                     >
-                      <td className="py-2.5 px-4 font-mono text-xs text-slate-300">
+                      <td className="py-2.5 px-4 font-mono text-xs text-[var(--card,#CBD5E1)]">
                         {shortId}
                       </td>
                       <td className={`py-2.5 px-4 text-sm ${styles.cardText}`}>
@@ -314,7 +314,7 @@ export default function TelemetryViewer() {
                           {trace.spanCount}
                         </span>
                       </td>
-                      <td className="py-2.5 px-4 text-xs text-right font-mono text-slate-400">
+                      <td className="py-2.5 px-4 text-xs text-right font-mono text-[var(--card,#94A3B8)]">
                         {formatDuration(trace.totalDuration_ms)}
                       </td>
                     </tr>
@@ -324,14 +324,14 @@ export default function TelemetryViewer() {
                         <td colSpan={4} className="p-0">
                           <div className="bg-black/10 px-4 py-3 border-b border-white/5">
                             {detailLoading ? (
-                              <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                              <div className={`flex items-center gap-2 text-xs ${styles.cardTextMuted} py-2`}>
                                 <Activity className="w-3.5 h-3.5 animate-spin" />
                                 {locale === "zh" ? "加载 Span 详情…" : "Loading spans…"}
                               </div>
                             ) : traceDetail && traceDetail.spans ? (
                               <table className="w-full text-left">
                                 <thead>
-                                  <tr className="text-[10px] uppercase tracking-wider text-slate-500">
+                                  <tr className={`text-[10px] uppercase tracking-wider ${styles.cardTextMuted}`}>
                                     <th className="py-1.5 px-3 font-medium">Span ID</th>
                                     <th className="py-1.5 px-3 font-medium">Operation</th>
                                     <th className="py-1.5 px-3 font-medium text-right">Duration</th>
@@ -343,7 +343,7 @@ export default function TelemetryViewer() {
                                 </tbody>
                               </table>
                             ) : (
-                              <p className="text-xs text-slate-500 py-2">
+                              <p className={`text-xs ${styles.cardTextMuted} py-2`}>
                                 {locale === "zh" ? "无 Span 数据" : "No span data"}
                               </p>
                             )}

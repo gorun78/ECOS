@@ -41,7 +41,7 @@ export function renderCenterFilters(vm: any) {
                                       disabled={editorMode === 'design'}
                                       checked={activeStatus === st}
                                       onChange={() => handleVariableChange('v_filter_status', st)}
-                                      className="rounded-full text-blue-600 border-slate-300 h-3 w-3 cursor-pointer"
+                                      className={`rounded-full text-blue-600 border ${styles.cardBorder} h-3 w-3 cursor-pointer`}
                                     />
                                     <span className="font-semibold text-xs">
                                       {st === 'ALL' ? '全量展示' : st === 'ON_TIME' ? '准点运行' : st === 'DELAYED' ? '发生延误' : st === 'BOARDING' ? '登机中' : '已取消'}
@@ -75,7 +75,7 @@ export function renderCenterFilters(vm: any) {
                     {editorMode === 'design' && (
                       <button
                         onClick={() => { setAddWidgetSlot('sidebar'); setShowAddWidgetModal(true); }}
-                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[100px] w-full`}
+                        className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[100px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">添加页面筛选栏</span>

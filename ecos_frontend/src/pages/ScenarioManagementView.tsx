@@ -548,7 +548,7 @@ export default function ScenarioManagementView({
           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
             <button
               onClick={() => setShowCopilot(!showCopilot)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? 'bg-blue-600 text-white border-blue-500' : `${styles.cardBg} ${styles.cardTextMuted} border-[var(--border)] hover:bg-slate-800/50`}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? 'bg-blue-600 text-white border-blue-500' : `${styles.cardBg} ${styles.cardTextMuted} border-[var(--border)] hover:opacity-80`}`}
             >
               <LucideIcon name="MessageSquare" size={12} />
               {showCopilot ? t('scenario.copilot.close') : t('scenario.copilot.open')}
@@ -591,7 +591,7 @@ export default function ScenarioManagementView({
                 <div className="flex flex-col gap-2 items-end self-end sm:self-start shrink-0">
                   <span className={`text-xs ${styles.cardTextMuted}`}>
                     {t('scenario.dept')}：{' '}
-                    <span className="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded font-bold text-slate-200">
+                    <span className="text-xs bg-[var(--card,#1E293B)] border border-[var(--card,#334155)] px-2.5 py-1 rounded font-bold text-[var(--card,#E2E8F0)]">
                       {activeScenario.department}
                     </span>
                   </span>
@@ -630,7 +630,7 @@ export default function ScenarioManagementView({
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? 'border-indigo-500 text-indigo-400' : `border-transparent ${styles.cardTextMuted} hover:text-slate-200`}`}
+                    className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? 'border-indigo-500 text-indigo-400' : `border-transparent ${styles.cardTextMuted} hover:text-[var(--card,#E2E8F0)]`}`}
                   >
                     <LucideIcon name={tabIcon[tab]} size={13} />
                     <span>{tabLabel[tab]}</span>

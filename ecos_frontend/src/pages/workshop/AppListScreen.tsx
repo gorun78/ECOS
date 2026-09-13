@@ -23,7 +23,7 @@ export function renderAppListScreen(vm: any) {
             </div>
             <button
               onClick={handleCreateNewApp}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer text-xs"
+              className="px-4 py-2 bg-[var(--card,#020617)] hover:bg-[var(--card,#0B1120)] text-white font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer text-xs"
             >
               <Plus size={14} />
               新建 Workshop 应用

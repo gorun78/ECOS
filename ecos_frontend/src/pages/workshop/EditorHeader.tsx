@@ -12,27 +12,27 @@ export function renderEditorHeader(vm: any) {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setActiveAppId(null)}
-                className={`p-1.5 hover:bg-slate-200 rounded-lg ${styles.cardTextMuted} transition-colors cursor-pointer`}
+                className={`p-1.5 ${styles.sidebarHoverBg} rounded-lg ${styles.cardTextMuted} transition-colors cursor-pointer`}
                 title="返回应用清单"
               >
                 <ArrowLeft size={15} />
               </button>
-              <div className="h-4 w-px bg-slate-300" />
+              <div className="h-4 w-px bg-[var(--card,#CBD5E1)]" />
               <div>
                 <input
                   type="text"
                   value={activeApp.name}
                   onChange={e => handleUpdateAppTheme({}, e.target.value)}
-                  className={`font-bold text-xs ${styles.cardText} bg-transparent hover:bg-slate-200/50 focus:${styles.cardBg} focus:outline-hidden px-1.5 py-0.5 rounded-md transition-all font-sans w-64 border border-transparent focus:border-slate-300`}
+                  className={`font-bold text-xs ${styles.cardText} bg-transparent ${styles.sidebarHoverBg} focus:outline-hidden px-1.5 py-0.5 rounded-md transition-all font-sans w-64 border border-transparent`}
                 />
               </div>
-              <span className={`text-[10px] ${styles.cardTextMuted} bg-slate-200/60 px-1.5 py-0.5 rounded font-mono uppercase`}>
+              <span className={`text-[10px] ${styles.cardTextMuted} ${styles.sidebarBg} px-1.5 py-0.5 rounded font-mono uppercase`}>
                 {activeApp.id}
               </span>
             </div>
 
             {/* Switchers for Edit Mode */}
-            <div className="flex items-center bg-slate-200 p-0.5 rounded-lg border border-slate-300/40">
+            <div className={`flex items-center ${styles.sidebarBg} p-0.5 rounded-lg border ${styles.appBorder}`}>
               <button
                 onClick={() => {
                   setEditorMode('design');

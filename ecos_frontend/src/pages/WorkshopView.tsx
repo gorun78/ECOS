@@ -154,7 +154,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
           {renderEditorHeader(vm)}
           <div className="flex-1 flex overflow-hidden">
             {renderLeftSidebar(vm)}
-            <div className={`flex-1 flex flex-col overflow-hidden ${activeApp?.theme.isDark ? 'bg-slate-950 text-slate-100' : `${styles.sidebarBg} ${styles.cardText}`}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden ${activeApp?.theme.isDark ? 'bg-[var(--card,#020617)] text-[var(--card,#F1F5F9)]' : `${styles.sidebarBg} ${styles.cardText}`}`}>
               {renderCenterCanvas(vm)}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 {renderCenterFilters(vm)}

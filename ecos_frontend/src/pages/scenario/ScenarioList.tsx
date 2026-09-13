@@ -96,8 +96,8 @@ export default function ScenarioList({
               onClick={() => onSelect(scen.id)}
               className={`p-3 rounded-lg border transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-slate-800 border-indigo-500 shadow-md shadow-indigo-950/30'
-                  : `${styles.cardBg} ${styles.cardBorder} hover:border-slate-700 hover:bg-slate-800/50`
+                  ? 'bg-[var(--card,#1E293B)] border-indigo-500 shadow-md shadow-indigo-950/30'
+                  : `${styles.cardBg} ${styles.cardBorder} hover:opacity-80`
               }`}
             >
               <div className="flex items-start justify-between gap-1.5">
@@ -110,7 +110,7 @@ export default function ScenarioList({
                       ? 'bg-red-950 text-red-400 border border-red-900/50'
                       : isHigh
                         ? 'bg-amber-950 text-amber-400 border border-amber-900/50'
-                        : `bg-slate-800 ${styles.cardTextMuted} border border-slate-700`
+                        : `bg-[var(--card,#1E293B)] ${styles.cardTextMuted} border border-[var(--card,#334155)]`
                   }`}
                 >
                   {scen.priority}
@@ -135,7 +135,7 @@ export default function ScenarioList({
                 >
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
-                      isDraft ? 'bg-slate-600' : 'bg-emerald-500 animate-pulse'
+                      isDraft ? 'bg-[var(--card,#475569)]' : 'bg-emerald-500 animate-pulse'
                     }`}
                   />
                   {scen.status}

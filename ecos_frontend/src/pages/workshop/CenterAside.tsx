@@ -85,7 +85,7 @@ export function renderCenterAside(vm: any) {
                             </div>
                           ) : (
                             <div className={`py-8 text-center ${styles.cardTextMuted} flex flex-col items-center justify-center`}>
-                              <Inbox size={20} className="stroke-1 text-slate-300 mb-1" />
+                              <Inbox size={20} className={`stroke-1 ${styles.cardText} mb-1`} />
                               <span>请从表格中选中任意实体查看本体卡片详情</span>
                             </div>
                           )}
@@ -138,7 +138,7 @@ export function renderCenterAside(vm: any) {
                     {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'aside').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('aside'); setShowAddWidgetModal(true); }}
-                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[140px] w-full`}
+                        className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[140px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">放置侧边面板栏</span>

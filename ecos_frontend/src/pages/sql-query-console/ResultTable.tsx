@@ -18,7 +18,7 @@ export default function ResultTable({ result, loading, error }: ResultTableProps
   if (loading) {
     return (
       <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} text-xs gap-2`}>
-        <div className="w-4 h-4 border-2 border-slate-500 border-t-cyan-400 rounded-full animate-spin" />
+        <div className="w-4 h-4 border-2 border-[var(--card,#64748B)] border-t-cyan-400 rounded-full animate-spin" />
         执行中...
       </div>
     );
@@ -74,8 +74,8 @@ export default function ResultTable({ result, loading, error }: ResultTableProps
             {rows.slice(0, 500).map((row: any, i: number) => (
               <tr key={i} className={`hover:bg-white/5 ${i % 2 === 0 ? '' : 'bg-black/10'}`}>
                 {columns.map(col => (
-                  <td key={col} className={`px-3 py-1 ${styles.cardTextMuted} border-b border-slate-800/50 max-w-[300px] truncate`}>
-                    {row[col] === null ? <span className="text-slate-600 italic">NULL</span> : String(row[col])}
+                  <td key={col} className={`px-3 py-1 ${styles.cardTextMuted} border-b ${styles.divider} max-w-[300px] truncate`}>
+                    {row[col] === null ? <span className={`${styles.cardTextMuted} italic`}>NULL</span> : String(row[col])}
                   </td>
                 ))}
               </tr>

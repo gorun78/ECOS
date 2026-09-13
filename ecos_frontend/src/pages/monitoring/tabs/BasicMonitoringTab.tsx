@@ -124,7 +124,7 @@ export default function BasicMonitoringTab() {
             <button 
               onClick={loadData}
               disabled={loading}
-              className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer disabled:opacity-50 text-xs font-bold rounded-lg transition h-8`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} cursor-pointer disabled:opacity-50 text-xs font-bold rounded-lg transition h-8`}
               title={tl("刷新", "Refresh")}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -146,7 +146,7 @@ export default function BasicMonitoringTab() {
           <div className="flex items-center justify-center py-16">
             <div className="flex flex-col items-center gap-3">
               <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-              <p className="text-sm text-slate-400">{tl("加载监控数据...", "Loading monitoring data...")}</p>
+              <p className={`text-sm ${styles.cardTextMuted}`}>{tl("加载监控数据...", "Loading monitoring data...")}</p>
             </div>
           </div>
         )}
@@ -172,14 +172,14 @@ export default function BasicMonitoringTab() {
 
         {/* Empty state */}
         {isEmpty && !loading && (
-          <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 flex flex-col items-center justify-center text-center">
-            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
-              <BarChart3 className="w-10 h-10 text-slate-400" />
+          <div className={`border border-dashed ${styles.cardBorder} rounded-xl p-12 flex flex-col items-center justify-center text-center`}>
+            <div className={`p-4 ${styles.appBg} rounded-full mb-4`}>
+              <BarChart3 className={`w-10 h-10 ${styles.cardTextMuted}`} />
             </div>
-            <h3 className="font-bold text-sm text-slate-500 dark:text-slate-400 mb-2">
+            <h3 className={`font-bold text-sm ${styles.cardTextMuted} mb-2`}>
               {tl("实时监控数据尚未就绪", "Real-time monitoring data not ready")}
             </h3>
-            <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+            <p className={`text-xs ${styles.cardTextMuted} max-w-md leading-relaxed`}>
               {tl("实时监控数据尚未就绪。后台服务连接后，系统指标、图表和告警将在此展示。点击刷新按钮重试。", "Real-time monitoring data is not yet available. Once the backend service is connected, system metrics, charts, and alerts will appear here. Click the refresh button to retry.")}
             </p>
           </div>
@@ -196,11 +196,11 @@ export default function BasicMonitoringTab() {
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="flex-grow min-w-0">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold select-none truncate">
+                    <div className={`text-[10px] font-mono uppercase tracking-wider ${styles.cardTextMuted} font-bold select-none truncate`}>
                       {met.label}
                     </div>
-                    <div className="text-lg font-extrabold mt-1 truncate">{met.value}</div>
-                    <div className="text-[9.5px] text-slate-400 truncate mt-0.5">{met.desc}</div>
+                    <div className={`text-lg font-extrabold mt-1 truncate ${styles.cardText}`}>{met.value}</div>
+                    <div className={`text-[9.5px] ${styles.cardTextMuted} truncate mt-0.5`}>{met.desc}</div>
                   </div>
                 </div>
               );
@@ -256,9 +256,9 @@ export default function BasicMonitoringTab() {
                   <Activity className="w-4 h-4 text-indigo-500 shrink-0" />
                   <h3 className="font-bold text-sm">{tl("进程监控", "Process Monitor")}</h3>
                 </div>
-                <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 text-xs">
+                <div className={`overflow-x-auto rounded border ${styles.cardBorder} text-xs`}>
                   <table className="w-full border-collapse">
-                    <thead className="bg-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider">
+                    <thead className="bg-[var(--card,#334155)] text-[var(--card,#E2E8F0)] font-mono text-[9px] uppercase tracking-wider">
                       <tr>
                         <th className="p-2 text-left">{tl("进程", "Job")}</th>
                         <th className="p-2 text-left">{tl("类型", "Type")}</th>
@@ -288,18 +288,18 @@ export default function BasicMonitoringTab() {
           <div className="lg:col-span-4 space-y-6">
             {alerts.length > 0 && (
               <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-4 shadow-3xs space-y-4`}>
-                <h4 className="text-xs font-extrabold uppercase font-mono tracking-wider text-slate-400 flex items-center gap-2">
+                <h4 className={`text-xs font-extrabold uppercase font-mono tracking-wider ${styles.cardTextMuted} flex items-center gap-2`}>
                   <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" /> {tl("最近告警", "Recent Alerts")}
                 </h4>
                 <div className="space-y-3">
                   {alerts.map((al, idx) => (
-                    <div key={idx} className="p-3 bg-black/5 dark:bg-white/5 rounded text-[11px] leading-normal font-mono border-l-2 border-l-amber-500 border border-slate-200 dark:border-slate-800">
-                      <div className="flex items-center justify-between font-bold text-slate-400">
+                    <div key={idx} className={`p-3 bg-black/5 dark:bg-white/5 rounded text-[11px] leading-normal font-mono border-l-2 border-l-amber-500 border ${styles.cardBorder}`}>
+                      <div className={`flex items-center justify-between font-bold ${styles.cardTextMuted}`}>
                         <span>[{al.level}]</span>
                         <span>{al.time}</span>
                       </div>
-                      <div className="font-semibold text-slate-700 dark:text-slate-300 mt-1">{al.module}</div>
-                      <p className="text-slate-500 dark:text-slate-400 mt-0.5">{al.message}</p>
+                      <div className={`font-semibold ${styles.cardText} mt-1`}>{al.module}</div>
+                      <p className={`${styles.cardTextMuted} mt-0.5`}>{al.message}</p>
                     </div>
                   ))}
                 </div>

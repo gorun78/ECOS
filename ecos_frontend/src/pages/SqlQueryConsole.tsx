@@ -101,7 +101,7 @@ export default function SqlQueryConsole() {
         />
 
         {/* SQL 编辑器 */}
-        <div className="h-[40%] min-h-[120px] border-b border-slate-800">
+        <div className={`h-[40%] min-h-[120px] border-b ${styles.cardBorder}`}>
           <textarea
             value={sql}
             onChange={e => setSql(e.target.value)}

@@ -159,7 +159,7 @@ export function renderWidgetInspector(vm: any) {
                 );
               })() : (
                 <div className={`py-12 text-center ${styles.cardTextMuted} flex flex-col items-center justify-center`}>
-                  <MousePointerClick size={24} className="stroke-1 text-slate-300 mb-2" />
+                  <MousePointerClick size={24} className={`stroke-1 ${styles.cardTextMuted} mb-2`} />
                   <p className="font-semibold text-xs leading-normal">未选中任何元素</p>
                   <p className={`text-[10px] ${styles.cardTextMuted} mt-1 max-w-[150px] leading-relaxed mx-auto`}>请点击左侧组件树或中央设计画布上的任意组件查看属性进行定制。</p>
                 </div>

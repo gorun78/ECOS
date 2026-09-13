@@ -59,7 +59,7 @@ export default function QueryToolbar({
       </div>
 
       {/* 分隔线 */}
-      <div className="w-px h-5 bg-slate-700" />
+      <div className="w-px h-5 bg-[var(--card,#334155)]" />
 
       {/* 执行按钮 */}
       <button
@@ -69,7 +69,7 @@ export default function QueryToolbar({
           flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all
           ${selectedDsId && !isExecuting
             ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer active:scale-95'
-            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+            : `bg-[var(--card,#1E293B)] text-[var(--card,#64748B)] cursor-not-allowed`
           }
         `}
         title="执行 SQL (Ctrl+Enter)"
@@ -85,7 +85,7 @@ export default function QueryToolbar({
       {/* 保存模板按钮 */}
       <button
         onClick={onSaveTemplate}
-        className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 cursor-pointer transition-all active:scale-95"
+        className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-[var(--card,#334155)] hover:bg-[var(--card,#475569)] text-[var(--card,#E2E8F0)] cursor-pointer transition-all active:scale-95"
         title="保存为模板"
       >
         <Icon name="Save" size={13} />
@@ -101,7 +101,7 @@ export default function QueryToolbar({
           flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer
           ${isHistoryOpen
             ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-            : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+            : 'bg-[var(--card,#334155)] hover:bg-[var(--card,#475569)] text-[var(--card,#E2E8F0)]'
           }
         `}
         title="查询历史"
