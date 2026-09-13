@@ -31,6 +31,7 @@ import ObjectTypeDetail from './ontology/ObjectTypeDetail';
 import LinkTypeDetail from './ontology/LinkTypeDetail';
 import ActionTypeDetail from './ontology/ActionTypeDetail';
 import FunctionTypeDetail from './ontology/FunctionTypeDetail';
+import ExportTasksView from './ontology/ExportTasksView';
 import { InterfaceView, SharedPropertyView, DatasetView } from './ontology/OtherViews';
 import GlossaryTab from './knowledge/tabs/GlossaryTab';
 import ObjectExplorerView from './ObjectExplorerView';
@@ -77,6 +78,8 @@ export default function OntologyWorkbenchLayout() {
   const [exportFormat, setExportFormat] = useState<'JSON' | 'CSV' | 'DDL'>('JSON');
   const [exportScope, setExportScope] = useState<'FULL' | 'ENTITIES' | 'RELATIONSHIPS'>('FULL');
   const [exporting, setExporting] = useState(false);
+  // T10: 新建导出任务后的列表刷新信号（ExportTasksView 监听自增即重拉任务列表）
+  const [exportTasksSignal, setExportTasksSignal] = useState(0);
 
   // ── Load Initial Data via custom hook ──
   // T8: domains 不再由 fetchOntologies(本体表) 映射 — 改由 reloadDomains 拉取
@@ -105,7 +108,8 @@ export default function OntologyWorkbenchLayout() {
       };
       await createExportTask(dto);
       showToast('success', t('ow.msg.exportStarted'));
-      setShowExportModal(false);
+      // T10: 创建成功后保持 Modal 打开，刷新右下任务列表并轮询状态闭环
+      setExportTasksSignal(v => v + 1);
     } catch (e: any) {
       showToast('error', t('ow.msg.exportFailed'));
     } finally {
@@ -571,10 +575,10 @@ export default function OntologyWorkbenchLayout() {
         )}
       </main>
 
-      {/* Export Modal — T3: 替换硬编码颜色,统一走 theme tokens */}
+      {/* Export Modal — T3 主题 token；T10 闭环：格式/范围创建 + 任务列表（轮询/下载/删除） */}
       {showExportModal && (
         <div className={`fixed inset-0 ${styles.overlayBg} z-50 flex items-center justify-center`} onClick={() => setShowExportModal(false)}>
-          <div className={`rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-96 ${styles.cardBg} ${styles.cardText}`} onClick={e => e.stopPropagation()}>
+          <div className={`rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-[34rem] max-w-[92vw] max-h-[85vh] overflow-y-auto ${styles.cardBg} ${styles.cardText}`} onClick={e => e.stopPropagation()}>
             <h3 className={`text-sm font-bold mb-3 ${styles.cardText}`}>{t('ow.section.exportPanel')}</h3>
             <div className="space-y-3">
               <div>
@@ -600,12 +604,14 @@ export default function OntologyWorkbenchLayout() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowExportModal(false)} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>Cancel</button>
+                <button onClick={() => setShowExportModal(false)} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>{t('ow.btn.cancel')}</button>
                 <button onClick={handleExportOntology} disabled={exporting}
                   className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}>
-                  {exporting ? '...' : t('ow.btn.exportOntology')}
+                  {exporting ? t('ow.exportTask.creating') : t('ow.btn.exportOntology')}
                 </button>
               </div>
+              {/* T10 导出任务闭环：列表 / 状态轮询 / 下载到本地 / 删除已结束任务 */}
+              <ExportTasksView visible={showExportModal} refreshSignal={exportTasksSignal} onToast={showToast} />
             </div>
           </div>
         </div>

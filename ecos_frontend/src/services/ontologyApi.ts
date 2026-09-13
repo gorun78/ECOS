@@ -1159,6 +1159,50 @@ export async function compileFunction(
 }
 
 // ================================================================
+// 本体导出任务落地下载 — T10
+// 对齐后端 OntologyExportController GET /api/v1/ontology/export/{id}/download
+// 响应为统一返回体 ApiResponse<Object>（payload 随 format: JSON Map / CSV 串 / DDL 串），
+// 非裸 Blob 流 — 需解包 data 字段后再触发浏览器文件保存。
+// ================================================================
+
+/** 导出任务下载文件扩展名（format → 扩展名，unknown 回退 txt） */
+const EXT_FOR_FORMAT: Record<string, string> = {
+  JSON: "json",
+  CSV: "csv",
+  DDL: "sql",
+};
+
+/**
+ * 下载 COMPLETED 导出任务的 payload 并落地为本地文件。
+ * GET /api/v1/ontology/export/{id}/download
+ * 仅 COMPLETED 任务可下载（后端 ONT-EXP-002 校验），失败由 apiFetchData 统一转抛。
+ *
+ * @param id      导出任务 ID
+ * @param format  导出格式（用于推断文件扩展名）
+ * @returns 保存后的文件名
+ */
+export async function downloadExportTask(id: string, format?: string): Promise<string> {
+  const payload = await apiFetchData<unknown>(`${EXPORT_BASE}/${id}/download`);
+  const ext = EXT_FOR_FORMAT[String(format || "").toUpperCase()] || "txt";
+  const content =
+    typeof payload === "string" ? payload : JSON.stringify(payload ?? {}, null, 2);
+  const filename = `ontology-export-${id}.${ext}`;
+
+  const blob = new Blob([content], {
+    type: format === "CSV" ? "text/csv" : "application/octet-stream",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return filename;
+}
+
+// ================================================================
 // 自动发现 (Auto Discover) — T1
 // ================================================================
 
