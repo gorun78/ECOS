@@ -224,4 +224,169 @@ REGEX 恒不命中、保留"），与 T4 目标态一致。本批 T4 = **0 代�
 
 ---
 
+## 9. ef4eca7 后复验（P0-1 证据补录, 2026-09-13）
+
+> 背景：PMO-57 终审检出 **P0-1 证据缺陷**（非代码缺陷）——gateway 修复 commit `ef4eca7`
+> （`excludeFilters` 排除 `CognitiveEngineOpenHealthController`，保历史行为）之后的**成功启动 +
+> 3 端点 curl 实证未入档**（上批口头回报 "102.5s 成功" 但全仓 grep 无落档，验收方无法采信）。
+> 本批次目标：**重建 JAR → 启动 → 端点实证 → 证据入档**，代码零改动。
+> 本章为证据源区：**原文粘贴，禁转述**；时区一律本地 +08:00。
+
+### 9.1 JAR 重建（确保含 ef4eca7）
+
+重建命令（`ecos_backend` 工作目录，2026-09-13 19:42~19:44 本地执行）：
+
+```powershell
+& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -pl gateway -D"skipTests" -D"maven.test.skip=true" -q install
+```
+
+- 退出码：`MVN_EXIT=0`
+- `ef4eca7` commit 时间（`git log -1` 原文）：
+  `ef4eca76f5fb51c34408a96db377fc91a527f692  2026-09-13 12:23:39 +0100  fix(本体): PMO-57 T5 gateway 启动修复 — excludeFilters 排除 cognitive 开放 health 副本 (保历史行为)`
+  （即本地 +08:00 **13:23:39**）
+- 重建后 JAR（`Get-Item` 原文）：
+
+  | 属性 | 值 |
+  |:--|:--|
+  | 文件 | `gateway-1.0.0-SNAPSHOT.jar` |
+  | LastWriteTime | **2026/9/13 19:44:54** |
+  | Length | 147,384,963 bytes（≈140.5 MB） |
+
+**对比判定**：JAR 时间戳 19:44:54 晚于 ef4eca7 commit 本地时间 13:23:39 约 6.4 小时
+→ 本次使用的 JAR **必然包含 ef4eca7 的 excludeFilters 改动**；
+P0-1 疑点"现有 JAR 是 ef0f39c 版本、不含 exclude 改动"以本批现场重建为前提消除，后续启动证据成立。
+
+### 9.2 启动（empirical 过程如实记录，两次前导试跑不入档）
+
+**前导试跑的如实记录**（本批运行期环境坑，非代码缺陷）：
+
+1. **19:47 第一次**：按原脚本 `powershell -ExecutionPolicy Bypass -File _win_tasks\start-gateway.ps1 *> log` 启动。
+   该脚本 `$ErrorActionPreference = 'Stop'`，将 java stderr 的
+   `SLF4J(W): Class path contains multiple SLF4J providers.` 当作 `NativeCommandError` 抛出，
+   中断了进程树——java 未进入 Spring 启动阶段，落盘日志仅 118 B（仅 `[START]` 一行），:8080 无监听。
+   属**启动脚本健壮性已知坑**（stderr 流被 `*>` 并入后触发 EAP），本批未改该脚本（代码零改动红线）。
+2. **19:49 第二次**：inline `java -jar`（参数与脚本等价，见下）+ PowerShell `*>` 重定向。
+   服务实际已起（:8080 LISTEN，PID 126600），3 端点 curl 亦已全过——但 **PowerShell 5 的 `*>`
+   流重定向存在缓冲，进程退出后缓冲未落盘**（日志 0 B），`Started` 行无从取证。
+   该过程佐证"P0-1 口头成功不可采信"的技术成因（相同的启动方式永远逐不出现档）。
+   取证后强杀 126600，:8080 清零，再以 **`Start-Process -RedirectStandardOutput`**（java 直写文件、
+   行级刷新无缓冲）第三次重跑作为**唯一入账来源**。
+
+**入账启动**（第三次）：
+
+```powershell
+$env:JWT_PRIVATE_KEY   = (Get-Content -Raw "$env:USERPROFILE\.config\ecos\jwt-private-key.pem").Trim()   # len=1703
+$env:DEEPSEEK_API_KEY  = <从 ~/.hermes/profiles/gorunkol/.env 取 DEEPSEEK_API_KEY>                        # len=35
+Start-Process java.exe -ArgumentList '-Xms256m','-Xmx1024m','-jar',
+  'D:\...\ecos_backend\gateway\target\gateway-1.0.0-SNAPSHOT.jar','--spring.profiles.active=enterprise' `
+  -RedirectStandardOutput 'D:\...\_win_tasks\gateway-reverify-p0-1.log' -NoNewWindow
+```
+
+（与 `start-gateway.ps1` 同源加载 JWT/DEEPSEEK/enterprise profile/同 jar/同 JVM 参数；
+日志完整落盘 `_win_tasks/gateway-reverify-p0-1.log`，最终 323,241 B）
+
+### 9.3 启动日志三行原文（`Select-String` 原样抓取）
+
+```
+2026-09-13T19:56:46.222+08:00  INFO 135400 --- [ecos-gateway] [           main] c.c.gzcm.gateway.GatewayApplication      : Starting GatewayApplication using Java 17.0.17 with PID 135400 (D:\workspace\javaprojects\ECOS\ecos_backend\gateway\target\gateway-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS\ecos_backend\gateway)
+2026-09-13T19:58:16.832+08:00  INFO 135400 --- [ecos-gateway] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path ''
+2026-09-13T19:58:19.308+08:00  INFO 135400 --- [ecos-gateway] [           main] c.c.gzcm.gateway.GatewayApplication      : Started GatewayApplication in 99.036 seconds (process running for 106.662)
+```
+
+**判定：启动成功，耗时 99.036s**（进程 PID 135400；与上批口头 102.5s 量级一致，
+现已由**落盘原文**替代口头传闻作为准据）。
+
+### 9.4 Ambiguous mapping / bean 双注册残留扫描（命令 + 输出原文）
+
+```powershell
+$log = "D:\workspace\javaprojects\ECOS\_win_tasks\gateway-reverify-p0-1.log"
+"AMBIGUOUS_COUNT="   + (Select-String -Path $log -Pattern "Ambiguous mapping").Count
+"FOUNDED2_COUNT="    + (Select-String -Path $log -Pattern "expected single candidate bean but found 2").Count
+```
+
+```
+AMBIGUOUS_COUNT=0
+FOUNDED2_COUNT=0
+```
+
+**判定：0 / 0** —— `ef4eca7` 的 `excludeFilters` 生效，cognitive2 开放 health 副本
+（§4 冲突方 `ecosCognitiveEngineOpenHealthController`）在本启动中已被排除，
+与 `aiEngineStatusController` 的 mapping 冲突（§4.1 根因）消除。
+
+### 9.5 3 端点 curl 实证（curl.exe 原文, 2026-09-13 19:59 本地）
+
+```powershell
+curl.exe -s -w "`nHTTP_STATUS:%{http_code}`n" http://localhost:8080/api/v1/ecos/workflows
+```
+
+```
+{"code":403,"message":"未认证用户无权访问该资源（需要 L1 及以上）","timestamp":1789300752527,"success":false}
+HTTP_STATUS:403
+```
+
+```powershell
+curl.exe -s -w "`nHTTP_STATUS:%{http_code}`n" http://localhost:8080/api/v1/ecos/workflows/instances
+```
+
+```
+{"code":403,"message":"未认证用户无权访问该资源（需要 L1 及以上）","timestamp":1789300752736,"success":false}
+HTTP_STATUS:403
+```
+
+```powershell
+curl.exe -s -w "`nHTTP_STATUS:%{http_code}`n" http://localhost:8080/api/v1/engine/cognitive/health
+```
+
+```
+{"code":0,"message":"ok","data":{"status":"UP","components":{"engine":"RUNNING","agents":16,"db":"UP"}},"timestamp":1789300752946,"success":true}
+HTTP_STATUS:200
+```
+
+**判定**：
+
+| # | 端点 | HTTP | 响应体关键 | 判定 |
+|:--|:--|:--|:--|:--|
+| 1 | `/api/v1/ecos/workflows` | **403**（非 404/500） | 标准认证拦截体 | **PASS**（路由存活，buszhi workflow 单点经 gateway 路由成立） |
+| 2 | `/api/v1/ecos/workflows/instances` | **403**（非 404/500） | 同上 | **PASS** |
+| 3 | `/api/v1/engine/cognitive/health` | **200** | `data.status=UP`、`data.components.engine=RUNNING`、**`agents=16`**、`db=UP` | **PASS**，且坐实"保 ai 副本"裁定 |
+
+EP3 关键：响应体为 `AiEngineStatusController`（ai-engine 副本，
+§4.4 兼容路线裁定"保历史行为"者）的结构——`agents`/`engine` 键存在；
+**不含** `CognitiveEngineOpenHealthController`（cognitive2）的
+`version/uptimeMs/pipelineCount` 结构 → 路由保留在 ai 侧，与 `ef4eca7` 的排除裁定完全一致。
+
+> 注：403 = 路由存活 + 安全域（Clearance L1）拦截，与 §3.2 :18083 standalone 实证基线语义一致；
+> 200 + 认证 token 的完整功能断言仍待有 token 窗口补跑（§3.2 遗留口径不变）。
+
+### 9.6 进程清理
+
+```powershell
+Stop-Process -Id 135400 -Force                      # → KILLED_135400
+Get-NetTCPConnection -LocalPort 8080 -State Listen  # → 无监听（PORT8080_EMPTY）
+```
+
+- gateway java PID 135400：已强杀
+- `:8080` 监听：**0**（清理实证原文 `PORT8080_EMPTY`）
+- 场景日志 `_win_tasks/gateway-reverify-p0-1.log`（323,241 B）保留于本地供抽检，不入仓
+
+### 9.7 §9 判定汇总（P0-1 闭环）
+
+| 项 | 实证 | 判定 |
+|:--|:--|:--|
+| JAR 含 ef4eca7 | 构建 19:44:54 > commit 13:23:39(本地) | 前提成立 |
+| 启动 | `Started GatewayApplication in 99.036 seconds`（落盘原文） | **PASS** |
+| Ambiguous mapping / found 2 | 0 / 0（grep 输出原文） | **PASS** |
+| workflows ×2 | 403 / 403（非 404/500） | **PASS** |
+| cognitive/health | 200 + ai 结构（`agents`/`engine`） | **PASS**（保 ai 副本坐实） |
+| :8080 清理 | 0 监听 | 完成 |
+
+**P0-1（证据缺陷）闭环判定：复验通过，证据源 = 本章 + 本地日志文件。代码零改动。**
+
+> 遗留（本批复验新发现，非阻塞、不属 PMO-57 范围）：`_win_tasks/start-gateway.ps1` 的
+> `$ErrorActionPreference='Stop'` 与 java 的 SLF4J stderr 警告组合，存在中断启动进程树
+> 的隐患（本批 19:47 首次启动即被触发，§9.2-1）。建议后续 runtime 窗口为脚本加
+> stderr 宽容处理或核用 `-ErrorAction Continue`。移交 PM，以待后续 PMO 裁定。
+
+---
+
 *TRACE: PMO-57 T5 · 生成于 2026-09-13 · node: ecosystem fullstack-implementer*
