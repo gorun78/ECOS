@@ -4,10 +4,13 @@
 
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- PMO-50 P8-A 收尾: 由顶层 common/ 物理迁入 runtime/common-api (保 artifactId 稳定, 20 处依赖零改动)。
+         parent 由 common 改为 runtime; runtime 聚合层新增 <module>common-api</module> -->
     <parent>
         <groupId>com.chinacreator.gzcm</groupId>
-        <artifactId>common</artifactId>
+        <artifactId>runtime</artifactId>
         <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>common-api</artifactId>
