@@ -3,17 +3,19 @@ package com.chinacreator.gzcm.engine.ontology.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
+
+import com.chinacreator.gzcm.engine.ontology.dto.OntologySourceQuery;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologySourceVO;
+import com.chinacreator.gzcm.engine.ontology.service.OntologySourceService;
 
 /**
- * 本体对象来源聚合查询 — PMO-40 批次3 T4a。
+ * 本体对象来源聚合查询 — PMO-40 批次3 T4a → T16-2 强类型重构。
  *
  * <p>聚合 {@code ecos_entity_table_mapping} 表，按本体实体维度返回
  * 来源域（sourceDomain）、原始表（originManifest 即 resource_name）、创建时间。
@@ -23,7 +25,12 @@ import java.util.Map;
  *   <li>GET /api/v1/ecos/ontology/sources — 本体对象来源聚合列表</li>
  * </ul>
  *
- * @author PMO-40 Batch3
+ * <p>T16-2 (2026-09-12)：
+ * <ul>
+ *   <li>SQL 从 Controller 抽到 {@link OntologySourceService}（Controller 不再持 JdbcTemplate，
+ *       与"Controller 不写业务"铁律对齐）</li>
+ *   <li>返回强类型 {@link OntologySourceVO}（替代 {@code Map<String,Object>}）</li>
+ * </ul>
  */
 @RestController
 @RequestMapping({"/api/v1/ecos/ontology", "/api/ecos/ontology"})
@@ -31,10 +38,10 @@ public class OntologySourceController {
 
     private static final Logger log = LoggerFactory.getLogger(OntologySourceController.class);
 
-    private final JdbcTemplate jdbc;
+    private final OntologySourceService sourceService;
 
-    public OntologySourceController(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public OntologySourceController(OntologySourceService sourceService) {
+        this.sourceService = sourceService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -42,46 +49,20 @@ public class OntologySourceController {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * 查询本体对象的来源信息聚合。
-     *
-     * <p>数据来源：{@code ecos_entity_table_mapping} JOIN
-     * {@code ecos_ontology_entity} JOIN {@code ecos_domain}。</p>
+     * 查询本体对象的来源信息聚合（强类型 VO）。
      *
      * @param domainCode 可选，按业务域过滤
      * @param limit      返回行数上限，默认 100，最大 500
      */
     @GetMapping("/sources")
-    public ApiResponse<List<Map<String, Object>>> listSources(
+    public ApiResponse<List<OntologySourceVO>> listSources(
             @RequestParam(required = false) String domainCode,
             @RequestParam(defaultValue = "100") int limit) {
         try {
-            int lim = Math.max(1, Math.min(limit, 500));
-
-            String sql = "SELECT " +
-                "  e.id          AS \"ontologyId\", " +
-                "  d.code        AS \"sourceDomain\", " +
-                "  m.resource_name AS \"originManifest\", " +
-                "  e.created_at  AS \"createdAt\", " +
-                "FROM ecos_entity_table_mapping m " +
-                "INNER JOIN ecos_ontology_entity e " +
-                "  ON e.code = m.entity_code " +
-                "INNER JOIN ecos_domain d " +
-                "  ON d.id = e.domain_id " +
-                "  AND d.code = m.domain_code";
-
-            if (domainCode != null && !domainCode.isBlank()) {
-                sql += " WHERE m.domain_code = ?";
-            }
-            sql += " ORDER BY m.created_at DESC LIMIT ?";
-
-            List<Map<String, Object>> rows;
-            if (domainCode != null && !domainCode.isBlank()) {
-                rows = jdbc.queryForList(sql, domainCode, lim);
-            } else {
-                rows = jdbc.queryForList(sql, lim);
-            }
-
-            return ApiResponse.success(rows);
+            OntologySourceQuery query = new OntologySourceQuery();
+            query.setDomainCode(domainCode);
+            query.setLimit(limit);
+            return ApiResponse.success(sourceService.listSources(query));
         } catch (Exception e) {
             log.error("Failed to query ontology sources: {}", e.getMessage(), e);
             return ApiResponse.internalError("查询本体来源失败: " + e.getMessage());

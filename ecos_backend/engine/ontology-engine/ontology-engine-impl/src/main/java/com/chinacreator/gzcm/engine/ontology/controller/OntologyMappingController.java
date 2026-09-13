@@ -20,18 +20,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingCreateDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingVO;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyMappingService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 本体映射管理 REST API — 将本体对象（实体/属性）映射到外部数据源（表、列、接口等）。
  *
  * <p>持久化委托至 {@link OntologyMappingService}（PostgreSQL 表 ecos_entity_table_mapping）。
- * 映射主键由 UUID 生成。保留原有端点签名不变。</p>
+ * 映射主键由 UUID 生成。保留原有端点签名不变。
  *
  * <h3>端点：</h3>
  * <ul>
@@ -40,10 +42,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li>POST   /api/v1/ontology/mappings            — 创建映射</li>
  *   <li>PUT    /api/v1/ontology/mappings/{id}       — 更新映射</li>
  *   <li>DELETE /api/v1/ontology/mappings/{id}       — 删除映射</li>
- *   <li>GET    /api/v1/ontology/mappings/objects    — 可被映射的本体对象列表（委托 OntologyService.listAllObjects）</li>
+ *   <li>GET    /api/v1/ontology/mappings/objects    — 可被映射的本体对象列表（委托 OntologyService）</li>
  * </ul>
  *
- * <p>本控制器只管理映射端点，不改动 {@link OntologyVersionController} 的现有 CRUD 签名。</p>
+ * <p>T16-2 (2026-09-12)：方法入/出参由 {@code Map<String,Object>} 改为强类型
+ * {@code OntologyMappingVO} / {@code OntologyMappingSaveDTO}（JSDoc 溯源 {@code T16-2}）。
+ * Service 旧 Map 签名保留（C1 mock 兼容）；VO 重载新增。
+ *
+ * <p>本控制器只管理映射端点，不改动 {@code OntologyVersionController} 的现有 CRUD 签名。
  */
 @RestController
 @RequestMapping("/api/v1/ontology/mappings")
@@ -53,7 +59,7 @@ public class OntologyMappingController {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** 共享映射存储（@Component注入，保留以兼容 OntologyService.entityToMap） */
+    /** 共享映射存储（@Component 注入，保留以兼容 {@code OntologyService.entityToMap}） */
     private final OntologyMappingStore mappingStoreRef;
 
     private final OntologyService ontologyService;
@@ -71,84 +77,76 @@ public class OntologyMappingController {
     // ═══════════════ 列表与详情 ═══════════════════
 
     /**
-     * GET /api/v1/ontology/mappings — 映射列表
+     * GET /api/v1/ontology/mappings — 映射列表（强类型 VO）。
      *
      * @param objectId   可选，按本体对象 ID 过滤（映射到 entity_code）
      * @param sourceType 可选，按来源类型过滤（映射到 domain_code）
      */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listMappings(
+    public ApiResponse<List<OntologyMappingVO>> listMappings(
             @RequestParam(required = false) String objectId,
             @RequestParam(required = false) String sourceType) {
-
-        List<Map<String, Object>> rows = mappingService.listMappings(objectId, sourceType);
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            result.add(rowToApiMap(row));
-        }
-        return ApiResponse.success(result);
+        return ApiResponse.success(mappingService.listMappingsVO(objectId, sourceType));
     }
 
     /**
-     * GET /api/v1/ontology/mappings/{id} — 映射详情
+     * GET /api/v1/ontology/mappings/{id} — 映射详情（强类型 VO）。
      */
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getMapping(@PathVariable String id) {
-        Map<String, Object> row = mappingService.findMappingById(id);
-        if (row == null) {
+    public ApiResponse<OntologyMappingVO> getMapping(@PathVariable String id) {
+        OntologyMappingVO vo = mappingService.findMappingByIdVO(id);
+        if (vo == null) {
             return ApiResponse.notFound("映射 " + id + " 不存在");
         }
-        return ApiResponse.success(rowToApiMap(row));
+        return ApiResponse.success(vo);
     }
 
     // ═══════════════ CRUD ═══════════════════
 
     /**
-     * POST /api/v1/ontology/mappings — 创建映射
+     * POST /api/v1/ontology/mappings — 创建映射（强类型 DTO）。
      * <p>Body 必填字段：objectId（本体对象 ID，映射到 entity_code）；
-     * 可选字段：sourceName、sourceType、sourceUri、fieldMappings、description。</p>
-     * <p>兼容旧字段: objectTypeId→objectId, datasetId→sourceType。</p>
+     * 可选字段：sourceName、sourceType、sourceUri、fieldMappings、description。
+     * <p>兼容旧字段: objectTypeId→objectId, datasetId→sourceType。
      */
     @PostMapping
-    public ApiResponse<Map<String, Object>> createMapping(@RequestBody Map<String, Object> body) {
-        // PMO指令字段兼容: objectTypeId→objectId, datasetId→sourceType
-        String objectId = String.valueOf(body.getOrDefault("objectId",
-                body.getOrDefault("objectTypeId", ""))).trim();
-        String datasetId = String.valueOf(body.getOrDefault("datasetId", "")).trim();
-        String sourceType = String.valueOf(body.getOrDefault("sourceType",
-                datasetId.isEmpty() ? "DATASET" : datasetId)).trim();
+    public ApiResponse<OntologyMappingVO> createMapping(@RequestBody OntologyMappingCreateDTO dto) {
+        // PMO 指令字段兼容: objectTypeId → objectId
+        String objectId = (dto.getObjectId() != null && !dto.getObjectId().isBlank())
+            ? dto.getObjectId().trim()
+            : (dto.getObjectTypeId() != null ? dto.getObjectTypeId().trim() : "");
+        String datasetId = dto.getDatasetId() != null ? dto.getDatasetId().trim() : "";
+        String sourceType = (dto.getSourceType() != null && !dto.getSourceType().isBlank())
+            ? dto.getSourceType().trim()
+            : (datasetId.isEmpty() ? "DATASET" : datasetId.trim());
         if (objectId.isEmpty()) {
             return ApiResponse.badRequest("ONT-MAP-001: objectTypeId/objectId 不能为空");
         }
 
         String id = UUID.randomUUID().toString().replace("-", "");
 
-        String sourceName = String.valueOf(body.getOrDefault("sourceName", ""));
-        String sourceUri = String.valueOf(body.getOrDefault("sourceUri", ""));
-        String description = String.valueOf(body.getOrDefault("description", ""));
-        String status = String.valueOf(body.getOrDefault("status", "ACTIVE"));
+        String sourceName = dto.getSourceName() != null ? dto.getSourceName() : "";
+        String sourceUri = dto.getSourceUri() != null ? dto.getSourceUri() : "";
+        String description = dto.getDescription() != null ? dto.getDescription() : "";
+        String status = dto.getStatus() != null ? dto.getStatus() : "ACTIVE";
 
-        // Build field_mappings JSONB: store extended attributes
+        // Build extended_attrs JSONB（包含 objectType/status/description + fieldMappings 等）
         Map<String, Object> extendedAttrs = new LinkedHashMap<>();
-        extendedAttrs.put("objectType", body.getOrDefault("objectType", "ENTITY"));
+        extendedAttrs.put("objectType", dto.getObjectType() != null ? dto.getObjectType() : "ENTITY");
         extendedAttrs.put("objectTypeId", objectId);
         extendedAttrs.put("datasetId", datasetId);
         extendedAttrs.put("sourceType", sourceType);
         extendedAttrs.put("description", description);
         extendedAttrs.put("status", status);
-
-        // Process fieldMappings and propertyMappings
-        Object rawFieldMappings = body.get("fieldMappings");
-        if (rawFieldMappings != null) {
-            extendedAttrs.put("fieldMappings", rawFieldMappings);
+        if (dto.getFieldMappings() != null) {
+            extendedAttrs.put("fieldMappings", dto.getFieldMappings());
         }
-        Object pm = body.get("propertyMappings");
-        if (pm != null) {
-            extendedAttrs.put("propertyMappings", pm);
+        if (dto.getPropertyMappings() != null) {
+            extendedAttrs.put("propertyMappings", dto.getPropertyMappings());
             // 转换为 fieldMappings 数组格式（兼容旧逻辑）
-            if (rawFieldMappings == null && pm instanceof Map) {
+            if (dto.getFieldMappings() == null) {
                 List<Map<String, Object>> fmList = new ArrayList<>();
-                ((Map<?, ?>) pm).forEach((k, v) -> {
+                dto.getPropertyMappings().forEach((k, v) -> {
                     Map<String, Object> fm = new LinkedHashMap<>();
                     fm.put("source", String.valueOf(k));
                     fm.put("target", String.valueOf(v));
@@ -161,7 +159,7 @@ public class OntologyMappingController {
         String fieldMappingsJson;
         try {
             fieldMappingsJson = MAPPER.writeValueAsString(extendedAttrs);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             return ApiResponse.badRequest("ONT-MAP-003: Failed to serialize field mappings: " + e.getMessage());
         }
 
@@ -173,55 +171,53 @@ public class OntologyMappingController {
         mappingStoreRef.store.put(id, apiMap);
         mappingStoreRef.store.put(objectId, apiMap);
 
-        Map<String, Object> created = mappingService.findMappingById(id);
+        OntologyMappingVO created = mappingService.findMappingByIdVO(id);
         log.info("Ontology mapping created: {} objectTypeId={} datasetId={}", id, objectId, datasetId);
-        return ApiResponse.success(rowToApiMap(created));
+        return ApiResponse.success(created);
     }
 
     /**
-     * PUT /api/v1/ontology/mappings/{id} — 更新映射
+     * PUT /api/v1/ontology/mappings/{id} — 更新映射（强类型 DTO）。
      */
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> updateMapping(
+    public ApiResponse<OntologyMappingVO> updateMapping(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody OntologyMappingCreateDTO dto) {
         Map<String, Object> existing = mappingService.findMappingById(id);
         if (existing == null) {
             return ApiResponse.notFound("映射 " + id + " 不存在");
         }
 
         // 读取当前 extended attrs
-        Object fmObj = existing.get("field_mappings");
-        Map<String, Object> currentAttrs = parseFieldMappings(fmObj);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> currentAttrs = parseFieldMappings(existing.get("field_mappings"));
 
-        // 部分更新 extended attrs
-        if (body.containsKey("objectType")) currentAttrs.put("objectType", body.get("objectType"));
-        if (body.containsKey("sourceType")) currentAttrs.put("sourceType", body.get("sourceType"));
-        if (body.containsKey("fieldMappings")) currentAttrs.put("fieldMappings", body.get("fieldMappings"));
-        if (body.containsKey("propertyMappings")) currentAttrs.put("propertyMappings", body.get("propertyMappings"));
-        if (body.containsKey("description")) currentAttrs.put("description", body.get("description"));
-        if (body.containsKey("status")) currentAttrs.put("status", body.get("status"));
+        // 部分更新 extended attrs（与旧 Map 版 body.containsKey 语义一致：仅"非 null"时覆盖）
+        if (dto.getObjectType() != null) currentAttrs.put("objectType", dto.getObjectType());
+        if (dto.getSourceType() != null) currentAttrs.put("sourceType", dto.getSourceType());
+        if (dto.getFieldMappings() != null) currentAttrs.put("fieldMappings", dto.getFieldMappings());
+        if (dto.getPropertyMappings() != null) currentAttrs.put("propertyMappings", dto.getPropertyMappings());
+        if (dto.getDescription() != null) currentAttrs.put("description", dto.getDescription());
+        if (dto.getStatus() != null) currentAttrs.put("status", dto.getStatus());
 
         // 更新表级字段
         StringBuilder sql = new StringBuilder("UPDATE ecos_entity_table_mapping SET updated_at=NOW()");
         List<Object> params = new ArrayList<>();
-
-        if (body.containsKey("sourceName")) {
+        if (dto.getSourceName() != null) {
             sql.append(", entity_name=?, resource_name=?");
-            String sn = String.valueOf(body.get("sourceName"));
+            String sn = dto.getSourceName();
             params.add(sn);
             params.add(sn);
         }
-        if (body.containsKey("sourceType")) {
+        if (dto.getSourceType() != null) {
             sql.append(", domain_code=?");
-            params.add(String.valueOf(body.get("sourceType")));
+            params.add(dto.getSourceType());
         }
-        if (body.containsKey("sourceUri")) {
+        if (dto.getSourceUri() != null) {
             sql.append(", table_schema=?");
-            params.add(String.valueOf(body.get("sourceUri")));
+            params.add(dto.getSourceUri());
         }
 
-        // 序列化 field_mappings
         try {
             sql.append(", field_mappings=?::jsonb");
             params.add(MAPPER.writeValueAsString(currentAttrs));
@@ -232,13 +228,13 @@ public class OntologyMappingController {
         sql.append(" WHERE id=?");
         params.add(id);
 
-        Map<String, Object> updated = mappingService.updateMapping(id, sql, params);
+        OntologyMappingVO updated = mappingService.updateMappingVO(id, sql, params);
         log.info("Ontology mapping updated: {}", id);
-        return ApiResponse.success(rowToApiMap(updated));
+        return ApiResponse.success(updated);
     }
 
     /**
-     * DELETE /api/v1/ontology/mappings/{id} — 删除映射
+     * DELETE /api/v1/ontology/mappings/{id} — 删除映射。
      */
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteMapping(@PathVariable String id) {
@@ -256,65 +252,39 @@ public class OntologyMappingController {
     // ═══════════════ 可映射对象查询 ═══════════════════
 
     /**
-     * GET /api/v1/ontology/mappings/objects — 可被映射的本体对象列表
-     * <p>委托 {@link OntologyService#listAllObjects()} 返回全部实体，前端据此选择映射目标。</p>
+     * GET /api/v1/ontology/mappings/objects — 可被映射的本体对象列表（强类型 VO）。
+     * <p>委托 {@link OntologyService#listEntitiesVO(String)} 返回全量实体
+     * （ontologyId = "" 时包含全部，与 T16-1 既有 VO 重载行为一致）。
      */
     @GetMapping("/objects")
-    public ApiResponse<List<Map<String, Object>>> listMappableObjects() {
-        return ApiResponse.success(ontologyService.listAllObjects());
+    public ApiResponse<List<OntologyEntityVO>> listMappableObjects() {
+        return ApiResponse.success(ontologyService.listEntitiesVO(""));
     }
 
     // ═══════════════ 内部辅助方法 ═══════════════════
 
     /**
-     * 将 ecos_entity_table_mapping 行转换为 API 响应 Map（兼容旧字段名）。
-     */
-    private Map<String, Object> rowToApiMap(Map<String, Object> row) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        String rowId = String.valueOf(row.get("id"));
-        String entityCode = String.valueOf(row.getOrDefault("entity_code", ""));
-        String entityName = String.valueOf(row.getOrDefault("entity_name", ""));
-        String domainCode = String.valueOf(row.getOrDefault("domain_code", ""));
-        String resourceName = String.valueOf(row.getOrDefault("resource_name", ""));
-        String tableSchema = String.valueOf(row.getOrDefault("table_schema", ""));
-
-        // 解析 field_mappings JSONB
-        Object fmObj = row.get("field_mappings");
-        Map<String, Object> attrs = parseFieldMappings(fmObj);
-
-        m.put("id", rowId);
-        m.put("objectId", entityCode);
-        m.put("objectTypeId", entityCode);
-        m.put("datasetId", attrs.getOrDefault("datasetId", domainCode));
-        m.put("objectType", attrs.getOrDefault("objectType", "ENTITY"));
-        m.put("sourceType", domainCode);
-        m.put("sourceName", entityName.isEmpty() ? resourceName : entityName);
-        m.put("sourceUri", tableSchema);
-        m.put("fieldMappings", attrs.getOrDefault("fieldMappings", new ArrayList<>()));
-        m.put("propertyMappings", attrs.getOrDefault("propertyMappings", new LinkedHashMap<>()));
-        m.put("description", attrs.getOrDefault("description", ""));
-        m.put("status", attrs.getOrDefault("status", "ACTIVE"));
-        m.put("createdAt", String.valueOf(row.getOrDefault("created_at", "")));
-        m.put("updatedAt", String.valueOf(row.getOrDefault("updated_at", "")));
-        return m;
-    }
-
-    /**
-     * 解析 field_mappings JSONB (可能是 PGobject, String, 或 Map)。
+     * 解析 field_mappings JSONB（可能是 PGobject / String / Map）— 与旧 {@code rowToApiMap} 行为一致。
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseFieldMappings(Object fmObj) {
-        if (fmObj == null) return new LinkedHashMap<>();
-        if (fmObj instanceof Map) return new LinkedHashMap<>((Map<String, Object>) fmObj);
+        if (fmObj == null) {
+            return new LinkedHashMap<>();
+        }
+        if (fmObj instanceof Map) {
+            return new LinkedHashMap<>((Map<String, Object>) fmObj);
+        }
         try {
-            return MAPPER.readValue(String.valueOf(fmObj), new TypeReference<LinkedHashMap<String, Object>>() {});
+            return MAPPER.readValue(String.valueOf(fmObj), new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() {});
         } catch (Exception e) {
             return new LinkedHashMap<>();
         }
     }
 
     /**
-     * 构建兼容旧 API 的 Map（用于同步到 OntologyMappingStore）。
+     * 构建兼容旧 API 的 Map（用于同步到 {@code OntologyMappingStore}）。
+     * 该 Map 形态仍被 {@code OntologyService.entityToMap} 等历史消费者使用，
+     * 因此保留 Map 形态（与 T16-2"service 旧 Map 签名保留"原则一致）。
      */
     private Map<String, Object> buildApiMap(String id, String objectId, String sourceType,
                                              String sourceName, String sourceUri,
