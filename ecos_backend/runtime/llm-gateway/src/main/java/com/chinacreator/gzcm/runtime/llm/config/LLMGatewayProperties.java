@@ -40,6 +40,8 @@ public class LLMGatewayProperties {
         private int maxConcurrency = 5;
         /** 默认超时（秒） */
         private int defaultTimeout = 600;
+        /** 嵌入模型（POST /embeddings 用）；为空时由调用方传入 */
+        private String embeddingModel = "text-embedding-3-small";
 
         public boolean isRunning() { return running; }
         public void setRunning(boolean running) { this.running = running; }
@@ -51,6 +53,8 @@ public class LLMGatewayProperties {
         public void setMaxConcurrency(int maxConcurrency) { this.maxConcurrency = maxConcurrency; }
         public int getDefaultTimeout() { return defaultTimeout; }
         public void setDefaultTimeout(int defaultTimeout) { this.defaultTimeout = defaultTimeout; }
+        public String getEmbeddingModel() { return embeddingModel; }
+        public void setEmbeddingModel(String embeddingModel) { this.embeddingModel = embeddingModel; }
     }
 
     /**
