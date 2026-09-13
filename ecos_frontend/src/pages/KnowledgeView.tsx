@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft,
   Binary,
-  CardsCheck,
+  ListChecks,
   Database,
   Download,
   FileText,
@@ -44,7 +44,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
   Download,
   FileText,
-  CardsCheck,
+  ListChecks,
   Workflow,
   Database,
   Binary,
