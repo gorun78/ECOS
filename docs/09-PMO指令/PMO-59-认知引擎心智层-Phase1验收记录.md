@@ -132,7 +132,7 @@ V129: CREATE TABLE / 3x CREATE INDEX / 7x COMMENT / INSERT 0 2
 | 1 | `028fa63` | `feat(认知引擎): PMO-59-P1 心智层三表 DDL — evidence/hypothesis/belief (ADR-9 口径, 含 seed)` |
 | 2 | `8fc00e4` | `feat(认知引擎): PMO-59-P1 common-api cognitive VO 契约 (EvidenceRecordVO/HypothesisVO/BeliefDistributionVO) + KafkaTopics.COGNITIVE` |
 | 3 | `98f5cf4` | `feat(认知引擎): PMO-59-P1 心智层 Service 接口契约 (IUncertaintyJudgementService/IHypothesisLifecycleService) + AGENTS ADR-9 三档落盘口径登记` |
-| 4 | 本文档随本批次提交（溯源：`git log --grep "PMO-59"`） | `docs(认知引擎): PMO-59-P1 api-contract 心智层契约登记 + Phase1 验收记录` |
+| 4 | `d3f01a3` | `docs(认知引擎): PMO-59-P1 api-contract 心智层契约登记 (ecos.cognitive topic + Phase2 端点预登记) + Phase1 验收记录` |
 
 分支：`feature/cognitive-mentalevidence-p0`（基于 `feat/ontology-workbench-wave-b` @ `f0b15b7` 拉取）
 溯源命令：`git log --grep "PMO-59" --oneline`
