@@ -98,6 +98,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         com.chinacreator.gzcm.sysman.boot.handler.GlobalExceptionHandler.class,
         // E3: 排除SysManApplication——它有自己的@ComponentScan会注册冲突bean
         com.chinacreator.gzcm.sysman.boot.SysManApplication.class,
+        // PMO-57 T5 (2026-09-13): CognitiveEngineOpenHealthController (PMO-55 E-C 新副本)
+        // 与 ai-engine AiEngineStatusController 同占 GET /api/v1/engine/cognitive/health
+        // 导致 Ambiguous mapping。AiEngineStatusController 整类承载 5 端点 (health/config/
+        // status/start/stop)，历史由它服务该 prefix，排除它会误杀 4 个 ai 专属端点；
+        // 故保 ai 副本、排 cognitive 新副本 (0 行为变化)。cognitive 开放 health 功能
+        // 仅在 cognitive standalone 态 (:18089) 生效。裁定原则: gateway 行为零变化优先。
+        com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineOpenHealthController.class,
     })
 })
 @MapperScan({
