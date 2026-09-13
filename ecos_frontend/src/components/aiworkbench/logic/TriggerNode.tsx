@@ -5,9 +5,11 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { Clock } from 'lucide-react';
+import { useTheme } from '../../ThemeContext';
 import type { LogicNodeData, LogicTriggerConfig } from '../../../types/aiworkbench';
 
 function TriggerNode({ data, selected }: NodeProps<LogicNodeData>) {
+  const { styles } = useTheme();
   const config = data.config as LogicTriggerConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -30,10 +32,10 @@ function TriggerNode({ data, selected }: NodeProps<LogicNodeData>) {
         <span className="text-xs font-bold text-teal-800 truncate flex-1">{data.label}</span>
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor}`} />
       </div>
-      <div className="px-3 py-2 space-y-1 text-[10px] text-slate-500">
+      <div className={`px-3 py-2 space-y-1 text-[10px] ${styles.cardTextMuted}`}>
         <div className="flex justify-between">
           <span className="font-semibold">Cron:</span>
-          <span className="font-mono text-slate-700">{config.cronExpr}</span>
+          <span className={`font-mono ${styles.cardText}`}>{config.cronExpr}</span>
         </div>
         <div className="flex justify-between">
           <span className="font-semibold">TZ:</span>
@@ -42,7 +44,7 @@ function TriggerNode({ data, selected }: NodeProps<LogicNodeData>) {
         {data.duration != null && (
           <div className="flex justify-between">
             <span className="font-semibold">耗时:</span>
-            <span className="font-mono text-slate-700">{data.duration}ms</span>
+            <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}
       </div>

@@ -316,7 +316,7 @@ export default function Sidebar({
 
             {/* Dropdown Menu */}
             {showDomainDropdown && (
-              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y divide-slate-100`}>
+              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y ${styles.divider}`}>
                 {/* 1. Global Panorama Option */}
                 <div
                   onClick={() => {
@@ -918,7 +918,7 @@ export default function Sidebar({
                         type="button"
                         onClick={() => setFormColor(color)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                          isSelected ? 'border-slate-800 scale-110 shadow-sm' : 'border-transparent hover:scale-105'
+                          isSelected ? `${styles.accentBorder} scale-110 shadow-sm` : 'border-transparent hover:scale-105'
                         }`}
                         style={{ backgroundColor:
                           color === 'blue' ? '#3b82f6' :
@@ -955,7 +955,7 @@ export default function Sidebar({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {}} // Handle on parent div click
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none"
+                          className={`rounded ${styles.inputBorder} text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none`}
                         />
                         <span className={`p-0.5 rounded border ${styles.cardBg} ${styles.appBorder} ${styles.muted}`}>
                           <DynamicIcon name={ot.icon} size={11} />
@@ -1001,7 +1001,7 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* 📖 术语库快速入口 — T4: 替换 border-slate-200 与 hover:bg-slate-100 硬编码 → theme tokens */}
+      {/* 📖 术语库快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
       <div className={`border-t ${styles.appBorder} px-3 py-3`}>
         <button
           onClick={() => onSelectCategory('glossary', null)}

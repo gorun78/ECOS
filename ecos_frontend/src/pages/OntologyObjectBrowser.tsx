@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import OntologyWorkbenchSidebar from "../components/ontology-workbench/OntologyWorkbenchSidebar";
 import { useLanguage } from "../components/LanguageContext";
+import { useTheme } from "../components/ThemeContext";
 import { apiFetchData } from "../api";
 import type {
   OntologyDomain,
@@ -118,6 +119,7 @@ const DOMAINS_API = "/api/v1/ontology/domains";
 // ──────────────────────────────────────────────────────────────
 function PropertyRow({ prop }: { prop: PropertyType }) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const isPK = prop.isPrimaryKey;
   const dtStyle = DATATYPE_STYLE[prop.dataType] || "text-slate-300 bg-slate-500/10";
   return (
@@ -129,18 +131,18 @@ function PropertyRow({ prop }: { prop: PropertyType }) {
               <Key size={11} className="text-amber-400" />
             </span>
           )}
-          <span className="text-xs font-medium text-slate-200 truncate">
+          <span className={`text-xs font-medium ${styles.cardText} truncate`}>
             {prop.displayName}
           </span>
         </div>
         {prop.description && (
-          <div className="text-[9px] text-slate-500 mt-0.5 truncate">
+          <div className={`text-[9px] ${styles.cardTextMuted} opacity-80 mt-0.5 truncate`}>
             {prop.description}
           </div>
         )}
       </td>
       <td className="px-3 py-2">
-        <span className="text-[10px] font-mono text-slate-400">{prop.apiName}</span>
+        <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{prop.apiName}</span>
       </td>
       <td className="px-3 py-2">
         <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${dtStyle}`}>
@@ -151,7 +153,7 @@ function PropertyRow({ prop }: { prop: PropertyType }) {
         {isPK ? (
           <span className="text-[9px] text-amber-400 font-semibold">PK</span>
         ) : (
-          <span className="text-[9px] text-slate-600">—</span>
+          <span className={`text-[9px] ${styles.cardTextMuted} opacity-50`}>—</span>
         )}
       </td>
       <td className="px-3 py-2 text-center">
@@ -160,7 +162,7 @@ function PropertyRow({ prop }: { prop: PropertyType }) {
             {t("ontology.browser.property.shared")}
           </span>
         ) : (
-          <span className="text-[9px] text-slate-600">—</span>
+          <span className={`text-[9px] ${styles.cardTextMuted} opacity-50`}>—</span>
         )}
       </td>
     </tr>
@@ -181,17 +183,18 @@ function MetaItem({
   value: React.ReactNode;
   mono?: boolean;
 }) {
+  const { styles } = useTheme();
   return (
     <div className="bg-[#0f1419] border border-[#1E293B] rounded-lg px-3 py-2">
-      <div className="flex items-center gap-1 text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+      <div className={`flex items-center gap-1 text-[9px] ${styles.cardTextMuted} uppercase tracking-wider mb-1`}>
         {icon}
         {label}
       </div>
       <div
-        className={`text-xs text-slate-200 truncate ${mono ? "font-mono" : ""}`}
+        className={`text-xs ${styles.cardText} truncate ${mono ? "font-mono" : ""}`}
         title={typeof value === "string" ? value : undefined}
       >
-        {value || <span className="text-slate-600">—</span>}
+        {value || <span className={`${styles.cardTextMuted} opacity-50`}>—</span>}
       </div>
     </div>
   );
@@ -202,6 +205,7 @@ function MetaItem({
 // ──────────────────────────────────────────────────────────────
 export default function OntologyObjectBrowser() {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [domainsLoading, setDomainsLoading] = useState(true);
   const [selected, setSelected] = useState<ObjectType | null>(null);
@@ -284,18 +288,18 @@ export default function OntologyObjectBrowser() {
         {/* Top Bar */}
         <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[#1E293B] bg-[#141924]">
           <Box className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="text-[11px] font-medium text-slate-300">{t("ontology.browser.title")}</span>
+          <span className={`text-[11px] font-medium ${styles.cardTextMuted}`}>{t("ontology.browser.title")}</span>
           {selected && (
             <>
-              <ChevronRight size={12} className="text-slate-600" />
-              <span className="text-[11px] text-slate-500">{domainName}</span>
-              <ChevronRight size={12} className="text-slate-600" />
-              <span className="text-[11px] font-medium text-slate-200 truncate">
+              <ChevronRight size={12} className={`${styles.cardTextMuted} opacity-50`} />
+              <span className={`text-[11px] ${styles.cardTextMuted} opacity-80`}>{domainName}</span>
+              <ChevronRight size={12} className={`${styles.cardTextMuted} opacity-50`} />
+              <span className={`text-[11px] font-medium ${styles.cardText} truncate`}>
                 {selected.displayName}
               </span>
             </>
           )}
-          <span className="ml-auto text-[10px] text-slate-600 font-mono">
+          <span className={`ml-auto text-[10px] ${styles.cardTextMuted} opacity-50 font-mono`}>
             {domainsLoading ? t("ontology.browser.loadingDomains") : t("ontology.browser.domainCount", { n: domains.length })}
           </span>
         </div>
@@ -359,29 +363,29 @@ export default function OntologyObjectBrowser() {
               <div className="bg-[#141924] border border-[#1E293B] rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1E293B]">
                   <Table2 size={13} className="text-indigo-400" />
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className={`text-xs font-semibold ${styles.cardText}`}>
                     {t("ontology.browser.properties.title")}
                   </span>
-                  <span className="text-[10px] text-slate-500">
+                  <span className={`text-[10px] ${styles.cardTextMuted}`}>
                     {t("ontology.browser.properties.count", { n: selected.properties.length })}
                   </span>
                   <div className="ml-auto relative">
                     <Search
                       size={11}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500"
+                      className={`absolute left-2 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`}
                     />
                     <input
                       value={propSearch}
                       onChange={(e) => setPropSearch(e.target.value)}
                       placeholder={t("ontology.browser.properties.searchPlaceholder")}
-                      className="w-44 bg-[#0b0e14] border border-[#1E293B] rounded-md pl-6 pr-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/40 transition"
+                      className={`w-44 bg-[#0b0e14] border border-[#1E293B] rounded-md pl-6 pr-2 py-1 text-[11px] ${styles.cardText} placeholder:opacity-50 focus:outline-none focus:border-indigo-500/40 transition`}
                     />
                   </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className="text-[9px] uppercase tracking-wider text-slate-500 border-b border-[#1E293B]">
+                      <tr className={`text-[9px] uppercase tracking-wider ${styles.cardTextMuted} border-b border-[#1E293B]`}>
                         <th className="px-3 py-2 font-medium">{t("ontology.browser.properties.column.name")}</th>
                         <th className="px-3 py-2 font-medium">{t("ontology.browser.properties.column.apiName")}</th>
                         <th className="px-3 py-2 font-medium">{t("ontology.browser.properties.column.type")}</th>
@@ -394,7 +398,7 @@ export default function OntologyObjectBrowser() {
                         <tr>
                           <td
                             colSpan={5}
-                            className="px-3 py-8 text-center text-[11px] text-slate-500"
+                            className={`px-3 py-8 text-center text-[11px] ${styles.cardTextMuted}`}
                           >
                             {selected.properties.length === 0
                               ? t("ontology.browser.properties.empty")
@@ -416,15 +420,15 @@ export default function OntologyObjectBrowser() {
                 <div className="bg-[#141924] border border-[#1E293B] rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1E293B]">
                     <Database size={13} className="text-indigo-400" />
-                    <span className="text-xs font-semibold text-slate-200">
+                    <span className={`text-xs font-semibold ${styles.cardText}`}>
                       {t("ontology.browser.mapping.title")}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono truncate">
+                    <span className={`text-[10px] ${styles.cardTextMuted} font-mono truncate`}>
                       {selected.mapping.datasetId}
                     </span>
                   </div>
                   <div className="p-3">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">
+                    <div className={`text-[9px] ${styles.cardTextMuted} uppercase tracking-wider mb-2`}>
                       {t("ontology.browser.mapping.propertyToColumn", { n: Object.keys(selected.mapping.propertyMappings).length })}
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -438,10 +442,10 @@ export default function OntologyObjectBrowser() {
                               key={propId}
                               className="flex items-center gap-1.5 bg-[#0f1419] border border-[#1E293B] rounded px-2 py-1.5"
                             >
-                              <span className="text-[10px] font-mono text-slate-400 truncate">
+                              <span className={`text-[10px] font-mono ${styles.cardText} truncate`}>
                                 {pn}
                               </span>
-                              <ArrowLeft size={9} className="text-slate-600 shrink-0" />
+                              <ArrowLeft size={9} className={`${styles.cardTextMuted} opacity-50 shrink-0`} />
                               <span className="text-[10px] font-mono text-indigo-400 truncate">
                                 {col}
                               </span>
@@ -459,7 +463,7 @@ export default function OntologyObjectBrowser() {
                 <div className="bg-[#141924] border border-[#1E293B] rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1E293B]">
                     <Link2 size={13} className="text-indigo-400" />
-                    <span className="text-xs font-semibold text-slate-200">
+                    <span className={`text-xs font-semibold ${styles.cardText}`}>
                       {t("ontology.browser.interfaces.title")}
                     </span>
                   </div>
@@ -501,6 +505,7 @@ function ObjectHeader({
   const tint = resolveTint(obj.color);
   const badge = STATUS_BADGE[obj.status];
   const { t } = useLanguage();
+  const { styles } = useTheme();
   return (
     <div className="bg-[#141924] border border-[#1E293B] rounded-xl p-4">
       <div className="flex items-start gap-3">
@@ -511,7 +516,7 @@ function ObjectHeader({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-sm font-bold text-white truncate">
+            <h2 className={`text-sm font-bold ${styles.cardText} truncate`}>
               {obj.displayName}
             </h2>
             {badge && (
@@ -522,15 +527,15 @@ function ObjectHeader({
               </span>
             )}
           </div>
-          <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+          <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>
             {obj.apiName} · {obj.id}
           </div>
           {obj.description && (
-            <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+            <p className={`text-[11px] ${styles.cardTextMuted} opacity-80 mt-2 leading-relaxed`}>
               {obj.description}
             </p>
           )}
-          <div className="flex items-center gap-3 mt-2 text-[9px] text-slate-500">
+          <div className={`flex items-center gap-3 mt-2 text-[9px] ${styles.cardTextMuted}`}>
             <span className="flex items-center gap-1">
               <Layers size={9} /> {domainName}
             </span>
@@ -556,13 +561,14 @@ function ObjectHeader({
 // ──────────────────────────────────────────────────────────────
 function EmptyState() {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   return (
-    <div className="h-full flex flex-col items-center justify-center text-slate-500 px-6">
+    <div className={`h-full flex flex-col items-center justify-center ${styles.cardTextMuted} px-6`}>
       <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-4">
         <Box size={28} className="text-indigo-400/60" />
       </div>
-      <p className="text-sm font-medium text-slate-400">{t("ontology.browser.empty.title")}</p>
-      <p className="text-[11px] text-slate-600 mt-1 text-center max-w-xs">
+      <p className={`text-sm font-medium ${styles.cardText} opacity-80`}>{t("ontology.browser.empty.title")}</p>
+      <p className={`text-[11px] ${styles.cardTextMuted} opacity-70 mt-1 text-center max-w-xs`}>
         {t("ontology.browser.empty.description")}
       </p>
     </div>

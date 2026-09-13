@@ -5,6 +5,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { GitBranch } from 'lucide-react';
+import { useTheme } from '../../ThemeContext';
 import type { LogicNodeData, LogicConditionConfig } from '../../../types/aiworkbench';
 
 function ConditionNode({ data, selected }: NodeProps<LogicNodeData>) {
@@ -30,6 +31,7 @@ function ConditionNode({ data, selected }: NodeProps<LogicNodeData>) {
 
 // Re-export with proper diamond style
 function ConditionNodeDiamond({ data, selected }: NodeProps<LogicNodeData>) {
+  const { styles } = useTheme();
   const config = data.config as LogicConditionConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -52,8 +54,8 @@ function ConditionNodeDiamond({ data, selected }: NodeProps<LogicNodeData>) {
         <span className="text-xs font-bold text-indigo-800 truncate flex-1">{data.label}</span>
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor}`} />
       </div>
-      <div className="px-3 py-2 space-y-1 text-[10px] text-slate-500">
-        <div className="font-mono text-slate-700 break-all line-clamp-1">{config.conditionExpr}</div>
+      <div className={`px-3 py-2 space-y-1 text-[10px] ${styles.cardTextMuted}`}>
+        <div className={`font-mono ${styles.cardText} break-all line-clamp-1`}>{config.conditionExpr}</div>
         <div className="flex justify-between gap-2">
           <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded font-bold text-[9px]">
             ✓ {config.thenBranch}
@@ -65,7 +67,7 @@ function ConditionNodeDiamond({ data, selected }: NodeProps<LogicNodeData>) {
         {data.duration != null && (
           <div className="flex justify-between">
             <span className="font-semibold">耗时:</span>
-            <span className="font-mono text-slate-700">{data.duration}ms</span>
+            <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}
       </div>

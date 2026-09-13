@@ -169,7 +169,7 @@ export default function ScenarioSandbox() {
               <strong className="text-2xl font-extrabold tracking-tight" style={{ color: "var(--cardText)" }}>$890M</strong>
               <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{t("cos.kpi.rev.target")}</span>
             </div>
-            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-3.5 overflow-hidden">
+            <div className={`w-full h-1.5 ${styles.appBg} rounded-full mt-3.5 overflow-hidden`}>
               <div className="h-full bg-amber-500" style={{ width: "81%" }}></div>
             </div>
           </div>
@@ -191,7 +191,7 @@ export default function ScenarioSandbox() {
               </strong>
               <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{t("cos.kpi.delay.target")}</span>
             </div>
-            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-3.5 overflow-hidden">
+            <div className={`w-full h-1.5 ${styles.appBg} rounded-full mt-3.5 overflow-hidden`}>
               <div className="h-full bg-red-500" style={{ width: "33%" }}></div>
             </div>
           </div>
@@ -211,7 +211,7 @@ export default function ScenarioSandbox() {
               <strong className="text-2xl font-extrabold text-green-600 tracking-tight">{t("cos.kpi.safety.val")}</strong>
               <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{t("cos.kpi.safety.target")}</span>
             </div>
-            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-3.5 overflow-hidden">
+            <div className={`w-full h-1.5 ${styles.appBg} rounded-full mt-3.5 overflow-hidden`}>
               <div className="h-full bg-green-500" style={{ width: "100%" }}></div>
             </div>
           </div>
