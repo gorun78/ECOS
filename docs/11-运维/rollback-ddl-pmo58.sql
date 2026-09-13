@@ -259,15 +259,27 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================
 
 -- ============================================================
--- § (d) 4 条外键回滚 (T3 中止留痕补充)
+-- § (d) 4 条外键回滚 (T3 中止留痕补充 + PMO-58 续批 Step 0 精确定义快照)
 --   来源: 见 docs/10-审查证据/pmo-58/pmo58-abort-evidence.md
---   若 V126 已执行 DROP TABLE 且需要恢复 FK 约束 (含跨引擎的
---   wk_cognitive 侧), 按本段 ALTER ADD CONSTRAINT 重建. 列存在性
---   以 (a) 8 表 DDL 为准:
+--         docs/10-审查证据/pmo-58/pmo58-execution-evidence.md
+--   若 V126 已执行 DROP TABLE 且需要恢复 FK 约束, 按本段 ALTER ADD
+--   CONSTRAINT 重建. 列存在性以 (a) 8 表 DDL 为准:
 --     - 3 条 FK 附着 8 ghost 表之间: property→entity / entity→domain /
---       business_glossary→domain
+--       business_glossary→domain (ghost 表全部 DROP 后随表无附着点,
+--       本段仅在 (a)+(b) 重建 8 表之后执行才有意义)
 --     - fk_cog_goal_domain 附着 ecos_cognitive.ecos_wm_goal (07 脚本侧建)
+--
+-- ----------------------------------------------------------------
+-- (d.0) FK 精确定义快照 (执行时刻新鲜数据, 2026-09-13 13:22:13Z,
+--       psql pg_get_constraintdef 原文, 容器 ecos-postgres / sys_man)
+-- ----------------------------------------------------------------
+--   fk_onto_prop_ent   | FOREIGN KEY (entity_id) REFERENCES ecos_ontology.ecos_ontology_entity(id)
+--   fk_onto_ent_domain | FOREIGN KEY (domain_id) REFERENCES ecos_ontology.ecos_domain(id)
+--   fk_onto_gloss_domain | FOREIGN KEY (domain_id) REFERENCES ecos_ontology.ecos_domain(id)
+--   fk_cog_goal_domain | FOREIGN KEY (domain_id) REFERENCES ecos_ontology.ecos_domain(id)
+--   (4 条全为无 ON DELETE/ON UPDATE 子句的 bare FK, 默认 NO ACTION)
 -- ============================================================
+
 ALTER TABLE ecos_ontology.ecos_ontology_property
     ADD CONSTRAINT fk_onto_prop_ent
     FOREIGN KEY (entity_id) REFERENCES ecos_ontology.ecos_ontology_entity(id);
@@ -280,8 +292,14 @@ ALTER TABLE ecos_ontology.ecos_business_glossary
     ADD CONSTRAINT fk_onto_gloss_domain
     FOREIGN KEY (domain_id) REFERENCES ecos_ontology.ecos_domain(id);
 
--- 以下 1 条 FK 属认知引擎 schema, 不在 PMO-58 8 表死锁范围内;
--- 回滚仅留档, 需 PMO 授权后手动执行:
-ALTER TABLE ecos_cognitive.ecos_wm_goal
-    ADD CONSTRAINT fk_cog_goal_domain
-    FOREIGN KEY (domain_id) REFERENCES ecos_ontology.ecos_domain(id);
+-- ============================================================
+-- fk_cog_goal_domain — **永久废弃不重建** (PMO-58 终态, PM 已裁定)
+-- 原定义: ALTER TABLE ecos_cognitive.ecos_wm_goal
+--     ADD CONSTRAINT fk_cog_goal_domain
+--     FOREIGN KEY (domain_id) REFERENCES ecos_ontology.ecos_domain(id);
+-- 不重建原因: 其指向对象 ecos_ontology.ecos_domain 系 PMO-58 授权 DROP
+-- 的 0 行 ghost 表, 重建将形成悬空引用 (除非同时恢复 ecos_domain 表);
+-- 参照语义已死 (ghost 表无数据, 认知侧无代码引用该 FK)。
+-- 如未来确需恢复: 须先经 (a)+(b) 恢复 ecos_domain 表及数据, 再加回
+-- 上面 ALTER ADD CONSTRAINT, 并同步评估 ON DELETE SET NULL 语义。
+-- ============================================================
