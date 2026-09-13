@@ -830,6 +830,8 @@
   "ow.version.diff.no_diff": "No differences between the two versions",
   "ow.version.diff.old": "old",
   "ow.version.diff.removed": "Removed",
+  "ow.version.diff.source_backend": "Backend computed",
+  "ow.version.diff.source_local": "Local fallback",
   "ow.version.hint": "Click a version to diff against the previous one; double-click to set it as the diff base",
   "ow.version.label.base": "First version snapshot",
   "ow.version.snapshot": "v{v} snapshot"

@@ -830,6 +830,8 @@
   "ow.version.diff.no_diff": "两个版本无差异",
   "ow.version.diff.old": "旧值",
   "ow.version.diff.removed": "移除",
+  "ow.version.diff.source_backend": "后端计算",
+  "ow.version.diff.source_local": "本地降级计算",
   "ow.version.hint": "单击版本与上一版本对比；双击版本设为对比基线",
   "ow.version.label.base": "首个版本快照",
   "ow.version.snapshot": "v{v} 快照"

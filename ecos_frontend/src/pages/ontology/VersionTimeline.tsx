@@ -5,12 +5,14 @@
  * 单击版本卡 → vs 前一版本；双击版本卡 → 设为对比基线（自选两两对比）。
  *
  * T11 联调策略（前后端契约铁律，快照 raw 动态结构豁免对齐 T16-4）：
- * 1. 主数据源：两侧版本详情 GET /api/v1/ecos/versions/{id} 拉全量 snapshot，
- *    本地按后端 VersionDiffController 同语义（顶层 key 逐值比对）计算
- *    added / removed / modified，集合类字段下钻到元素粒度
- * 2. 交叉验证：GET /api/v1/ontology/versions/diff?v1=..&v2=..
- *    （VersionDiffController，T16-4 强类型 OntologyVersionDiffVO），
- *    失败不阻断核心展示（快照详情已独立验证可获取）
+ * 1. 版本元数据：两侧版本详情 GET /api/v1/ecos/versions/{id} 拉全量 snapshot
+ *    （快照 preview 展示 + 本地降级 diff 数据源）
+ * 2. diff 消费源收口（T11-P1）：
+ *    - 后端成功：GET /api/v1/ontology/versions/diff?v1=..&v2=..
+ *      （VersionDiffController，T16-4 强类型 OntologyVersionDiffVO）
+ *      返回有效条目列表 → 直接消费后端 added/removed/modified（标签+明细同源）
+ *    - 后端失败/空 → 降级本地 computeSnapshotDiff（对齐后端 diffField/
+ *      diffModified 同语义，集合类字段下钻到元素粒度），前端标注来源
  *
  * @license Apache-2.0
  */
@@ -265,6 +267,8 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
   const [selected, setSelected] = useState<VersionItem | null>(null);
   const [baseId, setBaseId] = useState<string | null>(null);
   const [diffData, setDiffData] = useState<VersionDiff | null>(null);
+  /** diff 消费来源：backend=后端 diff 端点成功直用 / local=本地降级计算 */
+  const [diffSource, setDiffSource] = useState<'backend' | 'local'>('local');
   const [diffLoading, setDiffLoading] = useState(false);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [snapExpanded, setSnapExpanded] = useState(false);
@@ -295,11 +299,16 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
     return auto;
   }, [versions]);
 
-  /** 拉取两侧版本详情并计算 diff；后端 diff 端点交叉验证（失败降级） */
+  /**
+   * 拉取两侧版本详情并产出 diff；消费源优先级（T11-P1）：
+   * 后端 diff 端点成功且有有效条目 → 直用后端三组列表；
+   * 后端失败/空列表 → 本地 computeSnapshotDiff 降级（含集合下钻）。
+   */
   const runDiff = useCallback(async (target: VersionItem, base: VersionItem | null) => {
     setDiffLoading(true);
     setDiffError(null);
     setDiffData(null);
+    setDiffSource('local');
     setSnapExpanded(false);
     try {
       const details = await Promise.all(
@@ -309,26 +318,47 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
       const s1: JsonObj = base ? (isObj(details[1].snapshot) ? details[1].snapshot : {}) : {};
       const s2: JsonObj = isObj(tgt.snapshot) ? tgt.snapshot : {};
 
-      // T16-4 强类型端点交叉验证（version1/version2 字段口径对齐）
-      let backendV1: string | undefined;
-      let backendV2: string | undefined;
+      // 后端 diff 端点：成功且有有效条目 → 后端直用（标签+明细同源，消除语义偏差）
+      let backendDiff: VersionDiff | null = null;
       if (base) {
         try {
           const bres = await fetchOntologyVersionDiff(base.id, target.id);
-          backendV1 = bres.version1 ?? bres.version1Id;
-          backendV2 = bres.version2 ?? bres.version2Id;
-        } catch {
-          // 端点暂不可用时降级为本地快照对比（详情接口成功已证明快照可获取）
+          const hasEntries =
+            (bres.added?.length ?? 0) + (bres.removed?.length ?? 0) + (bres.modified?.length ?? 0) > 0;
+          if (hasEntries) {
+            backendDiff = {
+              version1: bres.version1,
+              version2: bres.version2,
+              added: bres.added ?? [],
+              removed: bres.removed ?? [],
+              modified: bres.modified ?? [],
+            };
+          }
+        } catch (e) {
+          // 4xx/网络异常留痕，降级本地快照对比（详情接口成功已证明快照可获取）
+          console.warn('T11: backend diff failed, fallback to local compute', e);
         }
       }
 
-      setDiffData({
-        version1: backendV1 ?? base?.versionNo,
-        version2: backendV2 ?? target.versionNo,
-        snapshot1: s1,
-        snapshot2: s2,
-        ...computeSnapshotDiff(s1, s2),
-      });
+      if (backendDiff) {
+        // 后端粒度直用：条目即后端 VO 语义（整字段粒度直接使用，不做前端二次下钻）
+        setDiffSource('backend');
+        setDiffData({
+          ...backendDiff,
+          snapshot1: s1,
+          snapshot2: s2,
+        });
+      } else {
+        // 本地降级：computeSnapshotDiff（null-value key 边界 + 集合下钻与后端存在已知偏差）
+        setDiffSource('local');
+        setDiffData({
+          version1: base?.versionNo,
+          version2: target.versionNo,
+          snapshot1: s1,
+          snapshot2: s2,
+          ...computeSnapshotDiff(s1, s2),
+        });
+      }
     } catch (err) {
       setDiffError(err instanceof Error ? err.message : t('ow.version.diff.loading_failed'));
     } finally {
@@ -494,9 +524,14 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
                   ) : (
                     <>
                       {counts && (
-                        <div className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>
-                          {ti(t, 'ow.version.diff.countSuffix',
-                            { added: String(counts.added), removed: String(counts.removed), modified: String(counts.modified) })}
+                        <div className={`flex items-center justify-between gap-2 text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>
+                          <span className="min-w-0 truncate">
+                            {ti(t, 'ow.version.diff.countSuffix',
+                              { added: String(counts.added), removed: String(counts.removed), modified: String(counts.modified) })}
+                          </span>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded ${styles.sidebarHoverBg}`}>
+                            {diffSource === 'backend' ? t('ow.version.diff.source_backend') : t('ow.version.diff.source_local')}
+                          </span>
                         </div>
                       )}
                       <DiffSection
