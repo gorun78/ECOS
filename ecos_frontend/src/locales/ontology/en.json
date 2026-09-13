@@ -787,5 +787,19 @@
   "ow.tab.parametersDesc": "Define the required inputs for this action. Can be basic types or object instances.",
   "ow.tab.properties": "Properties",
   "ow.tab.propertiesDesc": "Define the core properties of this object type. A unique primary key must be set.",
-  "ow.tab.validationDesc": "Define pre-execution intercept conditions. The action can only be submitted when validation expressions evaluate to true."
+  "ow.tab.validationDesc": "Define pre-execution intercept conditions. The action can only be submitted when validation expressions evaluate to true.",
+  "ow.version.base": "Diff base",
+  "ow.version.diff.added": "Added",
+  "ow.version.diff.baseExplicit": "Snapshot diff vs {version}",
+  "ow.version.diff.countSuffix": "added {added} · removed {removed} · modified {modified}",
+  "ow.version.diff.loading": "Computing version diff...",
+  "ow.version.diff.loading_failed": "Failed to load version diff, please retry",
+  "ow.version.diff.modified": "Modified",
+  "ow.version.diff.new": "new",
+  "ow.version.diff.no_diff": "No differences between the two versions",
+  "ow.version.diff.old": "old",
+  "ow.version.diff.removed": "Removed",
+  "ow.version.hint": "Click a version to diff against the previous one; double-click to set it as the diff base",
+  "ow.version.label.base": "First version snapshot",
+  "ow.version.snapshot": "v{v} snapshot"
 }

@@ -787,5 +787,19 @@
   "ow.tab.parametersDesc": "定义运行该操作所必需的输入。可以是基本类型或本系统内的对象实例。",
   "ow.tab.properties": "属性定义",
   "ow.tab.propertiesDesc": "定义构成此对象类型的所有核心属性。其中必须设定唯一的主键。",
-  "ow.tab.validationDesc": "定义执行操作前的拦截限制条件。只有当验证表达式计算结果为真时，该操作才允许被提交到本体。"
+  "ow.tab.validationDesc": "定义执行操作前的拦截限制条件。只有当验证表达式计算结果为真时，该操作才允许被提交到本体。",
+  "ow.version.base": "对比基线",
+  "ow.version.diff.added": "新增",
+  "ow.version.diff.baseExplicit": "与 {version} 的快照对比",
+  "ow.version.diff.countSuffix": "新增 {added} · 移除 {removed} · 修改 {modified}",
+  "ow.version.diff.loading": "正在计算版本差异...",
+  "ow.version.diff.loading_failed": "版本差异加载失败，请重试",
+  "ow.version.diff.modified": "修改",
+  "ow.version.diff.new": "新值",
+  "ow.version.diff.no_diff": "两个版本无差异",
+  "ow.version.diff.old": "旧值",
+  "ow.version.diff.removed": "移除",
+  "ow.version.hint": "单击版本与上一版本对比；双击版本设为对比基线",
+  "ow.version.label.base": "首个版本快照",
+  "ow.version.snapshot": "v{v} 快照"
 }

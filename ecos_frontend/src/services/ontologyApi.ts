@@ -833,42 +833,68 @@ export const ontologyApi = {
 
 const VERSION_BASE = "/api/v1/ecos/versions";
 
-/** 版本列表项 */
+/** 版本列表项 — 对齐后端 OntologyVersionVO (T16-5 简化端点强类型化) */
 export interface VersionItem {
-  version: string;
+  /** 版本 ID（ver 前缀，diff 端点定位键） */
+  id: string;
+  /** 版本号（如 1.0.0） */
+  versionNo: string;
+  /** 状态（Draft / Published / Deprecated） */
+  status?: string;
+  /** 发布人 */
+  publisher?: string;
+  /** 发布时间 ISO 字符串 */
+  publishedAt?: string;
+  /** 创建时间 ISO 字符串 */
   createdAt: string;
-  author: string;
-  summary?: {
-    addedEntities: number;
-    modifiedEntities: number;
-    deletedEntities: number;
-  };
-}
-
-/** 版本差异中的实体变更 */
-export interface VersionDiffEntity {
-  entityCode: string;
-  entityName: string;
-  changeType: 'added' | 'modified' | 'deleted';
-  propertiesAdded?: { name: string; type: string }[];
-  propertiesModified?: { name: string; oldType: string; newType: string }[];
-  propertiesDeleted?: string[];
-}
-
-/** 版本差异响应 */
-export interface VersionDiff {
-  v1: string;
-  v2: string;
-  entities: VersionDiffEntity[];
 }
 
 /**
- * 获取版本历史列表
- * GET /api/v1/ecos/versions?domainCode=finance
- * PMO-41: 路径由 /api/v1/ontology/versions 对齐后端实际路径
- * OntologyVersionSimpleController @RequestMapping("/api/v1/ecos/versions")。
- * 原 ?domainCode= 查询参数后端未消费（列表为全量跨 ontology），
- * 签名为 API 只增不改原则保留；前端如需按 ontology 过滤应在客户端本地过滤。
+ * 版本 diff 条目 — 对齐后端 OntologyVersionDiffVO 动态条目契约（T16-4 强类型容器，
+ * added/removed/modified 元素保持 {field, value[, newValue]} 动态结构豁免）。
+ */
+export interface VersionDiffEntry {
+  /** 变更的快照顶层字段名（entities / properties / relationships / actions） */
+  field: string;
+  /** 旧值（added 条目 = 新值；removed 条目 = 旧值；快照动态结构，Object 映射豁免） */
+  value: unknown;
+  /** 新值（仅 modified 条目填充） */
+  newValue?: unknown;
+}
+
+/**
+ * 版本差异响应 — 对齐后端 OntologyVersionDiffVO 字段（T16-4）。
+ * 正常分支: version1/version2 + snapshot1/snapshot2 + added/removed/modified；
+ * 空 diff 分支: version1Id/version2Id + 三空列表（NON_NULL 按需输出，故均可选）。
+ */
+export interface VersionDiff {
+  version1?: string;
+  version2?: string;
+  version1Id?: string;
+  version2Id?: string;
+  /** 第一版本快照（动态 JSON，T16-4 豁免） */
+  snapshot1?: unknown;
+  /** 第二版本快照（动态 JSON，T16-4 豁免） */
+  snapshot2?: unknown;
+  added?: VersionDiffEntry[];
+  removed?: VersionDiffEntry[];
+  modified?: VersionDiffEntry[];
+}
+
+/** 与前一版本 diff 响应 — 对齐后端 OntologyVersionPreviousDiffVO (T16-5) */
+export interface VersionPreviousDiff {
+  currentVersion: string;
+  currentSnapshot?: unknown;
+  previousVersion?: string;
+  previousSnapshot?: unknown;
+}
+
+/**
+ * 获取版本历史列表（跨全部 ontology，按创建时间由新到旧）
+ * GET /api/v1/ecos/versions
+ * 后端返回 OntologyVersionVO 列表（T16-5 强类型）；
+ * domainCode 参数按 API 只增不改原则保留，当前后端未消费，
+ * 前端如需按 ontology 过滤应在客户端本地过滤。
  */
 export async function fetchVersions(domainCode: string): Promise<VersionItem[]> {
   return apiFetchData<VersionItem[]>(
@@ -877,15 +903,28 @@ export async function fetchVersions(domainCode: string): Promise<VersionItem[]> 
 }
 
 /**
- * 获取两个版本之间的 diff
- * GET /api/v1/ontology/versions/diff?v1=3.1&v2=3.2
- * 说明: PMO-39 T3 将补齐该端点；后端现状仅有按 id 的 diff-with-previous
- * (GET /api/v1/ecos/versions/{id}/diff)，故此处路径本批次保持不变，
- * 待后端落地后再校。
+ * 获取版本详情（含全量 snapshot）
+ * GET /api/v1/ecos/versions/{id}
+ * 用于版本 diff 对比：前后端契约铁律 — 列表摘要不渲染编辑态，
+ * 对比前必须拉取两侧完整快照。
  */
-export async function fetchVersionDiff(v1: string, v2: string): Promise<VersionDiff> {
+export async function fetchVersionDetail(id: string): Promise<VersionItem & { snapshot?: unknown }> {
+  return apiFetchData<VersionItem & { snapshot?: unknown }>(
+    `${VERSION_BASE}/${encodeURIComponent(id)}`
+  );
+}
+
+/**
+ * 获取两个版本之间的 diff（T11 联调真实端点 — 后端 T16-4 强类型）
+ * GET /api/v1/ontology/versions/diff?v1={versionId1}&v2={versionId2}
+ * 后端契约: VersionDiffController（ontology-engine-impl，PMO-39 批次2 T3），
+ * v1/v2 为版本 ID（ver 前缀），非版本号；两版本需分属同一快照可比。
+ * 返回 OntologyVersionDiffVO（version1/version2[/version1Id/version2Id]/
+ * snapshot1/snapshot2/added/removed/modified），raw 动态值豁免。
+ */
+export async function fetchOntologyVersionDiff(v1Id: string, v2Id: string): Promise<VersionDiff> {
   return apiFetchData<VersionDiff>(
-    `${VERSION_BASE}/diff?v1=${encodeURIComponent(v1)}&v2=${encodeURIComponent(v2)}`
+    `/api/v1/ontology/versions/diff?v1=${encodeURIComponent(v1Id)}&v2=${encodeURIComponent(v2Id)}`
   );
 }
 
