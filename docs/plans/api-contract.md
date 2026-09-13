@@ -114,6 +114,275 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | GET | `/api/v1/ecos/workflow` | 前端 | 工作流定义 | — |
 | POST | `/api/v1/knowledge/sync` | **→ dccheng**（进程内，见 §3.4 注） | 本体→KG 同步 | 异步 |
 
+#### 3.3.1 ontology-engine 全量 Controller 端点登记（T19 追加，只增不改）
+
+> 2026-09-12（本体工作台 Wave D T19）：buszhi 节原有 5 行仅为服务间契约摘要，与本节并存、**未删改**。
+> 下表按 ontology-engine-impl 实际 Controller 逐一登记（代码为唯一真源，路径均核验 `@RequestMapping`/`@*Mapping` 字面）。
+> 完整路径 = 类级 base + 端点 Path。**T12 安全切面**：[OntologySecurityInterceptor](file:///d:/workspace/javaprojects/ECOS/ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/security/OntologySecurityInterceptor.java#L79-L82) 切点
+> `execution(* ...controller.Ontology*Controller.*(..))` 命中 24 个 `Ontology*` 前缀
+> Controller（写操作 401 强制 + 审计；读操作 RLS/CLS/脱敏）；下表以 ✅/❌ 标注。
+> **Wave 来源**：T7 = Wave B 工作台对象 CRUD；T8 = 前端现用域别名 API；T10 = 导出任务闭环（Wave C）；
+> T12 = 安全切点（独立切面，非本表端点）；T16-x = 强类型 VO/DTO 改造（T16-1/2/3/5 见各 Controller Javadoc）。
+
+**Controller base path 总表（30 Controller / 117 端点方法）**：
+
+| Controller | base path(s) | 端点数 | T12 切点 | Wave 来源 |
+|:--|:--|:--:|:--:|:--|
+| ActionTypeController | `/api/v1/ontology/action-types` | 6 | ❌ | — |
+| AutoDiscoverController | `/api/v1/ecos` | 2 | ❌ | — |
+| AutoDiscoverPreviewController | `/api/v1/ecos/domains`（+ `/api/ecos/domains` 别名） | 1 | ❌ | — |
+| EcosMappingFullController | `/api/v1/ecos/mappings` | 1 | ❌ | — |
+| FunctionController | `/api/v1/ontology/functions` | 5 | ❌ | — |
+| GlossaryController | `/api/v1/ontology/glossary` | 5 | ❌ | — |
+| LineageController | `/api/v1/lineage` | 11 | ❌ | — |
+| OntologyActionApiController | `/api/v1/ontology/actions` | 2 | ✅ | — |
+| OntologyActionController | `/api/v1/ecos` | 7 | ✅ | T16-x |
+| OntologyCompatController | `/api/ontology` | 4 | ✅ | 兼容旧前缀（无 v1） |
+| OntologyConfigController | `/api/v1/engine/ontology/settings` | 5 | ✅ | T16-x |
+| OntologyController | `/api/v1/ecos/ontologies` | 18 | ✅ | T16-x |
+| OntologyCopilotController | `/api/v1/engine/ontology/copilot` | 4 | ✅ | T16-3 |
+| OntologyDataController | `/api/v1/ontology/data` | 7 | ✅ | — |
+| OntologyDomainApiController | `/api/v1/ontology` | 12 | ✅ | **T8**（前端现用）+ T16-2 强类型 |
+| OntologyDomainController | `/api/v1/ecos/domains` | 8 | ✅ | — |
+| OntologyEngineStatusController | `/api/v1/engine/ontology` | 5 | ✅ | T16-5 |
+| OntologyExportController | `/api/v1/ontology/export` | 6 | ✅ | **T10**（Wave C 导出闭环） |
+| OntologyGitController | `/api/v1/engine/ontology/git` | 3 | ✅ | — |
+| OntologyGraphController | `/api/v1/engine/ontology/graph` | 3 | ✅ | — |
+| OntologyMappingController | `/api/v1/ontology/mappings` | 6 | ✅ | T16-x |
+| OntologyPropertyController | `/api/v1/ecos/entities` | 5 | ✅ | T16-x |
+| OntologyProposalController | `/api/v1/ontology/proposals` | 11 | ✅ | T16-x |
+| OntologyRelationshipController | `/api/v1/ecos` | 10 | ✅ | T16-x |
+| OntologyRuleController | `/api/v1/ecos` | 6 | ✅ | — |
+| OntologySourceController | `/api/v1/ecos/ontology`（+ `/api/ecos/ontology` 别名） | 1 | ✅ | — |
+| OntologyVersionController | `/api/v1/ecos/ontologies`（versions 段） | 7 | ✅ | T16-x |
+| OntologyVersionSimpleController | `/api/v1/ecos/versions` | 5 | ✅ | T16-x |
+| OntologyWorkbenchObjectController | `/api/v1/ecos/ontologies`（objects 段） | 5 | ✅ | **T7**（V121 新表 `ecos_ontology_workbench_object`） |
+| OntologyWorkflowController | `/api/v1/engine/ontology/workflow`（+ `/api/engine/ontology/workflow` 别名） | 7 | ✅ | — |
+| VersionDiffController | `/api/v1/ontology`（+ `/api/ontology` 别名） | 1 | ❌ | T11 前端接真实 diff |
+| WorkflowController | `/api/v1/ecos/workflows` | 17 | ❌ | — |
+
+> ❌ 说明：`ActionType / AutoDiscover(Preview) / EcosMappingFull / Function / Glossary / Lineage / VersionDiff / Workflow` 8 个类名不以 `Ontology` 开头，**不在 T12 切点**，无安全切面拦截；写操作不强制 401，属既知安全敞口（如需覆盖另行立项）。
+
+**子表 1：本体/域/实体/关系/动作（ecos 前缀）**
+
+| Controller | Method + Path | 返回类型 | Wave 来源 |
+|:--|:--|:--|:--|
+| OntologyController | GET / | `List<OntologyVO>` | T16-1 |
+| | POST / | `OntologyVO` | T16-1 |
+| | PUT /`{id}` | `OntologyVO` | T16-1 |
+| | DELETE /`{id}` | `String` | — |
+| | GET /`{ontologyId}/relationships` | `List<Map<String,Object>>` | — |
+| | GET /`{ontologyId}/entities` | `List<OntologyEntityVO>` | T16-1 |
+| | POST /`{ontologyId}/entities` | `OntologyEntityVO` | T16-1 |
+| | PUT /`{ontologyId}/entities/{entityId}` | `OntologyEntityVO` | T16-1 |
+| | DELETE /`{ontologyId}/entities/{entityId}` | `String` | — |
+| | GET /entities/`{entityId}` | `OntologyEntityDetailVO` | T16-1 |
+| | GET `/entities/{entityId}/dependencies` | `OntologyEntityDependenciesVO` | T16-1 |
+| | GET /entities/`{entityId}/properties` | `List<OntologyPropertyVO>` | T16-1 |
+| | POST /entities/`{entityId}/properties` | `OntologyPropertyVO` | T16-1 |
+| | PUT /entities/`{entityId}/properties/{propId}` | `OntologyPropertyVO` | T16-1 |
+| | DELETE /entities/`{entityId}/properties/{propId}` | `String` | — |
+| | GET /entities/`{entityId}/relationships` | `List<OntologyRelationshipVO>` | T16-1 |
+| | GET /relationships | `List<OntologyRelationshipVO>` | T16-1 |
+| | POST /entities/`{entityId}/relationships` | `OntologyRelationshipVO` | T16-1 |
+| | DELETE /entities/`{entityId}/relationships/{relId}` | `String` | — |
+| | GET /domains/`{domainCode}/entities` | `List<OntologyEntityVO>` | T16-1 |
+| | POST /domains/`{domainCode}/entities` | `OntologyEntityVO` | T16-1 |
+| OntologyDomainController | GET / | `List<...>` 域列表 | — |
+| | POST / | 域创建 | — |
+| | GET /`{domainCode}` | 域详情 | — |
+| | PUT /`{domainCode}` | 域更新 | — |
+| | DELETE /`{domainCode}` | 域删除 | — |
+| | POST /`{domainCode}/publish` | 域发布 | — |
+| | POST /`{domainCode}/deprecate` | 域废弃 | — |
+| | GET `/search` | 域搜索 | — |
+| | GET /`{domainCode}/entities` | 域内实体 | — |
+| OntologyDomainApiController（T8 前端现用） | GET `/domains` | `List<OntologyDomainVO>` | T8 + T16-2 |
+| | GET `/domains/search` | `List<OntologyDomainVO>` | T8 + T16-2 |
+| | POST `/domains` | `OntologyDomainVO` | T8 + T16-2 |
+| | PUT `/domains/{id}` | `OntologyDomainVO` | T8 + T16-2 |
+| | DELETE `/domains/{id}` | `String` | T8 |
+| | GET `/objects` | `List<OntologyEntityVO>` | T8 + T16-2 |
+| | PUT `/objects/{id}/domain` | `OntologyDomainReassignVO` | T8 + T16-2 |
+| | POST `/objects` | `OntologyEntityVO` | T8 + T16-2 |
+| | PUT `/objects/{id}` | `OntologyEntityVO` | T8 + T16-2 |
+| | DELETE `/objects/{id}` | `DeleteResultVO` | T8 + T16-2 |
+| | GET `/links` | `List<OntologyRelationshipVO>` | T8 + T16-2 |
+| | POST `/links` | `OntologyRelationshipVO` | T8 + T16-2 |
+| | DELETE `/links/{id}` | `DeleteResultVO` | T8 + T16-2 |
+| OntologyWorkbenchObjectController（T7） | GET `/  {ontologyId}/objects`（`?type=` 可省） | `List<OntologyWorkbenchObjectVO>`；type ∈ action/interface/shared_property/function/dataset | T7 V121 |
+| | GET `/{ontologyId}/objects/{fileId}` | `OntologyWorkbenchObjectVO` | T7 |
+| | POST `/{ontologyId}/objects` | `OntologyWorkbenchObjectVO` | T7 |
+| | PUT `/{ontologyId}/objects/{fileId}` | `OntologyWorkbenchObjectVO` | T7 |
+| | DELETE `/{ontologyId}/objects/{fileId}` | `String`（逻辑删除 is_deleted=1 + status=ARCHIVED，列表过滤、详情不可查） | T7 |
+| OntologyPropertyController | GET `/ {entityId}/properties` | `List<OntologyPropertyVO>` …（注：类 base `/api/v1/ecos/entities`，方法路径 `/{entityId}/properties**`） | T16-x |
+| | POST `/{entityId}/properties` | `OntologyPropertyVO` | T16-x |
+| | GET `/{entityId}/properties/{propId}` | `OntologyPropertyVO` | T16-x |
+| | PUT `/{entityId}/properties/{propId}` | `OntologyPropertyVO` | T16-x |
+| | DELETE `/{entityId}/properties/{propId}` | `String` | — |
+| OntologyRelationshipController | GET `/entities/{entityId}/relationships` | `List<OntologyRelationshipVO>` | T16-x |
+| | GET `/relationships` | `List<OntologyRelationshipVO>` | T16-x |
+| | GET `/relationships/{relId}` | `OntologyRelationshipVO` | — |
+| | POST `/entities/{entityId}/relationships` | `OntologyRelationshipVO` | T16-x |
+| | POST `/relationships` | `OntologyRelationshipVO` | T16-x |
+| | PUT `/relationships/{relId}` | `OntologyRelationshipVO` | T16-x |
+| | DELETE `/entities/{entityId}/relationships/{relId}` | `String` | — |
+| | DELETE `/relationships/{relId}` | `String` | — |
+| | POST `/relationships/validate` | `OntologyRelationshipValidateVO` | T16-x |
+| | GET `/relationships/graph` | `Map<String,Object>` 图 | — |
+| OntologyActionController | GET `/entities/{entityId}/actions` | `List<OntologyActionVO>` | T16-x |
+| | GET `/actions` | `List<OntologyActionVO>` | T16-x |
+| | GET `/actions/{actionId}` | `OntologyActionVO` | T16-x |
+| | POST `/entities/{entityId}/actions` | `OntologyActionVO` | T16-x |
+| | PUT `/actions/{actionId}` | `OntologyActionVO` | T16-x |
+| | DELETE `/actions/{actionId}` | `String` | — |
+| | POST `/actions/{actionId}/test` | `OntologyActionResultVO` | T16-x |
+| OntologyActionApiController | POST `/{id}/execute` | `OntologyActionResultVO` | — |
+| | GET `/{id}/proposals` | `List<OntologyActionProposalVO>`（占位空列表） | — |
+| OntologyRuleController | GET `/entities/{entityId}/rules` | 规则列表 | — |
+| | POST `/entities/{entityId}/rules` | 规则创建 | — |
+| | GET `/rules` | 规则列表 | — |
+| | GET `/rules/{ruleId}` | 规则详情 | — |
+| | PUT `/rules/{ruleId}` | 规则更新 | — |
+| | DELETE `/rules/{ruleId}` | 规则删除 | — |
+| OntologySourceController | GET `/sources` | 源列表 | — |
+| EcosMappingFullController | GET `/full` | `List<EcosMappingFullVO>`（手写 ETag/If-None-Match 304） | — |
+| AutoDiscoverController | POST `/domains/{domainCode}/auto-discover` | `List<OntologyAutoDiscoverResultVO>` | — |
+| | GET `/entity-mappings` | `List<OntologyAutoDiscoverMappingVO>` | — |
+| AutoDiscoverPreviewController | POST `/domains/{domainCode}/auto-discover/preview` | `Map<String,Object>`（动态结构） | — |
+
+**子表 2：版本/导出/提案/词汇/函数/类型（ontology 前缀）**
+
+| Controller | Method + Path | 返回类型 | Wave 来源 |
+|:--|:--|:--|:--|
+| OntologyVersionController | GET `/{ontologyId}/versions` | 版本列表 | T16-x |
+| | POST `/{ontologyId}/versions` | 版本创建 | T16-x |
+| | GET `/{ontologyId}/versions/{versionId}` | 版本详情 | T16-x |
+| | POST `/{ontologyId}/versions/{versionId}/publish` | 发布 | T16-x |
+| | POST `/{ontologyId}/versions/{versionId}/rollback` | 回滚 | T16-x |
+| | POST `/{ontologyId}/versions/{versionId}/deprecate` | 废弃 | T16-x |
+| | GET `/{ontologyId}/versions/{v1}/diff/{v2}` | 版本 diff | T16-x |
+| | POST `/{ontologyId}/versions/publish-from-proposal/{proposalId}` | 提案发布 | — |
+| OntologyVersionSimpleController | GET / | 版本列表 | T16-x |
+| | POST / | 版本创建 | T16-x |
+| | GET `/  {id}` | 版本详情 | T16-x |
+| | GET `/{id}/diff` | 版本 diff（T11 前端接真实快照对比） | T16-x |
+| | POST `/{id}/publish` | 发布 | T16-x |
+| VersionDiffController | GET `/versions/diff` | 版本 diff | T11 |
+| OntologyExportController | GET `/tasks` | 导出任务列表 | **T10**（Wave C 修复对齐） |
+| | GET `/{id}` | 任务详情 | T10 |
+| | POST /（`/? 创建导出任务`) | 任务创建 | T10 |
+| | GET `/{id}/download` | 文件下载 | T10 |
+| | DELETE `/{id}` | 任务删除 | T10 |
+| | GET / | 导出整体数据 | — |
+| OntologyProposalController | GET / | `List<OntologyProposalVO>` | T16-x |
+| | GET `/{id}` | `OntologyProposalVO` | T16-x |
+| | POST / | `OntologyProposalVO`（`?proposalType=` 可省） | T16-x |
+| | PUT `/{id}` | `OntologyProposalVO` | T16-x |
+| | DELETE `/{id}` | 提案删除 | — |
+| | POST `/{id}/submit` | 提交 | — |
+| | POST `/{id}/approve` | `OntologyProposalVO` | T16-x |
+| | POST `/{id}/reject` | `OntologyProposalVO` | T16-x |
+| | POST `/{id}/verify` | 校验 | — |
+| | POST `/{id}/execute` | 执行 | — |
+| | POST `/{id}/approve-and-publish` | `OntologyProposalPublishVO` | T16-x |
+| OntologyMappingController | GET / | `List<OntologyMappingVO>` | T16-x |
+| | GET `/{id}` | `OntologyMappingVO` | T16-x |
+| | POST / | `OntologyMappingVO` | T16-x |
+| | PUT `/{id}` | `OntologyMappingVO` | T16-x |
+| | DELETE `/{id}` | 映射删除 | — |
+| | GET `/objects` | 映射对象列表 | — |
+| GlossaryController | GET / | `Map<String,Object>`（根信息） | — |
+| | GET `/terms` | `List<OntologyGlossaryVO>` | — |
+| | POST `/terms` | `OntologyGlossaryVO` | — |
+| | PUT `/terms/{id}` | `OntologyGlossaryVO` | — |
+| | DELETE `/terms/{id}` | `String` | — |
+| FunctionController | POST `/test` | `FunctionResult` | — |
+| | POST `/compile` | `OntologyFunctionCompileVO` | T16-x |
+| | GET `/{propertyId}/execute` | `FunctionResult` | — |
+| | GET `/audit` | `OntologyFunctionAuditVO` | — |
+| | GET `/whitelist` | `List<String>` | — |
+| ActionTypeController | POST / | `ActionType` | — |
+| | GET /（`?objectTypeId=` 可省） | `List<ActionType>` | — |
+| | GET `/{id}` | `ActionType` | — |
+| | PUT `/{id}` | `ActionType` | — |
+| | DELETE `/{id}` | `String` | — |
+| | POST `/{id}/execute` | `ActionTypeExecuteVO` | — |
+| OntologyCompatController（旧前缀兼容） | GET `/mappings` | 映射列表 | 兼容 |
+| | POST `/mappings` | 映射创建 | 兼容 |
+| | GET `/export` | 导出 | 兼容 |
+| | GET `/entities/{entityType}/instances` | 实例列表 | 兼容 |
+
+**子表 3：数据/血缘/工作流（GraphQL 无关）**
+
+| Controller | Method + Path | 返回类型 | Wave 来源 |
+|:--|:--|:--|:--|
+| OntologyDataController | GET /（`?type=**` 可省) | `Map<String,Object>` | — |
+| | GET `/objects` | `List<Map<String,Object>>` | — |
+| | GET `/{id}` | 数据详情 | — |
+| | POST / | 数据创建 | — |
+| | PUT `/{id}` | 数据更新 | — |
+| | DELETE `/{id}` | 数据删除 | — |
+| | DELETE / | 批量删除 | — |
+| LineageController | GET / | `List<Map<String,Object>>`（`?source/**` 可省） | — |
+| | GET `/{id}` | `Map<String,Object>` | — |
+| | POST / | `Map<String,Object>`（入参 `Map<blob>`） | — |
+| | PUT `/{id}` | `Map<String,Object>` | — |
+| | DELETE `/{id}` | `String` | — |
+| | GET `/graph` | `Map<String,Object>` | — |
+| | GET `/trace/{nodeId}` | `Map<String,Object>` | — |
+| | GET `/entities` | `List<Map<String,Object>>` | — |
+| | POST `/parse` | `LineageParseResponse`（入参 `SqlLineageRequest`) | — |
+| | GET `/events`（`?format=` 可省) | `List<Map<String,Object>>` | — |
+| | GET `/impact`（`?rootObject=` 可省) | `Map<String,Object>` | — |
+| WorkflowController | GET / | 工作流定义列表 | — |
+| | GET `/{id}` | 工作流详情 | — |
+| | POST / | 工作流创建 | — |
+| | PUT `/{id}` | 工作流更新 | — |
+| | DELETE `/{id}` | 工作流删除 | — |
+| | PATCH `/{id}/publish` | 发布 | — |
+| | POST `/{id}/test` | 测试 | — |
+| | POST `/validate` | 校验 | — |
+| | POST `/{id}/preview` | 预览 | — |
+| | POST `/{id}/clone` | 克隆 | — |
+| | GET `/{id}/export` | 导出 | — |
+| | POST `/{id}/start` | 启动 | — |
+| | GET `/instances` | 实例列表 | — |
+| | GET `/instances/{instanceId}` | 实例详情 | — |
+| | POST `/instances/{instanceId}/suspend` | 挂起 | — |
+| | POST `/instances/{instanceId}/resume` | 恢复 | — |
+| | POST `/instances/{instanceId}/terminate` | 终止 | — |
+| OntologyWorkflowController | GET `/definitions` | 工作流定义 | — |
+| | POST `/definitions` | 定义创建 | — |
+| | GET `/instances` | 实例列表 | — |
+| | POST `/instances` | 实例创建 | — |
+| | GET `/instances/{id}` | 实例详情 | — |
+| | POST `/instances/{id}/approve` | 实例审批 | — |
+| | POST `/instances/{id}/reject` | 实例驳回 | — |
+| OntologyGitController | POST `/commit/{ontologyId}` | Git 提交 | — |
+| | POST `/pull/{ontologyId}` | Git 拉取 | — |
+| | POST `/load` | Git 加载 | — |
+| OntologyGraphController | GET `/{ontologyId}` | 图谱（按本体） | — |
+| | GET `/full` | 全量图谱 | — |
+| | GET `/trace/{nodeId}` | 节点追踪 | — |
+| OntologyCopilotController | POST `/entity` | `Map<String,Object>`（T16-3 动态结构豁免） | T16-3 |
+| | POST `/relation` | `Map<String,Object>` | T16-3 |
+| | POST `/validate` | `Map<String,Object>` | T16-3 |
+| | POST `/import` | `Map<String,Object>` | T16-3 |
+| OntologyConfigController | GET / | `List<OntologyConfigVO>` | T16-x |
+| | GET `/defaults` | `OntologyConfigDefaultVO` | T16-x |
+| | GET `/  {group}` | `List<OntologyConfigVO>` | T16-x |
+| | PUT / | `Map<String,Object>`（批量更新） | T16-x |
+| | POST `/refresh` | `OntologyConfigRefreshVO` | T16-x |
+| OntologyEngineStatusController | GET `/health` | `HealthCheck` | T16-5 |
+| | GET `/config` | `Map<String,Object>`（T16-5 动态结构豁免） | T16-5 |
+| | GET `/status` | `OntologyEngineStatusVO` | T16-5 |
+| | POST `/start` | `OntologyEngineStatusVO` | T16-5 |
+| | POST `/stop` | `OntologyEngineStatusVO` | T16-5 |
+
+**变更记录**：
+- 2026-09-12：本体工作台 Wave D T19 — 新增 §3.3.1 节完整登记 ontology-engine-impl 全部 30 Controller / 117 端点方法（代码为唯一真源、已逐一核验 `@RequestMapping`）；§3.3 原有 5 行表保留不动（服务间契约摘要）；T12 安全切点覆盖 24/30 由前缀 `Ontology*` 切点决定，其余 8 类不在切点。
+
 ### 3.4 dccheng（KB + Cognitive 合并，端口 18086）
 
 | Method | Path | 调用方 | 用途 | 说明 |
