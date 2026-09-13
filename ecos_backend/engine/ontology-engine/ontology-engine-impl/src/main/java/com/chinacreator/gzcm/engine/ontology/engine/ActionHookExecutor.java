@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import com.chinacreator.gzcm.common.engine.IActionHookExecutor;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -37,7 +38,7 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
  * <p>关键约束：Hook 执行异常不阻塞主流程（捕获 + log）。
  */
 @Component
-public class ActionHookExecutor {
+public class ActionHookExecutor implements IActionHookExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(ActionHookExecutor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();

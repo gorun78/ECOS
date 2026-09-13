@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import com.chinacreator.gzcm.common.engine.IFunctionPropertyEvaluator;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -37,7 +38,7 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
  * 计算异常返回 null + log error，不抛500。
  */
 @Component
-public class FunctionEvaluator {
+public class FunctionEvaluator implements IFunctionPropertyEvaluator {
 
     private static final Logger log = LoggerFactory.getLogger(FunctionEvaluator.class);
 

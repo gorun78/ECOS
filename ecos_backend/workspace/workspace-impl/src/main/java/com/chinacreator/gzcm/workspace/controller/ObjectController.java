@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
 import com.chinacreator.gzcm.common.engine.StateMachineEngine;
-import com.chinacreator.gzcm.engine.ontology.engine.FunctionEvaluator;
+import com.chinacreator.gzcm.common.engine.IFunctionPropertyEvaluator;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import com.chinacreator.gzcm.workspace.service.ObjectKgSyncService;
@@ -39,7 +39,7 @@ public class ObjectController {
 private static final Logger log = LoggerFactory.getLogger(ObjectController.class);
     private final ObjectRuntimeService runtimeService;
     private final StateMachineEngine stateMachineEngine;
-    private final FunctionEvaluator functionEvaluator;
+    private final IFunctionPropertyEvaluator functionEvaluator;
     private final AbacQueryFilter abacFilter;
     private final ObjectKgSyncService kgSyncService;
 
@@ -50,7 +50,7 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
     private static final Map<String, Set<String>> COLUMNS_CACHE = new ConcurrentHashMap<>();
 
     public ObjectController(ObjectQueryService objectQueryService, ObjectRuntimeService runtimeService,
-                             StateMachineEngine stateMachineEngine, FunctionEvaluator functionEvaluator,
+                             StateMachineEngine stateMachineEngine, IFunctionPropertyEvaluator functionEvaluator,
                              AbacQueryFilter abacFilter, ObjectKgSyncService kgSyncService) {
         this.objectQueryService = objectQueryService;
         this.runtimeService = runtimeService;

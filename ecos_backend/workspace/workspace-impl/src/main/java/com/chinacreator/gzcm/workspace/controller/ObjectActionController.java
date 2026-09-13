@@ -15,8 +15,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.engine.IActionHookExecutor;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
-import com.chinacreator.gzcm.engine.ontology.engine.ActionHookExecutor;
 import com.chinacreator.gzcm.workspace.service.ObjectActionService;
 
 /**
@@ -40,11 +40,11 @@ public class ObjectActionController {
 
     private static final Logger log = LoggerFactory.getLogger(ObjectActionController.class);
     private final ObjectRuntimeService runtimeService;
-    private final ActionHookExecutor hookExecutor;
+    private final IActionHookExecutor hookExecutor;
     private final ObjectActionService objectActionService;
 
     public ObjectActionController(ObjectActionService objectActionService, ObjectRuntimeService runtimeService,
-                                   ActionHookExecutor hookExecutor) {
+                                   IActionHookExecutor hookExecutor) {
         this.objectActionService = objectActionService;
         this.runtimeService = runtimeService;
         this.hookExecutor = hookExecutor;

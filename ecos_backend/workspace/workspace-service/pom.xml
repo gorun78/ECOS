@@ -67,6 +67,19 @@
             <artifactId>data-engine-impl</artifactId>
             <version>${databridge.version}</version>
         </dependency>
+        <!-- ★ G4 断链（PMO-50 决策2）：workspace-impl 不再 library 依赖 ontology/buszhi，
+             独立部署 :18090 需真实 bean（FunctionEvaluator/ActionHookExecutor）
+             实现 common-api 接口，由本 boot 模块显式持有 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ontology-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
