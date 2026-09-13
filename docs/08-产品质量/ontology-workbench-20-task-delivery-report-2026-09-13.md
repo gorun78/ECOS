@@ -56,10 +56,10 @@
 |:-:|:--|:--|
 | 1 | T13 datanet `/resources/{id}/fields` 端点未落地（stub fail-soft） | 与 datanet owner 对齐后落端点 |
 | 2 | T14 kb `graph/sync` 端点 + body 契约未落地（stub fail-soft） | 与 kb owner 对齐（真实端点 `POST /api/v1/knowledge/sync/trigger` 不读 body） |
-| 3 | **P1：ontology-engine-impl → buszhi-impl 跨引擎反向依赖**（pom + import 双实证） | 随 workflow 物理收敛断链，或契约上提 buszhi-api；已登记 `docs/11-运维/t18-route-consolidation-checklist.md` |
+| 3 | **P1：ontology-engine-impl → buszhi-impl 跨引擎反向依赖**（pom + import 双实证） | 已立项 [PMO-57](../04-本体/PMO-57-本体引擎跨引擎反向依赖断链.md)（契约上提 buszhi-api / 物理收敛断链 + workflow 路由单点化） |
 | 4 | workflow 同路由双副本（gateway/buszhi 双向互斥 exclude 存续） | 物理下线前置：buszhi 聚合 E2E + 线上流量方向核查（当前存活侧是 ontology，与原方向相反） |
 | 5 | T7 新端点 VO 不走 T12 RLS/CLS（interceptor 仅适配 Map/List\<Map\>） | 下一波 interceptor 适配 VO |
-| 6 | `ecos_ontology` schema 8 张 0 行 ghost 表 | 物理 DROP 需 PMO 专项（V122 已逐表 COMMENT 登记） |
+| 6 | `ecos_ontology` schema 8 张 0 行 ghost 表 | 已立项 [PMO-58](../04-本体/PMO-58-ecos-ontology-schema-ghost表物理清理.md)（V123 DROP + 回滚 DDL 留档 + 执行前 0 行终验） |
 | 7 | FunctionTypeDetail 死代码 ~23 行 / 旧 downloadExport 无消费者 | 下波顺手清理 |
 | 8 | 8 个 Controller 不在 T12 pointcut（Ontology 前缀缺失：Workflow/Function/Glossary 等） | 契约文档已 ❌ 标注，建议下一波扩 pointcut 或改类名 |
 
