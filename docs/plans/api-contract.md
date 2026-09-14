@@ -407,9 +407,22 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 
 > **认知心智层 P0（PMO-59，2026-09-13，ADR-9）**：三张心智状态表已落库（`ecos_cognitive_evidence` / `ecos_cognitive_hypothesis` / `ecos_cognitive_belief`，DDL V127~V129，手工执行）；契约先行——
 > - **VO 契约**：common-api `com.chinacreator.gzcm.common.cognitive.{EvidenceRecordVO, HypothesisVO, BeliefDistributionVO}`（跨 dccheng/workspace 共享）
-> - **Service 契约**：cognitive-engine-api `com.chinacreator.gzcm.engine.cognitive2.service.{IUncertaintyJudgementService, IHypothesisLifecycleService}`（仅接口，impl 留待 Phase 2）
-> - **Phase 2 开放端点（预登记，仅增不改）**：`GET/POST /api/v1/cognitive/evidence`、`GET /api/v1/cognitive/evidence/{id}`、`GET/POST /api/v1/cognitive/hypotheses`、`POST /api/v1/cognitive/hypotheses/{id}/invalidate`、`GET/POST /api/v1/cognitive/beliefs`、`POST /api/v1/cognitive/beliefs/{variable}/update-by-evidence`、`POST /api/v1/cognitive/beliefs/{variable}/override`（走三滤波器：VersionPrefixRewriteFilter KEEP + SecurityConfig permitAll 双路径 + ClearanceInterceptor 豁免双路径）
-> - **事件**：`ecos.cognitive` topic（KafkaTopics.COGNITIVE）— 新证据冲击/假设失效/不确定性判断更新；冲击链=原生 Kafka 事件 + runtime-task 定时补算（不做流式）
+> - **Service 契约**：cognitive-engine-api `com.chinacreator.gzcm.engine.cognitive2.service.{IUncertaintyJudgementService, IHypothesisLifecycleService}`（P2a 已落 JdbcTemplate Store 实现）
+> - **已开放端点（P2a 登记 + P2b 追加，全部经 gateway :8080 curl 实证；三滤波器：VersionPrefixRewriteFilter KEEP + SecurityConfig `/api/v1/cognitive/**` 既有覆盖 + ClearanceInterceptor 既有豁免，零新增登记）**：
+>   | Method | Path | 入参 | 语义 |
+>   |:-----:|:--|:--|:--|
+>   | GET/POST | `/api/v1/cognitive/evidence` | POST `EvidenceSaveDTO`（evidenceCode 幂等） | 证据列表/登记；同事实多值 Service 自动冲突检测（is_conflict/refuting 落库） |
+>   | GET | `/api/v1/cognitive/evidence/{id}` | — | 证据详情（EvidenceRecordVO） |
+>   | GET/POST | `/api/v1/cognitive/hypotheses` | POST `HypothesisSaveDTO`（hypothesisCode 幂等） | 假设列表（可 status 过滤）/注册（初始 VALID） |
+>   | GET | `/api/v1/cognitive/hypotheses/{id}` | — | 假设详情（HypothesisVO） |
+>   | POST | `/api/v1/cognitive/hypotheses/{id}/invalidate` | body `{"reason": "..."}`（最小 Map 载体，见 PMO-59 §禁止清单 6 例外） | 人工失效链路（与自动检测复用同一 `invalidate(id, reason, autoDetected)` 单点：事件+告警+审计） |
+>   | GET/POST | `/api/v1/cognitive/beliefs` | POST `BeliefSaveDTO`（domain 必填，prob 和=1 强校验） | 不确定性判断列表（domain 必填）/注册 |
+>   | GET | `/api/v1/cognitive/beliefs/{id}` | — | 不确定性判断详情 |
+>   | POST | `/api/v1/cognitive/beliefs/{variable}/update-by-evidence` | `BeliefEvidenceUpdateDTO {domain, evidenceId}`（P2b 新增） | 贝叶斯加权更新→version+1+last_evidence_id；**manualOverride 守卫**：最新版本为人工覆写时 400 拒绝（专家优先于模型） |
+>   | POST | `/api/v1/cognitive/beliefs/{variable}/override` | `BeliefOverrideDTO {domain, discreteDistribution, overrideReason, lastEvidenceId}`（P2b 新增） | 人工覆写→version+1+is_manual_override=true；覆写后模型自动更新让位直至下次覆写 |
+>   > ⚠️ 口径说明：PMO-59 P2b 指令表 T4 原文写 `PUT /override`，与本契约预登记及实现不一致——**按本契约预登记 POST 实现**（API 只增不改，预登记为准；审查知悉）。
+> - **事件（已实现，P2b 实证）**：`ecos.cognitive` topic（KafkaTopics.COGNITIVE，gateway `ecos.event.kafka.enabled=true` + `spring.kafka` 仅增配置）——强类型 Payload 三类：`COGNITIVE_EVIDENCE_REGISTERED` / `COGNITIVE_HYPOTHESIS_INVALIDATED`（含 autoDetected 标志）/ `COGNITIVE_BELIEF_UPDATED`；统一携带 `faultContext`（phase/hypothesisId|evidenceId/autoDetected/reviewTag=`P2b-mental-layer-review`，周一故障复盘预留）。冲击链=证据登记即时检测（refuting 命中/高可信冲突/数值漂移三规则）+ `runtime-task` `COGNITIVE_MENTAL_SCAN` 定时补算（默认 10min，`ecos.cognitive.scan-interval` 可调），不做流式
+> - **审计**：全部写操作（evidence.create / hypothesis.create / hypothesis.invalidate / belief 注册/更新/覆写）发 Kafka `ecos.audit`（铁律 §2.4 #5，P2b 实读 7 条全核）
 
 > 注：dccheng 内 kb 与 cognitive 为**同 JVM 进程内调用**（不再跨服务 REST）；aiming 调 dccheng 为跨服务 REST。
 
