@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- PMO-50 A: 新增横切底座 runtime-event — Kafka 事件总线。
+         跨模块事件通信统一走本模块 (铁律 §2.5 公共底座); KafkaTopics 契约保留在 common-api 不动。
+         Kafka 必须可降级: 默认走内存 SpringEventBus, 仅当生态 ecs.event.kafka.enabled=true
+         + spring.kafka.brokers 配置时才切 Kafka。 -->
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>runtime</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>runtime-event</artifactId>
+    <name>DataBridge Runtime Event Bus</name>
+    <description>运行时子系统 — Kafka 事件总线 (可降级: broker 不可用时 fallback 内存 SpringEventBus)</description>
+
+    <dependencies>
+        <!-- 共享契约: KafkaTopics / PipelineEvent / EventTypes (P8-A 收尾后位于 runtime/common-api) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- Spring Kafka — 走 root pom dependencyManagement 锁定的 ${spring-kafka.version}=3.1.2,
+             不在此重复声明版本 -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 基础 (AutoConfiguration / ApplicationEventPublisher / ConditionalOnProperty) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- SLF4J — 日志, 不写敏感数据 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

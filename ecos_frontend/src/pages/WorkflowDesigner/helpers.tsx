@@ -24,5 +24,5 @@ export const MINIMAP_FALLBACK = "#94A3B8";
 
 // ── BoxIcon fallback ──
 export function BoxIcon() {
-  return <div className="w-4 h-4 bg-slate-300 rounded" />;
+  return <div className="w-4 h-4 bg-[#CBD5E1] rounded" />;
 }

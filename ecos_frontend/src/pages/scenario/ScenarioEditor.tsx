@@ -22,7 +22,7 @@ const STEPS=[{s:1,l:'1. 场景要素',i:'Briefcase'},{s:2,l:'2. 物理数据',i:
 
 function CbList({items,selected,onChange,styles}:{items:{id:string;label:string;desc?:string}[];selected:string[];onChange:(v:string[])=>void;styles:ThemeStyles}){
   return <div className={`grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto p-2 ${styles.inputBg} border ${styles.inputBorder} rounded`}>
-    {items.map(item=>{const ck=selected.includes(item.id);return <label key={item.id} className={`flex items-start gap-2.5 p-2.5 rounded cursor-pointer transition-colors border ${ck?'bg-indigo-950/30 border-indigo-500/40 text-indigo-200':`${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-slate-850/40`}`}><input type="checkbox" checked={ck} onChange={()=>onChange(ck?selected.filter(id=>id!==item.id):[...selected,item.id])} className="mt-0.5 cursor-pointer accent-indigo-500"/><div className="space-y-0.5"><span className="font-bold text-[11px] block text-slate-200">{item.label}</span>{item.desc&&<span className={`text-[10px] ${styles.cardTextMuted} block leading-tight`}>{item.desc}</span>}</div></label>;})}
+    {items.map(item=>{const ck=selected.includes(item.id);return <label key={item.id} className={`flex items-start gap-2.5 p-2.5 rounded cursor-pointer transition-colors border ${ck?'bg-indigo-950/30 border-indigo-500/40 text-indigo-200':`${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted} hover:opacity-90`}`}><input type="checkbox" checked={ck} onChange={()=>onChange(ck?selected.filter(id=>id!==item.id):[...selected,item.id])} className="mt-0.5 cursor-pointer accent-indigo-500"/><div className="space-y-0.5"><span className={`font-bold text-[11px] block ${styles.cardText}`}>{item.label}</span>{item.desc&&<span className={`text-[10px] ${styles.cardTextMuted} block leading-tight`}>{item.desc}</span>}</div></label>;})}
   </div>;
 }
 
@@ -45,10 +45,10 @@ export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWN
         <div className="flex items-center justify-between min-w-[760px] px-2 py-1">
           {STEPS.map((it,idx,arr)=><React.Fragment key={it.s}>
             <div className="flex items-center gap-1.5">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${wizardStep===it.s?'bg-indigo-600 text-white ring-4 ring-indigo-950 shadow-md':wizardStep>it.s?'bg-emerald-600 text-white font-bold':`bg-slate-800 ${styles.cardTextMuted} border border-slate-700`}`}>{wizardStep>it.s?'✓':it.s}</div>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${wizardStep===it.s?'bg-indigo-600 text-white ring-4 ring-indigo-950 shadow-md':wizardStep>it.s?'bg-emerald-600 text-white font-bold':`bg-[var(--card,#1E293B)] ${styles.cardTextMuted} border border-[var(--card,#334155)]`}`}>{wizardStep>it.s?'✓':it.s}</div>
               <span className={`text-[11px] font-bold whitespace-nowrap transition-colors ${wizardStep===it.s?'text-indigo-400 font-extrabold':wizardStep>it.s?'text-emerald-500':styles.cardTextMuted}`}>{it.l}</span>
             </div>
-            {idx<arr.length-1&&<div className={`flex-1 h-[2px] mx-2 min-w-[12px] transition-all duration-300 ${wizardStep>it.s?'bg-emerald-600/60':'bg-slate-800'}`}/>}
+            {idx<arr.length-1&&<div className={`flex-1 h-[2px] mx-2 min-w-[12px] transition-all duration-300 ${wizardStep>it.s?'bg-emerald-600/60':'bg-[var(--card,#334155)]'}`}/>}
           </React.Fragment>)}
         </div>
       </div>

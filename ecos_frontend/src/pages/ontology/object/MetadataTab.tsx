@@ -26,7 +26,7 @@ export default function MetadataTab({
             type="text"
             value={objectType.displayName}
             onChange={e => handleMetaChange('displayName', e.target.value)}
-            className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden`}
+            className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
           />
         </div>
         <div className="space-y-1.5">
@@ -35,7 +35,7 @@ export default function MetadataTab({
             type="text"
             value={objectType.apiName}
             onChange={e => handleMetaChange('apiName', e.target.value)}
-            className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+            className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
           />
         </div>
       </div>
@@ -45,17 +45,17 @@ export default function MetadataTab({
         <textarea
           value={objectType.description}
           onChange={e => handleMetaChange('description', e.target.value)}
-          className="w-full h-20 px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+          className={`w-full h-20 px-3 py-1.5 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
           placeholder={t('ow.placeholder.objectDescription')}
         />
       </div>
 
-      <div className={`space-y-1.5 border-t border-gray-100 pt-4`}>
+      <div className={`space-y-1.5 border-t ${styles.divider} pt-4`}>
         <label className={`text-xs font-semibold ${styles.sidebarText}`}>{t('ow.label.domainHierarchy')}</label>
         <select
           value={objectType.domainId || ''}
           onChange={e => handleMetaChange('domainId', e.target.value || undefined)}
-          className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
+          className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
         >
           <option value="">{t('ow.placeholder.unclassified')}</option>
           {domains.map(d => (
@@ -65,13 +65,13 @@ export default function MetadataTab({
         <p className={`text-[10px] ${styles.muted}`}>{t('ow.label.domainHint')}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+      <div className={`grid grid-cols-2 gap-4 border-t ${styles.divider} pt-4`}>
         <div className="space-y-1.5">
           <label className={`text-xs font-semibold ${styles.sidebarText}`}>{t('ow.label.titleProperty')}</label>
           <select
             value={objectType.titleProperty}
             onChange={e => handleMetaChange('titleProperty', e.target.value)}
-            className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
+            className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
           >
             {objectType.properties.map(p => (
               <option key={p.id} value={p.id}>{p.displayName} ({p.apiName})</option>
@@ -85,7 +85,7 @@ export default function MetadataTab({
           <select
             value={objectType.status}
             onChange={e => handleMetaChange('status', e.target.value)}
-            className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
+            className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
           >
             <option value="DRAFT">{t('ow.status.draft')}</option>
             <option value="ACTIVE">{t('ow.status.active')}</option>
@@ -100,7 +100,7 @@ export default function MetadataTab({
           <select
             value={objectType.icon}
             onChange={e => handleMetaChange('icon', e.target.value)}
-            className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
+            className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
           >
             <option value="Plane">{t('ow.icon.plane')}</option>
             <option value="Building2">{t('ow.icon.building')}</option>
@@ -118,7 +118,7 @@ export default function MetadataTab({
           <select
             value={objectType.color}
             onChange={e => handleMetaChange('color', e.target.value)}
-            className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
+            className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
           >
             <option value="border-blue-500 bg-blue-50 text-blue-700">{t('ow.color.blue')}</option>
             <option value="border-emerald-500 bg-emerald-50 text-emerald-700">{t('ow.color.emerald')}</option>
@@ -131,14 +131,14 @@ export default function MetadataTab({
       </div>
 
       {/* Implements Interfaces */}
-      <div className={`space-y-2 border-t border-gray-100 pt-4`}>
+      <div className={`space-y-2 border-t ${styles.divider} pt-4`}>
         <label className={`text-xs font-semibold ${styles.sidebarText} block`}>{t('ow.label.implementsInterfaces')}</label>
         <div className="flex flex-wrap gap-2">
           {interfaces.map(intf => {
             const isChecked = (objectType.interfaces || []).includes(intf.id);
             return (
               <label key={intf.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer select-none transition-colors ${
-                isChecked ? `${styles.badgeBg} ${styles.accentBorder} ${styles.badgeText}` : `${styles.cardBg} ${styles.cardBorder} ${styles.sidebarText} hover:bg-gray-50`
+                isChecked ? `${styles.badgeBg} ${styles.accentBorder} ${styles.badgeText}` : `${styles.cardBg} ${styles.cardBorder} ${styles.sidebarText} hover:bg-blue-50/20`
               }`}>
                 <input
                   type="checkbox"

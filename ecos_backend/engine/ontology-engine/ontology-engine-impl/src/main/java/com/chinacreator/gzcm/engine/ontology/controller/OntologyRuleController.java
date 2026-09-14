@@ -1,12 +1,16 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
-import java.util.*;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleEvaluateQuery;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleEvaluationVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyRuleService;
 
 /**
@@ -22,6 +26,10 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyRuleService;
  *   <li>POST   /api/v1/ecos/rules/{ruleId}/test                        — 测试规则</li>
  *   <li>POST   /api/v1/ecos/rules/evaluate                             — 批量评估规则</li>
  * </ul>
+ *
+ * <p>T16-1 (2026-09-12)：方法入/出参由 {@code Map<String,Object>} 改为强类型 DTO/VO
+ * （{@code OntologyRuleSaveDTO} / {@code OntologyRuleVO} / {@code OntologyRuleEvaluateQuery} /
+ * {@code OntologyRuleEvaluationVO}）。
  */
 @RestController
 @RequestMapping("/api/v1/ecos")
@@ -35,41 +43,49 @@ public class OntologyRuleController {
         this.ruleService = ruleService;
     }
 
+    /** 列出实体的规则（强类型版本）。 */
     @GetMapping("/entities/{entityId}/rules")
-    public ApiResponse<List<Map<String, Object>>> listRules(@PathVariable String entityId) {
-        return ApiResponse.success(ruleService.listRulesByEntity(entityId));
+    public ApiResponse<List<OntologyRuleVO>> listRules(@PathVariable String entityId) {
+        return ApiResponse.success(ruleService.listRulesByEntityVO(entityId));
     }
 
+    /** 创建规则 — 接收 {@code OntologyRuleSaveDTO}。 */
     @PostMapping("/entities/{entityId}/rules")
-    public ApiResponse<Map<String, Object>> createRule(
+    public ApiResponse<OntologyRuleVO> createRule(
             @PathVariable String entityId,
-            @RequestBody Map<String, Object> body) {
-        Map<String, Object> rule = ruleService.createRule(entityId, body);
-        log.info("Rule created: {} [{}] type={}", rule.get("id"), rule.get("code"), rule.get("ruleType"));
+            @RequestBody OntologyRuleSaveDTO dto) {
+        OntologyRuleVO rule = ruleService.createRule(entityId, dto);
+        log.info("Rule created: {} [{}] type={}", rule.getId(), rule.getCode(), rule.getRuleType());
         return ApiResponse.success(rule);
     }
 
+    /** 列出全部规则（强类型版本）。 */
     @GetMapping("/rules")
-    public ApiResponse<List<Map<String, Object>>> listAllRules() {
-        return ApiResponse.success(ruleService.listAllRules());
+    public ApiResponse<List<OntologyRuleVO>> listAllRules() {
+        return ApiResponse.success(ruleService.listAllRulesVO());
     }
 
+    /** 规则详情 — 强类型版本。 */
     @GetMapping("/rules/{ruleId}")
-    public ApiResponse<Map<String, Object>> getRule(@PathVariable String ruleId) {
-        Map<String, Object> rule = ruleService.getRule(ruleId);
-        if (rule == null) return ApiResponse.notFound("ONT-001: Rule '" + ruleId + "' not found");
+    public ApiResponse<OntologyRuleVO> getRule(@PathVariable String ruleId) {
+        OntologyRuleVO rule = ruleService.getRuleVO(ruleId);
+        if (rule == null) {
+            return ApiResponse.notFound("ONT-001: Rule '" + ruleId + "' not found");
+        }
         return ApiResponse.success(rule);
     }
 
+    /** 更新规则 — 接收 {@code OntologyRuleSaveDTO}。 */
     @PutMapping("/rules/{ruleId}")
-    public ApiResponse<Map<String, Object>> updateRule(
+    public ApiResponse<OntologyRuleVO> updateRule(
             @PathVariable String ruleId,
-            @RequestBody Map<String, Object> body) {
-        return ruleService.updateRule(ruleId, body)
+            @RequestBody OntologyRuleSaveDTO dto) {
+        return ruleService.updateRule(ruleId, dto)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("ONT-001: Rule '" + ruleId + "' not found"));
     }
 
+    /** 删除规则（强类型未对 boolean 引入新 VO，保留 String 简返，与现有动作删除路径一致）。 */
     @DeleteMapping("/rules/{ruleId}")
     public ApiResponse<String> deleteRule(@PathVariable String ruleId) {
         if (ruleService.deleteRule(ruleId)) {
@@ -78,19 +94,21 @@ public class OntologyRuleController {
         return ApiResponse.notFound("ONT-001: Rule '" + ruleId + "' not found");
     }
 
+    /** 测试单条规则 — 强类型版本。 */
     @PostMapping("/rules/{ruleId}/test")
-    public ApiResponse<Map<String, Object>> testRule(@PathVariable String ruleId) {
+    public ApiResponse<OntologyRuleEvaluationVO> testRule(@PathVariable String ruleId) {
         try {
-            return ApiResponse.success(ruleService.testRule(ruleId));
+            return ApiResponse.success(ruleService.testRuleVO(ruleId));
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         }
     }
 
+    /** 批量评估规则 — 接收 {@code OntologyRuleEvaluateQuery}（entityIds）。 */
     @PostMapping("/rules/evaluate")
-    @SuppressWarnings("unchecked")
-    public ApiResponse<List<Map<String, Object>>> evaluateRules(@RequestBody Map<String, Object> body) {
-        List<String> entityIds = (List<String>) body.getOrDefault("entityIds", Collections.emptyList());
-        return ApiResponse.success(ruleService.evaluateRules(entityIds));
+    public ApiResponse<List<OntologyRuleEvaluationVO>> evaluateRules(
+            @RequestBody OntologyRuleEvaluateQuery query) {
+        return ApiResponse.success(ruleService.evaluateRulesVO(
+            query.getEntityIds() == null ? java.util.Collections.emptyList() : query.getEntityIds()));
     }
 }

@@ -64,7 +64,7 @@ const Toast: React.FC<{
 
 // ── Confirm Dialog (inline) ──────────────────────────────────
 
-const ConfirmDialog: React.FC<{
+function ConfirmDialog({ title, message, confirmLabel, confirmClass, onConfirm, onCancel, variant = "danger" }: {
   title: string;
   message: string;
   confirmLabel?: string;
@@ -72,19 +72,21 @@ const ConfirmDialog: React.FC<{
   onConfirm: () => void;
   onCancel: () => void;
   variant?: "danger" | "warning" | "default";
-}> = ({ title, message, confirmLabel, confirmClass, onConfirm, onCancel, variant = "danger" }) => (
+}) {
+  const { styles } = useTheme();
+  return (
   <div className="fixed inset-0 z-40 flex items-center justify-center">
     <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
     <div className="relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 bg-white dark:bg-[#141924] border border-[#E2E8F0] dark:border-[#1E293B]">
       <div className="flex items-center gap-2 mb-2">
         {variant === "danger" && <Trash2 className="w-4 h-4 text-red-500" />}
         {variant === "warning" && <AlertTriangle className="w-4 h-4 text-amber-500" />}
-        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{title}</h3>
+        <h3 className={`text-base font-bold ${styles.cardText}`}>{title}</h3>
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{message}</p>
+      <p className={`text-sm ${styles.cardTextMuted} mb-5`}>{message}</p>
       <div className="flex gap-2 justify-end">
         <button onClick={onCancel}
-          className="px-4 py-1.5 rounded text-xs border border-[#E2E8F0] dark:border-[#1E293B] text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5">
+          className="px-4 py-1.5 rounded text-xs border border-[#E2E8F0] dark:border-[#1E293B] text-[#334155] dark:text-[#cbd5e1] hover:bg-gray-50 dark:hover:bg-white/5">
           取消
         </button>
         <button onClick={onConfirm}
@@ -94,7 +96,8 @@ const ConfirmDialog: React.FC<{
       </div>
     </div>
   </div>
-);
+  );
+}
 
 // ── Empty State (inline) ─────────────────────────────────────
 
@@ -922,8 +925,6 @@ export default function UserManagement() {
           orgMap={orgMap}
           onEdit={async (u) => { if (!orgTree.length) await loadOrgs(); if (!roles.length) await loadRoles(); setUserForm({ mode: "edit", user: u }); }}
           onDelete={(u) => {
-            console.log('[DELETE BTN] user object:', JSON.stringify(u));
-            console.log('[DELETE BTN] u.userId:', u.userId, 'u.user_id:', (u as any).user_id);
             setConfirmAction({ type: "delete", tab: "users", id: u.userId || (u as any).user_id || (u as any).id, name: u.username });
           }}
           onForceLogout={(u) => handleForceLogout(u.userId)}

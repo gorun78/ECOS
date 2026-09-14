@@ -22,6 +22,8 @@ interface WorkbookHistoryProps {
     cardBorder: string;
     cardBg: string;
     cardTextMuted: string;
+    appBg: string;
+    divider: string;
   };
   visible: boolean;
   onRefresh: () => void;
@@ -77,12 +79,12 @@ export default function WorkbookHistory({
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <RotateCw className="w-5 h-5 text-slate-300 animate-spin" />
+            <RotateCw className={`w-5 h-5 ${styles.cardTextMuted} animate-spin`} />
           </div>
         ) : history.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full mb-3">
-              <History className="w-6 h-6 text-slate-400" />
+            <div className={`p-3 ${styles.appBg} rounded-full mb-3`}>
+              <History className={`w-6 h-6 ${styles.cardTextMuted}`} />
             </div>
             <p className={`text-xs ${styles.cardTextMuted} leading-relaxed`}>
               {locale === "zh"
@@ -95,7 +97,7 @@ export default function WorkbookHistory({
             {history.map((entry, idx) => (
               <div
                 key={idx}
-                className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                className={`px-4 py-3 border-b ${styles.divider} hover:bg-blue-50/20 transition-colors`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span
@@ -109,24 +111,24 @@ export default function WorkbookHistory({
                   >
                     {entry.language.toUpperCase()}
                   </span>
-                  <span className="text-[9px] text-slate-400 font-mono">
+                  <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>
                     {entry.elapsed_ms != null
                       ? `${entry.elapsed_ms}ms`
                       : ""}
                   </span>
                 </div>
-                <div className="font-mono text-[10px] text-slate-600 dark:text-slate-400 truncate mb-1 bg-slate-50 dark:bg-slate-800 rounded px-2 py-1">
+                <div className={`font-mono text-[10px] truncate mb-1 ${styles.appBg} ${styles.cardTextMuted} rounded px-2 py-1`}>
                   {entry.code.length > 80
                     ? entry.code.slice(0, 80) + "..."
                     : entry.code}
                 </div>
                 {entry.output && (
-                  <div className="font-mono text-[10px] text-slate-400 truncate max-h-8 overflow-hidden">
+                  <div className={`font-mono text-[10px] truncate max-h-8 overflow-hidden ${styles.cardTextMuted} opacity-80`}>
                     {entry.output.slice(0, 120)}
                   </div>
                 )}
                 {entry.createdAt && (
-                  <div className="text-[9px] text-slate-400 mt-1">
+                  <div className={`text-[9px] mt-1 ${styles.cardTextMuted} opacity-80`}>
                     {new Date(entry.createdAt).toLocaleString()}
                   </div>
                 )}

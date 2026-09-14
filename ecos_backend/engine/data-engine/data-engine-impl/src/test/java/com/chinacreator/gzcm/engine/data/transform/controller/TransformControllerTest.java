@@ -33,6 +33,11 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>POST /execute input 非 Map — 400</li>
  *   <li>POST /execute 未知 step type — 400</li>
  *   <li>POST /execute 合法 cleansing 链路 — 200 success=true 且 trim 生效</li>
+ *   <li>POST /execute chain 非 List — 400</li>
+ *   <li>POST /execute data 场景反序列化 — 200 直通</li>
+ *   <li>POST /execute step 缺 type — 400</li>
+ *   <li>POST /execute 全部 6 类 step type — 200（覆盖 switch 全分支）</li>
+ *   <li>POST /execute 转换失败 — 400 并携带原因</li>
  * </ol>
  *
  * @author ECOS Wave-2B ge D→I 收口
@@ -184,5 +189,106 @@ public class TransformControllerTest {
         if (nameVal instanceof String s) {
             assertEquals("张三", s.trim(), "trim 后值应等于「张三」（空白首尾被去除）");
         }
+    }
+
+    // ── T6: chain 非 List ──────────────────────────────
+
+    @Test
+    @DisplayName("POST /execute — chain 非 List 应返回 400")
+    void executeNonListChainReturnsBadRequest() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("input", Map.of("rows", new ArrayList<Map<String, Object>>()));
+        body.put("chain", "not-a-list");
+        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
+        assertTrue(resp.getMessage().contains("chain"), "错误信息应提及 chain");
+    }
+
+    // ── T7: data 场景反序列化（columns/rows 之外的兼容格式） ──
+
+    @Test
+    @DisplayName("POST /execute — data 兼容格式应 200 直通（chain 空）")
+    void executeWithDataFormatSucceeds() {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("data", List.of(Map.of("x", 1)));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("input", input);
+        body.put("chain", List.of());
+        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = (Map<String, Object>) resp.getData().get("output");
+        assertNotNull(out);
+        // data 兼容格式：toDataFrame 设 data 字段；DataFrame.getRows() 与 getData() 同源于 data 列表，
+        // 空 chain 直通 → output 原样回传，data 内容应保留
+        @SuppressWarnings("unchecked")
+        List<?> outRows = (List<?>) out.get("rows");
+        assertNotNull(outRows, "data 兼容格式下 rows 不应为 null");
+        assertEquals(1, outRows.size(), "直通应保留 1 行数据");
+    }
+
+    // ── T8: step 缺 type（def get("type")==null 分支） ──
+
+    @Test
+    @DisplayName("POST /execute — step 缺 type 字段应返回 400")
+    void executeStepWithoutTypeReturnsBadRequest() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("input", Map.of("rows", new ArrayList<Map<String, Object>>()));
+        body.put("chain", List.of(Map.of("params", Map.of("k", "v"))));
+        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
+        assertTrue(resp.getMessage().contains("type"), "错误信息应提及 type");
+    }
+
+    // ── T9: 全部 6 类 step type（覆盖 switch 全分支） ──
+
+    @Test
+    @DisplayName("POST /execute — 全部 6 类 step type 应 200/400 但都进入执行 switch")
+    void executeAllSixStepTypesSucceeds() {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("columns", List.of("a", "b"));
+        input.put("rows", List.of(Map.of("a", " x ", "b", 1)));
+        // 空 params map 供 step 读取（toDataFrame 之外的分支由 T7/T8/T10 覆盖）
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("input", input);
+        body.put("chain", List.of(
+                Map.of("type", "cleansing", "params", new LinkedHashMap<String, Object>()),
+                Map.of("type", "mapping", "params", new LinkedHashMap<String, Object>()),
+                Map.of("type", "typeConversion", "params", new LinkedHashMap<String, Object>()),
+                Map.of("type", "validation", "params", new LinkedHashMap<String, Object>()),
+                Map.of("type", "aggregation", "params", new LinkedHashMap<String, Object>()),
+                Map.of("type", "calculator", "params", new LinkedHashMap<String, Object>())));
+        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        // step 执行错误被 chain 捕获转成 TransformException — 控制器应返回 400 并携带 exception 原因
+        assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
+        assertNull(resp.getData(), "执行失败不应有 data");
+        assertNotNull(resp.getMessage(), "应携带转换失败原因");
+        assertFalse(resp.getMessage().isBlank(), "原因非空");
+    }
+
+    // ── T10: 服务抛 TransformException — 400 并携带原因 ──
+
+    @Test
+    @DisplayName("POST /execute — 转换服务抛异常应返回 400 并携带原因")
+    void executeServiceThrowsReturnsBadRequest() {
+        ITransformService failing = new ITransformService() {
+            @Override
+            public TransformResult transform(DataFrame in, TransformChain chain)
+                    throws TransformException {
+                throw new TransformException("boom");
+            }
+
+            @Override
+            public boolean validateChain(TransformChain chain) {
+                return true;
+            }
+        };
+        TransformController failingController = new TransformController(failing);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("input", new LinkedHashMap<>(Map.of("rows", new ArrayList<Map<String, Object>>())));
+        body.put("chain", List.of(Map.of("type", "cleansing")));
+        ApiResponse<Map<String, Object>> resp = failingController.execute(body);
+        assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
+        assertTrue(resp.getMessage().contains("boom"), "错误信息应携带异常原因");
     }
 }

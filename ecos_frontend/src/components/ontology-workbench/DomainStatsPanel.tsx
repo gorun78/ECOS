@@ -23,6 +23,7 @@
 
 import React from 'react';
 import { Box, GitBranch, Building2, Network } from 'lucide-react';
+import { useTheme } from '../ThemeContext';
 
 // ── Props ──
 
@@ -73,6 +74,7 @@ const COLOR_MAP: Record<StatCardProps['color'], { bg: string; text: string; bord
 };
 
 function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
+  const { styles } = useTheme();
   const c = COLOR_MAP[color];
 
   return (
@@ -84,7 +86,7 @@ function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
 
       {/* 标签 + 数值 */}
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+        <p className={`text-[10px] ${styles.muted} uppercase tracking-wider font-medium`}>
           {label}
         </p>
         <p className={`text-xl font-bold ${c.text} tabular-nums`}>
@@ -102,6 +104,7 @@ export default function DomainStatsPanel({
   totalRelationships,
   totalDomains,
 }: DomainStatsPanelProps) {
+  const { styles } = useTheme();
   // 计算健康度评分（简单的加权评分，范围 0-100）
   const healthScore = React.useMemo(() => {
     if (totalEntities === 0) return 0;
@@ -169,18 +172,18 @@ export default function DomainStatsPanel({
 
       {/* 健康度评分 */}
       <div className={`rounded-lg border ${healthBg} p-4`}>
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">
+        <p className={`text-[10px] ${styles.muted} uppercase tracking-wider font-medium mb-2`}>
           健康度评分
         </p>
         <div className="flex items-end gap-2">
           <span className={`text-2xl font-bold ${healthColor}`}>
             {healthScore}
           </span>
-          <span className="text-xs text-slate-500 mb-1">/ 100</span>
+          <span className={`text-xs ${styles.muted} mb-1`}>/ 100</span>
         </div>
 
         {/* 进度条 */}
-        <div className="mt-2 w-full h-1.5 rounded-full bg-slate-700 overflow-hidden">
+        <div className={`mt-2 w-full h-1.5 rounded-full ${styles.inputBg} overflow-hidden`}>
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               healthScore >= 70
@@ -194,7 +197,7 @@ export default function DomainStatsPanel({
         </div>
 
         {/* 评分说明 */}
-        <p className="text-[9px] text-slate-600 mt-1.5 leading-relaxed">
+        <p className={`text-[9px] ${styles.muted} mt-1.5 leading-relaxed`}>
           {healthScore >= 70
             ? '知识图谱结构良好，实体与关系分布合理'
             : healthScore >= 40
@@ -207,21 +210,21 @@ export default function DomainStatsPanel({
       {/* 数据指标明细 */}
       {totalEntities > 0 && (
         <div className="pt-2 border-t border-[#1E293B]">
-          <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+          <h4 className={`text-[10px] font-semibold ${styles.muted} uppercase tracking-wider mb-2`}>
             指标明细
           </h4>
           <div className="space-y-1.5 text-xs">
             {/* 关系密度 */}
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">关系密度</span>
-              <span className="text-slate-300 font-mono tabular-nums">
+              <span className={styles.cardTextMuted}>关系密度</span>
+              <span className={`${styles.sidebarText} font-mono tabular-nums`}>
                 {(totalRelationships / Math.max(totalEntities, 1)).toFixed(2)}
               </span>
             </div>
             {/* 域均实体 */}
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">域均实体</span>
-              <span className="text-slate-300 font-mono tabular-nums">
+              <span className={styles.cardTextMuted}>域均实体</span>
+              <span className={`${styles.sidebarText} font-mono tabular-nums`}>
                 {totalDomains > 0
                   ? (totalEntities / totalDomains).toFixed(1)
                   : 'N/A'}
@@ -229,8 +232,8 @@ export default function DomainStatsPanel({
             </div>
             {/* 实体密集度（max possible edges） */}
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">图密度</span>
-              <span className="text-slate-300 font-mono tabular-nums">
+              <span className={styles.cardTextMuted}>图密度</span>
+              <span className={`${styles.sidebarText} font-mono tabular-nums`}>
                 {totalEntities > 1
                   ? ((totalRelationships / (totalEntities * (totalEntities - 1))) * 100).toFixed(1) + '%'
                   : 'N/A'}

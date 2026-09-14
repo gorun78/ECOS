@@ -41,6 +41,10 @@ public class ConnectorFactory {
      * 数据源业务类型 → pipeline 规范类型映射（PMO-37 T1）。
      * 键全部大写。未列出的 JDBC 兼容业务类型（如 DB2 / HSQLDB / MARIADB / MONGODB）
      * 也归一到 JDBC。注意：MONGODB 走 JDBC 是简化归一，后续可换 mongo connector。
+     *
+     * PMO-45 新增: MSSQL / DM / KINGBASE / GAUSS (关系型, 归一 JDBC);
+     *               MINIO (S3 对象存储, 归一 JDBC 使 testConnection 走 JdbcConnector 返回 false);
+     *               FILESYSTEM (本地文件, 不走 Connector, 由 DataSourceServiceImpl 特殊处理)
      */
     private static final Map<String, String> RELATIONAL_ALIASES = Map.ofEntries(
             Map.entry("POSTGRESQL", "JDBC"),
@@ -51,7 +55,15 @@ public class ConnectorFactory {
             Map.entry("MARIADB", "JDBC"),
             Map.entry("HSQLDB", "JDBC"),
             Map.entry("DB2", "JDBC"),
-            Map.entry("MONGODB", "JDBC")
+            Map.entry("MONGODB", "JDBC"),
+            // ── PMO-45 新增: 关系型数据库 (归一 JDBC) ──
+            Map.entry("MSSQL", "JDBC"),
+            Map.entry("DM", "JDBC"),
+            Map.entry("KINGBASE", "JDBC"),
+            Map.entry("GAUSS", "JDBC"),
+            // ── PMO-45 新增: 对象存储/文件 (不走 JDBC, 登记为白名单类型) ──
+            Map.entry("MINIO", "MINIO"),
+            Map.entry("FILESYSTEM", "FILESYSTEM")
     );
 
     public ConnectorFactory(List<Connector> connectors) {

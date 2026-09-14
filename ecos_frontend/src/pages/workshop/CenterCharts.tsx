@@ -99,7 +99,7 @@ export function renderCenterCharts(vm: any) {
                     {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'main_middle').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('main_middle'); setShowAddWidgetModal(true); }}
-                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[120px] w-full`}
+                        className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[120px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">添加分析图表</span>
@@ -156,7 +156,7 @@ export function renderCenterCharts(vm: any) {
                                   )}
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-slate-100 text-[11px]">
+                              <tbody className={`divide-y ${styles.divider} text-[11px]`}>
                                 {rowData.map((row: any, idx: any) => {
                                   const key = isAircraftTable ? row.tailNumber : row.flightNumber;
                                   const isRowSelected = activeSelection && (isAircraftTable ? activeSelection.tailNumber === key : activeSelection.flightNumber === key);
@@ -223,7 +223,7 @@ export function renderCenterCharts(vm: any) {
                     {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'main_bottom').length === 0 && (
                       <button
                         onClick={() => { setAddWidgetSlot('main_bottom'); setShowAddWidgetModal(true); }}
-                        className={`border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} hover:${styles.cardTextMuted} hover:border-slate-400 hover:${styles.appBg} transition-all cursor-pointer min-h-[140px] w-full`}
+                        className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[140px] w-full`}
                       >
                         <Plus size={15} />
                         <span className="text-[10px] mt-1 font-semibold">添加本体表格明细</span>

@@ -255,16 +255,16 @@ export default function OntologyWorkbenchSidebar({
 
   return (
     <div
-      className={`flex flex-col h-full ${styles.cardBg} text-slate-200 ${className}`}
+      className={`flex flex-col h-full ${styles.cardBg} ${styles.cardText} ${className}`}
     >
       {/* ── 标题栏 ── */}
       <div className={`px-3 py-3 border-b ${styles.cardBorder} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-2">
           <Network className="w-4 h-4 text-indigo-400" />
           <div>
-            <div className="text-xs font-semibold text-slate-200">{title}</div>
+            <div className={`text-xs font-semibold ${styles.cardText}`}>{title}</div>
             {showStats && (
-              <div className="text-[9px] text-slate-500 font-mono mt-0.5">
+              <div className={`text-[9px] ${styles.muted} font-mono mt-0.5`}>
                 {domains.length} 域 · {totalObjects} 对象类型
               </div>
             )}
@@ -273,7 +273,7 @@ export default function OntologyWorkbenchSidebar({
         <button
           onClick={load}
           disabled={loading}
-          className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-400 transition disabled:opacity-50"
+          className={`p-1.5 rounded-lg hover:bg-indigo-500/10 ${styles.cardTextMuted} hover:text-indigo-400 transition disabled:opacity-50`}
           title="刷新"
         >
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
@@ -285,20 +285,20 @@ export default function OntologyWorkbenchSidebar({
         <div className="relative">
           <Search
             size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
+            className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.muted}`}
           />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索域或对象类型..."
             className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg pl-7 pr-7 py-1.5
-              text-xs text-white placeholder:text-slate-600
+              text-xs ${styles.text} placeholder:${styles.muted}
               focus:outline-none focus:border-indigo-500/40 transition`}
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"
+              className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${styles.muted} hover:${styles.cardText}`}
             >
               <X size={12} />
             </button>
@@ -320,12 +320,12 @@ export default function OntologyWorkbenchSidebar({
       {/* ── 树形列表 ── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {loading ? (
-          <div className="flex items-center justify-center py-10 text-slate-500">
+          <div className={`flex items-center justify-center py-10 ${styles.muted}`}>
             <Loader2 size={16} className="animate-spin mr-2" />
             <span className="text-[11px]">加载中...</span>
           </div>
         ) : filteredDomains.length === 0 && !hasUnassigned ? (
-          <div className="flex flex-col items-center justify-center py-14 text-slate-500 px-4">
+          <div className={`flex flex-col items-center justify-center py-14 ${styles.muted} px-4`}>
             <Layers size={28} className="mb-3 opacity-20" />
             <p className="text-xs">
               {search ? "无匹配结果" : "暂无本体数据"}
@@ -353,9 +353,9 @@ export default function OntologyWorkbenchSidebar({
                     }`}
                   >
                     {col ? (
-                      <ChevronRight size={13} className="text-slate-500 shrink-0" />
+                      <ChevronRight size={13} className={`${styles.muted} shrink-0`} />
                     ) : (
-                      <ChevronDown size={13} className="text-slate-500 shrink-0" />
+                      <ChevronDown size={13} className={`${styles.muted} shrink-0`} />
                     )}
                     <span
                       className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${tint.bg} ${tint.text}`}
@@ -365,16 +365,16 @@ export default function OntologyWorkbenchSidebar({
                     <div className="flex-1 min-w-0">
                       <div
                         className={`text-xs font-medium truncate ${
-                          isSel ? "text-indigo-300" : "text-slate-200"
+                          isSel ? "text-indigo-300" : styles.cardText
                         }`}
                       >
                         {d.displayName}
                       </div>
-                      <div className="text-[9px] text-slate-500 font-mono truncate">
+                      <div className={`text-[9px] ${styles.muted} font-mono truncate`}>
                         {d.id}
                       </div>
                     </div>
-                    <span className={`text-[9px] text-slate-500 ${styles.inputBg} px-1.5 py-0.5 rounded-full shrink-0`}>
+                    <span className={`text-[9px] ${styles.muted} ${styles.inputBg} px-1.5 py-0.5 rounded-full shrink-0`}>
                       {objs.length}
                     </span>
                   </button>
@@ -405,12 +405,12 @@ export default function OntologyWorkbenchSidebar({
                             <div className="flex-1 min-w-0">
                               <div
                                 className={`text-[11px] font-medium truncate ${
-                                  sel ? "text-indigo-300" : "text-slate-300"
+                                  sel ? "text-indigo-300" : styles.sidebarText
                                 }`}
                               >
                                 {o.displayName}
                               </div>
-                              <div className="text-[9px] text-slate-500 font-mono truncate">
+                              <div className={`text-[9px] ${styles.muted} font-mono truncate`}>
                                 {o.apiName}
                               </div>
                             </div>
@@ -421,7 +421,7 @@ export default function OntologyWorkbenchSidebar({
                                 {o.status}
                               </span>
                             )}
-                            <span className="text-[8px] text-slate-500 shrink-0">
+                            <span className={`text-[8px] ${styles.muted} shrink-0`}>
                               {o.properties?.length || 0}属性
                             </span>
                           </button>
@@ -436,7 +436,7 @@ export default function OntologyWorkbenchSidebar({
             {/* 未分配域的对象类型 */}
             {!q && hasUnassigned && (
               <div className="mt-2 px-2.5">
-                <div className="text-[9px] text-slate-600 font-mono uppercase tracking-wider mb-1">
+                <div className={`text-[9px] ${styles.muted} font-mono uppercase tracking-wider mb-1`}>
                   未分组
                 </div>
                 <div className={`ml-1 pl-3 border-l ${styles.cardBorder}`}>
@@ -453,14 +453,14 @@ export default function OntologyWorkbenchSidebar({
                             : `border-l-transparent hover:${styles.cardBg}/[0.03]`
                         }`}
                       >
-                        <span className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-slate-500/15 text-slate-400">
+                        <span className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${styles.badgeBg} ${styles.cardTextMuted}`}>
                           <Icon size={11} />
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[11px] font-medium truncate text-slate-300">
+                          <div className={`text-[11px] font-medium truncate ${styles.sidebarText}`}>
                             {o.displayName}
                           </div>
-                          <div className="text-[9px] text-slate-500 font-mono truncate">
+                          <div className={`text-[9px] ${styles.muted} font-mono truncate`}>
                             {o.apiName}
                           </div>
                         </div>
@@ -476,7 +476,7 @@ export default function OntologyWorkbenchSidebar({
 
       {/* ── 底部统计 ── */}
       {showStats && (
-        <div className={`shrink-0 border-t ${styles.cardBorder} px-3 py-2 flex items-center justify-between text-[9px] text-slate-500 font-mono`}>
+        <div className={`shrink-0 border-t ${styles.cardBorder} px-3 py-2 flex items-center justify-between text-[9px] ${styles.muted} font-mono`}>
           <span className="flex items-center gap-1">
             <Database size={10} /> {domains.length} 域
           </span>

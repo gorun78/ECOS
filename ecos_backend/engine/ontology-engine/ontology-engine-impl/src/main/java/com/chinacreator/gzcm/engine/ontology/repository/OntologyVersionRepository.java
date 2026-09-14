@@ -88,8 +88,15 @@ public class OntologyVersionRepository {
             """, status, status, id);
     }
 
+    /**
+     * 逻辑删除 version (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。
+     * is_deleted / update_time / update_by 列由 V120__ecos_ontology_wave31_fallback.sql
+     * 建表时补齐 (ecos_ontology_version 历史无 schema, 本 bundle 首次建表)。
+     */
     public int delete(String id) {
-        return jdbc.update("DELETE FROM ecos_ontology_version WHERE id = ?", id);
+        return jdbc.update(
+            "UPDATE ecos_ontology_version SET is_deleted = 1, status = 'ARCHIVED', " +
+            "update_time = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
     public List<OntologyVersion> findAll() {

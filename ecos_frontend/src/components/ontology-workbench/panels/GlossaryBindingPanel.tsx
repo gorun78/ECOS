@@ -15,6 +15,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { BookOpen, X, Plus, Loader2, Tag } from "lucide-react";
 import { useWorkbenchStore } from "../../../stores/useWorkbenchStore";
+import { useTheme } from "../../ThemeContext";
 import type { GlossaryTerm } from "../../../types/workbench";
 import TermSearchModal from "../modals/TermSearchModal";
 
@@ -47,9 +48,10 @@ interface TermChipProps {
 }
 
 function TermChip({ term, onUnbind }: TermChipProps) {
+  const { styles } = useTheme();
   const statusColor =
     STATUS_COLORS[term.status] ||
-    "bg-slate-500/15 text-slate-400 border-slate-500/20";
+    `${styles.badgeBg} ${styles.cardTextMuted} ${styles.cardBorder}`;
 
   return (
     <div
@@ -58,7 +60,7 @@ function TermChip({ term, onUnbind }: TermChipProps) {
     >
       {/* 术语名称 */}
       <Tag size={11} className="text-indigo-400 shrink-0" />
-      <span className="text-xs text-slate-300 truncate flex-1 min-w-0">
+      <span className={`text-xs ${styles.sidebarText} truncate flex-1 min-w-0`}>
         {term.name}
       </span>
 
@@ -72,9 +74,9 @@ function TermChip({ term, onUnbind }: TermChipProps) {
       {/* 解绑按钮 */}
       <button
         onClick={onUnbind}
-        className="p-0.5 rounded opacity-0 group-hover:opacity-100
-          hover:bg-red-500/10 text-slate-600 hover:text-red-400
-          transition-opacity shrink-0"
+        className={`p-0.5 rounded opacity-0 group-hover:opacity-100
+          hover:bg-red-500/10 ${styles.muted} hover:text-red-400
+          transition-opacity shrink-0`}
         title="解绑术语"
       >
         <X size={10} />
@@ -94,6 +96,7 @@ interface GlossaryBindingPanelProps {
 export default function GlossaryBindingPanel({
   entityId,
 }: GlossaryBindingPanelProps) {
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
   const {
     glossaryTerms,
@@ -161,10 +164,10 @@ export default function GlossaryBindingPanel({
     <div>
       {/* 标题栏 */}
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-          <BookOpen size={11} className="text-slate-500" />
+        <h4 className={`text-[11px] font-semibold ${styles.sidebarText} flex items-center gap-1.5`}>
+          <BookOpen size={11} className={styles.muted} />
           术语关联
-          <span className="text-[10px] font-normal text-slate-500 ml-1">
+          <span className={`text-[10px] font-normal ${styles.muted} ml-1`}>
             ({boundTerms.length})
           </span>
         </h4>
@@ -182,12 +185,12 @@ export default function GlossaryBindingPanel({
 
       {/* 术语列表 */}
       {glossaryTermsLoading && boundTerms.length === 0 ? (
-        <div className="flex items-center justify-center py-8 text-slate-500">
+        <div className={`flex items-center justify-center py-8 ${styles.muted}`}>
           <Loader2 size={16} className="animate-spin mr-2" />
           <span className="text-[11px]">加载术语中...</span>
         </div>
       ) : boundTerms.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+        <div className={`flex flex-col items-center justify-center py-10 ${styles.muted}`}>
           <BookOpen size={24} className="mb-2 opacity-20" />
           <p className="text-[11px]">暂无关联术语</p>
           <p className="text-[9px] mt-0.5 opacity-50">

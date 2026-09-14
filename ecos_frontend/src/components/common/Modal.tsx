@@ -111,7 +111,7 @@ export default function Modal({
             onClick={() => onConfirm?.()}
             className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition flex items-center gap-1.5 ${
               confirmDisabled
-                ? "bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700"
+                ? `bg-[var(--muted)] ${styles.cardTextMuted} cursor-not-allowed dark:bg-[var(--overlay)]`
                 : `${styles.accentBg} ${styles.accentText} hover:opacity-90`
             }`}
           >

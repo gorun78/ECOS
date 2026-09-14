@@ -246,7 +246,7 @@ export default function ObjectTypeView({
           return (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.cardTextMuted} hover:text-slate-800`
+                activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.cardTextMuted} hover:opacity-100 opacity-80`
               }`}>{tabLabels[tab]}</button>
           );
         })}

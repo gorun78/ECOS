@@ -3,12 +3,15 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEmbedding;
+import com.chinacreator.gzcm.engine.kb.repo.QueryEmbeddingHelper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +28,10 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
     private final JdbcTemplate jdbcTemplate;
+    // PMO-50 T1: RAG 向量检索真实化 — 注入 llm-gateway 取真实向量
+    private final QueryEmbeddingHelper queryEmbeddingHelper;
+    private final String embeddingModel;
+    private final String llmGatewayBase;
 
     private volatile boolean pgVectorAvailable = false;
 
@@ -32,12 +39,20 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                                          KnowledgeEmbeddingMapper embeddingMapper,
                                          KnowledgeNodeMapper nodeMapper,
                                          KnowledgeEdgeMapper edgeMapper,
-                                         JdbcTemplate jdbcTemplate) {
+                                         JdbcTemplate jdbcTemplate,
+                                         @Lazy QueryEmbeddingHelper queryEmbeddingHelper,
+                                         @Value("${ecos.rag.embedding-model:text-embedding-3-small}")
+                                         String embeddingModel,
+                                         @Value("${ecos.rag.llm-gateway-base:}")
+                                         String llmGatewayBase) {
         this.articleMapper = articleMapper;
         this.embeddingMapper = embeddingMapper;
         this.nodeMapper = nodeMapper;
         this.edgeMapper = edgeMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.queryEmbeddingHelper = queryEmbeddingHelper;
+        this.embeddingModel = embeddingModel;
+        this.llmGatewayBase = llmGatewayBase;
     }
 
     /**
@@ -103,19 +118,30 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
         if (queryText != null && !queryText.isBlank()) {
             if (pgVectorAvailable) {
-                try {
-                    List<Map<String, Object>> vectorResults = embeddingMapper.searchByVector(queryText, topK);
-                    for (Map<String, Object> row : vectorResults) {
-                        Map<String, Object> source = new LinkedHashMap<>();
-                        source.put("chunkId", row.getOrDefault("id", ""));
-                        source.put("content", row.getOrDefault("chunktext", ""));
-                        source.put("score", row.getOrDefault("score", 0.0));
-                        source.put("source", row.getOrDefault("articleid", ""));
-                        sources.add(source);
+                // PMO-50 T1: 真实向量检索 — 先走 llm-gateway 取 query 向量；
+                // 失败/不可用时（llm-gateway-base 空、库空、网络异常）回退 ILIKE 关键词
+                String queryVector = queryEmbeddingHelper.embed(queryText, embeddingModel, llmGatewayBase);
+                boolean vectorSuccess = false;
+                if (queryVector != null) {
+                    try {
+                        List<Map<String, Object>> vectorResults = embeddingMapper.searchByVector(queryVector, topK);
+                        if (vectorResults != null && !vectorResults.isEmpty()) {
+                            for (Map<String, Object> row : vectorResults) {
+                                Map<String, Object> source = new LinkedHashMap<>();
+                                source.put("chunkId", row.getOrDefault("id", ""));
+                                source.put("content", row.getOrDefault("chunkText", ""));
+                                source.put("score", row.getOrDefault("score", 0.0));
+                                source.put("source", row.getOrDefault("articleId", ""));
+                                sources.add(source);
+                            }
+                            vectorSuccess = !sources.isEmpty();
+                            log.debug("Vector search (real embedding) returned {} results", sources.size());
+                        }
+                    } catch (Exception e) {
+                        log.warn("Vector search failed (real embedding): {} — fallback ILIKE", e.getMessage());
                     }
-                    log.debug("Vector search returned {} results", sources.size());
-                } catch (Exception e) {
-                    log.warn("Vector search failed: {} — falling back to keyword search", e.getMessage());
+                }
+                if (!vectorSuccess) {
                     sources = fallbackKeywordSearch(queryText, topK);
                 }
             } else {
@@ -125,9 +151,17 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
         long latencyMs = System.currentTimeMillis() - startTime;
         result.put("sources", sources);
-        result.put("totalTokens", sources.size());
         result.put("sourcesCount", sources.size());
+        result.put("totalTokens", sources.size());
         result.put("latencyMs", latencyMs);
+
+        // PMO-50 T1: 拼 answer 字段（前端直接展示首段；topK>1 拼接分段）
+        StringBuilder answerBuf = new StringBuilder();
+        for (Map<String, Object> src : sources) {
+            String content = src.get("content") == null ? "" : String.valueOf(src.get("content"));
+            answerBuf.append(content).append('\n');
+        }
+        result.put("answer", answerBuf.toString().trim());
 
         if (latencyMs > 2000) {
             log.warn("⚠️  RAG query latency {}ms exceeded 2s target", latencyMs);

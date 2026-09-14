@@ -5,9 +5,11 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { Wrench } from 'lucide-react';
+import { useTheme } from '../../ThemeContext';
 import type { LogicNodeData, LogicToolConfig } from '../../../types/aiworkbench';
 
 function ToolNode({ data, selected }: NodeProps<LogicNodeData>) {
+  const { styles } = useTheme();
   const config = data.config as LogicToolConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -38,21 +40,21 @@ function ToolNode({ data, selected }: NodeProps<LogicNodeData>) {
         <span className="text-xs font-bold text-amber-800 truncate flex-1">{data.label}</span>
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor}`} />
       </div>
-      <div className="px-3 py-2 space-y-1 text-[10px] text-slate-500">
+      <div className={`px-3 py-2 space-y-1 text-[10px] ${styles.cardTextMuted}`}>
         <div className="flex justify-between">
           <span className="font-semibold">Tool:</span>
-          <span className="font-mono text-slate-700">{config.toolName}</span>
+          <span className={`font-mono ${styles.cardText}`}>{config.toolName}</span>
         </div>
         {paramPreview && (
           <div className="flex justify-between">
             <span className="font-semibold">Params:</span>
-            <span className="font-mono text-slate-700 truncate max-w-[120px]">{paramPreview}</span>
+            <span className={`font-mono ${styles.cardText} truncate max-w-[120px]`}>{paramPreview}</span>
           </div>
         )}
         {data.duration != null && (
           <div className="flex justify-between">
             <span className="font-semibold">耗时:</span>
-            <span className="font-mono text-slate-700">{data.duration}ms</span>
+            <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}
       </div>

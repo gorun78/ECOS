@@ -50,6 +50,13 @@
             <artifactId>sysman-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- PMO-51 T3: @KafkaListener 在 EcosOntologyEventConsumer / KnowledgeIngestController 用到,
+             之前是"反序列化路径的 ConditionalOnClass 类条件装配"误靠 dccheng 反射用，
+             编译期必须显式 spring-kafka 依赖才能 resolve。生产 EventBus 走 PMO-50 统一接 runtime-event。 -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.neo4j.driver</groupId>
             <artifactId>neo4j-java-driver</artifactId>

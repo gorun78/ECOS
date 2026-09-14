@@ -19,6 +19,7 @@ import com.chinacreator.gzcm.engine.data.datasource.dao.impl.DataSourceDaoImpl;
 import com.chinacreator.gzcm.runtime.core.i18n.I18nUtils;
 import com.chinacreator.gzcm.runtime.core.i18n.LocaleResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Service;
 
 /**
  * 数据源服务实现类
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * 
  * @author CDRC Runtime Team
  */
+@Service("ecoDsDataSourceService")
 public class DataSourceServiceImpl implements IDataSourceService {
     
     private static final Logger logger = LoggerFactory.getLogger(DataSourceServiceImpl.class);

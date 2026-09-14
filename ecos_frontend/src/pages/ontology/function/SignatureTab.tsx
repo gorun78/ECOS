@@ -119,7 +119,7 @@ export default function SignatureTab({
                 <th className="py-2.5 px-4 text-center">{t('ow.label.actions')}</th>
               </tr>
             </thead>
-            <tbody className={`divide-y divide-gray-100 ${styles.cardTextMuted}`}>
+            <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
               {func.parameters.length === 0 ? (
                 <tr><td colSpan={6} className={`text-center py-8 ${styles.muted} italic`}>{t('ow.empty.noFuncParams')}</td></tr>
               ) : (
@@ -144,7 +144,7 @@ export default function SignatureTab({
                     <td className="py-2.5 px-4">
                       <input type="text" value={p.description}
                         onChange={e => handleParamFieldChange(p.name, 'description', e.target.value)}
-                        className={`${styles.muted} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`}
+                        className={`${styles.muted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`}
                         placeholder={t('ow.placeholder.paramDescription')} />
                     </td>
                     <td className="py-2.5 px-4 text-center">

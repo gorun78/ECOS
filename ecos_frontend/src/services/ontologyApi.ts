@@ -64,9 +64,68 @@ export const DEFAULT_ONTOLOGY_ID = "ont001";
 /** API 基础路径 */
 const BASE = "/api/v1/ecos";
 
-// 动态路径拼接
+// ================================================================
+// 本体基础类型定义 (T2: 由 api.ts 收敛迁移至此)
+// 原位置: api.ts "Ontology Designer" 段落中的 export interface
+// 迁移原因: api.ts 仅保留通用业务函数,本体类型/接口归属收口于此
+// ================================================================
+
+/** 本体实体 (Entity) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/entities 项 */
+export interface OntologyEntity {
+  id: string;
+  ontologyId: string;
+  code: string;
+  name: string;
+  description?: string;
+  entityType: string;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 本体实体属性 (Property) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/entities/{e}/properties 项 */
+export interface OntologyProperty {
+  id: string;
+  entityId: string;
+  code: string;
+  name: string;
+  propertyType: string;
+  functionType?: string;
+  functionExpression?: string;
+  requiredFlag: number;
+  searchableFlag: number;
+  sortOrder?: number;
+}
+
+/** 本体关系 (Relationship) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/relationships 项 */
+export interface OntologyRelationship {
+  id: string;
+  sourceEntityId: string;
+  targetEntityId: string;
+  code: string;
+  name: string;
+  relationshipType: string;
+}
+
+/** 动态路径拼接 (T2 备注: 此函数仅作为私有 helper, 不对前端页面暴露) */
 const ontPath = (ontologyId: string, path: string) =>
   `${BASE}/ontologies/${ontologyId}${path}`;
+
+/** 实体列表摘要 — 仅保留 code/name/description/entityType (T2: 由 api.ts 收敛迁移至此) */
+export interface EntityListItem {
+  code: string;
+  name: string;
+  description?: string;
+  entityType?: string;
+}
+
+/**
+ * 获取默认本体的实体列表(用于 ObjectExplorer 动态渲染)
+ * T2: 由 api.ts GET /api/v1/ecos/ontologies/ont001/entities 收敛迁移至此
+ */
+export async function fetchEntityList(): Promise<EntityListItem[]> {
+  return apiFetchData<EntityListItem[]>(`${BASE}/ontologies/ont001/entities`);
+}
 
 // ================================================================
 // 知识图谱
@@ -464,7 +523,9 @@ export async function fetchExportTasks(params?: { ontologyId?: string; format?: 
   if (params?.format) qs.set("format", params.format);
   if (params?.status) qs.set("status", params.status);
   const query = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetchData<ExportTaskSummary[]>(`${EXPORT_BASE}${query}`);
+  // Wave C P0-01: 对齐后端 listExports (OntologyExportController L79 GET /api/v1/ontology/export/tasks);
+  // 原 URL 命中 exportFull 的直接导出端点 (返回对象, 非任务列表)
+  return apiFetchData<ExportTaskSummary[]>(`${EXPORT_BASE}/tasks${query}`);
 }
 
 export async function fetchExportTask(id: string) {
@@ -759,46 +820,83 @@ export const ontologyApi = {
   fetchLineageEntities,
   parseLineage,
   fetchLineageImpact,
+  fetchWorkbenchDomains,
+  createWorkbenchDomain,
+  updateWorkbenchDomain,
+  deleteWorkbenchDomain,
+  publishWorkbenchDomain,
+  deprecateWorkbenchDomain,
+  reassignObjectDomain,
 };
 
 // ================================================================
 // 版本管理 (Version Timeline) — T3
 // ================================================================
 
-const VERSION_BASE = "/api/v1/ontology/versions";
+const VERSION_BASE = "/api/v1/ecos/versions";
 
-/** 版本列表项 */
+/** 版本列表项 — 对齐后端 OntologyVersionVO (T16-5 简化端点强类型化) */
 export interface VersionItem {
-  version: string;
+  /** 版本 ID（ver 前缀，diff 端点定位键） */
+  id: string;
+  /** 版本号（如 1.0.0） */
+  versionNo: string;
+  /** 状态（Draft / Published / Deprecated） */
+  status?: string;
+  /** 发布人 */
+  publisher?: string;
+  /** 发布时间 ISO 字符串 */
+  publishedAt?: string;
+  /** 创建时间 ISO 字符串 */
   createdAt: string;
-  author: string;
-  summary?: {
-    addedEntities: number;
-    modifiedEntities: number;
-    deletedEntities: number;
-  };
-}
-
-/** 版本差异中的实体变更 */
-export interface VersionDiffEntity {
-  entityCode: string;
-  entityName: string;
-  changeType: 'added' | 'modified' | 'deleted';
-  propertiesAdded?: { name: string; type: string }[];
-  propertiesModified?: { name: string; oldType: string; newType: string }[];
-  propertiesDeleted?: string[];
-}
-
-/** 版本差异响应 */
-export interface VersionDiff {
-  v1: string;
-  v2: string;
-  entities: VersionDiffEntity[];
 }
 
 /**
- * 获取版本历史列表
- * GET /api/v1/ontology/versions?domainCode=finance
+ * 版本 diff 条目 — 对齐后端 OntologyVersionDiffVO 动态条目契约（T16-4 强类型容器，
+ * added/removed/modified 元素保持 {field, value[, newValue]} 动态结构豁免）。
+ */
+export interface VersionDiffEntry {
+  /** 变更的快照顶层字段名（entities / properties / relationships / actions） */
+  field: string;
+  /** 旧值（added 条目 = 新值；removed 条目 = 旧值；快照动态结构，Object 映射豁免） */
+  value: unknown;
+  /** 新值（仅 modified 条目填充） */
+  newValue?: unknown;
+}
+
+/**
+ * 版本差异响应 — 对齐后端 OntologyVersionDiffVO 字段（T16-4）。
+ * 正常分支: version1/version2 + snapshot1/snapshot2 + added/removed/modified；
+ * 空 diff 分支: version1Id/version2Id + 三空列表（NON_NULL 按需输出，故均可选）。
+ */
+export interface VersionDiff {
+  version1?: string;
+  version2?: string;
+  version1Id?: string;
+  version2Id?: string;
+  /** 第一版本快照（动态 JSON，T16-4 豁免） */
+  snapshot1?: unknown;
+  /** 第二版本快照（动态 JSON，T16-4 豁免） */
+  snapshot2?: unknown;
+  added?: VersionDiffEntry[];
+  removed?: VersionDiffEntry[];
+  modified?: VersionDiffEntry[];
+}
+
+/** 与前一版本 diff 响应 — 对齐后端 OntologyVersionPreviousDiffVO (T16-5) */
+export interface VersionPreviousDiff {
+  currentVersion: string;
+  currentSnapshot?: unknown;
+  previousVersion?: string;
+  previousSnapshot?: unknown;
+}
+
+/**
+ * 获取版本历史列表（跨全部 ontology，按创建时间由新到旧）
+ * GET /api/v1/ecos/versions
+ * 后端返回 OntologyVersionVO 列表（T16-5 强类型）；
+ * domainCode 参数按 API 只增不改原则保留，当前后端未消费，
+ * 前端如需按 ontology 过滤应在客户端本地过滤。
  */
 export async function fetchVersions(domainCode: string): Promise<VersionItem[]> {
   return apiFetchData<VersionItem[]>(
@@ -807,13 +905,303 @@ export async function fetchVersions(domainCode: string): Promise<VersionItem[]> 
 }
 
 /**
- * 获取两个版本之间的 diff
- * GET /api/v1/ontology/versions/diff?v1=3.1&v2=3.2
+ * 获取版本详情（含全量 snapshot）
+ * GET /api/v1/ecos/versions/{id}
+ * 用于版本 diff 对比：前后端契约铁律 — 列表摘要不渲染编辑态，
+ * 对比前必须拉取两侧完整快照。
  */
-export async function fetchVersionDiff(v1: string, v2: string): Promise<VersionDiff> {
-  return apiFetchData<VersionDiff>(
-    `${VERSION_BASE}/diff?v1=${encodeURIComponent(v1)}&v2=${encodeURIComponent(v2)}`
+export async function fetchVersionDetail(id: string): Promise<VersionItem & { snapshot?: unknown }> {
+  return apiFetchData<VersionItem & { snapshot?: unknown }>(
+    `${VERSION_BASE}/${encodeURIComponent(id)}`
   );
+}
+
+/**
+ * 获取两个版本之间的 diff（T11 联调真实端点 — 后端 T16-4 强类型）
+ * GET /api/v1/ontology/versions/diff?v1={versionId1}&v2={versionId2}
+ * 后端契约: VersionDiffController（ontology-engine-impl，PMO-39 批次2 T3），
+ * v1/v2 为版本 ID（ver 前缀），非版本号；两版本需分属同一快照可比。
+ * 返回 OntologyVersionDiffVO（version1/version2[/version1Id/version2Id]/
+ * snapshot1/snapshot2/added/removed/modified），raw 动态值豁免。
+ */
+export async function fetchOntologyVersionDiff(v1Id: string, v2Id: string): Promise<VersionDiff> {
+  return apiFetchData<VersionDiff>(
+    `/api/v1/ontology/versions/diff?v1=${encodeURIComponent(v1Id)}&v2=${encodeURIComponent(v2Id)}`
+  );
+}
+
+// ================================================================
+// 域 CRUD (Workbench Domain) — T8
+// 对齐后端 OntologyDomainApiController (@RequestMapping("/api/v1/ontology"))
+//   GET    /api/v1/ontology/domains         → 域列表
+//   POST   /api/v1/ontology/domains         → 创建域
+//   PUT    /api/v1/ontology/domains/{code}  → 更新域(id 即 domainCode)
+//   DELETE /api/v1/ontology/domains/{code}  → 删除域
+//   PUT    /api/v1/ontology/objects/{id}/domain → 对象归属域变更
+// 后端 T16-2 强类型契约: OntologyDomainVO / OntologyDomainSaveDTO
+// 注: 后端无独立 publish/deprecate 端点; 域状态变更经 PUT status 字段实现
+//     (OntologyDomainVO.status: Draft / Published / Deprecated)
+// ================================================================
+
+/**
+ * 工作台域 VO — 对齐后端 OntologyDomainVO (T16-2)。
+ * id 格式 "dom"+序号, code 为唯一业务键。
+ */
+export interface WorkbenchDomainVO {
+  id: string;
+  code: string;
+  name: string;
+  owner?: string;
+  description?: string;
+  status?: string;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 工作台域新增/编辑 DTO — 对齐后端 OntologyDomainSaveDTO */
+export interface WorkbenchDomainSaveDTO {
+  code: string;
+  name: string;
+  owner?: string;
+  description?: string;
+  status?: string;
+}
+
+/** 对象归属域变更结果 — 对齐后端 OntologyDomainReassignVO */
+export interface WorkbenchDomainReassignVO {
+  entityId: string;
+  domainId: string;
+  domainCode: string;
+  domainName: string;
+}
+
+/** 对象归属变更 DTO — 兼容 domainCode / domainId 双字段 */
+export interface WorkbenchDomainReassignDTO {
+  domainCode?: string;
+  domainId?: string;
+}
+
+/**
+ * 获取工作台域列表
+ * GET /api/v1/ontology/domains
+ */
+export async function fetchWorkbenchDomains(): Promise<WorkbenchDomainVO[]> {
+  return apiFetchData<WorkbenchDomainVO[]>("/api/v1/ontology/domains");
+}
+
+/**
+ * 创建工作台域
+ * POST /api/v1/ontology/domains
+ */
+export async function createWorkbenchDomain(
+  dto: WorkbenchDomainSaveDTO
+): Promise<WorkbenchDomainVO> {
+  return apiFetchData<WorkbenchDomainVO>("/api/v1/ontology/domains", {
+    method: "POST",
+    body: JSON.stringify(dto),
+  });
+}
+
+/**
+ * 更新工作台域
+ * PUT /api/v1/ontology/domains/{code} (id 即 domainCode)
+ */
+export async function updateWorkbenchDomain(
+  code: string,
+  dto: WorkbenchDomainSaveDTO
+): Promise<WorkbenchDomainVO> {
+  return apiFetchData<WorkbenchDomainVO>(
+    `/api/v1/ontology/domains/${encodeURIComponent(code)}`,
+    { method: "PUT", body: JSON.stringify(dto) }
+  );
+}
+
+/**
+ * 删除工作台域 (含实体时后端拒绝)
+ * DELETE /api/v1/ontology/domains/{code}
+ */
+export async function deleteWorkbenchDomain(code: string): Promise<void> {
+  await apiFetchData(`/api/v1/ontology/domains/${encodeURIComponent(code)}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * 发布域 (状态 → Published)
+ * 后端无独立 publish 端点: 经 "拉当前 VO → 合并 status → PUT 回写" 实现。
+ * 读-改-写而非直传 status, 避免后端 update 全字段覆盖把 name/description 清掉。
+ */
+export async function publishWorkbenchDomain(code: string): Promise<WorkbenchDomainVO> {
+  return changeWorkbenchDomainStatus(code, "Published");
+}
+
+/**
+ * 废弃域 (状态 → Deprecated)
+ * 后端无独立 deprecate 端点: 实现同 publishWorkbenchDomain。
+ */
+export async function deprecateWorkbenchDomain(code: string): Promise<WorkbenchDomainVO> {
+  return changeWorkbenchDomainStatus(code, "Deprecated");
+}
+
+/**
+ * 内部: 拉取当前域 VO → 仅改 status 回写 (name/description/owner 原值保留;
+ * 空值字段以 undefined 传递 → JSON 省略 → 后端 DTO 反序列化为 null = 不动)。
+ */
+async function changeWorkbenchDomainStatus(code: string, status: string): Promise<WorkbenchDomainVO> {
+  // eslint-disable-next-line no-use-before-define
+  const vos = await listWorkbenchDomains();
+  const vo = (vos || []).find((v) => v.code === code || v.id === code);
+  if (!vo) {
+    throw new Error(`Workbench domain not found: ${code}`);
+  }
+  const dto: WorkbenchDomainSaveDTO = {
+    code: vo.code,
+    name: vo.name,
+    status,
+  };
+  if (vo.description) {
+    dto.description = vo.description;
+  }
+  if (vo.owner) {
+    dto.owner = vo.owner;
+  }
+  return updateWorkbenchDomain(vo.code, dto);
+}
+
+/** 域列表别名 — 与 fetchWorkbenchDomains 同源 (status 读改写的内部取词) */
+function listWorkbenchDomains(): Promise<WorkbenchDomainVO[]> {
+  return fetchWorkbenchDomains();
+}
+
+/**
+ * 变更对象归属域
+ * PUT /api/v1/ontology/objects/{id}/domain
+ */
+export async function reassignObjectDomain(
+  objectId: string,
+  dto: WorkbenchDomainReassignDTO
+): Promise<WorkbenchDomainReassignVO> {
+  return apiFetchData<WorkbenchDomainReassignVO>(
+    `/api/v1/ontology/objects/${encodeURIComponent(objectId)}/domain`,
+    { method: "PUT", body: JSON.stringify(dto) }
+  );
+}
+
+// ================================================================
+// 函数沙盒 (Function Sandbox) — T9
+// 对齐后端 FunctionController (@RequestMapping("/api/v1/ontology/functions"))
+//   POST /api/v1/ontology/functions/test     → 沙盒执行（expression + entityName）
+//   POST /api/v1/ontology/functions/compile  → 仅编译（返回生成的参数化 SQL）
+// 后端 T16-3 强类型契约：入参 OntologyFunctionSaveDTO / 返回 FunctionResult
+// ================================================================
+
+const FUNCTION_BASE = "/api/v1/ontology/functions";
+
+/** 函数沙盒执行结果 — 对齐后端 FunctionResult POJO（@JsonInclude NON_NULL） */
+export interface FunctionTestResultVO {
+  /** 计算结果单值（无数据行时为 null） */
+  value: number | string | boolean | null;
+  /** SQL 类型：LONG / DOUBLE / NUMERIC 等（inferSqlType 推断） */
+  sqlType?: string;
+  /** 执行耗时（毫秒） */
+  executionTimeMs: number;
+  /** 编译生成的参数化 SQL（调试/预览） */
+  compiledSql?: string;
+  /** 是否命中结果缓存 */
+  fromCache?: boolean;
+  /** 缓存键 */
+  cacheKey?: string;
+}
+
+/** 函数沙盒执行请求 — 对齐后端 OntologyFunctionSaveDTO */
+export interface FunctionTestParams {
+  /** SQL 表达式（必填），如 "COUNT(id) FROM ecos_ontology_data WHERE object_type='ot1'" */
+  expression: string;
+  /** 目标实体名（必填，与 FROM 子句表名一致；按实体名=表名映射执行） */
+  entityName: string;
+  /** 调用方 id（可选，默认 anonymous；写入函数执行审计日志） */
+  callerId?: string;
+}
+
+/** 函数表达式编译结果 — 对齐后端 OntologyFunctionCompileVO */
+export interface FunctionCompileVO {
+  /** 编译生成的参数化 SQL */
+  sql?: string;
+  /** SQL 占位参数（动态 list，沙盒运行时 payload） */
+  params?: unknown[];
+  /** 解析出的目标实体名 */
+  entityName?: string;
+}
+
+/**
+ * 函数沙盒真实执行（替代前端 mock TS 执行）。
+ * POST /api/v1/ontology/functions/test
+ * 业务错误（白名单拒绝/执行失败）由 apiFetchData 统一转抛。
+ */
+export async function testFunction(params: FunctionTestParams): Promise<FunctionTestResultVO> {
+  return apiFetchData<FunctionTestResultVO>(`${FUNCTION_BASE}/test`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * 函数表达式仅编译（不执行）— 返回真实生成的参数化 SQL，供沙盒控制台日志预览。
+ * POST /api/v1/ontology/functions/compile
+ */
+export async function compileFunction(
+  expression: string,
+  entityName?: string
+): Promise<FunctionCompileVO> {
+  return apiFetchData<FunctionCompileVO>(`${FUNCTION_BASE}/compile`, {
+    method: "POST",
+    body: JSON.stringify({ expression, entityName }),
+  });
+}
+
+// ================================================================
+// 本体导出任务落地下载 — T10
+// 对齐后端 OntologyExportController GET /api/v1/ontology/export/{id}/download
+// 响应为统一返回体 ApiResponse<Object>（payload 随 format: JSON Map / CSV 串 / DDL 串），
+// 非裸 Blob 流 — 需解包 data 字段后再触发浏览器文件保存。
+// ================================================================
+
+/** 导出任务下载文件扩展名（format → 扩展名，unknown 回退 txt） */
+const EXT_FOR_FORMAT: Record<string, string> = {
+  JSON: "json",
+  CSV: "csv",
+  DDL: "sql",
+};
+
+/**
+ * 下载 COMPLETED 导出任务的 payload 并落地为本地文件。
+ * GET /api/v1/ontology/export/{id}/download
+ * 仅 COMPLETED 任务可下载（后端 ONT-EXP-002 校验），失败由 apiFetchData 统一转抛。
+ *
+ * @param id      导出任务 ID
+ * @param format  导出格式（用于推断文件扩展名）
+ * @returns 保存后的文件名
+ */
+export async function downloadExportTask(id: string, format?: string): Promise<string> {
+  const payload = await apiFetchData<unknown>(`${EXPORT_BASE}/${id}/download`);
+  const ext = EXT_FOR_FORMAT[String(format || "").toUpperCase()] || "txt";
+  const content =
+    typeof payload === "string" ? payload : JSON.stringify(payload ?? {}, null, 2);
+  const filename = `ontology-export-${id}.${ext}`;
+
+  const blob = new Blob([content], {
+    type: format === "CSV" ? "text/csv" : "application/octet-stream",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return filename;
 }
 
 // ================================================================

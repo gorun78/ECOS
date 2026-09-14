@@ -300,7 +300,7 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
                   <td className="px-4 py-2.5">
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        item.enabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                        item.enabled ? 'bg-emerald-500/10 text-emerald-600' : `${styles.appBg} ${styles.cardTextMuted}`
                       }`}
                     >
                       {item.enabled ? t('aiworkbench.actionType.enabled') : t('aiworkbench.actionType.disabled')}

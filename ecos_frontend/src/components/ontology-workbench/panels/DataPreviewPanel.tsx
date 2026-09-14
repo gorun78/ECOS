@@ -24,6 +24,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
+import { useTheme } from '../../ThemeContext';
 import { DATA_CATALOG_UNAVAILABLE } from '../../../services/dataCatalogClient';
 
 // ── 组件接口 ────────────────────────────────────────────────
@@ -42,6 +43,7 @@ export default function DataPreviewPanel({
   entityId,
   resourceId,
 }: DataPreviewPanelProps) {
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
   const {
     dataPreview,
@@ -104,7 +106,7 @@ export default function DataPreviewPanel({
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <Loader2 size={22} className="animate-spin text-indigo-400 mb-3" />
-        <p className="text-xs text-slate-400">加载数据预览...</p>
+        <p className={`text-xs ${styles.cardTextMuted}`}>加载数据预览...</p>
       </div>
     );
   }
@@ -144,7 +146,7 @@ export default function DataPreviewPanel({
     const hasMappings = mappedIds.length > 0;
 
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+      <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
         <Database size={32} className="mb-3 opacity-20" />
         <p className="text-xs">
           {hasMappings ? '暂无预览数据' : '未映射物理表'}
@@ -188,14 +190,14 @@ export default function DataPreviewPanel({
     <div className="space-y-3">
       {/* 头部信息 */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-slate-500">
+        <span className={`text-[10px] ${styles.muted}`}>
           共 {rows.length} 行 · {columns.length} 列
         </span>
         <button
           onClick={handleRetry}
           disabled={retrying}
-          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-slate-500
-            hover:text-slate-300 hover:bg-white/5 transition"
+          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] ${styles.muted}
+            hover:${styles.cardText} hover:bg-white/5 transition`}
           title="刷新预览"
         >
           <RefreshCw size={11} className={retrying ? 'animate-spin' : ''} />
@@ -211,15 +213,15 @@ export default function DataPreviewPanel({
           {/* 表头 */}
           <thead>
             <tr className="bg-[#0f131a] border-b border-[#1E293B]">
-              <th className="sticky left-0 bg-[#0f131a] px-3 py-2 text-[10px] font-medium text-slate-400
-                border-r border-[#1E293B] min-w-[40px] text-center">
+              <th className={`sticky left-0 bg-[#0f131a] px-3 py-2 text-[10px] font-medium ${styles.cardTextMuted}
+                border-r border-[#1E293B] min-w-[40px] text-center`}>
                 #
               </th>
               {columns.map((col) => (
                 <th
                   key={col}
-                  className="px-3 py-2 text-[10px] font-medium text-slate-400 whitespace-nowrap
-                    border-r border-[#1E293B] last:border-r-0 min-w-[100px]"
+                  className={`px-3 py-2 text-[10px] font-medium ${styles.cardTextMuted} whitespace-nowrap
+                    border-r border-[#1E293B] last:border-r-0 min-w-[100px]`}
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono">{col}</span>
@@ -240,8 +242,8 @@ export default function DataPreviewPanel({
                     rowIdx % 2 === 0 ? 'bg-transparent' : 'bg-[#0b0e14]/30'
                   }`}
                 >
-                  <td className="sticky left-0 px-3 py-1.5 text-[10px] text-slate-500 font-mono
-                    border-r border-[#1E293B] text-center bg-inherit">
+                  <td className={`sticky left-0 px-3 py-1.5 text-[10px] ${styles.muted} font-mono
+                    border-r border-[#1E293B] text-center bg-inherit`}>
                     {globalIdx + 1}
                   </td>
                   {columns.map((col) => {
@@ -260,8 +262,8 @@ export default function DataPreviewPanel({
                         className={`px-3 py-1.5 text-[11px] whitespace-nowrap max-w-[200px] truncate
                           border-r border-[#1E293B] last:border-r-0 ${
                             isNull
-                              ? 'text-slate-600 italic'
-                              : 'text-slate-200'
+                              ? `${styles.muted} italic`
+                              : styles.cardText
                           }`}
                         title={display}
                       >
@@ -281,23 +283,23 @@ export default function DataPreviewPanel({
       {/* 分页 */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-slate-500">
+          <span className={`text-[10px] ${styles.muted}`}>
             第 {page + 1} / {totalPages} 页
           </span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-white/5
-                disabled:opacity-30 disabled:cursor-not-allowed transition"
+              className={`p-1.5 rounded ${styles.cardTextMuted} hover:${styles.cardText} hover:bg-white/5
+                disabled:opacity-30 disabled:cursor-not-allowed transition`}
             >
               <ChevronLeft size={13} />
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-white/5
-                disabled:opacity-30 disabled:cursor-not-allowed transition"
+              className={`p-1.5 rounded ${styles.cardTextMuted} hover:${styles.cardText} hover:bg-white/5
+                disabled:opacity-30 disabled:cursor-not-allowed transition`}
             >
               <ChevronRight size={13} />
             </button>

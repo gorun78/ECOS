@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.access.connector;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 
 /**
@@ -31,18 +33,199 @@ public class JdbcConnector implements Connector {
 
     @Override
     public boolean testConnection(String connectionConfig) {
+        Object s = testConnectionDetailed(connectionConfig, "JDBC").get("success");
+        return Boolean.TRUE.equals(s);
+    }
+
+    /**
+     * PMO-46 Wave2 — 详细连通性测试：返回 {success, error, type, driverClass, ...}。
+     * <p>
+     * 与 {@link #testConnection(String)} 的行为差异：
+     * <ol>
+     *   <li>按数据源 type 解析 JDBC URL + 驱动类（而非仅依赖 config.jdbcUrl）；</li>
+     *   <li>先 {@code Class.forName(driverClass)} —— 驱动不在 classpath 时返回
+     *       “驱动未加载”，避免裸报 SQLException / 500；</li>
+     *   <li>连接超时 connectTimeout/socketTimeout = 10s；</li>
+     *   <li>SQLException 按 网络不可达 / 认证失败 / 驱动无适配 分类，输出可读 error。</li>
+     * </ol>
+     * 供 {@code DataSourceServiceImpl.testConnectionById} 返回给
+     * {@code POST /api/v1/datasource/test-connection/{id}}，满足验收：
+     * 能清楚显示哪种连接没成功，而不是超时或异常裸报 500。
+     *
+     * @param connectionConfig 连接配置 JSON
+     * @param dsType           数据源业务类型（ORACLE/MSSQL/DM/KINGBASE/GAUSS/MYSQL/POSTGRESQL/...）
+     * @return 连通性明细（never null；success=false 时 error 非空）
+     */
+    public Map<String, Object> testConnectionDetailed(String connectionConfig, String dsType) {
+        String type = dsType != null ? dsType.toUpperCase() : "JDBC";
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("type", type);
         try {
-            Map<String, String> config = parseConfig(connectionConfig);
-            try (Connection conn = DriverManager.getConnection(
-                    config.get("jdbcUrl"),
-                    config.get("username"),
-                    config.get("password"))) {
-                return conn.isValid(5);
+            Map<String, String> cfg = parseConfig(connectionConfig);
+            String url = buildJdbcUrl(type, cfg);
+            String driver = resolveDriverClass(type, url);
+            r.put("driverClass", driver);
+            if (url == null || url.isBlank()) {
+                r.put("success", false);
+                String err = "连接配置缺少 jdbcUrl 或 host/port 参数，无法拼装 JDBC URL (type=" + type + ")";
+                r.put("error", err);
+                r.put("message", err);
+                return r;
             }
+            // 1) 驱动加载检测 — 缺失时给出可读提示，而非 SQLException 裸报
+            try {
+                Class.forName(driver);
+                r.put("driverLoaded", true);
+            } catch (ClassNotFoundException cnfe) {
+                r.put("driverLoaded", false);
+                String err = "JDBC 驱动未加载: " + driver + " (type=" + type + ")。"
+                    + "当前部署包不含该驱动 JAR —— 请使用 -Pjdbc-drivers profile 重构建，"
+                    + "或确认企业版/旗舰版运行时已附带对应驱动。";
+                r.put("success", false);
+                r.put("error", err);
+                r.put("message", err);
+                return r;
+            }
+            // 2) 建连（10s 超时）
+            Properties props = new Properties();
+            if (cfg.get("username") != null) props.setProperty("user", cfg.get("username"));
+            if (cfg.get("password") != null) props.setProperty("password", cfg.get("password"));
+            props.setProperty("connectTimeout", "10");   // PG: 秒
+            props.setProperty("socketTimeout", "10");
+            try (Connection conn = DriverManager.getConnection(url, props)) {
+                boolean ok;
+                try { ok = conn.isValid(5); } catch (Exception ignored) { ok = false; }
+                r.put("success", ok);
+                if (!ok) {
+                    String err = "JDBC 已建连但 isValid(5s)=false (type=" + type + ")";
+                    r.put("error", err);
+                    r.put("message", err);
+                }
+            } catch (SQLException e) {
+                String err = classifySqlError(type, url, e);
+                r.put("success", false);
+                r.put("error", err);
+                r.put("message", err);
+                log.warn("JdbcConnector.testConnectionDetailed FAILED type={} url={}: {}", type, url, e.getMessage());
+            }
+        } catch (IllegalArgumentException e) {
+            String err = "连接配置 JSON 解析失败: " + e.getMessage();
+            r.put("success", false);
+            r.put("error", err);
+            r.put("message", err);
         } catch (Exception e) {
-            log.warn("JDBC connection test failed: {}", e.getMessage());
-            return false;
+            String err = "连接测试异常 (type=" + type + "): " + e.getMessage();
+            r.put("success", false);
+            r.put("error", err);
+            r.put("message", err);
         }
+        return r;
+    }
+
+    /**
+     * 按数据源类型拼装 JDBC URL。优先使用 config.jdbcUrl；缺失时按 host/port 拼装。
+     */
+    private String buildJdbcUrl(String type, Map<String, String> cfg) {
+        String direct = cfg.get("jdbcUrl");
+        if (direct != null && !direct.isBlank()) return direct;
+        String host = cfg.get("host");
+        String port = cfg.get("port");
+        if (host == null || host.isBlank()) return null;
+        if (port == null) port = defaultPort(type);
+        switch (type) {
+            case "ORACLE": {
+                String svc = cfg.getOrDefault("serviceName", cfg.getOrDefault("sid", ""));
+                return "jdbc:oracle:thin:@//" + host + ":" + port + "/" + svc;
+            }
+            case "MSSQL": {
+                String db = cfg.getOrDefault("databaseName", cfg.getOrDefault("database", ""));
+                return "jdbc:sqlserver://" + host + ":" + port + ";databaseName=" + db
+                    + ";encrypt=false;trustServerCertificate=true;connectTimeout=10;socketTimeout=10";
+            }
+            case "DM":
+                return "jdbc:dm://" + host + ":" + port + "/" + cfg.getOrDefault("schema", "").replaceFirst("^/", "");
+            case "KINGBASE":
+                return "jdbc:kingbase8://" + host + ":" + port + "/" + cfg.getOrDefault("database", "");
+            case "GAUSS":
+                return "jdbc:opengauss://" + host + ":" + port + "/" + cfg.getOrDefault("database", "");
+            case "MYSQL":
+                return "jdbc:mysql://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
+                    + "?connectTimeout=10000&socketTimeout=10000&useSSL=false";
+            case "POSTGRESQL":
+            default:
+                return "jdbc:postgresql://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
+                    + "?connectTimeout=10&socketTimeout=10";
+        }
+    }
+
+    private static String defaultPort(String type) {
+        switch (type) {
+            case "ORACLE": return "1521";
+            case "MSSQL": return "1433";
+            case "DM": return "5236";
+            case "KINGBASE": return "54321";
+            case "GAUSS": return "5432";
+            case "MYSQL": return "3306";
+            case "POSTGRESQL":
+            default: return "5432";
+        }
+    }
+
+    /**
+     * 依 URL scheme 或业务类型解析 JDBC 驱动类。
+     */
+    private String resolveDriverClass(String type, String jdbcUrl) {
+        if (jdbcUrl != null) {
+            if (jdbcUrl.startsWith("jdbc:oracle")) return "oracle.jdbc.OracleDriver";
+            if (jdbcUrl.startsWith("jdbc:sqlserver")) return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+            if (jdbcUrl.startsWith("jdbc:dm:")) return "dm.jdbc.driver.DmDriver";
+            if (jdbcUrl.startsWith("jdbc:kingbase8")) return "com.kingbase8.Driver";
+            if (jdbcUrl.startsWith("jdbc:opengauss") || jdbcUrl.startsWith("jdbc:gaussdb")) return "org.opengauss.Driver";
+            if (jdbcUrl.startsWith("jdbc:postgresql")) return "org.postgresql.Driver";
+            if (jdbcUrl.startsWith("jdbc:mysql")) return "com.mysql.cj.jdbc.Driver";
+        }
+        switch (type) {
+            case "ORACLE": return "oracle.jdbc.OracleDriver";
+            case "MSSQL": return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+            case "DM": return "dm.jdbc.driver.DmDriver";
+            case "KINGBASE": return "com.kingbase8.Driver";
+            case "GAUSS": return "org.opengauss.Driver";
+            case "MYSQL": return "com.mysql.cj.jdbc.Driver";
+            case "POSTGRESQL":
+            default: return "org.postgresql.Driver";
+        }
+    }
+
+    /**
+     * 分类 SQLException 为可读 error（网络不可达 / 认证失败 / 驱动无适配 / 其他）。
+     */
+    private String classifySqlError(String type, String url, SQLException e) {
+        String m = e.getMessage() != null ? e.getMessage() : "";
+        String combined = (type + " " + m).toLowerCase();
+        if (m.contains("No suitable driver")) {
+            return "无可用 JDBC 驱动适配 URL: " + url + " (type=" + type + ")";
+        }
+        if (m.contains("password authentication failed") || m.contains("FATAL:  password")
+                || m.contains("Login failed") || m.contains("access denied")
+                || m.contains("ORA-01017") || m.contains("ORA-28000")) {
+            return "认证失败 (type=" + type + "，账号/密码错误)";
+        }
+        if (m.contains("Connection refused") || m.contains("ORA-12154") || m.contains("ORA-12170")
+                || m.contains("network is unreachable") || m.contains("Connection timed out")
+                || m.contains("connect timed out") || m.contains("timed out")
+                || m.contains("No route to host") || m.contains("ECONNREFUSED")
+                || m.contains("通信链路失败") || m.contains("拒绝")) {
+            return "网络不可达/连接被拒绝 (type=" + type + ", " + url + ") — 请检查 host/port/防火墙/目标服务是否运行";
+        }
+        return "JDBC 连接失败 (type=" + type + "): " + firstLine(m);
+    }
+
+    private static String firstLine(String s) {
+        if (s == null) return "";
+        int nl = s.indexOf('\n');
+        String line = nl > 0 ? s.substring(0, nl) : s;
+        if (line.length() > 160) line = line.substring(0, 160) + "…";
+        return line.isBlank() ? s : line;
     }
 
     @Override
@@ -193,6 +376,58 @@ public class JdbcConnector implements Connector {
         return rows;
     }
 
+    /**
+     * 批量 INSERT（PreparedStatement.addBatch / executeBatch）。
+     * <p>
+     * 供 Pipeline SINK 节点批量写入外部数据源目标表，避免逐行 INSERT 的 SQL 往返开销。
+     * 单个 batch 内原子性由数据库保证（1 batch = 1 隐式事务）。
+     *
+     * @param connectionConfig 连接配置 JSON（jdbcUrl/username/password/schema）
+     * @param sql              参数化 INSERT SQL（占位符 ? 数量须与每行 paramCount 一致）
+     * @param values           每行的参数数组（已按列序对齐）
+     * @param batchSize        每批 executeBatch 行数（&lt;=0 时一次性提交全部）
+     * @return 实际写入总行数
+     */
+    public int executeBatch(String connectionConfig, String sql, List<Object[]> values, int batchSize) {
+        if (values == null || values.isEmpty()) {
+            return 0;
+        }
+        Map<String, String> config = parseConfig(connectionConfig);
+        int totalWritten = 0;
+        int effectiveBatch = batchSize > 0 ? batchSize : values.size();
+
+        try (Connection conn = DriverManager.getConnection(
+                config.get("jdbcUrl"),
+                config.get("username"),
+                config.get("password"))) {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (int from = 0; from < values.size(); from += effectiveBatch) {
+                    int to = Math.min(from + effectiveBatch, values.size());
+                    for (int i = from; i < to; i++) {
+                        Object[] row = values.get(i);
+                        for (int c = 0; c < row.length; c++) {
+                            ps.setObject(c + 1, row[c]);
+                        }
+                        ps.addBatch();
+                    }
+                    int[] results = ps.executeBatch();
+                    int batchRows = 0;
+                    for (int r : results) {
+                        batchRows += (r >= 0) ? r : 1;
+                    }
+                    totalWritten += batchRows;
+                    ps.clearBatch();
+                    log.info("JdbcConnector.executeBatch: rows_in_batch={}, total_written={}", batchRows, totalWritten);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("JdbcConnector.executeBatch failed after {} rows: {}", totalWritten, e.getMessage());
+            throw new DataAccessException(
+                    "外部数据源批量 INSERT 失败（已写入 " + totalWritten + " 行后中断）: " + e.getMessage(), e);
+        }
+        return totalWritten;
+    }
+
     private DataResource buildResource(ResultSet rs, String orgId, String orgName,
                                         String type, String schema) throws SQLException {
         DataResource r = new DataResource();
@@ -212,7 +447,15 @@ public class JdbcConnector implements Connector {
     @SuppressWarnings("unchecked")
     private Map<String, String> parseConfig(String connectionConfig) {
         try {
-            return mapper.readValue(connectionConfig, Map.class);
+            // PMO-49 W4 fix: JSON 数字/布尔端口等值此前按 Integer 装入 Map<String,String>，
+            // 后续 cfg.get("port") 触发 ClassCastException 导致 testConnectionDetailed 全量不可用。
+            // 统一 coerce 为 String，与 buildJdbcUrl/props.setProperty 的 String 契约一致。
+            Map<String, Object> raw = mapper.readValue(connectionConfig, Map.class);
+            Map<String, String> r = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, Object> e : raw.entrySet()) {
+                r.put(e.getKey(), e.getValue() == null ? null : e.getValue().toString());
+            }
+            return r;
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid connection config JSON: " + connectionConfig, e);
         }

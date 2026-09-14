@@ -47,6 +47,8 @@ function renderStars(rating: number, size = "w-3.5 h-3.5") {
   const full = Math.floor(rating);
   const hasHalf = rating - full >= 0.5;
   const stars: React.ReactNode[] = [];
+  // 未点亮星体走主题变量（跨 4 主题一致，替代原硬编码中性色）
+  const emptyCls = `${size} text-[color-mix(in_srgb,var(--muted-foreground,#94A3B8)_60%,transparent)]`;
   for (let i = 0; i < 5; i++) {
     if (i < full) {
       stars.push(
@@ -55,14 +57,14 @@ function renderStars(rating: number, size = "w-3.5 h-3.5") {
     } else if (i === full && hasHalf) {
       stars.push(
         <span key={i} className="relative inline-block">
-          <Star className={`${size} text-slate-600`} />
+          <Star className={emptyCls} />
           <span className="absolute inset-0 overflow-hidden w-1/2">
             <Star className={`${size} fill-amber-400 text-amber-400`} />
           </span>
         </span>
       );
     } else {
-      stars.push(<Star key={i} className={`${size} text-slate-600`} />);
+      stars.push(<Star key={i} className={emptyCls} />);
     }
   }
   return stars;
@@ -116,7 +118,7 @@ export default function MarketplaceDetailPanel({
               </h2>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors opacity-60 hover:opacity-100"
+                className="p-1.5 rounded-lg hover:bg-[var(--muted,rgba(100,116,139,0.2))] transition-colors opacity-60 hover:opacity-100"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -142,7 +144,7 @@ export default function MarketplaceDetailPanel({
                     {asset.name}
                   </h3>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-700/50 opacity-70">
+                    <span className="text-xs font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--muted,rgba(100,116,139,0.2))] opacity-70">
                       {asset.category}
                     </span>
                     <span

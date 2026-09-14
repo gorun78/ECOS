@@ -2,10 +2,13 @@
  * Pipeline Editor — palette & constants
  * Extracted from PipelineFlowEditor.tsx
  * Aligned with P2-01 node type enumeration (PMO-3J T1).
+ * Wave 5: extended with TRANSFORM_UDF / JOIN / SINK (lucide icons
+ * Braces / GitMerge / Upload to match the backend PipelineNodeTypesService
+ * single source of truth).
  * @license Apache-2.0
  */
 
-import { Database, FileText, Globe, Radio, Settings, HardDrive } from 'lucide-react';
+import { Database, FileText, Globe, Radio, Settings, HardDrive, Braces, GitMerge, Upload } from 'lucide-react';
 import type { PipelineNodeType } from './types';
 
 // ─── Node palette definitions ─────────────────────────────
@@ -31,6 +34,7 @@ type TFunc = (key: string, params?: Record<string, string | number>) => string;
 /**
  * Build palette items with theme styles and i18n labels.
  * Must be called inside a component (needs `styles` from useTheme and `t` from useLanguage).
+ * Wave 5: extended to all 9 P2-01 types (was 6).
  */
 export function buildPaletteItems(
   styles: Record<string, string>,
@@ -85,6 +89,33 @@ export function buildPaletteItems(
       borderColor: styles.successBorder,
     },
     {
+      type: 'TRANSFORM_UDF',
+      labelKey: 'dw.pipeline.node.transformUdf',
+      label: t('dw.pipeline.node.transformUdf'),
+      icon: ({ size, className }) => <Braces size={size} className={className} />,
+      color: styles.infoText,
+      bgColor: styles.infoBg,
+      borderColor: styles.infoBorder,
+    },
+    {
+      type: 'JOIN',
+      labelKey: 'dw.pipeline.node.join',
+      label: t('dw.pipeline.node.join'),
+      icon: ({ size, className }) => <GitMerge size={size} className={className} />,
+      color: styles.accentText,
+      bgColor: styles.cardBg,
+      borderColor: styles.cardBorder,
+    },
+    {
+      type: 'SINK',
+      labelKey: 'dw.pipeline.node.sink',
+      label: t('dw.pipeline.node.sink'),
+      icon: ({ size, className }) => <Upload size={size} className={className} />,
+      color: styles.successText,
+      bgColor: styles.successBg,
+      borderColor: styles.successBorder,
+    },
+    {
       type: 'OUTPUT_OBJECT',
       labelKey: 'dw.pipeline.node.outputObject',
       label: t('dw.pipeline.node.outputObject'),
@@ -106,6 +137,9 @@ export const PALETTE_LABELS: Record<PipelineNodeType, string> = {
   SOURCE_REST: 'Source REST',
   SOURCE_CDC: 'Source CDC',
   TRANSFORM_SQL: 'Transform SQL',
+  TRANSFORM_UDF: 'Transform UDF',
+  JOIN: 'Join',
+  SINK: 'Sink',
   OUTPUT_OBJECT: 'Output Object',
 };
 
@@ -116,5 +150,8 @@ export const PIPELINE_NODE_TYPES: PipelineNodeType[] = [
   'SOURCE_REST',
   'SOURCE_CDC',
   'TRANSFORM_SQL',
+  'TRANSFORM_UDF',
+  'JOIN',
+  'SINK',
   'OUTPUT_OBJECT',
 ];

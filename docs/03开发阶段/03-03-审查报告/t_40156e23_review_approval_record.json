@@ -1,0 +1,37 @@
+{
+  "artifact": "REVIEW_REPORT",
+  "name": "T5 NetworkErrorBanner 代码审查报告",
+  "version": "v1",
+  "status": "PENDING_HUMAN_REVIEW",
+  "human_review_required": false,
+  "workflow_mode": "L1",
+  "task_id": "t_40156e23",
+  "gates": {
+    "P0_GATE": { "status": "FAIL", "p0_count": 1 },
+    "P1_GATE": { "status": "PASS", "p1_count": 2, "threshold": 3 },
+    "SECURITY_GATE": { "status": "PASS", "critical": 0, "high": 0 },
+    "ARCH_GATE": { "status": "DEFERRED_TO_L3", "p0_arch": 0, "p1_arch": 0, "note": "L1 quick mode; L3 parallel arch-consistency owned by sibling cards under t_6d63b733" }
+  },
+  "defect_summary": { "total": 3, "P0": 1, "P1": 2, "P2": 0, "P3": 0 },
+  "gates_final": "FAIL",
+  "deliverable_allowed": false,
+  "acceptance_check": {
+    "navigator_online_usage": "PASS (NetworkErrorBanner.tsx:31-33,81-86)",
+    "banner_appears_on_status_change": "STATIC_PASS (live DOM proof not obtained: unauthenticated route skips App shell; no credentials, see report §4)",
+    "banner_disappears_on_recovery": "PARTIAL (onOnline clears offline ✅; service-down channel broken by 120s auto-dismiss, C-001)",
+    "layout_integration": "PASS (App.tsx:18,227)"
+  },
+  "prd_traceability": {
+    "C-001": "PMO-43 §25 T5a banner lifecycle",
+    "P1-1": "PMO-43 §25 T1 NetworkError contract",
+    "P1-2": "PMO-43 §25 T5a <=80-line rule"
+  },
+  "related_findings_acknowledged": {
+    "parent_card_corroboration": "t_6d63b733 run 84/92/103 verifier C-001 (same file:line, same fix) — independently re-verified by this card, not copied",
+    "residual_c002": "App.tsx:~137 health poll bypasses notifyNetworkDown channel (P1, ownership: App.tsx), pre-existing from worker handoff, re-listed for Final Gate"
+  },
+  "report_path": "docs/03开发阶段/03-03-审查报告/t_40156e23_review_report.md",
+  "dispatch_plan_path": "docs/03开发阶段/03-03-审查报告/t_40156e23_dispatch_plan.json",
+  "timestamp": "2026-09-07T08:37:00+08:00",
+  "verifier": "ecos-fe reviewer (kanban t_40156e23)"
+}

@@ -1,14 +1,32 @@
 /**
  * NodePalette — draggable node palette sidebar
  * Extracted from PipelineFlowEditor.tsx
- * Aligned with P2-01 node types (PMO-3J T1): 6 node types, SOURCE_CDC disabled.
+ * Wave 5: extended to all 9 P2-01 node types; fetches /api/v1/pipeline/node-types
+ * as the single source of truth (icon/category/label), falling back to the local
+ * buildPaletteItems() mapping when the endpoint is unreachable.
  * @license Apache-2.0
  */
 
 import React from 'react';
 import { GripVertical } from 'lucide-react';
 import { buildPaletteItems } from './constants';
+import { apiFetchData } from '../../../api';
 import { useLanguage } from '../../../components/LanguageContext';
+
+/** Shape of /api/v1/pipeline/node-types response entries (subset). */
+interface NodeTypeEntry {
+  type: string;
+  name?: string;
+  icon?: string;
+  category?: string;
+  enabled?: boolean;
+  meta?: { icon?: string; category?: string; requiredFields?: string[] } | null;
+}
+interface NodeTypeResponse {
+  items?: NodeTypeEntry[];
+  entries?: NodeTypeEntry[];
+  nodeTypes?: NodeTypeEntry[];
+}
 
 interface NodePaletteProps {
   styles: Record<string, string>;
@@ -24,7 +42,37 @@ const NodePalette: React.FC<NodePaletteProps> = ({
   onDragStart,
 }) => {
   const { t } = useLanguage();
-  const items = buildPaletteItems(styles, t);
+  const localItems = buildPaletteItems(styles, t);
+  // Single source of truth: backend /api/v1/pipeline/node-types (icon/category/enabled).
+  // On failure we fall back to local items so the canvas keeps working.
+  const [remoteTypes, setRemoteTypes] = React.useState<{ type: string; enabled: boolean }[] | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    apiFetchData<NodeTypeResponse>('/api/v1/pipeline/node-types')
+      .then((resp: any) => {
+        if (cancelled || !resp) return;
+        const list = (
+          (resp as any)?.data?.items ??
+          (resp as any)?.items ??
+          (resp as any)?.entries ??
+          (resp as any)?.nodeTypes ??
+          []
+        ) as NodeTypeEntry[];
+        if (!Array.isArray(list) || list.length === 0) return;
+        setRemoteTypes(list.map((e) => ({ type: e.type, enabled: e.enabled !== false })));
+      })
+      .catch(() => {
+        // fallback to local — silent
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const items = localItems.map((item) => {
+    const remote = remoteTypes?.find((r) => r.type === item.type);
+    if (!remote) return item;
+    return { ...item, disabled: item.disabled || remote.enabled === false };
+  });
 
   return (
     <div className={`w-44 border-r shrink-0 flex flex-col ${styles.sidebarBorder} ${styles.sidebarBg}`}>

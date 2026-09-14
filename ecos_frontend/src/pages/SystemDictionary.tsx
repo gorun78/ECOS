@@ -131,7 +131,7 @@ export default function SystemDictionary() {
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       onClick={() => setExpandedItem(isExpanded ? null : item.id)}
                     >
-                      <Hash size={14} className="text-slate-400 shrink-0" />
+                      <Hash size={14} className={`${styles.cardTextMuted} shrink-0`} />
                       <code className="text-xs px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-mono shrink-0">
                         {item.dictCode}
                       </code>
@@ -139,13 +139,13 @@ export default function SystemDictionary() {
                         {isZh ? item.dictLabel : (item.dictLabelEn || item.dictLabel)}
                       </span>
                       {item.extValue && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
                           {item.extValue}
                         </span>
                       )}
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono
                         ${item.status === 'active' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                          : `bg-[var(--muted,rgba(100,116,139,0.08))] text-[#94a3b8]`}`}>
                         {item.status}
                       </span>
                     </div>

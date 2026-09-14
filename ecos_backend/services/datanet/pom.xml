@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- PMO-49 P2-2: services/datanet 独立部署单元。
+         - 封装 data-engine (土·D) + ge 转化 (D→I)
+         - 生产入口（替代 engine/data-engine-boot，后者降级为独立调试）
+         - 端口 18082（与 data-engine 主引擎一致，本机同时运行两进程会端口互斥）
+         - 依赖方向：datanet → data-engine-impl → data-engine-api（铁律 §0.3）
+         - 兼容性：拆分期内 gateway 仍同时承载 data-engine 类，双跑期 ECOS_ROUTE_datanet=monolith|service 切流 -->
+    <artifactId>datanet-service</artifactId>
+    <packaging>jar</packaging>
+    <name>ECOS Datanet Service</name>
+    <description>数据服务 — 封装 data-engine + ge 转化 (数据源/管道/血缘/DQ)</description>
+
+    <dependencies>
+        <!-- 主封装引擎 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>data-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- data-engine-impl 已直接依赖 sysman-impl (iron rule §0.3)；显式列出以便 P2 追溯 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 共享契约 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- 运行时底座 (mybatis 配置 / Hikari / 通用 mapper 类) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-task</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- Spring Boot Web + Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- 数据库驱动 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.services.datanet.DatanetServiceApplication</mainClass>
+                </configuration>
+                <executions>
+                    <!-- 显式 repackage: 把可执行 fat-JAR 生成挂在 package phase，
+                         否则根 pom pluginManagement 只声明版本而 datanet 处于 reactor 末端时
+                         repackage goal 默认不绑定（不像 data-engine-boot 那种历史模块有已生效 bindings） -->
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

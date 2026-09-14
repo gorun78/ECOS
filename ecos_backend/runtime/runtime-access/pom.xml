@@ -28,11 +28,75 @@
             <artifactId>runtime-core</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- PMO-38 T1: connector/git 模块消费 common-api 的 DataResource / IObjectStorageService -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+        </dependency>
         <!-- A+4: MinIO storage client (migrated from gateway + workspace) -->
         <dependency>
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
             <version>8.5.10</version>
         </dependency>
+
+        <!-- PMO-45: JDBC driver deps — placed in profile `jdbc-drivers` below.
+             Activate with: mvn -Pjdbc-drivers ...
+             These are optional=true so even when active they are NOT propagated to consumers.
+             JdbcConnector loads drivers on-demand via Class.forName; if a driver class
+             is absent at runtime the test-connection call returns "driver not in runtime". -->
+
     </dependencies>
+
+    <!-- ================================================================
+         PMO-45: JDBC driver profile (opt-in)
+         Activate: `mvn clean install -Pjdbc-drivers`
+         When NOT active the 5 third-party drivers are excluded from the build
+         so that builds work in offline/narrow-network environments.
+         The JdbcConnector falls back to the postgres driver (always present)
+         for types where no driver is available, and returns a clear error
+         for types whose driver jar is not on the classpath.
+         ================================================================ -->
+    <profiles>
+        <profile>
+            <id>jdbc-drivers</id>
+            <dependencies>
+                <!-- Oracle -->
+                <dependency>
+                    <groupId>com.oracle.database.jdbc</groupId>
+                    <artifactId>ojdbc8</artifactId>
+                    <version>21.9.0.0</version>
+                    <optional>true</optional>
+                </dependency>
+                <!-- Microsoft SQL Server -->
+                <dependency>
+                    <groupId>com.microsoft.sqlserver</groupId>
+                    <artifactId>mssql-jdbc</artifactId>
+                    <version>12.6.1.jre11</version>
+                    <optional>true</optional>
+                </dependency>
+                <!-- Dameng (达梦) JDBC driver -->
+                <dependency>
+                    <groupId>com.dameng</groupId>
+                    <artifactId>DmJdbcDriver17</artifactId>
+                    <version>8.1.3.62</version>
+                    <optional>true</optional>
+                </dependency>
+                <!-- KingbaseES (金仓) JDBC driver -->
+                <dependency>
+                    <groupId>cn.com.kingbase</groupId>
+                    <artifactId>kingbase8</artifactId>
+                    <version>8.6.0</version>
+                    <optional>true</optional>
+                </dependency>
+                <!-- openGauss / GaussDB JDBC driver -->
+                <dependency>
+                    <groupId>org.opengauss</groupId>
+                    <artifactId>opengauss-jdbc</artifactId>
+                    <version>5.1.0-og</version>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

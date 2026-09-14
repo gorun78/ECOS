@@ -408,19 +408,32 @@
     <!-- 子模块列表 (按依赖顺序排列，方便阅读) -->
     <!-- ============================================================ -->
     <modules>
-        <module>common</module>
+        <!-- PMO-49 P8-A: 顶层 common/ 聚合已废弃, common-api 迁入 runtime/common-api (见 runtime/pom.xml) -->
         <module>engine</module>
         <module>runtime</module>
-        <module>sysman</module>
 
-        <module>buszhi</module>
-        
+        <!-- PMO-49 P8-B: 顶层 buszhi/ 迁至 services/buszhi/impl/ (buszhi-impl library 保持 artifact 稳定) -->
+        <module>services/buszhi/impl</module>
+
+        <!-- PMO-49 P8-C: 顶层 sysman/ 迁至 services/sysman/impl/ (sysman-api/impl/boot library 保持 artifact 稳定) -->
+        <module>services/sysman/impl</module>
+
         <module>workspace</module>
-        <!-- Sprint 1: Microservice boot modules -->
-        <module>services/api-gateway</module>
-        <module>services/identity-service</module>
-        <module>services/ontology-service</module>
-        <module>services/agent-service</module>
+        <!-- PMO-49 P2-A/B: 新增 5 个业务 service (sysman/datanet/buszhi/dccheng/aiming) 独立部署单元。
+             P2-1 sysman + P2-2 datanet + P2-3 buszhi + P2-4 dccheng 已启用。
+              P2-5 aiming 待 P2-B 批次加入 -->
+        <module>services/sysman</module>
+        <module>services/datanet</module>
+        <module>services/buszhi</module>
+        <module>services/dccheng</module>
+        <module>services/aiming</module>
+        <!-- PMO-49 P2-A (path A): 移除历史 Sprint 1 骨架 services/{api-gateway, identity-service, ontology-service, agent-service}。
+             - api-gateway: M0 改造已废弃（library 由顶层 gateway 集成），孤儿 no import
+             - identity-service: 与 sysman/security-engine 职责重叠，代码可弃
+             - ontology-service: OntologyDslCompiler 未合并到 buszhi，暂保留目录，从 build 移除等 P2-B 迁入 buszhi
+             - agent-service: 保留目录待 P2-B 迁到 aiming，M0 改造已 clear 从 gateway classpath
+             4 个 modules 全部删除的是"去掉历史骨架从 reactor 卸载"，实际代码目录由 P2-B 处理
+        -->
         <!-- Legacy gateway (kept for backward compatibility during migration) -->
         <module>gateway</module>
         <!-- 阶段5模块吸收: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng -->
@@ -443,17 +456,18 @@
             <id>standard</id>
             <activation><activeByDefault>true</activeByDefault></activation>
             <modules>
-                <module>common</module>
                 <module>runtime</module>
-                <module>sysman</module>
+                <module>services/sysman/impl</module>
         
-                
+        
                 <module>workspace</module>
-                <!-- Sprint 1: Microservice modules -->
-                <module>services/api-gateway</module>
-                <module>services/identity-service</module>
-                <module>services/ontology-service</module>
-                <module>services/agent-service</module>
+                <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
+                <module>services/sysman</module>
+                <module>services/datanet</module>
+                <module>services/buszhi</module>
+                <module>services/dccheng</module>
+                <module>services/aiming</module>
+                <!-- PMO-49 P2-A: 历史 services/* 骨架已从 reactor 移除，待 P2-B 迁入 buszhi/aiming -->
                 <module>gateway</module>
             </modules>
             <properties>
@@ -464,16 +478,17 @@
         <profile>
             <id>enterprise</id>
             <modules>
-                <module>common</module>
                 <module>runtime</module>
-                <module>sysman</module>
+                <module>services/sysman/impl</module>
         
-                
+        
                 <module>workspace</module>
-                <module>services/api-gateway</module>
-                <module>services/identity-service</module>
-                <module>services/ontology-service</module>
-                <module>services/agent-service</module>
+                <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
+                <module>services/sysman</module>
+                <module>services/datanet</module>
+                <module>services/buszhi</module>
+                <module>services/dccheng</module>
+                <module>services/aiming</module>
                 <module>gateway</module>
             </modules>
             <properties>
@@ -485,16 +500,15 @@
         <profile>
             <id>ultimate</id>
             <modules>
-                <module>common</module>
                 <module>runtime</module>
-                <module>sysman</module>
-        
-                
+                <module>services/sysman/impl</module>
                 <module>workspace</module>
-                <module>services/api-gateway</module>
-                <module>services/identity-service</module>
-                <module>services/ontology-service</module>
-                <module>services/agent-service</module>
+                <!-- PMO-49 P2-1/P2-2/P2-3/P2-4: 启用 4 个独立 service -->
+                <module>services/sysman</module>
+                <module>services/datanet</module>
+                <module>services/buszhi</module>
+                <module>services/dccheng</module>
+                <module>services/aiming</module>
                 <module>gateway</module>
             </modules>
             <properties>

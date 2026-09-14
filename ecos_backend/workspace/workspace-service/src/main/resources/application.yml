@@ -1,0 +1,86 @@
+server:
+  # PMO-49 P2-6: workspace 场景层端口 18090 (独立于 5 业务 service, 方案 v1.4)
+  port: 18090
+
+spring:
+  application:
+    name: ecos-workspace-service
+  main:
+    allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: WorkspaceHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  # Neo4j (workspace 场景 KG 同步 Operation 需要) — PMO-49 Q2 补标准凭据避免 health DOWN
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:neo4j123}
+
+  # Kafka (workspace 事件)
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP:ecos-workspace}
+      auto-offset-reset: earliest
+
+  # MinIO (workspace PgObjectStorageService, 流程文件存储)
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+
+# PMO-49 D1: 收窄 MyBatis 类型别名扫包
+ecos:
+  mybatis:
+    type-aliases-package: com.chinacreator.gzcm.workspace
+  header-auth:
+    enabled: false
+  neo4j:
+    enabled: ${ECOS_NEO4J_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.chinacreator.gzcm: INFO
+    org.apache.kafka: WARN
+    org.springframework: INFO

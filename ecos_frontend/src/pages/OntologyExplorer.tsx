@@ -21,7 +21,7 @@ export default function OntologyExplorer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { t, locale } = useLanguage();
-  useTheme();
+  const { styles } = useTheme();
 
   useEffect(() => {
     fetchOntology().then(data => {
@@ -36,10 +36,10 @@ export default function OntologyExplorer() {
 
   if (loading || entities.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
+      <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center">
           <Globe className="w-10 h-10 text-indigo-400 mx-auto mb-3 animate-pulse" />
-          <p className="text-sm text-slate-500">{t("ont.title")} — {t("ont.loading")}</p>
+          <p className={`text-sm ${styles.cardTextMuted}`}>{t("ont.title")} — {t("ont.loading")}</p>
         </div>
       </div>
     );
@@ -176,11 +176,11 @@ export default function OntologyExplorer() {
   ];
 
   return (
-    <div className="flex-1 bg-slate-50 text-slate-800 flex flex-col h-full font-sans overflow-hidden animate-fade-in">
+    <div className={`flex-1 ${styles.appBg} ${styles.appText} flex flex-col h-full font-sans overflow-hidden animate-fade-in`}>
       
       {/* Error Banner */}
       {error && (
-        <div className="bg-red-50 border border-red-200 p-3 flex items-center gap-2 text-red-700 text-sm shrink-0">
+        <div className={`${styles.dangerBg} border ${styles.dangerBorder} p-3 flex items-center gap-2 ${styles.dangerText} text-sm shrink-0`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">&times;</button>
@@ -188,13 +188,13 @@ export default function OntologyExplorer() {
       )}
 
       {/* 1. Header Information */}
-      <div className="bg-white border-b border-slate-200 p-5 shrink-0 flex items-center justify-between gap-4">
+      <div className={`${styles.inputBg} border-b ${styles.cardBorder} p-5 shrink-0 flex items-center justify-between gap-4`}>
         <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className={`text-xl font-bold ${styles.appText} flex items-center gap-2`}>
             <Globe className="text-indigo-650 w-5 h-5 shrink-0" />
             {t("ont.title")}
           </h1>
-          <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+          <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-2xl leading-relaxed`}>
             {t("ont.desc")}
           </p>
         </div>
@@ -212,8 +212,8 @@ export default function OntologyExplorer() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-5 p-6 min-h-0 overflow-hidden">
         
         {/* COL 1: LEFT SIDEBAR OBJECT LIST */}
-        <div className="lg:col-span-1 bg-white border border-slate-200 rounded-xl p-4 flex flex-col overflow-hidden shadow-xs">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block mb-3 leading-none">{t("ont.sidebar.title")}</div>
+        <div className={`lg:col-span-1 ${styles.inputBg} border ${styles.cardBorder} rounded-xl p-4 flex flex-col overflow-hidden shadow-xs`}>
+          <div className={`text-[10px] font-mono font-bold uppercase tracking-wider ${styles.cardTextMuted} block mb-3 leading-none`}>{t("ont.sidebar.title")}</div>
           <div className="space-y-1.5 overflow-y-auto flex-1 scrollbar-none">
             {entities.map((entity) => {
               const isSelected = selectedEntityId === entity.id;
@@ -229,16 +229,16 @@ export default function OntologyExplorer() {
                   className={`w-full text-left flex items-center justify-between p-3 rounded-lg transition-all border outline-hidden ${
                     isSelected 
                       ? "bg-indigo-50 border-indigo-250 text-indigo-950 font-bold shadow-2xs" 
-                      : "bg-transparent border-transparent hover:bg-slate-50 text-slate-500 hover:text-slate-800"
+                      : `bg-transparent border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                   }`}
                 >
                   <div className="min-w-0">
                     <span className="text-xs block font-bold truncate">{getEntityName(entity.id)}</span>
-                    <span className="text-[10px] text-slate-400 block truncate mt-1">
+                    <span className={`text-[10px] ${styles.cardTextMuted} block truncate mt-1`}>
                       {entity.properties.length} {locale === "zh" ? "项基础属性" : "Properties"}
                     </span>
                   </div>
-                  <ArrowRight className={`w-3.5 h-3.5 ${isSelected ? "text-indigo-600" : "text-slate-300"}`} />
+                  <ArrowRight className={`w-3.5 h-3.5 ${isSelected ? "text-indigo-600" : `${styles.cardTextMuted} opacity-60`}`} />
                 </button>
               );
             })}
@@ -246,24 +246,24 @@ export default function OntologyExplorer() {
         </div>
 
         {/* COL 2: MAIN DYNAMIC WORKBENCH CONTENT */}
-        <div className="lg:col-span-2 border border-slate-200 rounded-xl p-5 bg-white flex flex-col overflow-y-auto scrollbar-thin min-h-0 shadow-xs">
+        <div className={`lg:col-span-2 border ${styles.cardBorder} rounded-xl p-5 ${styles.inputBg} flex flex-col overflow-y-auto scrollbar-thin min-h-0 shadow-xs`}>
           <div className="mb-5 shrink-0">
-            <span className="text-[9px] uppercase font-bold font-mono tracking-wider text-slate-400">{t("ont.workbench.title")}</span>
-            <h2 className="text-md font-bold text-slate-800 mt-1 uppercase font-mono">{getEntityName(selectedEntity.id)}</h2>
-            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{getEntityDesc(selectedEntity.id, selectedEntity.description)}</p>
+            <span className={`text-[9px] uppercase font-bold font-mono tracking-wider ${styles.cardTextMuted}`}>{t("ont.workbench.title")}</span>
+            <h2 className={`text-md font-bold ${styles.appText} mt-1 uppercase font-mono`}>{getEntityName(selectedEntity.id)}</h2>
+            <p className={`text-xs ${styles.cardTextMuted} mt-1.5 leading-relaxed`}>{getEntityDesc(selectedEntity.id, selectedEntity.description)}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
             
             {/* Custom Object Properties */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-              <h3 className="text-[10px] font-bold uppercase font-mono tracking-wider text-slate-400 mb-2 leading-none">{t("ont.workbench.props")}</h3>
+            <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-4`}>
+              <h3 className={`text-[10px] font-bold uppercase font-mono tracking-wider ${styles.cardTextMuted} mb-2 leading-none`}>{t("ont.workbench.props")}</h3>
               <div className="space-y-2 mt-3">
                 {selectedEntity.properties.map((prop) => (
-                  <div key={prop.name} className="flex items-center justify-between text-xs border-b border-slate-100 pb-1.5">
-                    <span className="font-mono text-slate-750 font-medium">{getPropLabel(prop.name)}</span>
+                  <div key={prop.name} className={`flex items-center justify-between text-xs border-b ${styles.divider} pb-1.5`}>
+                    <span className={`font-mono ${styles.cardText} font-medium`}>{getPropLabel(prop.name)}</span>
                     <div className="flex gap-1.5">
-                      <span className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 text-[9px] font-mono font-medium">
+                      <span className={`px-2 py-0.5 rounded ${styles.inputBg} border ${styles.cardBorder} ${styles.cardTextMuted} text-[9px] font-mono font-medium`}>
                         {prop.type}
                       </span>
                       {prop.required && (
@@ -278,17 +278,17 @@ export default function OntologyExplorer() {
             </div>
 
             {/* Relations specs card */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between gap-4">
+            <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-4 flex flex-col justify-between gap-4`}>
               <div>
-                <h3 className="text-[10px] font-bold uppercase font-mono tracking-wider text-slate-400 mb-2 leading-none">{t("ont.workbench.rel")}</h3>
+                <h3 className={`text-[10px] font-bold uppercase font-mono tracking-wider ${styles.cardTextMuted} mb-2 leading-none`}>{t("ont.workbench.rel")}</h3>
                 <div className="space-y-2 mt-3">
                   {selectedEntity.relationships.map((rel) => (
-                    <div key={rel.name} className="flex items-center justify-between text-xs border-b border-slate-100 pb-1.5">
-                      <span className="font-mono text-slate-700 flex items-center gap-1">
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-450" />
+                    <div key={rel.name} className={`flex items-center justify-between text-xs border-b ${styles.divider} pb-1.5`}>
+                      <span className={`font-mono ${styles.cardText} flex items-center gap-1`}>
+                        <ArrowRight className={`w-3.5 h-3.5 ${styles.cardTextMuted} opacity-60`} />
                         {getRelLabel(rel.name)}
                       </span>
-                      <span className="text-slate-500 font-mono text-[10px] font-medium">
+                      <span className={`${styles.cardTextMuted} font-mono text-[10px] font-medium`}>
                         {getRelationTargetSuffix(rel.targetEntity, rel.cardinality)}
                       </span>
                     </div>
@@ -304,8 +304,8 @@ export default function OntologyExplorer() {
           </div>
 
           {/* DYNAMIC ACTION TRIGGER GRID */}
-          <div className="mt-6 pt-5 border-t border-slate-200">
-            <h3 className="text-[10px] font-bold uppercase font-mono tracking-wider text-slate-400 mb-3 leading-none">{t("ont.workbench.actions")}</h3>
+          <div className={`mt-6 pt-5 border-t ${styles.cardBorder}`}>
+            <h3 className={`text-[10px] font-bold uppercase font-mono tracking-wider ${styles.cardTextMuted} mb-3 leading-none`}>{t("ont.workbench.actions")}</h3>
             <div className="flex flex-wrap gap-2.5">
               {selectedEntity.actions.map((act) => (
                 <button
@@ -325,13 +325,13 @@ export default function OntologyExplorer() {
 
             {/* DYNAMIC FORM RENDERER DRAWER INTERACTION */}
             {activeAction && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mt-5 animate-fade-in text-xs font-sans shadow-2xs text-slate-800">
-                <div className="flex justify-between items-center mb-4 border-b border-slate-250 pb-2.5">
-                  <span className="font-bold text-slate-800 uppercase tracking-wide font-mono text-[11px] flex items-center gap-1.5">
+              <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 mt-5 animate-fade-in text-xs font-sans shadow-2xs ${styles.cardText}`}>
+                <div className={`flex justify-between items-center mb-4 border-b ${styles.cardBorder} pb-2.5`}>
+                  <span className={`font-bold ${styles.appText} uppercase tracking-wide font-mono text-[11px] flex items-center gap-1.5`}>
                     {activeAction.impactLevel === "high" && <Lock className="w-3.5 h-3.5 text-red-600" />}
                     {t("ont.workbench.form_active")} {getActionLabel(activeAction.id, activeAction.label)}
                   </span>
-                  <button onClick={() => setActiveAction(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer select-none font-bold border-0 bg-transparent">
+                  <button onClick={() => setActiveAction(null)} className={`${styles.cardTextMuted} hover:opacity-70 cursor-pointer select-none font-bold border-0 bg-transparent`}>
                     {t("ont.form.close")}
                   </button>
                 </div>
@@ -350,7 +350,7 @@ export default function OntologyExplorer() {
                   <form onSubmit={handleActionSubmit} className="space-y-4">
                     {activeAction.fields.map((f) => (
                       <div key={f.name}>
-                        <label className="block text-slate-600 font-bold mb-1.5 font-sans text-xs">
+                        <label className={`block ${styles.cardText} font-bold mb-1.5 font-sans text-xs`}>
                           {locale === "zh" && f.label === "Credit Multiplier"
                             ? "授信计算乘率"
                             : locale === "zh" && f.label === "Fulfillment Mode"
@@ -363,7 +363,7 @@ export default function OntologyExplorer() {
                           <input
                             type="text"
                             required={f.required}
-                            className="w-full bg-white border border-slate-300 p-2.5 text-xs rounded-lg focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/15 text-slate-850 outline-hidden focus:outline-hidden"
+                            className={`w-full ${styles.inputBg} border ${styles.inputBorder} p-2.5 text-xs rounded-lg focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/15 ${styles.inputText} outline-hidden focus:outline-hidden`}
                             value={actionFormValues[f.name] || ""}
                             onChange={(e) => handleFieldChange(f.name, e.target.value)}
                           />
@@ -371,14 +371,14 @@ export default function OntologyExplorer() {
                           <input
                             type="number"
                             required={f.required}
-                            className="w-full bg-white border border-slate-300 p-2.5 text-xs rounded-lg focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/15 text-slate-850 outline-hidden focus:outline-hidden"
+                            className={`w-full ${styles.inputBg} border ${styles.inputBorder} p-2.5 text-xs rounded-lg focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/15 ${styles.inputText} outline-hidden focus:outline-hidden`}
                             value={actionFormValues[f.name] || ""}
                             onChange={(e) => handleFieldChange(f.name, Number(e.target.value))}
                           />
                         ) : (
                           <select
                             required={f.required}
-                            className="w-full bg-white border border-slate-300 p-2.5 text-xs rounded-lg focus:border-indigo-500 text-slate-850 outline-hidden focus:outline-hidden"
+                            className={`w-full ${styles.inputBg} border ${styles.inputBorder} p-2.5 text-xs rounded-lg focus:border-indigo-500 ${styles.inputText} outline-hidden focus:outline-hidden`}
                             value={actionFormValues[f.name] || ""}
                             onChange={(e) => handleFieldChange(f.name, e.target.value === "true")}
                           >
@@ -389,11 +389,11 @@ export default function OntologyExplorer() {
                       </div>
                     ))}
 
-                    <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200">
+                    <div className={`flex justify-end gap-2.5 pt-3 border-t ${styles.cardBorder}`}>
                       <button
                         type="button"
                         onClick={() => setActiveAction(null)}
-                        className="px-4 py-2 border-0 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold cursor-pointer"
+                        className={`px-4 py-2 border-0 rounded-lg ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardTextMuted} font-semibold cursor-pointer`}
                       >
                         {t("ont.form.cancel")}
                       </button>
@@ -412,9 +412,9 @@ export default function OntologyExplorer() {
         </div>
 
         {/* COL 3 & 4: RELATIONSHIP MAP LOCAL GRAPH RENDERING */}
-        <div className="lg:col-span-1 bg-white border border-slate-200 rounded-xl p-4 flex flex-col overflow-hidden shadow-xs">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block mb-3 leading-none">{t("ont.workbench.topo")}</div>
-          <div className="flex-1 flex overflow-hidden rounded-xl border border-slate-250 bg-slate-50">
+        <div className={`lg:col-span-1 ${styles.inputBg} border ${styles.cardBorder} rounded-xl p-4 flex flex-col overflow-hidden shadow-xs`}>
+          <div className={`text-[10px] font-mono font-bold uppercase tracking-wider ${styles.cardTextMuted} block mb-3 leading-none`}>{t("ont.workbench.topo")}</div>
+          <div className={`flex-1 flex overflow-hidden rounded-xl border ${styles.cardBorder} ${styles.appBg}`}>
             <GraphCanvas nodes={ekgGraphNodes} links={ekgGraphLinks} selectedNodeId={selectedEntityId} interactive={true} />
           </div>
         </div>

@@ -193,10 +193,17 @@ export async function fetchModels(): Promise<string[]> {
   }
 }
 
-/** Fetch available knowledge bases */
+/**
+ * Fetch available knowledge bases
+ * GET /api/v1/knowledge-bases
+ * PMO-41: 去掉 /v1 重复前缀（本文件走 apiFetch 统一封装，
+ * API_BASE 自动补 /api 前缀）。
+ * 已走 apiFetch 统一 request 封装（含 handleAuthExpired on 401）。
+ * PMO-38 T3 将补齐该后端端点，本批次仅校正前端路径。
+ */
 export async function fetchKnowledgeBases(): Promise<KnowledgeBase[]> {
   try {
-    const resp = await apiFetch<{ code: number; data: KnowledgeBase[] }>("/v1/knowledge-bases");
+    const resp = await apiFetch<{ code: number; data: KnowledgeBase[] }>("/knowledge-bases");
     return resp.data || [];
   } catch {
     return [];

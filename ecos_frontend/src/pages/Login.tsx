@@ -5,11 +5,20 @@
  */
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import {
+  ShieldCheck,
+  Loader2,
+  LogIn,
+  KeyRound,
+  ChevronDown,
+} from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
+import { useTheme } from "../components/ThemeContext";
 import { authLogin } from "../api";
 
 export default function Login() {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,17 +34,19 @@ export default function Login() {
     (location.state as { from?: { pathname: string } })?.from?.pathname ||
     "/app";
 
+  const inputCls = `w-full px-4 py-2.5 ${styles.inputBg} ${styles.inputBorder} border rounded-lg text-sm ${styles.inputText} transition`;
+
   // ── Username / Password login ─────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!username.trim()) {
-      setError("请输入用户名");
+      setError(t("login.empty"));
       return;
     }
     if (!password) {
-      setError("请输入密码");
+      setError(t("login.empty"));
       return;
     }
 
@@ -64,9 +75,9 @@ export default function Login() {
       navigate(from, { replace: true });
     } catch (err: any) {
       if (err.message === "Failed to fetch" || err.name === "TypeError") {
-        setError("网络连接失败，请检查网络后重试");
+        setError(t("login.noNetwork"));
       } else {
-        setError(err.message || "登录失败，请重试");
+        setError(err.message || t("login.fail"));
       }
     } finally {
       setLoading(false);
@@ -79,7 +90,7 @@ export default function Login() {
     setError("");
 
     if (!token.trim()) {
-      setError("请输入 Access Token");
+      setError(t("login.empty"));
       return;
     }
 
@@ -88,41 +99,29 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className={`min-h-screen flex items-center justify-center ${styles.appBg}`}>
       <div className="w-full max-w-md mx-4">
         {/* ── Brand ──────────────────────────────────────── */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-200/60">
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: "var(--accent)" }}>
+            <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">ECOS Platform</h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Enterprise Cognitive Operating System
+          <h1 className={`text-2xl font-bold ${styles.text}`}>ECOS Platform</h1>
+          <p className={`text-sm mt-1 ${styles.muted}`}>
+            {t("login.subtitle")}
           </p>
         </div>
 
         {/* ── Login card ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
+        <div className={`rounded-2xl shadow-xl border p-8 ${styles.cardBg} ${styles.cardBorder}`}>
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Username */}
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className={`block text-sm font-medium mb-1.5 ${styles.text}`}
               >
-                用户名
+                {t("login.username")}
               </label>
               <input
                 id="username"
@@ -132,8 +131,8 @@ export default function Login() {
                   setUsername(e.target.value);
                   setError("");
                 }}
-                placeholder="请输入用户名"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition"
+                placeholder={t("login.username.placeholder")}
+                className={inputCls}
                 autoFocus
                 disabled={loading}
               />
@@ -143,9 +142,9 @@ export default function Login() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className={`block text-sm font-medium mb-1.5 ${styles.text}`}
               >
-                密码
+                {t("login.password")}
               </label>
               <input
                 id="password"
@@ -155,16 +154,16 @@ export default function Login() {
                   setPassword(e.target.value);
                   setError("");
                 }}
-                placeholder="请输入密码"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition"
+                placeholder={t("login.password.placeholder")}
+                className={inputCls}
                 disabled={loading}
               />
             </div>
 
             {/* Error message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="rounded-lg px-4 py-3 border border-red-500/50 bg-red-500/10">
+                <p className="text-red-500 text-sm">{error}</p>
               </div>
             )}
 
@@ -172,60 +171,36 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium rounded-lg shadow-md shadow-blue-200/60 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+              className="w-full py-2.5 px-4 text-white font-medium rounded-lg shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] inline-flex items-center justify-center gap-2 cursor-pointer"
+              style={{ backgroundColor: "var(--accent)" }}
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  登录中...
-                </span>
+                <>
+                  <Loader2 className="animate-spin h-4 w-4" />
+                  {t("login.loading")}
+                </>
               ) : (
-                "登录"
+                <>
+                  <LogIn className="h-4 w-4" />
+                  {t("login.login")}
+                </>
               )}
             </button>
           </form>
 
           {/* ── Advanced: Token login ────────────────────── */}
-          <div className="mt-6 pt-4 border-t border-gray-100">
+          <div className={`mt-6 pt-4 border-t ${styles.divider}`}>
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full text-xs text-gray-400 hover:text-gray-600 transition flex items-center justify-center gap-1"
+              className={`w-full text-xs flex items-center justify-center gap-1 transition cursor-pointer ${styles.muted} hover:opacity-80`}
             >
-              {showAdvanced ? "收起高级选项" : "高级选项"}
-              <svg
+              {showAdvanced ? t("login.advanced.collapse") : t("login.advanced.open")}
+              <ChevronDown
                 className={`w-3 h-3 transition-transform ${
                   showAdvanced ? "rotate-180" : ""
                 }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+              />
             </button>
 
             {showAdvanced && (
@@ -233,9 +208,9 @@ export default function Login() {
                 <div>
                   <label
                     htmlFor="token"
-                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                    className={`block text-sm font-medium mb-1.5 ${styles.text}`}
                   >
-                    Access Token
+                    {t("login.token.label")}
                   </label>
                   <input
                     id="token"
@@ -245,15 +220,16 @@ export default function Login() {
                       setToken(e.target.value);
                       setError("");
                     }}
-                    placeholder="粘贴 Access Token..."
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent focus:bg-white transition text-sm"
+                    placeholder={t("login.token.placeholder")}
+                    className={inputCls}
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm"
+                  className={`w-full py-2 px-4 rounded-lg transition text-sm font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer ${styles.cardTextMuted} bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10`}
                 >
-                  Token 登录
+                  <KeyRound className="h-3.5 w-3.5" />
+                  {t("login.token.submit")}
                 </button>
               </form>
             )}
@@ -261,8 +237,8 @@ export default function Login() {
         </div>
 
         {/* ── Footer ─────────────────────────────────────── */}
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Secure platform access &bull; All activity is audited
+        <p className={`text-center text-xs mt-6 ${styles.muted}`}>
+          {t("login.footer")}
         </p>
       </div>
     </div>

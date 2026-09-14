@@ -103,7 +103,7 @@ public class TransformController {
             String type = String.valueOf(def.get("type"));
             Map<String, Object> params = def.get("params") instanceof Map
                     ? (Map<String, Object>) def.get("params")
-                    : null;
+                    : new LinkedHashMap<>();
             TransformStep step = newStepByType(type, params);
             if (step == null) {
                 return ApiResponse.badRequest("未知 step type: " + type);

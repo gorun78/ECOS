@@ -119,14 +119,14 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
           <div>
             <div className="flex items-center gap-2">
               <input type="text" value={func.displayName} onChange={e => handleFieldChange('displayName', e.target.value)}
-                className={`text-lg font-semibold ${styles.cardText} border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5`} />
+                className={`text-lg font-semibold ${styles.cardText} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5`} />
               <span className={`text-xs font-mono ${styles.badgeBg} ${styles.badgeText} px-1.5 py-0.5 rounded`}>{func.apiName}</span>
               <span className={`text-xs ${styles.badgeBg} ${styles.muted} px-2 py-0.5 rounded-full font-mono`}>
                 Returns {func.returnType === 'ObjectTypeSet' ? `Set<${func.returnObjectTypeId}>` : func.returnType}
               </span>
             </div>
             <input type="text" value={func.description} onChange={e => handleFieldChange('description', e.target.value)}
-              className={`text-xs ${styles.muted} mt-1 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]`}
+              className={`text-xs ${styles.muted} mt-1 border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]`}
               placeholder={t('ow.placeholder.funcDescription')} />
           </div>
         </div>

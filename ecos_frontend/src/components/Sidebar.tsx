@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
+import { showToastGlobal } from "./common/Toast";
 import type { ComponentType } from "react";
 
 interface SidebarProps {
@@ -247,7 +248,7 @@ export default function Sidebar({
         {!desktopCollapsed && (
           <button
             onClick={onDesktopToggle}
-            className="hidden md:flex absolute bottom-3 right-2 w-7 h-7 items-center justify-center rounded-full bg-slate-300/60 dark:bg-slate-600/60 hover:bg-slate-400/70 dark:hover:bg-slate-500/70 shadow-md opacity-60 hover:opacity-100 transition-all z-10"
+            className={`hidden md:flex absolute bottom-3 right-2 w-7 h-7 items-center justify-center rounded-full ${styles.sidebarHoverBg} ${styles.sidebarBorder} shadow-md opacity-60 hover:opacity-100 transition-all z-10`}
             title={t("sidebar.desktop.collapse")}
           >
             <ChevronLeft className="w-[14px] h-[14px]" />
@@ -279,7 +280,7 @@ export default function Sidebar({
               >
                 <Icon className={`w-[18px] h-[18px] ${isActive ? styles.sidebarActiveText : ""}`} />
                 {/* Tooltip on hover */}
-                <span className="absolute left-full ml-2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
+                <span className={`absolute left-full ml-2 px-2 py-1 ${styles.cardBg} ${styles.cardText} text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]`}>
                   {label}
                 </span>
               </button>
@@ -288,7 +289,7 @@ export default function Sidebar({
 
           {/* Separator before expand button */}
           <div className="flex-1" />
-          <div className="w-8 h-px bg-slate-300/50 dark:bg-slate-600/50 mb-1" />
+          <div className={`w-8 h-px ${styles.sidebarBorder} mb-1`} />
 
           {/* Expand button */}
           <button
@@ -304,16 +305,16 @@ export default function Sidebar({
       {/* AsyncTaskCenterView */}
       {isTaskPanelOpen && (
         <div className="fixed inset-0 z-[60] bg-black/50 flex items-start justify-center pt-12" onClick={() => setIsTaskPanelOpen(false)}>
-          <div className="bg-white dark:bg-slate-900 w-[95vw] max-w-[1400px] h-[85vh] rounded-xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="font-bold text-lg">{t("sidebar.task_center")}</h2>
-              <button onClick={() => setIsTaskPanelOpen(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
+          <div className={`rounded-xl shadow-2xl overflow-hidden ${styles.cardBg} w-[95vw] max-w-[1400px] h-[85vh]`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-6 py-3 border-b ${styles.cardBorder}`}>
+              <h2 className={`font-bold text-lg ${styles.cardText}`}>{t("sidebar.task_center")}</h2>
+              <button onClick={() => setIsTaskPanelOpen(false)} className={`p-1 ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 rounded ${styles.cardText}`}>
                 <X size={20} />
               </button>
             </div>
             <div className="h-[calc(85vh-52px)] overflow-auto">
               <AsyncTaskCenterView
-                showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
+                showToast={(type, msg) => showToastGlobal(type, msg)}
                 onViewModeChange={(mode) => { navigate("/" + mode); setIsTaskPanelOpen(false); }}
               />
             </div>

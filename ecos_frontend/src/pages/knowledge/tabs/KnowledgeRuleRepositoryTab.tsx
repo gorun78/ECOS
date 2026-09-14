@@ -130,7 +130,7 @@ export default function KnowledgeRuleRepositoryTab() {
       case 'ACTIVE': return 'bg-emerald-50 text-emerald-700';
       case 'DRAFT': return 'bg-amber-50 text-amber-700';
       case 'DEPRECATED': return 'bg-rose-50 text-rose-700';
-      default: return 'bg-slate-50 text-slate-600';
+      default: return `bg-slate-50 ${styles.muted}`;
     }
   };
 
@@ -158,7 +158,7 @@ export default function KnowledgeRuleRepositoryTab() {
       <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border ${styles.inputBg} ${styles.inputBorder}`}>
         <Search size={14} className={styles.cardTextMuted} />
         <input type="text"
-          className={`bg-transparent outline-none text-xs ${styles.inputText} placeholder-slate-400 w-full`}
+          className={`bg-transparent outline-none text-xs ${styles.inputText} placeholder:${styles.muted} w-full`}
           placeholder={tl('搜索规则名或领域...', 'Search by name or domain...')}
           value={search} onChange={e => setSearch(e.target.value)}
         />
@@ -172,9 +172,9 @@ export default function KnowledgeRuleRepositoryTab() {
             <BookOpen size={11} /> {tl('法规层级', 'Regulation Hierarchy')}
           </h3>
           {loading ? (
-            <div className="text-center py-8 text-[10px] text-slate-400">{tl('加载中...', 'Loading...')}</div>
+            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{tl('加载中...', 'Loading...')}</div>
           ) : regTree.length === 0 ? (
-            <div className="text-center py-8 text-[10px] text-slate-400">{tl('无数据', 'No data')}</div>
+            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{tl('无数据', 'No data')}</div>
           ) : (
             <div className="space-y-0.5">
               {regTree.map(reg => {
@@ -184,7 +184,7 @@ export default function KnowledgeRuleRepositoryTab() {
                     {/* Regulation level */}
                     <button onClick={() => toggleReg(reg.name)}
                       className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[11px] font-bold transition cursor-pointer ${
-                        isRegOpen ? `${styles.accentBg} text-white` : `${styles.cardText} hover:bg-slate-50`
+                        isRegOpen ? `${styles.accentBg} text-white` : `${styles.cardText} ${styles.sidebarHoverBg}`
                       }`}>
                       {isRegOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                       <Bookmark size={11} /> {reg.name}
@@ -198,23 +198,23 @@ export default function KnowledgeRuleRepositoryTab() {
                           {/* Chapter level */}
                           <button onClick={() => toggleChapter(chapKey)}
                             className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-semibold transition cursor-pointer ${
-                              isChapOpen ? 'text-blue-600 bg-blue-50' : `${styles.cardTextMuted} hover:bg-slate-50`
+                              isChapOpen ? 'text-blue-600 bg-blue-50' : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                             }`}>
                             {isChapOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                             <ScrollText size={10} /> {chapter.name}
                           </button>
                           {isChapOpen && (
-                            <div className="ml-4 space-y-0.5 border-l-2 border-slate-100 pl-2">
+                            <div className={`ml-4 space-y-0.5 border-l-2 ${styles.divider} pl-2`}>
                               {chapter.clauses.map(clause => {
                                 const isActive = selectedClause === clause.name;
                                 const count = ruleCountForClause(clause.name);
                                 return (
                                   <button key={clause.name} onClick={() => selectClause(clause.name)}
                                     className={`w-full text-left px-2 py-1 rounded text-[9px] font-medium flex items-center gap-1.5 transition cursor-pointer ${
-                                      isActive ? 'bg-amber-50 text-amber-700 font-bold' : `${styles.cardTextMuted} hover:bg-slate-50`
+                                      isActive ? 'bg-amber-50 text-amber-700 font-bold' : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                                     }`}>
                                     <FileText size={9} /> {clause.name}
-                                    {count > 0 && <span className="ml-auto text-[8px] bg-slate-100 px-1 rounded">{count}</span>}
+                                    {count > 0 && <span className={`ml-auto text-[8px] ${styles.sidebarBg} px-1 rounded`}>{count}</span>}
                                   </button>
                                 );
                               })}
@@ -243,7 +243,7 @@ export default function KnowledgeRuleRepositoryTab() {
             </div>
           )}
           {loading ? (
-            <div className="text-center py-8 text-[10px] text-slate-400">{tl('加载中...', 'Loading...')}</div>
+            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{tl('加载中...', 'Loading...')}</div>
           ) : filteredRules.length === 0 ? (
             <div className={`text-center py-12 text-[10px] ${styles.cardTextMuted}`}>
               {selectedClause ? tl('该条款下无匹配规则', 'No rules under this clause') : tl('无匹配规则', 'No matching rules')}
@@ -251,14 +251,14 @@ export default function KnowledgeRuleRepositoryTab() {
           ) : (
             filteredRules.map(rule => (
               <div key={rule.id} className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} overflow-hidden`}>
-                <div className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-slate-50/50"
+                <div className={`flex items-center justify-between px-3 py-2 cursor-pointer ${styles.sidebarHoverBg}`}
                   onClick={() => setExpandedRuleId(expandedRuleId === rule.id ? null : rule.id)}>
                   <div className="flex items-center gap-3">
-                    <ChevronDown size={14} className={`transition ${expandedRuleId===rule.id?'rotate-180':''} text-slate-400`} />
+                    <ChevronDown size={14} className={`transition ${expandedRuleId===rule.id?'rotate-180':''} ${styles.muted}`} />
                     <span className={`text-sm font-medium ${styles.cardText}`}>{rule.name}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusColor(rule.status)}`}>{rule.status}</span>
                     {rule.regulation && (
-                      <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">{rule.regulation}</span>
+                      <span className={`text-[9px] ${styles.muted} ${styles.appBg} px-1.5 py-0.5 rounded`}>{rule.regulation}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -268,23 +268,23 @@ export default function KnowledgeRuleRepositoryTab() {
                   </div>
                 </div>
                 {expandedRuleId === rule.id && (
-                  <div className="px-4 py-3 border-t border-slate-100 space-y-2 text-xs">
+                  <div className={`px-4 py-3 border-t ${styles.cardBorder} space-y-2 text-xs`}>
                     {rule.chapter && (
                       <div className="flex gap-4">
                         <span className={`${styles.cardTextMuted} w-16`}>{tl('章节', 'Chapter')}</span>
-                        <span className="text-slate-600">{rule.chapter} · {rule.clause || '—'}</span>
+                        <span className={styles.cardText}>{rule.chapter} · {rule.clause || '—'}</span>
                       </div>
                     )}
                     {rule.domain && (
                       <div className="flex gap-4">
                         <span className={`${styles.cardTextMuted} w-16`}>{tl('领域', 'Domain')}</span>
-                        <span className="font-mono text-slate-600">{rule.domain}</span>
+                        <span className={`font-mono ${styles.cardText}`}>{rule.domain}</span>
                       </div>
                     )}
                     {rule.condition && (
                       <div className="flex gap-4">
                         <span className={`${styles.cardTextMuted} w-16`}>IF</span>
-                        <span className="font-mono text-slate-600 bg-slate-50 rounded px-2 py-0.5">{rule.condition}</span>
+                        <span className={`font-mono ${styles.cardText} ${styles.appBg} rounded px-2 py-0.5`}>{rule.condition}</span>
                       </div>
                     )}
                     {rule.action && (
@@ -302,7 +302,7 @@ export default function KnowledgeRuleRepositoryTab() {
                         </button>
                       </div>
                     )}
-                    <div className="pt-1 border-t border-slate-50 flex gap-2">
+                    <div className={`pt-1 border-t ${styles.cardBorder} flex gap-2`}>
                       <button className="flex items-center gap-1 text-[10px] text-indigo-500 hover:underline">
                         <History size={12} /> {tl('版本历史', 'History')}
                       </button>

@@ -1,0 +1,91 @@
+{
+  "task_id": "t_2e02d7bf",
+  "task_title": "Final gate decision and metadata update",
+  "swarm_root": "t_04a6ee19",
+  "auditor": "ecos-pmo",
+  "audit_time_cst": "2026-09-07",
+  "workflow_mode": "L2",
+  "compliance_status": "FAIL",
+  "gate_decision": "FAIL",
+  "gate": "fail",
+  "code_freeze": true,
+  "gates": {
+    "lint": "PASS",
+    "code_verification": "FAIL",
+    "arch_compliance": "FAIL"
+  },
+  "upstream": {
+    "t_bde9d204": {"name": "lint", "result": "PASS", "evidence": "tsc --noEmit exit 0, 0 errors, 0 warnings x2 runs"},
+    "t_75b3faf3": {"name": "code_verification", "result": "FAIL", "deliverable_allowed": false, "p0_gate": "FAIL", "p1_gate": "PASS", "arch_gate": "PASS", "security_gate": "PASS"},
+    "t_a1dfedf8": {"name": "arch_compliance", "result": "FAIL", "findings": {"CRITICAL": 2, "HIGH": 4, "MEDIUM": 1}}
+  },
+  "commander_independent_verification": {
+    "C_001_networkerrorbanner_120s_auto_dismiss": {
+      "status": "confirmed",
+      "file": "ecos_frontend/src/components/NetworkErrorBanner.tsx",
+      "line": 65,
+      "evidence": "timerRef.current = setTimeout(() => setDown(false), 120_000);"
+    },
+    "C_002_requireauth_failopen_bypass": {
+      "status": "confirmed",
+      "file": "ecos_frontend/src/components/RequireAuth.tsx",
+      "lines": "31,39,40,43",
+      "evidence": "checkedRef.current=true at :31 (before settle); .catch(()=>setState('ok')) at :43 (AbortError->ok); 401->login(:39) & 403->no-access(:40) permanently bypassed = silent permission bypass; endpoint now /api/v1/auth/me but race unchanged"
+    }
+  },
+  "issues_found": {"P0": 3, "P1": 3, "P2": 5},
+  "p0_gate_blockers": [
+    {"id": "P0-G1", "alias": "C1/C-001", "file": "components/NetworkErrorBanner.tsx:65", "desc": "120s wall-clock auto-dismiss hides banner while service still down; spec T5 requires clear only on online/ecos-network-up. File 134 lines vs <=80 declared.", "fix": "delete 120s timer; down clears only via onUp/onOnline; trim constants+interface"},
+    {"id": "P0-G2", "alias": "C2/C-002", "file": "components/RequireAuth.tsx:28-43", "desc": "checkedRef set before settle + AbortError->setState('ok') race => 403/401 bypass = silent permission bypass", "fix": "checkedRef=true after settle in .then; .catch distinguish AbortError(stay loading) from genuine network error(fail-open)"},
+    {"id": "P0-G3", "alias": "code-verif P0 x2", "desc": "EngineMonitor/GuardrailsView lack 403->percent-403 heartbeat fallback; App.tsx:130-168 health poll bypasses NetworkErrorBanner channel", "fix": "add 403 heartbeat fallback; route health poll through NetworkErrorBanner channel"}
+  ],
+  "p1_arch_blockers": [
+    {"id": "H1", "file": "pages/MonitoringCenter.tsx:62,117", "fix": "tag ecos-403 with cardId; filter in on403; removeEventListener in finally"},
+    {"id": "H2", "file": "pages/EngineMonitor.tsx:76,81,125,140,155", "fix": "use NoAccessError/isNoAccessError(e) + t('common.noPermission') instead of magic strings"},
+    {"id": "H4", "file": "pages/aiworkbench/index.tsx:287", "fix": "replace inline #555 with theme token"}
+  ],
+  "p2_tracked": [
+    {"id": "M1", "desc": "error:'MOCK' tag (types.ts + MOCK_DATA_ASSETS_TAGGED) has NO UI consumer; silent fake-data on fetch failure", "pm_scope_decision": true},
+    {"id": "H3", "desc": "aiworkbench/index.tsx:104,108,163 hardcoded Chinese (pre-existing)"},
+    {"id": "H5", "desc": "3 duplicated authHeaders+apiFetch/apiCall (pre-existing, widened by T4); recommend shared ecosApiFetch"},
+    {"id": "M-001", "desc": "aiworkbench mock import in production path (pre-existing)"},
+    {"id": "S2", "desc": "types.ts error?:'MOCK'|string collapses to string; use literal union/provenance field"}
+  ],
+  "escalations": {
+    "failed_exceeded": {
+      "rule": "compliance-monitor FAILED >= 2 -> P0 human escalation",
+      "lane": "t_6d63b733 (verifier)",
+      "failed_runs": ["run 84", "run 92"],
+      "action": "STOP re-running verifier until worker t_64e6e69e lands C1/C2/H1/H2 (+P0-G3) rework; PM explicit re-open required"
+    }
+  },
+  "pm_open_decisions": {
+    "OOS-1": "api.ts 33 residual wrapper .catch{console.warn + return {data:[],total:0}} sites (fetchUsers/fetchRoles/fetchTenants...) - PMO-43 rework scope or defer to PMO-44/45? Does not change this gate verdict (C1/C2/H1/H2 already block)."
+  },
+  "missing_work_for_worker_rework": [
+    "C1/C-001: NetworkErrorBanner.tsx:65 delete 120s timer; down clears only via onUp/onOnline; trim to <=80 lines",
+    "C2/C-002: RequireAuth.tsx:28-43 checkedRef after settle; AbortError stays 'loading', fail-open only on genuine network error",
+    "H1: MonitoringCenter on403 filter by card/apiBase; removeEventListener in finally",
+    "H2: EngineMonitor use isNoAccessError(e) + t('common.noPermission') (replace NO_PERMISSION magic string + hardcoded Chinese)",
+    "H4: aiworkbench:287 inline #555 -> theme token",
+    "P0-G3: EngineMonitor/GuardrailsView 403 heartbeat fallback; App.tsx health poll via NetworkErrorBanner channel",
+    "M1: PM scope call - render error:'MOCK' tag or make mock fallback throw NetworkError"
+  ],
+  "audit_items": [
+    {"item": "gate_decision", "status": "FAIL"},
+    {"item": "lint_gate", "status": "PASS"},
+    {"item": "code_verification_gate", "status": "FAIL"},
+    {"item": "arch_compliance_gate", "status": "FAIL"},
+    {"item": "commander_source_reverify", "status": "CONFIRMED"},
+    {"item": "failed_exceeded_escalation", "status": "TRIGGERED"}
+  ],
+  "recommendation": "打回修复(rework) + 代码冻结 + 升级人工; next step: PM dispatch worker t_64e6e69e for P0/P1 fix set + answer OOS-1; after rework lands, re-open t_6d63b733 for re-verification; do NOT set gate=pass on t_04a6ee19 before rework lands.",
+  "evidence_artifacts": [
+    "/home/guorongxiao/ECOS/docs/PMO/PMO-43-swarm-verdict-2026-09-07-run92.md",
+    "/home/guorongxiao/ECOS/docs/PMO/PMO-43-arch-compliance-2026-09-07.md",
+    "/home/guorongxiao/ECOS/docs/reviews/t_75b3faf3_review_report.md",
+    "/home/guorongxiao/ECOS/docs/reviews/t_75b3faf3_review_approval_record.json",
+    "/home/guorongxiao/ECOS/docs/reviews/t_75b3faf3_dispatch_plan.json"
+  ],
+  "crossnote": "Posted to t_04a6ee19 as [commander:final-gate] structured comment."
+}

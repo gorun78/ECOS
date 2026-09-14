@@ -1,0 +1,1 @@
+{"code":0,"message":"ok","data":{"type":"ORACLE","objects":[],"columnPreview":[],"error":"预览失败: 数据源表清单读取失败（请检查 host/端口/库名/账号是否正确）: The url cannot be null"},"timestamp":1788845532833,"success":true}

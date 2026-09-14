@@ -4,11 +4,19 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Tag, Trash2, X, Zap } from 'lucide-react';
+import { AlertCircle, Archive, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Rocket, Tag, Trash2, X, Zap } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
+import {
+  createWorkbenchDomain,
+  deleteWorkbenchDomain,
+  deprecateWorkbenchDomain,
+  publishWorkbenchDomain,
+  reassignObjectDomain,
+  updateWorkbenchDomain,
+} from '../../services/ontologyApi';
 
 function DynamicIcon({ name, size = 14, className }: { name: string; size?: number; className?: string }) {
   const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
@@ -28,12 +36,14 @@ interface SidebarProps {
   onSelectDomainId: (id: string | null) => void;
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objects: ObjectType[]) => void;
-  
+
   selectedCategory: 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
   selectedId: string | null;
 
   onSelectCategory: (category: any, id: string | null) => void;
   onCreateNew: (type: 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function') => void;
+  /** T8: 域 CRUD/workflow 结果 toast（由 Layout 提供 showToast） */
+  onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
 }
 
 export default function Sidebar({
@@ -53,7 +63,8 @@ export default function Sidebar({
   selectedCategory,
   selectedId,
   onSelectCategory,
-  onCreateNew
+  onCreateNew,
+  onToast
 }: SidebarProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
@@ -76,7 +87,9 @@ export default function Sidebar({
   const [showDomainDropdown, setShowDomainDropdown] = useState(false);
   const [showDomainModal, setShowDomainModal] = useState(false);
   const [editingDomain, setEditingDomain] = useState<OntologyDomain | null>(null);
-  
+  const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   // Modal states
   const [formId, setFormId] = useState('');
   const [formName, setFormName] = useState('');
@@ -111,6 +124,9 @@ export default function Sidebar({
     }
   };
 
+  /** code 归一化：小写 + 仅保留 [a-z0-9_]（后端 code 唯一约束） */
+  const normalizeDomainCode = (raw: string) => raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
   const handleStartAddDomain = () => {
     setEditingDomain(null);
     setFormId('');
@@ -124,7 +140,7 @@ export default function Sidebar({
 
   const handleStartEditDomain = (domain: OntologyDomain) => {
     setEditingDomain(domain);
-    setFormId(domain.id);
+    setFormId(domain.code || domain.id);
     setFormName(domain.displayName);
     setFormDesc(domain.description || '');
     setFormColor(domain.color);
@@ -134,83 +150,137 @@ export default function Sidebar({
     setShowDomainModal(true);
   };
 
+  /** T8: 删除域 → 先打后端，成功后本地移除 + 受影响对象置未分类，失败 toast 不盲改本地 */
   const handleDeleteDomain = (domainId: string) => {
     const targetDomain = domains.find(d => d.id === domainId);
     if (!targetDomain) return;
-    
+
     if (!window.confirm(t('ow.msg.confirmDeleteDomain').replace('{name}', targetDomain.displayName))) {
       return;
     }
-    
-    const updatedDomains = domains.filter(d => d.id !== domainId);
-    onUpdateDomains(updatedDomains);
 
-    const updatedObjects = allObjectTypes.map(ot => {
-      if (ot.domainId === domainId) {
-        return { ...ot, domainId: undefined };
-      }
-      return ot;
-    });
-    onUpdateObjectTypes(updatedObjects);
-
-    if (selectedDomainId === domainId) {
-      onSelectDomainId(null);
-    }
+    deleteWorkbenchDomain(targetDomain.code || targetDomain.id)
+      .then(() => {
+        const updatedDomains = domains.filter(d => d.id !== domainId);
+        onUpdateDomains(updatedDomains);
+        const updatedObjects = allObjectTypes.map(ot => (ot.domainId === domainId ? { ...ot, domainId: undefined } : ot));
+        onUpdateObjectTypes(updatedObjects);
+        if (selectedDomainId === domainId) {
+          onSelectDomainId(null);
+        }
+        onToast?.('success', t('ow.domain.deleted').replace('{name}', targetDomain.displayName));
+      })
+      .catch((e: any) => {
+        onToast?.('error', t('ow.domain.delete_failed').replace('{error}', String(e?.message || e)));
+      });
   };
 
+  /**
+   * T8: 创建/编辑域 → 打后端 POST/PUT，成功后本地同步 domains + 对象归属。
+   * 校验：code 必填且唯一、name 必填（i18n toast，停留弹窗）。
+   */
   const handleSaveDomain = (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setFormError('');
 
+    const code = normalizeDomainCode(formId);
+    if (!code) {
+      setFormError(t('ow.domain.validation.code_required'));
+      return;
+    }
     if (!formName.trim()) {
-      setFormError(t('ow.msg.domainNameRequired'));
+      setFormError(t('ow.domain.validation.name_required'));
+      return;
+    }
+    if (!editingDomain && domains.some(d => (d.code || d.id) === code)) {
+      setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
       return;
     }
 
-    const domainId = editingDomain 
-      ? editingDomain.id 
-      : (formId.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || `domain_${Date.now().toString().slice(-4)}`);
+    const savedName = formName.trim();
+    const savedDescription = formDesc.trim();
 
-    if (!editingDomain && domains.some(d => d.id === domainId)) {
-      setFormError(t('ow.msg.domainIdExists').replace('{id}', domainId));
-      return;
-    }
+    setSaving(true);
+    const savePromise = editingDomain
+      ? updateWorkbenchDomain(editingDomain.code || editingDomain.id, {
+          code,
+          name: savedName,
+          description: savedDescription,
+        })
+      : createWorkbenchDomain({
+          code,
+          name: savedName,
+          description: savedDescription,
+        });
 
-    const savedDomain: OntologyDomain = {
-      id: domainId,
-      displayName: formName.trim(),
-      description: formDesc.trim(),
-      color: formColor
-    };
+    savePromise
+      .then((vo) => {
+        const savedDomain: OntologyDomain = {
+          id: vo?.code || code,
+          code: vo?.code || code,
+          displayName: vo?.name || savedName,
+          description: vo?.description || savedDescription,
+          color: formColor,
+          status: vo?.status,
+        };
+        let newDomains: OntologyDomain[];
+        if (editingDomain) {
+          newDomains = domains.map(d => d.id === editingDomain.id ? savedDomain : d);
+        } else {
+          newDomains = [...domains, savedDomain];
+        }
+        onUpdateDomains(newDomains);
 
-    let newDomains: OntologyDomain[];
-    if (editingDomain) {
-      newDomains = domains.map(d => d.id === editingDomain.id ? savedDomain : d);
-    } else {
-      newDomains = [...domains, savedDomain];
-    }
+        // 对象归属：本地即时映射 + 后端 best-effort reassign（新增绑定逐对象 PUT）
+        const assignedSet = new Set(formAssignedObjects);
+        const updatedObjects = allObjectTypes.map(ot => {
+          const shouldHave = assignedSet.has(ot.id);
+          if (shouldHave && (ot.domainId || undefined) !== code) {
+            reassignObjectDomain(ot.id, { domainCode: code }).catch((rErr: any) => {
+              console.warn('T8 reassignObjectDomain failed:', ot.id, rErr?.message || rErr);
+            });
+          }
+          if (shouldHave) return { ...ot, domainId: code };
+          if (ot.domainId === code) return { ...ot, domainId: undefined };
+          return ot;
+        });
+        onUpdateObjectTypes(updatedObjects);
 
-    onUpdateDomains(newDomains);
+        setShowDomainModal(false);
+        setEditingDomain(null);
+        setFormAssignedObjects([]);
+        onToast?.('success', (editingDomain ? t('ow.domain.updated') : t('ow.domain.created')).replace('{name}', savedName));
+      })
+      .catch((err: any) => {
+        const msg = String(err?.message || err || '');
+        // 后端 code 唯一约束 (ONT-009) → 本地 i18n 提示
+        if (msg.toLowerCase().includes('ont-009') || msg.toLowerCase().includes('already exists')) {
+          setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
+        } else {
+          setFormError(t('ow.domain.save_failed').replace('{error}', msg));
+        }
+      })
+      .finally(() => setSaving(false));
+  };
 
-    const updatedObjects = allObjectTypes.map(ot => {
-      const shouldHaveThisDomain = formAssignedObjects.includes(ot.id);
-      if (shouldHaveThisDomain) {
-        return { ...ot, domainId };
-      } else if (ot.domainId === domainId) {
-        return { ...ot, domainId: undefined };
-      }
-      return ot;
-    });
-    
-    onUpdateObjectTypes(updatedObjects);
-    setShowDomainModal(false);
-    setEditingDomain(null);
+  /** T8: 发布/废弃 — 经后端 PUT status（无独立端点），成功后回刷本地 status */
+  const handleStatusChange = (domain: OntologyDomain, target: 'Published' | 'Deprecated') => {
+    const call = target === 'Published' ? publishWorkbenchDomain : deprecateWorkbenchDomain;
+    call(domain.code || domain.id)
+      .then((vo) => {
+        onUpdateDomains(domains.map(d => d.id === domain.id ? { ...d, status: vo?.status || target, code: vo?.code || d.code, displayName: vo?.name || d.displayName } : d));
+        onToast?.('success', t(target === 'Published' ? 'ow.domain.published' : 'ow.domain.deprecated').replace('{name}', domain.displayName));
+      })
+      .catch((e: any) => {
+        onToast?.('error', t('ow.domain.status_failed').replace('{error}', String(e?.message || e)));
+      });
   };
 
   const toggleObjectAssignment = (objId: string) => {
-    setFormAssignedObjects(prev => 
-      prev.includes(objId) 
-        ? prev.filter(id => id !== objId) 
+    setFormAssignedObjects(prev =>
+      prev.includes(objId)
+        ? prev.filter(id => id !== objId)
         : [...prev, objId]
     );
   };
@@ -219,7 +289,7 @@ export default function Sidebar({
 
   return (
     <aside className={`w-64 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col h-full select-none shrink-0 text-xs`}>
-      
+
       {/* Overview Button & Dropdown Selector */}
       <div className={`p-3 border-b ${styles.sidebarBorder} ${styles.cardBg} space-y-2`}>
         <div className="flex items-center gap-1.5">
@@ -228,6 +298,7 @@ export default function Sidebar({
             <button
               onClick={() => {
                 setShowDomainDropdown(!showDomainDropdown);
+                setStatusMenuFor(null);
                 onSelectCategory('overview', null);
               }}
               className={`w-full py-2 px-3 rounded-lg flex items-center justify-between font-semibold transition-all text-xs border ${
@@ -245,13 +316,14 @@ export default function Sidebar({
 
             {/* Dropdown Menu */}
             {showDomainDropdown && (
-              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y divide-slate-100`}>
+              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y ${styles.divider}`}>
                 {/* 1. Global Panorama Option */}
                 <div
                   onClick={() => {
                     onSelectDomainId(null);
                     onSelectCategory('overview', null);
                     setShowDomainDropdown(false);
+                    setStatusMenuFor(null);
                   }}
                   className={`px-2.5 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
                     selectedDomainId === null ? `${styles.sidebarActiveBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
@@ -264,7 +336,7 @@ export default function Sidebar({
                   {selectedDomainId === null && <Check size={11} className="text-blue-600" />}
                 </div>
 
-                {/* 2. Domains Options with Edit/Delete */}
+                {/* 2. Domains Options with Edit/Publish/Deprecate/Delete */}
                 {domains.map(d => {
                   const isSelected = selectedDomainId === d.id;
                   const count = allObjectTypes.filter(ot => ot.domainId === d.id).length;
@@ -278,6 +350,7 @@ export default function Sidebar({
                         onSelectDomainId(d.id);
                         onSelectCategory('overview', null);
                         setShowDomainDropdown(false);
+                        setStatusMenuFor(null);
                       }}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -285,23 +358,60 @@ export default function Sidebar({
                         <span className="truncate" title={d.displayName}>{d.displayName}</span>
                         <span className={`text-[9px] ${styles.muted} font-mono`}>({count})</span>
                       </div>
-                      
-                      {/* Edit/Delete Icons */}
+
+                      {/* Edit / Publish·Deprecate / Delete Icons (T8: 新增状态菜单) */}
                       <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => {
                             handleStartEditDomain(d);
                             setShowDomainDropdown(false);
+                            setStatusMenuFor(null);
                           }}
-                          className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:text-slate-800 rounded transition-colors`}
+                          className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:${styles.cardText} rounded transition-colors`}
                           title={t('ow.btn.editDomain')}
                         >
                           <Edit size={11} />
                         </button>
+                        <div className="relative">
+                          <button
+                            onClick={() => setStatusMenuFor(statusMenuFor === d.id ? null : d.id)}
+                            className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} rounded transition-colors`}
+                            title={t('ow.btn.domainStatus')}
+                          >
+                            <Layers size={11} />
+                          </button>
+                          {statusMenuFor === d.id && (
+                            <div className={`absolute right-0 top-6 w-32 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-50`}>
+                              <button
+                                onClick={() => {
+                                  setStatusMenuFor(null);
+                                  setShowDomainDropdown(false);
+                                  handleStatusChange(d, 'Published');
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 text-emerald-600 transition-colors"
+                              >
+                                <Rocket size={11} />
+                                <span>{t('ow.domain.publish')}</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setStatusMenuFor(null);
+                                  setShowDomainDropdown(false);
+                                  handleStatusChange(d, 'Deprecated');
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 text-amber-600 transition-colors"
+                              >
+                                <Archive size={11} />
+                                <span>{t('ow.domain.deprecate')}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => {
                             handleDeleteDomain(d.id);
                             setShowDomainDropdown(false);
+                            setStatusMenuFor(null);
                           }}
                           className={`p-1 hover:bg-red-50 ${styles.muted} hover:text-red-600 rounded transition-colors`}
                           title={t('ow.btn.deleteDomain')}
@@ -312,6 +422,9 @@ export default function Sidebar({
                     </div>
                   );
                 })}
+                {domains.length === 0 && (
+                  <div className={`px-2.5 py-2 text-[10px] ${styles.muted}`}>{t('ow.domain.empty')}</div>
+                )}
               </div>
             )}
           </div>
@@ -319,7 +432,7 @@ export default function Sidebar({
           {/* Plus button to add domain */}
           <button
             onClick={handleStartAddDomain}
-            className={`p-2 ${styles.sidebarActiveBg} hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
+            className={`p-2 ${styles.sidebarActiveBg} ${styles.sidebarHoverBg} ${styles.accentText} border ${styles.accentBorder} rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
             title={t('ow.btn.addDomain')}
           >
             <Plus size={14} />
@@ -342,12 +455,12 @@ export default function Sidebar({
 
       {/* Accordions List */}
       <div className="flex-1 overflow-y-auto py-3 space-y-1">
-        
+
         {/* 1. OBJECT TYPES */}
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('object')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -387,7 +500,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('link')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -427,7 +540,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('action')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -466,7 +579,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('function')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]`}
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -506,7 +619,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('interface')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -525,7 +638,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -545,7 +658,7 @@ export default function Sidebar({
         <div className="space-y-0.5">
           <button
             onClick={() => toggleExpand('shared_property')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -564,7 +677,7 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -581,10 +694,10 @@ export default function Sidebar({
         </div>
 
         {/* 6. RAW DATASETS */}
-        <div className="space-y-0.5 border-t border-slate-200/60 pt-2 mt-2">
+        <div className={`space-y-0.5 border-t ${styles.appBorder} pt-2 mt-2`}>
           <button
             onClick={() => toggleExpand('dataset')}
-            className="w-full py-1.5 px-3 flex items-center justify-between text-slate-500 hover:text-slate-800 font-semibold uppercase tracking-wider text-[10px]"
+            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
           >
             <div className="flex items-center gap-1">
               <DynamicIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
@@ -603,11 +716,11 @@ export default function Sidebar({
                     className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : 'text-slate-600 hover:bg-slate-200/50'
+                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="text-slate-400">
+                      <span className={`${styles.muted}`}>
                         <Database size={11} />
                       </span>
                       <span className="truncate font-mono text-[10px]">{ds.name}</span>
@@ -620,11 +733,11 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Bottom Action bar */}
-      <div className="p-3 border-t border-slate-200 bg-white relative">
+      {/* Bottom Action bar — T4: 替换原来的 白底/黑底 硬编码 → theme tokens */}
+      <div className={`p-3 border-t ${styles.appBorder} ${styles.cardBg} relative`}>
         <button
           onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+          className={`w-full ${styles.accentBg} text-white ${styles.accentHover} font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs`}
         >
           <PlusCircle size={14} />
           <span>{t('ow.btn.createNewElement')}</span>
@@ -633,13 +746,13 @@ export default function Sidebar({
 
         {/* Create Dropdown */}
         {showCreateDropdown && (
-          <div className="absolute bottom-14 left-3 right-3 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 divide-y divide-slate-100">
+          <div className={`absolute bottom-14 left-3 right-3 ${styles.cardBg} border ${styles.appBorder} rounded-lg shadow-lg py-1 z-30 divide-y ${styles.divider}`}>
             <button
               onClick={() => {
                 onCreateNew('object');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-blue-500">
                 <Box size={13} />
@@ -651,9 +764,9 @@ export default function Sidebar({
                 onCreateNew('link');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
-              <span className="text-slate-400">
+              <span className={`${styles.muted}`}>
                 <GitMerge size={13} />
               </span>
               <span>{t('ow.btn.newLinkType')}</span>
@@ -663,7 +776,7 @@ export default function Sidebar({
                 onCreateNew('action');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-amber-500">
                 <Zap size={13} />
@@ -675,7 +788,7 @@ export default function Sidebar({
                 onCreateNew('interface');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-indigo-500">
                 <Layers size={13} />
@@ -687,7 +800,7 @@ export default function Sidebar({
                 onCreateNew('shared_property');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-teal-500">
                 <Tag size={13} />
@@ -699,7 +812,7 @@ export default function Sidebar({
                 onCreateNew('function');
                 setShowCreateDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
             >
               <span className="text-violet-500">
                 <Code size={13} />
@@ -710,18 +823,18 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* 业务划分域模态对话框 */}
+      {/* 业务划分域模态对话框 — T8: CRUD 已接后端 (OntologyDomainApiController) */}
       {showDomainModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
-            
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.overlayBg} backdrop-blur-xs`}>
+          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.appBorder} w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]`}>
+
             {/* Modal Header */}
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className={`px-4 py-3 border-b ${styles.appBorder} ${styles.sidebarBg} flex items-center justify-between`}>
               <div className="flex items-center gap-2">
-                <span className="p-1 rounded bg-blue-100 text-blue-600">
+                <span className={`p-1 rounded ${styles.badgeBg} ${styles.badgeText}`}>
                   <Layers size={14} />
                 </span>
-                <h3 className="text-sm font-bold text-slate-800">
+                <h3 className={`text-sm font-bold ${styles.cardText}`}>
                   {editingDomain ? t('ow.btn.editDomainTitle') : t('ow.btn.newDomainTitle')}
                 </h3>
               </div>
@@ -731,16 +844,16 @@ export default function Sidebar({
                   setShowDomainModal(false);
                   setEditingDomain(null);
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className={`${styles.muted} hover:${styles.cardText} p-1 rounded-lg hover:${styles.sidebarHoverBg} transition-colors cursor-pointer`}
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Modal Form */}
+            {/* Modal Form — T8: 表单 error 用 danger semantic + 保存按钮 loading */}
             <form onSubmit={handleSaveDomain} className="flex-1 overflow-y-auto p-4 space-y-4">
               {formError && (
-                <div className="p-2.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-2">
+                <div className={`p-2.5 ${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder} rounded-lg text-xs font-semibold flex items-center gap-2`}>
                   <AlertCircle size={13} />
                   <span>{formError}</span>
                 </div>
@@ -748,7 +861,7 @@ export default function Sidebar({
 
               {/* ID Input (Only shown on Create) */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainId')} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -757,14 +870,14 @@ export default function Sidebar({
                   value={formId}
                   onChange={e => setFormId(e.target.value)}
                   placeholder={t('ow.placeholder.domainId')}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs bg-slate-50/50 disabled:bg-slate-100 disabled:text-slate-500"
+                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs ${styles.inputBg} disabled:opacity-60`}
                   required
                 />
               </div>
 
               {/* Display Name Input */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainDisplayName')} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -772,14 +885,14 @@ export default function Sidebar({
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
                   placeholder={t('ow.placeholder.domainDisplayName')}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs"
+                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs ${styles.inputBg} ${styles.inputText}`}
                   required
                 />
               </div>
 
               {/* Description Input */}
               <div className="space-y-1">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainDescription')}
                 </label>
                 <textarea
@@ -787,13 +900,13 @@ export default function Sidebar({
                   onChange={e => setFormDesc(e.target.value)}
                   placeholder={t('ow.placeholder.domainDescription')}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none"
+                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none ${styles.inputBg} ${styles.inputText}`}
                 />
               </div>
 
               {/* Color Theme Selector */}
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-semibold text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
                   {t('ow.label.domainColor')}
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -805,9 +918,9 @@ export default function Sidebar({
                         type="button"
                         onClick={() => setFormColor(color)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                          isSelected ? 'border-slate-800 scale-110 shadow-sm' : 'border-transparent hover:scale-105'
+                          isSelected ? `${styles.accentBorder} scale-110 shadow-sm` : 'border-transparent hover:scale-105'
                         }`}
-                        style={{ backgroundColor: 
+                        style={{ backgroundColor:
                           color === 'blue' ? '#3b82f6' :
                           color === 'emerald' ? '#10b981' :
                           color === 'amber' ? '#f59e0b' :
@@ -816,7 +929,7 @@ export default function Sidebar({
                           color === 'indigo' ? '#6366f1' : '#64748b'
                         }}
                       >
-                        {isSelected && <Check size={12} className="text-white font-bold" />}
+                        {isSelected && <Check size={12} className={styles.cardText} />}
                       </button>
                     );
                   })}
@@ -825,37 +938,37 @@ export default function Sidebar({
 
               {/* Assign Object Types Checklist */}
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-semibold flex justify-between items-center text-[11px]">
+                <label className={`block ${styles.sidebarText} font-semibold flex justify-between items-center text-[11px]`}>
                   <span>{t('ow.label.domainAssignedObjects').replace('{count}', String(formAssignedObjects.length))}</span>
-                  <span className="text-[9px] text-slate-400 font-normal">{t('ow.label.multiSelect')}</span>
+                  <span className={`text-[9px] ${styles.muted} font-normal`}>{t('ow.label.multiSelect')}</span>
                 </label>
-                <div className="border border-slate-200 rounded-lg max-h-36 overflow-y-auto p-1 bg-slate-50/30 divide-y divide-slate-150">
+                <div className={`border ${styles.appBorder} rounded-lg max-h-36 overflow-y-auto p-1 ${styles.inputBg} divide-y`}>
                   {allObjectTypes.map(ot => {
                     const isChecked = formAssignedObjects.includes(ot.id);
                     return (
                       <div
                         key={ot.id}
                         onClick={() => toggleObjectAssignment(ot.id)}
-                        className="flex items-center gap-2 py-1 px-1.5 hover:bg-slate-100 rounded-md cursor-pointer text-xs"
+                        className={`flex items-center gap-2 py-1 px-1.5 ${styles.sidebarHoverBg} rounded-md cursor-pointer text-xs`}
                       >
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {}} // Handle on parent div click
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none"
+                          className={`rounded ${styles.inputBorder} text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none`}
                         />
-                        <span className={`p-0.5 rounded border bg-white text-slate-500`}>
+                        <span className={`p-0.5 rounded border ${styles.cardBg} ${styles.appBorder} ${styles.muted}`}>
                           <DynamicIcon name={ot.icon} size={11} />
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-700 truncate text-[11px]">{ot.displayName}</p>
+                          <p className={`font-semibold ${styles.cardText} truncate text-[11px]`}>{ot.displayName}</p>
                         </div>
-                        <span className="text-[9px] font-mono text-slate-400 uppercase">{ot.id}</span>
+                        <span className={`text-[9px] font-mono ${styles.muted} uppercase`}>{ot.id}</span>
                       </div>
                     );
                   })}
                   {allObjectTypes.length === 0 && (
-                    <div className="p-4 text-center text-slate-400">
+                    <div className={`p-4 text-center ${styles.muted}`}>
                       {t('ow.empty.noObjectTypesForAssign')}
                     </div>
                   )}
@@ -863,22 +976,23 @@ export default function Sidebar({
               </div>
 
               {/* Footer Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className={`pt-3 border-t ${styles.appBorder} flex items-center justify-end gap-2`}>
                 <button
                   type="button"
                   onClick={() => {
                     setShowDomainModal(false);
                     setEditingDomain(null);
                   }}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 transition-colors font-semibold cursor-pointer text-xs"
+                  className={`px-3 py-1.5 border ${styles.appBorder} ${styles.cardBg} ${styles.cardText} hover:${styles.sidebarHoverBg} transition-colors font-semibold cursor-pointer text-xs`}
                 >
                   {t('ow.btn.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs"
+                  disabled={saving}
+                  className={`px-3.5 py-1.5 ${styles.accentBg} text-white ${styles.accentHover} rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs disabled:opacity-50`}
                 >
-                  {t('ow.btn.save')}
+                  {saving ? '...' : t('ow.btn.save')}
                 </button>
               </div>
             </form>
@@ -887,14 +1001,14 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* 📖 术语库快速入口 */}
-      <div className="border-t border-slate-200 px-3 py-3">
+      {/* 📖 术语库快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
+      <div className={`border-t ${styles.appBorder} px-3 py-3`}>
         <button
           onClick={() => onSelectCategory('glossary', null)}
           className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
             selectedCategory === 'glossary'
               ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
-              : 'text-slate-600 hover:bg-slate-100'
+              : `${styles.sidebarText} ${styles.sidebarHoverBg}`
           }`}
         >
           <BookOpen size={14} />

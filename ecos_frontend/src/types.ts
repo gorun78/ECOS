@@ -51,6 +51,13 @@ export interface DataAsset {
     editor: string[];
     viewer: string[];
   };
+  /**
+   * Optional provenance marker: set to `'MOCK'` when this item comes from the
+   * mock fallback rather than the live backend. PMO-43 T1 — lets UI layers
+   * and tests distinguish real data from enrichment/placeholder data
+   * (instead of treating the empty-and-busy-state as "0 rows").
+   */
+  error?: 'MOCK' | string;
 }
 
 // Lineage & Pipeline

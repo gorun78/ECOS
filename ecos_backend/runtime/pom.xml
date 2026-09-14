@@ -17,11 +17,13 @@
     <description>运行时子系统 — 任务调度、监控、加解密、元数据</description>
 
     <modules>
+        <module>common-api</module>
         <module>runtime-core</module>
         <module>runtime-monitor</module>
         <module>runtime-task</module>
         <module>llm-gateway</module>
             <module>runtime-access</module>
+        <module>runtime-event</module>
     </modules>
 
 </project>

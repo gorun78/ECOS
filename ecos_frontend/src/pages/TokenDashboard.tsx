@@ -136,7 +136,7 @@ export default function TokenDashboard() {
         <div className="mt-2">
           {loading && data === null ? (
             <div className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+              <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
               <span className={`text-xs ${styles.cardTextMuted}`}>
                 {locale === "zh" ? "加载中…" : "Loading…"}
               </span>
@@ -179,7 +179,7 @@ export default function TokenDashboard() {
                       <span className={`text-xs font-medium ${styles.cardText}`}>
                         {m.model || "unknown"}
                       </span>
-                      <span className="text-xs font-mono text-slate-400">
+                      <span className={`text-xs font-mono ${styles.cardTextMuted}`}>
                         {formatTokens(m.tokens)}
                       </span>
                     </div>
@@ -189,7 +189,7 @@ export default function TokenDashboard() {
                         style={{ width: `${Math.min(pct, 100)}%` }}
                       />
                     </div>
-                    <div className="text-[10px] text-right mt-0.5 text-slate-500">
+                    <div className={`text-[10px] text-right mt-0.5 ${styles.cardTextMuted}`}>
                       {pct.toFixed(1)}%
                     </div>
                   </div>
@@ -224,7 +224,7 @@ export default function TokenDashboard() {
                       <span className={`text-xs font-medium ${styles.cardText}`}>
                         {op.operation || "unknown"}
                       </span>
-                      <span className="text-xs font-mono text-slate-400">
+                      <span className={`text-xs font-mono ${styles.cardTextMuted}`}>
                         {formatTokens(op.tokens)}
                       </span>
                     </div>
@@ -234,7 +234,7 @@ export default function TokenDashboard() {
                         style={{ width: `${Math.min(pct, 100)}%` }}
                       />
                     </div>
-                    <div className="text-[10px] text-right mt-0.5 text-slate-500">
+                    <div className={`text-[10px] text-right mt-0.5 ${styles.cardTextMuted}`}>
                       {pct.toFixed(1)}%
                     </div>
                   </div>

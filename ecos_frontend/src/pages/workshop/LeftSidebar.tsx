@@ -10,14 +10,14 @@ export function renderLeftSidebar(vm: any) {
             {/* COLUMN 1: LEFT CONFIG SIDEBAR (Widget list, Pages, Variables, Styles) */}
             <div className={`w-60 ${styles.appBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
               {/* Tab Selector */}
-              <div className={`flex border-b ${styles.cardBorder} divide-x divide-slate-200/55 text-center shrink-0`}>
+              <div className={`flex border-b ${styles.cardBorder} divide-x ${styles.divider} text-center shrink-0`}>
                 {(['pages', 'variables', 'widgets', 'theme'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setLeftTab(tab)}
                     className={`flex-1 py-2 font-semibold text-[10px] uppercase transition-colors cursor-pointer ${
                       leftTab === tab
-                        ? '${styles.cardBg} ${styles.cardText} border-b-2 border-slate-800'
+                        ? '${styles.cardBg} ${styles.cardText} border-b-2 border-blue-500'
                         : '${styles.cardTextMuted} hover:${styles.sidebarBg} hover:${styles.cardText}'
                     }`}
                   >
@@ -34,7 +34,7 @@ export function renderLeftSidebar(vm: any) {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase`}>应用页面 ({activeApp.pages.length})</span>
-                      <button onClick={handleAddPage} className="p-1 hover:bg-slate-200 rounded text-blue-600" title="添加新视图">
+                      <button onClick={handleAddPage} className={`p-1 ${styles.sidebarHoverBg} rounded text-blue-600`} title="添加新视图">
                         <Plus size={13} />
                       </button>
                     </div>
@@ -49,11 +49,11 @@ export function renderLeftSidebar(vm: any) {
                               setSelectedWidgetId(null);
                             }}
                             className={`w-full p-2 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
-                              isActive ? '${styles.cardBg} shadow-xs border ${styles.cardBorder} font-bold ${styles.cardText}' : '${styles.cardTextMuted} hover:bg-slate-200/50'
+                              isActive ? '${styles.cardBg} shadow-xs border ${styles.cardBorder} font-bold ${styles.cardText}' : '${styles.cardTextMuted} ${styles.sidebarHoverBg}'
                             }`}
                           >
                             <div className="flex items-center gap-2 truncate">
-                              <DynamicIcon name={p.icon} size={12} className={isActive ? 'text-blue-500' : 'text-slate-400'} />
+                              <DynamicIcon name={p.icon} size={12} className={isActive ? 'text-blue-500' : styles.cardTextMuted} />
                               <input
                                 type="text"
                                 value={p.title}
@@ -108,7 +108,7 @@ export function renderLeftSidebar(vm: any) {
                       <span className={`font-bold text-[10px] ${styles.cardTextMuted} uppercase`}>状态与变量</span>
                       <button
                         onClick={() => setShowAddVarModal(true)}
-                        className="p-1 hover:bg-slate-200 rounded text-blue-600 flex items-center gap-0.5"
+                        className={`p-1 ${styles.sidebarHoverBg} rounded text-blue-600 flex items-center gap-0.5`}
                       >
                         <Plus size={12} />
                         <span className="text-[10px] font-semibold">添加变量</span>
@@ -117,7 +117,7 @@ export function renderLeftSidebar(vm: any) {
 
                     <div className="space-y-2">
                       {activeApp.variables.map((v: any) => (
-                        <div key={v.id} className={`p-2 ${styles.cardBg} rounded-lg border ${styles.cardBorder} space-y-1 hover:border-slate-300`}>
+                        <div key={v.id} className={`p-2 ${styles.cardBg} rounded-lg border ${styles.cardBorder} space-y-1`}>
                           <div className="flex items-center justify-between">
                             <span className={`font-bold ${styles.cardText} text-xs truncate`} title={v.name}>{v.name}</span>
                             <span className={`px-1.5 py-0.2 rounded border text-[8px] font-mono uppercase shrink-0 ${getVarTypeBadge(v.type)}`}>
@@ -212,7 +212,7 @@ export function renderLeftSidebar(vm: any) {
                               <button
                                 key={color}
                                 onClick={() => handleUpdateAppTheme({ primaryColor: color })}
-                                className={`w-5 h-5 rounded-full border ${selected ? 'ring-2 ring-slate-800 border-white shadow-xs' : 'border-transparent'}`}
+                                className={`w-5 h-5 rounded-full border ${selected ? 'ring-2 ring-blue-500 border-white shadow-xs' : 'border-transparent'}`}
                                 style={{
                                   backgroundColor:
                                     color === 'blue' ? '#2563eb' :
@@ -233,7 +233,7 @@ export function renderLeftSidebar(vm: any) {
                             type="checkbox"
                             checked={activeApp.theme.isDark}
                             onChange={e => handleUpdateAppTheme({ isDark: e.target.checked })}
-                            className={`rounded ${styles.cardText} border-slate-300 h-3 w-3`}
+                            className={`rounded ${styles.cardText} border ${styles.cardBorder} h-3 w-3`}
                           />
                         </label>
                       </div>

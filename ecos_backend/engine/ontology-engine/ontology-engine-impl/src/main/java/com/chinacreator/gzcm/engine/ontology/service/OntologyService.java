@@ -11,6 +11,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityDependenciesVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityDetailVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntitySaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyPropertySaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyPropertyVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipGraphVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipValidateVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRelationshipVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologySaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyVO;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -42,6 +54,312 @@ public class OntologyService {
     }
 
     private String nextId() { return String.valueOf(ID_SEQ.incrementAndGet()); }
+
+    // ═══════════════ Strong-Typed Facades (T16-1, 2026-09-12) ═══════════════════
+    // 旧 Map 签名方法保留（Wave31 / OntologyProposalController / OntologyDomainApiController 调用方）；
+    // 新增 DTO/VO 签名作 Controller 入参出参唯一消费路径。字段与语义与旧 method 完全一致。
+
+    // ═══════════════ Entity (强类型路径) ═══════════════════
+
+    public List<OntologyEntityVO> listEntitiesVO(String ontologyId) {
+        return repository.findEntitiesByOntology(ontologyId).stream()
+            .map(this::entityToVO)
+            .collect(Collectors.toList());
+    }
+
+    public OntologyEntityVO createEntity(String ontologyId, OntologyEntitySaveDTO dto) {
+        OntologyEntity entity = new OntologyEntity();
+        String id = "ent" + nextId();
+        entity.setId(id);
+        entity.setOntologyId(ontologyId);
+        entity.setCode(dto.getCode() != null ? dto.getCode() : "");
+        entity.setName(dto.getName() != null ? dto.getName() : "");
+        entity.setDescription(dto.getDescription() != null ? dto.getDescription() : "");
+        entity.setEntityType(dto.getEntityType() != null ? dto.getEntityType() : "MASTER");
+        entity.setSortOrder(1);
+        try {
+            repository.insertEntity(entity);
+        } catch (DuplicateKeyException e) {
+            log.warn("Entity unique constraint violation: {} in ontology {}", entity.getCode(), ontologyId);
+            throw e;
+        }
+        log.info("Ontology entity created: {} [{}]", id, entity.getCode());
+        return entityToVO(entity);
+    }
+
+    public Optional<OntologyEntityVO> updateEntity(String entityId, OntologyEntitySaveDTO dto) {
+        return repository.findEntityById(entityId).map(existing -> {
+            repository.updateEntity(entityId, dto.getCode(), dto.getName(),
+                dto.getDescription(), dto.getEntityType());
+            return repository.findEntityById(entityId).map(this::entityToVO).orElse(null);
+        });
+    }
+
+    public OntologyEntityDetailVO getEntityDetailVO(String entityId) {
+        return repository.findEntityById(entityId).map(entity -> {
+            OntologyEntityDetailVO vo = new OntologyEntityDetailVO();
+            vo.setId(entity.getId());
+            vo.setOntologyId(entity.getOntologyId());
+            vo.setCode(entity.getCode());
+            vo.setName(entity.getName());
+            vo.setDescription(entity.getDescription());
+            vo.setEntityType(entity.getEntityType());
+            vo.setDomainId(entity.getDomainId());
+            vo.setSortOrder(entity.getSortOrder());
+            vo.setMapping(mappingStore.store.get(entity.getId()));
+            vo.setCreatedAt(entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
+            vo.setUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
+            vo.setProperties(listProperties(entityId));
+            vo.setRelationships(listEntityRelationships(entityId));
+            vo.setRules(new java.util.ArrayList<>());
+            vo.setActions(new java.util.ArrayList<>());
+            return vo;
+        }).orElse(null);
+    }
+
+    public OntologyEntityDependenciesVO getEntityDependenciesVO(String entityId) {
+        OntologyEntityDependenciesVO vo = new OntologyEntityDependenciesVO();
+        vo.setEntityId(entityId);
+        List<OntologyRelationship> rels = repository.findRelationshipsByEntity(entityId);
+        java.util.Set<String> related = new java.util.HashSet<>();
+        for (OntologyRelationship r : rels) {
+            if (!entityId.equals(r.getSourceEntityId())) related.add(r.getSourceEntityId());
+            if (!entityId.equals(r.getTargetEntityId())) related.add(r.getTargetEntityId());
+        }
+        vo.setRelatedEntities(new java.util.ArrayList<>(related));
+        vo.setPropertyCount(listProperties(entityId).size());
+        vo.setRelationshipCount(rels.size());
+        vo.setCascadingDeletes(List.of("properties", "relationships", "actions"));
+        return vo;
+    }
+
+    // ═══════════════ Property (强类型路径) ═══════════════════
+
+    public List<OntologyPropertyVO> listPropertiesVO(String entityId) {
+        return repository.findPropertiesByEntity(entityId).stream()
+            .map(this::propToVO)
+            .collect(Collectors.toList());
+    }
+
+    public OntologyPropertyVO createProperty(String entityId, OntologyPropertySaveDTO dto) {
+        OntologyProperty prop = new OntologyProperty();
+        String id = "prop" + nextId();
+        prop.setId(id);
+        prop.setEntityId(entityId);
+        prop.setCode(dto.getCode() != null ? dto.getCode() : "");
+        prop.setName(dto.getName() != null ? dto.getName() : "");
+        prop.setPropertyType(dto.getPropertyType() != null ? dto.getPropertyType() : "STRING");
+        prop.setRequiredFlag(dto.getRequiredFlag() != null ? dto.getRequiredFlag() : 0);
+        prop.setSearchableFlag(dto.getSearchableFlag() != null ? dto.getSearchableFlag() : 0);
+        prop.setUniqueFlag(dto.getUniqueFlag() != null ? dto.getUniqueFlag() : 0);
+        prop.setSortOrder(1);
+        prop.setEnumValues(dto.getEnumValues() != null ? dto.getEnumValues() : "");
+        prop.setDefaultValue(dto.getDefaultValue() != null ? dto.getDefaultValue() : "");
+        prop.setValidationRule(dto.getValidationRule() != null ? dto.getValidationRule() : "");
+        prop.setRefEntityCode(dto.getRefEntityCode() != null ? dto.getRefEntityCode() : "");
+        prop.setMaxLength(dto.getMaxLength());
+        prop.setMinValue(dto.getMinValue());
+        prop.setMaxValue(dto.getMaxValue());
+        prop.setFunctionType(dto.getFunctionType() != null ? dto.getFunctionType() : "");
+        prop.setFunctionExpression(dto.getFunctionExpression() != null ? dto.getFunctionExpression() : "");
+        try {
+            repository.insertProperty(prop);
+        } catch (DuplicateKeyException e) {
+            log.warn("Property unique constraint violation: {} on entity {}", prop.getCode(), entityId);
+            throw e;
+        }
+        log.info("Property created: {} [{}] for entity {}", id, prop.getCode(), entityId);
+        return propToVO(prop);
+    }
+
+    public Optional<OntologyPropertyVO> updateProperty(String propId, OntologyPropertySaveDTO dto) {
+        return repository.findPropertyById(propId).map(existing -> {
+            repository.updateProperty(propId, dto.getCode(), dto.getName(), dto.getPropertyType(),
+                dto.getRequiredFlag(), dto.getSearchableFlag(),
+                dto.getFunctionType(), dto.getFunctionExpression());
+            return repository.findPropertyById(propId).map(this::propToVO).orElse(null);
+        });
+    }
+
+    // ═══════════════ Relationship (强类型路径) ═══════════════════
+
+    public List<OntologyRelationshipVO> listEntityRelationshipsVO(String entityId) {
+        return repository.findRelationshipsByEntity(entityId).stream()
+            .map(this::relToVO)
+            .collect(Collectors.toList());
+    }
+
+    public List<OntologyRelationshipVO> listAllRelationshipsVO() {
+        return repository.findAllRelationships().stream()
+            .map(this::relToVO)
+            .collect(Collectors.toList());
+    }
+
+    public OntologyRelationshipVO createRelationship(String sourceEntityId, OntologyRelationshipSaveDTO dto) {
+        OntologyRelationship rel = new OntologyRelationship();
+        String id = "rel" + nextId();
+        rel.setId(id);
+        rel.setSourceEntityId(sourceEntityId);
+        rel.setTargetEntityId(dto.getTargetEntityId() != null ? dto.getTargetEntityId() : "");
+        rel.setCode(dto.getCode() != null ? dto.getCode() : "");
+        rel.setName(dto.getName() != null ? dto.getName() : "");
+        rel.setRelationshipType(dto.getRelationshipType() != null ? dto.getRelationshipType() : "ONE_TO_MANY");
+        try {
+            repository.insertRelationship(rel);
+        } catch (DuplicateKeyException e) {
+            log.warn("Relationship unique constraint violation: {} {}→{}",
+                    rel.getCode(), sourceEntityId, rel.getTargetEntityId());
+            throw e;
+        }
+        log.info("Relationship created: {} [{}] {}→{}", id, rel.getCode(), sourceEntityId, rel.getTargetEntityId());
+        return relToVO(rel);
+    }
+
+    /** 强类型版本的关系校验（仅 source/target 两个 String，无 Map 中间结构）。 */
+    public OntologyRelationshipValidateVO validateRelationshipVO(String sourceEntityId, String targetEntityId) {
+        boolean hasCycle = validateAsBoolean(sourceEntityId, targetEntityId);
+        OntologyRelationshipValidateVO vo = new OntologyRelationshipValidateVO();
+        vo.setHasCycle(hasCycle);
+        vo.setMessage(hasCycle ? "ONT-003: Relationship would introduce a cycle" : "Relationship is valid");
+        return vo;
+    }
+
+    /** 关系图谱（强类型版）。 */
+    public OntologyRelationshipGraphVO getRelationshipGraphVO() {
+        List<Map<String, Object>> edges = repository.findAllRelationshipEdges();
+        java.util.Set<String> nodeIds = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> e : edges) {
+            nodeIds.add(String.valueOf(e.get("source")));
+            nodeIds.add(String.valueOf(e.get("target")));
+        }
+        OntologyRelationshipGraphVO vo = new OntologyRelationshipGraphVO();
+        List<OntologyRelationshipGraphVO.GraphNode> nodes = nodeIds.stream().map(id -> {
+            OntologyRelationshipGraphVO.GraphNode n = new OntologyRelationshipGraphVO.GraphNode();
+            n.setId(id);
+            return n;
+        }).collect(Collectors.toList());
+        List<OntologyRelationshipGraphVO.GraphEdge> edgeVos = edges.stream().map(e -> {
+            OntologyRelationshipGraphVO.GraphEdge edgeVo = new OntologyRelationshipGraphVO.GraphEdge();
+            edgeVo.setSource(String.valueOf(e.get("source")));
+            edgeVo.setTarget(String.valueOf(e.get("target")));
+            edgeVo.setCode(String.valueOf(e.get("code")));
+            return edgeVo;
+        }).collect(Collectors.toList());
+        vo.setNodes(nodes);
+        vo.setEdges(edgeVos);
+        return vo;
+    }
+
+    // ═══════════════ Ontology (强类型路径) ═══════════════════
+
+    public List<OntologyVO> listOntologiesVO() {
+        return repository.findAllOntologies().stream()
+            .map(this::ontologyToVO)
+            .collect(Collectors.toList());
+    }
+
+    public OntologyVO createOntology(OntologySaveDTO dto) {
+        String id = java.util.UUID.randomUUID().toString().substring(0, 8);
+        String code = dto.getCode() != null ? dto.getCode() : "";
+        String name = dto.getName() != null ? dto.getName() : "";
+        String description = dto.getDescription() != null ? dto.getDescription() : "";
+        repository.insertOntology(id, code, name, description);
+        log.info("Ontology created: {} [{}]", id, code);
+        return ontologyToVO(repository.findOntologyById(id));
+    }
+
+    public Optional<OntologyVO> updateOntology(String id, OntologySaveDTO dto) {
+        Map<String, Object> existing = repository.findOntologyById(id);
+        if (existing == null) return Optional.empty();
+        repository.updateOntology(id, dto.getName(), dto.getDescription(), dto.getStatus());
+        return Optional.ofNullable(ontologyToVO(repository.findOntologyById(id)));
+    }
+
+    // ═══════════════ Strong-Typed Converters (T16-1) ═══════════════════
+
+    private OntologyEntityVO entityToVO(OntologyEntity e) {
+        OntologyEntityVO vo = new OntologyEntityVO();
+        vo.setId(e.getId());
+        vo.setOntologyId(e.getOntologyId());
+        vo.setCode(e.getCode());
+        vo.setName(e.getName());
+        vo.setDescription(e.getDescription());
+        vo.setEntityType(e.getEntityType());
+        vo.setDomainId(e.getDomainId());
+        vo.setSortOrder(e.getSortOrder());
+        vo.setMapping(mappingStore.store.get(e.getId()));
+        vo.setCreatedAt(e.getCreatedAt() != null ? e.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(e.getUpdatedAt() != null ? e.getUpdatedAt().toString() : null);
+        return vo;
+    }
+
+    private OntologyPropertyVO propToVO(OntologyProperty p) {
+        OntologyPropertyVO vo = new OntologyPropertyVO();
+        vo.setId(p.getId());
+        vo.setEntityId(p.getEntityId());
+        vo.setCode(p.getCode());
+        vo.setName(p.getName());
+        vo.setPropertyType(p.getPropertyType());
+        vo.setRequiredFlag(p.getRequiredFlag());
+        vo.setSearchableFlag(p.getSearchableFlag());
+        vo.setUniqueFlag(p.getUniqueFlag());
+        vo.setSortOrder(p.getSortOrder());
+        vo.setEnumValues(p.getEnumValues());
+        vo.setDefaultValue(p.getDefaultValue());
+        vo.setValidationRule(p.getValidationRule());
+        vo.setRefEntityCode(p.getRefEntityCode());
+        vo.setMaxLength(p.getMaxLength());
+        vo.setMinValue(p.getMinValue());
+        vo.setMaxValue(p.getMaxValue());
+        vo.setFunctionType(p.getFunctionType());
+        vo.setFunctionExpression(p.getFunctionExpression());
+        vo.setCreatedAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : null);
+        return vo;
+    }
+
+    private OntologyRelationshipVO relToVO(OntologyRelationship r) {
+        OntologyRelationshipVO vo = new OntologyRelationshipVO();
+        vo.setId(r.getId());
+        vo.setSourceEntityId(r.getSourceEntityId());
+        vo.setTargetEntityId(r.getTargetEntityId());
+        vo.setCode(r.getCode());
+        vo.setName(r.getName());
+        vo.setRelationshipType(r.getRelationshipType());
+        vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
+        return vo;
+    }
+
+    private OntologyVO ontologyToVO(Map<String, Object> raw) {
+        if (raw == null) return null;
+        OntologyVO vo = new OntologyVO();
+        vo.setId(asString(raw.get("id")));
+        vo.setCode(asString(raw.get("code")));
+        vo.setName(asString(raw.get("name")));
+        vo.setVersion(asString(raw.get("version")));
+        vo.setDescription(asString(raw.get("description")));
+        vo.setStatus(asString(raw.get("status")));
+        vo.setCreatedAt(asString(raw.get("created_at")));
+        vo.setUpdatedAt(asString(raw.get("updated_at")));
+        return vo;
+    }
+
+    private static String asString(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    /** 内部辅助：跑一次 DFS 闭环检测，返回 boolean（与旧 validateRelationship 行为一致）。 */
+    private boolean validateAsBoolean(String sourceEntityId, String targetEntityId) {
+        List<Map<String, Object>> edges = repository.findAllRelationshipEdges();
+        Map<String, Object> pending = new LinkedHashMap<>();
+        pending.put("source", sourceEntityId);
+        pending.put("target", targetEntityId);
+        pending.put("code", "PENDING");
+        edges.add(pending);
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        java.util.Set<String> inStack = new java.util.HashSet<>();
+        return hasCycleDFS(sourceEntityId, edges, visited, inStack);
+    }
 
     // ═══════════════ Entity ═══════════════════
 
@@ -93,6 +411,13 @@ public class OntologyService {
         });
     }
 
+    /**
+     * 删除实体 (B1 决策)：逻辑删除 — 物理 DELETE 已改 Repository 层 UPDATE (Wave B-3 T17)。
+     * Service 方法签名与 4 次级联调用形态不变；仅 Repository 层 SQL 从 DELETE 改为
+     * UPDATE SET is_deleted=1, status='ARCHIVED'。Wave31OntologyConvergenceTest C1
+     * verify(ontRepo).deletePropertiesByEntity / deleteRelationshipsByEntity /
+     * deleteActionsByEntity / deleteEntity 4 次调用零改动仍 PASS。
+     */
     public boolean deleteEntity(String entityId) {
         Optional<OntologyEntity> existing = repository.findEntityById(entityId);
         if (existing.isEmpty()) return false;

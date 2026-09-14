@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
+import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,6 +54,9 @@ public class LLMGatewayImpl implements LLMGateway {
 
     @Autowired
     private OkHttpClient okHttpClient;
+
+    @Autowired(required = false)
+    private LLMGatewayProperties llmGatewayProperties;
 
     // ── Provider URL 解析 ──
 
@@ -142,6 +146,47 @@ public class LLMGatewayImpl implements LLMGateway {
     }
 
     @Override
+    public EmbeddingResponse embed(EmbeddingRequest request) {
+        if (request == null) {
+            return EmbeddingResponse.fail("request null");
+        }
+        String model = request.getModel();
+        if ((model == null || model.isEmpty()) && llmGatewayProperties != null) {
+            model = llmGatewayProperties.getEngine().getEmbeddingModel();
+        }
+        if (model == null || model.isEmpty()) {
+            model = "text-embedding-3-small";
+        }
+        String provider = request.getProvider();
+        if (provider == null || provider.isEmpty()) {
+            provider = detectProvider(model);
+        }
+        LLMConfig cfg = new LLMConfig();
+        cfg.setProvider(provider);
+        cfg.setModel(model);
+        String baseUrl = resolveBaseUrl(cfg);
+
+        String[] inputs;
+        if (request.getTexts() != null && request.getTexts().length > 0) {
+            inputs = request.getTexts();
+        } else if (request.getInput() != null && !request.getInput().isEmpty()) {
+            inputs = new String[] { request.getInput() };
+        } else {
+            return EmbeddingResponse.fail("既无 input 也无 texts");
+        }
+
+        String body;
+        try {
+            body = buildEmbeddingRequestBody(model, inputs);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to build embedding body JSON: {}", e.getMessage(), e);
+            return EmbeddingResponse.fail("serialize fail: " + e.getMessage());
+        }
+        log.debug("LLM embed -> {} model={} provider={} n={}", baseUrl, model, provider, inputs.length);
+        return callEmbeddingNonStreaming(baseUrl, "", body, model);
+    }
+
+    @Override
     public boolean isAvailable(LLMConfig config) {
         String baseUrl = resolveBaseUrl(config);
         String modelsUrl = baseUrl + "/models";
@@ -205,7 +250,7 @@ public class LLMGatewayImpl implements LLMGateway {
     }
 
     /**
-     * 构建 OpenAI 兼容的请求体 JSON
+     * 构建 OpenAI 兼容 /chat/completions 请求体 JSON
      */
     private String buildRequestBody(String model, List<ChatMessage> messages,
                                     Double temperature, Integer maxTokens,
@@ -234,7 +279,22 @@ public class LLMGatewayImpl implements LLMGateway {
     }
 
     /**
-     * 非流式调用
+     * 构建 OpenAI 兼容 /embeddings 请求体 JSON（input 单条:string / 多条:array）
+     */
+    private String buildEmbeddingRequestBody(String model, String[] inputs) throws JsonProcessingException {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("model", model);
+        if (inputs.length == 1) {
+            root.put("input", inputs[0]);
+        } else {
+            ArrayNode arr = root.putArray("input");
+            for (String s : inputs) arr.add(s);
+        }
+        return objectMapper.writeValueAsString(root);
+    }
+
+    /**
+     * 非流式 chat 调用
      */
     private ChatResponse callNonStreaming(String baseUrl, String apiKey, String requestBodyJson) {
         String url = baseUrl + "/chat/completions";
@@ -269,6 +329,73 @@ public class LLMGatewayImpl implements LLMGateway {
             long duration = System.currentTimeMillis() - startTime;
             log.error("LLM API call failed after {}ms: {}", duration, e.getMessage());
             return ChatResponse.fail("IO error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 非流式 embedding 调用 POST {baseUrl}/embeddings
+     */
+    private EmbeddingResponse callEmbeddingNonStreaming(String baseUrl, String apiKey, String requestBodyJson, String model) {
+        Request httpRequest = new Request.Builder()
+                .url(baseUrl + "/embeddings")
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .post(RequestBody.create(requestBodyJson, MediaType.parse("application/json")))
+                .build();
+        long start = System.currentTimeMillis();
+        try (Response response = okHttpClient.newCall(httpRequest).execute()) {
+            long elapsed = System.currentTimeMillis() - start;
+            if (!response.isSuccessful()) {
+                String errBody = response.body() != null ? response.body().string() : "";
+                log.warn("Embedding API HTTP error {} after {}ms: {}", response.code(), elapsed, errBody);
+                return EmbeddingResponse.fail(String.format("HTTP %d: %s", response.code(), errBody));
+            }
+            String responseBody = response.body() != null ? response.body().string() : "";
+            EmbeddingResponse resp = parseEmbeddingResponse(responseBody, model);
+            log.debug("LLM embed OK after {}ms model={} dims={}", elapsed, model,
+                    resp.getData().isEmpty() ? 0 : resp.getData().get(0).length);
+            return resp;
+        } catch (IOException e) {
+            log.warn("Embedding API IO error after call to {}: {}", baseUrl, e.getMessage());
+            return EmbeddingResponse.fail("IO error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 解析 OpenAI 兼容 embeddings 响应（OpenAI/DeepSeek: data[].embedding[]）
+     */
+    private EmbeddingResponse parseEmbeddingResponse(String responseBody, String model) {
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            if (root.has("error")) {
+                JsonNode err = root.get("error");
+                String msg = err.isTextual() ? err.asText()
+                        : (err.has("message") ? err.get("message").asText() : err.toString());
+                return EmbeddingResponse.fail("LLM error: " + msg);
+            }
+            List<float[]> vectors = new ArrayList<>();
+            if (root.has("data") && root.get("data").isArray()) {
+                for (JsonNode item : root.get("data")) {
+                    if (item.has("embedding") && item.get("embedding").isArray()) {
+                        JsonNode emb = item.get("embedding");
+                        float[] v = new float[emb.size()];
+                        for (int i = 0; i < emb.size(); i++) {
+                            v[i] = (float) emb.get(i).asDouble();
+                        }
+                        vectors.add(v);
+                    }
+                }
+            }
+            long tokensInput = 0, tokensTotal = 0;
+            if (root.has("usage")) {
+                JsonNode usage = root.get("usage");
+                tokensInput = usage.has("prompt_tokens") ? usage.get("prompt_tokens").asLong() : 0;
+                tokensTotal = usage.has("total_tokens") ? usage.get("total_tokens").asLong() : tokensInput;
+            }
+            return EmbeddingResponse.ok(vectors, model, tokensInput, tokensTotal);
+        } catch (Exception e) {
+            log.error("Failed to parse embedding response: {}", e.getMessage(), e);
+            return EmbeddingResponse.fail("parse fail: " + e.getMessage());
         }
     }
 

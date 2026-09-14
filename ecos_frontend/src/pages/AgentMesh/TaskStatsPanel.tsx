@@ -5,6 +5,7 @@
 
 import { BarChart3, Check, X, RefreshCw, Clock, Timer, Hash } from "lucide-react";
 import { AgentMeshMission, AgentMeshTask } from "../../api";
+import { useTheme } from "../../components/ThemeContext";
 
 interface TaskStatsPanelProps {
   mission: AgentMeshMission;
@@ -12,6 +13,7 @@ interface TaskStatsPanelProps {
 }
 
 export default function TaskStatsPanel({ mission, tasks }: TaskStatsPanelProps) {
+  const { styles } = useTheme();
   const total = tasks.length;
   const completed = tasks.filter(t => t.status === "COMPLETED").length;
   const failed = tasks.filter(t => t.status === "FAILED").length;
@@ -23,22 +25,22 @@ export default function TaskStatsPanel({ mission, tasks }: TaskStatsPanelProps) 
   if (total === 0) return null;
 
   return (
-    <div className="mb-3 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900">
+    <div className={`mb-3 p-4 rounded-lg border ${styles.cardBg}`} style={{ borderColor: 'var(--card-border, #A5B4FC)' }}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <BarChart3 size={16} className="text-indigo-500" />
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <span className={`text-sm font-semibold ${styles.cardText}`}>
             Mission 统计 — {mission.title}
           </span>
           <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
             mission.mode === "PIPELINE"
-              ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-              : "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
+              ? "bg-purple-100 text-purple-700"
+              : "bg-teal-100 text-teal-700"
           }`}>{mission.mode}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-500 tabular-nums">{progress}%</span>
-          <div className="w-24 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <span className={`text-[11px] font-medium ${styles.cardTextMuted} tabular-nums`}>{progress}%</span>
+          <div className={`w-24 h-2 ${styles.inputBg} rounded-full overflow-hidden`}>
             <div
               className="h-full bg-indigo-500 rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
@@ -48,11 +50,11 @@ export default function TaskStatsPanel({ mission, tasks }: TaskStatsPanelProps) 
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-          <Hash size={14} className="text-slate-500" />
+        <div className="flex items-center gap-2 p-2 rounded-lg border" style={{ background: 'var(--overlay, rgba(0,0,0,0.04))', borderColor: 'var(--app-border, #E2E8F0)' }}>
+          <Hash size={14} className={styles.cardTextMuted} />
           <div>
-            <div className="text-[10px] text-slate-400">总任务数</div>
-            <div className="text-sm font-bold text-slate-700 dark:text-slate-300">{total}</div>
+            <div className={`text-[10px] ${styles.cardTextMuted}`}>总任务数</div>
+            <div className={`text-sm font-bold ${styles.cardText}`}>{total}</div>
           </div>
         </div>
         <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">

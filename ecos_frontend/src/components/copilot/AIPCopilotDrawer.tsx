@@ -18,6 +18,7 @@
 import React, { useState, useCallback } from 'react';
 import LucideIcon from '../LucideIcon';
 import { useLanguage } from '../LanguageContext';
+import { useTheme } from '../ThemeContext';
 import AgentQuickActions from './AgentQuickActions';
 import CopilotMessageList from './CopilotMessageList';
 import CopilotInputBar from './CopilotInputBar';
@@ -150,6 +151,7 @@ export default function AIPCopilotDrawer({
   setSecuritySelectedRowColDs = () => {},
 }: AIPCopilotDrawerProps) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const [inputText, setInputText] = useState('');
 
   const {
@@ -280,9 +282,9 @@ export default function AIPCopilotDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 flex flex-col z-50 animate-slide-in select-none">
+    <div className={`fixed inset-y-0 right-0 w-96 ${styles.cardBg} shadow-2xl border-l ${styles.cardBorder} flex flex-col z-50 animate-slide-in select-none`}>
       {/* 1. Drawer Header */}
-      <div className="h-14 bg-slate-900 text-white flex items-center justify-between px-4 shrink-0">
+      <div className={`h-14 ${styles.sidebarBg} text-white flex items-center justify-between px-4 shrink-0`}>
         <div className="flex items-center gap-2">
           <span className="p-1.5 rounded-lg bg-indigo-600 text-white flex items-center justify-center animate-pulse">
             <LucideIcon name="Bot" size={15} />
@@ -295,7 +297,7 @@ export default function AIPCopilotDrawer({
         <button
           onClick={onClose}
           aria-label={t('common.close')}
-          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+          className={`p-1.5 text-[var(--text-muted)] hover:text-white hover:bg-black/20 rounded-lg transition-colors cursor-pointer`}
         >
           <LucideIcon name="X" size={16} />
         </button>

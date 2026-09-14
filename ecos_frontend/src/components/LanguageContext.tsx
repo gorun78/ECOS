@@ -12,6 +12,7 @@ import secZh from "../locales/sec/zh-CN.json";
 import commonZh from "../locales/common/zh-CN.json";
 import copilotZh from "../locales/copilot/zh-CN.json";
 import dashboardZh from "../locales/dashboard/zh-CN.json";
+import scenarioZh from "../locales/scenario/zh-CN.json";
 import ontologyEn from "../locales/ontology/en.json";
 import aiworkbenchEn from "../locales/aiworkbench/en.json";
 import dwEn from "../locales/dw/en.json";
@@ -20,6 +21,7 @@ import secEn from "../locales/sec/en.json";
 import commonEn from "../locales/common/en.json";
 import copilotEn from "../locales/copilot/en.json";
 import dashboardEn from "../locales/dashboard/en.json";
+import scenarioEn from "../locales/scenario/en.json";
 
 export type Locale = "zh" | "en";
 
@@ -30,15 +32,20 @@ interface LanguageContextType {
 }
 
 const TRANSLATIONS: Record<Locale, Record<string, string>> = {
-  zh: { ...ontologyZh, ...aiworkbenchZh, ...dwZh, ...knowledgeZh, ...secZh, ...commonZh, ...copilotZh, ...dashboardZh },
-  en: { ...ontologyEn, ...aiworkbenchEn, ...dwEn, ...knowledgeEn, ...secEn, ...commonEn, ...copilotEn, ...dashboardEn },
+  zh: { ...ontologyZh, ...aiworkbenchZh, ...dwZh, ...knowledgeZh, ...secZh, ...commonZh, ...copilotZh, ...dashboardZh, ...scenarioZh },
+  en: { ...ontologyEn, ...aiworkbenchEn, ...dwEn, ...knowledgeEn, ...secEn, ...commonEn, ...copilotEn, ...dashboardEn, ...scenarioEn },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    // Chinese is the absolute default
+    // Chinese is the absolute default; tests can force via `__ecos_test_locale`
+    // (set on globalThis by *.test.tsx beforeEach) to assert i18n keys.
+    const g = globalThis as unknown as { __ecos_test_locale?: Locale };
+    if (g.__ecos_test_locale) {
+      return g.__ecos_test_locale;
+    }
     const saved = localStorage.getItem("ecos_locale");
     return (saved as Locale) || "zh";
   });

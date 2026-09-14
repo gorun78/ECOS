@@ -1,12 +1,18 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.engine.ai.agent.vo.PipelineNodeTraceVO;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
 
 /**
@@ -52,6 +59,15 @@ public class AgentStudioService {
 
     /** 流水线执行记录 — 内存存储（后续迁移至 PG） */
     private final Map<String, PipelineExecution> pipelineStore = new ConcurrentHashMap<>();
+
+    /** 流水线节点伪执行线程池（mock 演示用，非生产负载，daemon 线程不阻塞 JVM 退出） */
+    private static final ExecutorService PIPELINE_EXECUTOR = Executors.newFixedThreadPool(
+            Math.max(4, Runtime.getRuntime().availableProcessors()),
+            r -> {
+                Thread t = new Thread(r, "pipeline-mock-executor");
+                t.setDaemon(true);
+                return t;
+            });
 
     // ═══════════════ createAndTest ═══════════════════
 
@@ -236,10 +252,17 @@ public class AgentStudioService {
     // ═══════════════ startPipeline ═══════════════════
 
     /**
-     * 启动流水线执行。
+     * 启动流水线执行（mock 拓扑伪执行）。
+     *
+     * <p>按拓扑序创建 per-node {@link PipelineNodeTraceVO}，逐节点串行伪执行：
+     * 节点状态 PENDING → RUNNING → SUCCESS/FAILED，全部完成后置 overall status。
+     * 失败注入规则：拓扑序 index % 7 == 3 的节点标记 FAILED（模拟确定性失败）。</p>
+     *
+     * <p>节点 ID 从 {@code params} 中的 {@code nodeIds} 列表获取拓扑序，
+     * 无 {@code nodeIds} 时创建单个 {@code trigger-0} 节点（兼容旧调用方）。</p>
      *
      * @param pipelineId 流水线ID
-     * @param params     执行参数
+     * @param params     执行参数（可含 nodeIds: List&lt;String&gt;）
      * @return PipelineExecution 包含执行ID和初始状态
      */
     public PipelineExecution startPipeline(String pipelineId, Map<String, Object> params) {
@@ -252,26 +275,119 @@ public class AgentStudioService {
         exec.setStartedAt(System.currentTimeMillis());
         pipelineStore.put(executionId, exec);
 
-        log.info("[AgentStudio] Pipeline execution started: {} for pipeline {}", executionId, pipelineId);
+        // 从 params 解析节点列表（前端 canvas 拓扑序；为空时创建单 trigger 节点保底）
+        List<String> nodeIds = new ArrayList<>();
+        if (params != null) {
+            Object nodeIdsObj = params.get("nodeIds");
+            if (nodeIdsObj instanceof List<?> rawNodeIds && !rawNodeIds.isEmpty()) {
+                for (Object item : rawNodeIds) {
+                    if (item instanceof String s && !s.isBlank()) {
+                        nodeIds.add(s);
+                    }
+                }
+            }
+        }
+        List<String> effectiveNodeIds = nodeIds.isEmpty()
+                ? List.of("trigger-0")
+                : Collections.unmodifiableList(nodeIds);
 
-        // 异步模拟执行（T3阶段仅记录入口，后续迭代实现真实流水线引擎）
-        new Thread(() -> {
+        // 初始化 nodeTraces（LinkedHashMap 保拓扑序）
+        for (String nodeId : effectiveNodeIds) {
+            PipelineNodeTraceVO trace = new PipelineNodeTraceVO();
+            trace.setNodeId(nodeId);
+            trace.setNodeName(nodeId);
+            trace.setStatus("pending");
+            exec.getNodeTraces().put(nodeId, trace);
+        }
+        exec.setNodeIds(new ArrayList<>(effectiveNodeIds));
+
+        log.info("[AgentStudio] Pipeline execution started (mock): {} for pipeline {}, nodes={}",
+                executionId, pipelineId, effectiveNodeIds.size());
+
+        // 异步伪执行：逐节点串行，CompletableFuture.runAsync 提交到 PIPELINE_EXECUTOR
+        CompletableFuture.runAsync(() -> {
             try {
-                Thread.sleep(2000); // 模拟耗时
-                exec.setStatus("completed");
+                int nodeCount = effectiveNodeIds.size();
+                boolean hasFailure = false;
+
+                for (int i = 0; i < nodeCount; i++) {
+                    String nodeId = effectiveNodeIds.get(i);
+                    PipelineNodeTraceVO trace = exec.getNodeTraces().get(nodeId);
+                    if (trace == null) {
+                        continue;
+                    }
+
+                    // PENDING → RUNNING
+                    trace.setStatus("running");
+                    long startEpoch = System.nanoTime();
+                    trace.setStartedAt(LocalDateTime.now());
+
+                    // mock 耗时：失败注入节点 index % 7 == 3 → FAILED；其余 SUCCESS
+                    boolean shouldFail = (i % 7 == 3);
+                    long sleepMs = shouldFail ? 100L : (150L + new Random().nextInt(151));
+                    Thread.sleep(sleepMs);
+
+                    long elapsedMs = (System.nanoTime() - startEpoch) / 1_000_000L;
+                    LocalDateTime now = LocalDateTime.now();
+                    trace.setCompletedAt(now);
+                    trace.setLatencyMs(elapsedMs);
+
+                    if (shouldFail) {
+                        trace.setStatus("failed");
+                        trace.setErrorMessage("mock failure for node " + nodeId + " (no real backend)");
+                        hasFailure = true;
+                        log.debug("[AgentStudio] Node {} FAILED (mock injection, index={})", nodeId, i);
+                    } else {
+                        trace.setStatus("success");
+                        trace.setInputJson("{\"mock\":true,\"nodeId\":\"" + nodeId + "\"}");
+                        trace.setOutputJson("{\"status\":\"ok\",\"latencyMs\":" + elapsedMs + "}");
+                    }
+
+                    // 前序节点失败 → 后继节点全部 skipped
+                    if (hasFailure) {
+                        for (int j = i + 1; j < nodeCount; j++) {
+                            String skipId = effectiveNodeIds.get(j);
+                            PipelineNodeTraceVO skipTrace = exec.getNodeTraces().get(skipId);
+                            if (skipTrace != null && "pending".equals(skipTrace.getStatus())) {
+                                skipTrace.setStatus("skipped");
+                                skipTrace.setStartedAt(LocalDateTime.now());
+                                skipTrace.setCompletedAt(LocalDateTime.now());
+                                skipTrace.setLatencyMs(0L);
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // 汇总 overall status
                 exec.setCompletedAt(System.currentTimeMillis());
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("message", "Pipeline executed successfully");
-                result.put("pipelineId", pipelineId);
-                result.put("params", params);
-                exec.setResult(result);
-                log.info("[AgentStudio] Pipeline execution completed: {}", executionId);
+                if (hasFailure) {
+                    exec.setStatus("failed");
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("message", "Pipeline completed with node failure (mock)");
+                    result.put("pipelineId", pipelineId);
+                    exec.setResult(result);
+                } else {
+                    exec.setStatus("completed");
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("message", "Pipeline executed successfully");
+                    result.put("pipelineId", pipelineId);
+                    result.put("params", params);
+                    exec.setResult(result);
+                }
+                log.info("[AgentStudio] Pipeline execution completed: {} status={}",
+                        executionId, exec.getStatus());
+
             } catch (InterruptedException e) {
                 exec.setStatus("failed");
                 exec.setCompletedAt(System.currentTimeMillis());
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("message", "Pipeline execution interrupted");
+                exec.setResult(result);
                 Thread.currentThread().interrupt();
+                log.error("[AgentStudio] Pipeline execution interrupted: {}", executionId, e);
             }
-        }, "pipeline-" + executionId).start();
+        }, PIPELINE_EXECUTOR);
 
         return exec;
     }
@@ -494,6 +610,10 @@ public class AgentStudioService {
         private long startedAt;
         private Long completedAt;
         private Map<String, Object> result;
+        /** per-node 执行轨迹（key=nodeId，LinkedHashMap 保拓扑序），新增字段，不影响旧契约 */
+        private Map<String, PipelineNodeTraceVO> nodeTraces = new LinkedHashMap<>();
+        /** 节点 ID 列表（拓扑序），新增字段 */
+        private List<String> nodeIds;
 
         public String getExecutionId() { return executionId; }
         public void setExecutionId(String executionId) { this.executionId = executionId; }
@@ -507,6 +627,10 @@ public class AgentStudioService {
         public void setCompletedAt(Long completedAt) { this.completedAt = completedAt; }
         public Map<String, Object> getResult() { return result; }
         public void setResult(Map<String, Object> result) { this.result = result; }
+        public Map<String, PipelineNodeTraceVO> getNodeTraces() { return nodeTraces; }
+        public void setNodeTraces(Map<String, PipelineNodeTraceVO> nodeTraces) { this.nodeTraces = nodeTraces; }
+        public List<String> getNodeIds() { return nodeIds; }
+        public void setNodeIds(List<String> nodeIds) { this.nodeIds = nodeIds; }
 
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -516,6 +640,17 @@ public class AgentStudioService {
             m.put("startedAt", Instant.ofEpochMilli(startedAt).toString());
             if (completedAt != null) m.put("completedAt", Instant.ofEpochMilli(completedAt).toString());
             if (result != null) m.put("result", result);
+            // 新增：per-node 执行轨迹（LinkedHashMap 保拓扑序，toMap 转 List<Map>）
+            if (nodeTraces != null && !nodeTraces.isEmpty()) {
+                List<Map<String, Object>> traceList = new ArrayList<>();
+                for (PipelineNodeTraceVO trace : nodeTraces.values()) {
+                    if (trace != null) {
+                        traceList.add(trace.toMap());
+                    }
+                }
+                m.put("nodeTraces", traceList);
+            }
+            if (nodeIds != null) m.put("nodeIds", nodeIds);
             return m;
         }
     }

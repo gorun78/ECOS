@@ -21,6 +21,25 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- Lombok (NodeStepVO / PipelineDebugSessionVO / PipelineStepStatusVO /
+             PipelineDebugStartDTO 使用 @Data; Wave 4 T1 补漏: data-engine-api 的
+             optional=true 让 lombok 不参与传递依赖导致"找不到符号 setNodeId/setXxx".
+             版本 1.18.36 与 Spring Boot 3.2.2 BOM 对齐 (locked)). -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- PMO-49: security-engine crypto (IDataEncryptionService / IKeyManagementService)
+             for datasource password encryption (dataSourcePwd key → td_datasource.password_enc) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>security-engine-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
                 <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>runtime-core</artifactId>
@@ -76,6 +95,14 @@
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>runtime-task</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Runtime Event (统一事件总线 — IntegrationMetadataService 审计走 EventBusService
+             Kafka ecos.audit，符合架构铁律 §2.4 #5 + §2.5，禁止引擎内自建 KafkaTemplate) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-event</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 

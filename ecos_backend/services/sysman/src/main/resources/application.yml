@@ -1,0 +1,103 @@
+server:
+  # PMO-49 P2-1: sysman service 端口 18081 (与 security-engine 主引擎一致, 拆分期互斥运行)
+  port: 18081
+
+spring:
+  application:
+    name: ecos-sysman-service
+  main:
+    allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: SysmanHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  # Neo4j (standard 档 standard 无 Neo4j, 但 classpath 有 driver 会自动探测)
+  # PMO-49 Q2: 补凭据给 Neo4jReactiveHealthIndicator (避免 health DOWN 因 auth scheme none)
+  # 本地 Docker neo4j 容器已起, password neo4j123
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:neo4j123}
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+
+# PMO-49 D1: 收窄 MyBatis 类型别名扫包到 sysman 域
+# + ADR-7 X-ECOS-* 头校验开关
+# 避免 engine.security 同名 DataSecurityPolicy 别名冲突
+ecos:
+  mybatis:
+    type-aliases-package: com.chinacreator.gzcm.sysman.security
+  header-auth:
+    enabled: false
+
+# 认证配置 (与 gateway 同款: whitelist 已在 gateway, 本 service 侧 SecurityConfig 独立声明)
+auth:
+  enabled: true
+
+# PMO-49 ADR-8: 审计事件统一走 Kafka ecos.audit (sysman 端消费落库)
+# Kafka 配置 (由 runtime-access 收敛 Client)
+spring.kafka:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+  consumer:
+    group-id: ${KAFKA_GROUP:ecos-sysman-audit}
+    auto-offset-reset: earliest
+  listener:
+    ack-mode: batch
+
+# JWT RS256 Keys — SEC-P0-2: 私钥环境变量注入, 公钥硬编码
+jwt:
+  private-key: ${JWT_PRIVATE_KEY:}
+  public-key: |
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowZc56deVTWoP3/J0csp
+    wIT60GM0qQbt1/SeEifcbImYr8B+ImvUMfO5mlba/h9ZCWJJdlsgX6qLq9TNKMCo
+    c8P3LDZ7jDikVOYHD40njdXHYu+nM5y3XHLDD3qNl8+qr7GfvCn6asXx6rOmO66V
+    UJ3h1zCzPnGbyfKfOmahnMA2l7WcCrzg1HwbSPopnaQrMPjPGLqezACSOv0289mK
+    iRAwSwfte0+Sf3YZcd4HbqNn4muSH5XY8+JKYAxwjZ+luw4wZFak502W7omVNie3
+    5EPhuY4zaMDG1n6+kz5BiB+7zbIuECUgsDdA5V7L/nAJwO10pwuHIDb45jWu47hn
+    BQIDAQAB
+    -----END PUBLIC KEY-----
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,beans,mappings
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.chinacreator.gzcm: INFO
+    org.apache.kafka: WARN
+    org.springframework: INFO

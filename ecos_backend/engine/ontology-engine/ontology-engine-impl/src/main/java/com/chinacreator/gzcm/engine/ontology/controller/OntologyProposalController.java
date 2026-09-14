@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalPublishVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVerifyVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
@@ -47,6 +52,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li>POST   /api/v1/ontology/proposals/{id}/execute  — 执行已验证提案</li>
  *   <li>POST   /api/v1/ontology/proposals/{id}/approve-and-publish — 审批+执行+版本发布</li>
  * </ul>
+ *
+ * <p>T16-3 (2026-09-13) 改造：入参 Map → 强类型 DTO（{@link OntologyProposalSaveDTO}）；
+ * 返回 {@code Map} → {@link OntologyProposalVO} / {@link OntologyProposalVerifyVO} /
+ * {@link OntologyProposalPublishVO}。payload JSONB 字段用 {@code Object} 承载
+ * （PGobject → 反序列化后对象，动态嵌套数据豁免）。Service 旧 Map 方法保留
+ * （C1 兼容，Wave31 C1 边界）。
  */
 @RestController("ontologyProposalController")
 @RequestMapping("/api/v1/ontology/proposals")
@@ -87,79 +98,97 @@ public class OntologyProposalController {
      * @param proposalType 可选，按提案类型过滤（CREATE_ENTITY/ADD_PROPERTY/MODIFY_PROPERTY/...）
      */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listProposals(
+    public ApiResponse<List<OntologyProposalVO>> listProposals(
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "type", required = false) String proposalType) {
         List<Map<String, Object>> rows = proposalService.listProposals(status, proposalType);
-        return ApiResponse.success(rows);
+        List<OntologyProposalVO> vos = rows == null ? new ArrayList<>()
+                : rows.stream().map(this::toVO).collect(Collectors.toList());
+        return ApiResponse.success(vos);
     }
 
     /**
      * GET /api/v1/ontology/proposals/{id} — 提案详情。
      */
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getProposal(@PathVariable String id) {
+    public ApiResponse<OntologyProposalVO> getProposal(@PathVariable String id) {
         Map<String, Object> p = proposalService.findProposalById(id);
         if (p == null) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
-        return ApiResponse.success(p);
+        return ApiResponse.success(toVO(p));
     }
 
     /**
      * POST /api/v1/ontology/proposals — 创建提案。
-     * <p>Body 字段：
-     * <ul>
-     *   <li>domainCode — 必填，领域编码</li>
-     *   <li>proposalType — 必填，提案类型（CREATE_ENTITY/ADD_PROPERTY/MODIFY_PROPERTY/...）</li>
-     *   <li>targetEntity — 可选，目标实体</li>
-     *   <li>payload — 可选，变更内容 Map</li>
-     *   <li>author — 可选，提案人</li>
-     * </ul>
-     * 兼容旧字段: type→proposalType, source→proposalType, title/description 存入 payload JSONB。
-     * <p>使用 @RequestParam 传递 proposalType/domainCode 避免 Spring body 绑定冲突。</p>
+     *
+     * <p>T16-3：入参 Map → {@link OntologyProposalSaveDTO}（兼容旧字段
+     * ptype/source/targetId/domain_code/target_entity/proposedBy/proposal_type/targetType，
+     * 通过 {@code @JsonProperty} 在 SaveDTO 上绑定）。
+     *
+     * <p>兼容旧字段: {@code type}→{@code proposalType}、{@code source}→{@code proposalType}、
+     * {@code title}/{@code description} 存入 payload JSONB。
      */
     @PostMapping
-    @SuppressWarnings("unchecked")
-    public ApiResponse<Map<String, Object>> createProposal(
+    public ApiResponse<OntologyProposalVO> createProposal(
             @RequestParam(value = "proposalType", required = false) String proposalTypeParam,
             @RequestParam(value = "domainCode", required = false) String domainCodeParam,
-            @RequestBody(required = false) Map<String, Object> body) {
-        
-        Map<String, Object> bodyMap = body != null ? body : new LinkedHashMap<>();
-        String proposalType = (proposalTypeParam != null) ? proposalTypeParam.trim()
-                : String.valueOf(bodyMap.getOrDefault("proposalType",
-                  bodyMap.getOrDefault("ptype", ""))).trim();
-        String domainCode = (domainCodeParam != null) ? domainCodeParam.trim()
-                : String.valueOf(bodyMap.getOrDefault("domainCode", "")).trim();
-        if (domainCode.isEmpty()) {
+            @RequestBody(required = false) OntologyProposalSaveDTO body) {
+
+        OntologyProposalSaveDTO dto = body != null ? body : new OntologyProposalSaveDTO();
+
+        // 解析 proposalType（优先级：路径 query > DTO 主字段 > DTO 兼容字段）
+        String proposalType = firstNonBlank(
+                proposalTypeParam,
+                dto.getProposalType(),
+                dto.getPtypeAlt(),
+                dto.getSourceAlt(),
+                dto.getProposalTypeAlt(),
+                dto.getTargetTypeAlt());
+        if (proposalType == null) {
+            proposalType = "";
+        }
+        proposalType = proposalType.trim();
+
+        // 解析 domainCode（优先级：路径 query > DTO 主字段 > DTO 兼容字段）
+        String domainCode = firstNonBlank(domainCodeParam, dto.getDomainCode(), dto.getDomainCodeAlt());
+        if (domainCode == null) {
             domainCode = "default";
         }
+        domainCode = domainCode.trim();
+
         if (proposalType.isEmpty()) {
             return ApiResponse.badRequest("ONT-002: 'proposalType' is required");
         }
 
-        String targetEntity = String.valueOf(bodyMap.getOrDefault("targetEntity",
-                bodyMap.getOrDefault("targetId", ""))).trim();
-        String author = String.valueOf(bodyMap.getOrDefault("author",
-                bodyMap.getOrDefault("proposedBy", "system"))).trim();
+        String targetEntity = firstNonBlank(
+                dto.getTargetEntity(),
+                dto.getTargetIdAlt(),
+                dto.getTargetEntityAlt());
+        if (targetEntity == null) {
+            targetEntity = "";
+        }
+        targetEntity = targetEntity.trim();
+
+        String author = firstNonBlank(dto.getAuthor(), dto.getProposedByAlt());
+        if (author == null) {
+            author = "system";
+        }
+        author = author.trim();
 
         // 构建 payload JSONB：包含 title/description/changeType 等扩展字段
         Map<String, Object> payloadData = new LinkedHashMap<>();
-        Object rawPayload = bodyMap.get("payload");
-        if (rawPayload instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> p = (Map<String, Object>) rawPayload;
-            payloadData.putAll(p);
+        if (dto.getPayload() != null) {
+            payloadData.putAll(dto.getPayload());
         }
-        if (bodyMap.containsKey("title") && !payloadData.containsKey("title")) {
-            payloadData.put("title", bodyMap.get("title"));
+        if (dto.getTitle() != null && !payloadData.containsKey("title")) {
+            payloadData.put("title", dto.getTitle());
         }
-        if (bodyMap.containsKey("description") && !payloadData.containsKey("description")) {
-            payloadData.put("description", bodyMap.get("description"));
+        if (dto.getDescription() != null && !payloadData.containsKey("description")) {
+            payloadData.put("description", dto.getDescription());
         }
-        if (bodyMap.containsKey("changeType") && !payloadData.containsKey("changeType")) {
-            payloadData.put("changeType", bodyMap.get("changeType"));
+        if (dto.getChangeType() != null && !payloadData.containsKey("changeType")) {
+            payloadData.put("changeType", dto.getChangeType());
         }
         String payloadJson;
         try {
@@ -168,12 +197,11 @@ public class OntologyProposalController {
             return ApiResponse.badRequest("ONT-003: Failed to serialize payload: " + e.getMessage());
         }
 
-        Object snapshotRaw = bodyMap.get("snapshot");
+        Object snapshotRaw = dto.getSnapshot();
         String snapshotJson = null;
         if (snapshotRaw != null) {
             try {
-                snapshotJson = snapshotRaw instanceof String ? (String) snapshotRaw
-                        : MAPPER.writeValueAsString(snapshotRaw);
+                snapshotJson = snapshotRaw instanceof String s ? s : MAPPER.writeValueAsString(snapshotRaw);
             } catch (JsonProcessingException e) {
                 snapshotJson = null;
             }
@@ -186,17 +214,19 @@ public class OntologyProposalController {
         Map<String, Object> created = proposalService.findCreatedProposal();
 
         log.info("Ontology proposal created: {} [{}] proposalType={}", created.get("id"), proposalType, proposalType);
-        return ApiResponse.success(created);
+        return ApiResponse.success(toVO(created));
     }
 
     /**
      * PUT /api/v1/ontology/proposals/{id} — 更新提案。
-     * <p>仅 DRAFT 状态允许编辑内容字段；其他状态返回 400。
+     *
+     * <p>T16-3：请求体 Map → {@link OntologyProposalSaveDTO}。
+     * 仅 DRAFT 状态允许编辑内容字段；其他状态返回 400。
      */
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> updateProposal(
+    public ApiResponse<OntologyProposalVO> updateProposal(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody OntologyProposalSaveDTO dto) {
         Map<String, Object> existing = proposalService.findProposalById(id);
         if (existing == null) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
@@ -209,50 +239,44 @@ public class OntologyProposalController {
                             + ", only DRAFT proposals can be edited");
         }
 
-        // 构建更新 SQL
+        // 构建更新（按 DTO 字段非空判定 → 拼 SQL）
         StringBuilder sql = new StringBuilder("UPDATE ecos_ontology_proposals SET updated_at=NOW()");
         List<Object> params = new ArrayList<>();
 
-        if (body.containsKey("domainCode") || body.containsKey("domain_code")) {
+        if (dto.getDomainCode() != null) {
             sql.append(", domain_code=?");
-            params.add(String.valueOf(body.getOrDefault("domainCode",
-                    body.getOrDefault("domain_code", existing.get("domain_code")))));
+            params.add(dto.getDomainCode());
         }
-        if (body.containsKey("proposalType") || body.containsKey("proposal_type")
-                || body.containsKey("type") || body.containsKey("source") || body.containsKey("targetType")) {
+        String proposalType = firstNonBlank(dto.getProposalType(), dto.getPtypeAlt(), dto.getSourceAlt(),
+                dto.getProposalTypeAlt(), dto.getTargetTypeAlt());
+        if (proposalType != null) {
             sql.append(", proposal_type=?");
-            params.add(String.valueOf(body.getOrDefault("proposalType",
-                    body.getOrDefault("proposal_type",
-                    body.getOrDefault("type",
-                    body.getOrDefault("source",
-                    body.getOrDefault("targetType", existing.get("proposal_type"))))))));
+            params.add(proposalType);
         }
-        if (body.containsKey("targetEntity") || body.containsKey("target_entity")
-                || body.containsKey("targetId")) {
+        String targetEntity = firstNonBlank(dto.getTargetEntity(), dto.getTargetIdAlt(), dto.getTargetEntityAlt());
+        if (targetEntity != null) {
             sql.append(", target_entity=?");
-            params.add(String.valueOf(body.getOrDefault("targetEntity",
-                    body.getOrDefault("target_entity",
-                    body.getOrDefault("targetId", existing.get("target_entity"))))));
+            params.add(targetEntity);
         }
-        if (body.containsKey("author") || body.containsKey("proposedBy")) {
+        String author = firstNonBlank(dto.getAuthor(), dto.getProposedByAlt());
+        if (author != null) {
             sql.append(", author=?");
-            params.add(String.valueOf(body.getOrDefault("author",
-                    body.getOrDefault("proposedBy", existing.get("author")))));
+            params.add(author);
         }
-        if (body.containsKey("payload")) {
+        if (dto.getPayload() != null) {
             try {
                 sql.append(", payload=?::jsonb");
-                Object p = body.get("payload");
-                params.add(p instanceof String ? (String) p : MAPPER.writeValueAsString(p));
+                Object p = dto.getPayload();
+                params.add(p instanceof String s ? s : MAPPER.writeValueAsString(p));
             } catch (JsonProcessingException e) {
                 return ApiResponse.badRequest("ONT-003: Failed to serialize payload: " + e.getMessage());
             }
         }
-        if (body.containsKey("snapshot")) {
+        if (dto.getSnapshot() != null) {
             try {
                 sql.append(", snapshot=?::jsonb");
-                Object s = body.get("snapshot");
-                params.add(s instanceof String ? (String) s : MAPPER.writeValueAsString(s));
+                Object s = dto.getSnapshot();
+                params.add(s instanceof String str ? str : MAPPER.writeValueAsString(s));
             } catch (JsonProcessingException e) {
                 // ignore snapshot serialization error
             }
@@ -263,7 +287,7 @@ public class OntologyProposalController {
 
         Map<String, Object> updated = proposalService.updateProposal(id, sql, params);
         log.info("Ontology proposal updated: {}", id);
-        return ApiResponse.success(updated);
+        return ApiResponse.success(toVO(updated));
     }
 
     /**
@@ -295,7 +319,7 @@ public class OntologyProposalController {
      * POST /api/v1/ontology/proposals/{id}/submit — 提交审批（DRAFT → PENDING）。
      */
     @PostMapping("/{id}/submit")
-    public ApiResponse<Map<String, Object>> submitProposal(@PathVariable String id) {
+    public ApiResponse<OntologyProposalVO> submitProposal(@PathVariable String id) {
         return transition(id, STATUS_DRAFT, STATUS_PENDING, null);
     }
 
@@ -304,9 +328,9 @@ public class OntologyProposalController {
      * <p>Body 可选字段：reviewer（审批人）、reviewComment（审批意见）。
      */
     @PostMapping("/{id}/approve")
-    public ApiResponse<Map<String, Object>> approveProposal(
+    public ApiResponse<OntologyProposalVO> approveProposal(
             @PathVariable String id,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) OntologyProposalSaveDTO body) {
         return transition(id, STATUS_PENDING, STATUS_APPROVED, body);
     }
 
@@ -315,9 +339,9 @@ public class OntologyProposalController {
      * <p>Body 可选字段：reviewer（审批人）、reviewComment（审批意见）。
      */
     @PostMapping("/{id}/reject")
-    public ApiResponse<Map<String, Object>> rejectProposal(
+    public ApiResponse<OntologyProposalVO> rejectProposal(
             @PathVariable String id,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) OntologyProposalSaveDTO body) {
         return transition(id, STATUS_PENDING, STATUS_REJECTED, body);
     }
 
@@ -329,10 +353,10 @@ public class OntologyProposalController {
      * @param id           提案 ID
      * @param expectedFrom 期望的当前状态（不匹配则 400）
      * @param target       目标状态
-     * @param body         请求体（可携带 reviewer / reviewComment），可为 null
+     * @param body         请求体（可携带 reviewer/reviewComment），可为 null
      */
-    private ApiResponse<Map<String, Object>> transition(
-            String id, String expectedFrom, String target, Map<String, Object> body) {
+    private ApiResponse<OntologyProposalVO> transition(
+            String id, String expectedFrom, String target, OntologyProposalSaveDTO body) {
         Map<String, Object> existing;
         try {
             existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
@@ -355,14 +379,15 @@ public class OntologyProposalController {
         List<Object> params = new ArrayList<>();
         params.add(target);
 
+        // 兼容旧 reviewer / reviewerComment 字段
         if (body != null) {
-            if (body.containsKey("reviewer")) {
+            if (body.getReviewer() != null) {
                 sql.append(", reviewer=?");
-                params.add(String.valueOf(body.get("reviewer")));
+                params.add(body.getReviewer());
             }
-            if (body.containsKey("reviewComment")) {
+            if (body.getReviewComment() != null) {
                 sql.append(", reviewer_comment=?");
-                params.add(String.valueOf(body.get("reviewComment")));
+                params.add(body.getReviewComment());
             }
         }
 
@@ -374,16 +399,18 @@ public class OntologyProposalController {
         Map<String, Object> updated = proposalService.queryForMap(
                 "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         log.info("Ontology proposal {} transition: {} → {}", id, expectedFrom, target);
-        return ApiResponse.success(updated);
+        return ApiResponse.success(toVO(updated));
     }
 
     // ═══════════════ PMO指令端点: verify + execute ═══════════════════
 
     /**
-     * POST /api/v1/ontology/proposals/{id}/verify — 验证提案（检查冲突/完整性）
+     * POST /api/v1/ontology/proposals/{id}/verify — 验证提案（检查冲突/完整性）。
+     *
+     * <p>T16-3：返回 Map → {@link OntologyProposalVerifyVO}。
      */
     @PostMapping("/{id}/verify")
-    public ApiResponse<Map<String, Object>> verifyProposal(@PathVariable String id) {
+    public ApiResponse<OntologyProposalVerifyVO> verifyProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
             existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
@@ -400,12 +427,13 @@ public class OntologyProposalController {
         Map<?, ?> payload = null;
         if (payloadObj != null) {
             try {
-                if (payloadObj instanceof Map) {
-                    payload = (Map<?, ?>) payloadObj;
+                if (payloadObj instanceof Map<?, ?> m) {
+                    payload = m;
                 } else {
                     payload = MAPPER.readValue(String.valueOf(payloadObj), Map.class);
                 }
             } catch (Exception ignored) {
+                // 解析失败 → payload 视为 empty（issues 后面会记录）
             }
         }
 
@@ -433,6 +461,9 @@ public class OntologyProposalController {
                         valid = false;
                     }
                     break;
+                default:
+                    // 其他类型不在白名单内，不做 payload 字段校验
+                    break;
             }
         } else {
             issues.add("payload is empty or unparseable");
@@ -443,19 +474,19 @@ public class OntologyProposalController {
         String newStatus = valid ? "verified" : STATUS_REJECTED;
         proposalService.update("UPDATE ecos_ontology_proposals SET status=? WHERE id=?::bigint", newStatus, id);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("valid", valid);
-        result.put("issues", issues);
-        result.put("proposal", proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id));
+        OntologyProposalVerifyVO vo = new OntologyProposalVerifyVO();
+        vo.setValid(valid);
+        vo.setIssues(issues);
+        vo.setProposal(proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id));
         log.info("Proposal {} verified: valid={}", id, valid);
-        return ApiResponse.success(result);
+        return ApiResponse.success(vo);
     }
 
     /**
-     * POST /api/v1/ontology/proposals/{id}/execute — 执行已验证提案
+     * POST /api/v1/ontology/proposals/{id}/execute — 执行已验证提案。
      */
     @PostMapping("/{id}/execute")
-    public ApiResponse<Map<String, Object>> executeProposal(@PathVariable String id) {
+    public ApiResponse<OntologyProposalVO> executeProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
             existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
@@ -476,7 +507,7 @@ public class OntologyProposalController {
         Map<String, Object> updated = proposalService.queryForMap(
                 "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
         log.info("Proposal {} executed", id);
-        return ApiResponse.success(updated);
+        return ApiResponse.success(toVO(updated));
     }
 
     // ═══════════════ T3: 审批+执行+版本发布联动 ═══════════════════
@@ -492,13 +523,13 @@ public class OntologyProposalController {
      *   <li>执行 payload（根据 proposal_type 创建实体/属性/关系）</li>
      *   <li>发布版本（Draft → Published）</li>
      *   <li>更新提案状态为 EXECUTED，回填 version_id</li>
-     *   <li>返回 {status: "EXECUTED", versionId: xxx, proposal: ...}</li>
+     *   <li>返回 {@link OntologyProposalPublishVO}</li>
      * </ol>
      */
     @PostMapping("/{id}/approve-and-publish")
-    public ApiResponse<Map<String, Object>> approveAndPublish(
+    public ApiResponse<OntologyProposalPublishVO> approveAndPublish(
             @PathVariable String id,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) OntologyProposalSaveDTO body) {
         // 1. 查询提案
         Map<String, Object> proposal = proposalService.findProposalById(id);
         if (proposal == null) {
@@ -513,14 +544,14 @@ public class OntologyProposalController {
         }
 
         // 2. 更新为 APPROVED，记录审批信息
-        String reviewer = body != null ? String.valueOf(body.getOrDefault("reviewer", "")) : "";
-        String reviewerComment = body != null ? String.valueOf(body.getOrDefault("reviewComment", "")) : "";
+        // T16-3: body 改强类型 SaveDTO；reviewer 取自 dto.reviewer，reviewComment 取自 dto.reviewComment
+        String reviewer = body != null && body.getReviewer() != null ? body.getReviewer() : "";
+        String reviewerComment = body != null && body.getReviewComment() != null ? body.getReviewComment() : "";
 
         proposalService.approve(id, STATUS_APPROVED, reviewer, reviewerComment);
 
         String domainCode = String.valueOf(proposal.getOrDefault("domain_code", "default"));
         String proposalType = String.valueOf(proposal.getOrDefault("proposal_type", ""));
-        Map<String, Object> updatedProposal = proposalService.findProposalById(id);
 
         // 3. 创建版本（使用 domain_code 作为 ontologyId）
         Long versionIdLong = null;
@@ -530,6 +561,7 @@ public class OntologyProposalController {
             versionBody.put("changeLog", "Approve-and-publish from proposal " + id
                     + ": " + proposalType);
             versionBody.put("publisher", reviewer.isEmpty() ? "system" : reviewer);
+            // T16-3: 版本 payload 动态嵌套豁免（versionService 历史契约）
             Map<String, Object> version = versionService.createVersion(domainCode, versionBody);
             versionIdStr = String.valueOf(version.get("id"));
 
@@ -565,11 +597,11 @@ public class OntologyProposalController {
         // 7. 返回结果
         Map<String, Object> finalProposal = proposalService.findProposalById(id);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", STATUS_EXECUTED);
-        result.put("versionId", versionIdStr);
-        result.put("proposal", finalProposal);
-        return ApiResponse.success(result);
+        OntologyProposalPublishVO vo = new OntologyProposalPublishVO();
+        vo.setStatus(STATUS_EXECUTED);
+        vo.setVersionId(versionIdStr);
+        vo.setProposal(finalProposal);
+        return ApiResponse.success(vo);
     }
 
     /**
@@ -580,8 +612,8 @@ public class OntologyProposalController {
         Map<?, ?> payload = null;
         if (payloadObj != null) {
             try {
-                if (payloadObj instanceof Map) {
-                    payload = (Map<?, ?>) payloadObj;
+                if (payloadObj instanceof Map<?, ?> m) {
+                    payload = m;
                 } else {
                     payload = MAPPER.readValue(String.valueOf(payloadObj), Map.class);
                 }
@@ -631,6 +663,55 @@ public class OntologyProposalController {
             default:
                 log.info("Proposal type '{}' execution is no-op (no entity/property/relationship creation)",
                         proposalType);
+                break;
         }
+    }
+
+    // ═══════════════ T16-3 工具方法 ═══════════════════
+
+    /**
+     * 任选第一个非空字符串（用于兼容旧字段映射）。
+     */
+    private static String firstNonBlank(@SuppressWarnings("unused") String... candidates) {
+        if (candidates != null) {
+            for (String c : candidates) {
+                if (c != null && !c.isBlank()) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Map 行（ecos_ontology_proposals 表 SELECT * 直出）→ VO。
+     * 字段名按 DB 下划线 → VO 驼峰。
+     */
+    private OntologyProposalVO toVO(Map<String, Object> row) {
+        OntologyProposalVO vo = new OntologyProposalVO();
+        if (row == null) {
+            return vo;
+        }
+        vo.setId(row.get("id"));
+        vo.setDomainCode(objToString(row.get("domain_code")));
+        vo.setProposalType(objToString(row.get("proposal_type")));
+        vo.setTargetEntity(objToString(row.get("target_entity")));
+        // payload / snapshot 是 PG JSONB 列，PG JDBC 直出 PGobject → 原始 Object 透传（动态嵌套数据豁免）
+        vo.setPayload(row.get("payload"));
+        vo.setSnapshot(row.get("snapshot"));
+        vo.setStatus(objToString(row.get("status")));
+        vo.setAuthor(objToString(row.get("author")));
+        vo.setReviewer(objToString(row.get("reviewer")));
+        vo.setReviewerComment(objToString(row.get("reviewer_comment")));
+        vo.setVersionId(row.get("version_id"));
+        vo.setOptimisticLockVersion(row.get("optimistic_lock_version"));
+        vo.setCreatedAt(objToString(row.get("created_at")));
+        vo.setUpdatedAt(objToString(row.get("updated_at")));
+        return vo;
+    }
+
+    /** Object → String（null 安全）。 */
+    private static String objToString(Object o) {
+        return o == null ? null : o.toString();
     }
 }

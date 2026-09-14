@@ -120,18 +120,18 @@ export default function DataLineage() {
             placeholder={tl("表名", "table")}
             value={tableName} onChange={e => setTableName(e.target.value)} />
           <button onClick={fetchLineage}
-            className="p-1.5 rounded hover:bg-slate-100 text-slate-500 text-[10px]">
+            className={`p-1.5 rounded hover:${styles.cardBorder} ${styles.cardTextMuted} text-[10px]`}>
             {tl("查询", "Query")}
           </button>
           <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 border ${styles.inputBg} ${styles.inputBorder}`}>
             <Search className={`w-3 h-3 ${styles.muted}`} />
             <input type="text"
-              className={`bg-transparent outline-none text-[11px] ${styles.inputText} placeholder-slate-400 w-28`}
+              className={`bg-transparent outline-none text-[11px] ${styles.inputText} placeholder:opacity-50 w-28`}
               placeholder={tl("搜索节点...", "Search...")}
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <button onClick={() => window.location.reload()}
-            className="p-1.5 rounded hover:bg-slate-100 text-slate-500">
+            className={`p-1.5 rounded hover:${styles.cardBorder} ${styles.cardTextMuted}`}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -149,7 +149,7 @@ export default function DataLineage() {
         <div className="flex-1 flex min-w-0">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <RefreshCw className="w-10 h-10 text-slate-300 animate-spin" />
+              <RefreshCw className={`w-10 h-10 ${styles.cardTextMuted} animate-spin`} />
             </div>
           ) : (
             <GraphCanvas
@@ -170,14 +170,14 @@ export default function DataLineage() {
                 {tl("节点详情", "Node Detail")}
               </h3>
               <button onClick={() => setSelectedNodeId(null)}
-                className={`text-[11px] ${styles.muted} hover:text-slate-600`}>
+                className={`text-[11px] ${styles.muted} hover:${styles.cardText}`}>
                 {tl("关闭", "Close")}
               </button>
             </div>
             <div className="space-y-3 text-xs">
               <div>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>ID</span>
-                <span className="font-mono text-slate-700">{selectedNode.id}</span>
+                <span className={`font-mono ${styles.cardText}`}>{selectedNode.id}</span>
               </div>
               <div>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>{tl("表名", "Table")}</span>
@@ -190,14 +190,14 @@ export default function DataLineage() {
 
               {/* 字段列表 */}
               {selectedNode.fields?.length > 0 && (
-                <div className="pt-2 border-t border-slate-100">
+                <div className="pt-2 border-t" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
                   <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block mb-2`}>
                     {tl("字段列表", "Fields")} ({selectedNode.fields.length})
                   </span>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {selectedNode.fields.map((f: any, i: number) => (
                       <div key={i} className="flex justify-between text-[10px]">
-                        <span className="font-mono text-slate-600">{f.name || f}</span>
+                        <span className={`font-mono ${styles.cardTextMuted}`}>{f.name || f}</span>
                         {f.type && <span className={styles.muted}>{f.type}</span>}
                       </div>
                     ))}
@@ -206,7 +206,7 @@ export default function DataLineage() {
               )}
 
               {/* 关联关系 */}
-              <div className="pt-3 border-t border-slate-100">
+              <div className="pt-3 border-t" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block mb-2`}>
                   {tl("上下游关系", "Up/Downstream")}
                 </span>
@@ -216,7 +216,7 @@ export default function DataLineage() {
                     return (
                       <div key={l.id} onClick={() => setSelectedEdge(l)}
                         className={`cursor-pointer rounded px-1.5 py-1 text-[10px] ${l.transform ? 'hover:bg-blue-50' : ''}`}>
-                        <div className="flex items-center gap-1 text-slate-500 font-mono">
+                        <div className={`flex items-center gap-1 ${styles.cardTextMuted} font-mono`}>
                           {isSource ? "→" : "←"} {isSource ? l.target : l.source}
                         </div>
                         {l.transform && (
@@ -236,7 +236,7 @@ export default function DataLineage() {
                   <span className={`text-[10px] text-blue-600 uppercase tracking-wider block mb-1`}>
                     SQL变换
                   </span>
-                  <pre className="text-[10px] text-slate-600 bg-slate-50 rounded p-2 whitespace-pre-wrap break-all font-mono">
+                  <pre className={`text-[10px] ${styles.cardTextMuted} ${styles.inputBg} rounded p-2 whitespace-pre-wrap break-all font-mono`}>
                     {selectedEdge.transform}
                   </pre>
                 </div>

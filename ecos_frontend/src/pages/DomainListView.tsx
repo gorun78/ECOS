@@ -155,7 +155,7 @@ export default function DomainListView() {
       <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}>
         <div className="text-center">
           <Loader2 size={32} className="animate-spin text-indigo-400 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">{t("ontology.list.loadingDomainData")}</p>
+          <p className={`text-sm ${styles.cardTextMuted}`}>{t("ontology.list.loadingDomainData")}</p>
         </div>
       </div>
     );
@@ -168,10 +168,10 @@ export default function DomainListView() {
         <div className="text-center p-8">
           <AlertCircle size={40} className="text-red-400 mx-auto mb-3" />
           <p className="text-sm text-red-400 mb-2">{t("ontology.list.loadFailed")}</p>
-          <p className="text-xs text-slate-500 mb-4">{error}</p>
+          <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
             onClick={() => store.fetchKGAndDomains()}
-            className="px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 transition"
+            className={`px-4 py-1.5 rounded-lg text-xs ${styles.inputBg} ${styles.sidebarText} hover:opacity-80 transition`}
           >
             {t("ontology.list.reload")}
           </button>
@@ -188,21 +188,21 @@ export default function DomainListView() {
         <div className={`px-4 py-3.5 border-b ${styles.cardBorder}`}>
           <div className="flex items-center gap-2 mb-3">
             <Building2 size={16} className="text-indigo-400" />
-            <h2 className="text-sm font-semibold text-white">{t("ontology.list.businessDomains")}</h2>
-            <span className="text-[10px] text-slate-500 ml-auto">
+            <h2 className={`text-sm font-semibold ${styles.cardText}`}>{t("ontology.list.businessDomains")}</h2>
+            <span className={`text-[10px] ${styles.muted} ml-auto`}>
               {filteredDomains.length}/{domains.length}
             </span>
           </div>
 
           {/* 搜索 */}
           <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={12} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.muted}`} />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("ontology.list.searchDomain")}
               className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg pl-7 pr-3 py-1.5
-                text-xs text-white placeholder:text-slate-600
+                text-xs ${styles.cardText} placeholder:opacity-50
                 focus:outline-none focus:border-indigo-500/40 transition`}
             />
           </div>
@@ -221,7 +221,7 @@ export default function DomainListView() {
                 className={`flex-1 py-1 rounded text-[10px] font-medium transition ${
                   statusFilter === f.key
                     ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                    : 'text-slate-500 hover:text-slate-400 border border-transparent'
+                    : `${styles.muted} hover:opacity-80 border border-transparent`
                 }`}
               >
                 {f.label}
@@ -233,7 +233,7 @@ export default function DomainListView() {
         {/* 域列表 */}
         <div className="flex-1 overflow-y-auto">
           {filteredDomains.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500">
+            <div className={`flex items-center justify-center h-full ${styles.muted}`}>
               <div className="text-center p-4">
                 <Box size={28} className="mx-auto mb-2 opacity-30" />
                 <p className="text-xs">{t("ontology.list.noMatchDomain")}</p>
@@ -249,17 +249,17 @@ export default function DomainListView() {
                 <button
                   key={domain.code}
                   onClick={() => setSelectedDomainCode(domain.code)}
-                  className={`w-full text-left px-4 py-3 border-b ${styles.cardBorder}/50 transition
+                  className={`w-full text-left px-4 py-3 border-b ${styles.cardBorder} transition
                     flex items-start gap-3 ${
                       isSelected
                         ? 'bg-indigo-500/10 border-l-2 border-l-indigo-500'
-                        : `hover:${styles.cardBg}/[0.03] border-l-2 border-l-transparent`
+                        : `${styles.sidebarHoverBg} border-l-2 border-l-transparent`
                     }`}
                 >
                   <span className="text-lg mt-0.5 shrink-0">{icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-white truncate">
+                      <span className={`text-xs font-semibold ${styles.cardText} truncate`}>
                         {domain.name}
                       </span>
                       {domain.status === 'draft' && (
@@ -268,10 +268,10 @@ export default function DomainListView() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">
+                    <p className={`text-[10px] ${styles.muted} font-mono truncate`}>
                       {domain.code}
                     </p>
-                    <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-500">
+                    <div className={`flex items-center gap-3 mt-1.5 text-[10px] ${styles.muted}`}>
                       <span className="flex items-center gap-1">
                         <Box size={10} /> {domain.entityCount}
                       </span>
@@ -294,7 +294,7 @@ export default function DomainListView() {
           <button
             onClick={() => store.fetchKGAndDomains()}
             className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg
-              text-[10px] text-slate-500 hover:text-slate-400 hover:${styles.cardBg}/[0.03] transition`}
+              text-[10px] ${styles.muted} hover:opacity-80 ${styles.sidebarHoverBg} transition`}
           >
             <RefreshCw size={10} className={kgLoading ? 'animate-spin' : ''} />
             {t("ontology.list.refreshData")}
@@ -309,14 +309,14 @@ export default function DomainListView() {
           <div className="flex items-center gap-2.5">
             <Layers size={18} className="text-indigo-400" />
             <div>
-              <h1 className="text-sm font-bold text-white">{t("ontology.list.domainManagement")}</h1>
-              <p className="text-[10px] text-slate-500">{t("ontology.list.selectDomainHint")}</p>
+              <h1 className={`text-sm font-bold ${styles.cardText}`}>{t("ontology.list.domainManagement")}</h1>
+              <p className={`text-[10px] ${styles.muted}`}>{t("ontology.list.selectDomainHint")}</p>
             </div>
           </div>
 
           {/* 排序 */}
           <div className="flex items-center gap-1 text-[10px]">
-            <span className="text-slate-500 mr-1">{t("ontology.list.sortBy")}</span>
+            <span className={`${styles.muted} mr-1`}>{t("ontology.list.sortBy")}</span>
             {([
               { key: 'name' as SortKey, label: t('ontology.list.sortByName') },
               { key: 'entityCount' as SortKey, label: t('ontology.list.sortByEntityCount') },
@@ -328,7 +328,7 @@ export default function DomainListView() {
                 className={`px-2 py-1 rounded transition flex items-center gap-0.5 ${
                   sortKey === s.key
                     ? 'text-indigo-300 bg-indigo-500/10'
-                    : 'text-slate-500 hover:text-slate-400'
+                    : `${styles.muted} hover:opacity-80`
                 }`}
               >
                 {s.label}
@@ -342,7 +342,7 @@ export default function DomainListView() {
 
         {/* 域详情 / 空状态 */}
         {!selectedDomain ? (
-          <div className="flex-1 flex items-center justify-center text-slate-500">
+          <div className={`flex-1 flex items-center justify-center ${styles.muted}`}>
             <div className="text-center">
               <Database size={40} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm">{t("ontology.list.selectLeftDomain")}</p>
@@ -359,8 +359,8 @@ export default function DomainListView() {
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{getDomainIcon(selectedDomain.name)}</span>
                   <div>
-                    <h2 className="text-lg font-bold text-white">{selectedDomain.name}</h2>
-                    <p className="text-xs font-mono text-slate-400">{selectedDomain.code}</p>
+                    <h2 className={`text-lg font-bold ${styles.appText}`}>{selectedDomain.name}</h2>
+                    <p className={`text-xs font-mono ${styles.cardTextMuted}`}>{selectedDomain.code}</p>
                   </div>
                 </div>
                 {/* 状态标签 */}
@@ -370,7 +370,7 @@ export default function DomainListView() {
                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                       : selectedDomain.status === 'draft'
                       ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                      : `${styles.badgeBg} ${styles.cardTextMuted} border ${styles.cardBorder}`
                   }`}
                 >
                   {selectedDomain.status === 'active' ? t('ontology.list.filterActive') : selectedDomain.status === 'draft' ? t('ontology.list.filterDraft') : t('ontology.list.filterInactive')}
@@ -379,28 +379,28 @@ export default function DomainListView() {
 
               {/* 统计数字 */}
               <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className={`${styles.appBg}/50 rounded-lg p-3 text-center border ${styles.cardBorder}/5`}>
+                <div className={`${styles.appBg} rounded-lg p-3 text-center border ${styles.cardBorder}`}>
                   <Box size={14} className="text-indigo-400 mx-auto mb-1" />
-                  <div className="text-lg font-bold text-white">{selectedDomain.entityCount}</div>
-                  <div className="text-[10px] text-slate-500">{t("ontology.designer.entity")}</div>
+                  <div className={`text-lg font-bold ${styles.appText}`}>{selectedDomain.entityCount}</div>
+                  <div className={`text-[10px] ${styles.muted}`}>{t("ontology.designer.entity")}</div>
                 </div>
-                <div className={`${styles.appBg}/50 rounded-lg p-3 text-center border ${styles.cardBorder}/5`}>
+                <div className={`${styles.appBg} rounded-lg p-3 text-center border ${styles.cardBorder}`}>
                   <GitBranch size={14} className="text-emerald-400 mx-auto mb-1" />
-                  <div className="text-lg font-bold text-white">{selectedDomain.relationshipCount}</div>
-                  <div className="text-[10px] text-slate-500">{t("ontology.designer.relationship")}</div>
+                  <div className={`text-lg font-bold ${styles.appText}`}>{selectedDomain.relationshipCount}</div>
+                  <div className={`text-[10px] ${styles.muted}`}>{t("ontology.designer.relationship")}</div>
                 </div>
-                <div className={`${styles.appBg}/50 rounded-lg p-3 text-center border ${styles.cardBorder}/5`}>
+                <div className={`${styles.appBg} rounded-lg p-3 text-center border ${styles.cardBorder}`}>
                   <Tag size={14} className="text-amber-400 mx-auto mb-1" />
-                  <div className="text-lg font-bold text-white">
+                  <div className={`text-lg font-bold ${styles.appText}`}>
                     {(selectedDomain.entities || []).length}
                   </div>
-                  <div className="text-[10px] text-slate-500">{t("ontology.list.entityRef")}</div>
+                  <div className={`text-[10px] ${styles.muted}`}>{t("ontology.list.entityRef")}</div>
                 </div>
               </div>
 
               {/* 描述 */}
               {selectedDomain.description && (
-                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                <p className={`text-xs ${styles.cardTextMuted} mb-4 leading-relaxed`}>
                   {selectedDomain.description}
                 </p>
               )}
@@ -408,8 +408,8 @@ export default function DomainListView() {
               {/* 实体列表预览 */}
               {selectedDomain.entities && selectedDomain.entities.length > 0 && (
                 <div className="mb-4">
-                  <h4 className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-                    <Database size={11} className="text-slate-500" />
+                  <h4 className={`text-xs font-semibold ${styles.sidebarText} mb-2 flex items-center gap-1.5`}>
+                    <Database size={11} className={styles.muted} />
                     {t("ontology.list.entityList")}
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
@@ -417,13 +417,13 @@ export default function DomainListView() {
                       <span
                         key={entityRef}
                         className={`text-[10px] px-2 py-1 rounded-md ${styles.appBg} border ${styles.cardBorder}
-                          text-slate-400 font-mono`}
+                          ${styles.cardTextMuted} font-mono`}
                       >
                         {entityRef}
                       </span>
                     ))}
                     {selectedDomain.entities.length > 15 && (
-                      <span className={`text-[10px] px-2 py-1 rounded-md ${styles.appBg} border ${styles.cardBorder} text-slate-500`}>
+                      <span className={`text-[10px] px-2 py-1 rounded-md ${styles.appBg} border ${styles.cardBorder} ${styles.muted}`}>
                         +{t('ontology.list.more', { count: selectedDomain.entities.length - 15 })}
                       </span>
                     )}
@@ -435,8 +435,8 @@ export default function DomainListView() {
             {/* 域列表网格（快速切换） */}
             {domains.length > 1 && (
               <div>
-                <h4 className="text-xs font-semibold text-slate-300 mb-3 flex items-center gap-1.5">
-                  <Building2 size={11} className="text-slate-500" />
+                <h4 className={`text-xs font-semibold ${styles.sidebarText} mb-3 flex items-center gap-1.5`}>
+                  <Building2 size={11} className={styles.muted} />
                   {t("ontology.list.otherDomains")}
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
@@ -453,11 +453,11 @@ export default function DomainListView() {
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm">{getDomainIcon(domain.name)}</span>
-                          <span className="text-xs font-semibold text-white truncate">
+                          <span className={`text-xs font-semibold ${styles.cardText} truncate`}>
                             {domain.name}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                        <div className={`flex items-center gap-3 text-[10px] ${styles.muted}`}>
                           <span>{t("ontology.list.entityCountSuffix", { count: domain.entityCount })}</span>
                           <span>{t("ontology.list.relCountSuffix", { count: domain.relationshipCount })}</span>
                         </div>
@@ -473,7 +473,7 @@ export default function DomainListView() {
       {/* ═══════ 右侧：快速操作面板 (280px) ═══════ */}
       <div className={`w-[280px] min-w-[220px] border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-y-auto`}>
         <div className={`px-4 py-3.5 border-b ${styles.cardBorder}`}>
-          <h3 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <h3 className={`text-xs font-semibold ${styles.sidebarText} flex items-center gap-1.5`}>
             <Eye size={12} className="text-indigo-400" />
             {t("ontology.list.quickActions")}
           </h3>
@@ -505,53 +505,53 @@ export default function DomainListView() {
           {/* 导出 Schema */}
           <button
             disabled={!selectedDomain}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl
-              bg-slate-500/10 border border-slate-500/20
-              hover:bg-slate-500/20 hover:border-slate-500/30
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl
+              ${styles.appBg} border ${styles.cardBorder}
+              ${styles.sidebarHoverBg}
               disabled:opacity-30 disabled:cursor-not-allowed
-              transition group"
+              transition group`}
           >
-            <div className="p-2 rounded-lg bg-slate-500/10 shrink-0">
-              <Download size={16} className="text-slate-400" />
+            <div className={`p-2 rounded-lg ${styles.appBg} shrink-0`}>
+              <Download size={16} className={styles.muted} />
             </div>
             <div className="text-left">
-              <div className="text-xs font-semibold text-slate-300">{t("ontology.list.exportSchema")}</div>
-              <div className="text-[10px] text-slate-500">{t("ontology.list.exportFormat")}</div>
+              <div className={`text-xs font-semibold ${styles.cardText}`}>{t("ontology.list.exportSchema")}</div>
+              <div className={`text-[10px] ${styles.muted}`}>{t("ontology.list.exportFormat")}</div>
             </div>
           </button>
 
           {/* 域统计 */}
           {selectedDomain && (
             <div className={`mt-4 pt-4 border-t ${styles.cardBorder}`}>
-              <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-3">
+              <h4 className={`text-[10px] font-semibold ${styles.muted} uppercase tracking-wider mb-3`}>
                 {t("ontology.list.domainStats")}
               </h4>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">{t("ontology.list.entityCount")}</span>
-                  <span className="text-white font-mono">{selectedDomain.entityCount}</span>
+                  <span className={styles.muted}>{t("ontology.list.entityCount")}</span>
+                  <span className={`${styles.appText} font-mono`}>{selectedDomain.entityCount}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">{t("ontology.list.relationshipCount")}</span>
-                  <span className="text-white font-mono">{selectedDomain.relationshipCount}</span>
+                  <span className={styles.muted}>{t("ontology.list.relationshipCount")}</span>
+                  <span className={`${styles.appText} font-mono`}>{selectedDomain.relationshipCount}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">{t("ontology.list.status")}</span>
+                  <span className={styles.muted}>{t("ontology.list.status")}</span>
                   <span
                     className={`font-medium ${
                       selectedDomain.status === 'active'
                         ? 'text-emerald-400'
                         : selectedDomain.status === 'draft'
                         ? 'text-amber-400'
-                        : 'text-slate-500'
+                        : styles.muted
                     }`}
                   >
                     {selectedDomain.status === 'active' ? t('ontology.list.filterActive') : selectedDomain.status === 'draft' ? t('ontology.list.filterDraft') : t('ontology.list.filterInactive')}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">{t("ontology.designer.code")}</span>
-                  <span className="text-slate-500 font-mono text-[10px]">{selectedDomain.code}</span>
+                  <span className={styles.muted}>{t("ontology.designer.code")}</span>
+                  <span className={`${styles.muted} font-mono text-[10px]`}>{selectedDomain.code}</span>
                 </div>
               </div>
             </div>
@@ -560,7 +560,7 @@ export default function DomainListView() {
           {/* 帮助提示 */}
           <div className={`mt-auto pt-4 border-t ${styles.cardBorder}`}>
             <div className={`px-3 py-2.5 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>
-              <p className="text-[10px] text-slate-500 leading-relaxed">
+              <p className={`text-[10px] ${styles.muted} leading-relaxed`}>
                 {t("ontology.list.helpTip")}
               </p>
             </div>

@@ -98,27 +98,28 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
         CausalChainResult result = new CausalChainResult();
 
         // ── 第1层：指标自身节点 ──
-        // Wave-6 T-25: 先查 KG 是否存在指标对应节点 — 不存在时返回 metricFound=false，
-        // 让上游按 404 处理（避免在 Reasoner/ReasoningPath 阶段触发 NPE）
+        // PMO-51 T4: KG 指标节点预检 — 不存在时**不再硬终止**，
+        // 降级走规则兜底（弱数据态：低置信度 + rootCause 标注 METRIC_NOT_FOUND）。
         boolean metricFound = false;
         try {
             List<KnowledgeNode> kgStartNodes = knowledgeGraphService.search(request.getMetric());
             metricFound = kgStartNodes != null && !kgStartNodes.isEmpty();
         } catch (Exception e) {
-            log.debug("KG 指标节点预检失败（降级为未找到）: {}", e.getMessage());
+            log.debug("KG 指标节点预检失败（视为未找到，走规则兜底）: {}", e.getMessage());
         }
-        if (!metricFound) {
-            log.info("指标 '{}' 在 KG 中不存在，cascade=0 终止诊断", request.getMetric());
-            result.setMetricFound(false);
-            return result;
-        }
-        result.setMetricFound(true);
+        result.setMetricFound(metricFound);
 
         String metricDesc = request.getMetric() + (request.getDeviation() != 0
                 ? String.format(" (%.0f%%)", request.getDeviation())
                 : "");
-        CausalChainNode rootNode = new CausalChainNode(1, metricDesc, 1.0, "metric", request.getDomain());
+        // 弱数据态：标注为低置信度节点，KG 无覆盖不影响后续规则兜底
+        CausalChainNode rootNode = metricFound
+                ? new CausalChainNode(1, metricDesc, 1.0, "metric", request.getDomain())
+                : new CausalChainNode(1, metricDesc + " (KG 未覆盖，降级)", 0.4, "metric", request.getDomain());
         result.getCausalChain().add(rootNode);
+        if (!metricFound) {
+            log.warn("指标 '{}' 在 KG 中未覆盖，启用规则兜底降级诊断 (confidence=0.4)", request.getMetric());
+        }
 
         int maxDepth = Math.max(3, request.getMaxDepth()); // 至少遍历3层
 

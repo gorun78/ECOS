@@ -155,7 +155,7 @@ export default function VectorIndexTab({
               </span>
               <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>NODE v20.10.0</span>
             </div>
-            <div className="font-mono text-[9.5px] leading-relaxed h-52 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
+            <div className="font-mono text-[9.5px] leading-relaxed h-52 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-[#1E293B]">
               {syncLogs.length > 0 ? (
                 syncLogs.map((log, idx) => {
                   let textClass = `${styles.cardTextMuted}`;

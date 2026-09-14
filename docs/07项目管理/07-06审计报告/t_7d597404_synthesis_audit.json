@@ -1,0 +1,46 @@
+{
+  "task_id": "t_7d597404",
+  "phase": "synthesizer",
+  "batch": "PMO-41",
+  "compliance_status": "PASS",
+  "audit_time": "2026-09-06T20:36:00+08:00",
+  "workflow_mode": "L1-variant",
+  "swarm": {
+    "root": "t_8fe72be2",
+    "worker": "t_448ed2bb",
+    "verifier": "t_d1ad3bca",
+    "synthesizer": "t_7d597404"
+  },
+  "gates": {
+    "verifier_deliverable_allowed": true,
+    "endpoint_grep_4files": "pass (0 code-level truly wrong)",
+    "lint": {"exit": 0, "reverified_by": "verifier (independent) + synthesizer (inherit)"},
+    "backend_controller_alignment": "pass (T1/T2/T3/T4 all confirmed against live controllers)",
+    "boundary_check": "pass (PMO-43 files not touched)"
+  },
+  "audit_report": {
+    "path": "/home/guorongxiao/ECOS/docs/07项目管理/07-06审计报告/t_7d597404_synthesis_audit.md",
+    "sha256": "2e03bf9cc81a4604a0d144f24253286c5e7baac65efa157a86602390451869f5",
+    "bytes": 2646
+  },
+  "deliverable_report": {
+    "path": "/home/guorongxiao/ECOS/docs/PMO/PMO-41-前端自承端点路径修正-交付报告.md",
+    "sha256": "05d1ca913fb9db6ef75f4ee1ae149b3d17e319a3357b25ceaed5e6957fac24c8",
+    "bytes": 3624
+  },
+  "changed_files": [
+    "ecos_frontend/src/services/ontologyApi.ts",
+    "ecos_frontend/src/services/agentConfig.ts",
+    "ecos_frontend/src/pages/sql-query-console/api.ts",
+    "ecos_frontend/src/pages/aiworkbench/api.ts"
+  ],
+  "signature_deviation_recorded": "T4: spec asked JSDoc comment + alias retention; worker wrote main path /api/v1/aip/agent-metrics + field alignment. Verifier confirmed it aligns with backend AgentMetricsController @RequestMapping. Direction = 'fix to correct', not 'cheap alias'. Accepted.",
+  "out_of_scope": [
+    "PMO-43: services/aiworkbenchApi.ts authHeaders (6-file scope of PMO-43, not PMO-41)",
+    "PMO-39 T3: fetchVersionDiff live endpoint deferred (spec row 5)",
+    "src/api.ts:59 lint error = PMO-43 WIP, out of bag"
+  ],
+  "worker_session_id": "20260906_201245_8a107d",
+  "verifier_session_id": "20260906_201001_pmo41verifier",
+  "synthesizer_added_evidence": "deliverable_report sha256 + byte count independently re-verified by synthesizer (not just inherited from verifier metadata)"
+}

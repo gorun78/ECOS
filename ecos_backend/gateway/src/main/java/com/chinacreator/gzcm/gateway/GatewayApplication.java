@@ -50,16 +50,36 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.git\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.datapermission\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.compliance\\..*"),
+    // 2026-09-12: gateway 与 workspace 同名 Bean 模块级排除 — gateway 是 authority (ITaskManagementService / alerts 等),
+    // workspace 包中所有 controller stub 与 gateway 同名冲突 (alertController/engineTaskController/taskController/...)
+    // 完整排除 workspace.controller 包 (workspace 端独立 :18090 已扫, gateway 无需重复)
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.workspace\\.controller\\..*"),
+    // workspace.twin.* 同样与 gateway.twin.* 同名冲突 (digitalTwinService 等) — workspace 端独立运行, 整包排除
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.workspace\\.twin\\..*"),
+    // workspace.service.* 中的 PgObjectStorageService 已在 ASSIGNABLE_TYPE 排除, 这里不重复
+    // 如需追加更宽的包级排除 (workspace 端业务 service), 在此追加
     // A+5: runtime.core.config.dao.ConfigDao 源码已删（sysman版本保留，无冲突）
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
         com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
         // 数据引擎已接管，旧 datanet 模块已删除（A+7c）
-        // 本体引擎已接管（阶段3），排除buszhi侧副本
-        com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class,
+        // PMO-57 T2 (2026-09-13): ontology 侧 workflow Controller 副本已物理删除，
+        // workflow 端点单点收敛至 buszhi 侧 WorkflowController（/api/v1/ecos/workflows），
+        // 原"排除 buszhi 侧副本让 ontology 副本存活"条目随之移除，
+        // gateway fat-JAR 态恢复 buszhi 侧 Bean 加载（追踪: docs/04-本体/PMO-57）。
         com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController.class,
         com.chinacreator.gzcm.engine.ai.controller.CognitiveController.class,
+        // PMO-55 E-A 修复 (2026-09-12)：OagForwardController 已在 gateway 正式接管
+        // /api/v1/oag/**（bd07da4 refactor），engine 侧 OagController 同路径
+        // /api/v1/oag/chat/stream 导致 Ambiguous mapping。排除 engine 副本，
+        // 统一走 gateway 转发（与 CognitiveController 排除模式对齐）。
+        com.chinacreator.gzcm.engine.ai.oag.OagController.class,
+        // PMO-55 E-A 修复 (2026-09-12)：cognitive2/CognitiveConfigController 是
+        // PMO-51 引入的权威认知配置端点（含 DTO + PUT），engine/ai 侧同名
+        // CognitiveConfigController 只处理 GET，两者都映射 GET /api/v1/cognitive/config
+        // 导致 Ambiguous mapping。排除 ai 侧简化版，保留 cognitive2 完整版。
+        com.chinacreator.gzcm.engine.ai.controller.CognitiveConfigController.class,
         // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
         // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
         com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
@@ -82,10 +102,20 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         //   - worldmodel services: OntologyKgSync/PgGraph/Neo4jGraph (迁到 ontology-engine)
         // E3-T2: gateway PgObjectStorageService是stub, workspace版是权威(@Profile("standard")), 删gateway副本避免Bean名冲突
         com.chinacreator.gzcm.gateway.service.PgObjectStorageService.class,
+        // 2026-09-12: gateway.controller.AlertController 已删除 (源码 stub) — 保留 workspace 版本作为唯一 AlertController
+        // gateway.controller.EngineTaskController 保留（权威 ITaskManagementService）, exclude workspace stub engineTaskController
+        com.chinacreator.gzcm.workspace.controller.EngineTaskController.class,
         // E3: sysman-boot GlobalExceptionHandler与gateway版本冲突,排除sysman-boot副本
         com.chinacreator.gzcm.sysman.boot.handler.GlobalExceptionHandler.class,
         // E3: 排除SysManApplication——它有自己的@ComponentScan会注册冲突bean
         com.chinacreator.gzcm.sysman.boot.SysManApplication.class,
+        // PMO-57 T5 (2026-09-13): CognitiveEngineOpenHealthController (PMO-55 E-C 新副本)
+        // 与 ai-engine AiEngineStatusController 同占 GET /api/v1/engine/cognitive/health
+        // 导致 Ambiguous mapping。AiEngineStatusController 整类承载 5 端点 (health/config/
+        // status/start/stop)，历史由它服务该 prefix，排除它会误杀 4 个 ai 专属端点；
+        // 故保 ai 副本、排 cognitive 新副本 (0 行为变化)。cognitive 开放 health 功能
+        // 仅在 cognitive standalone 态 (:18089) 生效。裁定原则: gateway 行为零变化优先。
+        com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineOpenHealthController.class,
     })
 })
 @MapperScan({
@@ -97,6 +127,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository",
     "com.chinacreator.gzcm.engine.data.repository",
+    // PMO-48-A: DqRuleMapper 在 data.quality.mapper，纳入扫描否则 bean 缺失（质量包下任意 mapper 包）
+    "com.chinacreator.gzcm.engine.data.quality.**.mapper",
+    "com.chinacreator.gzcm.engine.data.quality.mapper",
     "com.chinacreator.gzcm.engine.kb.repository"
 })
 public class GatewayApplication {

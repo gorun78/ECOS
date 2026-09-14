@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { Plus, X } from "lucide-react";
+import { useTheme } from "../../components/ThemeContext";
 
 interface Props {
   newEntity: { code: string; name: string; description: string; entityType: string };
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function AddEntityModal({ newEntity, setNewEntity, onClose, onCreate }: Props) {
+  const { styles } = useTheme();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-xl shadow-2xl w-full sm:w-[400px] animate-in zoom-in-95 mx-4 sm:mx-auto">
@@ -19,7 +21,7 @@ export default function AddEntityModal({ newEntity, setNewEntity, onClose, onCre
           <h3 className="text-sm font-bold flex items-center gap-2">
             <Plus className="w-4 h-4 text-indigo-500" /> 新建实体
           </h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
+          <button onClick={onClose}><X className={`w-4 h-4 ${styles.cardTextMuted}`} /></button>
         </div>
         <div className="p-4 space-y-3">
           <input value={newEntity.code} onChange={e => setNewEntity(p => ({...p, code: e.target.value}))}
@@ -35,7 +37,7 @@ export default function AddEntityModal({ newEntity, setNewEntity, onClose, onCre
           </select>
         </div>
         <div className="p-4 border-t flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-xs bg-slate-100 rounded-lg">取消</button>
+          <button onClick={onClose} className={`px-4 py-2 text-xs ${styles.appBg} ${styles.cardTextMuted} rounded-lg`}>取消</button>
           <button onClick={onCreate} className="px-4 py-2 text-xs bg-indigo-500 text-white rounded-lg hover:bg-indigo-600">创建</button>
         </div>
       </div>

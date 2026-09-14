@@ -48,6 +48,10 @@ export interface ThemeStyles {
   infoBorder: string;
   /** Overlay backdrop for modals/drawers */
   overlayBg: string;
+  /** Horizontal divider — used by Login / AIPKnowledgeView */
+  divider: string;
+  /** Primary text (aliased default highlight text) — used by Login / AIPKnowledgeView etc. */
+  text: string;
   [key: string]: string;
 }
 
@@ -94,7 +98,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBg: "bg-blue-50",
     infoText: "text-blue-700",
     infoBorder: "border-blue-200",
-    overlayBg: "bg-slate-900/40"
+    overlayBg: "bg-slate-900/40",
+    divider: "border-[#E2E8F0]",
+    text: "text-slate-800"
   },
   "deep-space": {
     appBg: "bg-[#0B0F19]",
@@ -132,7 +138,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBg: "bg-blue-500/10",
     infoText: "text-blue-400",
     infoBorder: "border-blue-500/30",
-    overlayBg: "bg-slate-950/50"
+    overlayBg: "bg-slate-950/50",
+    divider: "border-[#1E293B]",
+    text: "text-slate-100"
   },
   "cyber-terminal": {
     appBg: "bg-[#020202]",
@@ -170,7 +178,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBg: "bg-cyan-500/10",
     infoText: "text-cyan-400",
     infoBorder: "border-cyan-500/40",
-    overlayBg: "bg-black/60"
+    overlayBg: "bg-black/60",
+    divider: "border-emerald-650/50",
+    text: "text-emerald-500"
   },
   "royal-purple": {
     appBg: "bg-[#0F0C1B]",
@@ -208,7 +218,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBg: "bg-blue-500/10",
     infoText: "text-blue-400",
     infoBorder: "border-blue-500/30",
-    overlayBg: "bg-purple-950/50"
+    overlayBg: "bg-purple-950/50",
+    divider: "border-purple-900/40",
+    text: "text-purple-100"
   }
 };
 

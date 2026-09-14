@@ -21,15 +21,12 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- dccheng-api/impl + worldmodel-impl: 阶段 5 已吸收 —
-             dccheng→自身 (cognitive 内部吸收), worldmodel→buszhi
-             (源码已 0 import com.chinacreator.gzcm.{dccheng,worldmodel},
-              pom 只是历史残留 dependency)。Wave-10 CI root-cause. -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>buszhi-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- PMO-57 T3 (2026-09-13): 反向依赖断链 — 删除 buszhi-impl 依赖。
+             原历史残留（阶段5 worldmodel→buszhi 已吸收，源码 0 import），
+             实际 import 面仅 workflow 双 Controller（workflow 业务按架构铁律
+             §0.3.1 归 buszhi 服务层），随 PMO-57 T2 物理删除后本模块
+             0 处 buszhi import，引擎层不再引用任何服务层 artifact。
+             workflow 端点单点 = buszhi 侧 /api/v1/ecos/workflows。 -->
 
         <!-- Spring Boot Web -->
         <dependency>
@@ -43,7 +40,7 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
-        <!-- Jackson -->
+        <!-- JSON 序列化/反序列化（parse 事件的 nodes/edges 存储） -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -53,6 +50,32 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- JSqlParser 4.9 — 本体血缘 SQL 解析（PMO-52 T2: 自实现字段级解析，
+             版本与 data-engine-impl 对齐。架构铁律 2.1 不引用其他 engine-impl 类，
+             故该模块对 data-engine-api 的血缘依赖不再需要，予以移除） -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.9</version>
+        </dependency>
+
+        <!-- Lombok (SQLLineageRequest / LineageParseResponse 等 DTO 使用 @Data，
+             跟随 data-engine-impl 版本 1.18.36 与 Spring Boot 3.2.2 BOM 对齐) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Runtime Event (统一事件总线 — EventBusService 审计走 Kafka ecos.audit，
+             符合架构铁律 §2.4 #5 + §2.5 公共底座，禁止引擎内自建 KafkaTemplate) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-event</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
         <!-- SysMan (system config, etc.) -->

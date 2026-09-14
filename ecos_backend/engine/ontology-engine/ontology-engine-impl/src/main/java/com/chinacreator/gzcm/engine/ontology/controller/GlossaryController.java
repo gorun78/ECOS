@@ -1,16 +1,17 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyGlossarySaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyGlossaryVO;
 import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryEntity;
 import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryRepository;
 
@@ -25,6 +26,10 @@ import com.chinacreator.gzcm.engine.ontology.glossary.GlossaryRepository;
  * </ul>
  *
  * 状态流转: DRAFT → REVIEW → PUBLISHED → DEPRECATED
+ *
+ * <p>T16-3 (2026-09-13)：入参 Map → {@link OntologyGlossarySaveDTO}，
+ * 返回 Map → {@link OntologyGlossaryVO}。{@code root()} 端点保留原
+ * 自描述（硬编码端点路径 Map，非数据载体，豁免）。
  */
 @RestController
 @RequestMapping("/api/v1/ontology/glossary")
@@ -40,9 +45,12 @@ public class GlossaryController {
 
     // ═══════════════ 0. GET 根端点 ══════════════════════
 
+    /**
+     * 根端点自描述（硬编码端点路径，非业务数据载体，豁免强类型）。
+     */
     @GetMapping
-    public ApiResponse<Map<String, Object>> root() {
-        Map<String, Object> info = new LinkedHashMap<>();
+    public ApiResponse<java.util.Map<String, Object>> root() {
+        java.util.Map<String, Object> info = new java.util.LinkedHashMap<>();
         info.put("endpoint", "/api/v1/ontology/glossary");
         info.put("terms", "/api/v1/ontology/glossary/terms");
         info.put("description", "术语库管理 API");
@@ -51,45 +59,40 @@ public class GlossaryController {
 
     // ═══════════════ 1. GET 术语列表 ═══════════════════
 
+    /** 术语列表（强类型 VO）。 */
     @GetMapping("/terms")
-    public ApiResponse<List<Map<String, Object>>> listTerms(
+    public ApiResponse<List<OntologyGlossaryVO>> listTerms(
             @RequestParam(required = false) String domain,
             @RequestParam(required = false) String status) {
-
         List<GlossaryEntity> list = repository.findAll(domain, status);
-        List<Map<String, Object>> result = list.stream()
-                .map(this::toMap)
-                .toList();
-        return ApiResponse.success(result);
+        return ApiResponse.success(list.stream().map(this::toVO).collect(Collectors.toList()));
     }
 
     // ═══════════════ 2. POST 创建术语 ═══════════════════
 
+    /** 创建术语 — 接收 {@link OntologyGlossarySaveDTO}，返回 VO。 */
     @PostMapping("/terms")
-    public ApiResponse<Map<String, Object>> createTerm(@RequestBody Map<String, Object> body) {
+    public ApiResponse<OntologyGlossaryVO> createTerm(@RequestBody OntologyGlossarySaveDTO dto) {
         GlossaryEntity entity = new GlossaryEntity();
-        entity.setCode(getString(body, "code"));
-        entity.setName(getString(body, "name"));
-        entity.setDefinition(getString(body, "definition"));
-        entity.setDomain(getString(body, "domain"));
-        entity.setOwner(getString(body, "owner"));
+        entity.setCode(dto.getCode());
+        entity.setName(dto.getName());
+        entity.setDefinition(dto.getDefinition());
+        entity.setDomain(dto.getDomain());
+        entity.setOwner(dto.getOwner());
         entity.setStatus("DRAFT");
-        entity.setCreatedBy(getString(body, "createdBy"));
+        entity.setCreatedBy(dto.getCreatedBy());
 
         repository.insert(entity);
         log.info("Glossary term created: {} [{}]", entity.getId(), entity.getName());
-
-        // Read back to get the auto-generated id
-        // Since we don't have generated-key retrieval, we query by the last inserted
-        // A more robust approach would use KeyHolder, but for MVP this is sufficient.
-        return ApiResponse.success(toMap(entity));
+        return ApiResponse.success(toVO(entity));
     }
 
     // ═══════════════ 3. PUT 更新术语（含状态流转） ═════
 
+    /** 更新术语 — 接收 {@link OntologyGlossarySaveDTO}，按状态流转，返回 VO。 */
     @PutMapping("/terms/{id}")
-    public ApiResponse<Map<String, Object>> updateTerm(@PathVariable Long id,
-                                                        @RequestBody Map<String, Object> body) {
+    public ApiResponse<OntologyGlossaryVO> updateTerm(@PathVariable Long id,
+                                                        @RequestBody OntologyGlossarySaveDTO dto) {
         Optional<GlossaryEntity> existing = repository.findById(id);
         if (existing.isEmpty()) {
             return ApiResponse.notFound("术语 " + id + " 不存在");
@@ -97,22 +100,16 @@ public class GlossaryController {
 
         GlossaryEntity entity = existing.get();
 
-        // 按字段更新
-        String code = getString(body, "code");
-        if (code != null) entity.setCode(code);
-        String name = getString(body, "name");
-        if (name != null) entity.setName(name);
-        String definition = getString(body, "definition");
-        if (definition != null) entity.setDefinition(definition);
-        String domain = getString(body, "domain");
-        if (domain != null) entity.setDomain(domain);
-        String owner = getString(body, "owner");
-        if (owner != null) entity.setOwner(owner);
-        String createdBy = getString(body, "createdBy");
-        if (createdBy != null) entity.setCreatedBy(createdBy);
+        // 按字段映射（null 表不动）
+        if (dto.getCode() != null) entity.setCode(dto.getCode());
+        if (dto.getName() != null) entity.setName(dto.getName());
+        if (dto.getDefinition() != null) entity.setDefinition(dto.getDefinition());
+        if (dto.getDomain() != null) entity.setDomain(dto.getDomain());
+        if (dto.getOwner() != null) entity.setOwner(dto.getOwner());
+        if (dto.getCreatedBy() != null) entity.setCreatedBy(dto.getCreatedBy());
 
         // 状态流转 — DRAFT→REVIEW→PUBLISHED→DEPRECATED
-        String newStatus = getString(body, "status");
+        String newStatus = dto.getStatus();
         if (newStatus != null && !newStatus.equalsIgnoreCase(entity.getStatus())) {
             if (!isValidTransition(entity.getStatus(), newStatus)) {
                 return ApiResponse.badRequest(
@@ -123,11 +120,12 @@ public class GlossaryController {
 
         repository.update(entity);
         log.info("Glossary term updated: {} → status={}", id, entity.getStatus());
-        return ApiResponse.success(toMap(entity));
+        return ApiResponse.success(toVO(entity));
     }
 
     // ═══════════════ 4. DELETE 删除术语 ═════════════════
 
+    /** 删除术语。 */
     @DeleteMapping("/terms/{id}")
     public ApiResponse<String> deleteTerm(@PathVariable Long id) {
         int affected = repository.deleteById(id);
@@ -140,11 +138,7 @@ public class GlossaryController {
 
     // ═══════════════ 工具方法 ═══════════════════════════
 
-    private String getString(Map<String, Object> body, String key) {
-        Object val = body.get(key);
-        return val != null ? val.toString() : null;
-    }
-
+    /** 状态流转合法性判定 — DRAFT→REVIEW→PUBLISHED→DEPRECATED，DEPRECATED 可回 DRAFT。 */
     private boolean isValidTransition(String from, String to) {
         String upperFrom = from.toUpperCase();
         String upperTo = to.toUpperCase();
@@ -163,18 +157,19 @@ public class GlossaryController {
         }
     }
 
-    private Map<String, Object> toMap(GlossaryEntity entity) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", entity.getId());
-        map.put("code", entity.getCode());
-        map.put("name", entity.getName());
-        map.put("definition", entity.getDefinition());
-        map.put("domain", entity.getDomain());
-        map.put("owner", entity.getOwner());
-        map.put("status", entity.getStatus());
-        map.put("createdBy", entity.getCreatedBy());
-        map.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-        map.put("updatedAt", entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
-        return map;
+    /** GlossaryEntity → VO 映射（时间字段 LocalDateTime → ISO 字符串）。 */
+    private OntologyGlossaryVO toVO(GlossaryEntity entity) {
+        OntologyGlossaryVO vo = new OntologyGlossaryVO();
+        vo.setId(entity.getId());
+        vo.setCode(entity.getCode());
+        vo.setName(entity.getName());
+        vo.setDefinition(entity.getDefinition());
+        vo.setDomain(entity.getDomain());
+        vo.setOwner(entity.getOwner());
+        vo.setStatus(entity.getStatus());
+        vo.setCreatedBy(entity.getCreatedBy());
+        vo.setCreatedAt(entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
+        return vo;
     }
 }

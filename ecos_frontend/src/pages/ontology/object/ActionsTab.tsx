@@ -43,7 +43,7 @@ export default function ActionsTab({
                   </div>
                 </div>
                 <p className={`text-[10px] ${styles.cardTextMuted}`}>{action.description}</p>
-                <div className={`flex items-center gap-2 font-mono text-[9px] ${styles.muted} ${styles.appBg} p-1.5 rounded border border-slate-100`}>
+                <div className={`flex items-center gap-2 font-mono text-[9px] ${styles.muted} ${styles.appBg} p-1.5 rounded border ${styles.divider}`}>
                   <div>
                     <strong>{t('ow.label.params')}</strong> {action.parameters.length} | <strong>{t('ow.label.sideEffects')}</strong> {action.rules.length} {t('ow.label.countUnit')}
                   </div>

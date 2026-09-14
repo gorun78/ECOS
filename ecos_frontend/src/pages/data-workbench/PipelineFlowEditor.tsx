@@ -21,7 +21,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Play, Save, GitBranch, Trash2, ArrowLeft,
+  Play, Save, GitBranch, Trash2, ArrowLeft, Bolt,
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
@@ -29,12 +29,18 @@ import { useLanguage } from '../../components/LanguageContext';
 // ─── Types (extracted) ─────────────────────────────────────
 import type { NodeConfig, PipelineFlowEditorProps, PipelineSaveNode, PipelineSaveEdge } from './pipeline-editor/types';
 import type { PipelineNode } from './types';
+import type { Breakpoint } from './pipelineDebugApi';
 
 // ─── Extracted sub-components ──────────────────────────────
 import NodePalette from './pipeline-editor/NodePalette';
 import FlowCanvas from './pipeline-editor/FlowCanvas';
 import PropertyPanel from './pipeline-editor/PropertyPanel';
 import Toast from './pipeline-editor/Toast';
+import DebugPanel from './pipeline-editor/DebugPanel';
+import type { DebugState } from './pipeline-editor/DebugPanel';
+import { runPreFlightCheck } from './pipeline-editor/pipelineValidation';
+import MonitorPanel from './pipeline-editor/MonitorPanel';
+import GitVersionPanel from './pipeline-editor/GitVersionPanel';
 
 // ─── Helpers: ReactFlow ↔ backend PipelineNode conversion ──
 
@@ -91,6 +97,44 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<unknown>(null);
+  // Wave 3 (lower) T2: local pre-check failures — drives red borders on
+  // the canvas + toast messages on save/execute.
+  const [invalidNodeIds, setInvalidNodeIds] = useState<Set<string>>(new Set());
+  // Wave 3 (lower) T3: breakpoint + debug-session state. The session itself
+  // is owned by the backend in Wave3-upper; this placeholder drives the
+  // UI React-side (red dots on canvas, control-bar enable/disable).
+  const [breakpoints, setBreakpoints] = useState<Breakpoint[]>([]);
+  const [debugState, setDebugState] = useState<DebugState>('idle');
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  // PMO-52 T3b: Git Version History drawer state — null = unchecked, true = open,
+  // false = explicitly closed by user. When !editingPipeline?.id the GitBranch
+  // button is disabled with a "save first" tooltip, not the drawer.
+  const [gitVersionOpen, setGitVersionOpen] = useState(false);
+  const breakpointSeq = useRef(0);
+
+  const breakpointNodeIds = React.useMemo(
+    () => new Set(breakpoints.filter((b) => b.enabled).map((b) => b.nodeId)),
+    [breakpoints]
+  );
+
+  // ── Wave 3 (lower) T3: breakpoint ops (idempotent add/remove/toggle) ──
+  const addBreakpoint = useCallback((nodeId: string) => {
+    setBreakpoints((prev) =>
+      prev.some((b) => b.nodeId === nodeId)
+        ? prev
+        : [...prev, { id: `bp-${Date.now()}-${++breakpointSeq.current}`, nodeId, enabled: true }]
+    );
+  }, []);
+  const removeBreakpoint = useCallback((id: string) => {
+    setBreakpoints((prev) => prev.filter((b) => b.id !== id));
+  }, []);
+  const toggleBreakpoint = useCallback((id: string, enabled: boolean) => {
+    setBreakpoints((prev) => prev.map((b) => (b.id === id ? { ...b, enabled } : b)));
+  }, []);
+  const updateBreakpointCondition = useCallback((id: string, condition: string) => {
+    setBreakpoints((prev) => prev.map((b) => (b.id === id ? { ...b, condition } : b)));
+  }, []);
 
   // ── Toast helper ──
   const showLocalToast = useCallback(
@@ -102,10 +146,113 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
     [showToast]
   );
 
-  // ── Sync pipelineName when editingPipeline changes ──
+  // ── Wave 3 (lower) T3: debug control handlers — call the API when a
+  // session id is known, otherwise fall back to a local-only state change
+  // (the back-end endpoints land in Wave3-upper; UI stays usable regardless).
+  const ensureSession = useCallback(async (): Promise<string> => {
+    if (sessionId) return sessionId;
+    const jobSeq = ++breakpointSeq.current;
+    const url = `local-dbg-${Date.now()}-${jobSeq}`;
+    setSessionId(url);
+    return url;
+  }, [sessionId]);
+  const handleDebugStart = useCallback(async () => {
+    if (breakpoints.length === 0) {
+      showLocalToast('error', t('dw.pipeline.debug.startDisabled'));
+      return;
+    }
+    try {
+      const { startDebugSession } = await import('./pipelineDebugApi');
+      const adhocNodes = nodes.map((n) => {
+        const cfg = n.data as unknown as { nodeType?: string; config?: Record<string, unknown> };
+        const typeRaw = (cfg?.nodeType as string | number | undefined) ?? n.type ?? 'TRANSFORM_SQL';
+        return {
+          nodeId: n.id,
+          type: typeof typeRaw === 'string' ? typeRaw : String(typeRaw),
+          config: (cfg?.config || {}) as Record<string, unknown>,
+          dependsOn: edges.filter((e) => e.target === n.id).map((e) => e.source),
+        };
+      });
+      const snap = await startDebugSession({
+        definitionId: editingPipeline?.id,
+        definition: !editingPipeline?.id
+          ? {
+              name: pipelineName,
+              nodes: adhocNodes,
+            }
+          : undefined,
+        breakpoints: breakpoints.map((b) => ({ nodeId: b.nodeId, condition: b.condition })),
+      });
+      if (snap?.sessionId) {
+        setSessionId(snap.sessionId);
+        setDebugState('running');
+        return;
+      }
+    } catch (e) {
+      console.warn('[pipeline-debug] startDebugSession (placeholder) failed:', e);
+    }
+    // 后端不可达时退化为本地占位（保持 UI 可用）
+    const id = (await ensureSession()) || 'local-dbg';
+    setSessionId(id);
+    setDebugState('running');
+  }, [breakpoints.length, ensureSession, showLocalToast, t, nodes, edges, editingPipeline?.id, pipelineName]);
+  const handleDebugStepOver = useCallback(async () => {
+    if (debugState !== 'paused' && debugState !== 'running') return;
+    if (!sessionId) return;
+    try {
+      const { stepDebugSession } = await import('./pipelineDebugApi');
+      await stepDebugSession(sessionId);
+    } catch (e) {
+      console.warn('[pipeline-debug] stepDebugSession failed:', e);
+    }
+    setDebugState('running');
+  }, [debugState, sessionId]);
+  const handleDebugContinue = useCallback(async () => {
+    if (debugState !== 'paused' || !sessionId) return;
+    try {
+      const { continueDebugSession } = await import('./pipelineDebugApi');
+      await continueDebugSession(sessionId);
+    } catch (e) {
+      console.warn('[pipeline-debug] continueDebugSession (placeholder) failed:', e);
+    }
+    setDebugState('running');
+  }, [debugState, sessionId]);
+  const handleDebugStop = useCallback(async () => {
+    if (debugState === 'idle') return;
+    if (sessionId) {
+      try {
+        const { stopDebugSession } = await import('./pipelineDebugApi');
+        await stopDebugSession(sessionId);
+      } catch (e) {
+        console.warn('[pipeline-debug] stopDebugSession (placeholder) failed:', e);
+      }
+    }
+    setDebugState('idle');
+    setSessionId(null);
+    setNodes((nds) => nds.map((n) => ({
+      ...n,
+      data: { ...(n.data as Record<string, unknown>), nodeStatus: 'idle' },
+    })));
+  }, [debugState, sessionId, setNodes]);
+  const handleDebugReset = useCallback(() => {
+    setBreakpoints([]);
+    setDebugState('idle');
+    setSessionId(null);
+    setInvalidNodeIds(new Set());
+    setNodes((nds) => nds.map((n) => ({
+      ...n,
+      data: { ...(n.data as Record<string, unknown>), nodeStatus: 'idle' },
+    })));
+  }, [setNodes]);
+
+  // ── Sync pipelineName when the editing-pipeline identity changes ──
+  // Wave 3 (lower) 缺陷③: previously guarded by `if (editingPipeline?.name)`
+  // so `editingPipeline` switching to `null` (New) left the old name in the
+  // input field. Now we reset to the placeholder when no pipeline is selected.
   useEffect(() => {
-    if (editingPipeline?.name) setPipelineName(editingPipeline.name);
-  }, [editingPipeline]);
+    const displayName = editingPipeline?.name || t('dw.pipeline.editor.defaultName');
+    setPipelineName(displayName);
+  }, [editingPipeline?.id, editingPipeline?.name, t]);
 
   // ── Load editingPipeline.nodes → canvas (T3) ──
   // Reconstruct ReactFlow nodes/edges from the backend PipelineNode[].
@@ -252,12 +399,57 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
     showLocalToast('info', t('dw.pipeline.editor.canvasCleared'));
   }, [nodes, edges, setNodes, setEdges, showLocalToast, t]);
 
+  // ── Wave 3 (lower) T2: pre-flight validation (invalid fields, DAG cycle,
+  // source→sink reachability) ──
+  // Failures mark the offending node IDs in `invalidNodeIds` (canvas recolors
+  // them via FlowCanvas's `danger` prop), and we toast a friendly summary.
+  const runValidation = useCallback((): boolean => {
+    const result = runPreFlightCheck(nodes, edges.map((e) => ({ source: e.source, target: e.target })));
+    if (result.ok) {
+      setInvalidNodeIds(new Set());
+      return true;
+    }
+    setInvalidNodeIds(result.invalidNodeIds);
+    // Localized summary: prefer the first issue type to keep it short.
+    const cycle = result.issues.find((i) => i.key === 'cycle');
+    const orphan = result.issues.find((i) => i.key === 'reachability');
+    const missing = result.issues.filter((i) => i.key === 'missingConfig');
+    const missingCount = missing.length;
+    let msg = '';
+    if (missingCount > 0) {
+      msg = t('dw.pipeline.validation.missingConfigMany', { n: missingCount });
+      const first = missing[0];
+      const fieldName = t(`dw.pipeline.validation.field.${first.reason}`);
+      msg += ` (${fieldName}: ${first.nodeId.slice(0, 12)}…)`;
+    } else if (cycle) {
+      msg = t('dw.pipeline.validation.cycle', { n: result.invalidNodeIds.size });
+    } else if (orphan) {
+      msg = t('dw.pipeline.validation.orphaned', { n: result.invalidNodeIds.size });
+    } else {
+      msg = t('dw.pipeline.editor.canvasEmpty');
+    }
+    showLocalToast('error', msg);
+    return false;
+  }, [nodes, edges, t, showLocalToast]);
+
+  // ── PMO-52 T3b: GitVersionPanel restore stub — real rollback endpoint lands
+  // in a follow-up wave (T1 backend returns history; this button only marks
+  // intent so a reviewer can trace wire-up). The handler must keep the panel
+  // open (refetch happens via GitVersionPanel's refresh callback). ──
+  const handleGitVersionRestore = useCallback(
+    (ref: string): void => {
+      showLocalToast('info', t('dw.pipeline.git.restoreBacked'));
+    },
+    [showLocalToast, t]
+  );
+
   // ── Save (T3): convert ReactFlow nodes/edges → backend PipelineNode shape ──
   const handleSave = useCallback(() => {
     if (!pipelineName.trim()) {
       showLocalToast('error', t('dw.pipeline.editor.nameRequired'));
       return;
     }
+    if (!runValidation()) return;
     const saveNodes: PipelineSaveNode[] = nodes.map((n) => {
       const cfg = n.data as unknown as NodeConfig;
       return {
@@ -278,7 +470,7 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       computeEngine,
     });
     showLocalToast('success', t('dw.pipeline.editor.saved'));
-  }, [pipelineName, nodes, edges, computeEngine, onSave, showLocalToast, t, editingPipeline?.id]);
+  }, [pipelineName, nodes, edges, computeEngine, onSave, showLocalToast, t, editingPipeline?.id, runValidation]);
 
   // ── Execute ──
   const handleExecute = useCallback(() => {
@@ -286,12 +478,13 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       showLocalToast('error', t('dw.pipeline.editor.canvasEmpty'));
       return;
     }
+    if (!runValidation()) return;
     setNodes((nds) =>
       nds.map((n) => ({ ...n, data: { ...(n.data as Record<string, unknown>), nodeStatus: 'running' } }))
     );
     onExecute(editingPipeline?.id || pipelineName.trim() || 'untitled');
     showLocalToast('info', t('dw.pipeline.editor.executeTriggered'));
-  }, [nodes, pipelineName, onExecute, setNodes, showLocalToast, t, editingPipeline?.id]);
+  }, [nodes, pipelineName, onExecute, setNodes, showLocalToast, t, editingPipeline?.id, runValidation]);
 
   // ── Drag start from palette ──
   const onDragStart = useCallback((event: React.DragEvent<HTMLDivElement>, nodeType: string) => {
@@ -320,7 +513,32 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
               <ArrowLeft size={14} /> {t('dw.pipeline.editor.backToList')}
             </button>
           )}
-          <GitBranch size={18} className={`${styles.infoText}`} />
+          <button
+            type="button"
+            disabled={!editingPipeline?.id}
+            onClick={() => {
+              if (!editingPipeline?.id) {
+                showLocalToast('info', t('dw.pipeline.git.saveFirst'));
+                return;
+              }
+              setGitVersionOpen((v) => !v);
+            }}
+            title={
+              editingPipeline?.id
+                ? t('dw.pipeline.git.title')
+                : t('dw.pipeline.git.saveFirst')
+            }
+            className={`p-1 rounded transition-colors ${
+              gitVersionOpen
+                ? styles.accentBg
+                : styles.cardTextMuted
+            } ${editingPipeline?.id
+              ? 'hover:bg-indigo-50 cursor-pointer'
+              : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <GitBranch size={18} />
+          </button>
           <input
             type="text" value={pipelineName}
             onChange={(e) => setPipelineName(e.target.value)}
@@ -352,6 +570,19 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
           <button onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:${styles.cardText}`} title={t('dw.pipeline.editor.clearCanvas')}>
             <Trash2 size={13} /> {t('dw.pipeline.editor.clear')}
           </button>
+          <button onClick={() => setDebugOpen((v) => !v)}
+            className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors rounded ${
+              debugOpen
+                ? `${styles.accentBg} ${styles.accentText}`
+                : `${styles.cardTextMuted} hover:${styles.cardText}`
+            }`}
+            title={t('dw.pipeline.debug.title')}
+          >
+            <Bolt size={13} className={debugState === 'running' ? 'animate-pulse' : ''} />
+            {breakpoints.length > 0 && (
+              <span className={`text-[9px] font-mono ${debugOpen ? styles.accentText : styles.cardTextMuted}`}>{breakpoints.length}</span>
+            )}
+          </button>
           <button onClick={handleExecute} className={`flex items-center gap-1.5 px-3 py-1 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Play size={13} /> {t('dw.pipeline.editor.execute')}
           </button>
@@ -362,35 +593,70 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       </div>
 
       {/* ── Main Content ── */}
-      <div className="flex-1 flex overflow-hidden">
-        <NodePalette
-          styles={styles}
-          connectionsCount={connections.length}
-          pipelinesCount={pipelines.length}
-          onDragStart={onDragStart}
-        />
-        <div className="flex-1" ref={reactFlowWrapper}>
-          <FlowCanvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={setReactFlowInstance}
-            onNodeClick={onNodeClick}
-            onPaneClick={onPaneClick}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
+          <NodePalette
             styles={styles}
+            connectionsCount={connections.length}
+            pipelinesCount={pipelines.length}
+            onDragStart={onDragStart}
           />
+          <div className="flex-1" ref={reactFlowWrapper}>
+            <FlowCanvas
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onInit={setReactFlowInstance}
+              onNodeClick={onNodeClick}
+              onPaneClick={onPaneClick}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              styles={styles}
+              invalidNodeIds={invalidNodeIds}
+              breakpointNodeIds={breakpointNodeIds}
+            />
+          </div>
+          <PropertyPanel
+            node={selectedNode}
+            connections={connections}
+            onUpdateNode={updateNodeConfig}
+            onDeleteNode={deleteNode}
+            onClose={() => setSelectedNode(null)}
+          />
+          {debugOpen && (
+            <div className={`w-72 shrink-0 border-l ${styles.cardBorder}`}>
+              <DebugPanel
+                enabled={true}
+                breakpoints={breakpoints}
+                state={debugState}
+                currentNodeId={selectedNode?.id ?? null}
+                onAddBreakpoint={addBreakpoint}
+                onRemoveBreakpoint={removeBreakpoint}
+                onToggleBreakpoint={toggleBreakpoint}
+                onUpdateCondition={updateBreakpointCondition}
+                onStart={handleDebugStart}
+                onStepOver={handleDebugStepOver}
+                onContinue={handleDebugContinue}
+                onStop={handleDebugStop}
+                onReset={handleDebugReset}
+              />
+            </div>
+          )}
+          {gitVersionOpen && editingPipeline?.id && (
+            <GitVersionPanel
+              pipelineId={editingPipeline.id}
+              pipelineName={pipelineName}
+              onClose={() => setGitVersionOpen(false)}
+              onRestore={handleGitVersionRestore}
+            />
+          )}
         </div>
-        <PropertyPanel
-          node={selectedNode}
-          connections={connections}
-          onUpdateNode={updateNodeConfig}
-          onDeleteNode={deleteNode}
-          onClose={() => setSelectedNode(null)}
-        />
+
+        {/* ── Monitor Panel (画布下方停靠面板) ── */}
+        <MonitorPanel>
+        </MonitorPanel>
       </div>
 
       {/* ── Toast ── */}

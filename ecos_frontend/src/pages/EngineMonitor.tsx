@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
+import { useToast } from '../components/common/Toast';
+import { NoAccessError, isNoAccessError } from '../api';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -68,10 +70,18 @@ function authHeaders(): Record<string, string> {
 
 async function apiFetch<T = any>(url: string): Promise<T> {
   const res = await fetch(url, { headers: authHeaders() });
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
+    // Token expired/invalid → clear auth & re-login (AM-30 event,
+    // PMO-43 T4, same behaviour as api.ts handleAuthExpired).
     localStorage.removeItem('token');
     window.location.hash = '#/login';
-    throw new Error('登录已过期，请重新登录');
+    throw new Error('HTTP_401');
+  }
+  if (res.status === 403) {
+    // Permission denied on a valid session → canonical NoAccessError
+    // (api.ts contract). UI layers detect via isNoAccessError() and
+    // render t("common.noPermission"). Never log the user out.
+    throw new NoAccessError();
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -90,14 +100,8 @@ async function apiFetch<T = any>(url: string): Promise<T> {
 export default function EngineMonitor({ engine, initialHealth, initialStatus }: EngineMonitorProps) {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
+  const { showToast } = useToast();
   const meta = ENGINE_META[engine];
-
-  // ── Toast ──
-  const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
-  const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
 
   // ── State ──
   const [health, setHealth] = useState<HealthData | null>(initialHealth ?? null);
@@ -119,13 +123,13 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     try {
       const data = await apiFetch<HealthData>(`/api/v1/engine/${engine}/health`);
       setHealth(data);
-    } catch (e: any) {
-      setHealthError(e.message || 'Unknown error');
-      showToast('error', `健康检查失败: ${e.message}`);
+    } catch (e) {
+      setHealthError(e instanceof Error ? e.message : 'Unknown error');
+      if (!isNoAccessError(e)) showToast('error', t('common.loadFailed'));
     } finally {
       setHealthLoading(false);
     }
-  }, [engine, showToast]);
+  }, [engine, showToast, t]);
 
   // ── Load config ──
   const loadConfig = useCallback(async () => {
@@ -134,13 +138,13 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     try {
       const data = await apiFetch<ConfigData>(meta.configPath || `/api/v1/engine/${engine}/config`);
       setConfig(data);
-    } catch (e: any) {
-      setConfigError(e.message || 'Unknown error');
-      showToast('error', `配置加载失败: ${e.message}`);
+    } catch (e) {
+      setConfigError(e instanceof Error ? e.message : 'Unknown error');
+      if (!isNoAccessError(e)) showToast('error', t('common.loadFailed'));
     } finally {
       setConfigLoading(false);
     }
-  }, [engine, showToast]);
+  }, [engine, showToast, t]);
 
   // ── Load status ──
   const loadStatus = useCallback(async () => {
@@ -149,13 +153,13 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     try {
       const data = await apiFetch<StatusData>(`/api/v1/engine/${engine}/status`);
       setStatus(data);
-    } catch (e: any) {
-      setStatusError(e.message || 'Unknown error');
-      showToast('error', `状态加载失败: ${e.message}`);
+    } catch (e) {
+      setStatusError(e instanceof Error ? e.message : 'Unknown error');
+      if (!isNoAccessError(e)) showToast('error', t('common.loadFailed'));
     } finally {
       setStatusLoading(false);
     }
-  }, [engine, showToast]);
+  }, [engine, showToast, t]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -169,7 +173,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     loadHealth();
     loadConfig();
     loadStatus();
-    showToast('info', '正在刷新引擎数据...');
+    showToast('info', t('common.refreshing'));
   };
 
   // ── Derive health status ──
@@ -203,7 +207,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           </div>
           <button
             onClick={handleRefreshAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition-colors border border-slate-700"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm transition-colors border ${styles.inputBorder} ${styles.sidebarHoverBg}`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             {locale === 'zh' ? '刷新全部' : 'Refresh All'}
@@ -216,14 +220,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           {/* ──────────────── Card 1: Engine Health ──────────────── */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-slate-400" />
+              <Activity className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
                 {locale === 'zh' ? '引擎状态' : 'Engine Health'}
               </h3>
             </div>
 
             {healthLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {locale === 'zh' ? '加载中...' : 'Loading...'}
               </div>
@@ -273,14 +277,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           {/* ──────────────── Card 2: Config Info ──────────────── */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
             <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-slate-400" />
+              <Settings className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
                 {locale === 'zh' ? '配置信息' : 'Configuration'}
               </h3>
             </div>
 
             {configLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {locale === 'zh' ? '加载中...' : 'Loading...'}
               </div>
@@ -311,14 +315,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           {/* ──────────────── Card 3: Runtime Status ──────────────── */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
             <div className="flex items-center gap-2">
-              <Server className="w-4 h-4 text-slate-400" />
+              <Server className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
                 {locale === 'zh' ? '运行状态' : 'Runtime Status'}
               </h3>
             </div>
 
             {statusLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {locale === 'zh' ? '加载中...' : 'Loading...'}
               </div>
@@ -365,41 +369,25 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">/health</span>
+              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/health</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {health ? JSON.stringify(health, null, 2) : (healthError || '—')}
               </pre>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">{meta.configPath ? '/settings' : '/config'}</span>
+              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{meta.configPath ? '/settings' : '/config'}</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {config ? JSON.stringify(config, null, 2) : (configError || '—')}
               </pre>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-500">/status</span>
+              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/status</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {status ? JSON.stringify(status, null, 2) : (statusError || '—')}
               </pre>
             </div>
           </div>
         </div>
-
-        {/* ── Toast ── */}
-        {toast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
-            <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2
-              ${toast.type === 'success' ? 'bg-emerald-600 text-white' : ''}
-              ${toast.type === 'error' ? 'bg-red-600 text-white' : ''}
-              ${toast.type === 'info' ? 'bg-slate-700 text-slate-100' : ''}
-            `}>
-              {toast.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
-              {toast.type === 'error' && <AlertTriangle className="w-4 h-4" />}
-              {toast.type === 'info' && <Activity className="w-4 h-4" />}
-              {toast.msg}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

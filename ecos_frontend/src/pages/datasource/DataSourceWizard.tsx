@@ -74,7 +74,7 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
         const active = idx === step, done = idx < step;
         return (
           <React.Fragment key={idx}>
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition ${done ? "bg-green-50 text-green-700 border border-green-200" : active ? `${styles.accentBg} text-white` : "bg-slate-100 text-slate-400"}`}>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition ${done ? "bg-green-50 text-green-700 border border-green-200" : active ? `${styles.accentBg} text-white` : `${styles.appBorder} ${styles.cardTextMuted}`}`}>
               {done ? <CheckCircle className="w-3 h-3" /> : <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[9px]">{idx + 1}</span>}
               <span className="hidden sm:inline">{locale === "zh" ? s.zh : s.en}</span>
             </div>
@@ -156,7 +156,7 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className={`text-lg font-bold ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{locale === "zh" ? "注册数据源" : "Register Data Source"}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded transition cursor-pointer"><X className={`w-5 h-5 ${styles.muted}`} /></button>
+          <button onClick={onClose} className={`p-1 hover:${styles.appBg}/50 rounded transition cursor-pointer`}><X className={`w-5 h-5 ${styles.muted}`} /></button>
         </div>
 
         {stepIndicator}
@@ -173,9 +173,9 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
 
         {/* Navigation */}
         <div className="flex justify-between gap-2 mt-5">
-          <div>{step > 0 && <button onClick={goPrev} disabled={submitting} className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-lg transition flex items-center gap-1 cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" />{locale === "zh" ? "上一步" : "Back"}</button>}</div>
+          <div>{step > 0 && <button onClick={goPrev} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition flex items-center gap-1 cursor-pointer`}><ChevronLeft className="w-3.5 h-3.5" />{locale === "zh" ? "上一步" : "Back"}</button>}</div>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer">{locale === "zh" ? "取消" : "Cancel"}</button>
+            <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`}>{locale === "zh" ? "取消" : "Cancel"}</button>
             {step < 2 ? (
               <button onClick={goNext} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{locale === "zh" ? "下一步" : "Next"}<ChevronRight className="w-3.5 h-3.5" /></button>
             ) : importResult?.success ? (

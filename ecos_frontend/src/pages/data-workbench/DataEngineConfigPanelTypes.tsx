@@ -196,6 +196,8 @@ export function buildConfigGroups(edition: EcosEdition = 'standard'): ConfigGrou
         { key: 'dw.query.timeout', labelKey: 'dw.cfg.label.dw.query.timeout', descriptionKey: 'dw.cfg.desc.dw.query.timeout', type: 'int', defaultValue: 30, subgroup: 'general' },
         { key: 'dw.cache.ttl_seconds', labelKey: 'dw.cfg.label.dw.cache.ttl_seconds', descriptionKey: 'dw.cfg.desc.dw.cache.ttl_seconds', type: 'int', defaultValue: 300, subgroup: 'general' },
         { key: 'dw.engine.auto_start', labelKey: 'dw.cfg.label.dw.engine.auto_start', descriptionKey: 'dw.cfg.desc.dw.engine.auto_start', type: 'bool', defaultValue: true, subgroup: 'general' },
+        // 数据表目录历史版本保留份数（Git 元数据存档，超限自动清理最旧版本）
+        { key: 'dw.metadata.history_versions', labelKey: 'dw.cfg.label.dw.metadata.history_versions', descriptionKey: 'dw.cfg.desc.dw.metadata.history_versions', type: 'int', defaultValue: 50, subgroup: 'general' },
       ],
       modified: false,
     },

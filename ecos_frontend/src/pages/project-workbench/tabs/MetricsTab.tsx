@@ -26,8 +26,8 @@ export default function MetricsTab({ threatRadarData, efficiencyData }: Props) {
   {/* 1. Charts Row */}
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
     {/* Chart 1: Radar Area - Security Threats Blocked */}
-    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-      <span className="text-xs font-bold text-slate-400 flex items-center gap-1 mb-4">
+    <div className="bg-[var(--card,#0F172A)] border border-[var(--card,#1E293B)] p-4 rounded-xl">
+      <span className="text-xs font-bold text-[var(--card,#94A3B8)] flex items-center gap-1 mb-4">
         <LucideIcon name="Activity" size={12} className="text-rose-500 animate-pulse" />
         本月安全拦截审计分类雷达 (Blocked Policy Violations)
       </span>
@@ -47,14 +47,14 @@ export default function MetricsTab({ threatRadarData, efficiencyData }: Props) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-[10px] text-slate-500 text-center mt-2">
+      <p className="text-[10px] text-[var(--card,#64748B)] text-center mt-2">
         * 数据由底层安全审计控制器 `app.get('/api/security/audit-logs')` 实时导出并汇总。
       </p>
     </div>
 
     {/* Chart 2: Area Line - Delay Reschedule duration optimization */}
-    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-      <span className="text-xs font-bold text-slate-400 flex items-center gap-1 mb-4">
+    <div className="bg-[var(--card,#0F172A)] border border-[var(--card,#1E293B)] p-4 rounded-xl">
+      <span className="text-xs font-bold text-[var(--card,#94A3B8)] flex items-center gap-1 mb-4">
         <LucideIcon name="TrendingUp" size={12} className="text-emerald-500" />
         雷雨天气航班改派决策时效趋势评估 (Decision Efficiency (Minutes))
       </span>
@@ -81,19 +81,19 @@ export default function MetricsTab({ threatRadarData, efficiencyData }: Props) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-[10px] text-slate-500 text-center mt-2">
+      <p className="text-[10px] text-[var(--card,#64748B)] text-center mt-2">
         * 引入双引擎自动核对签名流程后，暑假恶劣天气调配平均时效已从 <b>45 分钟</b> 暴降至 <b>3.5 秒级</b>。
       </p>
     </div>
   </div>
 
   {/* 2. Executive PM Assessment Notes */}
-  <div className="bg-slate-950 p-4 border border-slate-800 rounded-xl space-y-2">
+  <div className="bg-[var(--card,#020617)] p-4 border border-[var(--card,#1E293B)] rounded-xl space-y-2">
     <span className="text-xs font-bold text-white flex items-center gap-1.5">
       <LucideIcon name="NotebookTabs" size={13} className="text-indigo-400" />
       企业高级运营总监综合评估结论 (Corporate Executive Assessment)
     </span>
-    <div className="text-xs text-slate-300 leading-relaxed space-y-2 font-sans">
+    <div className="text-xs text-[var(--card,#CBD5E1)] leading-relaxed space-y-2 font-sans">
       <p>
         1. <b>数据流动性良好</b>：本月对账主链路（Doris 清洗物理宽表 `ds_flights_clean` 到本体逻辑 `AviationFlight`）数据映射一致性维持在 <b>98%</b> 极佳水平。未发生逻辑契约破坏导致的写入异常。
       </p>

@@ -211,7 +211,7 @@ export default function UserEditModal({
                 className={`flex items-center gap-1.5 px-3 py-2 text-xs rounded-t transition-colors ${
                   tab === t.id
                     ? `${styles.accentBg} text-white`
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                    : `${styles.sidebarHoverBg} ${styles.cardTextMuted}`
                 }`}
               >
                 <Icon size={13} />
@@ -315,8 +315,8 @@ export default function UserEditModal({
                             key={level}
                             className={`h-1 flex-1 rounded-full transition-colors ${
                               passwordStrength >= level
-                                ? strengthInfo[passwordStrength]?.color || "bg-gray-300"
-                                : "bg-gray-200 dark:bg-gray-700"
+                                ? strengthInfo[passwordStrength]?.color
+                                : styles.appBg
                             }`}
                           />
                         ))}
@@ -414,7 +414,7 @@ export default function UserEditModal({
                         type="checkbox"
                         checked={secProfile.sandboxMandatory ?? false}
                         onChange={(e) => setSecProfile(p => ({ ...p!, sandboxMandatory: e.target.checked }))}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 h-4 w-4"
+                        className={`rounded ${styles.inputBorder} text-indigo-600 focus:ring-indigo-500 mt-0.5 h-4 w-4`}
                       />
                       <span className={`text-xs leading-normal ${styles.cardText}`}>
                         {t("user.security.sandbox")}

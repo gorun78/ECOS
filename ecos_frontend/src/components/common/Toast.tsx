@@ -4,7 +4,7 @@
  * @license Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────
@@ -69,6 +69,22 @@ const ToastItem: React.FC<{
 
 let toastIdCounter = 0;
 
+/**
+ * PMO-43 T2: 模块级全局 toast 句柄 — 供 ToastProvider 之外的代码（路由守卫、
+ * apiFetch 401/403 事件监听、测试环境无 Provider 场景）发送 toast。
+ * 页面已收到 propShowToast 时仍以 prop 为准，仅在 prop 缺席时降级到此处。
+ */
+const toastSubscribers: Array<(type: ToastType, message: string) => void> = [];
+
+export function showToastGlobal(type: ToastType, message: string): void {
+  if (toastSubscribers.length > 0) {
+    toastSubscribers.forEach(handler => handler(type, message));
+  } else {
+    // 测试/Story 环境下无 Provider 时静默降级
+    if (typeof console !== "undefined") console.log(`[toast:${type}] ${message}`);
+  }
+}
+
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -90,6 +106,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 3000);
     timersRef.current.set(id, timer);
   }, [removeToast]);
+
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+
+  useEffect(() => {
+    const handler: (type: ToastType, message: string) => void = (type, message) => showToastRef.current(type, message);
+    toastSubscribers.push(handler);
+    return () => {
+      const idx = toastSubscribers.indexOf(handler);
+      if (idx >= 0) toastSubscribers.splice(idx, 1);
+    };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>

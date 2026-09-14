@@ -1,9 +1,9 @@
-# ── ECOS 旗舰版 (Flagship Edition) ──
+# ── ECOS 旗舰版 (Ultimate/Flagship Edition) ──
 # 适用: 大型集团、>500GB数据、PG+Neo4j+Doris+MinIO
-# 启动: SPRING_PROFILES_ACTIVE=flagship
+# 启动: SPRING_PROFILES_ACTIVE=ultimate (Maven: -Pultimate；历史别名 flagship 已弃用)
 
 ecos:
-  edition: flagship
+  edition: ultimate
   graph:
     provider: neo4j
     neo4j-uri: bolt://neo4j-cluster:7687
@@ -30,3 +30,6 @@ ecos:
     worldmodel: true
     market: true
     portal: true
+  oag:
+    # OAG 推理节点 LLM 模型 fallback 链（按优先级排列，第一项最先尝试）
+    model-fallback: deepseek-chat,qwen-turbo,deepseek-v3-thinking

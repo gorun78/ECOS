@@ -24,14 +24,20 @@ const gatewayProxy = async (req: express.Request, res: express.Response) => {
   const method = req.method;
   console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl} (gateway)`);
   try {
+    // 仅在请求体存在时声明 JSON Content-Type —
+    // GET/HEAD 请求对 Java 后端加 JSON Content-Type 会被部分 Filter 判定为非法
+    // 触发 500 空响应（原本导致前端"点按钮无反馈"）。
+    const withBody =
+      method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
     const fetchOptions: RequestInit = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-      },
+      headers: upstreamHeaders,
     };
-    if (method !== "GET" && method !== "HEAD" && req.body) {
+    if (withBody) {
       fetchOptions.body = JSON.stringify(req.body);
     }
     const upstream = await fetch(targetUrl, fetchOptions);
@@ -55,6 +61,40 @@ const gatewayProxy = async (req: express.Request, res: express.Response) => {
 app.use("/api/monitor", gatewayProxy);
 app.use("/api/twins", gatewayProxy);
 app.use("/datanet", gatewayProxy);
+
+// ── P3-A: Dq/Git/DataLake 路由物理迁至 datanet :18082 ──────────────
+// These controllers 原在 gateway :8080，微服务化后迁至 datanet 微服务。
+// 必须定义在通用 /api proxy 之前，直接转发到 datanet 独立端口。
+const DATANET = process.env.DATANET_URL || "http://localhost:18082";
+const datanetProxy = async (req: express.Request, res: express.Response) => {
+  const targetUrl = `${DATANET}${req.originalUrl}`;
+  const method = req.method;
+  console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl} (datanet)`);
+  try {
+    const withBody = method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
+    const fetchOptions: RequestInit = { method, headers: upstreamHeaders };
+    if (withBody) fetchOptions.body = JSON.stringify(req.body);
+    const upstream = await fetch(targetUrl, fetchOptions);
+    const contentType = upstream.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await upstream.json();
+      res.status(upstream.status).json(data);
+    } else {
+      const text = await upstream.text();
+      res.status(upstream.status).set("Content-Type", contentType).send(text);
+    }
+  } catch (err: any) {
+    console.error(`[BFF] Datanet proxy error for ${req.originalUrl}:`, err.message);
+    res.status(502).json({ success: false, message: `Datanet unavailable: ${err.message}` });
+  }
+};
+app.use("/api/dq", datanetProxy);
+app.use("/api/v1/ecos/git", datanetProxy);
+app.use("/api/datalake", datanetProxy);
 
 // ── Special endpoints (backend doesn't have these) ─────────
 
@@ -91,15 +131,20 @@ app.use("/api", async (req, res) => {
   console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl}`);
 
   try {
+    // 与 gatewayProxy 保持一致 — 仅在请求体存在时设置 JSON Content-Type，
+    // 避免 GET 请求因带 JSON Content-Type 被 Java 后端 Filter 拒绝返回 500。
+    const withBody =
+      method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
     const fetchOptions: RequestInit = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-      },
+      headers: upstreamHeaders,
     };
 
-    if (method !== "GET" && method !== "HEAD" && req.body) {
+    if (withBody) {
       fetchOptions.body = JSON.stringify(req.body);
     }
 

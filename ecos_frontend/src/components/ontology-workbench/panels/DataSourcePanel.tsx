@@ -27,6 +27,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
+import { useTheme } from '../../ThemeContext';
 import type { BulkResource } from '../../../types/workbench';
 import DataResourcePickerModal from '../modals/DataResourcePickerModal';
 import { DATA_CATALOG_UNAVAILABLE } from '../../../services/dataCatalogClient';
@@ -46,6 +47,7 @@ interface TableChipProps {
 }
 
 function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
+  const { styles } = useTheme();
   const typeLabel = resource.resourceType === 'VIEW' ? '视图' : '表';
 
   return (
@@ -59,14 +61,14 @@ function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
       {/* 信息 */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-200 truncate">
+          <span className={`text-xs font-medium ${styles.cardText} truncate`}>
             {resource.resourceName}
           </span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#2a3040] text-slate-400 shrink-0">
+          <span className={`text-[9px] px-1.5 py-0.5 rounded ${styles.badgeBg} ${styles.cardTextMuted} shrink-0`}>
             {typeLabel}
           </span>
         </div>
-        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+        <div className={`flex items-center gap-2 mt-0.5 text-[10px] ${styles.muted}`}>
           <span className="truncate">{resource.datasourceName}</span>
           <span>·</span>
           <span>{resource.fieldCount} 字段</span>
@@ -78,14 +80,14 @@ function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
         <button
           onClick={(e) => { e.stopPropagation(); onPreview(); }}
           title="预览数据"
-          className="p-1 rounded hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-400 transition"
+          className={`p-1 rounded hover:bg-indigo-500/10 ${styles.muted} hover:text-indigo-400 transition`}
         >
           <Eye size={13} />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onUnbind(); }}
           title="解绑"
-          className="p-1 rounded hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition"
+          className={`p-1 rounded hover:bg-red-500/10 ${styles.muted} hover:text-red-400 transition`}
         >
           <X size={13} />
         </button>
@@ -97,6 +99,7 @@ function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
 // ── 主组件 ──────────────────────────────────────────────────
 
 export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
   const {
     dataResources,
@@ -224,8 +227,8 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
   if (dataResourcesLoading && mappedResources.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={20} className="animate-spin text-slate-500" />
-        <span className="ml-2 text-xs text-slate-500">加载数据资源...</span>
+        <Loader2 size={20} className={`animate-spin ${styles.muted}`} />
+        <span className={`ml-2 text-xs ${styles.muted}`}>加载数据资源...</span>
       </div>
     );
   }
@@ -268,9 +271,9 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
         <button
           onClick={handleAutoDiscover}
           disabled={autoDiscovering}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium
-            border border-[#2a3040] text-slate-300 hover:border-indigo-500/30 hover:text-indigo-300
-            disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium
+            border border-[#2a3040] ${styles.cardText} hover:border-indigo-500/30 hover:text-indigo-300
+            disabled:opacity-50 disabled:cursor-not-allowed transition`}
         >
           {autoDiscovering ? (
             <Loader2 size={12} className="animate-spin" />
@@ -291,7 +294,7 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
 
       {/* ── 空状态 ── */}
       {mappedResources.length === 0 && !error && (
-        <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+        <div className={`flex flex-col items-center justify-center py-8 ${styles.muted}`}>
           <Database size={28} className="mb-2 opacity-20" />
           <p className="text-xs">尚未映射物理表</p>
           <p className="text-[10px] mt-1 opacity-60">
@@ -304,7 +307,7 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
       {mappedResources.length > 0 && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-medium text-slate-500">
+            <span className={`text-[10px] font-medium ${styles.muted}`}>
               已映射 {mappedResources.length} 个物理表
             </span>
           </div>

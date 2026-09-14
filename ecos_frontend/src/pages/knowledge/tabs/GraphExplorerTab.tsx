@@ -256,12 +256,12 @@ export default function GraphExplorerTab() {
   const detailDisplayNode = nodeDetail || (selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null) || null;
 
   return (
-    <div className="flex h-full bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+    <div className={`flex h-full ${styles.appBg} rounded-xl border ${styles.cardBorder} overflow-hidden`}>
       {/* Left Toolbar */}
-      <div className="w-56 border-r border-slate-700 flex flex-col shrink-0 p-3 space-y-3 bg-slate-900">
+      <div className={`w-56 border-r ${styles.cardBorder} flex flex-col shrink-0 p-3 space-y-3 ${styles.appBg}`}>
         {/* Search — full-text graph search */}
         <div className="space-y-1.5 relative">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('knowledge.graph.fullTextSearch')}</label>
+          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.fullTextSearch')}</label>
           <div className="flex gap-1.5">
             <input
               type="text"
@@ -270,7 +270,7 @@ export default function GraphExplorerTab() {
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
               placeholder={t('knowledge.graph.searchPlaceholder')}
-              className="flex-1 px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
+              className={`flex-1 px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
             />
             <button
               onClick={handleSearch}
@@ -281,16 +281,16 @@ export default function GraphExplorerTab() {
           </div>
           {/* Search results dropdown */}
           {showSearchResults && searchResults.length > 0 && (
-            <div className="absolute z-30 left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+            <div className={`${styles.sidebarBg} border ${styles.sidebarBorder} rounded-lg shadow-xl max-h-48 overflow-y-auto`}>
               {searchResults.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => handleSearchResultClick(r.id)}
-                  className="w-full text-left px-2.5 py-1.5 text-[11px] text-slate-300 hover:bg-slate-700 border-b border-slate-700 last:border-0 flex items-center gap-2 transition cursor-pointer"
+                  className={`w-full text-left px-2.5 py-1.5 text-[11px] ${styles.sidebarText} ${styles.sidebarHoverBg} border-b ${styles.cardBorder} last:border-0 flex items-center gap-2 transition cursor-pointer`}
                 >
                   <CornerDownRight size={10} className="text-blue-400 shrink-0" />
                   <span className="truncate">{r.label}</span>
-                  <span className="text-[9px] text-slate-500 shrink-0 ml-auto">{r.type}</span>
+                  <span className={`text-[9px] ${styles.muted} shrink-0 ml-auto`}>{r.type}</span>
                 </button>
               ))}
             </div>
@@ -299,22 +299,22 @@ export default function GraphExplorerTab() {
 
         {/* Path finder — inline inputs */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('knowledge.graph.pathFinder')}</label>
+          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.pathFinder')}</label>
           <div className="flex gap-1 items-center">
             <input
               type="text"
               value={pathSource}
               onChange={(e) => setPathSource(e.target.value)}
               placeholder={t('knowledge.graph.pathSourcePlaceholder')}
-              className="w-[70px] px-2 py-1 text-[10px] bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500"
+              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
             />
-            <ArrowRight size={10} className="text-slate-500 shrink-0" />
+            <ArrowRight size={10} className={`${styles.muted} shrink-0`} />
             <input
               type="text"
               value={pathTarget}
               onChange={(e) => setPathTarget(e.target.value)}
               placeholder={t('knowledge.graph.pathTargetPlaceholder')}
-              className="w-[70px] px-2 py-1 text-[10px] bg-slate-800 border border-slate-600 rounded text-slate-200 placeholder-slate-500 outline-none focus:border-amber-500"
+              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
             />
             <button
               onClick={() => { if (pathSource && pathTarget) handleComputePath(); else showToast('error', t('knowledge.graph.pathRequired')); }}
@@ -328,11 +328,11 @@ export default function GraphExplorerTab() {
 
         {/* Domain Filter */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('knowledge.graph.domainFilter')}</label>
+          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.domainFilter')}</label>
           <select
             value={domainFilter}
             onChange={(e) => handleDomainChange(e.target.value)}
-            className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-blue-500 cursor-pointer"
+            className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-blue-500 cursor-pointer`}
           >
             {DOMAIN_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -344,7 +344,7 @@ export default function GraphExplorerTab() {
         <button
           onClick={handleLoadFullGraph}
           disabled={isLoading}
-          className="w-full px-3 py-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-600 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+          className={`w-full px-3 py-2 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50`}
         >
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Network size={12} />}
           {t('knowledge.graph.loadFullGraph')}
@@ -352,7 +352,7 @@ export default function GraphExplorerTab() {
 
         {/* Neighbor Expand */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
             {t('knowledge.graph.neighborDegree')}
           </label>
           <input
@@ -363,7 +363,7 @@ export default function GraphExplorerTab() {
             onChange={(e) => setNeighborDegree(parseInt(e.target.value))}
             className="w-full accent-blue-500 cursor-pointer"
           />
-          <div className="flex justify-between text-[10px] text-slate-500">
+          <div className={`flex justify-between text-[10px] ${styles.muted}`}>
             <span>1</span>
             <span className="font-bold text-blue-400">{neighborDegree}</span>
             <span>3</span>
@@ -371,9 +371,9 @@ export default function GraphExplorerTab() {
         </div>
 
         {/* Legend */}
-        <div className="mt-auto p-2.5 bg-slate-800 rounded-lg border border-slate-700 space-y-1.5">
-          <span className="text-[9px] font-bold text-slate-500 uppercase">{t('knowledge.graph.legend')}</span>
-          <div className="space-y-1 text-[10px] text-slate-400">
+        <div className={`mt-auto p-2.5 ${styles.sidebarBg} rounded-lg border ${styles.cardBorder} space-y-1.5`}>
+          <span className={`text-[9px] font-bold ${styles.muted} uppercase`}>{t('knowledge.graph.legend')}</span>
+          <div className={`space-y-1 text-[10px] ${styles.cardTextMuted}`}>
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-500" /> {t('knowledge.graph.dataDomain')}
             </div>
@@ -390,16 +390,16 @@ export default function GraphExplorerTab() {
       {/* Middle Graph Canvas */}
       <div className="flex-1 relative">
         {isLoading && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
+          <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 ${styles.sidebarBg} border ${styles.cardBorder} rounded-lg text-[11px] ${styles.cardText} flex items-center gap-2 shadow-lg`}>
             <Loader2 size={12} className="animate-spin" />
             {t('knowledge.graph.loadingGraph')}
           </div>
         )}
 
         {nodes.length === 0 && !isLoading ? (
-          <div className="flex items-center justify-center h-full text-slate-500 text-xs">
+          <div className={`flex items-center justify-center h-full ${styles.muted} text-xs`}>
             <div className="text-center space-y-2">
-              <Network size={32} className="mx-auto text-slate-600" />
+              <Network size={32} className={`mx-auto ${styles.muted}`} />
               <p>{t('knowledge.graph.emptyHint')}</p>
             </div>
           </div>
@@ -435,7 +435,7 @@ export default function GraphExplorerTab() {
             <ArrowRight size={12} />
             {t('knowledge.graph.newEdge')}
           </button>
-          <span className="text-[10px] text-slate-500 self-center ml-auto">
+          <span className={`text-[10px] ${styles.muted} self-center ml-auto`}>
             {t('knowledge.graph.nodeEdgeCount', { nodes: nodes.length, edges: edges.length })}
           </span>
         </div>
@@ -443,15 +443,15 @@ export default function GraphExplorerTab() {
 
       {/* Right Detail Panel (slide-out) */}
       {showDetailPanel && (
-        <div className="w-72 border-l border-slate-700 flex flex-col shrink-0 bg-slate-900 overflow-y-auto">
-          <div className="px-3 py-2.5 border-b border-slate-700 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+        <div className={`w-72 border-l ${styles.cardBorder} flex flex-col shrink-0 ${styles.appBg} overflow-y-auto`}>
+          <div className={`px-3 py-2.5 border-b ${styles.cardBorder} flex items-center justify-between`}>
+            <h3 className={`text-xs font-bold ${styles.sidebarText} flex items-center gap-1.5`}>
               <Info size={12} className="text-blue-400" />
               {t('knowledge.graph.nodeDetail')}
             </h3>
             <button
               onClick={() => { setShowDetailPanel(false); setSelectedNodeId(null); }}
-              className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300 cursor-pointer transition"
+              className={`p-1 ${styles.sidebarHoverBg} rounded ${styles.muted} hover:${styles.cardText} cursor-pointer transition`}
             >
               <X size={13} />
             </button>
@@ -461,15 +461,15 @@ export default function GraphExplorerTab() {
             <div className="p-3 space-y-3 text-[11px]">
               {/* Basic Info */}
               <div className="space-y-1.5">
-                <div className="text-sm font-bold text-slate-100">
+                <div className={`text-sm font-bold ${styles.cardText}`}>
                   {detailDisplayNode.label}
                 </div>
-                <div className="flex items-center gap-1.5 text-slate-400">
+                <div className={`flex items-center gap-1.5 ${styles.cardTextMuted}`}>
                   <Tag size={10} />
                   <span>{detailDisplayNode.type || 'N/A'}</span>
                 </div>
                 {detailDisplayNode.description && (
-                  <p className="text-slate-400 leading-relaxed">
+                  <p className={`${styles.cardTextMuted} leading-relaxed`}>
                     {detailDisplayNode.description}
                   </p>
                 )}
@@ -478,14 +478,14 @@ export default function GraphExplorerTab() {
               {/* Properties */}
               {detailDisplayNode.properties && Object.keys(detailDisplayNode.properties).length > 0 && (
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span className={`text-[10px] font-bold ${styles.muted} uppercase tracking-wider`}>
                     {t('knowledge.graph.properties')}
                   </span>
-                  <div className="bg-slate-800 rounded-lg p-2 space-y-1">
+                  <div className={`${styles.sidebarBg} rounded-lg p-2 space-y-1`}>
                     {Object.entries(detailDisplayNode.properties).map(([key, value]) => (
                       <div key={key} className="flex justify-between text-[10px]">
-                        <span className="text-slate-400">{key}</span>
-                        <span className="text-slate-200 font-mono">
+                        <span className={styles.cardTextMuted}>{key}</span>
+                        <span className={`${styles.cardText} font-mono`}>
                           {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                         </span>
                       </div>
@@ -496,19 +496,19 @@ export default function GraphExplorerTab() {
 
               {/* Related Edges */}
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className={`text-[10px] font-bold ${styles.muted} uppercase tracking-wider`}>
                   {t('knowledge.graph.relatedEdges', { count: nodeEdges.length })}
                 </span>
                 {nodeEdges.length === 0 ? (
-                  <p className="text-slate-600 text-[10px]">{t('knowledge.graph.noRelatedEdges')}</p>
+                  <p className={`${styles.muted} text-[10px]`}>{t('knowledge.graph.noRelatedEdges')}</p>
                 ) : (
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {nodeEdges.map((edge) => (
                       <div
                         key={edge.id}
-                        className="bg-slate-800 rounded-md px-2 py-1.5 text-[10px] flex items-center justify-between"
+                        className={`${styles.sidebarBg} rounded-md px-2 py-1.5 text-[10px] flex items-center justify-between`}
                       >
-                        <span className="text-slate-300 truncate flex-1">
+                        <span className={`${styles.cardText} truncate flex-1`}>
                           {edge.source} → {edge.target}
                         </span>
                         {edge.relationship && (
@@ -523,7 +523,7 @@ export default function GraphExplorerTab() {
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <div className={`space-y-1.5 pt-2 border-t ${styles.cardBorder}`}>
                 {expandedNodeIds.has(detailDisplayNode.id) ? (
                   <button
                     onClick={() => handleCollapseNode(detailDisplayNode.id)}
@@ -553,7 +553,7 @@ export default function GraphExplorerTab() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-slate-500 text-[11px]">
+            <div className={`flex items-center justify-center h-full ${styles.muted} text-[11px]`}>
               {t('knowledge.graph.noNodeSelected')}
             </div>
           )}
@@ -563,9 +563,9 @@ export default function GraphExplorerTab() {
       {/* Create Node/Edge Modal */}
       {showCreateForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-96 p-5 space-y-4 shadow-2xl">
+          <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl w-96 p-5 space-y-4 shadow-2xl`}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
                 {showCreateForm === 'node'
                   ? <><Plus size={14} className="text-blue-400" /> {t('knowledge.graph.newNode')}</>
                   : <><ArrowRight size={14} className="text-emerald-400" /> {t('knowledge.graph.newEdge')}</>
@@ -573,7 +573,7 @@ export default function GraphExplorerTab() {
               </h3>
               <button
                 onClick={() => setShowCreateForm(null)}
-                className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300 cursor-pointer"
+                className={`p-1 ${styles.sidebarHoverBg} rounded ${styles.muted} hover:${styles.cardText} cursor-pointer`}
               >
                 <X size={14} />
               </button>
@@ -582,49 +582,49 @@ export default function GraphExplorerTab() {
             {showCreateForm === 'node' ? (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeLabel')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeLabel')}</label>
                   <input
                     type="text"
                     value={newNodeForm.label}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, label: e.target.value }))}
                     placeholder={t('knowledge.graph.nodeLabelPlaceholder')}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeType')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeType')}</label>
                   <input
                     type="text"
                     value={newNodeForm.nodeType}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, nodeType: e.target.value }))}
                     placeholder={t('knowledge.graph.nodeTypePlaceholder')}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeDescription')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeDescription')}</label>
                   <textarea
                     value={newNodeForm.description}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, description: e.target.value }))}
                     placeholder={t('knowledge.graph.nodeDescriptionPlaceholder')}
                     rows={2}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 resize-none"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500 resize-none`}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.nodeProperties')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeProperties')}</label>
                   <textarea
                     value={newNodeForm.properties}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, properties: e.target.value }))}
                     placeholder='{"domain": "finance", "owner": "admin"}'
                     rows={2}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 resize-none font-mono"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500 resize-none font-mono`}
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => setShowCreateForm(null)}
-                    className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-600 transition cursor-pointer"
+                    className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} transition cursor-pointer`}
                   >
                     {t('knowledge.graph.cancel')}
                   </button>
@@ -639,11 +639,11 @@ export default function GraphExplorerTab() {
             ) : (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.sourceNode')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.sourceNode')}</label>
                   <select
                     value={newEdgeForm.sourceNodeId}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, sourceNodeId: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-emerald-500 cursor-pointer"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-emerald-500 cursor-pointer`}
                   >
                     <option value="">{t('knowledge.graph.selectNode')}</option>
                     {nodes.map(n => (
@@ -652,11 +652,11 @@ export default function GraphExplorerTab() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.targetNode')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.targetNode')}</label>
                   <select
                     value={newEdgeForm.targetNodeId}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, targetNodeId: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-emerald-500 cursor-pointer"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-emerald-500 cursor-pointer`}
                   >
                     <option value="">{t('knowledge.graph.selectNode')}</option>
                     {nodes.map(n => (
@@ -665,30 +665,30 @@ export default function GraphExplorerTab() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.relationship')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.relationship')}</label>
                   <input
                     type="text"
                     value={newEdgeForm.relationship}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, relationship: e.target.value }))}
                     placeholder={t('knowledge.graph.relationshipPlaceholder')}
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 outline-none focus:border-emerald-500"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-emerald-500`}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">{t('knowledge.graph.weight')}</label>
+                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.weight')}</label>
                   <input
                     type="number"
                     value={newEdgeForm.weight}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, weight: e.target.value }))}
                     min="0"
                     step="0.1"
-                    className="w-full px-2.5 py-1.5 text-[11px] bg-slate-800 border border-slate-600 rounded-lg text-slate-200 outline-none focus:border-emerald-500"
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-emerald-500`}
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => setShowCreateForm(null)}
-                    className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-600 transition cursor-pointer"
+                    className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} transition cursor-pointer`}
                   >
                     {t('knowledge.graph.cancel')}
                   </button>

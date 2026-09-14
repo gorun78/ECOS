@@ -263,7 +263,7 @@ export default function DashboardView({
             </button>
             <button
               onClick={() => onNavigateToView('logic')}
-              className={`px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 ${styles.cardText} border ${styles.inputBorder} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5`}
+              className={`px-3.5 py-1.5 bg-[var(--muted,#1E293B)] hover:bg-[var(--card,#334155)] text-[var(--text-primary,#E2E8F0)] border ${styles.inputBorder} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5`}
             >
               <Cpu size={13} />
               <span>{t('dashboard.welcome.btnLogic')}</span>
@@ -316,7 +316,7 @@ export default function DashboardView({
                 const heightPercent = (val / maxUsage) * 100;
                 return (
                   <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full px-1.5 group relative">
-                    <span className="absolute -top-6 bg-slate-800 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
+                    <span className="absolute -top-6 bg-[var(--muted,#1E293B)] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
                       {t('dashboard.trend.calls', { n: val })}
                     </span>
                     <div
@@ -400,7 +400,7 @@ export default function DashboardView({
               : log.status === 'pending_approval' ? 'dashboard.audit.pending'
               : 'dashboard.audit.passed';
             return (
-              <div key={log.id} className={`p-3 hover:bg-slate-900/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs`}>
+              <div key={log.id} className={`p-3 hover:bg-[var(--muted,rgba(0,0,0,0.04))] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs`}>
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className={`font-mono text-[10px] ${styles.cardTextMuted} ${styles.appBg} px-1 py-0.5 rounded`}>{log.timestamp}</span>
@@ -517,11 +517,11 @@ export default function DashboardView({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 mt-4 pt-4 border-t border-slate-700/50">
+        <div className={`flex items-center gap-2.5 mt-4 pt-4 border-t ${styles.cardBorder}`}>
           <button
             onClick={startEvaluation}
             disabled={!selectedAgentId || !selectedQSetId || isRunning}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-lg text-xs transition-all cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
+            className={`px-4 py-2 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Play size={13} />
             <span>{t('dashboard.eval.start')}</span>
@@ -529,7 +529,7 @@ export default function DashboardView({
           <button
             onClick={resetEvaluation}
             disabled={!session}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-300 font-semibold rounded-lg text-xs transition-all cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
+            className={`px-4 py-2 ${styles.appBg} hover:bg-[var(--muted,rgba(0,0,0,0.04))] disabled:opacity-50 ${styles.cardTextMuted} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed`}
           >
             <RotateCcw size={13} />
             <span>{t('dashboard.eval.reset')}</span>
@@ -560,7 +560,7 @@ export default function DashboardView({
               {session.progress}%
             </span>
           </div>
-          <div className="w-full bg-slate-700/50 rounded-full h-2 overflow-hidden">
+          <div className="w-full rounded-full h-2 overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--muted-foreground, #64748B) 25%, transparent)" }}>
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 session.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-500'
@@ -572,13 +572,13 @@ export default function DashboardView({
             {session.results.map((r, i) => {
               const iconCls = r.status === 'completed' ? 'text-emerald-400' :
                 r.status === 'running' ? 'text-blue-400 animate-pulse' :
-                r.status === 'failed' ? 'text-red-400' : 'text-slate-600';
+                r.status === 'failed' ? 'text-red-400' : `${styles.cardTextMuted} opacity-50`;
               return (
                 <span key={r.questionId} className={`text-[9px] font-mono px-2 py-1 rounded border ${
                   r.status === 'completed' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' :
                   r.status === 'running' ? 'border-blue-500/30 bg-blue-500/5 text-blue-400' :
                   r.status === 'failed' ? 'border-red-500/30 bg-red-500/5 text-red-400' :
-                  'border-slate-700 bg-slate-800 text-slate-500'
+                  `${styles.appBg} ${styles.cardBorder} ${styles.cardTextMuted}`
                 }`}>
                   Q{i + 1}
                 </span>
@@ -613,7 +613,7 @@ export default function DashboardView({
                 <div key={dim.key} className="flex items-center gap-1.5 text-[10px]">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dim.color }} />
                   <span className={styles.cardTextMuted}>{t(`dashboard.radar.${dim.key}`)}</span>
-                  <span className="font-bold text-slate-300 ml-auto">{session.radarScores[dim.key] ?? '-'}</span>
+                  <span className={`font-bold ${styles.cardText} ml-auto`}>{session.radarScores[dim.key] ?? '-'}</span>
                 </div>
               ))}
             </div>
@@ -633,7 +633,7 @@ export default function DashboardView({
                 })}
               </span>
             </div>
-            <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-700/50">
+            <div className="max-h-[420px] overflow-y-auto divide-y divide-[var(--card-border,#E2E8F0)]">
               {session.results.map((r, i) => (
                 <div key={r.questionId} className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
@@ -646,7 +646,7 @@ export default function DashboardView({
                         ) : r.status === 'failed' ? (
                           <XCircle size={14} className="text-red-400" />
                         ) : (
-                          <Clock size={14} className="text-slate-600" />
+                          <Clock size={14} className={`${styles.cardTextMuted} opacity-50`} />
                         )}
                       </span>
                       <div className="min-w-0">
@@ -671,7 +671,7 @@ export default function DashboardView({
                           r.score >= 80 ? 'text-emerald-400' :
                           r.score >= 60 ? 'text-amber-400' : 'text-red-400'
                         }`}>{r.score}</p>
-                        <p className="text-[8px] text-slate-500 font-bold uppercase">{t('dashboard.eval.scoreLabel')}</p>
+                        <p className={`text-[8px] ${styles.cardTextMuted} font-bold uppercase`}>{t('dashboard.eval.scoreLabel')}</p>
                       </div>
                     )}
                   </div>
@@ -703,7 +703,7 @@ export default function DashboardView({
           className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             subView === 'overview'
               ? 'bg-blue-600 text-white shadow-sm'
-              : `${styles.cardTextMuted} hover:${styles.cardText} hover:bg-slate-700/50`
+              : `${styles.cardTextMuted} hover:${styles.cardText} hover:bg-[var(--muted,rgba(0,0,0,0.04))]`
           }`}
         >
           <LayoutDashboard size={13} />
@@ -714,7 +714,7 @@ export default function DashboardView({
           className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             subView === 'evaluation'
               ? 'bg-blue-600 text-white shadow-sm'
-              : `${styles.cardTextMuted} hover:${styles.cardText} hover:bg-slate-700/50`
+              : `${styles.cardTextMuted} hover:${styles.cardText} hover:bg-[var(--muted,rgba(0,0,0,0.04))]`
           }`}
         >
           <BarChart3 size={13} />

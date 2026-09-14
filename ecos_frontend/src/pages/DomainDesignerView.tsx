@@ -31,12 +31,12 @@ function MissingDomainView({ t, styles, onBack }: { t: (k: string) => string; st
   return (
     <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}>
       <div className="text-center">
-        <Network size={40} className="text-slate-500 mx-auto mb-3 opacity-30" />
+        <Network size={40} className={`${styles.muted} mx-auto mb-3 opacity-30`} />
         <p className="text-sm text-red-400">{t('ontology.designer.missingDomainParam')}</p>
-        <p className="text-xs text-slate-500 mt-1">{t('ontology.designer.enterFromDomainList')}</p>
+        <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('ontology.designer.enterFromDomainList')}</p>
         <button
           onClick={onBack}
-          className="mt-4 px-4 py-1.5 rounded-lg text-xs bg-slate-700 text-slate-300 hover:bg-slate-600"
+          className={`mt-4 px-4 py-1.5 rounded-lg text-xs ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}
         >
           {t('ontology.designer.backToDomainList')}
         </button>
@@ -103,13 +103,13 @@ export default function DomainDesignerView() {
         <div className={`flex items-center justify-between px-4 py-2 border-b ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
           <div className="flex items-center gap-1.5">
             <button onClick={() => store.toggleLeftPanel()}
-              className={`p-1.5 rounded hover:${styles.cardBg}/5 text-slate-400 hover:text-slate-300 transition`}
+              className={`p-1.5 rounded ${styles.sidebarHoverBg} ${styles.cardTextMuted} transition`}
               title={leftPanelCollapsed ? t('ontology.designer.expandEntityTree') : t('ontology.designer.collapseEntityTree')}>
               {leftPanelCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
             </button>
             <div className={`w-px h-5 border-l ${styles.cardBorder} mx-1`} />
             <Network size={14} className="text-indigo-400" />
-            <span className="text-xs font-medium text-slate-300">{t('ontology.designer.ontologyDesigner')}</span>
+            <span className={`text-xs font-medium ${styles.cardText}`}>{t('ontology.designer.ontologyDesigner')}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <button onClick={() => setShowCreateEntity(true)}
@@ -129,12 +129,12 @@ export default function DomainDesignerView() {
               <History size={11} />{t('ontology.version.title')}
             </button>
             <div className={`w-px h-5 border-l ${styles.cardBorder} mx-1`} />
-            <button className={`p-1.5 rounded hover:${styles.cardBg}/5 text-slate-400 hover:text-slate-300 transition`}
+            <button className={`p-1.5 rounded ${styles.sidebarHoverBg} ${styles.cardTextMuted} transition`}
               title={t('ontology.designer.autoLayout')}>
               <Maximize2 size={13} />
             </button>
             <button onClick={() => store.toggleRightPanel()}
-              className={`p-1.5 rounded hover:${styles.cardBg}/5 text-slate-400 hover:text-slate-300 transition`}
+              className={`p-1.5 rounded ${styles.sidebarHoverBg} ${styles.cardTextMuted} transition`}
               title={rightPanelCollapsed ? t('ontology.designer.expandPropertyPanel') : t('ontology.designer.collapsePropertyPanel')}>
               {rightPanelCollapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
             </button>

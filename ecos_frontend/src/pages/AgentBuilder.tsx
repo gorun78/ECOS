@@ -197,24 +197,24 @@ export default function AgentBuilder() {
 
   if (loading) {
     return (
-      <div className="flex-1 bg-slate-50 p-6 animate-fade-in">
+      <div className={`flex-1 ${styles.appBg} p-6 animate-fade-in`}>
         <LoadingSkeleton variant="card" rows={3} />
       </div>
     );
   }
 
   return (
-    <div className="flex-1 bg-slate-50 text-slate-800 flex flex-col h-full font-sans overflow-hidden animate-fade-in w-full">
+    <div className={`flex-1 ${styles.appBg} ${styles.cardText} flex flex-col h-full font-sans overflow-hidden animate-fade-in w-full`}>
       {/* Page header */}
-      <div className="bg-white border-b border-slate-200 p-3 sm:p-5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className={`border-b ${styles.cardBg} p-3 sm:p-5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
         <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className={`text-xl font-bold ${styles.cardText} flex items-center gap-2`}>
             <Cpu className="text-indigo-600 w-5 h-5 shrink-0" />
             {isEdit
               ? g(locale, "Edit Agent", "编辑Agent")
               : g(locale, "Create Agent", "创建Agent")}
           </h1>
-          <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+          <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-2xl leading-relaxed`}>
             {isEdit
               ? g(locale, "Modify agent configuration and tools", "修改Agent配置与工具绑定")
               : g(locale, "Configure a new AI agent with model, tools, and knowledge", "配置新的AI Agent：选择模型、绑定工具与知识库")}
@@ -224,7 +224,7 @@ export default function AgentBuilder() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => navigate("/agent_studio")}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+            className={`${styles.badgeBg} ${styles.cardText} rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition`}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             {g(locale, "Back to Studio", "返回工坊")}
@@ -275,15 +275,15 @@ export default function AgentBuilder() {
           )}
 
           {/* ── Basic Info Card ───────────────────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <div className={`border rounded-xl p-5 shadow-xs space-y-4 ${styles.cardBg}`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+            <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
               <Bot className="w-4 h-4 text-indigo-600" />
               {g(locale, "Basic Information", "基本信息")}
             </h2>
 
             {/* Agent Name */}
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+              <label className={`text-xs font-semibold ${styles.cardTextMuted} block mb-1.5`}>
                 {g(locale, "Agent Name", "Agent名称")}
                 <span className="text-red-500 ml-0.5">*</span>
               </label>
@@ -291,35 +291,35 @@ export default function AgentBuilder() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition"
+                className={`w-full border rounded-lg px-3.5 py-2.5 text-sm ${styles.inputText} placeholder:opacity-50 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition ${styles.inputBg} ${styles.inputBorder}`}
                 placeholder={g(locale, "e.g. Data Analyst Agent", "如: 数据分析Agent")}
               />
             </div>
 
             {/* Description */}
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+              <label className={`text-xs font-semibold ${styles.cardTextMuted} block mb-1.5`}>
                 {g(locale, "Description", "描述")}
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition resize-none"
+                className={`w-full border rounded-lg px-3.5 py-2.5 text-sm ${styles.inputText} placeholder:opacity-50 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition resize-none ${styles.inputBg} ${styles.inputBorder}`}
                 placeholder={g(locale, "What does this agent do?", "描述此Agent的用途")}
               />
             </div>
 
             {/* Model Selection */}
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+              <label className={`text-xs font-semibold ${styles.cardTextMuted} block mb-1.5`}>
                 {g(locale, "Model", "模型选择")}
                 <span className="text-red-500 ml-0.5">*</span>
               </label>
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 bg-white outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition"
+                className={`w-full border rounded-lg px-3.5 py-2.5 text-sm ${styles.inputText} ${styles.inputBg} ${styles.inputBorder} outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition`}
               >
                 <option value="">{g(locale, "Select a model...", "请选择模型...")}</option>
                 {models.map((m) => (
@@ -332,8 +332,8 @@ export default function AgentBuilder() {
           </div>
 
           {/* ── System Prompt Card ────────────────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <div className={`border rounded-xl p-5 shadow-xs space-y-4 ${styles.cardBg}`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+            <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
               <Brain className="w-4 h-4 text-purple-600" />
               {g(locale, "System Prompt", "系统提示词")}
             </h2>
@@ -341,7 +341,7 @@ export default function AgentBuilder() {
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               rows={8}
-              className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition font-mono resize-y"
+              className={`w-full border rounded-lg px-3.5 py-2.5 text-sm ${styles.inputText} placeholder:opacity-50 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition font-mono resize-y ${styles.inputBg} ${styles.inputBorder}`}
               placeholder={g(
                 locale,
                 "You are a helpful AI assistant...",
@@ -351,17 +351,17 @@ export default function AgentBuilder() {
           </div>
 
           {/* ── Tools Card ────────────────────────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <div className={`border rounded-xl p-5 shadow-xs space-y-4 ${styles.cardBg}`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+            <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
               <Wrench className="w-4 h-4 text-amber-600" />
               {g(locale, "Tools", "工具绑定")}
-              <span className="text-[10px] font-normal text-slate-400 ml-1">
+              <span className={`text-[10px] font-normal ${styles.cardTextMuted} ml-1`}>
                 ({selectedToolIds.length} {g(locale, "selected", "已选")})
               </span>
             </h2>
 
             {tools.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-3">
+              <p className={`text-xs ${styles.cardTextMuted} italic py-3`}>
                 {g(locale, "No tools available. Add tools from the backend first.", "暂无可用工具，请先在后台注册工具。")}
               </p>
             ) : (
@@ -374,7 +374,7 @@ export default function AgentBuilder() {
                       className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${
                         isSelected
                           ? "bg-indigo-50 border-indigo-300 shadow-sm"
-                          : "bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white"
+                          : `${styles.inputBg} ${styles.cardBorder} hover:border-opacity-70 hover:${styles.cardBg}`
                       }`}
                     >
                       <input
@@ -384,16 +384,16 @@ export default function AgentBuilder() {
                         className="mt-0.5 shrink-0 accent-indigo-600"
                       />
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs font-bold text-slate-700 block leading-tight">
+                        <span className={`text-xs font-bold ${styles.cardText} block leading-tight`}>
                           {tool.name}
                         </span>
                         {tool.description && (
-                          <p className="text-[10px] text-slate-450 leading-relaxed mt-0.5 line-clamp-2">
+                          <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed mt-0.5 line-clamp-2`}>
                             {tool.description}
                           </p>
                         )}
                         {tool.category && (
-                          <span className="inline-block text-[9px] font-mono text-slate-400 bg-white/70 border border-slate-200 rounded px-1.5 py-0.5 mt-1">
+                          <span className={`inline-block text-[9px] font-mono ${styles.cardTextMuted} ${styles.cardBg}/70 ${styles.cardBorder} border rounded px-1.5 py-0.5 mt-1`}>
                             {tool.category}
                           </span>
                         )}
@@ -406,22 +406,22 @@ export default function AgentBuilder() {
           </div>
 
           {/* ── Knowledge Base + Temperature Card ─────────────── */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5">
+          <div className={`border rounded-xl p-5 shadow-xs space-y-5 ${styles.cardBg}`} style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
             {/* Knowledge Base */}
             <div>
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+              <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2 mb-3`}>
                 <BookOpen className="w-4 h-4 text-cyan-600" />
                 {g(locale, "Knowledge Base", "知识库绑定")}
               </h2>
               {knowledgeBases.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">
+                <p className={`text-xs ${styles.cardTextMuted} italic`}>
                   {g(locale, "No knowledge bases available.", "暂无可用知识库。")}
                 </p>
               ) : (
                 <select
                   value={knowledgeBaseId}
                   onChange={(e) => setKnowledgeBaseId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 bg-white outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition"
+                  className={`w-full border rounded-lg px-3.5 py-2.5 text-sm ${styles.inputText} ${styles.inputBg} ${styles.inputBorder} outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition`}
                 >
                   <option value="">
                     {g(locale, "None (no knowledge base)", "无（不绑定知识库）")}
@@ -438,7 +438,7 @@ export default function AgentBuilder() {
 
             {/* Temperature Slider */}
             <div>
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+              <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2 mb-3`}>
                 <Thermometer className="w-4 h-4 text-orange-500" />
                 {g(locale, "Temperature", "温度参数")}
               </h2>
@@ -450,13 +450,13 @@ export default function AgentBuilder() {
                   step="0.05"
                   value={temperature}
                   onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  className="flex-1 accent-indigo-600 h-2 rounded-lg appearance-none bg-slate-200 cursor-pointer"
+                  className="flex-1 accent-indigo-600 h-2 rounded-lg appearance-none bg-zinc-200 cursor-pointer"
                 />
                 <span className="text-sm font-bold font-mono text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5 min-w-[4rem] text-center">
                   {temperature.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-[10px] text-slate-400 mt-1.5 font-mono">
+              <div className={`flex justify-between text-[10px] ${styles.cardTextMuted} mt-1.5 font-mono`}>
                 <span>{g(locale, "Precise", "精确")} (0)</span>
                 <span>{g(locale, "Balanced", "平衡")} (1.0)</span>
                 <span>{g(locale, "Creative", "创意")} (2.0)</span>

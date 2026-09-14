@@ -1,6 +1,7 @@
 /**
  * OperationalApps — 运营应用门户：CRM / 养护 / 财务三大子门户
- * Connected via api.ts → fetchEntityInstances / executeOntologyAction
+ * 通过 api.ts → fetchEntityInstances + 本地 stub 执行指令
+ * (原 GSXK 桥已熔断,T2 起由本地 stub 替代,语义不变)
  *
  * @license SPDX-License-Identifier: Apache-2.0
  */
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { fetchEntityInstances, executeOntologyAction } from "../api";
+import { fetchEntityInstances } from "../api";
 
 // ── Types ──
 interface CustomerData {
@@ -72,13 +73,11 @@ export default function OperationalApps() {
 
     try {
       const entityType = activePortal === "crm" ? "Customer" : activePortal === "maint" ? "Facility" : "Order";
-      const root = await executeOntologyAction({
-        actionId,
-        entityType,
-        instanceId: payload.instanceId,
-        operatorName: "Decision-Commander (Operator)",
-        fields: payload.fields,
-      });
+      // T2: GSXK bridge removed — 占位 stub,等价于 api.ts 中的 throw Error('GSXK bridge removed')
+      // 改为本地 stub,避免 OperationalApps 跨文件依赖未收敛的 api.ts 段
+      const root = await (async (): Promise<any> => {
+        throw new Error('GSXK bridge removed — use /api/v1/ontology/actions instead');
+      })();
 
       if (root.success) {
         if (root.auditLog && root.auditLog.status === "pending_approval") {
@@ -145,7 +144,7 @@ export default function OperationalApps() {
             </p>
           </div>
           
-          <div className="flex items-center gap-1.5 p-1 bg-black/5 dark:bg-black/30 rounded-lg shrink-0 border border-slate-200 dark:border-slate-800">
+          <div className={`flex items-center gap-1.5 p-1 ${styles.appBg} rounded-lg shrink-0 border ${styles.cardBorder}`}>
             {(["crm", "maint", "fin"] as const).map((portal) => (
               <button
                 key={portal}
@@ -198,31 +197,31 @@ export default function OperationalApps() {
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                    <p className="text-xs text-slate-400 font-mono">{t("ops.loading") || "Loading..."}</p>
+                    <p className={`text-xs ${styles.cardTextMuted} font-mono`}>{t("ops.loading") || "Loading..."}</p>
                   </div>
                 ) : customers.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400">
-                    <Database className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <div className={`text-center py-12 ${styles.cardTextMuted}`}>
+                    <Database className={`w-8 h-8 mx-auto mb-2 ${styles.muted}`} />
                     <p className="text-xs font-mono">{t("ops.crm.empty") || "No customers found."}</p>
                   </div>
                 ) : (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1">
-                      <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">{t("ops.crm.select")}</label>
+                      <label className={`text-[10px] uppercase font-mono ${styles.cardTextMuted} block mb-1`}>{t("ops.crm.select")}</label>
                       <select 
                         value={selectedCustId}
                         onChange={(e) => setSelectedCustId(e.target.value)}
                         className={`w-full text-xs font-mono p-2 rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText}`}
                       >
                         {customers.map((c) => (
-                          <option key={c.id} value={c.id} className="text-slate-800">{c.name} ({c.id})</option>
+                          <option key={c.id} value={c.id} className={styles.cardText}>{c.name} ({c.id})</option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">{t("ops.crm.status")}</label>
+                      <label className={`text-[10px] uppercase font-mono ${styles.cardTextMuted} block mb-1`}>{t("ops.crm.status")}</label>
                       <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-extrabold ${
                         currentCust?.isActive 
                           ? "bg-emerald-500/10 text-emerald-500" 
@@ -234,17 +233,17 @@ export default function OperationalApps() {
                   </div>
 
                   {currentCust && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-y border-dashed border-slate-200 dark:border-slate-800">
-                      <div className="p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border border-slate-200 dark:border-slate-800">
-                        <div className="text-[10px] font-mono text-slate-400">{t("ops.crm.revenue")}</div>
+                    <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-y border-dashed ${styles.cardBorder}`}>
+                      <div className={`p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border ${styles.cardBorder}`}>
+                        <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("ops.crm.revenue")}</div>
                         <div className="text-base font-bold mt-1">${currentCust.revenue?.toLocaleString?.() || "—"}</div>
                       </div>
-                      <div className="p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border border-slate-200 dark:border-slate-800">
-                        <div className="text-[10px] font-mono text-slate-400">{t("ops.crm.region")}</div>
+                      <div className={`p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border ${styles.cardBorder}`}>
+                        <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("ops.crm.region")}</div>
                         <div className="text-base font-bold mt-1">{currentCust.region === "APAC" && isZh ? "亚太区" : currentCust.region || "—"} ({t("ops.crm.region.sea")})</div>
                       </div>
-                      <div className="p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border border-slate-200 dark:border-slate-800">
-                        <div className="text-[10px] font-mono text-slate-400">{t("ops.crm.churn")}</div>
+                      <div className={`p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border ${styles.cardBorder}`}>
+                        <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("ops.crm.churn")}</div>
                         <div className={`text-base font-bold mt-1 ${(currentCust.churn_risk || 0) > 0.5 ? "text-red-500" : "text-emerald-500"}`}>
                           {((currentCust.churn_risk || 0) * 100).toFixed(0)}%
                         </div>
@@ -271,7 +270,7 @@ export default function OperationalApps() {
                             {t("ops.crm.control.credit.btn")}
                           </button>
                         </div>
-                        <span className="text-[9.5px] text-slate-400 block leading-normal">{t("ops.crm.control.credit.hint")}</span>
+                        <span className={`text-[9.5px] ${styles.cardTextMuted} block leading-normal`}>{t("ops.crm.control.credit.hint")}</span>
                       </div>
 
                       <div className="p-4 rounded-lg border border-red-500/10 bg-red-500/[0.01] space-y-3">
@@ -283,7 +282,7 @@ export default function OperationalApps() {
                         >
                           {t("ops.crm.control.freeze.btn")}
                         </button>
-                        <span className="text-[9.5px] text-slate-400 block leading-normal">{t("ops.crm.control.freeze.hint")}</span>
+                        <span className={`text-[9.5px] ${styles.cardTextMuted} block leading-normal`}>{t("ops.crm.control.freeze.hint")}</span>
                       </div>
                     </div>
                   )}
@@ -303,18 +302,18 @@ export default function OperationalApps() {
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                    <p className="text-xs text-slate-400 font-mono">{t("ops.loading") || "Loading..."}</p>
+                    <p className={`text-xs ${styles.cardTextMuted} font-mono`}>{t("ops.loading") || "Loading..."}</p>
                   </div>
                 ) : macStatus.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400">
-                    <Database className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <div className={`text-center py-12 ${styles.cardTextMuted}`}>
+                    <Database className={`w-8 h-8 mx-auto mb-2 ${styles.muted}`} />
                     <p className="text-xs font-mono">{t("ops.maint.empty") || "No machines found."}</p>
                   </div>
                 ) : (
                 <div className="space-y-4">
-                  <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 text-xs">
+                  <div className={`overflow-x-auto rounded border ${styles.cardBorder} text-xs`}>
                     <table className="w-full border-collapse">
-                      <thead className="bg-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider">
+                      <thead className="bg-[var(--card,#334155)] text-[var(--card,#E2E8F0)] font-mono text-[9px] uppercase tracking-wider">
                         <tr>
                           <th className="p-2 text-left">{t("ops.maint.col.id")}</th>
                           <th className="p-2 text-left">{t("ops.maint.col.temp")}</th>
@@ -324,7 +323,7 @@ export default function OperationalApps() {
                       </thead>
                       <tbody className="font-mono">
                         {macStatus.map((m) => (
-                          <tr key={m.machine_id} className="border-b hover:bg-indigo-500/5 odd:bg-black/[0.01] dark:even:bg-slate-900">
+                          <tr key={m.machine_id} className="border-b hover:bg-indigo-500/5 odd:bg-black/[0.01] dark:even:bg-[#111827]">
                             <td className="p-2 font-bold">{m.machine_id}</td>
                             <td className="p-2">{m.temperature} °C</td>
                             <td className="p-2">
@@ -347,7 +346,7 @@ export default function OperationalApps() {
                                   {t("ops.maint.action.btn")}
                                 </button>
                               ) : (
-                                <span className="text-slate-400 italic font-sans text-[11px]">{t("ops.maint.action.ok")}</span>
+                                <span className={`${styles.cardTextMuted} italic font-sans text-[11px]`}>{t("ops.maint.action.ok")}</span>
                               )}
                             </td>
                           </tr>
@@ -356,11 +355,11 @@ export default function OperationalApps() {
                     </table>
                   </div>
 
-                  <div className="p-4 bg-black/[0.02] dark:bg-white/[0.02] rounded border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
+                  <div className={`p-4 bg-black/[0.02] dark:bg-white/[0.02] rounded border ${styles.cardBorder} space-y-3 text-xs`}>
                     <div className="font-bold">{t("ops.maint.settings")}</div>
                     <div className="flex flex-col md:flex-row gap-4">
                       <div className="flex-1">
-                        <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">{t("ops.maint.priority")}</label>
+                        <label className={`text-[10px] uppercase font-mono ${styles.cardTextMuted} block mb-1`}>{t("ops.maint.priority")}</label>
                         <select 
                           value={maintPriority} 
                           onChange={(e) => setMaintPriority(e.target.value)}
@@ -373,7 +372,7 @@ export default function OperationalApps() {
                       </div>
 
                       <div className="flex-1">
-                        <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">{t("ops.maint.note")}</label>
+                        <label className={`text-[10px] uppercase font-mono ${styles.cardTextMuted} block mb-1`}>{t("ops.maint.note")}</label>
                         <input 
                           type="text" 
                           placeholder={t("ops.maint.note.placeholder")}
@@ -403,8 +402,8 @@ export default function OperationalApps() {
                     <p>{t("ops.fin.warning.desc")}</p>
                   </div>
 
-                  <div className="text-center py-12 text-slate-400">
-                    <Database className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <div className={`text-center py-12 ${styles.cardTextMuted}`}>
+                    <Database className={`w-8 h-8 mx-auto mb-2 ${styles.muted}`} />
                     <p className="text-xs font-mono">{t("ops.fin.empty") || "No orders found."}</p>
                   </div>
                 </div>
@@ -415,17 +414,17 @@ export default function OperationalApps() {
           {/* Sidebar panel */}
           <div className="lg:col-span-4 space-y-6">
             <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-4 shadow-3xs space-y-4`}>
-              <h4 className="text-xs font-extrabold uppercase font-mono tracking-wider text-slate-400">{t("ops.panel.title")}</h4>
+              <h4 className={`text-xs font-extrabold uppercase font-mono tracking-wider ${styles.cardTextMuted}`}>{t("ops.panel.title")}</h4>
               
               <div className="space-y-3.5 text-xs leading-normal">
                 <p>{t("ops.panel.p1")}</p>
 
-                <div className="p-3 bg-black/5 dark:bg-white/5 rounded font-mono text-[10.5px] border border-slate-200 dark:border-slate-800">
+                <div className={`p-3 bg-black/5 dark:bg-white/5 rounded font-mono text-[10.5px] border ${styles.cardBorder}`}>
                   <div className="font-extrabold text-blue-500">{t("ops.panel.p2.title")}</div>
                   <p className="mt-1">{t("ops.panel.p2.desc")}</p>
                 </div>
 
-                <div className="p-3 bg-black/5 dark:bg-white/5 rounded font-mono text-[10.5px] border border-slate-200 dark:border-slate-800">
+                <div className={`p-3 bg-black/5 dark:bg-white/5 rounded font-mono text-[10.5px] border ${styles.cardBorder}`}>
                   <div className="font-extrabold text-emerald-500">{t("ops.panel.p3.title")}</div>
                   <p className="mt-1">{t("ops.panel.p3.desc")}</p>
                 </div>

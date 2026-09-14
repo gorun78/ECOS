@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDomainReassignDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDomainSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDomainVO;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -46,10 +49,25 @@ public class OntologyDomainService {
         return repository.findAll().stream().map(this::toMap).collect(Collectors.toList());
     }
 
+    /**
+     * 列出全部领域的强类型 VO 版本（T16-2）。
+     * <p>旧 {@link #listDomains()} 签名保留（Wave31 C1 mock 兼容）。
+     */
+    public List<OntologyDomainVO> listDomainsVO() {
+        return repository.findAll().stream().map(this::toVO).collect(Collectors.toList());
+    }
+
     public Map<String, Object> getDomain(String domainCode) {
         return repository.findByCode(domainCode)
             .map(this::toMap)
             .orElse(null);
+    }
+
+    /**
+     * 强类型 VO 版（T16-2）；不存在返回 null（与旧 Map 版语义一致）。
+     */
+    public OntologyDomainVO getDomainVO(String domainCode) {
+        return repository.findByCode(domainCode).map(this::toVO).orElse(null);
     }
 
     public Map<String, Object> createDomain(Map<String, Object> body) {
@@ -70,6 +88,27 @@ public class OntologyDomainService {
         return toMap(dom);
     }
 
+    /**
+     * 强类型 VO 版（T16-2）；新增时 code/name 必填（由 DTO 字段语义承载）。
+     */
+    public OntologyDomainVO createDomain(OntologyDomainSaveDTO dto) {
+        String code = dto.getCode() != null ? dto.getCode() : "";
+        if (repository.existsByCode(code)) {
+            throw new IllegalArgumentException("ONT-009: Domain code '" + code + "' already exists");
+        }
+        OntologyDomain dom = new OntologyDomain();
+        dom.setId(nextId());
+        dom.setCode(code);
+        dom.setName(dto.getName() != null ? dto.getName() : "");
+        dom.setOwner(dto.getOwner() != null ? dto.getOwner() : "");
+        dom.setDescription(dto.getDescription() != null ? dto.getDescription() : "");
+        dom.setStatus("Draft");
+        dom.setSortOrder(1);
+        repository.insert(dom);
+        log.info("Domain created (VO): {} [{}]", dom.getId(), dom.getCode());
+        return toVO(dom);
+    }
+
     public Optional<Map<String, Object>> updateDomain(String domainCode, Map<String, Object> body) {
         return repository.findByCode(domainCode).map(existing -> {
             String code = body.containsKey("code") ? String.valueOf(body.get("code")) : null;
@@ -79,6 +118,38 @@ public class OntologyDomainService {
             String status = body.containsKey("status") ? String.valueOf(body.get("status")) : null;
             repository.update(existing.getId(), code, name, owner, description, status);
             return repository.findByCode(domainCode).map(this::toMap).orElse(null);
+        });
+    }
+
+    /**
+     * 强类型 VO 版（T16-2）；用于 {@code OntologyDomainApiController.updateDomain} 路径。
+     * 与 {@link #updateDomain(String, OntologyDomainSaveDTO)} 同语义，
+     * 不同泛型返回类型便于 Controller 显式选用。
+     */
+    public Optional<OntologyDomainVO> updateDomainVO(String domainCode, OntologyDomainSaveDTO dto) {
+        return repository.findByCode(domainCode).map(existing -> {
+            String code = dto.getCode();
+            String name = dto.getName();
+            String owner = dto.getOwner();
+            String description = dto.getDescription();
+            String status = dto.getStatus();
+            repository.update(existing.getId(), code, name, owner, description, status);
+            return repository.findByCode(domainCode).map(this::toVO).orElse(null);
+        });
+    }
+
+    /**
+     * 强类型 VO 版（T16-2）；DTO 字段 null 表示不动（与旧 Map 版语义一致）。
+     */
+    public Optional<OntologyDomainVO> updateDomain(String domainCode, OntologyDomainSaveDTO dto) {
+        return repository.findByCode(domainCode).map(existing -> {
+            String code = dto.getCode();
+            String name = dto.getName();
+            String owner = dto.getOwner();
+            String description = dto.getDescription();
+            String status = dto.getStatus();
+            repository.update(existing.getId(), code, name, owner, description, status);
+            return repository.findByCode(domainCode).map(this::toVO).orElse(null);
         });
     }
 
@@ -98,8 +169,18 @@ public class OntologyDomainService {
         return setStatus(domainCode, "Published");
     }
 
+    /** 强类型 VO 版（T16-2）。 */
+    public OntologyDomainVO publishDomainVO(String domainCode) {
+        return setAndToVO(domainCode, "Published");
+    }
+
     public Map<String, Object> deprecateDomain(String domainCode) {
         return setStatus(domainCode, "Deprecated");
+    }
+
+    /** 强类型 VO 版（T16-2）。 */
+    public OntologyDomainVO deprecateDomainVO(String domainCode) {
+        return setAndToVO(domainCode, "Deprecated");
     }
 
     /**
@@ -117,11 +198,28 @@ public class OntologyDomainService {
             .collect(Collectors.toList());
     }
 
+    /**
+     * 强类型 VO 版（T16-2）。
+     */
+    public List<OntologyDomainVO> searchDomainsVO(String keyword, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        return repository.searchDomains(keyword, safeLimit).stream()
+            .map(this::toVO)
+            .collect(Collectors.toList());
+    }
+
     private Map<String, Object> setStatus(String domainCode, String status) {
         OntologyDomain dom = repository.findByCode(domainCode)
             .orElseThrow(() -> new IllegalArgumentException("ONT-008: Domain '" + domainCode + "' not found"));
         repository.update(dom.getId(), null, null, null, null, status);
         return repository.findByCode(domainCode).map(this::toMap).orElse(null);
+    }
+
+    private OntologyDomainVO setAndToVO(String domainCode, String status) {
+        OntologyDomain dom = repository.findByCode(domainCode)
+            .orElseThrow(() -> new IllegalArgumentException("ONT-008: Domain '" + domainCode + "' not found"));
+        repository.update(dom.getId(), null, null, null, null, status);
+        return repository.findByCode(domainCode).map(this::toVO).orElse(null);
     }
 
     // ═══════════════ Object → Domain 归属变更 ═══════════════════
@@ -144,6 +242,17 @@ public class OntologyDomainService {
         return result;
     }
 
+    /**
+     * 强类型 VO 版（T16-2）；DTO 兼容 domainCode / domainId 双字段。
+     * <p>与旧 Map 版语义一致：domainCode 优先，否则回退 domainId。
+     */
+    public Map<String, Object> reassignEntityDomainVO(String entityId, OntologyDomainReassignDTO dto) {
+        String domainCode = dto.getDomainCode() != null && !dto.getDomainCode().isBlank()
+            ? dto.getDomainCode()
+            : (dto.getDomainId() != null ? dto.getDomainId() : "");
+        return reassignEntityDomain(entityId, domainCode);
+    }
+
     private Map<String, Object> toMap(OntologyDomain d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", d.getId());
@@ -156,5 +265,22 @@ public class OntologyDomainService {
         m.put("createdAt", d.getCreatedAt() != null ? d.getCreatedAt().toString() : null);
         m.put("updatedAt", d.getUpdatedAt() != null ? d.getUpdatedAt().toString() : null);
         return m;
+    }
+
+    /**
+     * 转换到 {@link OntologyDomainVO}（T16-2 强类型）。
+     */
+    private OntologyDomainVO toVO(OntologyDomain d) {
+        OntologyDomainVO v = new OntologyDomainVO();
+        v.setId(d.getId());
+        v.setCode(d.getCode());
+        v.setName(d.getName());
+        v.setOwner(d.getOwner());
+        v.setDescription(d.getDescription());
+        v.setStatus(d.getStatus());
+        v.setSortOrder(d.getSortOrder());
+        v.setCreatedAt(d.getCreatedAt() != null ? d.getCreatedAt().toString() : null);
+        v.setUpdatedAt(d.getUpdatedAt() != null ? d.getUpdatedAt().toString() : null);
+        return v;
     }
 }

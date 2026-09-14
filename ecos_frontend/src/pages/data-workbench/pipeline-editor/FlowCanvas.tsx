@@ -25,6 +25,7 @@ import {
 } from '@xyflow/react';
 import {
   Database, FileText, Globe, Radio, Settings, HardDrive,
+  Braces, GitMerge, Upload,
   Loader2, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import type { NodeStatus, NodeConfig, PipelineNodeType } from './types';
@@ -96,11 +97,17 @@ const NodeShell: React.FC<
   NodeProps & {
     theme: NodeShellTheme;
     body: (cfg: NodeConfig['config']) => React.ReactNode;
+    /** Wave 3 (lower) T3: red badge dot for breakpoint nodes. */
+    breakpoint?: boolean;
   }
-> = React.memo(({ data, selected, theme, body }) => {
+> = React.memo(({ data, selected, theme, body, breakpoint: breakpointProp }) => {
   const { styles } = useTheme();
-  const config = (data ?? {}) as unknown as NodeConfig;
+  const { t } = useLanguage();
+  const config = (data ?? {}) as unknown as NodeConfig & { breakpoint?: boolean };
   const status: NodeStatus = config.nodeStatus || 'idle';
+  // Wave 3 (lower) T3 — breakpoint flag can be passed as a prop (for direct
+  // usage) or as `data.breakpoint` (for the runtime-wrapped variants).
+  const breakpoint = breakpointProp ?? config.breakpoint ?? false;
   const Icon = theme.icon;
   return (
     <div
@@ -108,6 +115,16 @@ const NodeShell: React.FC<
         selected ? `${theme.borderCls} shadow-lg ring-2 ${theme.selectedRing}` : theme.borderCls
       }`}
     >
+      {/* Wave 3 (lower) T3: breakpoint red dot badge (top-right).
+          Static bg-red-500 — a functional state indicator, not a
+          structural color, safe across all four themes. */}
+      {breakpoint && (
+        <span className={`absolute -top-2 -right-2 z-10`} title={t('dw.pipeline.debug.badge')}>
+          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full border-2 ${styles.cardBg}`}>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+          </span>
+        </span>
+      )}
       <NodeHandle type="target" position={Position.Top} id="top" />
       <NodeHandle type="target" position={Position.Left} id="left" />
       <div className={`flex items-center gap-2 px-3 py-2 ${theme.headerBg} rounded-t-xl border-b ${theme.borderCls}`}>
@@ -289,7 +306,100 @@ const OutputObjectNode: React.FC<NodeProps> = (props) => {
   );
 };
 
-// ─── Node type registry (P2-01 enumeration) ───────────────
+// ─── Wave 5: TRANSFORM_UDF / JOIN / SINK nodes ─────────────
+
+const TransformUdfNode: React.FC<NodeProps> = (props) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <NodeShell
+      {...props}
+      theme={{
+        icon: Braces,
+        iconCls: styles.infoText,
+        headerBg: styles.infoBg,
+        headerText: styles.infoText,
+        borderCls: styles.infoBorder,
+        selectedRing: styles.infoBorder,
+      }}
+      body={(cfg: NodeConfigFields) =>
+        cfg.udfId ? (
+          <div className="truncate" title={cfg.udfId}>
+            {t('dw.pipeline.node.body.udf')}: <span className={`font-mono ${styles.infoText}`}>{cfg.udfName || cfg.udfId}</span>
+          </div>
+        ) : (
+          <div className={`italic ${styles.cardTextMuted}`}>{t('dw.pipeline.node.body.selectUdf')}</div>
+        )
+      }
+    />
+  );
+};
+
+const JoinNode: React.FC<NodeProps> = (props) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <NodeShell
+      {...props}
+      theme={{
+        icon: GitMerge,
+        iconCls: styles.accentText,
+        headerBg: styles.cardBg,
+        headerText: styles.accentText,
+        borderCls: styles.cardBorder,
+        selectedRing: styles.accentBorder,
+      }}
+      body={(cfg: NodeConfigFields) => {
+        const jt = cfg.joinType || 'inner';
+        const keys = cfg.joinKeys?.length ? cfg.joinKeys.join(', ') : '';
+        return (
+          <div className="truncate" title={`${jt}${keys ? ' ' + keys : ''}`}>
+            {String(jt).toUpperCase()}{keys ? <span className={`ml-1 font-mono ${styles.accentText}`}>{keys}</span> : null}
+          </div>
+        );
+      }}
+    />
+  );
+};
+
+const SinkNode: React.FC<NodeProps> = (props) => {
+  const { styles } = useTheme();
+  const { t } = useLanguage();
+  return (
+    <NodeShell
+      {...props}
+      theme={{
+        icon: Upload,
+        iconCls: styles.successText,
+        headerBg: styles.successBg,
+        headerText: styles.successText,
+        borderCls: styles.successBorder,
+        selectedRing: styles.successBorder,
+      }}
+      body={(cfg: NodeConfigFields) =>
+        cfg.targetTable ? (
+          <div className="truncate" title={`${cfg.targetDatasourceId || ''} ${cfg.targetTable}`}>
+            {cfg.targetDatasourceId ? (
+              <>
+                {t('dw.pipeline.node.body.target')}: <span className={`font-mono ${styles.successText}`}>{cfg.targetDatasourceId}</span>
+                <span className={`mx-1 ${styles.cardTextMuted}`}>/</span>
+                <span className={`font-mono ${styles.successText}`}>{cfg.targetTable}</span>
+              </>
+            ) : (
+              <>
+                <span className={`font-mono ${styles.successText}`}>{cfg.targetTable}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className={`italic ${styles.cardTextMuted}`}>{t('dw.pipeline.node.body.selectSink')}</div>
+        )
+      }
+    />
+  );
+};
+
+// ─── Node type registry (P2-01 enumeration, Wave 5: 6 → 9) ──
 
 export const CUSTOM_NODE_TYPES: NodeTypes = {
   SOURCE_JDBC: SourceJdbcNode,
@@ -297,10 +407,13 @@ export const CUSTOM_NODE_TYPES: NodeTypes = {
   SOURCE_REST: SourceRestNode,
   SOURCE_CDC: SourceCdcNode,
   TRANSFORM_SQL: TransformSqlNode,
+  TRANSFORM_UDF: TransformUdfNode,
+  JOIN: JoinNode,
+  SINK: SinkNode,
   OUTPUT_OBJECT: OutputObjectNode,
 };
 
-// ─── MiniMap color helper (P2-01) ─────────────────────────
+// ─── MiniMap color helper (P2-01, Wave 5: 6 → 9) ──────────
 
 export const miniMapNodeColor = (node: Node): string => {
   switch (node.type as PipelineNodeType) {
@@ -309,10 +422,28 @@ export const miniMapNodeColor = (node: Node): string => {
     case 'SOURCE_REST': return '#0ea5e9';
     case 'SOURCE_CDC': return '#f97316';
     case 'TRANSFORM_SQL': return '#14b8a6';
+    case 'TRANSFORM_UDF': return '#06b6d4';
+    case 'JOIN': return '#8b5cf6';
+    case 'SINK': return '#22c55e';
     case 'OUTPUT_OBJECT': return '#64748b';
     default: return '#94a3b8';
   }
 };
+
+// ─── Wave 3 (lower) T2: danger-marked node shell ──────────
+// Wrapped around the normal NodeShell content so the validation-failure red
+// border/ring are visible without mutating the original node component.
+
+const DangerShell: React.FC<{ children?: React.ReactNode }> = React.memo(({ children }) => {
+  const { styles } = useTheme();
+  return (
+    <div className={`relative rounded-xl border-2 ${styles.dangerBorder} shadow-lg ${styles.dangerBg} p-[2px]`}>
+      <div className={`rounded-lg ${styles.cardBg}`}>
+        {children as React.ReactNode}
+      </div>
+    </div>
+  );
+});
 
 // ─── FlowCanvas Props ─────────────────────────────────────
 
@@ -328,6 +459,10 @@ interface FlowCanvasProps {
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
   styles: Record<string, string>;
+  /** Wave 3 (lower) T2: ids of nodes that failed local pre-checks. */
+  invalidNodeIds?: Set<string>;
+  /** Wave 3 (lower) T3: ids of nodes that have a breakpoint set (red dot). */
+  breakpointNodeIds?: Set<string>;
 }
 
 const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -342,6 +477,8 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onDragOver,
   onDrop,
   styles,
+  invalidNodeIds,
+  breakpointNodeIds,
 }) => {
   const { t } = useLanguage();
   const onConnectWrapped = useCallback(
@@ -351,10 +488,58 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     [onConnect]
   );
 
+  // Wave 3 (lower) T2 + T3: per-node wrapping — injects (a) a danger frame
+  // for nodes that failed local pre-checks, and (b) a `breakpoint` prop
+  // so the node shell can render the red dot badge.
+  const { displayNodes, displayNodeTypes } = React.useMemo<{
+    displayNodes: Node[];
+    displayNodeTypes: Record<string, React.ComponentType<NodeProps>>;
+  }>(() => {
+    const invalidated = (invalidNodeIds && invalidNodeIds.size > 0) || (breakpointNodeIds && breakpointNodeIds.size > 0);
+    if (!invalidated) {
+      return {
+        displayNodes: nodes,
+        displayNodeTypes: CUSTOM_NODE_TYPES as Record<string, React.ComponentType<NodeProps>>,
+      };
+    }
+    const nextTypes: Record<string, React.ComponentType<NodeProps>> = {
+      ...(CUSTOM_NODE_TYPES as Record<string, React.ComponentType<NodeProps>>),
+    };
+    const makeVariant = (base: React.ComponentType<NodeProps>, key: string, extra: { danger?: boolean; breakpoint?: boolean }) => {
+      const variantKey = `${key}${extra.danger ? '__danger' : ''}${extra.breakpoint ? '__bp' : ''}`;
+      if (nextTypes[variantKey]) return nextTypes[variantKey];
+      const Wrapped = ((props: NodeProps) => {
+        const content = <base {...props} />;
+        if (extra.danger) {
+          return <DangerShell>{content}</DangerShell>;
+        }
+        return content;
+      }) as unknown as React.ComponentType<NodeProps>;
+      nextTypes[variantKey] = Wrapped;
+      return Wrapped;
+    };
+    const display = nodes.map((n) => {
+      const isInvalid = invalidNodeIds?.has(n.id) ?? false;
+      const isBp = breakpointNodeIds?.has(n.id) ?? false;
+      if (!isInvalid && !isBp) return n;
+      const base = nextTypes[n.type as string];
+      if (!base) return n;
+      makeVariant(base, n.type as string, { danger: isInvalid, breakpoint: isBp });
+      const newType = `${n.type}${isInvalid ? '__danger' : ''}${isBp ? '__bp' : ''}` as string;
+      // The node shell reads `breakpoint` from `data` so we don't need to
+      // rely on any specific React component prop contract.
+      const dataWithBp = isBp
+        ? { ...(n.data as Record<string, unknown>), breakpoint: true }
+        : (n.data as Record<string, unknown>);
+      return { ...n, type: newType as unknown as Node['type'], data: dataWithBp as Node['data'] };
+    });
+    return { displayNodes: display, displayNodeTypes: nextTypes };
+  }, [nodes, invalidNodeIds, breakpointNodeIds]);
+
   return (
     <div className="flex-1 h-full">
       <ReactFlow
-        nodes={nodes}
+        nodes={displayNodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -364,7 +549,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        nodeTypes={CUSTOM_NODE_TYPES}
+        nodeTypes={displayNodeTypes}
         fitView
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"

@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
-import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -8,6 +8,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDomainSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDomainVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyDomainService;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyRepository;
 
@@ -24,6 +27,10 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyRepository;
  *   <li>POST   /api/v1/ecos/domains/{domainCode}/publish         — 发布领域</li>
  *   <li>POST   /api/v1/ecos/domains/{domainCode}/deprecate       — 废弃领域</li>
  * </ul>
+ *
+ * <p>T16-2 (2026-09-12)：方法入/出参由 {@code Map<String,Object>} 改为强类型
+ * {@code OntologyDomainVO} / {@code OntologyDomainSaveDTO}（JSDoc 溯源 {@code T16-2}）。
+ * Service 旧 Map 签名保留（Wave31 C1 mock 兼容）。
  */
 @RestController
 @RequestMapping("/api/v1/ecos/domains")
@@ -40,38 +47,45 @@ public class OntologyDomainController {
         this.ontologyRepository = ontologyRepository;
     }
 
+    /** 列出全部领域（强类型 {@link OntologyDomainVO}）。 */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listDomains() {
-        return ApiResponse.success(domainService.listDomains());
+    public ApiResponse<List<OntologyDomainVO>> listDomains() {
+        return ApiResponse.success(domainService.listDomainsVO());
     }
 
+    /** 创建领域 — 强类型 {@link OntologyDomainSaveDTO}。 */
     @PostMapping
-    public ApiResponse<Map<String, Object>> createDomain(@RequestBody Map<String, Object> body) {
+    public ApiResponse<OntologyDomainVO> createDomain(@RequestBody OntologyDomainSaveDTO dto) {
         try {
-            Map<String, Object> dom = domainService.createDomain(body);
-            log.info("Domain created: {} [{}]", dom.get("id"), dom.get("code"));
+            OntologyDomainVO dom = domainService.createDomain(dto);
+            log.info("Domain created (VO): {} [{}]", dom.getId(), dom.getCode());
             return ApiResponse.success(dom);
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         }
     }
 
+    /** 领域详情（不存在 404）。 */
     @GetMapping("/{domainCode}")
-    public ApiResponse<Map<String, Object>> getDomain(@PathVariable String domainCode) {
-        Map<String, Object> dom = domainService.getDomain(domainCode);
-        if (dom == null) return ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found");
+    public ApiResponse<OntologyDomainVO> getDomain(@PathVariable String domainCode) {
+        OntologyDomainVO dom = domainService.getDomainVO(domainCode);
+        if (dom == null) {
+            return ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found");
+        }
         return ApiResponse.success(dom);
     }
 
+    /** 更新领域 — 强类型 {@link OntologyDomainSaveDTO}；字段 null 表示不动（与既有 Map 版语义一致）。 */
     @PutMapping("/{domainCode}")
-    public ApiResponse<Map<String, Object>> updateDomain(
+    public ApiResponse<OntologyDomainVO> updateDomain(
             @PathVariable String domainCode,
-            @RequestBody Map<String, Object> body) {
-        return domainService.updateDomain(domainCode, body)
+            @RequestBody OntologyDomainSaveDTO dto) {
+        return domainService.updateDomain(domainCode, dto)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found"));
     }
 
+    /** 删除领域（含实体时拒绝）。 */
     @DeleteMapping("/{domainCode}")
     public ApiResponse<String> deleteDomain(@PathVariable String domainCode) {
         try {
@@ -84,19 +98,21 @@ public class OntologyDomainController {
         }
     }
 
+    /** 发布领域（Draft → Published）。 */
     @PostMapping("/{domainCode}/publish")
-    public ApiResponse<Map<String, Object>> publishDomain(@PathVariable String domainCode) {
+    public ApiResponse<OntologyDomainVO> publishDomain(@PathVariable String domainCode) {
         try {
-            return ApiResponse.success(domainService.publishDomain(domainCode));
+            return ApiResponse.success(domainService.publishDomainVO(domainCode));
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         }
     }
 
+    /** 废弃领域。 */
     @PostMapping("/{domainCode}/deprecate")
-    public ApiResponse<Map<String, Object>> deprecateDomain(@PathVariable String domainCode) {
+    public ApiResponse<OntologyDomainVO> deprecateDomain(@PathVariable String domainCode) {
         try {
-            return ApiResponse.success(domainService.deprecateDomain(domainCode));
+            return ApiResponse.success(domainService.deprecateDomainVO(domainCode));
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         }
@@ -107,32 +123,40 @@ public class OntologyDomainController {
     // 模糊匹配 name/code/description, 按 sort_order + created_at DESC 返回。
     // 无租户上下文时返回全部域; 有上下文时只返回当前租户及 NULL 共享域。
 
+    /** 搜索领域（强类型 {@link OntologyDomainVO}）。 */
     @GetMapping("/search")
-    public ApiResponse<List<Map<String, Object>>> searchDomains(
+    public ApiResponse<List<OntologyDomainVO>> searchDomains(
             @RequestParam(required = false) String q,
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
-        return ApiResponse.success(domainService.searchDomains(q, limit));
+        return ApiResponse.success(domainService.searchDomainsVO(q, limit));
     }
 
     // ═══════════════ Domain → Entities 子资源 ═══════════════════
 
+    /**
+     * 列出领域下实体（强类型 {@link OntologyEntityVO}，复用 T16-1 既有 VO）。
+     * <p>走 VO 版 {@code getDomainVO} 检查存在性；实体行的字段映射在 Controller 内
+     * 手动落地（与 T16-1 既有 {@code OntologyEntityVO} 字段对齐）。
+     */
     @GetMapping("/{domainCode}/entities")
-    public ApiResponse<List<Map<String, Object>>> listDomainEntities(@PathVariable String domainCode) {
-        Map<String, Object> dom = domainService.getDomain(domainCode);
-        if (dom == null) return ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found");
-        return ApiResponse.success(
-            ontologyRepository.findEntitiesByDomain(domainCode).stream()
-                .map(e -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", e.getId());
-                    m.put("code", e.getCode());
-                    m.put("name", e.getName());
-                    m.put("entityType", e.getEntityType());
-                    m.put("description", e.getDescription());
-                    m.put("domainCode", domainCode);
-                    return m;
-                })
-                .collect(Collectors.toList())
-        );
+    public ApiResponse<List<OntologyEntityVO>> listDomainEntities(@PathVariable String domainCode) {
+        if (domainService.getDomainVO(domainCode) == null) {
+            return ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found");
+        }
+        List<OntologyEntityVO> entities = ontologyRepository.findEntitiesByDomain(domainCode).stream()
+            .map(e -> {
+                OntologyEntityVO vo = new OntologyEntityVO();
+                vo.setId(e.getId());
+                vo.setCode(e.getCode());
+                vo.setName(e.getName());
+                vo.setEntityType(e.getEntityType());
+                vo.setDescription(e.getDescription());
+                // domainId 存 domainCode（与既有 Map 行为一致：listDomainEntities Map 形态
+                // 的 `domainCode` key 值即 domainCode，前端消费时不依赖 domain.id 形态）
+                vo.setDomainId(domainCode);
+                return vo;
+            })
+            .collect(Collectors.toList());
+        return ApiResponse.success(entities);
     }
 }

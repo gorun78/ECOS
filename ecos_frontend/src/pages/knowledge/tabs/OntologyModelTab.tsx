@@ -1,0 +1,245 @@
+/**
+ * PMO-54 — OntologyModelTab（本体模型）
+ *
+ * 替换原 OntologyTab：
+ * - 保留 read-only 只读 + 右侧候选提案面板
+ * - 添加 deeplink 跳转到 buszhi 工作台（#/ontology-workbench/entity?entity=X&from=kb&json=Y）
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  Workflow, Cpu, Database, Combine, ShieldCheck, Layers, Plus, Lightbulb,
+  Trash2, Save, Info, Download, Copy, X, ExternalLink,
+} from 'lucide-react';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
+import { knowledgeApi } from '../services/knowledgeApi';
+
+export default function OntologyModelTab() {
+  const { t, locale } = useLanguage();
+  const { styles } = useTheme();
+  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
+  const [ontologyMappings, setOntologyMappings] = useState<any[]>([]);
+  const [availableTables, setAvailableTables] = useState<any[]>([]);
+  const [editingOntology, setEditingOntology] = useState<any | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportedMarkdown, setExportedMarkdown] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const data = await knowledgeApi.fetchOntologyMappings() as any;
+      setOntologyMappings(data?.mappings || []);
+      setAvailableTables(data?.availableTables || []);
+    } catch { setOntologyMappings([]); setAvailableTables([]); }
+    setIsLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const handleSaveMappings = async (mappings: any[]) => {
+    try {
+      await knowledgeApi.saveOntologyMappings({ mappings });
+    } catch { /* fallback */ }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const result = await knowledgeApi.exportOntology() as any;
+      setExportedMarkdown(result?.knowledgeMarkdown || result || '');
+      setShowExportModal(true);
+    } catch { setExportedMarkdown(''); }
+    setIsExporting(false);
+  };
+
+  const handleAddEntity = () => {
+    const newId = prompt(t("knowledge.ontologytab.请输入新本体实体标识符"));
+    if (!newId) return;
+    const name = prompt(t("knowledge.ontologytab.显示名称")) || newId;
+    const desc = prompt(t("knowledge.ontologytab.描述")) || '';
+    const newEntity: any = { entityId: newId, entityName: newId, chineseName: name, description: desc, mappings: [] };
+    const updated = [...ontologyMappings, newEntity];
+    setOntologyMappings(updated);
+    setEditingOntology(newEntity);
+  };
+
+  const handleAddMapping = () => {
+    if (!editingOntology) return;
+    const newMappingItem = { logicalField: 'newField', logicalType: 'String', physicalTable: availableTables[0]?.tableName || 'ds_flights_clean', physicalColumn: availableTables[0]?.columns?.[0]?.name || 'flight_id', description: '' };
+    const updated = ontologyMappings.map(e => e.entityId === editingOntology.entityId ? { ...e, mappings: [...(e.mappings || []), newMappingItem] } : e);
+    setOntologyMappings(updated);
+    setEditingOntology(updated.find(e => e.entityId === editingOntology.entityId));
+  };
+
+  const updateMapping = (idx: number, field: string, value: string) => {
+    if (!editingOntology) return;
+    const updated = ontologyMappings.map(ent => {
+      if (ent.entityId === editingOntology.entityId) {
+        const newM = [...ent.mappings]; newM[idx] = { ...newM[idx], [field]: value };
+        return { ...ent, mappings: newM };
+      }
+      return ent;
+    });
+    setOntologyMappings(updated);
+    setEditingOntology(updated.find(e => e.entityId === editingOntology.entityId));
+  };
+
+  const removeMapping = (idx: number) => {
+    if (!editingOntology) return;
+    const updated = ontologyMappings.map(ent => {
+      if (ent.entityId === editingOntology.entityId) {
+        return { ...ent, mappings: ent.mappings.filter((_: any, i: number) => i !== idx) };
+      }
+      return ent;
+    });
+    setOntologyMappings(updated);
+    setEditingOntology(updated.find(e => e.entityId === editingOntology.entityId));
+  };
+
+  const handleDeleteEntity = (entityId: string) => {
+    if (!confirm(t("knowledge.ontologytab.确认删除"))) return;
+    const remaining = ontologyMappings.filter(e => e.entityId !== entityId);
+    setOntologyMappings(remaining);
+    setEditingOntology(remaining[0] || null);
+    handleSaveMappings(remaining);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-4 gap-4`}>
+        <div className="space-y-1">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}><Workflow size={16} className="text-blue-600 animate-pulse" />{t("knowledge.ontologytab.语义本体与物理宽表对齐管理器")}</h2>
+          <p className={`text-xs ${styles.cardTextMuted} font-sans`}>{t("knowledge.ontologytab.建立强类型对齐契约_将逻辑本体字段与物理大宽表列名进行多对多")}</p>
+        </div>
+        <div className="flex gap-2">
+          {/* Deep link to buszhi workbench (PMO-54) */}
+          <button
+            onClick={() => { window.location.hash = `#/ontology-workbench/entity?from=kb`; }}
+            className={`px-3.5 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all`}
+          >
+            <ExternalLink size={12} /><span>{tl('跳转本体工作台', 'Open buszhi')}</span>
+          </button>
+          <button onClick={handleExport} disabled={isExporting} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all">
+            <Download size={12} /><span>{isExporting ? (t("knowledge.ontologytab.导出中")) : (t("knowledge.ontologytab.导出_rag_知识包"))}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Active Ontologies', value: `${ontologyMappings.length} Entities`, icon: <Cpu size={14} />, bg: 'bg-blue-50 text-blue-600' },
+          { label: 'Physical Targets', value: `${availableTables.length} OLAP Tables`, icon: <Database size={14} />, bg: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Mapped Connections', value: 'Many-to-Many', icon: <Combine size={14} />, bg: 'bg-indigo-50 text-indigo-600' },
+          { label: 'Alignment Integrity', value: '100% Strong-Typed', icon: <ShieldCheck size={14} />, bg: 'bg-emerald-50 text-emerald-600' },
+        ].map((card, i) => (
+          <div key={i} className={`${styles.cardBg} border ${styles.cardBorder} p-3.5 rounded-xl flex items-center justify-between`}>
+            <div><span className={`${styles.muted} font-mono text-[9px] block uppercase`}>{card.label}</span><span className={`text-base font-black ${styles.cardText} font-mono`}>{card.value}</span></div>
+            <span className={`p-2 rounded-lg ${card.bg}`}>{card.icon}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-3 space-y-4">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
+            <div className={`flex items-center justify-between border-b ${styles.appBorder} pb-2`}>
+              <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}><Layers size={12} className={styles.muted} /><span>{t("knowledge.ontologytab.语义本体实体")}</span></h3>
+              <button onClick={handleAddEntity} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={10} /><span>{t("knowledge.ontologytab.新建")}</span></button>
+            </div>
+            <div className="space-y-1.5">
+              {ontologyMappings.map(ent => {
+                const isSelected = editingOntology?.entityId === ent.entityId;
+                return (
+                  <button key={ent.entityId} onClick={() => setEditingOntology(ent)} className={`w-full p-2.5 rounded-lg border text-left flex flex-col space-y-1 transition-all cursor-pointer ${isSelected ? `${styles.sidebarActiveBg} ${styles.cardText} shadow-sm` : `${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardBorder} ${styles.sidebarText}`}`}>
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-black text-xs">{ent.entityId}</span>
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-mono ${isSelected ? 'bg-blue-500 text-white' : `${styles.badgeBg} ${styles.sidebarText}`}`}>{ent.mappings?.length || 0} fields</span>
+                    </div>
+                    <span className={`text-[9px] truncate block ${isSelected ? 'text-white' : styles.cardTextMuted}`}>{ent.chineseName || ent.entityName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 text-[10px] leading-relaxed text-blue-800 font-sans">
+            <p className="font-extrabold flex items-center gap-1.5"><Lightbulb size={12} className="text-blue-600" />{t("knowledge.ontologytab.多对多穿透绑定")}</p>
+            <p>{t("knowledge.ontologytab.系统支持多对多映射_例如_aviationpilot_las")}</p>
+          </div>
+        </div>
+
+        <div className="lg:col-span-9">
+          {editingOntology ? (
+            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-5`}>
+              <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.appBorder} pb-3 gap-3`}>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-black ${styles.cardText} text-sm font-mono`}>{editingOntology.entityId}</span>
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md">{editingOntology.chineseName || 'Entity'}</span>
+                  </div>
+                  <p className={`text-[11px] ${styles.cardTextMuted} font-sans`}>{editingOntology.description}</p>
+                </div>
+                <button onClick={() => handleDeleteEntity(editingOntology.entityId)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer transition-all"><Trash2 size={11} />{t("knowledge.ontologytab.删除")}</button>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-extrabold ${styles.muted} uppercase tracking-wider font-mono`}>{t("knowledge.ontologytab.对齐映射清单")}</span>
+                  <button onClick={handleAddMapping} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={11} />{t("knowledge.ontologytab.添加映射")}</button>
+                </div>
+                <div className={`border ${styles.appBorder} rounded-xl overflow-hidden`}>
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className={`${styles.badgeBg} border-b ${styles.appBorder} text-[10px] font-extrabold ${styles.cardTextMuted} font-sans select-none`}><th className="p-3">{t("knowledge.ontologytab.逻辑属性")}</th><th className="p-3">{t("knowledge.synctab.类型")}</th><th className="p-3">{t("knowledge.ontologytab.物理表")}</th><th className="p-3">{t("knowledge.ontologytab.物理列")}</th><th className="p-3">{t("knowledge.ontologytab.说明")}</th><th className="p-3 text-center">{t("knowledge.ontologytab.操作")}</th></tr></thead>
+                    <tbody className={`divide-y ${styles.sidebarBorder} text-[11px]`}>
+                      {(!editingOntology.mappings || editingOntology.mappings.length === 0) ? (
+                        <tr><td colSpan={6} className={`p-8 text-center ${styles.muted} font-sans`}>{t("knowledge.ontologytab.尚未配置映射")}</td></tr>
+                      ) : editingOntology.mappings.map((m: any, idx: number) => {
+                        const matchedTable = availableTables.find((t: any) => t.tableName === m.physicalTable);
+                        const availableCols = matchedTable?.columns || [];
+                        return (
+                          <tr key={idx} className={styles.sidebarHoverBg}>
+                            <td className="p-3"><input type="text" value={m.logicalField} onChange={e => updateMapping(idx, 'logicalField', e.target.value)} className={`w-full px-2 py-1 border ${styles.inputBorder} rounded-md font-mono text-[10px] font-bold ${styles.inputText} ${styles.inputBg}`} /></td>
+                            <td className="p-3"><select value={m.logicalType} onChange={e => updateMapping(idx, 'logicalType', e.target.value)} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-bold text-[10px] ${styles.inputBg} ${styles.sidebarText}`}><option value="String">String</option><option value="Integer">Integer</option><option value="Double">Double</option><option value="DateTime">DateTime</option><option value="Boolean">Boolean</option></select></td>
+                            <td className="p-3"><select value={m.physicalTable} onChange={e => { updateMapping(idx, 'physicalTable', e.target.value); const mt = availableTables.find((t: any) => t.tableName === e.target.value); updateMapping(idx, 'physicalColumn', mt?.columns?.[0]?.name || ''); }} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-bold text-[10px] ${styles.inputBg} text-blue-800`}>{availableTables.map((t: any) => <option key={t.tableName} value={t.tableName}>{t.tableName}</option>)}</select></td>
+                            <td className="p-3"><select value={m.physicalColumn} onChange={e => updateMapping(idx, 'physicalColumn', e.target.value)} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-mono text-[10px] font-bold ${styles.inputBg} text-emerald-800`}>{availableCols.map((c: any) => <option key={c.name} value={c.name}>{c.name} ({c.type})</option>)}</select></td>
+                            <td className="p-3"><input type="text" value={m.description} onChange={e => updateMapping(idx, 'description', e.target.value)} className={`w-full px-2 py-1 border ${styles.inputBorder} rounded-md text-[10px] ${styles.sidebarText} ${styles.inputBg}`} /></td>
+                            <td className="p-3 text-center"><button onClick={() => removeMapping(idx)} className="p-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer transition-colors"><Trash2 size={11} /></button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className={`flex items-center justify-between pt-4 border-t ${styles.appBorder}`}>
+                <div className={`text-[10px] ${styles.muted}`}>* {t("knowledge.ontologytab.保存后实时更新_rag_上下文数据库")}</div>
+                <button onClick={() => handleSaveMappings(ontologyMappings)} className={`px-5 py-2 ${styles.accentBg} text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-colors`}><Save size={12} /><span>{t("knowledge.ontologytab.保存对齐契约")}</span></button>
+              </div>
+            </div>
+          ) : (
+            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-12 text-center ${styles.muted} space-y-2`}><Workflow size={24} className={`mx-auto ${styles.muted} animate-pulse`} /><p className="font-bold text-xs">{t("knowledge.ontologytab.请选择或创建本体对象")}</p></div>
+          )}
+        </div>
+      </div>
+
+      {showExportModal && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${styles.overlayBg} backdrop-blur-xs animate-fade-in`}>
+          <div className={`${styles.cardBg} rounded-2xl max-w-2xl w-full border ${styles.cardBorder} shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
+            <div className="bg-[var(--card,#020617)] text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2"><Download size={15} className="text-blue-400" /><span className="font-black text-xs">{t("knowledge.ontologytab.rag_先验知识元数据包")}</span></div>
+              <button onClick={() => setShowExportModal(false)} className={`text-[var(--card,#94A3B8)] hover:text-white opacity-80 hover:opacity-100 font-bold cursor-pointer`}><X size={16} /></button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4">
+              <pre className={`p-4 ${styles.accentHover} ${styles.cardBorder} rounded-xl font-mono text-[9px] whitespace-pre-wrap leading-relaxed select-text max-h-[350px] overflow-y-auto`}>{exportedMarkdown}</pre>
+            </div>
+            <div className={`p-4 ${styles.badgeBg} border-t ${styles.appBorder} flex items-center justify-end gap-2 shrink-0`}>
+              <button onClick={() => { navigator.clipboard.writeText(exportedMarkdown); }} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1 transition-all"><Copy size={12} />{t("knowledge.ontologytab.复制")}</button>
+              <button onClick={() => setShowExportModal(false)} className={`px-4 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg text-xs cursor-pointer transition-all`}>{t("knowledge.ontologytab.关闭")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

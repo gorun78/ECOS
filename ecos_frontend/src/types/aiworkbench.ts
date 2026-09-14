@@ -262,3 +262,44 @@ export interface LogicNodeData {
 export interface LogicEdgeData {
   condition?: string;
 }
+
+// ── OAG Playground (SSE) Types (2026-09-12) ───────────────────
+
+/** OAG 步骤事件（event:node）载荷结构；后端可能追加字段，故保留索引签名 */
+export interface OagStepEvent {
+  node?: string;
+  status?: 'RUNNING' | 'DONE';
+  nodeElapsedMs?: number;
+  traceId?: string;
+  intent?: string;
+  securityPassed?: boolean;
+  message?: string;
+  // 后端追加字段
+  [k: string]: unknown;
+}
+
+/** 已保存的 Agent 会话（来自后端 AgentSessionService） */
+export interface AgentSessionSaved {
+  id: string;
+  agentId?: string;
+  userId: string;
+  tenantId?: string;
+  status: 'ACTIVE' | 'EXPIRED';
+  messageCount: number;
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+// ── Evals (AIP) Types (2026-09-12) ─────────────────────────────
+
+/** Agent 评估结果（AIP evals 维度评分） */
+export interface AgentEvalResult {
+  agentId: string;
+  accuracy: number;
+  safety: number;
+  latencyScore: number;
+  hallucinationRate: number;
+  toolCallAccuracy: number;
+  overallScore: number;
+  details: Array<{ question: string; score: number; expected: string; actual: string }>;
+}

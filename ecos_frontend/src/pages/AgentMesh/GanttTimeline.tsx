@@ -3,10 +3,11 @@
  * @license Apache-2.0
  */
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { ArrowRight, GanttChart } from "lucide-react";
 import { AgentMeshTask } from "../../api";
 import { STATUS_BAR_COLORS } from "./helpers";
+import { useTheme } from "../../components/ThemeContext";
 
 interface GanttTimelineProps {
   tasks: AgentMeshTask[];
@@ -14,6 +15,7 @@ interface GanttTimelineProps {
 }
 
 export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
+  const { styles } = useTheme();
   if (tasks.length === 0) return null;
 
   const sorted = [...tasks].sort((a, b) => a.seq - b.seq);
@@ -37,13 +39,13 @@ export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
   }, [sorted, mode]);
 
   return (
-    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+    <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
       <div className="flex items-center gap-1.5 mb-3">
         <GanttChart size={14} className="text-indigo-500" />
-        <h4 className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted} uppercase tracking-wide`}>
           时间线 / 甘特图
         </h4>
-        <span className="text-[10px] text-slate-400 ml-auto">
+        <span className={`text-[10px] ${styles.cardTextMuted} ml-auto`}>
           总耗时 {sorted.reduce((sum, t) => sum + (t.durationMs || 0), 0)}ms
         </span>
       </div>
@@ -53,7 +55,7 @@ export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
           <div key={pi}>
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="text-xs">{phase.icon}</span>
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              <span className={`text-[10px] font-medium ${styles.cardTextMuted}`}>
                 {phase.label}
               </span>
             </div>
@@ -65,22 +67,22 @@ export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
                 return (
                   <div key={task.id} className="flex items-center gap-2 group">
                     <div className="w-28 min-w-[7rem] text-right">
-                      <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate block">
+                      <span className={`text-[11px] font-medium ${styles.cardText} truncate block`}>
                         {task.agentName || task.agentId}
                       </span>
                     </div>
-                    <div className="flex items-center text-slate-300 dark:text-slate-600">
+                    <div className={`flex items-center ${styles.cardTextMuted}`}>
                       <ArrowRight size={12} />
                     </div>
                     <div className="flex-1 min-w-0 relative">
-                      <div className="h-7 w-full bg-slate-100 dark:bg-slate-800 rounded overflow-hidden relative">
+                      <div className={`h-7 w-full ${styles.inputBg} rounded overflow-hidden relative`}>
                         <div className="absolute inset-0 flex">
                           {Array.from({ length: 10 }).map((_, i) => (
-                            <div key={i} className="flex-1 border-r border-slate-200/50 dark:border-slate-700/50 last:border-r-0" />
+                            <div key={i} className="flex-1 border-r border-opacity-50 last:border-r-0" style={{ borderColor: 'var(--app-border, #E2E8F0)' }} />
                           ))}
                         </div>
                         <div
-                          className={`h-full ${STATUS_BAR_COLORS[task.status] || "bg-slate-400"} rounded transition-all duration-500 relative`}
+                          className={`h-full ${STATUS_BAR_COLORS[task.status] || "bg-zinc-400"} rounded transition-all duration-500 relative`}
                           style={{ width: `${barWidth}%` }}
                         >
                           {task.status === "RUNNING" && (
@@ -122,12 +124,12 @@ export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <span className="text-[10px] text-slate-400">图例:</span>
+      <div className="flex items-center gap-3 mt-3 pt-2 border-t" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
+        <span className={`text-[10px] ${styles.cardTextMuted}`}>图例:</span>
         {["COMPLETED", "RUNNING", "FAILED", "PENDING"].map(s => (
           <div key={s} className="flex items-center gap-1">
             <div className={`w-3 h-3 rounded ${STATUS_BAR_COLORS[s]}`} />
-            <span className="text-[10px] text-slate-500">{s}</span>
+            <span className={`text-[10px] ${styles.cardTextMuted}`}>{s}</span>
           </div>
         ))}
       </div>

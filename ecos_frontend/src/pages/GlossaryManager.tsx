@@ -51,22 +51,23 @@ const DeleteConfirm: React.FC<{
   onConfirm: () => void;
   onCancel: () => void;
   t: (key: string) => string;
-}> = ({ termName, onConfirm, onCancel, t }) => (
+  styles: ReturnType<typeof useTheme>["styles"];
+}> = ({ termName, onConfirm, onCancel, t, styles }) => (
   <div className="fixed inset-0 z-40 flex items-center justify-center">
     <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
     <div
-      className="relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+      className={`relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 ${styles.cardBg} border ${styles.cardBorder}`}
     >
-      <h3 className="text-base font-bold mb-2 text-slate-800 dark:text-slate-100">
+      <h3 className={`text-base font-bold mb-2 ${styles.cardText}`}>
         {t("glossary.delete_confirm_title")}
       </h3>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+      <p className={`text-sm ${styles.cardTextMuted} mb-5`}>
         {t("glossary.delete_confirm_msg").replace("{name}", termName)}
       </p>
       <div className="flex gap-2 justify-end">
         <button
           onClick={onCancel}
-          className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent cursor-pointer text-sm text-slate-600 dark:text-slate-300"
+          className={`px-4 py-1.5 rounded-lg border ${styles.cardBorder} bg-transparent cursor-pointer text-sm ${styles.cardTextMuted} hover:opacity-80`}
         >
           {t("glossary.cancel")}
         </button>
@@ -86,7 +87,7 @@ const DeleteConfirm: React.FC<{
 // ═══════════════════════════════════════════
 export default function GlossaryManager() {
   const { t } = useLanguage();
-  useTheme();
+  const { styles } = useTheme();
   // ── data state ──
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -282,7 +283,7 @@ export default function GlossaryManager() {
   // Render
   // ═══════════════════════════════════════════
   return (
-    <div className="flex-1 bg-slate-50 flex h-full overflow-hidden font-sans">
+    <div className={`flex-1 ${styles.appBg} flex h-full overflow-hidden font-sans`}>
       {/* ── Toast ── */}
       {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
 
@@ -293,31 +294,32 @@ export default function GlossaryManager() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           t={t}
+          styles={styles}
         />
       )}
 
       {/* ═══════════ Left Panel: Term List ═══════════ */}
-      <div className="w-[320px] min-w-[280px] border-r border-slate-200 bg-white flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-200">
-          <div className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
+      <div className={`w-[320px] min-w-[280px] border-r ${styles.cardBorder} bg-white flex flex-col shrink-0`}>
+        <div className={`p-4 border-b ${styles.cardBorder}`}>
+          <div className={`text-base font-bold ${styles.cardText} mb-3 flex items-center gap-2`}>
             <FileText size={18} />
             {t("glossary.title")}
-            <span className="text-xs font-normal text-slate-400">{counts.all} {t("glossary.unit")}</span>
+            <span className={`text-xs font-normal ${styles.muted}`}>{counts.all} {t("glossary.unit")}</span>
           </div>
 
           {/* search + filter */}
           <div className="flex gap-2 mb-2.5">
-            <div className="flex items-center gap-1.5 flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs">
-              <Search size={14} className="text-slate-400 shrink-0" />
+            <div className={`flex items-center gap-1.5 flex-1 px-3 py-2 rounded-lg border ${styles.inputBorder} bg-white text-xs`}>
+              <Search size={14} className={`${styles.muted} shrink-0`} />
               <input
                 placeholder={t("glossary.search_placeholder")}
                 value={search}
                 onChange={e => handleSearchChange(e.target.value)}
-                className="border-none outline-none flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400"
+                className={`border-none outline-none flex-1 bg-transparent text-xs ${styles.inputText} ${styles.muted}`}
               />
             </div>
             <select
-              className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 min-w-[110px] outline-none"
+              className={`px-2.5 py-2 rounded-lg border ${styles.inputBorder} bg-white text-xs ${styles.inputText} min-w-[110px] outline-none`}
               value={statusFilter}
               onChange={e => handleStatusFilter(e.target.value)}
             >
@@ -338,7 +340,7 @@ export default function GlossaryManager() {
             {t("glossary.new_term")}
           </button>
           {/* quick stats */}
-          <div className="flex gap-3 mt-2.5 text-[11px] text-slate-400">
+          <div className={`flex gap-3 mt-2.5 text-[11px] ${styles.muted}`}>
             <span>{t("glossary.status.draft")} {counts.draft}</span>
             <span>{t("glossary.status.review")} {counts.review}</span>
             <span>{t("glossary.status.published")} {counts.published}</span>
@@ -348,12 +350,12 @@ export default function GlossaryManager() {
         {/* term list */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-xs gap-2">
+            <div className={`flex flex-col items-center justify-center py-12 ${styles.muted} text-xs gap-2`}>
               <RotateCw size={18} className="animate-spin" />
               <div>{t("glossary.loading")}</div>
             </div>
           ) : filteredTerms.length === 0 ? (
-            <div className="flex items-center justify-center py-12 text-slate-400 text-xs px-4 text-center">
+            <div className={`flex items-center justify-center py-12 ${styles.muted} text-xs px-4 text-center`}>
               {search ? `${t("glossary.no_match")}「${search}」` : t("glossary.empty")}
             </div>
           ) : (
@@ -364,21 +366,21 @@ export default function GlossaryManager() {
               return (
                 <div
                   key={term.id}
-                  className={`flex items-center gap-2 px-3 py-2.5 border-b border-slate-100 cursor-pointer transition text-xs ${
-                    isActive ? "bg-indigo-50 border-l-2 border-l-indigo-500" : "hover:bg-slate-50"
+                  className={`flex items-center gap-2 px-3 py-2.5 border-b ${styles.cardBorder} cursor-pointer transition text-xs ${
+                    isActive ? "bg-indigo-50 border-l-2 border-l-indigo-500" : `hover:${styles.appBg}`
                   }`}
                   onClick={() => selectTerm(term)}
                 >
-                  <span className="flex-1 font-semibold text-slate-700 truncate">{term.name}</span>
+                  <span className={`flex-1 font-semibold ${styles.cardText} truncate`}>{term.name}</span>
                   <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${color}`}>{label}</span>
 
                   {/* actions */}
                   <button
-                    className="p-1 hover:bg-slate-200 rounded"
+                    className={`p-1 ${styles.sidebarHoverBg} rounded`}
                     title={t("glossary.edit")}
                     onClick={e => { e.stopPropagation(); selectTerm(term); }}
                   >
-                    <Edit3 size={14} className="text-slate-400" />
+                    <Edit3 size={14} className={styles.muted} />
                   </button>
                   <button
                     className="p-1 hover:bg-red-50 rounded"
@@ -397,21 +399,21 @@ export default function GlossaryManager() {
       {/* ═══════════ Right Panel: Detail / Form ═══════════ */}
       <div className="flex-1 bg-white p-6 overflow-y-auto">
         {mode === "view" && !selected ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs gap-3">
+          <div className={`flex flex-col items-center justify-center h-full ${styles.muted} text-xs gap-3`}>
           <FileText size={48} className="opacity-25" />
           <div className="text-center">{t("glossary.empty_hint")}</div>
           </div>
           ) : (
           <div className="space-y-4">
-          <h2 className="text-base font-bold text-slate-800">
+          <h2 className={`text-base font-bold ${styles.cardText}`}>
             {mode === "create" ? t("glossary.new_term") : selected?.name ?? t("glossary.term_detail")}
           </h2>
 
           {/* name */}
           <div>
-            <div className="text-[11px] font-semibold text-slate-500 mb-1">{t("glossary.field.name")} *</div>
+            <div className={`text-[11px] font-semibold ${styles.cardTextMuted} mb-1`}>{t("glossary.field.name")} *</div>
             <input
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 outline-none focus:border-indigo-400 disabled:opacity-50"
+              className={`w-full px-3 py-2 rounded-lg border ${styles.inputBorder} bg-white text-xs ${styles.inputText} outline-none focus:border-indigo-400 disabled:opacity-50`}
               placeholder={t("glossary.field.name_placeholder")}
               value={formName}
               onChange={e => setFormName(e.target.value)}
@@ -421,9 +423,9 @@ export default function GlossaryManager() {
 
           {/* domain */}
           <div>
-            <div className="text-[11px] font-semibold text-slate-500 mb-1">{t("glossary.field.domain")}</div>
+            <div className={`text-[11px] font-semibold ${styles.cardTextMuted} mb-1`}>{t("glossary.field.domain")}</div>
             <select
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 outline-none focus:border-indigo-400 disabled:opacity-50"
+              className={`w-full px-3 py-2 rounded-lg border ${styles.inputBorder} bg-white text-xs ${styles.inputText} outline-none focus:border-indigo-400 disabled:opacity-50`}
               value={formDomain}
               onChange={e => setFormDomain(e.target.value)}
               disabled={saving}
@@ -435,9 +437,9 @@ export default function GlossaryManager() {
 
           {/* definition */}
           <div>
-            <div className="text-[11px] font-semibold text-slate-500 mb-1">{t("glossary.field.definition")}</div>
+            <div className={`text-[11px] font-semibold ${styles.cardTextMuted} mb-1`}>{t("glossary.field.definition")}</div>
             <textarea
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 outline-none focus:border-indigo-400 disabled:opacity-50 resize-none"
+              className={`w-full px-3 py-2 rounded-lg border ${styles.inputBorder} bg-white text-xs ${styles.inputText} outline-none focus:border-indigo-400 disabled:opacity-50 resize-none`}
               placeholder={t("glossary.field.definition_placeholder")}
               value={formDefinition}
               onChange={e => setFormDefinition(e.target.value)}
@@ -449,7 +451,7 @@ export default function GlossaryManager() {
           {/* status display */}
           {selected && (
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 mb-1">{t("glossary.field.status")}</div>
+              <div className={`text-[11px] font-semibold ${styles.cardTextMuted} mb-1`}>{t("glossary.field.status")}</div>
               <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${getColor(selected.status, 'DRAFT')}`}>
                 {getLabel(selected.status)}
               </span>
@@ -459,14 +461,14 @@ export default function GlossaryManager() {
           {/* status transitions */}
           {transitions.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-semibold text-slate-400">{t("glossary.actions")}:</span>
+              <span className={`text-[11px] font-semibold ${styles.muted}`}>{t("glossary.actions")}:</span>
                 {transitions.map(tr => (
                   <button
                     key={tr.status}
                     className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition disabled:opacity-50 ${
                       tr.variant === "primary" ? "bg-indigo-600 hover:bg-indigo-700 text-white" :
                       tr.variant === "danger" ? "bg-red-600 hover:bg-red-700 text-white" :
-                      "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                      `${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.muted}`
                     }`}
                     onClick={() => handleTransition(tr.status)}
                     disabled={saving}
@@ -479,7 +481,7 @@ export default function GlossaryManager() {
             )}
 
             {/* action buttons */}
-            <div className="flex gap-2 pt-3 border-t border-slate-100">
+            <div className={`flex gap-2 pt-3 border-t ${styles.cardBorder}`}>
               <button
                 className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1"
                 onClick={handleSave}
@@ -489,7 +491,7 @@ export default function GlossaryManager() {
                 {t("glossary.save")}
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition disabled:opacity-50"
+                className={`px-4 py-2 rounded-lg ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.muted} text-xs font-semibold transition disabled:opacity-50`}
                 onClick={handleCancel}
                 disabled={saving}
               >

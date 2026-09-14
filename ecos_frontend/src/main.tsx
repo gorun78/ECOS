@@ -7,8 +7,10 @@ import './index.css';
 import App from './App.tsx';
 import RequireAuth from './components/RequireAuth.tsx';
 import Login from './pages/Login.tsx';
+import NoAccessPage from './pages/NoAccess.tsx';
 import { LanguageProvider } from './components/LanguageContext.tsx';
 import { ThemeProvider } from './components/ThemeContext.tsx';
+import { ToastProvider, showToastGlobal } from './components/common/Toast';
 
 // Per-route lazy-loaded feature pages (50 routes → ~50 chunks)
 const CognitiveOperatingSystem = lazy(() => import('./pages/CognitiveOperatingSystem.tsx'));
@@ -50,8 +52,10 @@ const KnowledgeView = lazy(() => import('./pages/KnowledgeView.tsx'));
 const GraphExplorerView = lazy(() => import('./pages/GraphExplorerView.tsx'));
 const GuardrailsView = lazy(() => import('./pages/GuardrailsView.tsx'));
 const AIWorkbench = lazy(() => import('./pages/aiworkbench/index.tsx'));
+const ChatbotStudioRouterPage = lazy(() => import('./pages/aiworkbench/ChatbotStudioRouterPage.tsx'));
 const WorkshopView = lazy(() => import('./pages/WorkshopView.tsx'));
 const ScenarioManagementView = lazy(() => import('./pages/ScenarioManagementView.tsx'));
+const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
 // EngineMonitor + CognitiveEngineView are imported once eagerly because
 // lazy() can't pass static props at import site.
 const EngineMonitor = lazy(() => import('./pages/EngineMonitor.tsx'));
@@ -83,7 +87,7 @@ function TasksCenterRoute() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <AsyncTaskCenterView
-        showToast={(type, msg) => console.log(`[TaskCenter] ${type}: ${msg}`)}
+        showToast={(type, msg) => showToastGlobal(type, msg)}
         onViewModeChange={() => {}}
       />
     </Suspense>
@@ -95,9 +99,11 @@ createRoot(document.getElementById('root')!).render(
     <HashRouter>
       <LanguageProvider>
         <ThemeProvider>
+          <ToastProvider>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/no-access" element={<NoAccessPage />} />
               <Route
                 element={
                   <RequireAuth>
@@ -123,7 +129,12 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="business-workbench" element={<BusinessWorkbenchLayoutStandalone />} />
                 {/* 数据工作台 */}
                 <Route path="data-workbench" element={<DataWorkbenchLayoutStandalone />} />
-                {/* Legacy redirects — 旧路由统一重定向到本体工作台 */}
+                {/* PMO-48-A T5: 数据质量中心(独立顶级路由, 不在 DataWorkbenchLayout 内 Tab, 与 /business-workbench 同级, Topbar 有菜单入口) */}
+                <Route path="dq_dashboard" element={<DataQualityDashboard />} />
+                {/* Legacy redirects (T6: 死代码清理 — 本体工作台/业务工作台死页面重定向)
+                    旧路由统一 Navigate 重定向到 /ontology_workbench (主工作台入口, hash #/ontology_workbench)
+                    对应死页面源文件 (OntologyDesigner / OntologyExplorer / DomainDesignerView /
+                    OntologyObjectBrowser / KnowledgeGraphPage) 保留在 src/pages 下, 不再 import */}
                 <Route path="domains" element={<Navigate to="/ontology_workbench" replace />} />
                 <Route path="domain_designer" element={<Navigate to="/ontology_workbench" replace />} />
                 <Route path="ontology" element={<Navigate to="/ontology_workbench" replace />} />
@@ -140,6 +151,7 @@ createRoot(document.getElementById('root')!).render(
                 {/* W · 智能层 */}
                 <Route path="agent_studio" element={<Navigate to="/ai-workbench" replace />} />
                 <Route path="ai-workbench" element={<AIWorkbench />} />
+                <Route path="chatbot_studio" element={<ChatbotStudioRouterPage />} />
                 <Route path="workshop" element={<WorkshopView />} />
                 <Route path="agent_mesh" element={<AgentMesh />} />
                 <Route path="agent-builder/:agentId?" element={<AgentBuilder />} />
@@ -168,6 +180,7 @@ createRoot(document.getElementById('root')!).render(
               </Route>
             </Routes>
           </Suspense>
+          </ToastProvider>
         </ThemeProvider>
       </LanguageProvider>
     </HashRouter>

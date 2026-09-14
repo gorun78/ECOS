@@ -9,6 +9,16 @@ import type {
   RuleRepository,
   RuleVersion,
   GlossaryTerm,
+  GraphBuildJob,
+  GraphBuildPreview,
+  ImportQueueItem,
+  EvalSeedQuery,
+  EvalReport,
+  LifecycleAsset,
+  LifecycleAuditEntry,
+  LifecycleState,
+  EngineConfigScope,
+  EngineConfig,
 } from '../typesAndConstants';
 
 const KNOWLEDGE_BASE = '/api/knowledge';
@@ -17,6 +27,44 @@ const GLOSSARY_BASE = '/api/v1/ontology/glossary';
 const CATALOG_BASE = '/api/catalog';
 const COGNITIVE_BASE = '/api/v1/cognitive';
 const RULES_BASE = '/api/v1/knowledge/compliance-rules';
+
+// ── PMO-54 helpers ───────────────────────────────────────────────────────────
+
+const KB_V1 = '/api/v1/knowledge';
+
+/** SSE-capable RAG query — falls back to POST /rag when backend hasn't wired SSE */
+export async function runRAGQuerySSE(query: string, onToken: (token: string) => void): Promise<{ answerGenerated: boolean }> {
+  // Try: GET /api/v1/knowledge/rag?query=...&stream=true
+  const token = localStorage.getItem('token') || '';
+  try {
+    const url = `${KB_V1}/rag?query=${encodeURIComponent(query)}&stream=true`;
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let answerGenerated = true;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      // SSE-format `data: xxx` lines; strip newline and parse
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        const m = line.match(/^data:\s*(.+)$/);
+        if (m) onToken(m[1].trim());
+      }
+    }
+    return { answerGenerated };
+  } catch (e) {
+    // SSE not available — fall back to POST; report answer not generated
+    console.info('SSE fallback to POST:', (e as Error).message);
+    const result = await runRAGQuery({ query });
+    onToken(result.answer || '');
+    return { answerGenerated: Boolean(result.answerGenerated) };
+  }
+}
 
 export async function fetchGraph(domain?: string) {
   const q = domain ? `?domain=${encodeURIComponent(domain)}` : '';
@@ -313,6 +361,370 @@ export async function fetchRuleVersions(ruleId: string): Promise<RuleVersion[]> 
   }
 }
 
+// ── PMO-54 — Overview / Dashboard ─────────────────────────────────────────────
+
+export async function fetchGraphStats(): Promise<{
+  graphNodeCount: number;
+  graphEdgeCount: number;
+  embeddingCount: number;
+  ruleCount: number;
+  lastUpdatedAt?: string;
+}> {
+  try {
+    const data = await apiFetchData<any>('/api/v1/knowledge/stats');
+    return {
+      graphNodeCount: data?.graphNodeCount ?? 0,
+      graphEdgeCount: data?.graphEdgeCount ?? 0,
+      embeddingCount: data?.embeddingCount ?? 0,
+      ruleCount: data?.ruleCount ?? 0,
+      lastUpdatedAt: data?.lastUpdatedAt,
+    };
+  } catch {
+    return { graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 };
+  }
+}
+
+// 引擎健康响应（engine → ok/latency/message）
+export interface EngineHealthMap {
+  [key: string]: { ok: boolean; latencyMs?: number; message?: string };
+}
+
+export async function fetchEngineHealth(): Promise<EngineHealthMap> {
+  try {
+    return await apiFetchData<EngineHealthMap>(`${KB_V1}/health`);
+  } catch {
+    return {};
+  }
+}
+
+// ── PMO-54 — Graph build (jobs) ──────────────────────────────────────────────
+
+export async function fetchGraphJobs(): Promise<GraphBuildJob[]> {
+  try {
+    const data = await apiFetchData<any>(`${KB_V1}/sync/jobs`);
+    return Array.isArray(data) ? (data as GraphBuildJob[]) : (data?.data as GraphBuildJob[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function previewGraphBuild(params?: { dryRun?: boolean }): Promise<GraphBuildPreview> {
+  try {
+    return await apiFetchData<GraphBuildPreview>(`${KB_V1}/graph/build/preview?${params?.dryRun ? 'dryRun=true' : ''}`, { method: 'POST' });
+  } catch {
+    return { create: 0, update: 0, skip: 0 };
+  }
+}
+
+export async function triggerGraphBuild(payload: Record<string, unknown>): Promise<{ jobId: string }> {
+  const data = await apiFetchData<{ jobId: string }>(`${KB_V1}/graph/build`, { method: 'POST', body: JSON.stringify(payload) });
+  return data || { jobId: '' };
+}
+
+export interface JobPreview {
+  create: number;
+  update: number;
+  skip: number;
+  samples?: Array<Record<string, unknown>>;
+}
+
+export async function previewGraphJob(jobId: string): Promise<JobPreview> {
+  try {
+    return await apiFetchData<JobPreview>(`${KB_V1}/sync/jobs/${encodeURIComponent(jobId)}/preview`);
+  } catch {
+    return { create: 0, update: 0, skip: 0 };
+  }
+}
+
+export async function rollbackGraphJob(jobId: string) {
+  return apiFetchData(`${KB_V1}/sync/jobs/${encodeURIComponent(jobId)}/rollback`, { method: 'POST' });
+}
+
+export async function fetchGraphJobLogs(jobId: string): Promise<string[]> {
+  try {
+    const data = await apiFetchData<string[]>(`${KB_V1}/sync/jobs/${encodeURIComponent(jobId)}/logs`);
+    return Array.isArray(data) ? data : [String(data)];
+  } catch {
+    return [];
+  }
+}
+
+// ── PMO-54 — Ingest queue ─────────────────────────────────────────────────────
+
+const IMPORT_QUEUE_STORAGE_KEY = 'kb_import_queue';
+
+export function fetchImportQueue(): ImportQueueItem[] {
+  try {
+    const raw = localStorage.getItem(IMPORT_QUEUE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ImportQueueItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addImportToQueue(item: Omit<ImportQueueItem, 'id' | 'status' | 'enrollmentAt'>): ImportQueueItem {
+  const list = fetchImportQueue();
+  const now = new Date().toISOString();
+  const entry: ImportQueueItem = {
+    id: `imp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    dsId: item.dsId,
+    pipelineId: item.pipelineId,
+    label: item.label,
+    status: 'queued',
+    progress: 0,
+    enrollmentAt: now,
+    errorMsg: item.errorMsg,
+  };
+  list.unshift(entry);
+  localStorage.setItem(IMPORT_QUEUE_STORAGE_KEY, JSON.stringify(list.slice(0, 50)));
+  return entry;
+}
+
+export function retryImport(id: string) {
+  const list = fetchImportQueue().map(item =>
+    item.id === id ? { ...item, status: 'queued' as const, progress: 0, errorMsg: undefined } : item
+  );
+  localStorage.setItem(IMPORT_QUEUE_STORAGE_KEY, JSON.stringify(list));
+}
+
+// ── PMO-54 — Document extraction (chunked upload) ──────────────────────────
+
+export async function uploadDocumentChunked(
+  file: File,
+  onProgress: (fraction: number) => void,
+): Promise<{ fileId: string; taskId: string }> {
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const fileId = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const token = localStorage.getItem('token') || '';
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const blob = file.slice(start, end);
+    const fd = new FormData();
+    fd.append('file', blob);
+    fd.append('fileId', fileId);
+    fd.append('chunkIndex', String(i));
+    fd.append('totalChunks', String(totalChunks));
+    fd.append('name', file.name);
+    const res = await fetch(`${KB_V1}/extract/upload`, { method: 'POST', headers, body: fd });
+    if (!res.ok) throw new Error(`chunk ${i}/${totalChunks} failed: ${res.status}`);
+    onProgress((i + 1) / totalChunks);
+  }
+  return { fileId, taskId: fileId };
+}
+
+export async function fetchExtractCandidates(fileId: string): Promise<{ candidates: Record<string, unknown>[] } | null> {
+  try {
+    const data = await apiFetchData<{ candidates?: Record<string, unknown>[] } | null>(`${KB_V1}/extract/candidates/${encodeURIComponent(fileId)}`);
+    if (!data) return null;
+    return { candidates: (data.candidates || []) as Record<string, unknown>[] };
+  } catch {
+    return null;
+  }
+}
+
+// 待审核文件列表（PMO-56 待补）
+export async function fetchExtractCandidateFiles(): Promise<{
+  fileId: string;
+  fileName: string;
+  status: string;
+  candidateCount: number;
+  checksum?: string;
+  createdAt?: string;
+  error?: string;
+}[]> {
+  return await apiFetchData<{
+    fileId: string;
+    fileName: string;
+    status: string;
+    candidateCount: number;
+    checksum?: string;
+    createdAt?: string;
+    error?: string;
+  }[]>(`${KB_V1}/extract/files`);
+}
+
+// ── PMO-54 — Knowledge eval ───────────────────────────────────────────────────
+
+export async function fetchEvalSeeds(): Promise<EvalSeedQuery[]> {
+  try {
+    const data = await apiFetchData<EvalSeedQuery[]>(`${KB_V1}/eval/seeds`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function uploadEvalSeed(file: File): Promise<{ name: string; count: number }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const token = localStorage.getItem('token') || '';
+  const res = await fetch(`${KB_V1}/eval/seeds/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`seed upload failed ${res.status}`);
+  const json = await res.json();
+  return json?.data || json;
+}
+
+export async function runEval(seedSetName: string): Promise<EvalReport> {
+  try {
+    const data = await apiFetchData<EvalReport>(`${KB_V1}/eval/run`, {
+      method: 'POST',
+      body: JSON.stringify({ seedSetName }),
+    });
+    return data || { reportId: '', seedSetName, printedAt: new Date().toISOString(), recallAt5: 0, mrrAt5: 0, ndcgAt5: 0 };
+  } catch (e) {
+    // Degraded mode: hint that backend isn't ready; run degraded stub locally
+    console.info('runEval backend unavailable — degraded', (e as Error).message);
+    const evalDegraded: EvalReport = {
+      reportId: `local-${Date.now()}`,
+      seedSetName,
+      printedAt: new Date().toISOString(),
+      recallAt5: 0,
+      mrrAt5: 0,
+      ndcgAt5: 0,
+      degraded: true,
+    };
+    return evalDegraded;
+  }
+}
+
+// ── PMO-54 — Lifecycle ────────────────────────────────────────────────────────
+
+export async function fetchLifecycleAssets(): Promise<LifecycleAsset[]> {
+  try {
+    const data = await apiFetchData<any>(`${KB_V1}/assets`);
+    const items = Array.isArray(data) ? data : (data?.data as any[]) || [];
+    return (items as any[]).map((a: any) => ({
+      id: String(a.id ?? a.assetId ?? ''),
+      name: String(a.name ?? a.assetName ?? a.id ?? ''),
+      type: String(a.type ?? a.assetType ?? 'unknown'),
+      state: (a.state ?? a.status ?? 'draft') as LifecycleState,
+      updatedAt: String(a.updatedAt ?? a.updateTime ?? new Date().toISOString()),
+      updatedBy: a.updatedBy,
+    })).filter(a => a.id);
+  } catch {
+    return [];
+  }
+}
+
+export async function lifecycleTransition(assetId: string, next: LifecycleState): Promise<LifecycleAsset> {
+  return apiFetchData<LifecycleAsset>(`${KB_V1}/assets/${encodeURIComponent(assetId)}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({ state: next }),
+  });
+}
+
+export async function fetchLifecycleAudit(): Promise<LifecycleAuditEntry[]> {
+  try {
+    const data = await apiFetchData<LifecycleAuditEntry[]>(`${KB_V1}/lifecycle/audit`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+// ── PMO-54 — Engine config ─────────────────────────────────────────────────────
+
+export async function fetchEngineConfig(scope: EngineConfigScope): Promise<{ config: EngineConfig; version: number; updatedAt: string }> {
+  try {
+    const data = await apiFetchData<EngineConfig>(`${KB_V1}/engine-config?scope=${encodeURIComponent(scope)}`);
+    return { config: data || {}, version: 1, updatedAt: new Date().toISOString() };
+  } catch {
+    // fallback: cognitive group + local knowledge_engine group
+    try {
+      const data = await apiFetchData<EngineConfig>('/api/v1/cognitive/config');
+      const result: EngineConfig = {};
+      for (const [k, v] of Object.entries(data || {})) result[`knowledge.${scope}.${k}`] = String(v);
+      return { config: result, version: 1, updatedAt: new Date().toISOString() };
+    } catch {
+      return { config: {}, version: 1, updatedAt: new Date().toISOString() };
+    }
+  }
+}
+
+export async function saveEngineConfig(scope: EngineConfigScope, cfg: Record<string, unknown>): Promise<{ config: EngineConfig; version: number; updatedAt: string }> {
+  // Try PMO-54-specific endpoint; fall back to sys_config group=knowledge_engine
+  const asyncRp = apiFetchData<{ config: EngineConfig; version: number; updatedAt: string } | EngineConfig | null>(`${KB_V1}/engine-config?scope=${encodeURIComponent(scope)}`, {
+    method: 'PUT',
+    body: JSON.stringify(cfg),
+  });
+
+  const settle = async (): Promise<{ config: EngineConfig; version: number; updatedAt: string }> => {
+    const primary = await asyncRp.catch(function (): { config: EngineConfig; version: number; updatedAt: string } | EngineConfig | null { return null; });
+    if (primary && typeof primary === 'object' && 'config' in primary) return primary as { config: EngineConfig; version: number; updatedAt: string };
+    if (primary && typeof primary === 'object' && 'config' in (primary as Record<string, unknown>)) {
+      const p = primary as Record<string, unknown>;
+      return { config: (p.config as EngineConfig) || (cfg as EngineConfig), version: Number(p.version ?? 1), updatedAt: String(p.updatedAt ?? new Date().toISOString()) };
+    }
+    if (primary) return { config: (primary as EngineConfig) || (cfg as EngineConfig), version: 1, updatedAt: new Date().toISOString() };
+    // 回退到 cognitive/config
+    const updates = Object.entries(cfg).map(([config_key, config_value]) => ({ config_key: `knowledge_engine.${scope}.${config_key}`, config_value }));
+    const fbResp = await apiFetchData<Record<string, unknown> | null>('/api/v1/cognitive/config', { method: 'PUT', body: JSON.stringify(updates) });
+    return { config: (fbResp ? fbResp as EngineConfig : cfg) as EngineConfig, version: 1, updatedAt: new Date().toISOString() };
+  };
+  try {
+    return await settle();
+  } catch {
+    return { config: cfg as EngineConfig, version: 1, updatedAt: new Date().toISOString() };
+  }
+}
+
+// ── PMO-54 — Ingest / ETL workspace ───────────────────────────────────────────
+
+export interface DataWorkbenchSource {
+  dsId: string;
+  name: string;
+  type: string;
+  status: 'connected' | 'disconnected' | 'flaky';
+  records?: string;
+  pipelines?: Array<{ pipelineId: string; name: string }>;
+}
+
+export async function fetchDataWorkbenchSources(): Promise<DataWorkbenchSource[]> {
+  try {
+    const data = await apiFetchData<any>('/api/integration/metadata');
+    const items = Array.isArray(data) ? data : (data?.data as any[]) || data?.sources || [];
+    return (items as any[]).map((s: any) => ({
+      dsId: String(s.id ?? s.dsId ?? s.name ?? ''),
+      name: String(s.name ?? s.tableName ?? s.id ?? ''),
+      type: String(s.sourceType ?? s.type ?? 'integration'),
+      status: (s.status ?? (s.syncStatus === 'synced' ? 'connected' : 'disconnected')) as DataWorkbenchSource['status'],
+      records: s.records ?? s.recordsOrFields,
+      pipelines: Array.isArray(s.pipelines) ? s.pipelines : undefined,
+    })).filter(s => s.dsId);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchMetadataDrift(sample?: boolean): Promise<{
+  schemaDelta: Array<Record<string, unknown>>;
+  rows?: Array<Record<string, unknown>>;
+  lineage?: { nodes: Array<Record<string, unknown>>; links: Array<Record<string, unknown>> };
+}> {
+  try {
+    const q = sample ? '?sample=true' : '';
+    const data = await apiFetchData<any>(`/api/v1/integration/metadata/drift${q}`);
+    return {
+      schemaDelta: data?.schemaDelta || data?.fields || [],
+      rows: data?.rows || data?.samples,
+      lineage: data?.lineage,
+    };
+  } catch {
+    return { schemaDelta: [] };
+  }
+}
+
+// ── PMO-54 — Consolidated knowledgeApi export (extended with above) ──────────
+
 export const knowledgeApi = {
   fetchGraph,
   fetchNode,
@@ -334,6 +746,7 @@ export const knowledgeApi = {
   fetchIndexStatus,
   syncVectors,
   runRAGQuery,
+  runRAGQuerySSE,
   runKnowledgeQuery,
   getSettings,
   updateSettings,
@@ -354,4 +767,29 @@ export const knowledgeApi = {
   updateRule,
   deleteRule,
   fetchRuleVersions,
+  // PMO-54
+  fetchGraphStats,
+  fetchEngineHealth,
+  fetchGraphJobs,
+  previewGraphBuild,
+  triggerGraphBuild,
+  previewGraphJob,
+  rollbackGraphJob,
+  fetchGraphJobLogs,
+  fetchImportQueue,
+  addImportToQueue,
+  retryImport,
+  uploadDocumentChunked,
+  fetchExtractCandidates,
+  fetchExtractCandidateFiles,
+  fetchEvalSeeds,
+  uploadEvalSeed,
+  runEval,
+  fetchLifecycleAssets,
+  lifecycleTransition,
+  fetchLifecycleAudit,
+  fetchEngineConfig,
+  saveEngineConfig,
+  fetchDataWorkbenchSources,
+  fetchMetadataDrift,
 };

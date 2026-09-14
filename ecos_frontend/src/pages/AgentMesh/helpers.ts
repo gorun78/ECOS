@@ -7,14 +7,14 @@ export const STATUS_BAR_COLORS: Record<string, string> = {
   COMPLETED: "bg-green-500",
   RUNNING:   "bg-blue-500",
   FAILED:    "bg-red-500",
-  PENDING:   "bg-slate-300 dark:bg-slate-600",
+  PENDING:   "bg-zinc-300 dark:bg-zinc-600",
   CANCELLED: "bg-gray-400",
 };
 
 export const STATUS_BG_COLORS: Record<string, string> = {
-  COMPLETED: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800",
-  RUNNING:   "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",
-  FAILED:    "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800",
-  PENDING:   "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700",
-  CANCELLED: "bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700",
+  COMPLETED: "bg-green-50 border-green-200",
+  RUNNING:   "bg-blue-50 border-blue-200",
+  FAILED:    "bg-red-50 border-red-200",
+  PENDING:   "bg-zinc-50 border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700",
+  CANCELLED: "bg-gray-50 border-gray-200",
 };

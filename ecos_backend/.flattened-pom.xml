@@ -15,7 +15,7 @@
         <enabled>true</enabled>
       </snapshots>
       <id>local-maven-repo</id>
-      <url>file:///home/guorongxiao/.m2/repository</url>
+      <url>file://C:\Users\guoro/.m2/repository</url>
     </repository>
   </repositories>
 </project>

@@ -152,4 +152,56 @@ public class MetadataTaskService {
             return null;
         }
     }
+
+    /**
+     * 同步执行（提交 + 解析 + 同步等待完成）— 给"立即采集"按钮用。
+     *
+     * <p>与 submitCollect 区别：
+     * <ul>
+     *   <li>submitCollect 在调用线程里同步走 executeTask，并默认走 ITaskExecutor；
+     *       本方法显式标 setAsync(false) 让 TaskManagementService 不以异步 fire-and-forget
+     *       方式运行，且执行过程 executor 内的 statusCallback 持续上报进度</li>
+     *   <li>完成后直接返回 result JSON 字符串（进度相关字段已手写在 TaskStatus 里供前端轮询）</li>
+     * </ul>
+     *
+     * @param datasourceId 数据源 ID
+     * @return 采集结果 JSON 字符串；抛出异常时向上抛 {@link RuntimeException}
+     */
+    public String executeSync(String datasourceId) {
+        String dsName = "unknown";
+        try {
+            var ds = dsRepository.findById(datasourceId);
+            if (ds != null) {
+                dsName = ds.getDatasourceName();
+            }
+        } catch (Exception e) {
+            log.warn("读取数据源名称失败: {}", e.getMessage());
+        }
+
+        TaskDescription desc = new TaskDescription();
+        desc.setTaskName("元数据采集(同步): " + dsName);
+        desc.setTaskType(MetadataCollectTaskParser.TASK_TYPE);
+        desc.setDescription("同步立即执行: 采集数据源 " + datasourceId + " 的表清单/行数/字段元数据");
+        Map<String, Object> params = new HashMap<>();
+        params.put("datasourceId", datasourceId);
+        desc.setParameters(params);
+        desc.setAsync(false);
+
+        try {
+            String taskId = taskManagementService.submitTask(desc);
+            log.info("METADATA_COLLECT 同步任务已提交: taskId={}, datasourceId={}", taskId, datasourceId);
+            taskManagementService.parseTask(taskId);
+            String result = taskManagementService.executeTask(taskId);
+            log.info("METADATA_COLLECT 同步任务完成: taskId={}", taskId);
+            return result;
+        } catch (Exception e) {
+            log.error("METADATA_COLLECT 同步任务执行失败 datasource={}: {}", datasourceId, e.getMessage(), e);
+            throw new RuntimeException("元数据采集任务执行失败: " + e.getMessage(), e);
+        }
+    }
+
+    /** 查任务的 ITaskManagementService 引用（保留给需要跨服务的上下文） */
+    public ITaskManagementService taskManagementService() {
+        return taskManagementService;
+    }
 }

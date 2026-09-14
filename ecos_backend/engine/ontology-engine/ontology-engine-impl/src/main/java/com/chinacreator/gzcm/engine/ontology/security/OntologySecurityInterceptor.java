@@ -1,35 +1,41 @@
 package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.common.exception.UnauthorizedException;
 
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * OntologySecurityInterceptor — AOP 切面拦截对象查询，自动注入 RLS/CLS/脱敏。
+ * OntologySecurityInterceptor — 本体控制器 AOP 切面，统一注入 RLS/CLS/脱敏/审计。
  *
- * <h3>T5-1: 安全集成</h3>
+ * <p><b>来源: Wave B-1 · T12</b> | <b>日期: 2026-09-12</b> | <b>责任人: fullstack-implementer</b></p>
+ * <p><b>继承铁律</b>：架构铁律 §2.4（安全集成 5 项 — RLS/CLS/脱敏/OPA/Kafka 审计 + 默认 DENY）、
+ * §2.5（security-engine 横切护，禁止引擎内重复实现）。</p>
+ *
+ * <p>T12 改造 (2026-09-12)：
  * <ol>
- *   <li><b>RLS（行级安全）</b>：查询 ecos_rls_policy 表，按当前用户匹配策略，
- *       对 {@code OntologyDataController.listData()} 的结果做行级过滤。</li>
- *   <li><b>CLS（列级安全）</b>：查询 ecos_cls_policy 表，剥离当前用户无权查看的列。</li>
- *   <li><b>数据脱敏</b>：对手机号、邮箱、身份证等敏感字段，自动应用脱敏规则
- *       (phone→138****1234, email→j***@example.com, idCard→3201**********1234)。</li>
+ *   <li>Pointcut 扩展到 Ontology*Controller（27 个）
+ *   <li>非登录态默认 DENY — 写操作（POST/PUT/PATCH/DELETE）缺登录态直接抛
+ *       {@link UnauthorizedException}（HTTP 401 + ApiResponse）
+ *   <li>写操作审计 — 成功后调 {@link SecurityEngineClient#audit} 发 Kafka {@code ecos.audit}
+ *   <li>RLS / CLS / 脱敏 / ABAC 统一通过 {@link SecurityEngineClient} 委托 security-engine REST
+ *   <li>修复单条 GET 切面 row.clear() 自坏 bug
  * </ol>
- *
- * <p>不改已有API签名，通过 {@code @AfterReturning} 后处理模式透明增强。</p>
  *
  * @author PMO-13
  * @since 2026-08-06
@@ -38,370 +44,282 @@ import java.util.regex.Pattern;
 @Component
 public class OntologySecurityInterceptor {
 
-    private static final Logger log = LoggerFactory.getLogger(OntologySecurityInterceptor.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Logger log =
+            LoggerFactory.getLogger(OntologySecurityInterceptor.class);
 
-    // ── 脱敏正则 ─────────────────────────────────────
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^(.)[^@]*(@.*)$");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^(\\d{3})\\d{4}(\\d{4})$");
-    private static final Pattern IDCARD_PATTERN = Pattern.compile("^(\\d{4})\\d{10}(\\d{4})$");
+    private static final Pattern WRITE_METHOD_PATTERN =
+            Pattern.compile("^(POST|PUT|PATCH|DELETE)$");
 
-    /**
-     * 脱敏字段名 → 脱敏规则映射。
-     * 字段名含这些关键词时，自动应用对应脱敏规则。
-     */
-    private static final Map<String, String> MASKING_RULES = Map.of(
-        "phone", "phone",
-        "mobile", "phone",
-        "telephone", "phone",
-        "email", "email",
-        "mail", "email",
-        "idcard", "idCard",
-        "id_card", "idCard",
-        "identity", "idCard",
-        "idnumber", "idCard",
-        "id_number", "idCard"
-    );
-
-    private final JdbcTemplate jdbc;
-
-    public OntologySecurityInterceptor(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    /** 脱敏字段名 → 规则 */
+    private static final Map<String, String> MASKING_RULES;
+    static {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("phone", "phone");
+        m.put("mobile", "phone");
+        m.put("telephone", "phone");
+        m.put("email", "email");
+        m.put("mail", "email");
+        m.put("idcard", "idcard");
+        m.put("id_card", "idcard");
+        m.put("identity", "idcard");
+        m.put("idnumber", "idcard");
+        m.put("id_number", "idcard");
+        m.put("amount", "amount");
+        MASKING_RULES = Map.copyOf(m);
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // Pointcuts
-    // ════════════════════════════════════════════════════════════════
+    private final SecurityEngineClient securityEngineClient;
 
-    /**
-     * 拦截 OntologyDataController 中所有读取操作（GET 请求）。
-     */
-    @Pointcut("execution(* com.chinacreator.gzcm.engine.ontology.controller.OntologyDataController.list*(..))")
-    public void listDataOperations() {
+    public OntologySecurityInterceptor(SecurityEngineClient securityEngineClient) {
+        this.securityEngineClient = securityEngineClient;
     }
 
-    @Pointcut("execution(* com.chinacreator.gzcm.engine.ontology.controller.OntologyDataController.getData(..))")
-    public void getDataOperation() {
+    // ═══════════════ Pointcut ═══════════════
+
+    @Pointcut(
+            "execution(* com.chinacreator.gzcm.engine.ontology.controller.Ontology*Controller.*(..))")
+    public void anyOperation() {
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // Advice
-    // ════════════════════════════════════════════════════════════════
+    // ═══════════════ 写操作：401 强制 + 审计 ═══════════════
 
-    /**
-     * 对列表查询结果应用 RLS + CLS + 脱敏。
-     */
-    @AfterReturning(pointcut = "listDataOperations()", returning = "result")
-    public void secureListData(Object result) {
-        try {
-            if (!(result instanceof ApiResponse<?> resp)) return;
-            if (resp.getData() == null) return;
-
-            Object payload = resp.getData();
-            if (!(payload instanceof Map)) return;
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> dataMap = (Map<String, Object>) payload;
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> rows = (List<Map<String, Object>>) dataMap.get("data");
-            if (rows == null || rows.isEmpty()) return;
-
-            String tableName = resolveTableName(rows);
-            String userId = getCurrentUserId();
-            if (userId == null) return;
-
-            // 1. RLS — 行级过滤
-            rows = applyRls(tableName, userId, rows);
-
-            // 2. CLS — 列级剥离
-            rows = applyCls(tableName, userId, rows);
-
-            // 3. 数据脱敏
-            rows = applyMasking(rows);
-
-            // 写回
-            dataMap.put("data", rows);
-            int oldTotal = (int) dataMap.getOrDefault("total", 0);
-            dataMap.put("total", rows.size());
-            dataMap.put("totalPages", (int) Math.ceil((double) rows.size()
-                / Math.max(1, (int) dataMap.getOrDefault("size", 20))));
-
-            if (rows.size() != oldTotal) {
-                log.debug("RLS过滤: table={}, rows: {}→{}", tableName, oldTotal, rows.size());
+    @Around("anyOperation()")
+    public Object secureWriteAuthAndAudit(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (isWriteRequest()) {
+            String userId = currentUserId();
+            if (userId == null) {
+                log.warn("OntologySecurityInterceptor: DENY write {} {} (no authentication)",
+                        getHttpMethodOrUnknown(),
+                        joinPoint.getSignature().toShortString());
+                securityEngineClient.audit(
+                        getHttpMethodOrUnknown() + "_" + joinPoint.getSignature().getName(),
+                        "DENY_UNAUTHORIZED");
+                throw new UnauthorizedException("ONT-401: 写操作需要登录态，请先登录");
             }
-
-        } catch (Exception e) {
-            log.warn("安全拦截器列表查询增强失败 (不影响主流程): {}", e.getMessage());
-        }
-    }
-
-    /**
-     * 对单条查询结果应用 CLS + 脱敏。
-     */
-    @AfterReturning(pointcut = "getDataOperation()", returning = "result")
-    public void secureGetData(Object result) {
-        try {
-            if (!(result instanceof ApiResponse<?> resp)) return;
-            if (resp.getData() == null) return;
-
-            Object payload = resp.getData();
-            if (!(payload instanceof Map)) return;
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> row = (Map<String, Object>) payload;
-            if (row.isEmpty()) return;
-
-            String tableName = resolveTableName(List.of(row));
-            String userId = getCurrentUserId();
-            if (userId == null) return;
-
-            // 1. CLS — 列级剥离
-            row = applyClsSingle(tableName, userId, row);
-
-            // 2. 数据脱敏
-            row = applyMaskingSingle(row);
-
-            // 写回（直接修改原始对象）
-            row.clear(); // 不行——需要保留 ApiResponse 引用
-            // 这里我们直接修改 payload Map 的内容
-
-        } catch (Exception e) {
-            log.warn("安全拦截器单条查询增强失败 (不影响主流程): {}", e.getMessage());
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // RLS — 行级安全
-    // ════════════════════════════════════════════════════════════════
-
-    /**
-     * 查询 ecos_rls_policy 表获取当前用户的 RLS 策略，
-     * 对内存中的行数据进行过滤。
-     */
-    private List<Map<String, Object>> applyRls(String tableName, String userId,
-                                                List<Map<String, Object>> rows) {
-        List<RlsPolicy> policies = loadRlsPolicies(tableName, userId);
-        if (policies.isEmpty()) return rows;
-
-        List<Map<String, Object>> filtered = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            if (rowMatchesAllRlsPolicies(row, policies)) {
-                filtered.add(row);
-            }
-        }
-        return filtered;
-    }
-
-    private List<RlsPolicy> loadRlsPolicies(String tableName, String userId) {
-        try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT filter_expr, priority FROM ecos_rls_policy " +
-                "WHERE table_name = ? AND enabled = true " +
-                "  AND (user_id = ? OR user_id IS NULL) " +
-                "ORDER BY priority ASC",
-                tableName, userId);
-            List<RlsPolicy> policies = new ArrayList<>();
-            for (Map<String, Object> row : rows) {
-                String expr = (String) row.get("filter_expr");
-                if (expr != null && !expr.isBlank()) {
-                    policies.add(new RlsPolicy(expr));
-                }
-            }
-            return policies;
-        } catch (Exception e) {
-            log.debug("RLS策略加载跳过 (表可能不存在): {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    /**
-     * 检查单行是否满足所有 RLS 策略。
-     */
-    private boolean rowMatchesAllRlsPolicies(Map<String, Object> row, List<RlsPolicy> policies) {
-        for (RlsPolicy policy : policies) {
-            if (!policy.matches(row)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * RLS 策略值对象 — 支持 JSON 条件和简单 SQL 条件。
-     */
-    private static class RlsPolicy {
-        private final String rawExpr;
-        private Map<String, Object> jsonCondition;
-
-        RlsPolicy(String expr) {
-            this.rawExpr = expr;
-            // 尝试按 JSON 解析
+            Object result = joinPoint.proceed();
             try {
-                Object parsed = MAPPER.readValue(expr, Object.class);
-                if (parsed instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> cond = (Map<String, Object>) parsed;
-                    this.jsonCondition = cond;
-                }
-            } catch (Exception ignored) {
-                // 非 JSON 格式，保持为 SQL 条件
+                securityEngineClient.audit(
+                        getHttpMethodOrUnknown() + "_" + joinPoint.getSignature().getName(),
+                        "OK");
+            } catch (Exception e) {
+                log.debug("Audit after write failed (non-blocking): {}", e.getMessage());
             }
+            return result;
         }
-
-        boolean matches(Map<String, Object> row) {
-            if (jsonCondition != null) {
-                return evaluateJsonCondition(jsonCondition, row);
-            }
-            // 简单 SQL 条件解析
-            return evaluateSqlCondition(rawExpr, row);
-        }
-
-        @SuppressWarnings("unchecked")
-        private boolean evaluateJsonCondition(Map<String, Object> cond, Map<String, Object> row) {
-            // 支持组合条件：{"and": [...]} / {"or": [...]}
-            if (cond.containsKey("and")) {
-                List<Map<String, Object>> subs = (List<Map<String, Object>>) cond.get("and");
-                for (Map<String, Object> sub : subs) {
-                    if (!evaluateJsonCondition(sub, row)) return false;
-                }
-                return true;
-            }
-            if (cond.containsKey("or")) {
-                List<Map<String, Object>> subs = (List<Map<String, Object>>) cond.get("or");
-                for (Map<String, Object> sub : subs) {
-                    if (evaluateJsonCondition(sub, row)) return true;
-                }
-                return false;
-            }
-
-            String field = String.valueOf(cond.getOrDefault("field", ""));
-            String op = String.valueOf(cond.getOrDefault("op", "eq")).toLowerCase();
-            Object expected = cond.get("value");
-            Object actual = row.get(field);
-
-            return evaluateOp(op, actual, expected);
-        }
-
-        private boolean evaluateSqlCondition(String expr, Map<String, Object> row) {
-            // 简单解析: "field = 'value'" 或 "field != 'value'"
-            String trimmed = expr.trim();
-            String[] parts;
-            boolean isNeq = false;
-
-            if (trimmed.contains(" != ")) {
-                parts = trimmed.split(" != ", 2);
-                isNeq = true;
-            } else if (trimmed.contains(" <> ")) {
-                parts = trimmed.split(" <> ", 2);
-                isNeq = true;
-            } else if (trimmed.contains(" = ")) {
-                parts = trimmed.split(" = ", 2);
-            } else {
-                // 无法解析，宽容通过
-                return true;
-            }
-
-            if (parts.length < 2) return true;
-            String field = parts[0].trim();
-            String value = parts[1].trim().replaceAll("^'|'$", "").replaceAll("^\"|\"$", "");
-
-            Object actual = row.get(field);
-            if (actual == null) return isNeq; // null != value → true if neq
-
-            boolean eq = actual.toString().equals(value);
-            return isNeq != eq;
-        }
+        return joinPoint.proceed();
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // CLS — 列级安全
-    // ════════════════════════════════════════════════════════════════
-
-    private List<Map<String, Object>> applyCls(String tableName, String userId,
-                                                List<Map<String, Object>> rows) {
-        Set<String> blockedColumns = loadClsBlockedColumns(tableName, userId);
-        if (blockedColumns.isEmpty()) return rows;
-
-        List<Map<String, Object>> stripped = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            Map<String, Object> cleaned = new LinkedHashMap<>(row);
-            for (String col : blockedColumns) {
-                cleaned.remove(col);
-                cleaned.remove(col.toLowerCase());
-            }
-            stripped.add(cleaned);
-        }
-        log.debug("CLS列剥离: table={}, blockedColumns={}, rows={}", tableName, blockedColumns, rows.size());
-        return stripped;
-    }
-
-    private Map<String, Object> applyClsSingle(String tableName, String userId,
-                                                 Map<String, Object> row) {
-        Set<String> blockedColumns = loadClsBlockedColumns(tableName, userId);
-        if (blockedColumns.isEmpty()) return row;
-
-        for (String col : blockedColumns) {
-            row.remove(col);
-            row.remove(col.toLowerCase());
-        }
-        return row;
-    }
-
-    private Set<String> loadClsBlockedColumns(String tableName, String userId) {
+    /**
+     * 拦截读方法 — 行级 RLS + 列级 CLS + 脱敏。
+     * <p>仅处理 ApiResponse 的 payload 是 List 或 {data: List} Map 两种形态。</p>
+     */
+    @AfterReturning(pointcut = "anyOperation()", returning = "result")
+    public void secureReadResult(Object result) {
+        if (!isReadRequest()) return;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT blocked_cols FROM ecos_cls_policy " +
-                "WHERE table_name = ? AND enabled = true " +
-                "  AND (user_id = ? OR user_id IS NULL) " +
-                "ORDER BY priority ASC",
-                tableName, userId);
+            if (!(result instanceof ApiResponse<?> resp)) return;
+            Object payload = resp.getData();
+            if (payload == null) return;
 
-            Set<String> blocked = new LinkedHashSet<>();
-            for (Map<String, Object> row : rows) {
-                String blockedJson = (String) row.get("blocked_cols");
-                if (blockedJson != null && !blockedJson.isBlank()) {
-                    try {
-                        List<String> cols = MAPPER.readValue(blockedJson,
-                            new TypeReference<List<String>>() {});
-                        blocked.addAll(cols);
-                    } catch (Exception e) {
-                        log.debug("解析blocked_cols失败: {}", blockedJson);
+            String userId = currentUserId();
+            if (payload instanceof List<?> list) {
+                List<Map<String, Object>> rows = asRowList(list);
+                if (rows != null && !rows.isEmpty()) {
+                    String tableName = resolveTableName(rows);
+                    if (userId != null) {
+                        rows = applyRlsRemote(tableName, userId, rows);
+                        rows = applyClsRemote(tableName, userId, rows);
+                    }
+                    rows = applyMaskingRows(rows);
+                    assignData(resp, rows);
+                }
+            } else if (payload instanceof Map<?, ?>) {
+                Map<String, Object> dataMap = copyMap((Map<?, ?>) payload);
+                Object inner = dataMap.get("data");
+                if (inner instanceof List<?> list) {
+                    List<Map<String, Object>> rows = asRowList(list);
+                    if (rows != null && !rows.isEmpty()) {
+                        String tableName = resolveTableName(rows);
+                        if (userId != null) {
+                            rows = applyRlsRemote(tableName, userId, rows);
+                            rows = applyClsRemote(tableName, userId, rows);
+                        }
+                        rows = applyMaskingRows(rows);
+                        dataMap.put("data", rows);
+                        dataMap.put("total", rows.size());
                     }
                 }
+                maskMapInPlace(dataMap);
             }
-            return blocked;
         } catch (Exception e) {
-            log.debug("CLS策略加载跳过: {}", e.getMessage());
-            return Set.of();
+            log.warn("OntologySecurityInterceptor 读增强失败 (不影响主流程): {}", e.getMessage());
         }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 数据脱敏
-    // ════════════════════════════════════════════════════════════════
+    // ═══════════════ RLS — 走 security-engine ═══════════════
 
-    private List<Map<String, Object>> applyMasking(List<Map<String, Object>> rows) {
-        if (rows.isEmpty()) return rows;
-        List<Map<String, Object>> masked = new ArrayList<>();
+    private List<Map<String, Object>> applyRlsRemote(String tableName, String userId,
+                                                     List<Map<String, Object>> rows) {
+        try {
+            String where = securityEngineClient.applyRls("ecos_ontology", tableName,
+                    Map.of("tenant", "default"));
+            if (where == null || where.isEmpty()) return rows;
+            if ("1=0".equals(where)) return new ArrayList<>();
+            // P0-2: 仅接受单条件白名单 (entity_code/tenant_id/domain_id/ontology_id/is_deleted/status)
+            // 的 = / != 二 token; 其它情况 (AND/OR/NOT/LIKE/IN/多条件/未知字段名) 视为 RLS 表达式不可信
+            // -> DENY (return empty). 多条件 SQL WHERE 推到 DAO 层做 (T17 落库时白名单字段名 + 参数绑定).
+            String key;
+            String val;
+            boolean isNeq = false;
+            if (where.contains(" != ") || where.contains(" <> ")) {
+                String op = where.contains(" <> ") ? " <> " : " != ";
+                String[] parts = where.split(java.util.regex.Pattern.quote(op), 2);
+                isNeq = true;
+                if (parts.length < 2) {
+                    return denyUntrustedWhere(where);
+                }
+                key = parts[0].trim();
+                val = parts[1].trim().replaceAll("^'|'$", "").replaceAll("^\"|\"$", "");
+            } else if (where.contains(" = ")) {
+                String[] parts = where.split(" = ", 2);
+                if (parts.length < 2) {
+                    return denyUntrustedWhere(where);
+                }
+                key = parts[0].trim();
+                val = parts[1].trim().replaceAll("^'|'$", "").replaceAll("^\"|\"$", "");
+            } else {
+                // 无 = / != / <> _operators -> 视为不可信 (AND/OR/NOT/LIKE/IN 等)
+                return denyUntrustedWhere(where);
+            }
+            // P0-2: 字段名必须在白名单; 非白名单字段名 -> DENY
+            if (!isWhitelistedFieldName(key)) {
+                return denyUntrustedWhere(where);
+            }
+            List<Map<String, Object>> filtered = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                Object actual = row.get(key);
+                boolean eq = actual != null && actual.toString().equals(val);
+                if (isNeq != eq) filtered.add(row);
+            }
+            return filtered;
+        } catch (Exception e) {
+            // P0-1: 默认 DENY (架构铁律 2.4.6) — security-engine 不可用必须返空,
+            // 不可 fail-open 返原 rows 否则 27 个 Controller 读接口全量渗漏全行
+            log.warn("security-engine RLS 不可用, 默认 DENY: {}", e.getMessage());
+            try {
+                securityEngineClient.audit("RLS_DENY_FAIL_OPEN_DETECTED", "deny:resttemplate_throw:" + e.getMessage());
+            } catch (Exception ignored) {
+                // audit 不阻断主流程
+            }
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * P0-2: RLS whereClause 不可信时走默认 DENY — 记录审计并返回空集.
+     * <p>覆盖场景: AND/OR/NOT/LIKE/IN 多条件 / 未知 op / 非白名单字段名.</p>
+     *
+     * @param whereClause 原始 where 字符串
+     * @return 空列表
+     */
+    private List<Map<String, Object>> denyUntrustedWhere(String whereClause) {
+        log.warn("RLS whereClause 不可信, 默认 DENY: clause={}", whereClause);
+        try {
+            securityEngineClient.audit("RLS_DENY_UNTRUSTED_WHERE", "deny:clause=" + whereClause);
+        } catch (Exception ignored) {
+            // audit 不阻断
+        }
+        return new ArrayList<>();
+    }
+
+    /**
+     * P0-2: RLS 白名单字段名判定 — 仅接受明确的实体/租户/域/本体/删除/状态字段.
+     *
+     * @param name 字段名
+     * @return true 表示在白名单内
+     */
+    private static boolean isWhitelistedFieldName(String name) {
+        if (name == null) return false;
+        return RLS_WHITELIST_FIELDS.contains(name.toLowerCase());
+    }
+
+    /** RLS 白名单字段名集合 (全小写, 忽略大小写比对) */
+    private static final Set<String> RLS_WHITELIST_FIELDS = Set.of(
+            "entity_code", "tenant_id", "domain_id", "ontology_id", "is_deleted", "status"
+    );
+
+    // ═══════════════ CLS — 走 security-engine ═══════════════
+
+    private List<Map<String, Object>> applyClsRemote(String tableName, String userId,
+                                                     List<Map<String, Object>> rows) {
+        try {
+            Set<String> allowed = new LinkedHashSet<>();
+            for (Map<String, Object> row : rows) {
+                allowed.addAll(row.keySet());
+            }
+            List<String> filtered = securityEngineClient.filterColumns(
+                    tableName, new ArrayList<>(allowed));
+            // P0-1 (Wave B-2 加固 round 2): 默认 DENY — filterColumns 内部已 swallow
+            // 任何 fail-open (serviceRestTemplate == null / internal catch -> List.of()),
+            // 不允许 interceptor 侧面另起炉灶把"空 = 不允许"变成"空 = 全放行" —
+            // (前次: filtered.isEmpty() -> return rows 把 security-engine 短暂 down
+            //  时全部 27 个 Controller 读接口全列裸返)
+            if (filtered == null || filtered.isEmpty()) {
+                try {
+                    securityEngineClient.audit("CLS_DENY_EMPTY_ALLOWED_SET",
+                            "deny:filterColumns_empty:" + tableName);
+                } catch (Exception ignored) { /* audit 不阻断主流程 */ }
+                return Collections.emptyList();
+            }
+            Set<String> allowedSet = new LinkedHashSet<>(filtered);
+            List<Map<String, Object>> stripped = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                Map<String, Object> clean = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> e : row.entrySet()) {
+                    String key = e.getKey();
+                    if (allowedSet.contains(key) || allowedSet.contains(key.toLowerCase())) {
+                        clean.put(key, e.getValue());
+                    }
+                }
+                stripped.add(clean);
+            }
+            return stripped;
+        } catch (Exception e) {
+            // P0-1: 默认 DENY (架构铁律 2.4.6) — CLS 不可用时无可见列, 不允许裸返全列
+            log.warn("security-engine CLS 不可用, 默认 DENY(无可见列): {}", e.getMessage());
+            try {
+                securityEngineClient.audit("CLS_DENY_FAIL_OPEN_DETECTED", "deny:resttemplate_throw:" + e.getMessage());
+            } catch (Exception ignored) {
+                // audit 不阻断主流程
+            }
+            return Collections.emptyList();
+        }
+    }
+
+    // ═══════════════ 脱敏 ═══════════════
+
+    private List<Map<String, Object>> applyMaskingRows(List<Map<String, Object>> rows) {
+        List<Map<String, Object>> masked = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
-            masked.add(applyMaskingSingle(row));
+            masked.add(maskSingleRow(row));
         }
         return masked;
     }
 
-    private Map<String, Object> applyMaskingSingle(Map<String, Object> row) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : row.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
+    private Map<String, Object> maskSingleRow(Map<String, Object> row) {
+        Map<String, Object> result = new LinkedHashMap<>(row.size());
+        for (Map.Entry<String, Object> e : row.entrySet()) {
+            String key = e.getKey();
+            Object value = e.getValue();
             String rule = findMaskingRule(key);
-            if (rule != null && value instanceof String && !((String) value).isEmpty()) {
-                result.put(key, applyMask((String) value, rule));
-            } else if (value instanceof Map) {
-                // 递归处理嵌套属性
-                @SuppressWarnings("unchecked")
-                Map<String, Object> nested = (Map<String, Object>) value;
-                result.put(key, applyMaskingSingle(nested));
+            if (rule != null && value instanceof String s && !s.isEmpty()) {
+                result.put(key, applyMask(s, rule));
+            } else if (value instanceof Map<?, ?> m) {
+                result.put(key, maskSingleRow(copyMap(m)));
+            } else if (value instanceof List<?> l) {
+                List<Object> maskedList = new ArrayList<>(l.size());
+                for (Object v : l) maskedList.add(maskValue(v));
+                result.put(key, maskedList);
             } else {
                 result.put(key, value);
             }
@@ -409,9 +327,40 @@ public class OntologySecurityInterceptor {
         return result;
     }
 
-    /**
-     * 根据字段名查找脱敏规则。
-     */
+    private Object maskValue(Object v) {
+        if (v instanceof Map<?, ?> m) {
+            return maskSingleRow(copyMap(m));
+        } else if (v instanceof List<?> l) {
+            List<Object> maskedList = new ArrayList<>(l.size());
+            for (Object item : l) maskedList.add(maskValue(item));
+            return maskedList;
+        }
+        return v;
+    }
+
+    private void maskMapInPlace(Map<String, Object> map) {
+        for (Iterator<Map.Entry<String, Object>> it = map.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, Object> e = it.next();
+            Object value = e.getValue();
+            if (value instanceof String s) {
+                String rule = findMaskingRule(e.getKey());
+                if (rule != null && !s.isEmpty()) {
+                    String key = e.getKey();
+                    it.remove();
+                    map.put(key, applyMask(s, rule));
+                }
+            } else if (value instanceof Map<?, ?> sub) {
+                maskMapInPlace(copyMap(sub));
+            } else if (value instanceof List<?> list) {
+                for (Object item : list) {
+                    if (item instanceof Map<?, ?> m) {
+                        maskMapInPlace(copyMap(m));
+                    }
+                }
+            }
+        }
+    }
+
     private String findMaskingRule(String fieldName) {
         if (fieldName == null) return null;
         return MASKING_RULES.get(fieldName.toLowerCase());
@@ -421,64 +370,75 @@ public class OntologySecurityInterceptor {
         return switch (rule) {
             case "phone" -> maskPhone(raw);
             case "email" -> maskEmail(raw);
-            case "idCard" -> maskIdCard(raw);
+            case "idcard" -> maskIdCard(raw);
+            case "amount" -> raw.replaceAll("\\d{1,9}(?=(\\.\\d{1,2})?$)", "*");
             default -> raw;
         };
     }
 
-    private String maskEmail(String raw) {
+    private static String maskEmail(String raw) {
         if (raw == null || !raw.contains("@")) return raw;
-        var m = EMAIL_PATTERN.matcher(raw);
+        var m = Pattern.compile("^(.)[^@]*(@.*)$").matcher(raw);
         if (m.matches()) return m.group(1) + "***" + m.group(2);
         return raw.charAt(0) + "***" + raw.substring(raw.indexOf('@'));
     }
 
-    private String maskPhone(String raw) {
+    private static String maskPhone(String raw) {
         if (raw == null) return raw;
-        var m = PHONE_PATTERN.matcher(raw);
+        var m = Pattern.compile("^(\\d{3})\\d{4}(\\d{4})$").matcher(raw);
         if (m.matches()) return m.group(1) + "****" + m.group(2);
-        if (raw.length() >= 7)
-            return raw.substring(0, 3) + "*".repeat(raw.length() - 6) + raw.substring(raw.length() - 3);
+        if (raw.length() >= 7) {
+            return raw.substring(0, 3)
+                    + "*".repeat(raw.length() - 6)
+                    + raw.substring(raw.length() - 3);
+        }
         return raw;
     }
 
-    private String maskIdCard(String raw) {
+    private static String maskIdCard(String raw) {
         if (raw == null) return raw;
-        var m = IDCARD_PATTERN.matcher(raw);
+        var m = Pattern.compile("^(\\d{4})\\d{10}(\\d{4})$").matcher(raw);
         if (m.matches()) return m.group(1) + "**********" + m.group(2);
         if (raw.length() == 18) return raw.substring(0, 4) + "**********" + raw.substring(14);
         if (raw.length() == 15) return raw.substring(0, 4) + "*******" + raw.substring(11);
         return raw;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 辅助方法
-    // ════════════════════════════════════════════════════════════════
+    // ═══════════════ 辅助 ═══════════════
 
-    /**
-     * 统一的 op 评估器，与 PreconditionEngine 保持一致。
-     */
-    private static boolean evaluateOp(String op, Object actual, Object expected) {
-        return switch (op.toLowerCase()) {
-            case "eq" -> actual != null && actual.toString().equals(String.valueOf(expected));
-            case "neq" -> actual == null || !actual.toString().equals(String.valueOf(expected));
-            case "in" -> {
-                if (expected instanceof List<?> list && actual != null)
-                    yield list.contains(actual.toString());
-                yield false;
+    /** List&lt;?&gt; → List&lt;Map&lt;String,Object&gt;&gt;；非 Map 元素返回 null */
+    private static List<Map<String, Object>> asRowList(List<?> list) {
+        if (list.isEmpty()) return new ArrayList<>();
+        if (!(list.get(0) instanceof Map<?, ?>)) return null;
+        List<Map<String, Object>> result = new ArrayList<>(list.size());
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> mm) {
+                result.add(copyMap(mm));
             }
-            case "contains" -> actual != null && expected != null
-                && actual.toString().contains(expected.toString());
-            case "regex" -> actual != null && expected != null
-                && actual.toString().matches(expected.toString());
-            default -> true; // 未知 op 宽容通过
-        };
+        }
+        return result;
     }
 
-    /**
-     * 从行数据推断表名（优先取 objectTypeId）。
-     */
-    private String resolveTableName(List<Map<String, Object>> rows) {
+    /** 拷贝 Map，显式 String key，避免 CAP 推断 */
+    private static Map<String, Object> copyMap(Map<?, ?> map) {
+        Map<String, Object> result = new LinkedHashMap<>(map.size());
+        for (Map.Entry<?, ?> e : map.entrySet()) {
+            result.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return result;
+    }
+
+    /** 反射写回，绕过 ApiResponse&lt;?&gt; 的 CAP 推断 */
+    private static void assignData(ApiResponse<?> resp, Object data) {
+        try {
+            var method = resp.getClass().getMethod("setData", Object.class);
+            method.invoke(resp, data);
+        } catch (Exception e) {
+            log.debug("assignData 反射失败: {}", e.getMessage());
+        }
+    }
+
+    private static String resolveTableName(List<Map<String, Object>> rows) {
         for (Map<String, Object> row : rows) {
             Object oid = row.get("objectTypeId");
             if (oid != null) return oid.toString();
@@ -486,10 +446,7 @@ public class OntologySecurityInterceptor {
         return "ecos_ontology_data";
     }
 
-    /**
-     * 从 SecurityContext 获取当前用户 ID。
-     */
-    private String getCurrentUserId() {
+    private static String currentUserId() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.isAuthenticated()) {
@@ -501,5 +458,22 @@ public class OntologySecurityInterceptor {
             log.debug("无法获取当前用户: {}", e.getMessage());
         }
         return null;
+    }
+
+    private static String getHttpMethodOrUnknown() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (attrs instanceof ServletRequestAttributes servlet) {
+            return servlet.getRequest().getMethod();
+        }
+        return "UNKNOWN";
+    }
+
+    private static boolean isWriteRequest() {
+        return WRITE_METHOD_PATTERN.matcher(getHttpMethodOrUnknown()).matches();
+    }
+
+    private static boolean isReadRequest() {
+        String m = getHttpMethodOrUnknown();
+        return "GET".equalsIgnoreCase(m) || "HEAD".equalsIgnoreCase(m);
     }
 }

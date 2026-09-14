@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>databridge-v2</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- PMO-49 P2-5: services/aiming 独立部署单元 (火·W 智慧)。
+         - 聚合 ai-engine (火·W: Agent/Loop/Memory/LLM) + agent-service runtime
+           (ToolRouter/Memory/Planner/Governance/Reflection/Telemetry) + llm-gateway
+         - 依赖方向 (单向, 无循环):
+             ai-engine-impl ──import──> services.agent.* (runtime model/service)
+             agent-service ──depend──> llm-gateway / common-api / runtime-core
+           故 aiming 声明:
+             aiming -> ai-engine-impl  (传递带入 agent-service 依赖? 不, 需显式)
+             aiming -> agent-service   (runtime 实现)
+             aiming -> llm-gateway     (LLM 调用收敛)
+         说明: ai-engine-impl 已 import services.agent.* => 必须显式声明
+             agent-service 依赖, 否则 aiming 独立打包时 agent runtime 类不在 classpath。
+         - 端口 18084 (与 ai-engine 主引擎一致, 本机互斥运行)
+         - 拆分期双跑: gateway 仍承载 ai-engine, 切流 ECOS_ROUTE_aiming
+         - 不改任何 package 名 (agent runtime 50+ 类保留 com.chinacreator.gzcm.services.agent.*) -->
+    <artifactId>aiming-service</artifactId>
+    <packaging>jar</packaging>
+    <name>ECOS Aiming Service</name>
+    <description>智能服务 — 封装 ai-engine + agent-service runtime + llm-gateway (Agent/Loop/Memory/工具路由)</description>
+
+    <dependencies>
+        <!-- 主封装引擎 — ai-engine (火·W) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ai-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- agent-service runtime (ToolRouter/Memory/Planner/Governance/Reflection/Telemetry) —— 显式声明,
+             因 ai-engine-impl 以 import 引用其类, 但 POM 不传递该实现依赖 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>agent-service</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- LLM 调用收敛 (铁律 §2.5 所有 LLM 走 llm-gateway) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>llm-gateway</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- agent-service 依赖 runtime-core, 显式补 agent 域 mapper/repository -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>common-api</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- sysman-impl: CognitiveConfigController (ai-engine) 注入
+             sysman.config.service.impl.SysConfigService 具体类,
+             独立 aiming 需 sysman-impl 在 classpath 才装配成功 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+
+        <!-- Spring Boot Web + Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- 数据库驱动 + Kafka (agent 事件流) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.services.aiming.AimingServiceApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

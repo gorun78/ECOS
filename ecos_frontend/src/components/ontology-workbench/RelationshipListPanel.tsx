@@ -19,6 +19,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
+import { useTheme } from '../ThemeContext';
 import type { Relationship } from '../../types/workbench';
 
 // ── 关系类型颜色映射 ──────────────────────────────────────────
@@ -54,12 +55,13 @@ interface ConfirmDeleteProps {
 }
 
 function ConfirmDelete({ rel, sourceName, targetName, onConfirm, onCancel, loading }: ConfirmDeleteProps) {
+  const { styles } = useTheme();
   return (
     <div className="px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 mx-2 my-1">
       <p className="text-[10px] text-red-400 mb-2">
         确定要删除关系「{rel.name || rel.code}」吗？
       </p>
-      <p className="text-[9px] text-slate-500 mb-2 font-mono">
+      <p className={`text-[9px] ${styles.muted} mb-2 font-mono`}>
         {sourceName} → {targetName}
       </p>
       <div className="flex items-center gap-2">
@@ -76,9 +78,9 @@ function ConfirmDelete({ rel, sourceName, targetName, onConfirm, onCancel, loadi
         <button
           onClick={onCancel}
           disabled={loading}
-          className="px-2.5 py-1 rounded text-[10px] text-slate-400
-            hover:text-slate-300 hover:bg-white/5 transition
-            disabled:opacity-40"
+          className={`px-2.5 py-1 rounded text-[10px] ${styles.sidebarText}
+            hover:${styles.cardText} hover:bg-white/5 transition
+            disabled:opacity-40`}
         >
           取消
         </button>
@@ -96,6 +98,7 @@ interface RelationshipListPanelProps {
 }
 
 export default function RelationshipListPanel({ entityId }: RelationshipListPanelProps) {
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
   const { relationships, entities } = store;
 
@@ -142,17 +145,17 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
   return (
     <div>
       {/* 标题 */}
-      <h4 className="text-[11px] font-semibold text-slate-300 mb-3 flex items-center gap-1.5">
-        <GitBranch size={11} className="text-slate-500" />
+      <h4 className={`text-[11px] font-semibold ${styles.sidebarText} mb-3 flex items-center gap-1.5`}>
+        <GitBranch size={11} className={styles.muted} />
         关联关系
-        <span className="text-[10px] font-normal text-slate-500 ml-1">
+        <span className={`text-[10px] font-normal ${styles.muted} ml-1`}>
           ({entityRelationships.length})
         </span>
       </h4>
 
       {/* 空状态 */}
       {entityRelationships.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+        <div className={`flex flex-col items-center justify-center py-10 ${styles.muted}`}>
           <GitBranch size={24} className="mb-2 opacity-20" />
           <p className="text-[11px]">暂无关系</p>
           <p className="text-[9px] mt-0.5 opacity-50">
@@ -164,7 +167,7 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
           {entityRelationships.map((rel) => {
             const { isSource, sourceName, targetName } = getDirection(rel);
             const isConfirming = confirmingDeleteId === rel.id;
-            const typeColor = RELATIONSHIP_TYPE_COLORS[rel.relationshipType] || 'bg-slate-500/15 text-slate-400 border-slate-500/20';
+            const typeColor = RELATIONSHIP_TYPE_COLORS[rel.relationshipType] || `${styles.badgeBg} ${styles.cardTextMuted} ${styles.cardBorder}`;
 
             return (
               <React.Fragment key={rel.id}>
@@ -180,7 +183,7 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
                     <span className={`font-mono ${isSource ? 'text-emerald-400' : 'text-blue-400'}`}>
                       {isSource ? sourceName : targetName}
                     </span>
-                    <span className="mx-1 text-slate-600">
+                    <span className={`mx-1 ${styles.muted}`}>
                       {isSource ? <ArrowRight size={10} /> : <ArrowLeft size={10} />}
                     </span>
                     <span className={`font-mono ${isSource ? 'text-blue-400' : 'text-emerald-400'}`}>
@@ -201,9 +204,9 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
                   {/* 删除按钮 */}
                   <button
                     onClick={() => setConfirmingDeleteId(isConfirming ? null : rel.id)}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100
-                      hover:bg-red-500/10 text-slate-600 hover:text-red-400
-                      transition-opacity shrink-0"
+                    className={`p-1 rounded opacity-0 group-hover:opacity-100
+                      hover:bg-red-500/10 ${styles.muted} hover:text-red-400
+                      transition-opacity shrink-0`}
                     title="删除关系"
                   >
                     <Trash2 size={11} />

@@ -134,7 +134,7 @@ services:
     ports:
       - "8181:8181"
     volumes:
-      - /home/guorongxiao/opa-policies:/policies:ro
+      - ./opa-policies:/policies:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8181/v1/data || exit 1"]
       interval: 5s

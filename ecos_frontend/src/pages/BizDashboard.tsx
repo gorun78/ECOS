@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Briefcase, FileText, TrendingUp, Building2, Users, RefreshCw, AlertCircle, Loader2, Stethoscope } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
+import { useTheme } from "../components/ThemeContext";
 import { fetchBizDashboard, callDiagnosticAgent } from "../api";
 import DiagnosticPanel from "../components/DiagnosticPanel";
 
@@ -18,6 +19,7 @@ interface BizData {
 
 export default function BizDashboard() {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const [data, setData] = useState<BizData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +62,7 @@ export default function BizDashboard() {
     <div className="h-full flex items-center justify-center">
       <div className="text-center space-y-3">
         <Loader2 className="w-8 h-8 text-[#3B82F6] animate-spin mx-auto" />
-        <p className="text-sm text-slate-400">加载仪表盘数据...</p>
+        <p className={`text-sm ${styles.cardTextMuted}`}>加载仪表盘数据...</p>
       </div>
     </div>
   );
@@ -68,7 +70,7 @@ export default function BizDashboard() {
     <div className="h-full flex items-center justify-center">
       <div className="text-center max-w-sm">
         <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-        <p className="text-sm text-slate-400">{error}</p>
+        <p className={`text-sm ${styles.cardTextMuted}`}>{error}</p>
         <button onClick={() => loadData()} className="mt-3 px-4 py-2 rounded bg-blue-500 text-white text-sm hover:bg-blue-600 transition">重试</button>
       </div>
     </div>
@@ -105,8 +107,8 @@ export default function BizDashboard() {
     <div className="flex-1 overflow-auto p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">经营仪表盘</h1>
-          <p className="text-sm text-slate-400 mt-1">CEO晨会 · 项目型企业全景</p>
+          <h1 className={`text-2xl font-bold ${styles.appText}`}>经营仪表盘</h1>
+          <p className={`text-sm ${styles.cardTextMuted} mt-1`}>CEO晨会 · 项目型企业全景</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -115,7 +117,7 @@ export default function BizDashboard() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
               hasCriticalDeviation
                 ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
-                : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                : `${styles.inputBg} border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`
             } disabled:opacity-50`}
           >
             <Stethoscope className={`w-4 h-4 ${diagnosing ? "animate-spin" : ""}`} />
@@ -124,7 +126,7 @@ export default function BizDashboard() {
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition disabled:opacity-50"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} text-sm ${styles.cardText} ${styles.sidebarHoverBg} transition disabled:opacity-50`}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
             刷新
@@ -174,16 +176,16 @@ export default function BizDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Departments */}
         {deptCount > 0 && (
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+          <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
+            <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
               <Users className="w-5 h-5 text-blue-500" />
               组织机构 ({deptCount})
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {data?.departments?.slice(0, 6).map((dept) => (
-                <div key={dept.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{dept.name}</p>
-                  <p className="text-xs text-slate-400 mt-1">{dept.manager || "—"}</p>
+                <div key={dept.id} className={`p-3 rounded-lg border ${styles.appBorder} ${styles.appBg}`}>
+                  <p className={`text-sm font-medium ${styles.cardText}`}>{dept.name}</p>
+                  <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{dept.manager || "—"}</p>
                 </div>
               ))}
             </div>
@@ -192,8 +194,8 @@ export default function BizDashboard() {
 
         {/* Project Stats Card */}
         {projects && (
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+          <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
+            <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
               <Briefcase className="w-5 h-5 text-indigo-500" />
               项目概览
             </h2>
@@ -210,8 +212,8 @@ export default function BizDashboard() {
 
       {/* Target vs Actual */}
       {targets.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 mb-6">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+        <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5 mb-6`}>
+          <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
             <TrendingUp className="w-5 h-5 text-amber-500" />
             年度目标追踪
           </h2>
@@ -224,8 +226,8 @@ export default function BizDashboard() {
               const atRisk = pct < 80;
               return (
                 <div key={t.id} className="flex items-center gap-4">
-                  <span className="text-sm text-slate-600 dark:text-slate-400 w-32">{t.target_type === 'revenue' ? '营收' : t.target_type === 'profit' ? '利润' : '回款率'}</span>
-                  <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <span className={`text-sm ${styles.cardText} w-32`}>{t.target_type === 'revenue' ? '营收' : t.target_type === 'profit' ? '利润' : '回款率'}</span>
+                  <div className={`flex-1 h-3 ${styles.inputBg} rounded-full overflow-hidden`}>
                     <div
                       className={`h-full rounded-full transition-all ${atRisk ? 'bg-red-500' : 'bg-emerald-500'}`}
                       style={{ width: `${Math.min(pct, 100)}%` }}
@@ -255,10 +257,11 @@ export default function BizDashboard() {
 }
 
 function StatRow({ label, value, highlight }: { label: string; value: number | string; highlight?: boolean }) {
+  const { styles } = useTheme();
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-sm text-slate-500 dark:text-slate-400">{label}</span>
-      <span className={`text-sm font-semibold ${highlight ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
+      <span className={`text-sm ${styles.cardTextMuted}`}>{label}</span>
+      <span className={`text-sm font-semibold ${highlight ? 'text-indigo-600 dark:text-indigo-400' : styles.cardText}`}>
         {value}
       </span>
     </div>
@@ -268,6 +271,8 @@ function StatRow({ label, value, highlight }: { label: string; value: number | s
 function KpiCard({ icon: Icon, label, value, sub, color }: {
   icon: any; label: string; value: number | string; sub?: string; color: string;
 }) {
+  const { styles } = useTheme();
+  // KPI 图标语义色映射（blue/indigo/emerald/amber/red）— 属状态语义枚举，保留
   const colors: Record<string, string> = {
     blue: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
     indigo: "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400",
@@ -276,15 +281,15 @@ function KpiCard({ icon: Icon, label, value, sub, color }: {
     red: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400",
   };
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+    <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
       <div className="flex items-center gap-3">
         <div className={`p-2.5 rounded-lg ${colors[color] || colors.blue}`}>
           <Icon className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-xs text-slate-400">{label}</p>
-          <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
-          {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+          <p className={`text-xs ${styles.cardTextMuted}`}>{label}</p>
+          <p className={`text-2xl font-bold ${styles.appText}`}>{value}</p>
+          {sub && <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>{sub}</p>}
         </div>
       </div>
     </div>

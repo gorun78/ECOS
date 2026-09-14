@@ -22,15 +22,16 @@ import {
   fetchAvailableTransitions, executeTransition,
   createObjectRelationship, fetchObjectTimeline,
   TimelineEvent,
-  fetchEntityList, EntityListItem,
 } from "../api";
+// T2: fetchEntityList/EntityListItem 由 api.ts 收敛到 services/ontologyApi.ts
+import { fetchEntityList, EntityListItem } from "../services/ontologyApi";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
 import { FALLBACK_ENTITIES, EVENT_LABELS, STATUS_COLORS, PAGE_SIZE, type Relation } from "./ObjectExplorer/helpers";
 
 // ---- Main component ----
 export default function ObjectExplorer() {
   const { t } = useLanguage();
-  useTheme();
+  const { styles } = useTheme();
   const [entityCode, setEntityCode] = useState<string>("Customer");
   const [entityList, setEntityList] = useState<EntityListItem[]>([]);
   const [entityListLoading, setEntityListLoading] = useState(true);
@@ -291,7 +292,7 @@ export default function ObjectExplorer() {
         label: "ID",
         width: "100px",
         render: (_, record) => (
-          <span className="font-mono text-[10px] text-slate-400">{record.id?.slice(0, 12)}</span>
+          <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{record.id?.slice(0, 12)}</span>
         ),
       },
       {
@@ -312,7 +313,7 @@ export default function ObjectExplorer() {
         label: prop.name || prop.code,
         render: (val: any) => (
           <span className="truncate block max-w-[180px]" title={val != null ? String(val) : ""}>
-            {val != null ? String(val) : <span className="text-slate-300 italic">—</span>}
+            {val != null ? String(val) : <span className={`${styles.cardTextMuted} italic`}>—</span>}
           </span>
         ),
       }));
@@ -321,8 +322,8 @@ export default function ObjectExplorer() {
     } else {
       // Fallback columns
       cols.splice(1, 0,
-        { key: "name", label: "名称", render: (val: any) => <span className="font-medium text-slate-700 truncate block max-w-[160px]">{val || "—"}</span> },
-        { key: "code", label: "编码", render: (val: any) => <span className="font-mono text-[10px] truncate block max-w-[120px]">{val || "—"}</span> },
+        { key: "name", label: "名称", render: (val: any) => <span className={`font-medium ${styles.cardText} truncate block max-w-[160px]`}>{val || "—"}</span> },
+        { key: "code", label: "编码", render: (val: any) => <span className={`font-mono text-[10px] truncate block max-w-[120px] ${styles.cardText}`}>{val || "—"}</span> },
       );
     }
 
@@ -331,34 +332,34 @@ export default function ObjectExplorer() {
       label: "创建时间",
       width: "140px",
       render: (val: any) => (
-        <span className="text-[10px] text-slate-400">
+        <span className={`text-[10px] ${styles.cardTextMuted}`}>
           {val ? val.replace("T", " ").slice(0, 19) : "—"}
         </span>
       ),
     });
 
     return cols;
-  }, [schema]);
+  }, [schema, styles]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 font-sans text-slate-800">
+    <div className={`flex flex-col h-full ${styles.appBg} font-sans ${styles.cardText}`}>
       {/* Error toast */}
       {error && (
-        <div className="absolute top-4 right-4 z-50 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-xs flex items-center gap-2 shadow-lg max-w-md animate-in slide-in-from-top-2">
+        <div className={`absolute top-4 right-4 z-50 ${styles.dangerBg} border ${styles.dangerBorder} ${styles.dangerText} rounded-lg px-4 py-3 text-xs flex items-center gap-2 shadow-lg max-w-md animate-in slide-in-from-top-2`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="hover:bg-red-100 rounded p-0.5"><X className="w-3 h-3" /></button>
+          <button onClick={() => setError(null)} className="hover:opacity-70 rounded p-0.5"><X className="w-3 h-3" /></button>
         </div>
       )}
 
       {/* ── Top Bar ── */}
-      <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+      <div className={`shrink-0 ${styles.inputBg} border-b ${styles.cardBorder} px-4 py-3 flex items-center gap-3`}>
         {/* Entity selector dropdown */}
         <div className="relative">
           <select
             value={entityCode}
             onChange={(e) => handleEntityChange(e.target.value)}
-            className="appearance-none bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 pr-8 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition"
+            className={`appearance-none rounded-lg px-3 py-2 pr-8 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition ${styles.appBg} border ${styles.cardBorder} ${styles.cardText}`}
           >
             {(() => {
               const entities = entityList.length > 0
@@ -369,22 +370,22 @@ export default function ObjectExplorer() {
               ));
             })()}
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${styles.cardTextMuted} pointer-events-none`} />
         </div>
 
         {/* Search input */}
-        <div className="flex-1 max-w-md bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-2 text-xs transition focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
-          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <div className={`flex-1 max-w-md rounded-lg px-3 py-2 flex items-center gap-2 text-xs transition focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 ${styles.appBg} border ${styles.cardBorder}`}>
+          <Search className={`w-3.5 h-3.5 ${styles.cardTextMuted} shrink-0`} />
           <input
             type="text"
             value={searchQ}
             onChange={e => setSearchQ(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleSearch()}
             placeholder="搜索对象..."
-            className="bg-transparent border-0 outline-none w-full placeholder-slate-400"
+            className={`bg-transparent border-0 outline-none w-full ${styles.cardText}`}
           />
           {searchQ && (
-            <button onClick={() => { setSearchQ(""); loadObjects(entityCode, 1, ""); }} className="text-slate-400 hover:text-slate-600">
+            <button onClick={() => { setSearchQ(""); loadObjects(entityCode, 1, ""); }} className={`${styles.cardTextMuted} ${styles.sidebarHoverBg}`}>
               <X className="w-3 h-3" />
             </button>
           )}
@@ -394,7 +395,7 @@ export default function ObjectExplorer() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => loadObjects(entityCode, currentPage, searchQ)}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+            className={`p-2 ${styles.cardTextMuted} ${styles.sidebarHoverBg} rounded-lg transition`}
             title="刷新"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -411,7 +412,7 @@ export default function ObjectExplorer() {
       {/* ── Main Area: Table + Detail Split ── */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
         {/* Left: Data Table */}
-        <div className="flex-1 min-w-0 flex flex-col border-r border-slate-200 bg-white">
+        <div className={`flex-1 min-w-0 flex flex-col border-r ${styles.cardBorder} ${styles.cardBg}`}>
           <DataTable<ObjectData>
             columns={tableColumns}
             data={objects}
@@ -419,7 +420,7 @@ export default function ObjectExplorer() {
             loading={loading}
             emptyTitle={`暂无${entityCode}对象`}
             emptyDescription="点击「新建」按钮创建第一个对象"
-            emptyIcon={<Box className="w-8 h-8 text-slate-300" />}
+            emptyIcon={<Box className={`w-8 h-8 ${styles.cardTextMuted}`} />}
             emptyAction={{ label: "新建对象", onClick: () => { setShowForm("create"); setFormData({}); } }}
             pageSize={PAGE_SIZE}
             currentPage={currentPage}
@@ -431,29 +432,29 @@ export default function ObjectExplorer() {
         </div>
 
         {/* Right: Detail Panel */}
-        <div className="w-full lg:w-[420px] shrink-0 flex flex-col bg-white min-w-0">
+        <div className={`w-full lg:w-[420px] shrink-0 flex flex-col ${styles.inputBg} min-w-0`}>
           {!selectedId ? (
-            <div className="flex-1 flex items-center justify-center text-slate-400 text-xs">
+            <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} text-xs`}>
               <div className="text-center">
-                <ChevronRight className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                <ChevronRight className={`w-10 h-10 mx-auto mb-3 ${styles.cardTextMuted}`} />
                 选择左侧对象查看详情
               </div>
             </div>
           ) : detailLoading ? (
             <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+              <Loader2 className={`w-6 h-6 ${styles.cardTextMuted} animate-spin`} />
             </div>
           ) : detail ? (
             <>
               {/* Detail header */}
-              <div className="p-4 border-b border-slate-200 shrink-0">
+              <div className={`p-4 border-b ${styles.cardBorder} shrink-0`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0">
-                    <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 truncate">
+                    <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2 truncate`}>
                       <Box className="w-4 h-4 text-blue-500 shrink-0" />
                       {displayName(detail)}
                     </h2>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>
                       {detail.entityCode} · {detail.id}
                     </div>
                   </div>
@@ -472,16 +473,16 @@ export default function ObjectExplorer() {
                       <ChevronDown className="w-2.5 h-2.5" />
                     </button>
                     {showStatusDropdown && availableTransitions.length > 0 && (
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[120px]">
+                      <div className={`absolute top-full left-0 mt-1 ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-lg py-1 z-30 min-w-[120px]`}>
                         {availableTransitions.map(t => (
                           <button
                             key={t.transitionCode}
                             onClick={() => handleStatusChange(t.transitionCode)}
-                            className="w-full text-left px-3 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-500 transition flex items-center gap-2"
+                            className={`w-full text-left px-3 py-1.5 text-[10px] font-semibold ${styles.cardText} hover:bg-blue-50 hover:text-blue-500 transition flex items-center gap-2`}
                           >
                             <ArrowRightLeft className="w-2.5 h-2.5" />
                             → {t.toStatus}
-                            {t.transitionName && <span className="text-slate-400 font-normal ml-1">({t.transitionName})</span>}
+                            {t.transitionName && <span className={`${styles.cardTextMuted} font-normal ml-1`}>({t.transitionName})</span>}
                           </button>
                         ))}
                       </div>
@@ -491,7 +492,7 @@ export default function ObjectExplorer() {
                   {/* Edit button */}
                   <button
                     onClick={openEditForm}
-                    className="text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded px-2 py-1 font-semibold transition flex items-center gap-1"
+                    className={`text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardText} border ${styles.cardBorder} rounded px-2 py-1 font-semibold transition flex items-center gap-1`}
                   >
                     <Edit3 className="w-2.5 h-2.5" />编辑
                   </button>
@@ -507,7 +508,7 @@ export default function ObjectExplorer() {
               </div>
 
               {/* Tab bar */}
-              <div className="flex border-b border-slate-200 shrink-0 px-4 gap-0">
+              <div className={`flex border-b ${styles.cardBorder} shrink-0 px-4 gap-0`}>
                 {(["properties", "relations", "timeline"] as const).map(tab => (
                   <button
                     key={tab}
@@ -515,7 +516,7 @@ export default function ObjectExplorer() {
                     className={`px-3 py-2 text-[11px] font-semibold border-b-2 transition ${
                       activeDetailTab === tab
                         ? "border-blue-500 text-blue-500"
-                        : "border-transparent text-slate-500 hover:text-slate-700"
+                        : `border-transparent ${styles.cardTextMuted} hover:text-blue-400`
                     }`}
                   >
                     {tab === "properties" && <><FileText className="w-3 h-3 inline mr-1" />基本属性</>}
@@ -533,12 +534,12 @@ export default function ObjectExplorer() {
                       const val = detail[prop.code];
                       return (
                         <div key={prop.code} className="group">
-                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                          <label className={`text-[10px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider`}>
                             {prop.name || prop.code}
                             {prop.required && <span className="text-red-400 ml-1">*</span>}
                           </label>
-                          <div className="text-xs text-slate-700 mt-0.5 bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 font-mono break-all">
-                            {val != null ? String(val) : <span className="text-slate-300 italic">未设置</span>}
+                          <div className={`text-xs ${styles.cardText} mt-0.5 ${styles.appBg} border ${styles.cardBorder} rounded px-2.5 py-1.5 font-mono break-all`}>
+                            {val != null ? String(val) : <span className={`${styles.cardTextMuted} italic`}>未设置</span>}
                           </div>
                         </div>
                       );
@@ -547,9 +548,9 @@ export default function ObjectExplorer() {
                       .filter(([k]) => !["id", "entityCode", "status", "createdAt", "updatedAt", "relations", "timeline"].includes(k))
                       .map(([k, v]) => (
                         <div key={k}>
-                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{k}</label>
-                          <div className="text-xs text-slate-700 mt-0.5 bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 font-mono break-all">
-                            {v != null ? String(v) : <span className="text-slate-300 italic">—</span>}
+                          <label className={`text-[10px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider`}>{k}</label>
+                          <div className={`text-xs ${styles.cardText} mt-0.5 ${styles.appBg} border ${styles.cardBorder} rounded px-2.5 py-1.5 font-mono break-all`}>
+                            {v != null ? String(v) : <span className={`${styles.cardTextMuted} italic`}>—</span>}
                           </div>
                         </div>
                       ))}
@@ -569,8 +570,8 @@ export default function ObjectExplorer() {
                       <Plus className="w-3 h-3" />添加关系
                     </button>
                     {detailRelations.length === 0 ? (
-                      <div className="text-center py-12 text-xs text-slate-400">
-                        <GitBranch className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                      <div className={`text-center py-12 text-xs ${styles.cardTextMuted}`}>
+                        <GitBranch className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
                         无关联对象
                       </div>
                     ) : (
@@ -588,7 +589,7 @@ export default function ObjectExplorer() {
                                 navigateToRelated(targetCode, targetId);
                               }
                             }}
-                            className="bg-white border border-slate-200 rounded-lg p-3 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50/30 transition cursor-pointer"
+                            className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50/30 transition cursor-pointer`}
                           >
                             <div className={`p-1.5 rounded shrink-0 ${isSource ? "bg-green-50" : "bg-blue-50"}`}>
                               {isSource ? (
@@ -598,17 +599,17 @@ export default function ObjectExplorer() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-semibold text-slate-700">{rel.relationCode}</div>
-                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              <div className={`text-[11px] font-semibold ${styles.cardText}`}>{rel.relationCode}</div>
+                              <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>
                                 {isSource ? "→" : "←"} {rel.targetEntityCode || "?"} · {rel.targetObjectId?.slice(0, 8)}
                               </div>
                             </div>
                             {rel.targetData && (
-                              <div className="text-[10px] text-slate-500 bg-slate-50 rounded px-2 py-0.5 max-w-[120px] truncate">
+                              <div className={`text-[10px] ${styles.cardTextMuted} ${styles.appBg} rounded px-2 py-0.5 max-w-[120px] truncate`}>
                                 {rel.targetData.name || rel.targetData.code || rel.targetObjectId?.slice(0, 8)}
                               </div>
                             )}
-                            <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+                            <ChevronRight className={`w-3 h-3 ${styles.cardTextMuted} shrink-0`} />
                           </div>
                         );
                       })
@@ -617,15 +618,15 @@ export default function ObjectExplorer() {
                 )}
 
                 {activeDetailTab === "timeline" && (
-                  <div className="space-y-2 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-200">
+                  <div className="space-y-2 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--card-border,#E2E8F0)]">
                     {timelineLoading && detailTimeline.length === 0 ? (
-                      <div className="text-center py-12 text-xs text-slate-400">
-                        <Loader2 className="w-6 h-6 mx-auto mb-2 text-slate-400 animate-spin" />
+                      <div className={`text-center py-12 text-xs ${styles.cardTextMuted}`}>
+                        <Loader2 className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted} animate-spin`} />
                         加载时间线...
                       </div>
                     ) : detailTimeline.length === 0 ? (
-                      <div className="text-center py-12 text-xs text-slate-400">
-                        <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                      <div className={`text-center py-12 text-xs ${styles.cardTextMuted}`}>
+                        <Clock className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
                         暂无操作记录
                       </div>
                     ) : (
@@ -636,18 +637,18 @@ export default function ObjectExplorer() {
                               evt.eventType === "created" ? "bg-green-100 border-green-400" :
                               evt.eventType === "deleted" ? "bg-red-100 border-red-400" :
                               evt.eventType === "status_changed" ? "bg-blue-100 border-blue-400" :
-                              "bg-slate-100 border-slate-400"
+                              `${styles.appBg} ${styles.appBorder}`
                             }`} />
                             <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-semibold text-slate-700">
+                              <div className={`text-[11px] font-semibold ${styles.cardText}`}>
                                 {EVENT_LABELS[evt.eventType] || evt.eventType}
                                 {evt.eventType === "status_changed" && evt.eventDetail && (
-                                  <span className="text-[10px] font-normal text-slate-500 ml-1">
+                                  <span className={`text-[10px] font-normal ${styles.cardTextMuted} ml-1`}>
                                     {typeof evt.eventDetail === "object" ? `${evt.eventDetail.from} → ${evt.eventDetail.to}` : ""}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                              <div className={`flex items-center gap-2 text-[10px] ${styles.cardTextMuted} mt-0.5`}>
                                 <User className="w-2.5 h-2.5" />
                                 <span>{evt.operator || "system"}</span>
                                 <Calendar className="w-2.5 h-2.5 ml-1" />
@@ -662,7 +663,7 @@ export default function ObjectExplorer() {
                             <button
                               onClick={() => setTimelinePage(prev => prev + 1)}
                               disabled={timelineLoading}
-                              className="w-full text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg px-3 py-2 font-semibold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                              className={`w-full text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardText} border ${styles.cardBorder} rounded-lg px-3 py-2 font-semibold transition flex items-center justify-center gap-1.5 disabled:opacity-50`}
                             >
                               {timelineLoading ? (
                                 <><Loader2 className="w-3 h-3 animate-spin" />加载中...</>
@@ -679,9 +680,9 @@ export default function ObjectExplorer() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-400 text-xs">
+            <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} text-xs`}>
               <div className="text-center">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <AlertCircle className={`w-8 h-8 mx-auto mb-2 ${styles.cardTextMuted}`} />
                 详情暂不可用
               </div>
             </div>
@@ -691,21 +692,21 @@ export default function ObjectExplorer() {
 
       {/* ── Create/Edit Form Modal ── */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowForm(null)}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.overlayBg}`} onClick={() => setShowForm(null)}>
           <div
-            className="bg-white rounded-xl shadow-2xl w-full sm:w-[460px] max-h-[85vh] overflow-y-auto animate-in zoom-in-95 mx-4 sm:mx-auto"
+            className={`${styles.cardBg} rounded-xl shadow-2xl w-full sm:w-[460px] max-h-[85vh] overflow-y-auto animate-in zoom-in-95 mx-4 sm:mx-auto`}
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <div className={`p-4 border-b ${styles.cardBorder} flex items-center justify-between sticky top-0 ${styles.cardBg} z-10`}>
+              <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
                 {showForm === "create" ? (
                   <><Plus className="w-4 h-4 text-blue-500" />新建 {entityCode}</>
                 ) : (
                   <><Edit3 className="w-4 h-4 text-blue-500" />编辑 {entityCode}</>
                 )}
               </h3>
-              <button onClick={() => setShowForm(null)} className="hover:bg-slate-100 rounded p-1 transition">
-                <X className="w-4 h-4 text-slate-500" />
+              <button onClick={() => setShowForm(null)} className={`${styles.sidebarHoverBg} rounded p-1 transition`}>
+                <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
               </button>
             </div>
             <div className="p-4 space-y-3">
@@ -728,10 +729,10 @@ export default function ObjectExplorer() {
                 ))
               )}
             </div>
-            <div className="p-4 border-t border-slate-200 flex gap-2 justify-end sticky bottom-0 bg-white">
+            <div className={`p-4 border-t ${styles.cardBorder} flex gap-2 justify-end sticky bottom-0 ${styles.cardBg}`}>
               <button
                 onClick={() => setShowForm(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+                className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} ${styles.sidebarHoverBg} rounded-lg transition`}
               >
                 取消
               </button>
@@ -753,27 +754,27 @@ export default function ObjectExplorer() {
 
       {/* ── Gap 2: Add Relationship Modal ── */}
       {showRelationForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowRelationForm(false)}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.overlayBg}`} onClick={() => setShowRelationForm(false)}>
           <div
-            className="bg-white rounded-xl shadow-2xl w-full sm:w-[400px] animate-in zoom-in-95 mx-4 sm:mx-auto"
+            className={`${styles.cardBg} rounded-xl shadow-2xl w-full sm:w-[400px] animate-in zoom-in-95 mx-4 sm:mx-auto`}
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <div className={`p-4 border-b ${styles.cardBorder} flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
                 <Link2 className="w-4 h-4 text-blue-500" />添加关系
               </h3>
-              <button onClick={() => setShowRelationForm(false)} className="hover:bg-slate-100 rounded p-1 transition">
-                <X className="w-4 h-4 text-slate-500" />
+              <button onClick={() => setShowRelationForm(false)} className={`${styles.sidebarHoverBg} rounded p-1 transition`}>
+                <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
               </button>
             </div>
             <div className="p-4 space-y-3">
               <FormField label="目标对象 ID" required value={relFormData.targetObjectId} onChange={v => setRelFormData(prev => ({ ...prev, targetObjectId: v }))} />
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">目标实体</label>
+                <label className={`block text-[10px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-1`}>目标实体</label>
                 <select
                   value={relFormData.targetEntityCode}
                   onChange={e => setRelFormData(prev => ({ ...prev, targetEntityCode: e.target.value }))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono"
+                  className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg px-3 py-2 text-xs ${styles.cardText} outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono`}
                 >
                   {(() => {
                     const entities = entityList.length > 0
@@ -787,11 +788,11 @@ export default function ObjectExplorer() {
               </div>
               <FormField label="关系编码" required placeholder="如 supplier_of" value={relFormData.relationshipCode} onChange={v => setRelFormData(prev => ({ ...prev, relationshipCode: v }))} />
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">关系类型</label>
+                <label className={`block text-[10px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-1`}>关系类型</label>
                 <select
                   value={relFormData.relationshipType}
                   onChange={e => setRelFormData(prev => ({ ...prev, relationshipType: e.target.value }))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono"
+                  className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg px-3 py-2 text-xs ${styles.cardText} outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono`}
                 >
                   <option value="OneToOne">OneToOne</option>
                   <option value="OneToMany">OneToMany</option>
@@ -799,10 +800,10 @@ export default function ObjectExplorer() {
                 </select>
               </div>
             </div>
-            <div className="p-4 border-t border-slate-200 flex gap-2 justify-end">
+            <div className={`p-4 border-t ${styles.cardBorder} flex gap-2 justify-end`}>
               <button
                 onClick={() => setShowRelationForm(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+                className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} ${styles.sidebarHoverBg} rounded-lg transition`}
               >
                 取消
               </button>
@@ -829,9 +830,10 @@ function FormField({ label, placeholder, required, value, onChange }: {
   value: string;
   onChange: (val: string) => void;
 }) {
+  const { styles } = useTheme();
   return (
     <div>
-      <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+      <label className={`block text-[10px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-1`}>
         {label}
         {required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
@@ -840,7 +842,7 @@ function FormField({ label, placeholder, required, value, onChange }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder || label}
-        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono"
+        className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg px-3 py-2 text-xs ${styles.cardText} outline-none placeholder:opacity-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono`}
       />
     </div>
   );

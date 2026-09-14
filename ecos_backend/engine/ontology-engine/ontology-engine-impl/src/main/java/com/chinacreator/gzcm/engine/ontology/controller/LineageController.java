@@ -27,6 +27,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.LineageParseResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.SqlLineageRequest;
+import com.chinacreator.gzcm.engine.ontology.lineage.OntologyLineageService;
+import com.chinacreator.gzcm.engine.ontology.model.LineageEvent;
+import com.chinacreator.gzcm.engine.ontology.repository.LineageEventRepository;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
@@ -55,13 +60,23 @@ public class LineageController {
 
     private static final Logger log = LoggerFactory.getLogger(LineageController.class);
 
-    /** 内存存储：lineageId → 血缘边记录 */
+    /** 内存存储：lineageId → 血缘边记录（CRUD 端点仍使用，兼容 B' 并行开发） */
     private final Map<String, Map<String, Object>> store = new ConcurrentHashMap<>();
 
     private final OntologyService ontologyService;
 
-    public LineageController(OntologyService ontologyService) {
+    /** 血缘事件持久化仓库（kb_lineage_event 表，parse 事件写入 PG） */
+    private final LineageEventRepository lineageEventRepository;
+
+    /** 血缘真实解析/多跳影响分析服务（PMO-52 T2：jsqlparser 字段级 + 多跳 BFS） */
+    private final OntologyLineageService ontologyLineageService;
+
+    public LineageController(OntologyService ontologyService,
+                             LineageEventRepository lineageEventRepository,
+                             OntologyLineageService ontologyLineageService) {
         this.ontologyService = ontologyService;
+        this.lineageEventRepository = lineageEventRepository;
+        this.ontologyLineageService = ontologyLineageService;
     }
 
     // ═══════════════ 列表与详情 ═══════════════════
@@ -259,49 +274,166 @@ public class LineageController {
     // ═══════════════ PMO指令端点: parse + impact ═══════════════════
 
     /**
-     * POST /api/v1/lineage/parse — 解析OpenLineage/Atlas格式血缘数据
+     * POST /api/v1/lineage/parse — 真实解析 SQL/OpenLineage/Atlas 血缘（PMO-52 T2）。
+     *
+     * <p>流程：
+     * <ol>
+     *   <li>强类型 {@link SqlLineageRequest} 反序列化（query/format/data/payload 均兼容）</li>
+     *   <li>调 {@link OntologyLineageService#parse(SqlLineageRequest)} — 本地 JSqlParser
+     *       字段级真实解析（非 echo；不 import data-engine-impl 类，符合架构铁律 2.1 依赖方向）</li>
+     *   <li>解析结果序列化 nodes/edges JSON 持久化到 kb_lineage_event（PG，批次C 既有能力保留）</li>
+     *   <li>边同步写入内存 store，供 /graph、/trace/{id}、/impact 继续可用（只增不改）</li>
+     * </ol>
      */
     @PostMapping("/parse")
-    public ApiResponse<Map<String, Object>> parseLineage(@RequestBody Map<String, Object> body) {
+    public ApiResponse<LineageParseResponse> parseLineage(@RequestBody SqlLineageRequest body) {
+        LineageParseResponse resp =
+                ontologyLineageService.parse(body != null ? body : new SqlLineageRequest());
+        List<Map<String, Object>> nodes = resp.getNodes() != null ? resp.getNodes() : new ArrayList<>();
+        List<Map<String, Object>> edges = resp.getEdges() != null ? resp.getEdges() : new ArrayList<>();
+
+        // 持久化到 kb_lineage_event（保留批次 C 插入逻辑，仅换为真实解析结果）
+        String eventId = UUID.randomUUID().toString().replace("-", "");
+        String query = body != null && body.getQuery() != null ? body.getQuery() : "";
+        String format = resp.getFormat() != null ? resp.getFormat() : "openlineage";
         try {
-            String format = String.valueOf(body.getOrDefault("format", "openlineage"));
-            Object data = body.get("data");
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("format", format);
-            result.put("parsed", true);
-            result.put("nodesCount", data != null ? 1 : 0);
-            result.put("edgesCount", 0);
-            log.info("解析血缘数据: format={}", format);
-            return ApiResponse.success(result);
+            lineageEventRepository.insert(eventId, query, format, toNodesJson(nodes), toEdgesJson(edges));
         } catch (Exception e) {
-            log.error("解析血缘数据失败", e);
-            return ApiResponse.success(Map.of("parsed", false, "error", e.getMessage()));
+            // 持久化失败不阻塞解析结果返回（kb_lineage_event 表未初始化等边缘场景），记录日志
+            log.error("血缘事件持久化失败 eventId={}: {}", eventId, e.getMessage(), e);
+        }
+
+        // 写入内存 store（供 CRUD 端点 traceLineage / getLineageGraph / impactAnalysis 使用）
+        for (Map<String, Object> edge : edges) {
+            String src = String.valueOf(edge.get("source"));
+            String tgt = String.valueOf(edge.get("target"));
+            if (!src.isEmpty() && !"null".equals(src) && !tgt.isEmpty() && !"null".equals(tgt)) {
+                String edgeId = "lin_parse_" + UUID.randomUUID().toString().substring(0, 8);
+                Map<String, Object> lineage = new LinkedHashMap<>();
+                lineage.put("id", edgeId);
+                lineage.put("source", src);
+                lineage.put("target", tgt);
+                lineage.put("lineageType", String.valueOf(edge.getOrDefault("type", "DERIVED")));
+                lineage.put("eventId", eventId);
+                lineage.put("createdAt", Instant.now().toString());
+                lineage.put("updatedAt", Instant.now().toString());
+                store.put(edgeId, lineage);
+            }
+        }
+        log.info("解析血缘真实数据并持久化: format={}, eventId={}, nodes={}, edges={}",
+                format, eventId, nodes.size(), edges.size());
+        return ApiResponse.success(resp);
+    }
+
+    /**
+     * GET /api/v1/lineage/events — 查询历史血缘事件（从 PG 读取）
+     *
+     * @param format 可选，按格式过滤
+     */
+    @GetMapping("/events")
+    public ApiResponse<List<Map<String, Object>>> listEvents(
+            @RequestParam(required = false) String format) {
+        List<LineageEvent> events = (format != null && !format.isEmpty())
+                ? lineageEventRepository.findByFormat(format)
+                : lineageEventRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (LineageEvent e : events) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("eventId", e.getEventId());
+            m.put("query", e.getQuery());
+            m.put("format", e.getFormat());
+            m.put("nodes", parseJsonArray(e.getNodesJson()));
+            m.put("edges", parseJsonArray(e.getEdgesJson()));
+            m.put("parseAt", e.getParseAt() != null ? e.getParseAt().toString() : "");
+            result.add(m);
+        }
+        return ApiResponse.success(result);
+    }
+
+    // ═══════════════ parse 辅助方法 ═══════════════════
+
+    /** 节点列表 → JSON 字符串 */
+    private String toNodesJson(List<Map<String, Object>> nodes) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(nodes);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    /** 边列表 → JSON 字符串 */
+    private String toEdgesJson(List<Map<String, Object>> edges) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(edges);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    /** JSON 字符串 → List<Map>（用于 GET /events 响应） */
+    private List<Map<String, Object>> parseJsonArray(String json) {
+        if (json == null || json.isBlank()) return new ArrayList<>();
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        } catch (Exception e) {
+            return new ArrayList<>();
         }
     }
 
     /**
-     * GET /api/v1/lineage/impact?objectId={id}&depth=3 — 下游影响分析
+     * GET /api/v1/lineage/impact — 下游多跳影响分析（PMO-52 T2）。
+     *
+     * <p>从 root 对象出发，基于内存 store 中的血缘边真实执行分层 BFS（depth 有效，
+     * 缺省 3、上限 16），返回受影响对象列表（{id, path, hopCount, riskScore...}）。</p>
+     *
+     * @param rootObject 根节点 ID（优先）
+     * @param objectId   兼容旧参数字段
+     * @param startNode  兼容前端 fetchLineageImpact 传参字段
+     * @param depth      最大跳数
      */
     @GetMapping("/impact")
     public ApiResponse<Map<String, Object>> impactAnalysis(
             @RequestParam(value = "rootObject", required = false) String rootObject,
             @RequestParam(value = "objectId", required = false) String objectId,
+            @RequestParam(value = "startNode", required = false) String startNode,
             @RequestParam(defaultValue = "3") int depth) {
-        String id = rootObject != null ? rootObject : objectId;
+        String id = rootObject != null ? rootObject
+                : (objectId != null ? objectId : startNode);
+
+        // 从 store 构建边集合（source/target → source/target 字段）
+        List<Map<String, Object>> edgeList = new ArrayList<>();
+        for (Map<String, Object> lin : store.values()) {
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("source", lin.get("source"));
+            e.put("target", lin.get("target"));
+            edgeList.add(e);
+        }
+
+        // 真实多跳 BFS
+        List<Map<String, Object>> impactedObjects =
+                ontologyLineageService.impactAnalysis(id, edgeList, depth);
+
+        // 前端兼容字段：impactedNodes（path/hopCount/riskScore/id/type）+ 总风险 + 严重级
+        List<Map<String, Object>> impactedNodes = new ArrayList<>();
+        for (Map<String, Object> imp : impactedObjects) {
+            Map<String, Object> n = new LinkedHashMap<>(imp);
+            n.putIfAbsent("path", List.of(id, String.valueOf(imp.get("id"))));
+            impactedNodes.add(n);
+        }
+        int totalRisk = impactedNodes.stream()
+                .mapToInt(n -> n.get("riskScore") instanceof Number v ? v.intValue() : 0)
+                .sum();
+        String severity = impactedNodes.isEmpty() ? "NONE"
+                : (totalRisk >= 240 || impactedNodes.size() >= 8 ? "CRITICAL"
+                : (totalRisk >= 90 || impactedNodes.size() >= 3 ? "HIGH" : "NORMAL"));
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rootObject", id);
-        // 从store中查找以id为source的下游节点
-        List<Map<String, Object>> impacted = new ArrayList<>();
-        for (Map<String, Object> edge : store.values()) {
-            if (id.equals(String.valueOf(edge.get("source")))) {
-                Map<String, Object> impact = new LinkedHashMap<>();
-                impact.put("id", edge.get("target"));
-                impact.put("type", edge.getOrDefault("targetType", "unknown"));
-                impact.put("path", List.of(id, edge.get("target")));
-                impacted.add(impact);
-            }
-        }
-        result.put("impactedObjects", impacted);
+        result.put("impactedObjects", impactedObjects); // 新契约（PMO）
+        result.put("impactedNodes", impactedNodes);     // 兼容前端 LineageTab
+        result.put("totalRisk", totalRisk);
+        result.put("severity", severity);
         result.put("depth", depth);
         return ApiResponse.success(result);
     }

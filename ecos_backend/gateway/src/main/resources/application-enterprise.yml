@@ -27,3 +27,6 @@ ecos:
     worldmodel: true
     market: true
     portal: true
+  oag:
+    # OAG 推理节点 LLM 模型 fallback 链（按优先级排列，第一项最先尝试）
+    model-fallback: deepseek-chat,qwen-turbo,deepseek-v3-thinking

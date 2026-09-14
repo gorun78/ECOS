@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.common.data.model.DataLayer;
+import com.chinacreator.gzcm.engine.data.model.DataLayer;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 

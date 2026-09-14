@@ -1,6 +1,6 @@
 {
   "project" : "ECOS",
-  "boards" : "ECOS-boards",
+  "boards" : "ecos",
   "agents" : [ {
     "name" : "pm-default",
     "code" : "ecos-pm"

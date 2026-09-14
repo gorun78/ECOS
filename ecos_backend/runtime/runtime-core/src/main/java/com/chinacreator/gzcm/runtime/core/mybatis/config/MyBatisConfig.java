@@ -5,6 +5,7 @@ import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.mapper.MapperScannerConfigurer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.io.Resource;
@@ -30,7 +31,17 @@ import java.util.Properties;
 @EnableTransactionManagement
 @ComponentScan(basePackages = "com.chinacreator.gzcm.runtime.core.mybatis")
 public class MyBatisConfig {
-    
+
+    /**
+     * PMO-49 D1: 类型别名扫描包 (隔离 mybatis DataSecurityPolicy 双 domain 冲突)。
+     * 拆分期默认 root = "com.chinacreator.gzcm" (保持 monolith 兼容)，
+     * 每个独立 service 可在 application.yml 用
+     *   ecos.mybatis.type-aliases-package: com.chinacreator.gzcm.sysman
+     * 收窄到自己 domain, 避免 engine.* 实体与 service.* 实体基名冲突。
+     */
+    @Value("${ecos.mybatis.type-aliases-package:com.chinacreator.gzcm}")
+    private String typeAliasesPackage;
+
     /**
      * Configure SqlSessionFactory
      * 
@@ -43,7 +54,10 @@ public class MyBatisConfig {
         SqlSessionFactoryBean sessionFactory = new SqlSessionFactoryBean();
         sessionFactory.setDataSource(dataSource);
         
-        // Set mapper XML locations
+        // PMO-49 D1 补丁: 仅扫 mapper/**/*.xml，不再兼容 **/dao/**/*-sql.xml。
+        // 那些 -sql.xml 是历史遗留 "SQL 占位符"（AbacPolicyDaoImpl 通过
+        // ISystemDatabaseAccess.executeInsertFromConfig 独立读取），非 MyBatis
+        // mapper 契约。进 buildSqlSessionFactory 会触发 Xerces DOCTYPE 严格校验失败。
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         List<Resource> mapperLocations = new ArrayList<>();
         try {
@@ -54,20 +68,12 @@ public class MyBatisConfig {
         } catch (Exception e) {
             // Ignore if no mapper resources found
         }
-        try {
-            Resource[] sqlResources = resolver.getResources("classpath*:**/dao/**/*-sql.xml");
-            for (Resource resource : sqlResources) {
-                mapperLocations.add(resource);
-            }
-        } catch (Exception e) {
-            // Ignore if no SQL resources found
-        }
         if (!mapperLocations.isEmpty()) {
             sessionFactory.setMapperLocations(mapperLocations.toArray(new Resource[0]));
         }
         
-        // Set type aliases package
-        sessionFactory.setTypeAliasesPackage("com.chinacreator.gzcm");
+        // PMO-49 D1: 从 property 读 (fallback 到 monolith 默认)
+        sessionFactory.setTypeAliasesPackage(typeAliasesPackage);
         
         // Configure MyBatis settings
         Configuration configuration = new Configuration();

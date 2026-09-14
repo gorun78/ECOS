@@ -21,7 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyExportFullVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyExportTaskQuery;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyExportTaskSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyExportTaskVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 本体导出 REST API — 将本体（实体/属性/关系）导出为 JSON / CSV / DDL 等格式。
@@ -39,6 +45,12 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
  * </ul>
  *
  * <p>本控制器只新增导出端点，不改动 {@link OntologyController} 的现有 CRUD 签名。</p>
+ *
+ * <p><b>T16-4 说明</b>：入参/出参由 Map 改强类型（Query / SaveDTO / VO），
+ * 跟随 T16-1/2/3 命名先例，复用 T16-4 已有的 {@link OntologyExportTaskSaveDTO} /
+ * {@link OntologyExportTaskVO}。存储层内部记录仍为 {@code Map<String, Object>}
+ * （T16-4: 导出 payload 动态结构豁免 Map），响应前统一
+ * {@link ObjectMapper#convertValue} 转 VO，JSON 输出契约等价。
  */
 @RestController
 @RequestMapping("/api/v1/ontology/export")
@@ -46,7 +58,9 @@ public class OntologyExportController {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyExportController.class);
 
-    /** 内存存储：exportId → 导出任务记录 */
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** 内存存储：exportId → 导出任务记录（内部存储结构，响应前转 VO） */
     private final Map<String, Map<String, Object>> store = new ConcurrentHashMap<>();
 
     private final OntologyService ontologyService;
@@ -60,21 +74,18 @@ public class OntologyExportController {
     /**
      * GET /api/v1/ecos/ontology-exports — 导出任务列表
      *
-     * @param ontologyId 可选，按本体 ID 过滤
-     * @param format     可选，按格式过滤（JSON / CSV / DDL）
-     * @param status     可选，按状态过滤（COMPLETED / FAILED）
+     * @param query 过滤条件（ontologyId / format / status 均可空）
      */
     @GetMapping("/tasks")
-    public ApiResponse<List<Map<String, Object>>> listExports(
-            @RequestParam(required = false) String ontologyId,
-            @RequestParam(required = false) String format,
-            @RequestParam(required = false) String status) {
+    public ApiResponse<List<OntologyExportTaskVO>> listExports(
+            @RequestParam(required = false) OntologyExportTaskQuery query) {
+        OntologyExportTaskQuery q = query == null ? new OntologyExportTaskQuery() : query;
         // 列表接口不返回 payload，避免响应过大；详情/下载接口才返回
-        List<Map<String, Object>> result = store.values().stream()
-            .filter(m -> ontologyId == null || ontologyId.equals(m.get("ontologyId")))
-            .filter(m -> format == null || format.equals(m.get("format")))
-            .filter(m -> status == null || status.equals(m.get("status")))
-            .map(this::summary)
+        List<OntologyExportTaskVO> result = store.values().stream()
+            .filter(m -> q.getOntologyId() == null || q.getOntologyId().equals(m.get("ontologyId")))
+            .filter(m -> q.getFormat() == null || q.getFormat().equals(m.get("format")))
+            .filter(m -> q.getStatus() == null || q.getStatus().equals(m.get("status")))
+            .map(this::toSummaryVO)
             .collect(Collectors.toList());
         return ApiResponse.success(result);
     }
@@ -83,26 +94,29 @@ public class OntologyExportController {
      * GET /api/v1/ecos/ontology-exports/{id} — 导出任务详情（含 payload）
      */
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getExport(@PathVariable String id) {
+    public ApiResponse<OntologyExportTaskVO> getExport(@PathVariable String id) {
         Map<String, Object> record = store.get(id);
         if (record == null) return ApiResponse.notFound("导出任务 " + id + " 不存在");
-        return ApiResponse.success(record);
+        return ApiResponse.success(toTaskVO(record));
     }
 
     // ═══════════════ 创建导出 ═══════════════════
 
     /**
      * POST /api/v1/ecos/ontology-exports — 创建导出任务
-     * <p>Body 字段：ontologyId（必填）、format（可选，默认 JSON）、scope（可选，FULL / ENTITIES / RELATIONSHIPS）。</p>
+     * <p>body 字段：ontologyId（必填）、format（可选，默认 JSON）、scope（可选，FULL / ENTITIES / RELATIONSHIPS）。</p>
      */
     @PostMapping
-    public ApiResponse<Map<String, Object>> createExport(@RequestBody Map<String, Object> body) {
-        String ontologyId = String.valueOf(body.getOrDefault("ontologyId", "")).trim();
+    public ApiResponse<OntologyExportTaskVO> createExport(@RequestBody OntologyExportTaskSaveDTO body) {
+        Object rawId = body == null ? null : body.getOntologyId();
+        String ontologyId = rawId == null ? "" : String.valueOf(rawId).trim();
         if (ontologyId.isEmpty()) {
             return ApiResponse.badRequest("ONT-EXP-001: ontologyId 不能为空");
         }
-        String format = String.valueOf(body.getOrDefault("format", "JSON")).toUpperCase();
-        String scope = String.valueOf(body.getOrDefault("scope", "FULL")).toUpperCase();
+        String format = String.valueOf(body.getFormat() == null || body.getFormat().isBlank()
+            ? "JSON" : body.getFormat()).toUpperCase();
+        String scope = String.valueOf(body.getScope() == null || body.getScope().isBlank()
+            ? "FULL" : body.getScope()).toUpperCase();
 
         String id = "exp_" + UUID.randomUUID().toString().substring(0, 8);
         Map<String, Object> record = new LinkedHashMap<>();
@@ -127,13 +141,14 @@ public class OntologyExportController {
         store.put(id, record);
         log.info("Ontology export created: {} ontologyId={} format={} status={}",
                 id, ontologyId, format, record.get("status"));
-        return ApiResponse.success(record);
+        return ApiResponse.success(toTaskVO(record));
     }
 
     // ═══════════════ 下载与删除 ═══════════════════
 
     /**
      * GET /api/v1/ecos/ontology-exports/{id}/download — 仅返回导出载荷
+     * <p>T16-4: 导出 blob 动态结构豁免 Map（payload 随 format 为 JSON Map / CSV / DDL 字符串）。
      */
     @GetMapping("/{id}/download")
     public ApiResponse<Object> downloadExport(@PathVariable String id) {
@@ -159,21 +174,17 @@ public class OntologyExportController {
 
     // ═══════════════ 内部方法 ═══════════════════
 
-    /** 去除 payload 的摘要视图，用于列表接口 */
-    private Map<String, Object> summary(Map<String, Object> record) {
-        Map<String, Object> s = new LinkedHashMap<>();
-        s.put("id", record.get("id"));
-        s.put("ontologyId", record.get("ontologyId"));
-        s.put("format", record.get("format"));
-        s.put("scope", record.get("scope"));
-        s.put("status", record.get("status"));
-        s.put("objectCount", record.get("objectCount"));
-        s.put("createdAt", record.get("createdAt"));
-        return s;
+    /** 去除 payload 的摘要 VO，用于列表接口（NON_NULL 保证与既有 Map 输出一致） */
+    private OntologyExportTaskVO toSummaryVO(Map<String, Object> record) {
+        return MAPPER.convertValue(record, OntologyExportTaskVO.class);
+    }
+
+    /** 完整记录 VO（含 payload / error） */
+    private OntologyExportTaskVO toTaskVO(Map<String, Object> record) {
+        return MAPPER.convertValue(record, OntologyExportTaskVO.class);
     }
 
     /** 根据格式与范围构建导出载荷 */
-    @SuppressWarnings("unchecked")
     private Object buildPayload(String ontologyId, String format, String scope) {
         List<Map<String, Object>> entities = ontologyService.listEntities(ontologyId);
         List<Map<String, Object>> relationships = ontologyService.listRelationshipsByOntology(ontologyId);
@@ -243,10 +254,9 @@ public class OntologyExportController {
         return s;
     }
 
-    @SuppressWarnings("unchecked")
     private int countObjects(Object payload) {
         if (payload instanceof Map) {
-            Map<String, Object> p = (Map<String, Object>) payload;
+            Map<?, ?> p = (Map<?, ?>) payload;
             int count = 0;
             Object entities = p.get("entities");
             if (entities instanceof List) count += ((List<?>) entities).size();
@@ -260,16 +270,20 @@ public class OntologyExportController {
     // ═══════════════ 直接导出 ═══════════════════
 
     /**
-     * GET /api/v1/ontology/export — 直接返回完整本体JSON（含objectTypes+linkTypes等）
+     * GET /api/v1/ontology/export — 直接返回完整本体（含objectTypes+linkTypes等）
+     *
+     * <p>T16-4：返回强类型 {@link OntologyExportFullVO}；实体行统一
+     * {@link OntologyEntityVO}（同 service.entityToMap 结构）；
+     * linkTypes 当前为空占位（T16-4: 导出 blob 动态结构豁免 Map）。
      */
     @GetMapping
-    public ApiResponse<Map<String, Object>> exportFull() {
+    public ApiResponse<OntologyExportFullVO> exportFull() {
         try {
             List<Map<String, Object>> allObjects = ontologyService.listAllObjects();
-            List<Map<String, Object>> objectTypes = new ArrayList<>();
-            List<Map<String, Object>> linkTypes = new ArrayList<>();
-            List<Map<String, Object>> actionTypes = new ArrayList<>();
-            List<Map<String, Object>> functionTypes = new ArrayList<>();
+            List<OntologyEntityVO> objectTypes = new ArrayList<>();
+            List<Object> linkTypes = new ArrayList<>();
+            List<OntologyEntityVO> actionTypes = new ArrayList<>();
+            List<OntologyEntityVO> functionTypes = new ArrayList<>();
 
             for (Map<String, Object> obj : allObjects) {
                 String entityType = String.valueOf(obj.getOrDefault("entityType", ""));
@@ -277,7 +291,7 @@ public class OntologyExportController {
                     case "MASTER":
                     case "OBJECT":
                     case "object_type":
-                        objectTypes.add(obj);
+                        objectTypes.add(MAPPER.convertValue(obj, OntologyEntityVO.class));
                         break;
                     case "TRANSACTION":
                     case "LINK":
@@ -286,29 +300,29 @@ public class OntologyExportController {
                         break;
                     case "ACTION":
                     case "action_type":
-                        actionTypes.add(obj);
+                        actionTypes.add(MAPPER.convertValue(obj, OntologyEntityVO.class));
                         break;
                     case "FUNCTION":
                     case "function_type":
-                        functionTypes.add(obj);
+                        functionTypes.add(MAPPER.convertValue(obj, OntologyEntityVO.class));
                         break;
                     default:
-                        objectTypes.add(obj);
+                        objectTypes.add(MAPPER.convertValue(obj, OntologyEntityVO.class));
                 }
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("objectTypes", objectTypes);
-            result.put("linkTypes", linkTypes);
-            result.put("actionTypes", actionTypes);
-            result.put("functionTypes", functionTypes);
-            result.put("mappings", new ArrayList<>()); // 空列表占位
-            return ApiResponse.success(result);
+            OntologyExportFullVO vo = new OntologyExportFullVO();
+            vo.setObjectTypes(objectTypes);
+            vo.setLinkTypes(linkTypes);
+            vo.setActionTypes(actionTypes);
+            vo.setFunctionTypes(functionTypes);
+            vo.setMappings(new ArrayList<>());
+            return ApiResponse.success(vo);
         } catch (Exception e) {
             log.error("导出本体失败", e);
-            Map<String, Object> empty = new LinkedHashMap<>();
-            empty.put("objectTypes", new ArrayList<>());
-            empty.put("linkTypes", new ArrayList<>());
+            OntologyExportFullVO empty = new OntologyExportFullVO();
+            empty.setObjectTypes(new ArrayList<>());
+            empty.setLinkTypes(new ArrayList<>());
             return ApiResponse.success(empty);
         }
     }

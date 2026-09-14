@@ -30,7 +30,10 @@ public class DataSourceEntity {
     private String remark;
     /** PMO-37 元数据获取策略配置（JSONB），如 {"strategy":"ON_SAVE","includeRowCount":true,"countMethod":"ESTIMATE"} */
     private String metadataConfig;
-    /** PMO-37 最近一次元数据采集完成时间 */
+
+    /** PMO-46: 密码密文（AES 加密后 Base64），读取自 td_datasource.password_enc。 */
+    private String passwordEncrypted;
+
     private Timestamp lastCollectTime;
     
     public String getDatasourceId() {
@@ -188,11 +191,21 @@ public class DataSourceEntity {
     public Timestamp getLastCollectTime() {
         return lastCollectTime;
     }
-    
+
     public void setLastCollectTime(Timestamp lastCollectTime) {
         this.lastCollectTime = lastCollectTime;
     }
-    
+
+    /** PMO-46: 密码密文 getter */
+    public String getPasswordEncrypted() {
+        return passwordEncrypted;
+    }
+
+    /** PMO-46: 密码密文 setter（Service 层读取 password_enc 列时填充） */
+    public void setPasswordEncrypted(String passwordEncrypted) {
+        this.passwordEncrypted = passwordEncrypted;
+    }
+
     public static class DataSourceType {
         public static final String DATABASE = "DATABASE";
         public static final String FILE = "FILE";

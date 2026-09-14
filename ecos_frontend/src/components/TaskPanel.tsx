@@ -1,12 +1,16 @@
 /**
- * TaskPanel — 任务引擎管理面板
- * 统计卡片 + 筛选栏 + 任务列表 + 批量操作 + 详情抽屉
- * 支持四类分组: 管道 / Agent / 实时 / 管理
+ * TaskPanel — Task Engine Management Panel
+ * Stats cards + filter bar + task list + batch operations + detail drawer
+ * Supports 4 categories: Pipeline / Agent / Realtime / Management
  * @license Apache-2.0
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, RefreshCw, Search, Play, Pause, RotateCcw, Square, Archive } from "lucide-react";
+import { X, RefreshCw, Search, Play, Pause, RotateCcw, Square, Archive, GitBranch, Bot, Zap, SlidersHorizontal } from "lucide-react";
+import { useLanguage } from "./LanguageContext";
+import { useTheme } from "./ThemeContext";
+import { useToast } from "./common/Toast";
+import ConfirmDialog from "./common/ConfirmDialog";
 
 // ── 类型定义 ──────────────────────────────────────────────
 
@@ -51,7 +55,8 @@ interface TaskStats {
 
 interface CategoryConfig {
   key: TaskCategory;
-  label: string;
+  /** i18n key for the category label */
+  labelKey: string;
   /** 该分类包含的任务类型 */
   types: string[];
   /** Tailwind 颜色（用于卡片左侧色条 + 标题） */
@@ -63,54 +68,54 @@ interface CategoryConfig {
   /** Badge 背景 + 文字 */
   badgeBg: string;
   badgeText: string;
-  /** 图标 */
-  icon: string;
+  /** lucide-react 图标组件 */
+  Icon: typeof GitBranch;
 }
 
 const CATEGORIES: CategoryConfig[] = [
   {
     key: "pipeline",
-    label: "管道",
+    labelKey: "taskPanel.category.pipeline",
     types: ["DORIS_SQL", "ETL", "DATA_SYNC", "PIPELINE"],
     color: "border-l-blue-500",
     bg: "bg-blue-50/60 dark:bg-blue-900/20",
     textColor: "text-blue-600 dark:text-blue-400",
     badgeBg: "bg-blue-100 dark:bg-blue-900/40",
     badgeText: "text-blue-700 dark:text-blue-300",
-    icon: "🔗",
+    Icon: GitBranch,
   },
   {
     key: "agent",
-    label: "Agent",
+    labelKey: "taskPanel.category.agent",
     types: ["AGENT", "AI_AGENT", "LLM_TASK", "KG_SYNC"],
     color: "border-l-purple-500",
     bg: "bg-purple-50/60 dark:bg-purple-900/20",
     textColor: "text-purple-600 dark:text-purple-400",
     badgeBg: "bg-purple-100 dark:bg-purple-900/40",
     badgeText: "text-purple-700 dark:text-purple-300",
-    icon: "🤖",
+    Icon: Bot,
   },
   {
     key: "realtime",
-    label: "实时",
+    labelKey: "taskPanel.category.realtime",
     types: ["REALTIME", "STREAMING", "MONITOR", "ALERT", "TELEMETRY"],
     color: "border-l-green-500",
     bg: "bg-green-50/60 dark:bg-green-900/20",
     textColor: "text-green-600 dark:text-green-400",
     badgeBg: "bg-green-100 dark:bg-green-900/40",
     badgeText: "text-green-700 dark:text-green-300",
-    icon: "⚡",
+    Icon: Zap,
   },
   {
     key: "management",
-    label: "管理",
+    labelKey: "taskPanel.category.management",
     types: ["DATA_QUALITY", "REPORT", "MAINTENANCE", "BACKUP", "CONFIG", "ADMIN"],
     color: "border-l-gray-400",
     bg: "bg-gray-50/60 dark:bg-gray-800/40",
     textColor: "text-gray-600 dark:text-gray-400",
     badgeBg: "bg-gray-100 dark:bg-gray-700",
     badgeText: "text-gray-700 dark:text-gray-300",
-    icon: "⚙️",
+    Icon: SlidersHorizontal,
   },
 ];
 
@@ -141,12 +146,12 @@ const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; dot: string 
   CANCELLED: { bg: "bg-yellow-100 dark:bg-yellow-900/40",text: "text-yellow-700 dark:text-yellow-300",dot: "bg-yellow-500" },
 };
 
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  PENDING: "等待中", RUNNING: "运行中", SUCCEEDED: "已完成", FAILED: "失败", CANCELLED: "已取消",
+const STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
+  PENDING: "taskPanel.status.pending", RUNNING: "taskPanel.status.running", SUCCEEDED: "taskPanel.status.succeeded", FAILED: "taskPanel.status.failed", CANCELLED: "taskPanel.status.cancelled",
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  HIGH: "高", MEDIUM: "中", LOW: "低", CRITICAL: "紧急",
+const PRIORITY_LABEL_KEYS: Record<string, string> = {
+  HIGH: "taskPanel.priority.high", MEDIUM: "taskPanel.priority.medium", LOW: "taskPanel.priority.low", CRITICAL: "taskPanel.priority.critical",
 };
 
 // ── Props ──────────────────────────────────────────────────
@@ -159,6 +164,10 @@ interface TaskPanelProps {
 // ── 组件 ──────────────────────────────────────────────────
 
 export default function TaskPanel({ open, onClose }: TaskPanelProps) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
+  const { showToast } = useToast();
+
   // 列表 & 统计
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [statusMap, setStatusMap] = useState<Record<string, TaskStatusInfo>>({});
@@ -186,6 +195,9 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
   // 详情抽屉
   const [detailTask, setDetailTask] = useState<TaskDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // 批量操作确认框
+  const [batchConfirm, setBatchConfirm] = useState<null | "cancel" | "pause" | "resume" | "archive">(null);
 
   // 操作中状态
   const [actingIds, setActingIds] = useState<Set<string>>(new Set());
@@ -302,19 +314,24 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
     try {
       const r = await fetch(`/api/v1/task/${taskId}/${action}`, { method: "POST" });
       const d = await r.json();
-      if (d.code !== 0) alert(`操作失败: ${d.message || "未知错误"}`);
+      if (d.code !== 0) showToast("error", `${t("taskPanel.actionFailed")}: ${d.message || t("taskPanel.unknownError")}`);
     } catch (e: any) {
-      alert(`操作异常: ${e.message}`);
+      showToast("error", `${t("taskPanel.actionError")}: ${e.message}`);
     } finally {
       setActingIds(prev => { const s = new Set(prev); s.delete(taskId); return s; });
       refresh();
     }
   };
 
-  const doBatchAction = async (action: "cancel" | "pause" | "resume" | "archive") => {
+  const doBatchAction = (action: "cancel" | "pause" | "resume" | "archive") => {
     if (selectedIds.size === 0) return;
-    const actionLabels: Record<string, string> = { cancel: "中止", pause: "暂停", resume: "恢复", archive: "归档" };
-    if (!window.confirm(`确定要批量${actionLabels[action]} ${selectedIds.size} 个任务吗？`)) return;
+    setBatchConfirm(action);
+  };
+
+  const confirmBatchAction = async () => {
+    const action = batchConfirm;
+    setBatchConfirm(null);
+    if (!action) return;
     setBatchActioning(true);
     try {
       const r = await fetch("/api/v1/task/batch", {
@@ -323,13 +340,14 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
         body: JSON.stringify({ taskIds: [...selectedIds], action }),
       });
       const d = await r.json();
-      if (d.code !== 0) alert(`批量操作失败: ${d.message || "未知错误"}`);
+      if (d.code !== 0) showToast("error", `${t("taskPanel.batchFailed")}: ${d.message || t("taskPanel.unknownError")}`);
       else {
+        showToast("success", t("taskPanel.batchDone"));
         setSelectedIds(new Set());
         refresh();
       }
     } catch (e: any) {
-      alert(`批量操作异常: ${e.message}`);
+      showToast("error", `${t("taskPanel.batchError")}: ${e.message}`);
     } finally {
       setBatchActioning(false);
     }
@@ -369,9 +387,13 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
   // ── 辅助 ─────────────────────────────────────────────────
 
-  const formatTime = (ts: string | null) => {
+  const formatTime = (ts: string | null, localeHint?: string) => {
     if (!ts) return "—";
-    try { return new Date(ts).toLocaleString("zh-CN"); } catch { return ts; }
+    try {
+      // Use the active UI locale so timestamps follow the language toggle
+      const loc = localeHint || (typeof window !== "undefined" ? (localStorage.getItem("ecos_locale") === "en" ? "en-US" : "zh-CN") : "zh-CN");
+      return new Date(ts).toLocaleString(loc);
+    } catch { return ts; }
   };
 
   const renderStatusBadge = (status: TaskStatus) => {
@@ -379,7 +401,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-        {STATUS_LABELS[status] || status}
+        {t(STATUS_LABEL_KEYS[status] || "taskPanel.status.pending")}
       </span>
     );
   };
@@ -388,15 +410,15 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
     const cat = getCategory(taskType);
     if (!cat) {
       return (
-        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+        <span className={`text-xs px-1.5 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
           —
         </span>
       );
     }
     return (
       <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${cat.badgeBg} ${cat.badgeText}`}>
-        <span>{cat.icon}</span>
-        {cat.label}
+        <cat.Icon size={12} />
+        {t(cat.labelKey)}
       </span>
     );
   };
@@ -405,8 +427,8 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          className="h-full bg-blue-500 rounded-full transition-all duration-500"
-          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: "var(--accent)" }}
         />
       </div>
       <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{progress}%</span>
@@ -428,24 +450,24 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* 主面板 */}
-      <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in-down">
+      <div className={`relative ${styles.cardBg} rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in-down`}>
         {/* ── Header ─────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${styles.cardBorder} shrink-0`}>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">任务引擎</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">任务管理 · 调度监控 · 批量操作</p>
+            <h2 className={`text-lg font-bold ${styles.cardText}`}>{t("taskPanel.title")}</h2>
+            <p className={`text-xs ${styles.cardTextMuted}`}>{t("taskPanel.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={refresh}
               disabled={loading}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition disabled:opacity-50"
-              title="刷新"
+              className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition disabled:opacity-50`}
+              title={t("taskPanel.refresh")}
             >
-              <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${styles.cardTextMuted} ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-              <X className="w-5 h-5 text-slate-400" />
+            <button onClick={onClose} className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition ${styles.cardTextMuted}`}>
+              <X className={`w-5 h-5 ${styles.cardTextMuted}`} />
             </button>
           </div>
         </div>
@@ -454,8 +476,8 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
         <div className="grid grid-cols-4 gap-3 px-6 pt-4 shrink-0">
           {CATEGORIES.map(cat => (
             <div key={cat.key} className={`rounded-lg border-l-4 px-4 py-3 ${cat.color} ${cat.bg} transition`}>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                {cat.icon} {cat.label}
+              <div className={`text-xs ${styles.cardTextMuted} mb-1`}>
+                {t(cat.labelKey)}
               </div>
               <div className={`text-2xl font-bold ${cat.textColor}`}>
                 {categoryCounts[cat.key]}
@@ -467,32 +489,32 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
         {/* ── Stats Cards — 状态统计 ─────────────── */}
         <div className="grid grid-cols-4 gap-3 px-6 py-3 shrink-0">
           {([
-            { label: "运行中", value: stats.running, color: "border-l-blue-500 bg-blue-50/60 dark:bg-blue-900/20", textColor: "text-blue-600 dark:text-blue-400" },
-            { label: "等待中", value: stats.pending, color: "border-l-gray-400 bg-gray-50/60 dark:bg-gray-800/40", textColor: "text-gray-600 dark:text-gray-400" },
-            { label: "已完成", value: stats.succeeded, color: "border-l-green-500 bg-green-50/60 dark:bg-green-900/20", textColor: "text-green-600 dark:text-green-400" },
-            { label: "失败", value: stats.failed, color: "border-l-red-500 bg-red-50/60 dark:bg-red-900/20", textColor: "text-red-600 dark:text-red-400" },
-          ] as const).map(({ label, value, color, textColor }) => (
-            <div key={label} className={`rounded-lg border-l-4 px-4 py-3 ${color}`}>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</div>
+            { key: "taskPanel.status.running", value: stats.running, color: "border-l-blue-500 bg-blue-50/60 dark:bg-blue-900/20", textColor: "text-blue-600 dark:text-blue-400" },
+            { key: "taskPanel.status.pending", value: stats.pending, color: "border-l-gray-400 bg-gray-50/60 dark:bg-gray-800/40", textColor: "text-gray-600 dark:text-gray-400" },
+            { key: "taskPanel.status.succeeded", value: stats.succeeded, color: "border-l-green-500 bg-green-50/60 dark:bg-green-900/20", textColor: "text-green-600 dark:text-green-400" },
+            { key: "taskPanel.status.failed", value: stats.failed, color: "border-l-red-500 bg-red-50/60 dark:bg-red-900/20", textColor: "text-red-600 dark:text-red-400" },
+          ] as const).map(({ key, value, color, textColor }) => (
+            <div key={key} className={`rounded-lg border-l-4 px-4 py-3 ${color}`}>
+              <div className={`text-xs ${styles.cardTextMuted} mb-1`}>{t(key)}</div>
               <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
             </div>
           ))}
         </div>
 
         {/* ── Filter Bar ─────────────────────────── */}
-        <div className="flex flex-col gap-2 px-6 py-3 border-b border-slate-100 dark:border-slate-700/50 shrink-0">
+        <div className={`flex flex-col gap-2 px-6 py-3 border-b ${styles.appBorder} shrink-0`}>
           {/* 分类 Tab 按钮 */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">分类:</span>
+            <span className={`text-xs ${styles.cardTextMuted} mr-1`}>{t("taskPanel.filter.category")}</span>
             <button
               onClick={() => setFilterCategory("")}
               className={`px-2.5 py-1 text-xs rounded-full transition ${
                 filterCategory === ""
-                  ? "bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800 font-medium"
-                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                  ? `bg-[var(--card)] text-white font-medium`
+                  : `${styles.appBg} ${styles.cardTextMuted} hover:${styles.sidebarHoverBg}`
               }`}
             >
-              全部
+              {t("taskPanel.filter.all")}
             </button>
             {CATEGORIES.map(cat => (
               <button
@@ -501,11 +523,11 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
                 className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition ${
                   filterCategory === cat.key
                     ? `${cat.badgeBg} ${cat.badgeText} font-medium ring-1 ring-current/30`
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                    : `${styles.appBg} ${styles.cardTextMuted} hover:${styles.sidebarHoverBg}`
                 }`}
               >
-                <span>{cat.icon}</span>
-                {cat.label}
+                <cat.Icon size={12} />
+                {t(cat.labelKey)}
               </button>
             ))}
           </div>
@@ -515,30 +537,30 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30"
+              className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30`}
             >
-              <option value="">全部状态</option>
-              <option value="PENDING">等待中</option>
-              <option value="RUNNING">运行中</option>
-              <option value="SUCCEEDED">已完成</option>
-              <option value="FAILED">失败</option>
-              <option value="CANCELLED">已取消</option>
+              <option value="">{t("taskPanel.filter.allStatus")}</option>
+              <option value="PENDING">{t("taskPanel.status.pending")}</option>
+              <option value="RUNNING">{t("taskPanel.status.running")}</option>
+              <option value="SUCCEEDED">{t("taskPanel.status.succeeded")}</option>
+              <option value="FAILED">{t("taskPanel.status.failed")}</option>
+              <option value="CANCELLED">{t("taskPanel.status.cancelled")}</option>
             </select>
             <input
               type="text"
               value={filterType}
               onChange={e => setFilterType(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") setSearchType(filterType.trim()); }}
-              placeholder="任务类型..."
-              className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30 w-40"
+              placeholder={t("taskPanel.filter.typePlaceholder")}
+              className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30 w-40`}
             />
             {taskTypes.length > 0 && (
               <select
                 value={filterType}
                 onChange={e => { setFilterType(e.target.value); setSearchType(e.target.value); }}
-                className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/30"
+                className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30`}
               >
-                <option value="">选择类型…</option>
+                <option value="">{t("taskPanel.filter.selectType")}</option>
                 {taskTypes.map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -546,10 +568,11 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             )}
             <button
               onClick={() => setSearchType(filterType.trim())}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition"
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg transition"
+              style={{ backgroundColor: "var(--accent)", color: "#fff" }}
             >
               <Search className="w-3.5 h-3.5" />
-              搜索
+              {t("taskPanel.filter.searchBtn")}
             </button>
           </div>
         </div>
@@ -557,46 +580,46 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
         {/* ── Batch Action Bar ───────────────────── */}
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-2 px-6 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30 shrink-0">
-            <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-              已选 {selectedIds.size} 项
+            <span className="text-sm font-medium" style={{ color: "var(--accent)" }}>
+              {t("taskPanel.batch.selected", { n: selectedIds.size })}
             </span>
             <div className="flex-1" />
             <button onClick={() => doBatchAction("resume")} disabled={batchActioning}
-              className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition disabled:opacity-50">▶ 批量恢复</button>
+              className="px-3 py-1 text-xs rounded transition disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "#fff" }}>{t("taskPanel.batch.resume")}</button>
             <button onClick={() => doBatchAction("pause")} disabled={batchActioning}
-              className="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded transition disabled:opacity-50">⏸ 批量暂停</button>
+              className="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.pause")}</button>
             <button onClick={() => doBatchAction("cancel")} disabled={batchActioning}
-              className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">⏹ 批量中止</button>
+              className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.cancel")}</button>
             <button onClick={() => doBatchAction("archive")} disabled={batchActioning}
-              className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded transition disabled:opacity-50">📦 批量归档</button>
+              className={`px-3 py-1 text-xs ${styles.cardBg} hover:${styles.appBg} ${styles.cardText} rounded transition disabled:opacity-50`}>{t("taskPanel.batch.archive")}</button>
             <button onClick={() => setSelectedIds(new Set())}
-              className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition">取消选择</button>
+              className={`px-3 py-1 text-xs ${styles.cardTextMuted} transition`}>{t("taskPanel.batch.deselect")}</button>
           </div>
         )}
 
         {/* ── Task Table ─────────────────────────── */}
         <div className="flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80 z-10">
-              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <thead className={`sticky top-0 ${styles.appBg} z-10`}>
+              <tr className={`border-b ${styles.cardBorder} text-left text-xs ${styles.cardTextMuted} uppercase tracking-wider`}>
                 <th className="px-4 py-2.5 w-10">
                   <input type="checkbox" checked={displayTasks.length > 0 && selectedIds.size === displayTasks.length} onChange={toggleAll} />
                 </th>
-                <th className="px-2 py-2.5">任务名称</th>
-                <th className="px-2 py-2.5">分类</th>
-                <th className="px-2 py-2.5">类型</th>
-                <th className="px-2 py-2.5">状态</th>
-                <th className="px-2 py-2.5 w-36">进度</th>
-                <th className="px-2 py-2.5">创建时间</th>
-                <th className="px-2 py-2.5">操作</th>
+                <th className="px-2 py-2.5">{t("taskPanel.col.name")}</th>
+                <th className="px-2 py-2.5">{t("taskPanel.col.category")}</th>
+                <th className="px-2 py-2.5">{t("taskPanel.col.type")}</th>
+                <th className="px-2 py-2.5">{t("taskPanel.col.status")}</th>
+                <th className="px-2 py-2.5 w-36">{t("taskPanel.col.progress")}</th>
+                <th className="px-2 py-2.5">{t("taskPanel.col.created")}</th>
+                <th className="px-2 py-2.5">{t("taskPanel.col.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {displayTasks.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="text-center py-16 text-slate-400 dark:text-slate-500">
-                    <div className="text-4xl mb-2">📋</div>
-                    <p>暂无任务</p>
+                  <td colSpan={8} className={`text-center py-16 ${styles.cardTextMuted}`}>
+                    <div className="text-4xl mb-2" aria-hidden>📋</div>
+                    <p>{t("taskPanel.empty")}</p>
                   </td>
                 </tr>
               )}
@@ -609,26 +632,26 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
                 return (
                   <tr
                     key={task.taskId}
-                    className={`border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer ${isSelected ? "bg-blue-50/50 dark:bg-blue-900/10" : ""}`}
+                    className={`border-b ${styles.appBorder} hover:${styles.sidebarHoverBg} transition cursor-pointer ${isSelected ? "bg-blue-50/50 dark:bg-blue-900/10" : ""}`}
                     onClick={() => openDetail(task.taskId)}
                   >
                     <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={isSelected} onChange={() => toggleOne(task.taskId)} />
                     </td>
-                    <td className="px-2 py-2.5 font-medium text-slate-800 dark:text-slate-200 max-w-[140px] truncate" title={task.taskName}>
+                    <td className={`px-2 py-2.5 font-medium ${styles.cardText} max-w-[140px] truncate`} title={task.taskName}>
                       {task.taskName}
                     </td>
                     <td className="px-2 py-2.5">
                       {renderCategoryBadge(task.taskType)}
                     </td>
                     <td className="px-2 py-2.5">
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted}`}>
                         {task.taskType || "—"}
                       </span>
                     </td>
                     <td className="px-2 py-2.5">{renderStatusBadge(status)}</td>
                     <td className="px-2 py-2.5">{renderProgress(progress)}</td>
-                    <td className="px-2 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                    <td className={`px-2 py-2.5 text-xs ${styles.cardTextMuted}`}>
                       {formatTime(task.createTime)}
                     </td>
                     <td className="px-2 py-2.5" onClick={e => e.stopPropagation()}>
@@ -637,31 +660,31 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
                           onClick={() => doAction(task.taskId, "execute")}
                           disabled={isActing || status === "RUNNING"}
                           className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                          title="启动"
+                          title={t("taskPanel.action.start")}
                         ><Play className="w-3.5 h-3.5" /></button>
                         <button
                           onClick={() => doAction(task.taskId, "pause")}
                           disabled={isActing || status !== "RUNNING"}
                           className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                          title="暂停"
+                          title={t("taskPanel.action.pause")}
                         ><Pause className="w-3.5 h-3.5" /></button>
                         <button
                           onClick={() => doAction(task.taskId, "resume")}
                           disabled={isActing || status === "RUNNING"}
                           className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                          title="恢复"
+                          title={t("taskPanel.action.resume")}
                         ><RotateCcw className="w-3.5 h-3.5" /></button>
                         <button
                           onClick={() => doAction(task.taskId, "cancel")}
                           disabled={isActing || status === "SUCCEEDED" || status === "CANCELLED"}
                           className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                          title="中止"
+                          title={t("taskPanel.action.cancel")}
                         ><Square className="w-3.5 h-3.5" /></button>
                         <button
                           onClick={() => doAction(task.taskId, "archive")}
                           disabled={isActing}
                           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                          title="归档"
+                          title={t("taskPanel.action.archive")}
                         ><Archive className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
@@ -674,20 +697,20 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
         {/* ── Pagination ─────────────────────────── */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 dark:border-slate-700/50 shrink-0 text-sm">
-            <span className="text-slate-500 dark:text-slate-400">共 {total} 条</span>
+          <div className={`flex items-center justify-between px-6 py-3 border-t ${styles.appBorder} shrink-0 text-sm`}>
+            <span className={`${styles.cardTextMuted}`}>{t("taskPanel.pagination.total", { n: total })}</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition"
-              >上一页</button>
-              <span className="px-2 text-slate-600 dark:text-slate-300">{page} / {totalPages}</span>
+                className={`px-3 py-1 rounded border ${styles.cardBorder} ${styles.sidebarHoverBg} disabled:opacity-40 transition`}
+              >{t("taskPanel.pagination.prev")}</button>
+              <span className={`px-2 ${styles.cardText}`}>{page} / {totalPages}</span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition"
-              >下一页</button>
+                className={`px-3 py-1 rounded border ${styles.cardBorder} ${styles.sidebarHoverBg} disabled:opacity-40 transition`}
+              >{t("taskPanel.pagination.next")}</button>
             </div>
           </div>
         )}
@@ -700,85 +723,85 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
       {/* ── 详情抽屉 ────────────────────────────── */}
       <div
-        className={`absolute top-0 right-0 h-full w-[360px] bg-white dark:bg-slate-800 shadow-2xl border-l border-slate-200 dark:border-slate-700 overflow-auto transition-transform duration-300 ${
+        className={`absolute top-0 right-0 h-full w-[360px] ${styles.cardBg} shadow-2xl border-l ${styles.cardBorder} overflow-auto transition-transform duration-300 ${
           detailTask ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {detailLoading ? (
           <div className="flex items-center justify-center h-full">
-            <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+            <RefreshCw className="w-6 h-6 animate-spin" style={{ color: "var(--accent)" }} />
           </div>
         ) : detailTask ? (
           <div className="p-5 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">任务详情</h3>
-              <button onClick={() => setDetailTask(null)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <X className="w-4 h-4 text-slate-400" />
+              <h3 className={`text-base font-bold ${styles.cardText}`}>{t("taskPanel.detail.title")}</h3>
+              <button onClick={() => setDetailTask(null)} className={`p-1.5 rounded ${styles.sidebarHoverBg} transition`}>
+                <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
               </button>
             </div>
 
             {/* 执行状态 */}
             <section>
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">执行状态</h4>
+              <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.execution")}</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">状态</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.status")}</span>
                   {renderStatusBadge(detailTask.status.status)}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">进度</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.progress")}</span>
                   <span className="w-48">{renderProgress(detailTask.status.progress)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">启动时间</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.status.startedAt)}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.startedAt")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.status.startedAt)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">完成时间</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.status.completedAt)}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.completedAt")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.status.completedAt)}</span>
                 </div>
               </div>
             </section>
 
             {/* 基本信息 */}
             <section>
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">基本信息</h4>
+              <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.basicInfo")}</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务ID</span>
-                  <span className="text-sm font-mono text-slate-700 dark:text-slate-300 text-xs">{detailTask.task.taskId}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskId")}</span>
+                  <span className={`text-sm font-mono ${styles.cardText} text-xs`}>{detailTask.task.taskId}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务名称</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{detailTask.task.taskName}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskName")}</span>
+                  <span className={`text-sm ${styles.cardText} font-medium`}>{detailTask.task.taskName}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务分类</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskCategory")}</span>
                   <span>{renderCategoryBadge(detailTask.task.taskType)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">任务类型</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{detailTask.task.taskType || "—"}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskType")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{detailTask.task.taskType || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">优先级</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                    {PRIORITY_LABELS[detailTask.task.priority] || detailTask.task.priority || "—"}
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.priority")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>
+                    {t(PRIORITY_LABEL_KEYS[detailTask.task.priority] || "taskPanel.priority.medium")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">创建人</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{detailTask.task.createdBy || "—"}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.createdBy")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{detailTask.task.createdBy || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">创建时间</span>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{formatTime(detailTask.task.createTime)}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.createdAt")}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.task.createTime)}</span>
                 </div>
                 {detailTask.task.description && (
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400 block mb-1">描述</span>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 rounded p-2">
+                    <span className={`text-sm ${styles.cardTextMuted} block mb-1`}>{t("taskPanel.detail.description")}</span>
+                    <p className={`text-sm ${styles.cardText} ${styles.appBg} rounded p-2`}>
                       {detailTask.task.description}
                     </p>
                   </div>
@@ -788,18 +811,30 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
             {/* 参数信息 */}
             <section>
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">参数信息</h4>
+              <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.params")}</h4>
               {detailTask.task.parameters && Object.keys(detailTask.task.parameters).length > 0 ? (
-                <pre className="text-xs font-mono bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 overflow-auto max-h-48 text-slate-700 dark:text-slate-300">
+                <pre className={`text-xs font-mono ${styles.appBg} rounded-lg p-3 overflow-auto max-h-48 ${styles.cardText}`}>
                   {JSON.stringify(detailTask.task.parameters, null, 2)}
                 </pre>
               ) : (
-                <p className="text-sm text-slate-400 dark:text-slate-500">无参数</p>
+                <p className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.noParams")}</p>
               )}
             </section>
           </div>
         ) : null}
       </div>
+
+      {/* ── 批量操作确认框 ────────────────────────── */}
+      {batchConfirm && (
+        <ConfirmDialog
+          visible
+          variant={batchConfirm === "cancel" || batchConfirm === "archive" ? "danger" : "warning"}
+          title={t(`taskPanel.batch.confirm.${batchConfirm}`)}
+          message={t("taskPanel.batch.confirmMessage", { n: selectedIds.size })}
+          onConfirm={confirmBatchAction}
+          onCancel={() => setBatchConfirm(null)}
+        />
+      )}
     </div>
   );
 }

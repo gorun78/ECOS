@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Box, Loader2, AlertCircle } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
+import { useTheme } from '../../ThemeContext';
 import type { CreateEntityDTO } from '../../../types/workbench';
 
 // ── 实体类型选项 ────────────────────────────────────────────
@@ -36,6 +37,7 @@ interface CreateEntityModalProps {
 // ── 主组件 ──────────────────────────────────────────────────
 
 export default function CreateEntityModal({ open, onClose, domainCode }: CreateEntityModalProps) {
+  const { styles } = useTheme();
   // 本地表单状态
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -118,12 +120,12 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white">创建实体</h3>
-              <p className="text-[10px] text-slate-500">新建本体实体定义</p>
+              <p className={`text-[10px] ${styles.muted}`}>新建本体实体定义</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-300 transition"
+            className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >
             <X size={16} />
           </button>
@@ -133,7 +135,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
         <div className="px-5 py-4 space-y-4">
           {/* 编码 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>
               编码 <span className="text-red-400">*</span>
             </label>
             <input
@@ -143,16 +145,16 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
               maxLength={64}
               autoFocus
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
-                text-sm text-white placeholder:text-slate-600
+                text-sm text-white placeholder:${styles.muted}
                 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                 transition"
             />
-            <p className="text-[10px] text-slate-600 mt-1">英文字母开头，支持字母、数字、下划线</p>
+            <p className={`text-[10px] ${styles.muted} mt-1`}>英文字母开头，支持字母、数字、下划线</p>
           </div>
 
           {/* 名称 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>
               名称 <span className="text-red-400">*</span>
             </label>
             <input
@@ -161,7 +163,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
               placeholder="中文名称，如 客户、销售订单"
               maxLength={100}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
-                text-sm text-white placeholder:text-slate-600
+                text-sm text-white placeholder:${styles.muted}
                 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                 transition"
             />
@@ -169,7 +171,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
 
           {/* 实体类型 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">实体类型</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>实体类型</label>
             <div className="space-y-1.5">
               {ENTITY_TYPES.map((et) => (
                 <label
@@ -189,8 +191,8 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
                     className="mt-0.5 accent-indigo-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium text-slate-300">{et.label}</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">{et.desc}</p>
+                    <span className={`text-xs font-medium ${styles.sidebarText}`}>{et.label}</span>
+                    <p className={`text-[10px] ${styles.muted} mt-0.5`}>{et.desc}</p>
                   </div>
                 </label>
               ))}
@@ -199,7 +201,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
 
           {/* 描述 */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">描述</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>描述</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -207,7 +209,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
               rows={3}
               maxLength={500}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
-                text-sm text-white placeholder:text-slate-600 resize-none
+                text-sm text-white placeholder:${styles.muted} resize-none
                 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                 transition"
             />
@@ -227,8 +229,8 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
           <button
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-xs font-medium text-slate-300
-              bg-[#2a3040] hover:bg-[#3a4050] disabled:opacity-50 transition"
+            className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
+              bg-[#2a3040] hover:bg-[#3a4050] disabled:opacity-50 transition`}
           >
             取消
           </button>

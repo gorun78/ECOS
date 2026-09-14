@@ -184,7 +184,7 @@ export default function WorkflowDesigner() {
 
   // ── Render ──
   return (
-    <div className="flex h-full bg-slate-50 font-sans text-slate-800 w-full">
+    <div className={`flex h-full ${styles.appBg} font-sans ${styles.appText} w-full`}>
       {/* Toast */}
       {toast && (
         <div className={`absolute top-4 right-4 z-50 px-4 py-2.5 rounded-lg text-xs font-semibold shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 ${
@@ -200,10 +200,10 @@ export default function WorkflowDesigner() {
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <h2 className={`text-lg font-bold ${styles.cardText} flex items-center gap-2`}>
                 <GitBranch className="w-5 h-5 text-indigo-500" /> {t("wf.title")}
               </h2>
-              <p className="text-xs text-slate-400 mt-1">{t("wf.desc")}</p>
+              <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t("wf.desc")}</p>
             </div>
             <button
               onClick={handleCreate}
@@ -215,7 +215,7 @@ export default function WorkflowDesigner() {
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+              <Loader2 className={`w-6 h-6 ${styles.cardTextMuted} animate-spin`} />
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -223,23 +223,23 @@ export default function WorkflowDesigner() {
                 <div
                   key={wf.id}
                   onClick={() => openDesigner(wf.id)}
-                  className="bg-white border border-slate-200 hover:border-indigo-300 rounded-xl p-4 cursor-pointer transition shadow-sm hover:shadow"
+                  className={`${styles.cardBg} ${styles.cardBorder} hover:border-indigo-300 rounded-xl p-4 cursor-pointer transition shadow-sm hover:shadow`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-slate-800">{wf.name}</h3>
+                    <h3 className={`text-sm font-bold ${styles.cardText}`}>{wf.name}</h3>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                       wf.status === "PUBLISHED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
                     }`}>
                       {wf.status === "PUBLISHED" ? t("wf.status.published") : t("wf.status.draft")}
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-mono">{wf.code}</div>
-                  <div className="text-[11px] text-slate-500 mt-1">{wf.workflowType} · {wf.description || "—"}</div>
+                  <div className={`text-[11px] ${styles.cardTextMuted} font-mono`}>{wf.code}</div>
+                  <div className={`text-[11px] ${styles.cardTextMuted} mt-1`}>{wf.workflowType} · {wf.description || "—"}</div>
                 </div>
               ))}
               {workflows.length === 0 && (
-                <div className="col-span-2 text-center py-16 text-xs text-slate-400">
-                  <GitBranch className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <div className={`col-span-2 text-center py-16 text-xs ${styles.cardTextMuted}`}>
+                  <GitBranch className={`w-8 h-8 mx-auto mb-2 ${styles.cardTextMuted}`} />
                   {t("wf.empty.desc")}
                 </div>
               )}
@@ -250,14 +250,14 @@ export default function WorkflowDesigner() {
         /* ── Designer View ── */
         <div className="flex flex-col lg:flex-row flex-1">
           {/* Left palette */}
-          <div className="w-full lg:w-40 shrink-0 bg-white border-r border-slate-200 flex flex-col">
-            <div className="p-3 border-b border-slate-200">
-              <button onClick={() => setView("list")} className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 transition">
+          <div className={`w-full lg:w-40 shrink-0 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col`}>
+            <div className={`p-3 border-b ${styles.cardBorder}`}>
+              <button onClick={() => setView("list")} className={`text-xs ${styles.cardTextMuted} hover:text-indigo-500 flex items-center gap-1 transition`}>
                 <ArrowLeft className="w-3 h-3" /> {t("wf.btn.back")}
               </button>
             </div>
             <div className="p-2 space-y-1">
-              <div className="text-[10px] text-slate-400 font-semibold uppercase px-2 py-1">{t("wf.palette.title")}</div>
+              <div className={`text-[10px] ${styles.cardTextMuted} font-semibold uppercase px-2 py-1`}>{t("wf.palette.title")}</div>
               {Object.entries(NODE_TYPES).map(([type, def]) => {
                 const Icon = def.icon;
                 return (
@@ -268,8 +268,8 @@ export default function WorkflowDesigner() {
                     onClick={() => addNode(type)}
                     className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border cursor-grab hover:shadow-sm transition active:cursor-grabbing ${def.color}`}
                   >
-                    <div className="p-1 rounded bg-white/70"><Icon className="w-3.5 h-3.5 text-slate-600" /></div>
-                    <span className="text-[11px] font-semibold text-slate-700">{t(`wf.node_type.${type}`)}</span>
+                    <div className={`p-1 rounded ${styles.appBg}`}><Icon className={`w-3.5 h-3.5 ${styles.cardText}`} /></div>
+                    <span className={`text-[11px] font-semibold ${styles.cardText}`}>{t(`wf.node_type.${type}`)}</span>
                   </div>
                 );
               })}
@@ -279,7 +279,7 @@ export default function WorkflowDesigner() {
           {/* Center canvas */}
           <div className="flex-1 relative min-h-[300px] lg:min-h-0">
             <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+              <span className={`text-xs font-bold ${styles.cardText} ${styles.cardBg} backdrop-blur px-3 py-1.5 rounded-lg border ${styles.cardBorder} shadow-sm`}>
                 {wfDetail?.name || t("wf.designer.untitled")}
                 <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
                   wfDetail?.status === "PUBLISHED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
@@ -289,7 +289,7 @@ export default function WorkflowDesigner() {
               </span>
             </div>
             <div className="absolute top-3 right-3 z-10 flex flex-wrap items-center gap-2">
-              <button onClick={handleSave} disabled={saving} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className={`${styles.cardBg} border ${styles.cardBorder} hover:opacity-80 ${styles.cardText} rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50`}>
                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}{t("wf.btn.save")}
               </button>
               <button onClick={handlePublish} disabled={wfDetail?.status === "PUBLISHED"} className="bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50">
@@ -307,18 +307,18 @@ export default function WorkflowDesigner() {
               onPaneClick={() => setSelectedNode(null)}
               onInit={setRfInstance} nodeTypes={nodeTypes} fitView
               deleteKeyCode={["Backspace", "Delete"]}
-              className="bg-slate-50"
+              className={styles.appBg}
             >
-              <Controls className="!rounded-lg !shadow-sm !border !border-slate-200" />
+              <Controls className={`!rounded-lg !shadow-sm !border ${styles.divider}`} />
               <Background gap={20} size={1} color="#E2E8F0" />
-              <MiniMap className="!rounded-lg !shadow-sm !border !border-slate-200"
+              <MiniMap className={`!rounded-lg !shadow-sm !border ${styles.divider}`}
                 nodeColor={(n: any) => MINIMAP_COLORS[n.type || ""] || MINIMAP_FALLBACK}
               />
             </ReactFlow>
           </div>
 
           {/* Right: Property Panel */}
-          <div className="w-full lg:w-80 shrink-0 bg-white border-l border-slate-200 overflow-y-auto">
+          <div className={`w-full lg:w-80 shrink-0 ${styles.cardBg} border-l ${styles.cardBorder} overflow-y-auto`}>
             <PropertyPanel selectedNode={selectedNode} onUpdateData={updateNodeData} onDelete={deleteSelectedNode} />
           </div>
 

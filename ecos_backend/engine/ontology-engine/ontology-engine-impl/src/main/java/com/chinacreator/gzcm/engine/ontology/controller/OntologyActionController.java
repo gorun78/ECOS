@@ -1,12 +1,15 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
-import java.util.*;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyActionSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyActionResultVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyActionVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyActionService;
 
 /**
@@ -20,6 +23,9 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyActionService;
  *   <li>PUT    /api/v1/ecos/entities/{entityId}/actions/{id}      — 更新动作</li>
  *   <li>DELETE /api/v1/ecos/entities/{entityId}/actions/{id}      — 删除动作</li>
  * </ul>
+ *
+ * <p>T16-1 (2026-09-12)：方法入/出参由 {@code Map<String,Object>} 改为强类型 DTO/VO
+ * （{@code OntologyActionSaveDTO} / {@code OntologyActionVO} / {@code OntologyActionResultVO}）。
  */
 @RestController
 @RequestMapping("/api/v1/ecos")
@@ -35,41 +41,49 @@ public class OntologyActionController {
 
     // ═══════════════ 动作 CRUD ═══════════════════
 
+    /** 列出实体的动作（强类型版本）。 */
     @GetMapping("/entities/{entityId}/actions")
-    public ApiResponse<List<Map<String, Object>>> listActions(@PathVariable String entityId) {
-        return ApiResponse.success(actionService.listActionsByEntity(entityId));
+    public ApiResponse<List<OntologyActionVO>> listActions(@PathVariable String entityId) {
+        return ApiResponse.success(actionService.listActionsByEntityVO(entityId));
     }
 
+    /** 列出全部动作（强类型版本）。 */
     @GetMapping("/actions")
-    public ApiResponse<List<Map<String, Object>>> listAllActions() {
-        return ApiResponse.success(actionService.listAllActions());
+    public ApiResponse<List<OntologyActionVO>> listAllActions() {
+        return ApiResponse.success(actionService.listAllActionsVO());
     }
 
+    /** 动作详情 — 强类型版本。 */
     @GetMapping("/actions/{actionId}")
-    public ApiResponse<Map<String, Object>> getAction(@PathVariable String actionId) {
-        Map<String, Object> act = actionService.getAction(actionId);
-        if (act == null) return ApiResponse.notFound("ONT-001: Action '" + actionId + "' not found");
+    public ApiResponse<OntologyActionVO> getAction(@PathVariable String actionId) {
+        OntologyActionVO act = actionService.getActionVO(actionId);
+        if (act == null) {
+            return ApiResponse.notFound("ONT-001: Action '" + actionId + "' not found");
+        }
         return ApiResponse.success(act);
     }
 
+    /** 创建动作 — 接收 {@code OntologyActionSaveDTO}。 */
     @PostMapping("/entities/{entityId}/actions")
-    public ApiResponse<Map<String, Object>> createAction(
+    public ApiResponse<OntologyActionVO> createAction(
             @PathVariable String entityId,
-            @RequestBody Map<String, Object> body) {
-        Map<String, Object> act = actionService.createAction(entityId, body);
-        log.info("Action created via DB: {} [{}] for entity {}", act.get("id"), act.get("code"), entityId);
+            @RequestBody OntologyActionSaveDTO dto) {
+        OntologyActionVO act = actionService.createAction(entityId, dto);
+        log.info("Action created via DB: {} [{}] for entity {}", act.getId(), act.getCode(), entityId);
         return ApiResponse.success(act);
     }
 
+    /** 更新动作 — 接收 {@code OntologyActionSaveDTO}。 */
     @PutMapping("/actions/{actionId}")
-    public ApiResponse<Map<String, Object>> updateAction(
+    public ApiResponse<OntologyActionVO> updateAction(
             @PathVariable String actionId,
-            @RequestBody Map<String, Object> body) {
-        return actionService.updateAction(actionId, body)
+            @RequestBody OntologyActionSaveDTO dto) {
+        return actionService.updateAction(actionId, dto)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("ONT-001: Action '" + actionId + "' not found"));
     }
 
+    /** 删除动作（保留 String 简返，与旧路径一致）。 */
     @DeleteMapping("/actions/{actionId}")
     public ApiResponse<String> deleteAction(@PathVariable String actionId) {
         if (actionService.deleteAction(actionId)) {
@@ -78,10 +92,11 @@ public class OntologyActionController {
         return ApiResponse.notFound("ONT-001: Action '" + actionId + "' not found");
     }
 
+    /** 测试动作（模拟执行摘要） — 强类型版本。 */
     @PostMapping("/actions/{actionId}/test")
-    public ApiResponse<Map<String, Object>> testAction(@PathVariable String actionId) {
+    public ApiResponse<OntologyActionResultVO> testAction(@PathVariable String actionId) {
         try {
-            return ApiResponse.success(actionService.testAction(actionId));
+            return ApiResponse.success(actionService.testActionVO(actionId));
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         }

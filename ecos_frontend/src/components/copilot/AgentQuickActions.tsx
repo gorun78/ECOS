@@ -8,6 +8,7 @@
 import React from 'react';
 import LucideIcon from '../LucideIcon';
 import { useLanguage } from '../LanguageContext';
+import { useTheme } from '../ThemeContext';
 import { useAgentScenarios, AgentScenarioView, AgentScenarioType } from './AgentScenarioData';
 
 interface AgentQuickActionsProps {
@@ -37,6 +38,7 @@ const ICON_BY_SCENARIO: Record<AgentScenarioType, string> = {
 
 export default function AgentQuickActions({ viewMode, isExecuting, onRun }: AgentQuickActionsProps) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const { data, security, workshop } = useAgentScenarios();
 
   // Pick the visible scenario group based on the current drawer view mode.
@@ -46,8 +48,8 @@ export default function AgentQuickActions({ viewMode, isExecuting, onRun }: Agen
     : data;
 
   return (
-    <div className="border-t border-slate-200 p-3 bg-slate-50 shrink-0 space-y-2 select-none">
-      <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider font-mono">
+    <div className={`border-t ${styles.appBorder} p-3 ${styles.appBg} shrink-0 space-y-2 select-none`}>
+      <span className={`text-[10px] font-black uppercase ${styles.cardTextMuted} block tracking-wider font-mono`}>
         {t('copilot.chat.quickHeader')}
       </span>
       <div className="grid grid-cols-1 gap-2">
@@ -56,10 +58,10 @@ export default function AgentQuickActions({ viewMode, isExecuting, onRun }: Agen
             key={s.type}
             onClick={() => { if (!isExecuting) onRun(s.type); }}
             disabled={isExecuting}
-            className="w-full text-left p-2.5 bg-white border border-slate-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50/20 active:bg-indigo-50 transition-all text-xs flex flex-col gap-1 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} rounded-xl hover:border-indigo-400 hover:bg-indigo-50/20 active:bg-indigo-50 transition-all text-xs flex flex-col gap-1 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed ${styles.cardText}`}
           >
             <div className="flex items-center justify-between w-full">
-              <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+              <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
                 <LucideIcon
                   name={ICON_BY_SCENARIO[s.type]}
                   size={13}
@@ -71,7 +73,7 @@ export default function AgentQuickActions({ viewMode, isExecuting, onRun }: Agen
                 {t('copilot.chat.runAgent')}
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 font-sans group-hover:text-slate-500">
+            <p className={`text-[10px] ${styles.cardTextMuted} font-sans group-hover:${styles.cardTextMuted}`}>
               {s.desc}
             </p>
           </button>

@@ -1,0 +1,11 @@
+{
+  "definitionId": null,
+  "definition": {
+    "name": "debug-rerun",
+    "nodes": [
+      { "nodeId": "d-a", "type": "SOURCE_CSV", "config": { "filePath": "mock.csv", "interfaceType": "csv", "header": true }, "dependsOn": [] },
+      { "nodeId": "d-b", "type": "TRANSFORM_SQL", "config": { "sql": "SELECT 2" }, "dependsOn": ["d-a"] }
+    ]
+  },
+  "breakpoints": [{ "nodeId": "d-a" }]
+}

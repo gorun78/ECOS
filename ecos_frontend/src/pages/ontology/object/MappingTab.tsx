@@ -52,7 +52,7 @@ export default function MappingTab({
           <select
             value={mapping.datasetId}
             onChange={e => handleDatasetChange(e.target.value)}
-            className={`px-3 py-1.5 text-xs border border-slate-300 rounded ${styles.cardBg} focus:outline-hidden`}
+            className={`px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:outline-hidden`}
           >
             {datasets.map(ds => (
               <option key={ds.id} value={ds.id}>{ds.name}</option>
@@ -60,7 +60,7 @@ export default function MappingTab({
           </select>
           <button
             onClick={handleAutoMap}
-            className={`${styles.sidebarBg} hover:bg-slate-300 ${styles.sidebarText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
+            className={`${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
           >
             <Wand2 size={13} />
             {t('ow.btn.smartMap')}
@@ -81,9 +81,9 @@ export default function MappingTab({
               {selectedDataset?.columns.length} {t('ow.label.columns')}
             </span>
           </div>
-          <div className={`border ${styles.cardBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y divide-slate-100`}>
+          <div className={`border ${styles.cardBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
             {selectedDataset?.columns.map(col => (
-              <div key={col.name} className={`flex justify-between items-center px-4 py-2.5 hover:bg-slate-50/50`}>
+              <div key={col.name} className={`flex justify-between items-center px-4 py-2.5 hover:bg-blue-50/20`}>
                 <div className={`font-mono text-xs font-medium ${styles.sidebarText}`}>{col.name}</div>
                 <div className={`text-[10px] ${styles.muted} font-mono italic uppercase ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>
                   {col.type}
@@ -104,11 +104,11 @@ export default function MappingTab({
               {Object.keys(mapping.propertyMappings).length} / {objectType.properties.length} {t('ow.label.mapped')}
             </span>
           </div>
-          <div className={`border ${styles.cardBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y divide-slate-100`}>
+          <div className={`border ${styles.cardBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
             {objectType.properties.map(prop => {
               const mappedCol = mapping.propertyMappings[prop.id] || '';
               return (
-                <div key={prop.id} className={`flex justify-between items-center px-4 py-2.5 ${styles.cardBg} hover:bg-slate-50/50`}>
+                <div key={prop.id} className={`flex justify-between items-center px-4 py-2.5 ${styles.cardBg} hover:bg-blue-50/20`}>
                   <div className="flex items-center gap-2">
                     <span className={objectType.primaryKey === prop.id ? 'text-amber-500' : styles.muted}>
                       <DynamicIcon name={objectType.primaryKey === prop.id ? 'Key' : 'CircleDot'} size={12} />

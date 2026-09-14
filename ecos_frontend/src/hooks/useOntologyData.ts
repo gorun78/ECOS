@@ -52,23 +52,25 @@ export function useOntologyData(
 
         // 2. Load entities for the primary ontology
         const rawEntities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
-        const entityList: ObjectType[] = [];
-        for (const e of (rawEntities || [])) {
-          const entity = e as any;
-          let props: { id: string; displayName: string; apiName: string; dataType: string; isPrimaryKey: boolean; description: string }[] = [];
-          try {
-            const rawProps = await fetchProperties(entity.id, DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
-            props = (rawProps || []).map((p: any) => ({
-              id: p.id || p.apiName || p.name,
-              displayName: p.displayName || p.name || p.apiName,
-              apiName: p.apiName || p.name,
-              dataType: p.dataType || 'string',
-              isPrimaryKey: p.isPrimaryKey || p.primaryKey || false,
-              description: p.description || '',
-            }));
-          } catch { /* entity may have no properties */ }
-
-          entityList.push({
+        const normals = rawEntities || [];
+        // T1: 把"for await fetchProperties"改为"Promise.all 并发",
+        // 将 N+1 次串行请求降为 1 次 entities + N 次并发 properties(总仍 N+1 次但网络往返只有 2 轮,首屏时间取决于最慢的一次 properties)
+        const propsResponses = await Promise.all(
+          normals.map((entity: any) =>
+            fetchProperties(entity.id, DEFAULT_ONTOLOGY_ID).catch((): any[] => [])
+          )
+        );
+        const entityList: ObjectType[] = normals.map((entity: any, idx: number) => {
+          const rawProps = propsResponses[idx] || [];
+          const props: { id: string; displayName: string; apiName: string; dataType: string; isPrimaryKey: boolean; description: string }[] = (rawProps || []).map((p: any) => ({
+            id: p.id || p.apiName || p.name,
+            displayName: p.displayName || p.name || p.apiName,
+            apiName: p.apiName || p.name,
+            dataType: p.dataType || 'string',
+            isPrimaryKey: p.isPrimaryKey || p.primaryKey || false,
+            description: p.description || '',
+          }));
+          return {
             id: entity.id,
             displayName: entity.name || entity.code,
             apiName: entity.code || entity.name,
@@ -83,8 +85,8 @@ export function useOntologyData(
             properties: props,
             mapping: entity.mapping || null,
             domainId: entity.domainId || null,
-          } as ObjectType);
-        }
+          } as ObjectType;
+        });
 
         // 3. Load relationships
         const rawRels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);

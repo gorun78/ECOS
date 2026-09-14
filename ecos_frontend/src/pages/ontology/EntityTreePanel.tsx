@@ -77,7 +77,7 @@ export default function EntityTreePanel({
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-400 mb-2.5 transition"
+          className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} opacity-80 hover:opacity-100 mb-2.5 transition`}
         >
           <ChevronLeft size={12} />
           {t("ontology.designer.backToDomainList")}
@@ -87,10 +87,10 @@ export default function EntityTreePanel({
             <Building2 size={14} className="text-indigo-400" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-white truncate">
+            <h3 className={`text-sm font-semibold ${styles.cardText} truncate`}>
               {domainCode}
             </h3>
-            <p className="text-[10px] text-slate-500">
+            <p className={`text-[10px] ${styles.cardTextMuted}`}>
               {t('ontology.designer.entityRelationshipCount', { entities: entities.length, relationships: relationships.length })}
             </p>
           </div>
@@ -100,13 +100,13 @@ export default function EntityTreePanel({
       {/* 实体搜索 */}
       <div className={`px-4 py-2 border-b ${styles.cardBorder}`}>
         <div className="relative">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={12} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.muted}`} />
           <input
             value={entitySearch}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t("ontology.designer.searchEntity")}
             className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg pl-7 pr-3 py-1.5
-              text-xs text-white placeholder:text-slate-600
+              text-xs ${styles.cardText} placeholder:opacity-50
               focus:outline-none focus:border-indigo-500/40 transition`}
           />
         </div>
@@ -115,11 +115,11 @@ export default function EntityTreePanel({
       {/* 实体树列表 */}
       <div className="flex-1 overflow-y-auto">
         {entitiesLoading ? (
-          <div className="flex items-center justify-center py-8 text-slate-500">
+          <div className={`flex items-center justify-center py-8 ${styles.muted}`}>
             <Loader2 size={16} className="animate-spin" />
           </div>
         ) : filteredEntities.length === 0 ? (
-          <div className="flex items-center justify-center py-12 text-slate-500">
+          <div className={`flex items-center justify-center py-12 ${styles.muted}`}>
             <div className="text-center">
               <Box size={24} className="mx-auto mb-2 opacity-30" />
               <p className="text-xs">
@@ -146,13 +146,13 @@ export default function EntityTreePanel({
                 >
                   {config.icon}
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                    <div className={`text-xs font-semibold ${styles.cardText} truncate flex items-center gap-1.5`}>
                       {entity.name || entity.code}
-                      <span className="text-[9px] font-normal text-slate-500">
+                      <span className="text-[9px] font-normal opacity-80">
                         ({getEntityTypeLabel(entity.entityType, t)})
                       </span>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-mono truncate">
+                    <div className={`text-[10px] ${styles.cardTextMuted} font-mono truncate`}>
                       {entity.code}
                     </div>
                   </div>

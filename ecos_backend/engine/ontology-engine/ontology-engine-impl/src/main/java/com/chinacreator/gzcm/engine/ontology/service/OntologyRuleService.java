@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleEvaluationVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyRuleVO;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -39,6 +42,93 @@ public class OntologyRuleService {
     }
 
     private String nextId() { return "rule" + ID_SEQ.incrementAndGet(); }
+
+    // ═══════════════ Strong-Typed Facades (T16-1, 2026-09-12) ═══════════════════
+    // 旧 Map 签名方法保留（外部调用方可能依赖）；新增 DTO/VO 签名供 6 Controller 使用。
+
+    public List<OntologyRuleVO> listRulesByEntityVO(String entityId) {
+        return repository.findByEntity(entityId).stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    public List<OntologyRuleVO> listAllRulesVO() {
+        return repository.findAll().stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    public OntologyRuleVO getRuleVO(String ruleId) {
+        return repository.findById(ruleId).map(this::toVO).orElse(null);
+    }
+
+    public OntologyRuleVO createRule(String entityId, OntologyRuleSaveDTO dto) {
+        OntologyRule rule = new OntologyRule();
+        rule.setId(nextId());
+        rule.setEntityId(entityId);
+        rule.setCode(dto.getCode() != null ? dto.getCode() : "");
+        rule.setName(dto.getName() != null ? dto.getName() : "");
+        rule.setRuleType(dto.getRuleType() != null ? dto.getRuleType() : "VALIDATION");
+        rule.setExpression(dto.getExpression() != null ? dto.getExpression() : "");
+        rule.setAction(dto.getAction() != null ? dto.getAction() : "");
+        rule.setPriority(dto.getPriority() != null ? dto.getPriority() : 0);
+        rule.setEnabled(dto.getEnabled() != null ? dto.getEnabled() : 1);
+        rule.setDescription(dto.getDescription() != null ? dto.getDescription() : "");
+        repository.insert(rule);
+        log.info("Rule created: {} [{}] type={} for entity {}", rule.getId(), rule.getCode(), rule.getRuleType(), entityId);
+        return toVO(rule);
+    }
+
+    public Optional<OntologyRuleVO> updateRule(String ruleId, OntologyRuleSaveDTO dto) {
+        return repository.findById(ruleId).map(existing -> {
+            repository.update(ruleId, dto.getCode(), dto.getName(), dto.getRuleType(),
+                dto.getExpression(), dto.getAction(), dto.getPriority(), dto.getEnabled(), dto.getDescription());
+            return repository.findById(ruleId).map(this::toVO).orElse(null);
+        });
+    }
+
+    /** 强类型版规则测试。 */
+    public OntologyRuleEvaluationVO testRuleVO(String ruleId) {
+        OntologyRule rule = repository.findById(ruleId)
+            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Rule '" + ruleId + "' not found"));
+        OntologyRuleEvaluationVO vo = new OntologyRuleEvaluationVO();
+        vo.setRuleId(rule.getId());
+        vo.setCode(rule.getCode());
+        vo.setExpression(rule.getExpression());
+        vo.setParsable(tryParseExpression(rule.getExpression()));
+        vo.setRuleType(rule.getRuleType());
+        vo.setEnabled(rule.getEnabled() == 1);
+        return vo;
+    }
+
+    /** 强类型版批量评估。 */
+    public List<OntologyRuleEvaluationVO> evaluateRulesVO(List<String> entityIds) {
+        return entityIds.stream().flatMap(entityId ->
+            repository.findByEntity(entityId).stream().filter(r -> r.getEnabled() == 1).map(rule -> {
+                OntologyRuleEvaluationVO vo = new OntologyRuleEvaluationVO();
+                vo.setRuleId(rule.getId());
+                vo.setEntityId(entityId);
+                vo.setCode(rule.getCode());
+                vo.setExpression(rule.getExpression());
+                vo.setRuleType(rule.getRuleType());
+                vo.setParsable(tryParseExpression(rule.getExpression()));
+                return vo;
+            })
+        ).collect(Collectors.toList());
+    }
+
+    private OntologyRuleVO toVO(OntologyRule r) {
+        OntologyRuleVO vo = new OntologyRuleVO();
+        vo.setId(r.getId());
+        vo.setEntityId(r.getEntityId());
+        vo.setCode(r.getCode());
+        vo.setName(r.getName());
+        vo.setRuleType(r.getRuleType());
+        vo.setExpression(r.getExpression());
+        vo.setAction(r.getAction());
+        vo.setPriority(r.getPriority());
+        vo.setEnabled(r.getEnabled());
+        vo.setDescription(r.getDescription());
+        vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(r.getUpdatedAt() != null ? r.getUpdatedAt().toString() : null);
+        return vo;
+    }
 
     public List<Map<String, Object>> listRulesByEntity(String entityId) {
         return repository.findByEntity(entityId).stream().map(this::toMap).collect(Collectors.toList());

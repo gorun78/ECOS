@@ -140,11 +140,11 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
 
       {/* Search Bar */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 mb-5 flex items-center gap-3 shrink-0 shadow-xs`}>
-        <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 flex items-center gap-2 text-xs">
+        <div className={`flex-1 ${styles.inputBg} border ${styles.inputBorder} rounded-lg px-3.5 py-2 flex items-center gap-2 text-xs`}>
           <Search className={`w-3.5 h-3.5 ${styles.muted} shrink-0`} />
-          <input type="text" className="bg-transparent border-0 outline-hidden w-full text-slate-700 placeholder-slate-400" placeholder={locale === "zh" ? "搜索数据源名称、类型..." : "Search data source name, type..."} value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)} />
+          <input type="text" className={`bg-transparent border-0 outline-hidden w-full ${styles.cardText} placeholder:${styles.cardTextMuted}`} placeholder={locale === "zh" ? "搜索数据源名称、类型..." : "Search data source name, type..."} value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)} />
         </div>
-        <button onClick={loadDataSources} className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold ${styles.muted} hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer`} title={locale === "zh" ? "刷新列表" : "Refresh list"}><RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /></button>
+        <button onClick={loadDataSources} className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.cardText} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`} title={locale === "zh" ? "刷新列表" : "Refresh list"}><RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /></button>
       </div>
 
       {/* Table / States */}
@@ -160,13 +160,13 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-xs overflow-hidden`}>
             <table className="w-full text-xs">
               <thead>
-                <tr className={`bg-slate-50 border-b ${styles.cardBorder}`}>
-                  <th className="text-left px-4 py-3 font-bold text-slate-600">{locale === "zh" ? "名称" : "Name"}</th>
-                  <th className="text-left px-4 py-3 font-bold text-slate-600">{locale === "zh" ? "数据库类型" : "DB Type"}</th>
-                  <th className="text-left px-4 py-3 font-bold text-slate-600">JDBC URL</th>
-                  <th className="text-left px-4 py-3 font-bold text-slate-600">{locale === "zh" ? "状态" : "Status"}</th>
-                  <th className="text-left px-4 py-3 font-bold text-slate-600">{locale === "zh" ? "创建时间" : "Created"}</th>
-                  <th className="text-right px-4 py-3 font-bold text-slate-600">{locale === "zh" ? "操作" : "Actions"}</th>
+                <tr className={`${styles.appBg} border-b ${styles.cardBorder}`}>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "名称" : "Name"}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "数据库类型" : "DB Type"}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>JDBC URL</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "状态" : "Status"}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "创建时间" : "Created"}</th>
+                  <th className={`text-right px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "操作" : "Actions"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,9 +175,9 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                   const isT = testingId === dsId, isC = collectingId === dsId, isD = deletingId === dsId;
                   const typeLabel = getDsTypeLabel(ds.datasourceType || "JDBC");
                   return (
-                    <tr key={dsId} className={`border-b ${styles.cardBorder} hover:bg-slate-50 transition ${idx === filtered.length - 1 ? "border-b-0" : ""}`}>
+                    <tr key={dsId} className={`border-b ${styles.cardBorder} hover:${styles.appBg}/50 transition ${idx === filtered.length - 1 ? "border-b-0" : ""}`}>
                       <td className="px-4 py-3.5"><div className="flex items-center gap-2"><Database className={`w-4 h-4 ${styles.accentText} shrink-0`} /><span className={`font-bold ${styles.cardText} text-sm`}>{ds.datasourceName || "—"}</span></div></td>
-                      <td className="px-4 py-3.5"><span className={`font-mono text-[10px] font-bold bg-slate-50 border border-slate-200 ${styles.cardTextMuted} px-2 py-0.5 rounded-md`}>{typeLabel}</span></td>
+                      <td className="px-4 py-3.5"><span className={`font-mono text-[10px] font-bold ${styles.inputBg} border ${styles.inputBorder} ${styles.cardTextMuted} px-2 py-0.5 rounded-md`}>{typeLabel}</span></td>
                       <td className="px-4 py-3.5"><span className={`${styles.cardTextMuted} font-mono text-[10px] truncate max-w-[200px] block`}>{getJdbcUrl(ds)}</span></td>
                       <td className="px-4 py-3.5">{statusBadge(ds.status || "UNKNOWN")}{resultBanner(testResults[dsId])}{resultBanner(collectResults[dsId])}</td>
                       <td className={`px-4 py-3.5 ${styles.muted} font-mono text-[11px] whitespace-nowrap`}>{ds.createdAt || "—"}</td>
@@ -201,7 +201,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                 <div className="flex items-center gap-2 mb-3">
                   <Database className="w-4 h-4 text-green-600" />
                   <h3 className={`text-sm font-bold ${styles.cardText}`}>{locale === "zh" ? "数据资源列表" : "Data Resources"}</h3>
-                  <span className="text-[10px] text-slate-400">({resources.length})</span>
+                  <span className={`text-[10px] ${styles.cardTextMuted}`}>({resources.length})</span>
                   {resourcesLoading && <Loader2 className="w-3 h-3 animate-spin text-green-500" />}
                 </div>
                 {resources.length === 0 && !resourcesLoading ? (
@@ -210,10 +210,10 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                   <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
                     {resources.map(r => (
                       <div key={r.resourceId}>
-                        <button onClick={() => handleBrowseFields(r.resourceId)} className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition cursor-pointer ${expandedResource === r.resourceId ? "bg-green-100 border border-green-300" : "bg-white border border-slate-200 hover:border-green-300 hover:bg-green-50"}`}>
+                        <button onClick={() => handleBrowseFields(r.resourceId)} className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition cursor-pointer ${expandedResource === r.resourceId ? "bg-green-100 border border-green-300" : `${styles.cardBg} border ${styles.cardBorder} hover:border-green-300 hover:bg-green-50`}`}>
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.resourceType === "TABLE" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{r.resourceType || "?"}</span>
                           <span className={`font-bold ${styles.cardText} flex-1`}>{r.resourceName}</span>
-                          <span className="text-[10px] text-slate-400">{r.fieldCount ?? "?"} {locale === "zh" ? "字段" : "fields"}</span>
+                          <span className={`text-[10px] ${styles.cardTextMuted}`}>{r.fieldCount ?? "?"} {locale === "zh" ? "字段" : "fields"}</span>
                         </button>
                         {expandedResource === r.resourceId && (
                           <div className="mt-1 ml-4 border-l-2 border-green-200 pl-4 animate-fade-in">
@@ -230,7 +230,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                                       <td className="py-1.5">{f.primaryKey ? <span className="text-amber-500 text-[10px]" title="Primary Key">🔑</span> : null}</td>
                                       <td className={`py-1.5 font-mono ${styles.cardText} font-bold`}>{f.fieldName}</td>
                                       <td className={`py-1.5 ${styles.muted}`}>{f.dataType}</td>
-                                      <td className="py-1.5"><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${f.nullable ? "bg-amber-50 text-amber-600 border border-amber-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>{f.nullable ? "NULL" : "NOT NULL"}</span></td>
+                                      <td className="py-1.5"><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${f.nullable ? "bg-amber-50 text-amber-600 border border-amber-200" : `${styles.appBorder} ${styles.cardTextMuted} border ${styles.inputBorder}`}`}>{f.nullable ? "NULL" : "NOT NULL"}</span></td>
                                       <td className={`py-1.5 ${styles.muted} font-mono`}>{f.dataLength || "—"}</td>
                                     </tr>
                                   ))}

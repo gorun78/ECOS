@@ -10,6 +10,7 @@ import {
   Globe, Command, GitBranch, Loader2,
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
+import { useTheme } from "./ThemeContext";
 import { globalSearch, SearchHit } from "../api";
 
 interface CommandPaletteProps {
@@ -84,6 +85,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { locale } = useLanguage();
+  const { styles } = useTheme();
   const zh = locale === "zh";
 
   useEffect(() => {
@@ -153,34 +155,34 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const hasStatic = filteredStatic.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-slate-900/40 backdrop-blur-xs">
-      <div className="w-full max-w-2xl overflow-hidden bg-white border border-[#E2E8F0] rounded-xl shadow-2xl animate-fade-in-down text-[#1E293B] font-sans">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-[var(--overlay)] backdrop-blur-xs">
+      <div className={`w-full max-w-2xl overflow-hidden ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl animate-fade-in-down text-[#1E293B] font-sans`}>
 
         {/* Search header */}
-        <div className="flex items-center px-5 py-4 border-b border-[#E2E8F0] bg-slate-50">
-          <Search className="w-5 h-5 mr-3 text-slate-400 shrink-0" />
+        <div className={`flex items-center px-5 py-4 border-b ${styles.cardBorder} ${styles.appBg}`}>
+          <Search className={`w-5 h-5 mr-3 ${styles.cardTextMuted} shrink-0`} />
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 text-sm bg-transparent border-0 outline-hidden text-[#1E293B] placeholder-slate-400"
+            className={`flex-1 text-sm bg-transparent border-0 outline-hidden ${styles.cardText} placeholder:${styles.cardTextMuted}`}
             placeholder={zh ? "实时搜索…" : "Live search…"}
             autoFocus
             value={search}
             onChange={(e) => onInput(e.target.value)}
           />
-          <span className="px-2 py-0.5 text-[10px] font-mono text-slate-400 bg-white rounded border border-[#E2E8F0]">ESC</span>
+          <span className={`px-2 py-0.5 text-[10px] font-mono ${styles.cardTextMuted} ${styles.cardBg} rounded border ${styles.cardBorder}`}>ESC</span>
         </div>
 
         <div className="max-h-[420px] overflow-y-auto p-3 scrollbar-thin">
           {loading && (
-            <div className="py-8 text-center text-slate-400">
+            <div className={`py-8 text-center ${styles.cardTextMuted}`}>
               <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
               <p className="text-xs">{zh ? "搜索中…" : "Searching…"}</p>
             </div>
           )}
 
           {!loading && error && (
-            <div className="py-8 text-center text-slate-400">
+            <div className={`py-8 text-center ${styles.cardTextMuted}`}>
               <HelpCircle className="w-6 h-6 mx-auto mb-2 text-amber-400" />
               <p className="text-xs">{zh ? "搜索暂不可用" : "Search unavailable"}</p>
             </div>
@@ -202,10 +204,10 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">{hit.name || hit.id || "—"}</span>
-                        <span className="px-1.5 py-0 text-[9px] font-mono rounded bg-slate-100 text-slate-400">{hit.type || "?"}</span>
+                        <span className={`text-sm font-semibold ${styles.cardText}`}>{hit.name || hit.id || "—"}</span>
+                        <span className={`px-1.5 py-0 text-[9px] font-mono rounded ${styles.appBg} ${styles.cardTextMuted}`}>{hit.type || "?"}</span>
                       </div>
-                      <span className="text-[10px] text-slate-400">{zh ? meta.catZh : meta.cat}</span>
+                      <span className={`text-[10px] ${styles.cardTextMuted}`}>{zh ? meta.catZh : meta.cat}</span>
                     </div>
                   </button>
                 );
@@ -220,20 +222,20 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                 if (catItems.length === 0) return null;
                 return (
                   <div key={cat.en} className="space-y-1">
-                    <div className="px-3 py-1 text-[9px] font-mono tracking-widest uppercase text-slate-400 font-bold">
+                    <div className={`px-3 py-1 text-[9px] font-mono tracking-widest uppercase ${styles.cardTextMuted} font-bold`}>
                       {zh ? cat.zh : cat.en}
                     </div>
                     {catItems.map((item) => {
                       const IconC = item.icon;
                       return (
                         <button key={item.id} onClick={() => { onNavigate(item.id); onClose(); }}
-                          className="w-full text-left flex items-start p-2.5 rounded-lg hover:bg-slate-50 group transition cursor-pointer">
-                          <div className="p-2 mr-3 bg-slate-50 border border-[#E2E8F0] rounded-md">
-                            <IconC className="w-4 h-4 text-slate-400 group-hover:text-[#3B82F6]" />
+                          className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
+                          <div className={`p-2 mr-3 ${styles.appBg} border ${styles.cardBorder} rounded-md`}>
+                            <IconC className={`w-4 h-4 ${styles.cardTextMuted} group-hover:text-[#3B82F6]`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-700">{zh ? item.titleZh : item.title}</p>
-                            <p className="text-xs text-slate-400 truncate mt-1">{zh ? item.descriptionZh : item.description}</p>
+                            <p className={`text-sm font-semibold ${styles.cardText}`}>{zh ? item.titleZh : item.title}</p>
+                            <p className={`text-xs ${styles.cardTextMuted} truncate mt-1`}>{zh ? item.descriptionZh : item.description}</p>
                           </div>
                         </button>
                       );
@@ -245,16 +247,16 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
           )}
 
           {!loading && !hasStatic && !hasResults && (
-            <div className="py-12 text-center text-slate-400">
-              <HelpCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+            <div className={`py-12 text-center ${styles.cardTextMuted}`}>
+              <HelpCircle className={`w-8 h-8 mx-auto mb-2 ${styles.cardTextMuted}`} />
               <p className="text-sm font-semibold">{zh ? "无结果" : "No results"}</p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3 border-t border-[#E2E8F0] bg-slate-50 text-[10px] text-slate-400 font-mono">
+        <div className={`flex items-center justify-between px-5 py-3 border-t ${styles.cardBorder} ${styles.appBg} text-[10px] ${styles.cardTextMuted} font-mono`}>
           <span>{zh ? "↵ 选择 · ESC 关闭" : "↵ Select · ESC Close"}</span>
-          <span className="font-semibold text-slate-500">{zh ? "C2EOS 命令面板" : "C2EOS Command Palette"}</span>
+          <span className={`font-semibold ${styles.cardTextMuted}`}>{zh ? "C2EOS 命令面板" : "C2EOS Command Palette"}</span>
         </div>
       </div>
     </div>

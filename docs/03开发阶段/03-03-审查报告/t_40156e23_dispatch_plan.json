@@ -1,0 +1,18 @@
+{
+  "task_id": "t_40156e23",
+  "artifact_type": "SOURCE_PATCH",
+  "workflow_mode": "L1",
+  "artifact_ref": "ecos_frontend/src/components/NetworkErrorBanner.tsx + App.tsx (uncommitted working tree, feature/pmo-43-fe-p0-infra-network)",
+  "dispatched_at": "2026-09-07T00:37:00Z",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "SOURCE_PATCH(t5-banner)",
+      "mode": "quick",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT"],
+  "final_gate_logic": "AND_ALL",
+  "notes": "L1 quick-mode focus review per task body: navigator.onLine usage, banner appears/disappears on network status, layout integration. L3 parallel arch-consistency/security-audit tracked by sibling lanes t_a1dfedf8 / t_fdf943ce; not re-run here."
+}

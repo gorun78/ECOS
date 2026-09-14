@@ -27,9 +27,11 @@ import {
   Package,
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
+import { useTheme } from '../ThemeContext';
 import type { Entity } from '../../types/workbench';
 
 // ── 实体类型配置 ──────────────────────────────────────────────
+// 注：default 分支保留 slate 配色（未知类型枚举回退，与 DOM 主体类目同色方案）
 
 const ENTITY_TYPE_CONFIG: Record<string, {
   icon: React.ReactNode;
@@ -91,6 +93,7 @@ interface EntityListItemProps {
 }
 
 function EntityListItem({ entity, isSelected, onSelect, propertyCount }: EntityListItemProps) {
+  const { styles } = useTheme();
   const config = ENTITY_TYPE_CONFIG[entity.entityType] || ENTITY_TYPE_CONFIG.default;
 
   const handleClick = useCallback(() => {
@@ -129,10 +132,10 @@ function EntityListItem({ entity, isSelected, onSelect, propertyCount }: EntityL
             {getEntityTypeLabel(entity.entityType)}
           </span>
         </div>
-        <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">
+        <div className={`text-[10px] ${styles.cardTextMuted} font-mono truncate mt-0.5`}>
           {entity.code}
           {propertyCount !== undefined && (
-            <span className="text-slate-600 ml-1.5">
+            <span className={`${styles.cardTextMuted} ml-1.5`}>
               · {propertyCount} 属性
             </span>
           )}
@@ -177,6 +180,7 @@ export default function EntityTreePanel({
   loading = false,
   footer,
 }: EntityTreePanelProps) {
+  const { styles } = useTheme();
   const store = useWorkbenchStore();
   const { entities, selectedEntityId, properties } = store;
 
@@ -210,7 +214,7 @@ export default function EntityTreePanel({
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-400 mb-2.5 transition"
+            className={`flex items-center gap-1 text-[10px] ${styles.cardTextMuted} hover:${styles.cardText} mb-2.5 transition`}
           >
             <ChevronRight size={11} className="rotate-180" />
             返回域列表
@@ -225,7 +229,7 @@ export default function EntityTreePanel({
             <h3 className="text-sm font-semibold text-white truncate">
               {domainCode}
             </h3>
-            <p className="text-[10px] text-slate-500">
+            <p className={`text-[10px] ${styles.cardTextMuted}`}>
               {entityCount} 实体 · {relationshipCount} 关系
             </p>
           </div>
@@ -235,19 +239,19 @@ export default function EntityTreePanel({
       {/* ── 搜索框 ── */}
       <div className="px-4 py-2.5 border-b border-[#1E293B] shrink-0">
         <div className="relative">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={12} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索实体..."
-            className="w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg pl-7 pr-3 py-1.5
-              text-xs text-white placeholder:text-slate-600
-              focus:outline-none focus:border-indigo-500/40 transition"
+            className={`w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg pl-7 pr-3 py-1.5
+              text-xs text-white placeholder:${styles.cardTextMuted.replace('text-', 'text-')}
+              focus:outline-none focus:border-indigo-500/40 transition`}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"
+              className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted} hover:${styles.cardText}`}
             >
               <span className="text-[11px] leading-none">✕</span>
             </button>
@@ -258,11 +262,11 @@ export default function EntityTreePanel({
       {/* ── 实体列表 ── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-slate-500">
+          <div className={`flex items-center justify-center py-12 ${styles.cardTextMuted}`}>
             <Loader2 size={18} className="animate-spin" />
           </div>
         ) : filteredEntities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-14 text-slate-500 px-4">
+          <div className={`flex flex-col items-center justify-center py-14 ${styles.cardTextMuted} px-4`}>
             <Box size={28} className="mb-3 opacity-20" />
             <p className="text-xs">
               {searchQuery ? '无匹配实体' : '暂无实体'}

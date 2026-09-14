@@ -1,0 +1,1 @@
+{"code":400,"message":"不支持的数据源类型: NOT_A_TYPE。支持: [POSTGRESQL, FILESYSTEM, MYSQL, GAUSS, DM, KINGBASE, MSSQL, MINIO, ORACLE]","timestamp":1788845522970,"success":false}

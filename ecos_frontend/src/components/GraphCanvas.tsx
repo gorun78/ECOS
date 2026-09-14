@@ -8,6 +8,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ZoomIn, ZoomOut, Maximize2, Search, Info, Database, Activity, Layout, Layers } from "lucide-react";
+import { useTheme } from "./ThemeContext";
 
 interface Node {
   id: string;
@@ -73,6 +74,7 @@ export default function GraphCanvas({
   const [panOffset, setPanOffset] = useState({ x: 20, y: 20 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const { styles } = useTheme();
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const simTimerRef = useRef<number | null>(null);
@@ -313,9 +315,9 @@ export default function GraphCanvas({
         };
       default:
         return {
-          bg: `bg-slate-50 border-slate-200 hover:border-slate-400 text-slate-700 ${baseOpacity}`,
+          bg: `${styles.appBg} ${styles.cardBorder} hover:${styles.sidebarActiveBg} ${styles.cardText} ${baseOpacity}`,
           glow: "shadow-2xs",
-          iconBg: "bg-slate-100",
+          iconBg: `${styles.appBg}`,
           icon: Info,
         };
     }
@@ -329,7 +331,7 @@ export default function GraphCanvas({
   return (
     <div
       ref={canvasRef}
-      className="relative flex-1 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden select-none"
+      className={`relative flex-1 ${styles.appBg} border ${styles.cardBorder} rounded-xl overflow-hidden select-none`}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -338,10 +340,10 @@ export default function GraphCanvas({
       {/* Search overlay */}
       <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
         <div className="flex items-center gap-2 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-xl border border-[#E2E8F0] shadow-sm">
-          <Search className="w-3.5 h-3.5 text-slate-400" />
+          <Search className={`w-3.5 h-3.5 ${styles.cardTextMuted}`} />
           <input
             type="text"
-            className="text-[11px] bg-transparent border-0 outline-hidden text-slate-800 placeholder-slate-400 w-44 font-sans"
+            className={`text-[11px] bg-transparent border-0 outline-hidden ${styles.cardText} placeholder:${styles.cardTextMuted} w-44 font-sans`}
             placeholder="Search lineage node..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -350,30 +352,30 @@ export default function GraphCanvas({
 
         <button
           onClick={handleFitView}
-          className="p-2 bg-white text-slate-550 hover:bg-slate-50 hover:text-slate-800 rounded-xl border border-[#E2E8F0] shadow-xs cursor-pointer transition"
+          className={`p-2 ${styles.cardBg} ${styles.cardTextMuted} hover:${styles.appBg} hover:${styles.cardText} rounded-xl border ${styles.cardBorder} shadow-xs cursor-pointer transition`}
           title="Fit View"
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 bg-white/95 border border-[#E2E8F0] px-2.5 py-1 rounded-lg text-[10px] font-mono text-slate-450 shadow-xs">
+      <div className={`absolute bottom-3 left-3 z-10 flex items-center gap-1.5 ${styles.cardBg} border ${styles.cardBorder} px-2.5 py-1 rounded-lg text-[10px] font-mono ${styles.cardTextMuted} shadow-xs`}>
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         <span>FORCE-DIRECTED CANVAS</span>
       </div>
 
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
-        <div className="flex flex-col rounded-xl border border-[#E2E8F0] bg-white p-1 shadow-sm">
+        <div className={`flex flex-col rounded-xl border ${styles.cardBorder} ${styles.cardBg} p-1 shadow-sm`}>
           <button
             onClick={() => setZoom(z => Math.min(z + 0.1, 1.8))}
-            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-lg cursor-pointer transition-all"
+            className={`p-1.5 ${styles.cardTextMuted} hover:${styles.cardText} hover:${styles.appBg} rounded-lg cursor-pointer transition-all`}
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))}
-            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-lg cursor-pointer transition-all"
+            className={`p-1.5 ${styles.cardTextMuted} hover:${styles.cardText} hover:${styles.appBg} rounded-lg cursor-pointer transition-all`}
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
@@ -484,20 +486,20 @@ export default function GraphCanvas({
                 } ${style.glow} ${borderClass}`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className={`p-1 rounded bg-white border border-[#E2E8F0] shrink-0 ${isNew ? "text-green-600" : "text-slate-550"}`}>
+                  <div className={`p-1 rounded ${styles.cardBg} border ${styles.cardBorder} shrink-0 ${isNew ? "text-green-600" : `${styles.cardTextMuted}`}`}>
                     <Icon className="w-3.5 h-3.5 text-current shrink-0" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-[11px] font-bold block truncate leading-tight tracking-wide text-slate-800">
+                    <span className={`text-[11px] font-bold block truncate leading-tight tracking-wide ${styles.cardText}`}>
                       {node.label}
                     </span>
-                    <span className="text-[8.5px] uppercase font-mono text-slate-400 block leading-none mt-1 font-bold">
+                    <span className={`text-[8.5px] uppercase font-mono ${styles.cardTextMuted} block leading-none mt-1 font-bold`}>
                       {node.type}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 mt-1 first-letter:uppercase leading-none">
+                <div className={`flex items-center justify-between text-[9px] font-mono ${styles.cardTextMuted} mt-1 first-letter:uppercase leading-none`}>
                   <span className="truncate">{node.rows || "Active Link"}</span>
                   <div className="flex items-center gap-1">
                     <span
@@ -509,7 +511,7 @@ export default function GraphCanvas({
                         : "bg-blue-500"
                       }`}
                     />
-                    <span className="text-[9px] text-slate-400 font-bold shrink-0">
+                    <span className={`text-[9px] ${styles.cardTextMuted} font-bold shrink-0`}>
                       {isNew ? "New" : node.status || "Ready"}
                     </span>
                   </div>

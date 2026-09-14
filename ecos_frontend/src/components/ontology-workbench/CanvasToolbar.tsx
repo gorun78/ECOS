@@ -22,6 +22,7 @@ import {
   GitBranch,
   Layers,
 } from "lucide-react";
+import { useTheme } from "../ThemeContext";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export default function CanvasToolbar({
   currentZoom = 100,
   editable = true,
 }: CanvasToolbarProps) {
+  const { styles } = useTheme();
   // 布局按钮选中态
   const [activeLayout, setActiveLayout] = React.useState<
     "force" | "hierarchical" | "circular" | null
@@ -111,17 +113,17 @@ export default function CanvasToolbar({
 
         {/* 统计 */}
         <div className="flex items-center gap-2.5 text-[10px]">
-          <span className="flex items-center gap-1 text-slate-400">
+          <span className={`flex items-center gap-1 ${styles.cardTextMuted}`}>
             <Box size={11} className="text-indigo-400" />
             <span className="font-mono text-indigo-300">{entityCount}</span>
-            <span className="text-slate-500">实体</span>
+            <span className={styles.muted}>实体</span>
           </span>
-          <span className="flex items-center gap-1 text-slate-400">
+          <span className={`flex items-center gap-1 ${styles.cardTextMuted}`}>
             <GitBranch size={11} className="text-emerald-400" />
             <span className="font-mono text-emerald-300">
               {relationshipCount}
             </span>
-            <span className="text-slate-500">关系</span>
+            <span className={styles.muted}>关系</span>
           </span>
         </div>
       </div>
@@ -160,7 +162,7 @@ export default function CanvasToolbar({
               ${
                 activeLayout === id
                   ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-white hover:bg-[#2A3040]"
+                  : `${styles.cardTextMuted} hover:text-white hover:bg-[#2A3040]`
               }
             `}
             title={`${label}布局`}
@@ -175,30 +177,30 @@ export default function CanvasToolbar({
       <div className="flex items-center gap-0.5 bg-[#1A1F2E] rounded-lg p-0.5 border border-[#1E293B]">
         <button
           onClick={onZoomOut}
-          className="
+          className={`
             p-1.5 rounded-md
-            text-slate-400 hover:text-white hover:bg-[#2A3040]
+            ${styles.cardTextMuted} hover:text-white hover:bg-[#2A3040]
             transition-colors duration-150
             cursor-pointer
-          "
+          `}
           title="缩小"
         >
           <ZoomOut size={13} />
         </button>
 
         {/* 缩放比例显示 */}
-        <span className="text-[10px] font-mono text-slate-400 px-1 min-w-[36px] text-center">
+        <span className={`text-[10px] font-mono ${styles.cardTextMuted} px-1 min-w-[36px] text-center`}>
           {Math.round(currentZoom)}%
         </span>
 
         <button
           onClick={onZoomIn}
-          className="
+          className={`
             p-1.5 rounded-md
-            text-slate-400 hover:text-white hover:bg-[#2A3040]
+            ${styles.cardTextMuted} hover:text-white hover:bg-[#2A3040]
             transition-colors duration-150
             cursor-pointer
-          "
+          `}
           title="放大"
         >
           <ZoomIn size={13} />
@@ -208,13 +210,13 @@ export default function CanvasToolbar({
       {/* 自适应视图 */}
       <button
         onClick={onFitView}
-        className="
+        className={`
           p-1.5 rounded-lg
-          text-slate-400 hover:text-white hover:bg-[#1A1F2E]
+          ${styles.cardTextMuted} hover:text-white hover:bg-[#1A1F2E]
           border border-transparent hover:border-[#1E293B]
           transition-all duration-150
           cursor-pointer
-        "
+        `}
         title="自适应视图"
       >
         <Maximize2 size={14} />

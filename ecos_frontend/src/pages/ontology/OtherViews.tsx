@@ -68,11 +68,11 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
                   <th className="py-2.5 px-4">{t('ow.label.specDescription')}</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y divide-gray-100 ${styles.cardTextMuted}`}>
+              <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
                 {intf.properties.map(p => (
-                  <tr key={p.id} className={`hover:bg-slate-50/50`}>
+                  <tr key={p.id} className="hover:bg-blue-50/20">
                     <td className="py-2.5 px-4">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${p.isRequired ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${p.isRequired ? 'bg-red-100 text-red-800' : `${styles.appBg} ${styles.cardTextMuted}`}`}>
                         {p.isRequired ? 'REQUIRED' : 'OPTIONAL'}
                       </span>
                     </td>
@@ -87,7 +87,7 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-gray-100 pt-6">
+        <div className={`space-y-3 border-t ${styles.divider} pt-6`}>
           <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.section.implementingObjects')} ({implementingObjects.length})</h3>
           {implementingObjects.length === 0 ? (
             <div className={`text-center py-6 border border-dashed ${styles.cardBorder} rounded-lg ${styles.muted} text-xs`}>
@@ -183,7 +183,7 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-gray-100 pt-6">
+        <div className={`space-y-3 border-t ${styles.divider} pt-6`}>
           <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.section.boundObjectTypes')} ({referencedObjects.length})</h3>
           {referencedObjects.length === 0 ? (
             <div className={`text-center py-6 border border-dashed ${styles.cardBorder} rounded-lg ${styles.muted} text-xs`}>
@@ -296,12 +296,12 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
                   ))}
                 </tr>
               </thead>
-              <tbody className={`divide-y divide-slate-100 ${styles.cardTextMuted}`}>
+              <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
                 {dataset.sampleData.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/30">
+                  <tr key={idx} className={`hover:bg-blue-50/[0.15]`}>
                     {dataset.columns.map(col => (
                       <td key={col.name} className="py-2.5 px-3 truncate max-w-[150px]" title={String(row[col.name] ?? '')}>
-                        {row[col.name] === undefined ? <span className="text-slate-300">null</span> : String(row[col.name])}
+                        {row[col.name] === undefined ? <span className="opacity-40">null</span> : String(row[col.name])}
                       </td>
                     ))}
                   </tr>

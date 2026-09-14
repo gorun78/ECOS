@@ -5,16 +5,18 @@
 
 import React from "react";
 import { useLanguage } from "../../components/LanguageContext";
+import { useTheme } from "../../components/ThemeContext";
 import { TwinTelemetry } from "../../api";
 
 // ── SVG Telemetry Mini Chart ───────────────────────────────
 export default function TelemetryMiniChart({ data, color = "#818CF8", height = 60 }: { data: TwinTelemetry[]; color?: string; height?: number }) {
   const { locale } = useLanguage();
+  const { styles } = useTheme();
   const tl = (zh: string, en: string) => locale === "zh" ? zh : en;
 
   if (data.length < 2) {
     return (
-      <div className="flex items-center justify-center text-[10px] text-slate-400" style={{ height }}>
+      <div className={`flex items-center justify-center text-[10px] ${styles.cardTextMuted}`} style={{ height }}>
         {tl("数据不足，至少需要2个数据点", "Insufficient data, need at least 2 data points")}
       </div>
     );

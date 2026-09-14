@@ -1,7 +1,7 @@
 /**
  * OntologyDesigner helpers — 类型常量
  */
-import type { OntologyEntity, OntologyProperty, OntologyRelationship } from "../../api";
+import type { OntologyEntity, OntologyProperty, OntologyRelationship } from "../../services/ontologyApi";
 
 export const ONTOLOGY_ID = "ont001";
 

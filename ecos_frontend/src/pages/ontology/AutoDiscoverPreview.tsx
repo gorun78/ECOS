@@ -13,6 +13,7 @@ import React from 'react';
 import { Table, Check, Database } from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
+import type { ThemeStyles } from '../../components/ThemeContext';
 import type { AutoDiscoverEntityPreview } from '../../services/ontologyApi';
 
 // ── 组件接口 ────────────────────────────────────────────────
@@ -32,10 +33,10 @@ interface AutoDiscoverPreviewProps {
 
 // ── 置信度颜色映射 ──────────────────────────────────────────
 
-function getConfidenceColor(confidence: number): string {
+function getConfidenceColor(confidence: number, styles: ThemeStyles): string {
   if (confidence >= 0.8) return 'text-emerald-400 bg-emerald-500/10';
   if (confidence >= 0.6) return 'text-amber-400 bg-amber-500/10';
-  return 'text-slate-400 bg-slate-500/10';
+  return `${styles.cardTextMuted} ${styles.cardBg}/10`;
 }
 
 function getConfidenceLabel(c: number): string {
@@ -61,7 +62,7 @@ export default function AutoDiscoverPreview({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Database size={24} className="animate-pulse text-slate-600" />
+        <Database size={24} className={`animate-pulse ${styles.muted} opacity-70`} />
         <span className={`ml-3 text-sm ${styles.muted}`}>
           {t('ontology.autoDiscover.discovering')}
         </span>
@@ -73,7 +74,7 @@ export default function AutoDiscoverPreview({
   if (candidates.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <Database size={32} className="mb-3 opacity-20 text-slate-500" />
+        <Database size={32} className={`mb-3 opacity-20 ${styles.muted}`} />
         <p className={`text-sm ${styles.muted}`}>
           {t('ontology.autoDiscover.noCandidates')}
         </p>
@@ -96,7 +97,7 @@ export default function AutoDiscoverPreview({
           className={`text-[10px] px-2 py-1 rounded transition ${
             someSelected
               ? 'text-indigo-400 hover:text-indigo-300'
-              : `${styles.muted} hover:text-slate-400`
+              : `${styles.muted} hover:opacity-100 opacity-80`
           }`}
         >
           {allSelected
@@ -109,7 +110,7 @@ export default function AutoDiscoverPreview({
       <div className={`max-h-[360px] overflow-y-auto space-y-1.5 rounded-lg border ${styles.cardBorder} ${styles.appBg}`}>
         {candidates.map((cand) => {
           const isSelected = selectedNames.has(cand.resourceName);
-          const confColor = getConfidenceColor(cand.confidence);
+          const confColor = getConfidenceColor(cand.confidence, styles);
 
           return (
             <button
@@ -118,7 +119,7 @@ export default function AutoDiscoverPreview({
               className={`w-full text-left flex items-center gap-3 px-3 py-2.5 border-b ${styles.cardBorder}/50 last:border-b-0 transition ${
                 isSelected
                   ? 'bg-indigo-500/8'
-                  : `hover:${styles.cardBg}/[0.03]`
+                  : styles.sidebarHoverBg
               }`}
             >
               {/* 勾选框 */}
@@ -126,15 +127,15 @@ export default function AutoDiscoverPreview({
                 className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition ${
                   isSelected
                     ? 'bg-indigo-500 border-indigo-500'
-                    : `border-slate-600 bg-transparent`
+                    : `${styles.sidebarBorder} bg-transparent`
                 }`}
               >
                 {isSelected && <Check size={10} className="text-white" />}
               </div>
 
               {/* 图标 */}
-              <div className={`p-1.5 rounded shrink-0 ${isSelected ? 'bg-indigo-500/15' : 'bg-slate-500/10'}`}>
-                <Table size={14} className={isSelected ? 'text-indigo-400' : 'text-slate-500'} />
+              <div className={`p-1.5 rounded shrink-0 ${isSelected ? 'bg-indigo-500/15' : styles.appBg}`}>
+                <Table size={14} className={isSelected ? 'text-indigo-400' : styles.muted} />
               </div>
 
               {/* 信息 */}
@@ -143,7 +144,7 @@ export default function AutoDiscoverPreview({
                   <span className={`text-xs font-medium truncate ${styles.cardText}`}>
                     {cand.resourceName}
                   </span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-700/40 text-slate-500 shrink-0">
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${styles.appBg} ${styles.cardTextMuted} shrink-0`}>
                     {cand.resourceType}
                   </span>
                 </div>

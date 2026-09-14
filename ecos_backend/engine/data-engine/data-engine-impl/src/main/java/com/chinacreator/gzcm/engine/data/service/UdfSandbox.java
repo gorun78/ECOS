@@ -4,15 +4,21 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.util.Map;
 
-class UdfSandbox {
+/**
+ * UDF 沙箱：按 UDF 语言类型对源码做语法检查或真实执行（JS 真执行，Py/Java/SQL 语法校验）。
+ * <p>
+ * 架构铁律 P2-01 §8：执行器节点 TRANSFORM_UDF 统一走此沙箱，禁止各引擎自建脚本引擎。
+ * 可见性提升到 public 以支持 PipelineExecutionService 跨包调用。
+ */
+public class UdfSandbox {
 
-    static class SandboxOutput {
-        final boolean success;
-        final String output;
-        final String error;
-        final long elapsedMs;
+    public static class SandboxOutput {
+        public final boolean success;
+        public final String output;
+        public final String error;
+        public final long elapsedMs;
 
-        SandboxOutput(boolean success, String output, String error, long elapsedMs) {
+        public SandboxOutput(boolean success, String output, String error, long elapsedMs) {
             this.success = success;
             this.output = output;
             this.error = error;
@@ -20,7 +26,7 @@ class UdfSandbox {
         }
     }
 
-    static SandboxOutput execute(String language, String sourceCode, Map<String, Object> params) {
+    public static SandboxOutput execute(String language, String sourceCode, Map<String, Object> params) {
         long start = System.currentTimeMillis();
 
         if ("javascript".equalsIgnoreCase(language) || "js".equalsIgnoreCase(language)) {

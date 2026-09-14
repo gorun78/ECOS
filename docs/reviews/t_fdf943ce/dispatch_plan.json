@@ -1,0 +1,13 @@
+{
+  "task_id": "t_fdf943ce",
+  "project": "PMO-43 前端行为修复 Wave",
+  "artifact_path": "{\"type\":\"workspace\",\"path\":\"/home/guorongxiao/ECOS/ecos_frontend/src\"}",
+  "match_count": 3,
+  "route_valid": true,
+  "summary": "L3-修改（多文件 >50 行：EngineMonitor/MonitoringCenter/App/GuardrailsView+新组件 NetworkErrorBanner）→ CODE_REVIEW + ARCH_CONSISTENCY + SECURITY_AUDIT 并行：CODE_REVIEW=audited(employee-auth, node-panel-ring/module-map), ARCH_CONSISTENCY=per-form(twin/tab-status-channels), SECURITY_AUDIT=per-security-module(token-store/token-lifecycle/auth-state-machine)",
+  "pre_rejection_reason": null,
+  "created_at": "2026-09-07T15:46:00+08:00",
+  "created_at_ms": 1788740760000,
+  "expires_at_ms": 1788744360000,
+  "requires_delta_note": true
+}

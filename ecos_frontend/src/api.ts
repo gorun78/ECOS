@@ -18,6 +18,116 @@ import {
 
 const API_BASE = "/api";
 
+// ═══════════════════════════════════════════════
+//  PMO-43: Network error handling primitives
+// ═══════════════════════════════════════════════
+
+/** Thrown when a network-level failure occurs (backend down, offline, unreachable). */
+export class NetworkError extends Error {
+  constructor(message = "Network error: service unavailable", original?: unknown) {
+    super(message);
+    this.name = "NetworkError";
+    if (original instanceof Error) this.cause = original;
+  }
+}
+
+/**
+ * Wrap a promise chain so that network-level failures propagate visibly
+ * (instead of being swallowed by a Promise chain) while still notifying the
+ * global network-down UI. Business errors (thrown as Error with a message)
+ * re-throw as-is; the caller's own catch remains responsible.
+ */
+function wrapNet(p: Promise<unknown>): Promise<unknown> {
+  return p.then(
+    v => v,
+    (e: unknown) => {
+      const network = e instanceof NetworkError ||
+        e instanceof TypeError ||
+        (typeof navigator !== "undefined" && navigator.onLine === false);
+      if (network) void notifyNetworkDown(e);
+      if (network && !(e instanceof NetworkError)) throw new NetworkError(undefined, e);
+      throw e;
+    }
+  );
+}
+
+/** Check response status for auth failure — only 401 triggers logout, 403 is a permission issue */
+export function isErrorResponse(e: unknown): { message: string; kind: "network" | "http" | "unknown"; status?: number } {
+  if (e instanceof NetworkError) return { message: e.message, kind: "network" };
+  if (e instanceof TypeError) return { message: "网络错误：服务不可用", kind: "network" };
+  if (e instanceof Error) {
+    const status = typeof (e as { status?: unknown }).status === "number" ? (e as { status?: number }).status : undefined;
+    if (typeof status === "number") return { message: e.message, kind: "http", status };
+    return { message: e.message, kind: "unknown" };
+  }
+  return { message: String(e ?? "Unknown error"), kind: "unknown" };
+}
+
+/**
+ * Publish a `ecos-network-down` CustomEvent so global UI layers
+ * (NetworkErrorBanner) can react to backend/network failures.
+ */
+export async function notifyNetworkDown(e?: unknown): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const detail: Record<string, unknown> = { timestamp: Date.now() };
+    if (e && typeof e === "object") {
+      const record = e as { status?: number; message?: string };
+      if (record.status !== undefined) detail.status = record.status;
+      if (record.message) detail.message = record.message;
+      if (e instanceof NetworkError) detail.kind = "network";
+    }
+    window.dispatchEvent(new CustomEvent("ecos-network-down", { detail }));
+  } catch {
+    // SSR/runtime without window — ignore
+  }
+}
+
+/**
+ * Publish a `ecos-network-up` CustomEvent when a fetch succeeds after a
+ * previously reported network-down, so the banner can self-clear.
+ * Idempotent: only dispatches while a down state is tracked (best-effort
+ * module-level flag, no global state store).
+ */
+let lastNetworkDownAt = 0;
+
+export function markNetworkDown(at: number = Date.now()): void {
+  lastNetworkDownAt = at;
+}
+
+export function notifyNetworkUp(): void {
+  if (typeof window === "undefined") return;
+  if (lastNetworkDownAt === 0) return;
+  const elapsed = Date.now() - lastNetworkDownAt;
+  // Only announce recovery if we recently went down (avoids noisy events
+  // after a long quiet period where the banner has already self-dismissed).
+  if (elapsed > 5 * 60_000) return;
+  lastNetworkDownAt = 0;
+  try {
+    window.dispatchEvent(new CustomEvent("ecos-network-up", { detail: { timestamp: Date.now() } }));
+  } catch {
+    // SSR/runtime without window — ignore
+  }
+}
+
+/** Decode network failures from raw fetch → throw instead of swallow silently. */
+function toNetworkError(e: unknown, operation = "fetch"): NetworkError | Error {
+  if (e instanceof NetworkError) return e;
+  if (e instanceof TypeError) {
+    return new NetworkError(`Network error: ${operation} unreachable`);
+  }
+  if (e instanceof Error) return e;
+  return new Error(e instanceof Error ? e.message : String(e ?? "Unknown error"));
+}
+
+/** Safely convert an AbortError into a user-visible "Request cancelled" error. */
+function toAbortError(e: unknown): Error {
+  if (e instanceof DOMException && e.name === "AbortError") {
+    return new Error("Request cancelled");
+  }
+  return toNetworkError(e, "fetch");
+}
+
 // ── Internal fetch helpers ────────────────────────────────────
 
 /** Global token expiration handler — clears auth and redirects to login */
@@ -27,12 +137,64 @@ function handleAuthExpired(): never {
   localStorage.removeItem('roles');
   // Hash-based redirect avoids React Router race conditions
   window.location.hash = '#/login';
-  throw new Error('登录已过期，请重新登录');
+  throw new Error('Session expired. Please sign in again.');
 }
 
-/** Check response status for auth failure — only 401 triggers logout, 403 is a permission issue */
+/**
+ * Check response status for auth failure.
+ * 401 → token invalid: clear auth and redirect to login.
+ * 403 → token VALID but insufficient permission: never clear the token.
+ *      Notify the global UI (ecos-no-access) so the caller can surface the
+ *      NoAccess page/message — see PMO-44 T5.
+ */
 function checkAuthExpired(status: number): void {
   if (status === 401) handleAuthExpired();
+  if (status === 403) notifyNoAccess();
+}
+
+/** 403 marker attached to thrown errors for 403 responses */
+export const NO_ACCESS_ERROR_NAME = "NoAccessError";
+
+/**
+ * Thrown-like marker for 403 responses: token is valid but the resource is
+ * forbidden. The error carries `status: 403` and `name: NoAccessError` so
+ * UI layers can render a dedicated "no access" state (instead of logging
+ * the user out or showing a generic HTTP error).
+ */
+export class NoAccessError extends Error {
+  status = 403;
+  constructor(message = "You do not have permission to access this resource.") {
+    super(message);
+    this.name = NO_ACCESS_ERROR_NAME;
+  }
+}
+
+/** 403 notification event name */
+export const NO_ACCESS_EVENT = "ecos-no-access";
+
+/**
+ * Publish a `ecos-no-access` CustomEvent so global UI layers
+ * (e.g. the NoAccess page / a banner) can react to permission denials.
+ * The token must NOT be cleared — the user is authenticated, just
+ * unauthorized for this specific resource.
+ */
+export function notifyNoAccess(detail?: { path?: string; status?: number }): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(NO_ACCESS_EVENT, {
+      detail: { ...detail, timestamp: Date.now() },
+    }));
+  } catch {
+    // SSR/runtime without window — ignore
+  }
+}
+
+/**
+ * Detect whether an error thrown by apiFetch/apiFetchData/doFetch was a
+ * 403 permission denial (token still valid).
+ */
+export function isNoAccessError(e: unknown): e is NoAccessError {
+  return e instanceof NoAccessError;
 }
 
 /**
@@ -44,12 +206,21 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   const token = localStorage.getItem('token') || '';
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}${finalPath}`, {
-    headers,
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${finalPath}`, { headers, ...options });
+  } catch (e) {
+    markNetworkDown();
+    await notifyNetworkDown(e);
+    throw toNetworkError(e, `fetch ${path}`);
+  }
   if (res.status === 401) handleAuthExpired();
-  if (!res.ok) throw new Error(`API ${path} returned ${res.status}`);
+  if (res.status === 403) notifyNoAccess({ path });
+  if (!res.ok) {
+    if (res.status === 403) throw new NoAccessError(`API ${path} forbidden`);
+    throw new Error(`API ${path} returned ${res.status}`);
+  }
+  notifyNetworkUp();
   return res.json();
 }
 
@@ -62,36 +233,58 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
   const token = localStorage.getItem('token') || '';
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(url, {
-    headers,
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, { headers, ...options });
+  } catch (e) {
+    markNetworkDown();
+    await notifyNetworkDown(e);
+    throw toNetworkError(e, `fetch ${url}`);
+  }
   if (res.status === 401) handleAuthExpired();
+  if (res.status === 403) notifyNoAccess({ path: url });
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => '');
+    if (res.status === 403) throw new NoAccessError(text || `HTTP 403`);
     throw new Error(text || `HTTP ${res.status}`);
   }
   const json = await res.json();
   if (json.success === false) throw new Error(json.message || "Request failed");
   if (json.code && json.code !== 200 && json.code !== 0) throw new Error(json.message || `Error ${json.code}`);
+  notifyNetworkUp();
   return json.data !== undefined ? json.data : json;
 }
 
 /**
  * Simple doFetch – returns full JSON body from arbitrary URL.
  * Includes Authorization Bearer token from localStorage when available.
+ * Network failures are normalized to NetworkError + ecos-network-down event.
  */
 async function doFetch(url: string, opts: RequestInit = {}): Promise<any> {
   const token = localStorage.getItem('token') || '';
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  let r: Response;
   try {
-    const r = await fetch(url, { headers, ...opts });
-    if (r.status === 401) handleAuthExpired();
-    if (!r.ok) throw new Error(`${r.status}`);
-    const ct = r.headers.get('content-type');
-    return ct && ct.includes('application/json') ? await r.json() : null;
+    r = await fetch(url, { headers, ...opts });
   } catch (e) {
+    markNetworkDown();
+    await notifyNetworkDown(e);
+    throw toNetworkError(e, `fetch ${url}`);
+  }
+  try {
+    if (r.status === 401) handleAuthExpired();
+    if (r.status === 403) notifyNoAccess({ path: url });
+    if (!r.ok) {
+      if (r.status === 403) throw new NoAccessError(`HTTP 403 on ${url}`);
+      throw new Error(`${r.status}`);
+    }
+    const ct = r.headers.get('content-type');
+    const body = ct && ct.includes('application/json') ? await r.json() : null;
+    notifyNetworkUp();
+    return body;
+  } catch (e) {
+    // 401 redirects outside; business errors keep their message/pass-through.
     throw e;
   }
 }
@@ -141,6 +334,19 @@ export async function authLogin(body: LoginRequest): Promise<LoginResponse> {
 }
 
 // ── Datasets ────────────────────────────────────────────
+
+/**
+ * PMO-43 T1 — tag mock-fallback data with `error: 'MOCK'` so UI and tests can
+ * distinguish provable real backend data from placeholder enrichment rows.
+ * Each entry is shallow-copied (shallow is sufficient because the status items
+ * in the raw mock are primitives/leaf arrays; a shallow copy is O(1) per asset
+ * and avoids accidentally mutating the mock singletons).
+ */
+const MOCK_DATA_ASSETS_TAGGED: DataAsset[] = MOCK_DATA_ASSETS.map((a) => ({
+  ...a,
+  error: 'MOCK',
+}));
+
 export async function fetchDatasets(): Promise<DataAsset[]> {
   try {
     // Get first active datasource and its resources
@@ -148,12 +354,12 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
     const sources = dsResp?.data ?? [];
     if (!Array.isArray(sources) || sources.length === 0) {
       console.warn("fetchDatasets: no datasources registered, using mock");
-      return MOCK_DATA_ASSETS;
+      return MOCK_DATA_ASSETS_TAGGED;
     }
     const active = sources.find((s: any) => s.status === "ACTIVE");
     if (!active) {
       console.warn("fetchDatasets: no active datasource, using mock");
-      return MOCK_DATA_ASSETS;
+      return MOCK_DATA_ASSETS_TAGGED;
     }
     // Try to get resources from this datasource
     const resResp = await doFetch(`/api/v1/datanet/metadata/resources/${active.datasourceId}`);
@@ -161,7 +367,7 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
     const items = Array.isArray(resources) ? resources : [];
     if (items.length === 0) {
       console.warn("fetchDatasets: no resources collected, using mock");
-      return MOCK_DATA_ASSETS;
+      return MOCK_DATA_ASSETS_TAGGED;
     }
     return items.map((r: any, i: number) => ({
       id: r.tableName || r.name || `ds_${i}`,
@@ -184,7 +390,7 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
     })) as unknown as DataAsset[];
   } catch (e) {
     console.warn("fetchDatasets: backend unavailable, using mock", e);
-    return MOCK_DATA_ASSETS;
+    return MOCK_DATA_ASSETS_TAGGED;
   }
 }
 
@@ -237,8 +443,8 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
   }
   // Fallback: try mock data, then construct minimal asset
   const mockAsset = MOCK_DATA_ASSETS.find(a => a.id === id || a.name === id);
-  if (mockAsset) return mockAsset;
-  // Construct minimal asset so the page isn't blank
+  if (mockAsset) return { ...mockAsset, error: 'MOCK' };
+  // Construct minimal asset so the page isn't blank — tag it as a placeholder
   return {
     id,
     name: id,
@@ -257,6 +463,7 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
     qualityRules: [],
     history: [],
     permissions: { owner: ["data-team"], editor: [] as string[], viewer: [] as string[] },
+    error: 'MOCK',
   };
 }
 
@@ -266,7 +473,7 @@ export async function fetchOntology(): Promise<{
   instances: Record<string, EntityInstance[]>;
 }> {
   try {
-    const resp = await apiFetchData<{ data?: any[]; records?: any[] }>(`${ONT_BASE}/ont001/entities`);
+    const resp = await apiFetchData<{ data?: any[]; records?: any[] }>(`/api/v1/ecos/ontologies/ont001/entities`);
     const records = resp?.data || resp?.records || [];
 
     if (records.length > 0) {
@@ -347,6 +554,7 @@ function buildFallbackEntity(name: string, instances: EntityInstance[]): EntityD
 }
 
 // ── Agent Chat ──────────────────────────────────────────
+/** @deprecated legacy path `/agent/chat`; please use `/api/v1/agent/chat` via the primary entry `pages/aiworkbench/api`. 保留本函数仅为兼容 AgentTestConsole 等旧调用方。 */
 export async function agentChat(
   agentId: string, message: string, promptTemplate?: string, datasetContext?: any
 ): Promise<{
@@ -363,13 +571,16 @@ export async function agentChat(
     status?: "pending" | "approved" | "rejected";
   };
 }> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   return apiFetch("/agent/chat", {
     method: "POST",
     body: JSON.stringify({ agentId, message, promptTemplate, datasetContext }),
   });
 }
 
+/** @deprecated legacy path `/agent/agents`; please use `/api/v1/agent/agents` via the primary entry. 保留本函数仅为兼容 AgentBuilder 等旧调用方。 */
 export async function fetchAgents(): Promise<AgentDefinition[]> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   try {
     const resp = await apiFetch<{ success: boolean; data: any[] }>("/agent/agents");
     const raw = resp.data || [];
@@ -395,7 +606,9 @@ export async function fetchAgents(): Promise<AgentDefinition[]> {
   }
 }
 
+/** @deprecated legacy path `/agent/tools`; please use `/api/v1/agent/tools` via the primary entry. 保留本函数仅为兼容 AgentBuilder 等旧调用方。 */
 export async function fetchTools(): Promise<ToolDefinition[]> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   try {
     const resp = await apiFetch<{ success: boolean; data: ToolDefinition[] }>("/agent/tools");
     return resp.data || [];
@@ -404,7 +617,9 @@ export async function fetchTools(): Promise<ToolDefinition[]> {
   }
 }
 
+/** @deprecated legacy path `/agent/prompts`; please use `/api/v1/agent/prompts` via the primary entry. 保留本函数仅为兼容 AgentBuilder 等旧调用方。 */
 export async function fetchPrompts(): Promise<PromptTemplate[]> {
+  console.warn("legacy api, please use /api/v1/agent/*");
   try {
     const resp = await apiFetch<{ success: boolean; data: any[] }>("/agent/prompts");
     const raw = resp.data || [];
@@ -492,18 +707,21 @@ export async function fetchAuditLogs(
   page = 1,
   pageSize = 50
 ): Promise<{ data: AuditEvent[]; total: number; page: number; pageSize: number }> {
-  try {
     const params = new URLSearchParams();
     if (userId) params.set('userId', userId);
     if (action) params.set('action', action);
     if (resourceType) params.set('resourceType', resourceType);
     params.set('page', String(page));
     params.set('pageSize', String(pageSize));
-    return await apiFetchData(`/api/v1/audit/logs?${params.toString()}`);
-  } catch (e) {
-    console.warn("fetchAuditLogs: backend unavailable, returning empty", e);
-    return { data: [], total: 0, page, pageSize };
-  }
+    try {
+      return await apiFetchData(`/api/v1/audit/logs?${params.toString()}`);
+    } catch (e) {
+      // T1: catch must propagate — no silent empty return. Surface the
+      // outage to the global NetworkErrorBanner, then rethrow a typed
+      // NetworkError so the caller can render a real error state.
+      notifyNetworkDown(e);
+      throw toNetworkError(e, 'audit/logs');
+    }
 }
 
 // ── Audit Stats ───────────────────────────────────────────
@@ -552,18 +770,20 @@ export async function fetchCryptAuditLogs(
   page = 1,
   pageSize = 20
 ): Promise<CryptAuditLogPage> {
-  try {
     const params = new URLSearchParams();
     if (keyword) params.set("keyword", keyword);
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
-    return await apiFetchData<CryptAuditLogPage>(
-      `/v1/audit/crypto/logs?${params.toString()}`
-    );
-  } catch (e) {
-    console.warn("fetchCryptAuditLogs: backend unavailable", e);
-    return { data: [], total: 0, page, pageSize };
-  }
+    try {
+      return await apiFetchData<CryptAuditLogPage>(
+        `/v1/audit/crypto/logs?${params.toString()}`
+      );
+    } catch (e) {
+      // T1: same propagation rule as fetchAuditLogs — no silent empty
+      // return. Surface the outage then rethrow a typed NetworkError.
+      notifyNetworkDown(e);
+      throw toNetworkError(e, 'audit/crypto/logs');
+    }
 }
 
 export async function fetchCryptAuditVerify(): Promise<CryptAuditVerifyResult> {
@@ -1072,118 +1292,6 @@ export async function getExecution(executionId: string): Promise<PipelineExecuti
   return apiFetchData(`/api/v1/pipeline/executions/${executionId}`);
 }
 
-// ── Ontology Designer ─────────────────────────────────────────
-const ONT_BASE = "/api/v1/ecos/ontologies";
-
-export interface OntologyEntity {
-  id: string;
-  ontologyId: string;
-  code: string;
-  name: string;
-  description?: string;
-  entityType: string;
-  sortOrder?: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface OntologyProperty {
-  id: string;
-  entityId: string;
-  code: string;
-  name: string;
-  propertyType: string;
-  functionType?: string;
-  functionExpression?: string;
-  requiredFlag: number;
-  searchableFlag: number;
-  sortOrder?: number;
-}
-
-export interface OntologyRelationship {
-  id: string;
-  sourceEntityId: string;
-  targetEntityId: string;
-  code: string;
-  name: string;
-  relationshipType: string;
-}
-
-export async function fetchOntologyEntities(ontologyId = "ont001"): Promise<OntologyEntity[]> {
-  return apiFetchData(`${ONT_BASE}/${ontologyId}/entities`);
-}
-
-// ── ObjectExplorer entity list (dynamic from API) ──────────────
-export interface EntityListItem {
-  code: string;
-  name: string;
-  description?: string;
-  entityType?: string;
-}
-
-export async function fetchEntityList(): Promise<EntityListItem[]> {
-  return apiFetchData<EntityListItem[]>(`${ONT_BASE}/ont001/entities`);
-}
-
-export async function fetchEntityProperties(entityId: string): Promise<OntologyProperty[]> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/properties`);
-}
-
-export async function fetchOntologyRelationships(): Promise<OntologyRelationship[]> {
-  return apiFetchData(`${ONT_BASE}/relationships`);
-}
-
-export async function fetchEntityRelationships(entityId: string): Promise<OntologyRelationship[]> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/relationships`);
-}
-
-export async function createOntologyEntity(ontologyId: string, body: Partial<OntologyEntity>): Promise<OntologyEntity> {
-  return apiFetchData(`${ONT_BASE}/${ontologyId}/entities`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateOntologyEntity(ontologyId: string, entityId: string, body: Partial<OntologyEntity>): Promise<OntologyEntity> {
-  return apiFetchData(`${ONT_BASE}/${ontologyId}/entities/${entityId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteOntologyEntity(ontologyId: string, entityId: string): Promise<void> {
-  await apiFetchData(`${ONT_BASE}/${ontologyId}/entities/${entityId}`, { method: "DELETE" });
-}
-
-export async function createEntityProperty(entityId: string, body: Partial<OntologyProperty>): Promise<OntologyProperty> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/properties`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateEntityProperty(entityId: string, propId: string, body: Partial<OntologyProperty>): Promise<OntologyProperty> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/properties/${propId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteEntityProperty(entityId: string, propId: string): Promise<void> {
-  await apiFetchData(`${ONT_BASE}/entities/${entityId}/properties/${propId}`, { method: "DELETE" });
-}
-
-export async function createEntityRelationship(entityId: string, body: Partial<OntologyRelationship>): Promise<OntologyRelationship> {
-  return apiFetchData(`${ONT_BASE}/entities/${entityId}/relationships`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteEntityRelationship(entityId: string, relId: string): Promise<void> {
-  await apiFetchData(`${ONT_BASE}/entities/${entityId}/relationships/${relId}`, { method: "DELETE" });
-}
-
 // ── Data Quality Dashboard ────────────────────────────────────
 const DQ_BASE = "/api/v1/dq";
 
@@ -1454,10 +1562,29 @@ export async function fetchFields(resourceId: string): Promise<DataField[]> {
   return [];
 }
 
-/** GET /datanet/metadata/preview/{resourceId} — 预览数据行 */
-export async function fetchPreview(resourceId: string, limit = 50): Promise<{rows: Record<string,any>[], columns: number, rowCount: number}> {
+/** GET /datanet/metadata/preview/{resourceId} — 预览数据行 + 列元数据
+ *  后端返回: { rows: Record<string,any>[], columns: {name,label,type}[], rowCount: number } */
+export interface DataPreview {
+  rows: Record<string, any>[];
+  columns: { name: string; label?: string; type: string }[];
+  rowCount: number;
+}
+
+export async function fetchPreview(resourceId: string, limit = 50): Promise<DataPreview> {
   const resp = await doFetch(`${DATANET_META}/preview/${resourceId}?limit=${limit}`);
-  return resp?.data ?? { rows: [], columns: 0, rowCount: 0 };
+  const d = resp?.data;
+  if (!d) return { rows: [], columns: [], rowCount: 0 };
+  return {
+    rows: Array.isArray(d.rows) ? d.rows : [],
+    columns: Array.isArray(d.columns)
+      ? (d.columns as Record<string, unknown>[]).map(c => ({
+          name: (c.name as string) || (c.columnName as string) || '',
+          label: (c.label as string) || undefined,
+          type: (c.type as string) || (c.dataType as string) || '',
+        }))
+      : [],
+    rowCount: typeof d.rowCount === 'number' ? d.rowCount : 0,
+  };
 }
 
 // ── Monitoring Dashboard ───────────────────────────────
@@ -1638,17 +1765,6 @@ export async function globalSearch(
   type: string = 'all'
 ): Promise<SearchHit[]> {
   return apiFetchData<SearchHit[]>(`/api/v1/portal/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
-}
-
-// ── Ontology Actions Execution (Operational Apps) ────────────
-export async function executeOntologyAction(_body: {
-  actionId: string;
-  entityType: string;
-  instanceId: string;
-  operatorName: string;
-  fields: Record<string, any>;
-}): Promise<any> {
-  throw new Error('GSXK bridge removed — use /api/v1/ontology/actions instead');
 }
 
 // ── Goals / Causal / Scenarios (async with mock fallback) ─
@@ -2341,9 +2457,11 @@ export async function fetchBizDashboard(): Promise<any> {
 }
 
 // ── Goal Tracking ────────────────────────────────────────
+// NOTE: 裸路径 /api/dq/goal-tracking → DqDashboardController (datanet:18082, P3-A)
+//       不用 /api/v1/dq（DqGovernanceController 没有 goal-tracking 子路径）
 export async function fetchGoalTracking(goalId?: number): Promise<any> {
   const qs = goalId ? `?goalId=${goalId}` : '';
-  return apiFetchData(`/api/v1/dq/goal-tracking${qs}`);
+  return apiFetchData(`/api/dq/goal-tracking${qs}`);
 }
 
 // ── ECOS Knowledge Graph ─────────────────────────────────

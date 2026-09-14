@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
  */
 @Service
 @Profile("standard")
+@org.springframework.context.annotation.Primary
 public class PgGraphService implements IGraphService {
 
     private static final Logger log = LoggerFactory.getLogger(PgGraphService.class);

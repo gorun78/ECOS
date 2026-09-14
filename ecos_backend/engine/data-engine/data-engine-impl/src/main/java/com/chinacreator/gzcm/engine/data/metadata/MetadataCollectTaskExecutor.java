@@ -51,6 +51,7 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
     private final ConnectorFactory connectorFactory;
     private final MetadataRowCountService rowCountService;
     private final com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync;
+    private final MetadataCollectGitArchive gitArchive;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final Map<String, Boolean> cancelFlags = new ConcurrentHashMap<>();
@@ -59,11 +60,13 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
     public MetadataCollectTaskExecutor(DataSourceRepository dsRepository,
                                        ConnectorFactory connectorFactory,
                                        MetadataRowCountService rowCountService,
-                                       com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync) {
+                                       com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync,
+                                       MetadataCollectGitArchive gitArchive) {
         this.dsRepository = dsRepository;
         this.connectorFactory = connectorFactory;
         this.rowCountService = rowCountService;
         this.resourceSync = resourceSync;
+        this.gitArchive = gitArchive;
     }
 
     @Override
@@ -83,6 +86,11 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
         pauseFlags.remove(executionPlan.getTaskId());
 
         try {
+            // 步骤1：获取表清单（10% 预估，完成前上报 statusMessage）
+            if (statusCallback != null) {
+                statusCallback.onStepStart(executionPlan.getTaskId(), "listResources", "获取数据表清单");
+                statusCallback.onProgressUpdate(executionPlan.getTaskId(), 1, "正在通过连接器获取数据表清单...");
+            }
             final String dsId = datasourceId;
             DataSourceEntity ds = withRetry(() -> {
                 try {
@@ -120,9 +128,19 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                 throw new TaskExecutionException("Connector 返回空表清单");
             }
 
+            // 步骤1 完成：10% → 进入步骤2（90% 分配给逐表采集）
+            if (statusCallback != null) {
+                statusCallback.onStepComplete(executionPlan.getTaskId(), "listResources", "获取数据表清单", true,
+                        "成功获取 " + resources.size() + " 张表");
+                statusCallback.onProgressUpdate(executionPlan.getTaskId(), 10, "获取表清单完成，开始逐表采集元数据与行数");
+                statusCallback.onStepStart(executionPlan.getTaskId(), "collectTables", "逐表采集元数据");
+            }
+
             // 2) 逐表落库 + 行数统计
             int ok = 0;
             int failed = 0;
+            int processed = 0;
+            int total = resources.size();
             List<String> failedTables = new ArrayList<>();
 
             for (com.chinacreator.gzcm.common.data.model.DataResource r : resources) {
@@ -135,6 +153,7 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                         throw new TaskExecutionException("任务已取消");
                     }
                 }
+                String tableName = r.getResourceName() != null ? r.getResourceName() : "?";
                 try {
                     Long rowCnt = includeRowCount
                             ? rowCountService.countTable(ds.getConnectionConfig(),
@@ -145,9 +164,23 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                     ok++;
                 } catch (Exception e) {
                     failed++;
-                    failedTables.add(r.getResourceName());
-                    log.warn("表 {} 元数据采集失败: {}", r.getResourceName(), e.getMessage());
+                    failedTables.add(tableName);
+                    log.warn("表 {} 元数据采集失败: {}", tableName, e.getMessage());
                 }
+                processed++;
+                // 进度映射：10〜98%（逐表，留 2% 给归档 + 审计）
+                if (statusCallback != null) {
+                    int progress = 10 + (processed * 88) / Math.max(total, 1);
+                    int done = ok + failed;
+                    String msg = String.format("采集表 %d / %d（成功 %d / 失败 %d）— 当前: %s",
+                            done, total, ok, failed, tableName);
+                    statusCallback.onProgressUpdate(executionPlan.getTaskId(), progress, msg);
+                }
+            }
+            if (statusCallback != null) {
+                statusCallback.onStepComplete(executionPlan.getTaskId(), "collectTables", "逐表采集元数据", true,
+                        "Table collection done: ok=" + ok + " failed=" + failed);
+                statusCallback.onProgressUpdate(executionPlan.getTaskId(), 98, "归档到 Git 与声明审计");
             }
 
             // 3) 审计 + 采集时间
@@ -179,13 +212,27 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                 }
             }
 
+            // Git 存档 + 版本差异对比（失败不影响采集任务成功判定）
+            // 注意：必须先于 auditLog 执行 — result 携带 gitCommit/diffSummary 落库，
+            // 供 collect-diff 端点与历史版本比较的"提交说明"列使用（原先顺序反了导致 gitCommit 恒不落库）
+            try {
+                Map<String, Object> gitResult = gitArchive.archiveAndDiff(datasourceId, resources);
+                if (Boolean.TRUE.equals(gitResult.get("archived"))) {
+                    result.put("diffSummary", gitResult.get("diffSummary"));
+                    result.put("diffMarkdown", gitResult.get("diffMarkdown"));
+                    result.put("gitCommit", gitResult.get("commitMessage"));
+                }
+            } catch (Exception e) {
+                log.warn("Git 存档调用失败（不影响采集任务成功）: datasource={}, error={}", datasourceId, e.getMessage());
+            }
+
             try {
                 rowCountService.auditLog(datasourceId, countMethod, resources.size(), ok,
                         failed, String.join(",", failedTables), status,
                         mapper.writeValueAsString(result), executionPlan.getTaskId(), elapsed);
                 dsRepository.updateLastCollectTime(datasourceId);
             } catch (Exception e) {
-                log.warn("审计写入失败（不影响任务成功判定）: {}", e.getMessage());
+                log.warn("审计写入失败（不影响采集任务成功判定）: {}", e.getMessage());
             }
 
             log.info("METADATA_COLLECT 完成 datasource={} status={} tables={}/{} failed={} elapsed={}ms",

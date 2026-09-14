@@ -56,13 +56,13 @@ export default function SchemaTree({ datasourceId }: SchemaTreeProps) {
           {node.type === 'schema' && <Icon name="Folder" size={12} className="text-amber-400 shrink-0" />}
           {node.type === 'table' && <Icon name="Table" size={12} className="text-blue-400 shrink-0" />}
           {node.type === 'view' && <Icon name="Eye" size={12} className="text-purple-400 shrink-0" />}
-          {node.type === 'column' && <Icon name="Hash" size={10} className="text-slate-500 shrink-0" />}
-          <span className={`truncate ${isColumn ? 'text-slate-400' : styles.cardText}`}>{node.name}</span>
+          {node.type === 'column' && <Icon name="Hash" size={10} className={`${styles.cardTextMuted} shrink-0`} />}
+          <span className={`truncate ${isColumn ? styles.cardTextMuted : styles.cardText}`}>{node.name}</span>
           {isColumn && node.dataType && (
             <span className="text-[9px] text-cyan-500/70 ml-auto shrink-0">{node.dataType}</span>
           )}
           {hasChildren && (
-            <Icon name={isExpanded ? 'ChevronDown' : 'ChevronRight'} size={10} className="text-slate-500 ml-auto shrink-0" />
+            <Icon name={isExpanded ? 'ChevronDown' : 'ChevronRight'} size={10} className={`${styles.cardTextMuted} ml-auto shrink-0`} />
           )}
         </div>
         {hasChildren && isExpanded && node.children!.map((child, i) =>
@@ -74,17 +74,17 @@ export default function SchemaTree({ datasourceId }: SchemaTreeProps) {
 
   return (
     <div className={`w-56 border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-hidden`}>
-      <div className={`px-2.5 py-2 border-b ${styles.cardBorder} text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5`}>
+      <div className={`px-2.5 py-2 border-b ${styles.cardBorder} text-[10px] font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
         <Icon name="FolderTree" size={13} />
         Schema 浏览器
       </div>
       <div className="flex-1 overflow-y-auto px-1 py-1">
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-slate-500 text-[11px]">
+          <div className={`flex items-center justify-center py-8 ${styles.cardTextMuted} text-[11px]`}>
             <Icon name="Loader2" size={14} className="animate-spin mr-1.5" />加载中...
           </div>
         ) : tree.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-[10px]">
+          <div className={`text-center py-8 ${styles.cardTextMuted} text-[10px]`}>
             {datasourceId ? '无 Schema 数据' : '请先选择数据源'}
           </div>
         ) : (

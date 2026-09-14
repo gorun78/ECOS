@@ -11,9 +11,10 @@
 - `DiagnosisController` — `/api/v1/cognitive/diagnose` 业务诊断（含 ≥3 层因果链）。
 - `CognitivePipelineController` — `/api/v1/knowledge/reason` 混合推理编排（KG_QUERY / RULE_CHECK / VECTOR_RAG / HYBRID）。
 - `DecisionController` — 决策服务 API（含 `DecisionException` / `DecisionPolicy` / `DecisionPrecedent`）。
-- `ScenarioController` / `WorldModelController` / `ProvenanceController` / `Wave3DemoController` — 情景模拟/世界模型/Provenance/Wave 3 演示。
+- `ScenarioController` / `WorldModelController` / `ProvenanceController` / `Wave3DemoController` — 情景模拟（文档口径：**仿真情景**，代码类名仍为 `Scenario`*，见 PMO-50 决策 4）/世界模型/Provenance/Wave 3 演示。
+- `ForecastController` — `/api/v1/cognitive/forecast` 指标预测 + `/api/v1/cognitive/models` 模型注册表（PMO-51）。
 - `CognitiveEngineHealthController` — `/api/v1/engine/cognitive/*` 健康检查与统计。
-- service：`CausalReasonerService` / `ReasoningPathBuilder` / `RuleRefCollector` / `TraverseKgChain` / `PrecedentRecaller` / `EntityLinker` / `NewsFeedReader` / `NewsLetter` / `ScenarioSimulator`（合同体系）。
+- service：`CausalReasonerService` / `ReasoningPathBuilder` / `RuleRefCollector` / `TraverseKgChain` / `PrecedentRecaller` / `EntityLinker` / `NewsFeedReader` / `NewsLetter` / `ScenarioSimulator`（合同体系）/ `ForecastServiceImpl`（统计基线：移动均值 + 最小二乘线性外推 + KG 因子修正）/ `ModelRegistryService`（`ecos_cognitive_model` 注册表）。
 
 ## 调用链（只读 + 调谁）
 - → 同 engine api: 注入 `CausalReasonerService` / `DecisionService` / `ScenarioSimulatorService` / `WorldModelService` / `ParetoOptimizerService` / `EngineCapabilityRegistry` 等接口（来自 `cognitive-engine-api`）。
@@ -30,6 +31,8 @@
   - `/api/v1/rules/impact-analysis` — 影响分析。
   - `/api/v1/rules/audit-logs` — 合规审计日志。
   - `/api/v1/cognitive/*` — 认知推理通用端点（`DiagnosisController` / `ScenarioController` / `WorldModelController` / `ProvenanceController`）。
+  - `/api/v1/cognitive/forecast` — 指标预测（`ForecastController`，PMO-51）。
+  - `/api/v1/cognitive/models` — 认知模型注册表 GET/POST（`ForecastController`，PMO-51）。
   - `/api/v1/world-model/*` — 世界模型。
   - `/api/v1/engine/cognitive/*` — 引擎健康检查。
 - 因果链产出契约（`CausalReasonerService`）：
@@ -43,7 +46,7 @@ public CausalChainResult diagnose(DiagnosisRequest req) {
 
 ## 禁止
 - **不直接 import `kb-engine-impl` / `*-engine-impl**`**（顶层红线 #1，违反 = 验收失败）。
-- **不新增数据库表**（顶层红线 #2：推理结果实时计算，不持久化）。
+- **DB 落盘按 ADR-9 三档口径**（顶层红线 #2 修订，PMO-59 P0）：推理**结果**实时计算不落盘；模型**资产**注册落 `ecos_cognitive_model`（ADR-8，PMO-51）；认知**心智状态**（`ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`，DDL V127~V129，PMO-59 P0）落盘。impl 落盘实现（Mapper/Service/Controller）留待 Phase 2；Phase 1 仅契约（api 层 `IUncertaintyJudgementService`/`IHypothesisLifecycleService`）。
 - **不引入规则引擎**（顶层红线 #3：SpEL 表达式评估即可，不要引入 jBoss Drools / Easy Rules）。
 - 不直接 LLM 调用（LLM 走 `llm-gateway`）。
 - 不硬编码 token / BOD / metadata（cross-engine 凭据走 `RestTemplate` 注入的 `restTemplate` Bean，不在 Service 字面量）。

@@ -208,19 +208,22 @@ const DeleteConfirm: React.FC<{
   targetName: string;
   onConfirm: () => void;
   onCancel: () => void;
-}> = ({ targetName, onConfirm, onCancel }) => (
-  <div className="fixed inset-0 z-40 flex items-center justify-center">
-    <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-    <div className="relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 bg-[#141924] border border-[#1E293B]">
-      <h3 className="text-base font-bold mb-2 text-slate-100">确认删除</h3>
-      <p className="text-sm text-slate-400 mb-5">确定要删除租户「{targetName}」吗？此操作不可撤销。</p>
-      <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="px-4 py-1.5 rounded text-xs border border-[#1E293B] text-slate-300 hover:bg-white/5">取消</button>
-        <button onClick={onConfirm} className="px-4 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700">删除</button>
+}> = ({ targetName, onConfirm, onCancel }) => {
+  const { styles } = useTheme();
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div className="relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 bg-[#141924] border border-[#1E293B]">
+        <h3 className={`text-base font-bold mb-2 ${styles.cardText}`}>确认删除</h3>
+        <p className={`text-sm ${styles.cardTextMuted} mb-5`}>确定要删除租户「{targetName}」吗？此操作不可撤销。</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel} className={`px-4 py-1.5 rounded text-xs border border-[#1E293B] ${styles.cardTextMuted} hover:bg-white/5`}>取消</button>
+          <button onClick={onConfirm} className="px-4 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700">删除</button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Simple Bar Chart ───────────────────────────────────────────
 
@@ -239,7 +242,7 @@ function BarChart({
 
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center text-xs text-slate-500" style={{ height: h }}>
+      <div className={`flex items-center justify-center text-xs ${styles.cardTextMuted}`} style={{ height: h }}>
         <BarChart3 className="w-5 h-5 mr-2 opacity-40" />No data
       </div>
     );
@@ -822,7 +825,7 @@ export default function TenantManager() {
             {/* Table */}
             {loadingTenants ? (
               <div className="flex items-center gap-2 p-4">
-                <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+                <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
                 <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载中…" : "Loading…"}</span>
               </div>
             ) : tenants.length === 0 ? (
@@ -948,7 +951,7 @@ export default function TenantManager() {
               </div>
             ) : loadingQuotas ? (
               <div className="flex items-center gap-2 p-4">
-                <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+                <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
                 <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载配额…" : "Loading quotas…"}</span>
               </div>
             ) : quotas.length === 0 ? (
@@ -1054,7 +1057,7 @@ export default function TenantManager() {
               </div>
             ) : loadingUsage ? (
               <div className="flex items-center gap-2 p-4">
-                <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+                <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
                 <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载用量…" : "Loading usage…"}</span>
               </div>
             ) : Object.keys(usageChartGroups).length === 0 ? (
@@ -1123,7 +1126,7 @@ export default function TenantManager() {
               </div>
             ) : loadingInvoice ? (
               <div className="flex items-center gap-2 p-4">
-                <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+                <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
                 <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载账单…" : "Loading invoice…"}</span>
               </div>
             ) : !invoice ? (

@@ -9,7 +9,7 @@ export function renderWorkshopModals(vm: any) {
     <>
       {/* 4. MODAL: ADD WIDGET */}
       {showAddWidgetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
           <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-lg overflow-hidden flex flex-col`}>
             <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
               <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
@@ -49,7 +49,7 @@ export function renderWorkshopModals(vm: any) {
 
       {/* 5. MODAL: ADD VARIABLE */}
       {showAddVarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
           <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-sm overflow-hidden`}>
             <form onSubmit={handleAddVariable}>
               <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
@@ -136,7 +136,7 @@ export function renderWorkshopModals(vm: any) {
         const boundObject = activeApp ? activeApp.variables.find((v: any) => v.type === 'object')?.value : null;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
             <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-sm overflow-hidden`}>
               <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
                 <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
@@ -228,7 +228,7 @@ export function renderWorkshopModals(vm: any) {
                       });
                     }
                   }}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-md flex items-center gap-1 transition-colors"
+                  className="px-3.5 py-1.5 bg-[var(--card,#020617)] hover:bg-[var(--card,#0B1120)] text-white font-bold rounded-md flex items-center gap-1 transition-colors"
                 >
                   <Check size={11} />
                   <span>提交 Action 并修改</span>

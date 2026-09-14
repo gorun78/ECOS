@@ -12,6 +12,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyActionSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyActionResultVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyActionVO;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -42,6 +45,109 @@ public class OntologyActionService {
     }
 
     private String nextId() { return "act" + String.valueOf(ID_SEQ.incrementAndGet()); }
+
+    // ═══════════════ Strong-Typed Facades (T16-1, 2026-09-12) ═══════════════════
+    // 旧 Map 签名方法保留（外部调用方依赖）；新增 DTO/VO 签名供 6 Controller 使用。
+
+    public List<OntologyActionVO> listActionsByEntityVO(String entityId) {
+        return repository.findActionsByEntity(entityId).stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    public List<OntologyActionVO> listAllActionsVO() {
+        return repository.findAllActions().stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    public OntologyActionVO getActionVO(String actionId) {
+        return repository.findActionById(actionId).map(this::toVO).orElse(null);
+    }
+
+    public OntologyActionVO createAction(String entityId, OntologyActionSaveDTO dto) {
+        OntologyAction action = new OntologyAction();
+        String id = nextId();
+        action.setId(id);
+        action.setEntityId(entityId);
+        action.setCode(dto.getCode() != null ? dto.getCode() : "");
+        action.setName(dto.getName() != null ? dto.getName() : "");
+        action.setActionType(dto.getActionType() != null ? dto.getActionType() : "CUSTOM");
+        action.setDescription(dto.getDescription() != null ? dto.getDescription() : "");
+        action.setPreconditions(toJson(dto.getPreconditions()));
+        action.setEffects(toJson(dto.getEffects()));
+        action.setRuleJson(dto.getRuleJson() != null ? dto.getRuleJson() : "");
+        action.setStrategy(dto.getStrategy() != null ? dto.getStrategy() : "SYNC");
+        action.setStatus(dto.getStatus() != null ? dto.getStatus() : "ACTIVE");
+        repository.insertAction(action);
+        log.info("Ontology action created: {} [{}] for entity {}", id, action.getCode(), entityId);
+        return toVO(action);
+    }
+
+    public Optional<OntologyActionVO> updateAction(String actionId, OntologyActionSaveDTO dto) {
+        return repository.findActionById(actionId).map(existing -> {
+            repository.updateAction(actionId, dto.getCode(), dto.getName(), dto.getActionType(),
+                dto.getDescription(), toJson(dto.getPreconditions()), toJson(dto.getEffects()),
+                dto.getRuleJson(), dto.getStrategy(), dto.getStatus());
+            return repository.findActionById(actionId).map(this::toVO).orElse(null);
+        });
+    }
+
+    /** 强类型版 testAction（仅返 OntologyActionResultVO，executionSteps 保留 Map 嵌套结构）。 */
+    public OntologyActionResultVO testActionVO(String actionId) {
+        OntologyAction action = repository.findActionById(actionId)
+            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Action '" + actionId + "' not found"));
+        OntologyActionResultVO vo = new OntologyActionResultVO();
+        vo.setActionId(action.getId());
+        vo.setCode(action.getCode());
+        vo.setName(action.getName());
+        vo.setActionType(action.getActionType());
+        vo.setStrategy(action.getStrategy());
+        vo.setPreconditions(safeParseJson(action.getPreconditions()));
+        vo.setEffects(safeParseJson(action.getEffects()));
+        Map<String, Object> execSteps = new LinkedHashMap<>();
+        execSteps.put("1-permissionCheck", "PASSED — assuming 'SalesManager' role");
+        execSteps.put("2-preconditionCheck", "PASSED — all preconditions met");
+        execSteps.put("3-execution", action.getStrategy().equals("SYNC") ? "SYNC_EXECUTED" : "ASYNC_QUEUED");
+        execSteps.put("4-effects", "APPLIED");
+        execSteps.put("5-notify", "NOTIFIED roles: [CustomerOwner]");
+        vo.setExecutionSteps(execSteps);
+        vo.setTestResult("SUCCESS");
+        return vo;
+    }
+
+    /** 强类型版 executeAction。 */
+    public OntologyActionResultVO executeActionVO(String actionId, Map<String, Object> payload) {
+        OntologyAction action = repository.findActionById(actionId)
+            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Action '" + actionId + "' not found"));
+        OntologyActionResultVO vo = new OntologyActionResultVO();
+        vo.setActionId(action.getId());
+        vo.setCode(action.getCode());
+        vo.setName(action.getName());
+        vo.setActionType(action.getActionType());
+        vo.setStrategy(action.getStrategy());
+        vo.setStatus(action.getStatus());
+        vo.setPayload(payload);
+        vo.setExecuted(Boolean.TRUE);
+        vo.setMessage("Action executed (placeholder)");
+        log.info("Ontology action executed: {} [{}]", action.getId(), action.getCode());
+        return vo;
+    }
+
+    private OntologyActionVO toVO(OntologyAction a) {
+        OntologyActionVO vo = new OntologyActionVO();
+        vo.setId(a.getId());
+        vo.setEntityId(a.getEntityId());
+        vo.setCode(a.getCode());
+        vo.setName(a.getName());
+        vo.setActionType(a.getActionType());
+        vo.setDescription(a.getDescription());
+        vo.setPreconditions(safeParseJson(a.getPreconditions()));
+        vo.setEffects(safeParseJson(a.getEffects()));
+        vo.setRuleJson(a.getRuleJson());
+        vo.setValidationRules(safeParseJson(a.getRuleJson()));
+        vo.setStrategy(a.getStrategy());
+        vo.setStatus(a.getStatus());
+        vo.setCreatedAt(a.getCreatedAt() != null ? a.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(a.getUpdatedAt() != null ? a.getUpdatedAt().toString() : null);
+        return vo;
+    }
 
     // ═══════════════ Action CRUD ═══════════════════
 

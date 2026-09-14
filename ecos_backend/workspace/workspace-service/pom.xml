@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.chinacreator.gzcm</groupId>
+        <artifactId>workspace</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>workspace-service</artifactId>
+    <packaging>jar</packaging>
+    <name>ECOS Workspace Service</name>
+    <description>工作区场景层独立部署单元 (PMO-49 P2-6, 端口 18090) —
+        聚合 workspace-impl 所有场景 controller/service/workbook, 承担调用全部业务 service 的
+        综合应用场景。按方案 v1.4 workspace 是独立场景应用层, 放在顶层 workspace/ 目录,
+        不是 services/5 业务之一。</description>
+
+    <dependencies>
+        <!-- 主封装 — workspace 场景库 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>workspace-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- 运行时: spring web + actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- MyBatis + PG -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Kafka (workspace 事件) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <!-- sysman-impl: ontology-engine-impl 内 CognitiveConfigController 等注入 SysConfigService
+             具体类, workspace workspace-service 独立部署需 sysman impl 在 classpath -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- data-engine-impl: ontology-engine-impl 的 OntologyCopilotController
+             注入 ICopilotService (接口在 common.service), 实现 CopilotServiceImpl
+             在 engine.data.service.CopilotServiceImpl, 需 classpath 提供实现 bean -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>data-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <!-- ★ G4 断链（PMO-50 决策2）：workspace-impl 不再 library 依赖 ontology/buszhi，
+             独立部署 :18090 需真实 bean（FunctionEvaluator/ActionHookExecutor）
+             实现 common-api 接口，由本 boot 模块显式持有 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>ontology-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.chinacreator.gzcm.workspace.service.WorkspaceServiceApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
