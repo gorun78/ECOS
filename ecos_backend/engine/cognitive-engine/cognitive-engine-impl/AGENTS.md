@@ -33,6 +33,10 @@
   - `/api/v1/cognitive/*` — 认知推理通用端点（`DiagnosisController` / `ScenarioController` / `WorldModelController` / `ProvenanceController`）。
   - `/api/v1/cognitive/forecast` — 指标预测（`ForecastController`，PMO-51）。
   - `/api/v1/cognitive/models` — 认知模型注册表 GET/POST（`ForecastController`，PMO-51）。
+  - **PMO-59 P2a 心智层端点（ADR-9，新增，三滤波器：V1_REWRITE KEEP + SecurityConfig `/api/v1/cognitive/**` 已覆盖 + ClearanceInterceptor 已豁免）**：
+    - `GET/POST /api/v1/cognitive/evidence`、`GET /api/v1/cognitive/evidence/{id}` — 证据登记/列表/详情（`CognitiveEvidenceController`，V127；evidence_code 幂等 + 同事实多值自动冲突检测）。
+    - `GET/POST /api/v1/cognitive/hypotheses`、`GET /api/v1/cognitive/hypotheses/{id}`、`POST /api/v1/cognitive/hypotheses/{id}/invalidate` — 假设注册/列表/详情/人工失效（`CognitiveHypothesisController`，V128；P2a 仅状态切换+失效时间写，自动失效检测 P2b）。
+    - `GET/POST /api/v1/cognitive/beliefs`、`GET /api/v1/cognitive/beliefs/{id}` — 不确定性判断注册/列表（domain 必填）/详情（`CognitiveBeliefController`，V129；prob 和=1 Service 强校验，P2a）。
   - `/api/v1/world-model/*` — 世界模型。
   - `/api/v1/engine/cognitive/*` — 引擎健康检查。
 - 因果链产出契约（`CausalReasonerService`）：
@@ -46,7 +50,7 @@ public CausalChainResult diagnose(DiagnosisRequest req) {
 
 ## 禁止
 - **不直接 import `kb-engine-impl` / `*-engine-impl**`**（顶层红线 #1，违反 = 验收失败）。
-- **DB 落盘按 ADR-9 三档口径**（顶层红线 #2 修订，PMO-59 P0）：推理**结果**实时计算不落盘；模型**资产**注册落 `ecos_cognitive_model`（ADR-8，PMO-51）；认知**心智状态**（`ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`，DDL V127~V129，PMO-59 P0）落盘。impl 落盘实现（Mapper/Service/Controller）留待 Phase 2；Phase 1 仅契约（api 层 `IUncertaintyJudgementService`/`IHypothesisLifecycleService`）。
+- **DB 落盘按 ADR-9 三档口径**（顶层红线 #2 修订，PMO-59 P0）：推理**结果**实时计算不落盘；模型**资产**注册落 `ecos_cognitive_model`（ADR-8，PMO-51）；认知**心智状态**（`ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`，DDL V127~V129，PMO-59 P0）落盘。Phase 1 契约（api 层 `IUncertaintyJudgementService`/`IHypothesisLifecycleService`）；**P2a 落盘实现已交付（2026-09-14）**：Store 层（`EvidenceStore`/`HypothesisStore`/`BeliefStore`，JdbcTemplate 显式列名跟齐 `ModelRegistryService` 既有风格，0 `SELECT *`、全 `is_deleted=0` 过滤）+ Service（`CognitiveEvidenceService`/`CognitiveHypothesisService`/`CognitiveBeliefService`，强类型 DTO、prob 和=1 强校验、写操作发 Kafka `ecos.audit`）+ Controller（evidence/hypotheses/beliefs 三组，`ApiResponse` 统一返回体）。P2b 待接入：Kafka `ecos.cognitive` 事件 + runtime-task 定时补算 + 失效自动检测 + 贝叶斯更新/人工覆写端点。
 - **不引入规则引擎**（顶层红线 #3：SpEL 表达式评估即可，不要引入 jBoss Drools / Easy Rules）。
 - 不直接 LLM 调用（LLM 走 `llm-gateway`）。
 - 不硬编码 token / BOD / metadata（cross-engine 凭据走 `RestTemplate` 注入的 `restTemplate` Bean，不在 Service 字面量）。

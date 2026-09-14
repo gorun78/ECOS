@@ -103,8 +103,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // E3-T2: gateway PgObjectStorageService是stub, workspace版是权威(@Profile("standard")), 删gateway副本避免Bean名冲突
         com.chinacreator.gzcm.gateway.service.PgObjectStorageService.class,
         // 2026-09-12: gateway.controller.AlertController 已删除 (源码 stub) — 保留 workspace 版本作为唯一 AlertController
-        // gateway.controller.EngineTaskController 保留（权威 ITaskManagementService）, exclude workspace stub engineTaskController
-        com.chinacreator.gzcm.workspace.controller.EngineTaskController.class,
+        // workspace.controller.EngineTaskController 类已随 merge feature/knowledge-pmo-50 从代码库删除
+        // (2026-09-14 PMO-59-P2a 核对: 原 exclude 条目引用不存在的类致 gateway 编译失败, 移除该死引用;
+        //  该类 Bean 本就缺失, 移除 exclude 0 行为变化 — workspace.controller 整包已由上方 REGEX 排除覆盖)
         // E3: sysman-boot GlobalExceptionHandler与gateway版本冲突,排除sysman-boot副本
         com.chinacreator.gzcm.sysman.boot.handler.GlobalExceptionHandler.class,
         // E3: 排除SysManApplication——它有自己的@ComponentScan会注册冲突bean

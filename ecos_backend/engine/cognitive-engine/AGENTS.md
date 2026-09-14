@@ -20,9 +20,17 @@
 | /api/v1/cognitive/forecast | POST | 指标预测（PMO-51） |
 | /api/v1/cognitive/models | GET/POST | 认知模型注册表（PMO-51） |
 | /api/v1/cognitive/* | * | 认知推理通用端点 |
+| /api/v1/cognitive/evidence | GET/POST | 心智层证据 列表/登记（PMO-59 P2a，ADR-9） |
+| /api/v1/cognitive/evidence/{id} | GET | 心智层证据详情（PMO-59 P2a） |
+| /api/v1/cognitive/hypotheses | GET/POST | 心智层假设 列表/注册（PMO-59 P2a） |
+| /api/v1/cognitive/hypotheses/{id} | GET | 心智层假设详情（PMO-59 P2a） |
+| /api/v1/cognitive/hypotheses/{id}/invalidate | POST | 假设人工失效（P2a；自动失效检测 P2b） |
+| /api/v1/cognitive/beliefs | GET/POST | 不确定性判断 列表（domain 必填）/注册（prob 和=1 强校验，PMO-59 P2a） |
+| /api/v1/cognitive/beliefs/{id} | GET | 不确定性判断详情（PMO-59 P2a） |
 | /api/v1/world-model/* | * | 世界模型 |
 
 > 心智层契约（PMO-59 P0）：`cognitive-engine-api` 已登记 `IUncertaintyJudgementService` / `IHypothesisLifecycleService` 两接口（仅契约无实现，端点留待 Phase 2 开放，届时按上表模式登记 `/api/v1/cognitive/...` 具体路径）。
+> **P2a 端点已开放（2026-09-14，ADR-9 正式落盘）**：上表 7 行心智层端点即 Phase 2 第一单交付物；`beliefs/{variable}/update-by-evidence`（贝叶斯更新）与 `beliefs/{variable}/override`（人工覆写）P2b 落（api-contract §3.4 已预登记）。
 
 ## 我的数据库表（ADR-9 三档落盘口径，PMO-59 P0）
 - 复用 kb-engine 的合规规则表（compliance_rules，只读）
