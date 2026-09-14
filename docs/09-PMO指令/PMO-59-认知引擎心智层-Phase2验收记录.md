@@ -195,7 +195,7 @@ version 4 | t | cog_ev_0f861da4-aab   ← P2b 人工覆写（is_manual_override=
 |:--:|:--|------|
 | P2a（前单，复核） | `365e99f` | `feat(认知引擎): PMO-59-P2a 心智层三表持久化与端点 (ADR-9 落盘+铁律同步)` |
 | P2b-1 | `a1ac61d` | `feat(认知引擎): PMO-59-P2b 心智层事件与失效检测 (ecos.cognitive 强类型事件 + runtime-task 补算 + 3规则假设失效检测 + 贝叶斯更新/人工覆写 + 双EventBus互斥runtime补强)`（15 files, +1104/-15） |
-| P2b-2 | 本提交的 hash | `docs(认知引擎): PMO-59-P2b api-contract §3.4 回填实际登记 + Phase2 验收记录` |
+| P2b-2 | `6b23a76` | `docs(认知引擎): PMO-59-P2b api-contract 3.4 回填实际登记 + Phase2 验收记录`（2 files, +234/-3） |
 
 分支：`feature/cognitive-mentalevidence-p0`
 溯源命令：`git log --grep "PMO-59" --oneline`
