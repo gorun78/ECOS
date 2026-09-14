@@ -37,6 +37,9 @@
     - `GET/POST /api/v1/cognitive/evidence`、`GET /api/v1/cognitive/evidence/{id}` — 证据登记/列表/详情（`CognitiveEvidenceController`，V127；evidence_code 幂等 + 同事实多值自动冲突检测）。
     - `GET/POST /api/v1/cognitive/hypotheses`、`GET /api/v1/cognitive/hypotheses/{id}`、`POST /api/v1/cognitive/hypotheses/{id}/invalidate` — 假设注册/列表/详情/人工失效（`CognitiveHypothesisController`，V128；P2a 仅状态切换+失效时间写，自动失效检测 P2b）。
     - `GET/POST /api/v1/cognitive/beliefs`、`GET /api/v1/cognitive/beliefs/{id}` — 不确定性判断注册/列表（domain 必填）/详情（`CognitiveBeliefController`，V129；prob 和=1 Service 强校验，P2a）。
+    - `POST /api/v1/cognitive/beliefs/{variable}/update-by-evidence`、`POST /api/v1/cognitive/beliefs/{variable}/override` — 贝叶斯更新/人工覆写（`CognitiveBeliefController`，P2b）。
+  - **PMO-59 P3a 反事实推演端点（ADR-9 推演核心，三滤波器同上零新增登记）**：
+    - `POST /api/v1/cognitive/counterfactual` — do(A) 干预式反事实推演（`CounterfactualController` + `CounterfactualSimulator`：belief 分布装配 + 干预 SET/DELTA + 蒙特卡洛 N≤5000 配对采样 + 风险四指标 expectedBenefit/maxDrawdown/lossProbability/volatilityRange + 敏感性 Top3 + 假设有效性过滤留痕；纯 Java 数值 0 LLM；seed 可传入保证复现；审计发 `ecos.audit`）。
   - `/api/v1/world-model/*` — 世界模型。
   - `/api/v1/engine/cognitive/*` — 引擎健康检查。
 - 因果链产出契约（`CausalReasonerService`）：
