@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     OAG E2E 冒烟测试脚本 — 验证 gateway :8080 的 /api/v1/oag/* 转发到 aiming :18084 路由通畅
 .DESCRIPTION
@@ -82,52 +82,28 @@ function Get-HttpCode {
 
 function Read-SseFrames {
     param([string]$Url, [string]$DataFile, [int]$MaxFrames = 8, [int]$Sec = $Timeout)
-    # 通过 HttpWebRequest POST + 网络流按行读 SSE 帧（同源 Get-HttpCode，零外部依赖）
+    # curl.exe --no-buffer + --max-time 让 chunked SSE 立即 flush 拿 N 帧
     $frames = @()
-    $deadline = (Get-Date).AddSeconds($Sec)
+    $tmpResp = Join-Path $env:TEMP ("oag-sse-" + [guid]::NewGuid().ToString('N') + ".txt")
     try {
-        $req = [System.Net.HttpWebRequest]::Create($Url)
-        $req.Method = 'POST'
-        $req.ContentType = 'application/json'
-        $req.UserAgent = 'oag-e2e-smoke/1.0'
-        $req.Timeout = $Sec * 1000
-        $req.ReadWriteTimeout = $Sec * 1000
-        $req.Accept = 'text/event-stream'
-        # 注: HttpWebRequest 默认不自动 read 全部 body, 不消耗 connection
-        $req.AllowWriteStreamBuffering = $true  # 流式发出 body
-        $bodyBytes = if ($DataFile -and (Test-Path $DataFile)) {
-            [System.IO.File]::ReadAllBytes($DataFile)
-        } else { @(0) }
-        $req.ContentLength = $bodyBytes.Length
-        $reqStream = $req.GetRequestStream()
-        if ($bodyBytes.Length -gt 0) { $reqStream.Write($bodyBytes, 0, $bodyBytes.Length) }
-        $reqStream.Close()
-        $resp = $req.GetResponse()
-        if ([string]$resp.StatusCode -ne '200') {
-            $resp.Close()
-            return @()
-        }
-        # 读.GetResponse body stream, 行按行解析
-        $bodyStream = $resp.GetResponseStream()
-        $reader = New-Object System.IO.StreamReader $bodyStream, [System.Text.Encoding]::UTF8
-        while ($frames.Count -lt $MaxFrames) {
-            if ((Get-Date) -gt $deadline) { break }
-            $line = $reader.ReadLine()
-            if ($null -eq $line) { break }  # EOF
+        if (-not (Test-Path $DataFile)) { return $frames }
+        & curl.exe -s --no-buffer --max-time $Sec -X POST $Url `
+            -H "Content-Type: application/json" `
+            -H "Accept: text/event-stream" `
+            --data-binary "@$DataFile" `
+            -o $tmpResp 2>$null | Out-Null
+        $raw = (Get-Content $tmpResp -Raw -ErrorAction SilentlyContinue -Encoding UTF8) -replace "`r`n", "`n"
+        if (-not $raw) { return $frames }
+        foreach ($line in ($raw -split "`n")) {
             if ($line -match '^event:\s*(\S+)') {
                 $frames += @{ kind = 'event'; text = $Matches[1] }
             } elseif ($line -match '^data:\s*(.{0,120})') {
                 $frames += @{ kind = 'data';  text = $Matches[1] }
             }
-            # 其他控制帧 (id/retry/空行) 跳过
+            if ($frames.Count -ge $MaxFrames) { break }
         }
-        $reader.Close()
-        $resp.Close()
-    } catch [System.Net.WebException] {
-        # 4xx/5xx 无 SSE 帧, 返回空数组（与网关侧 HTTP code 无 SSE 等价）
-        return @()
-    } catch {
-        Write-Verbose "SSE 读取异常: $($_.Exception.Message)"
+    } finally {
+        if (Test-Path $tmpResp) { Remove-Item $tmpResp -Force -ErrorAction SilentlyContinue }
     }
     return $frames
 }
@@ -150,12 +126,13 @@ Write-Result '0' '/api/health (gateway 自检)' $code0 $sw.ElapsedMilliseconds $
 $results.Add(@{ Id = 0; Name = '/api/health (gateway)'; Http = $code0; Verdict = $verdict })
 $sw.Stop()
 
-# [1] aiming /api/v1/oag/health 直连
+# [1] aiming /api/v1/oag/chat/health 直连
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$code1 = Get-HttpCode -Url "$AIMING/api/v1/oag/health" -Method 'GET'
-$verdict = if ($code1 -eq '200') { 'PASS' } else { 'FAIL' }
-Write-Result '1' 'GET /api/v1/oag/health (aiming 直连)' $code1 $sw.ElapsedMilliseconds $verdict
-$results.Add(@{ Id = 1; Name = 'GET /oag/health (aiming)'; Http = $code1; Verdict = $verdict })
+$code1 = Get-HttpCode -Url "$AIMING/api/v1/oag/chat/health" -Method 'GET'
+$sw.Stop()
+$verdict = if ($code1 -eq 200) { 'PASS' } else { 'FAIL' }
+Write-Result '1' 'GET /api/v1/oag/chat/health (aiming 直连)' $code1 $sw.ElapsedMilliseconds $verdict
+$results.Add(@{ Id = 1; Name = 'GET /oag/chat/health (aiming)'; Http = $code1; Verdict = $verdict })
 $sw.Stop()
 
 # 任一前置未起 → 退出 2
@@ -172,20 +149,21 @@ $guid   = [guid]::NewGuid().ToString('N').Substring(0, 12)
 $tmpV2  = Join-Path $env:TEMP "oag-e2e-v2-$guid.json"
 $tmpV1  = Join-Path $env:TEMP "oag-e2e-v1-$guid.json"
 try {
-    # 写入含 UTF-8 BOM 的中文 JSON（与后端 Jackson 中文原样传输对齐）
-    $bodyV2 = '{"message":"你好，请简短自我介绍","userId":"smoke_test","tenantId":"default"}'
+    # 写入 UTF-8 无 BOM 的 JSON（避免 BOM 让后端 Jackson 解析 400）；ASCII 表达是为了与 [4] echo 同字段
+    $bodyV2 = '{"message":"hello e2e smoke test v2","userId":"smoke_test","tenantId":"default"}'
     $bodyV1 = '{"message":"hi","userId":"smoke_test","tenantId":"default"}'
-    [System.IO.File]::WriteAllText($tmpV2, $bodyV2, (New-Object System.Text.UTF8Encoding($true)))
-    [System.IO.File]::WriteAllText($tmpV1, $bodyV1, (New-Object System.Text.UTF8Encoding($true)))
+    [System.IO.File]::WriteAllText($tmpV2, $bodyV2, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($tmpV1, $bodyV1, (New-Object System.Text.UTF8Encoding($false)))
 
     Write-Host " [OAG] gateway 路由可达性（4 项）" -ForegroundColor Yellow
 
-    # [2] POST /api/v1/oag/health (gateway 转发 — 简易健康转发)
+    # [2] GET /api/v1/oag/chat/health (gateway 转发 — 健康转发, OagController 自身是 GET 端点)
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $code = Get-HttpCode -Url "$GATEWAY/api/v1/oag/health" -Method 'POST'
-    $verdict = if ($code -eq '200' -or $code -eq '201') { 'PASS' } else { 'FAIL' }
-    Write-Result '2' 'POST /api/v1/oag/health (gateway 转发)' $code $sw.ElapsedMilliseconds $verdict
-    $results.Add(@{ Id = 2; Name = 'POST /oag/health (gateway)'; Http = $code; Verdict = $verdict })
+    $code = Get-HttpCode -Url "$GATEWAY/api/v1/oag/chat/health" -Method 'GET'
+    $sw.Stop()
+    $verdict = if ($code -eq 200) { 'PASS' } else { 'FAIL' }
+    Write-Result '2' 'GET /api/v1/oag/chat/health (gateway 转发)' $code $sw.ElapsedMilliseconds $verdict
+    $results.Add(@{ Id = 2; Name = 'GET /oag/chat/health (gateway)'; Http = $code; Verdict = $verdict })
     $sw.Stop()
 
     # [3] POST /api/v1/oag/chat/v2 (gateway — 强类型 DTO 兼容)

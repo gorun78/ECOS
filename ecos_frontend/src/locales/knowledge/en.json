@@ -69,6 +69,8 @@
   "extractReview.complete.title": "Processing Complete",
   "extractReview.complete.subtitle": "The extraction result has been submitted. Return to upload or review other tasks.",
   "extractReview.noData": "No data",
+  "extractReview.promoteToCandidate": "Promote to Candidates ({n})",
+  "extractReview.promoteToCandidateSuccess": "{n} candidate ontologies submitted",
   "kb.common.close": "Close",
   "kb.index.chunkConfig": "Chunking Config",
   "kb.index.syncBtn": "Build Vector Index",

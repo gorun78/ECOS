@@ -50,6 +50,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.git\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.datapermission\\..*"),
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.compliance\\..*"),
+    // 2026-09-12: gateway 与 workspace 同名 Bean 模块级排除 — gateway 是 authority (ITaskManagementService / alerts 等),
+    // workspace 包中所有 controller stub 与 gateway 同名冲突 (alertController/engineTaskController/taskController/...)
+    // 完整排除 workspace.controller 包 (workspace 端独立 :18090 已扫, gateway 无需重复)
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.workspace\\.controller\\..*"),
+    // workspace.twin.* 同样与 gateway.twin.* 同名冲突 (digitalTwinService 等) — workspace 端独立运行, 整包排除
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.workspace\\.twin\\..*"),
+    // workspace.service.* 中的 PgObjectStorageService 已在 ASSIGNABLE_TYPE 排除, 这里不重复
+    // 如需追加更宽的包级排除 (workspace 端业务 service), 在此追加
     // A+5: runtime.core.config.dao.ConfigDao 源码已删（sysman版本保留，无冲突）
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
@@ -94,6 +102,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         //   - worldmodel services: OntologyKgSync/PgGraph/Neo4jGraph (迁到 ontology-engine)
         // E3-T2: gateway PgObjectStorageService是stub, workspace版是权威(@Profile("standard")), 删gateway副本避免Bean名冲突
         com.chinacreator.gzcm.gateway.service.PgObjectStorageService.class,
+        // 2026-09-12: gateway.controller.AlertController 已删除 (源码 stub) — 保留 workspace 版本作为唯一 AlertController
+        // gateway.controller.EngineTaskController 保留（权威 ITaskManagementService）, exclude workspace stub engineTaskController
+        com.chinacreator.gzcm.workspace.controller.EngineTaskController.class,
         // E3: sysman-boot GlobalExceptionHandler与gateway版本冲突,排除sysman-boot副本
         com.chinacreator.gzcm.sysman.boot.handler.GlobalExceptionHandler.class,
         // E3: 排除SysManApplication——它有自己的@ComponentScan会注册冲突bean

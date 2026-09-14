@@ -1,22 +1,34 @@
 package com.chinacreator.gzcm.engine.kb.repo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
- * RAG 查询向量 helper — PMO-50 T1。
+ * 查询文本 → 真实向量嵌入辅助类（PMO-50 T1）。
  *
- * <p>通过 llm-gateway REST {@code /api/v1/llm/embedding} 拉取 query 真实向量，
- * 替代此前 {@code KnowledgeEmbeddingMapper#searchByVector(String queryText, int topK)}
- * 的"queryText::vector"字符串强转（必失败）bug。
+ * <p>统一走 runtime llm-gateway 网关 POST {@code {baseUrl}/embedding}
+ * （铁律 2.5 #2：kb-engine 自身不持有 provider key，所有 LLM/embedding 调用
+ * 经 llm-gateway 出口；baseUrl 指向 gateway :8080 反重写表路由，
+ * 不直连 18084 内网端口，遵循 ADR-7）。
  *
- * <p>支持三种 OpenAI / DeepSeek / Gemini 兼容响应结构（兼容 llm-gateway 三种 provider）。
- * 失败时返回 {@code null}，让上层回退 ILIKE 关键词搜索（PMO 优雅降级）。
+ * <p>返回 PG vector 文本字面量 {@code [v1,v2,...]}，供
+ * {@code KnowledgeEmbeddingMapper#searchByVector} 直接绑定 {@code ::vector} 强转。
+ * 调用失败返回 {@code null}，由调用方走 ILIKE 关键词回退。
  */
 @Component
 public class QueryEmbeddingHelper {
@@ -24,139 +36,138 @@ public class QueryEmbeddingHelper {
     private static final Logger log = LoggerFactory.getLogger(QueryEmbeddingHelper.class);
 
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public QueryEmbeddingHelper(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
     /**
-     * 获取 query 文本的 embedding 字面量（含括号）。
+     * 把查询文本 embed 成 PG vector 字面量字符串。
      *
-     * @param query   用户查询文本
-     * @param model   embedding 模型名（如 text-embedding-3-small）
-     * @param baseUrl llm-gateway base（空字符串=不可用，直接返回 null）
-     * @return 形如 "[v1,v2,...]" 字面量；失败/不可用时返回 null
+     * @param queryText 查询原文（trim 后处理）
+     * @param modelId   embedding 模型标识（可空，沿 gateway 默认 profile）
+     * @param baseUrl   llm-gateway 入口（如 {@code http://localhost:8080/api/v1/llm}）
+     * @return {@code [a,b,c...]} 字面量；任何失败返回 {@code null}
      */
-    public String embed(String query, String model, String baseUrl) {
-        if (query == null || query.isBlank()) {
+    public String embed(String queryText, String modelId, String baseUrl) {
+        if (queryText == null || queryText.isBlank() || baseUrl == null || baseUrl.isBlank()) {
+            log.debug("QueryEmbedding: skip — query or baseUrl missing");
             return null;
         }
-        if (baseUrl == null || baseUrl.isBlank()) {
-            log.debug("QueryEmbeddingHelper: llm-gateway-base is blank — skip, fallback ILIKE");
-            return null;
-        }
-        String url = baseUrl.endsWith("/")
-                ? baseUrl + "api/v1/llm/embedding"
-                : baseUrl + "/api/v1/llm/embedding";
+        String url = baseUrl.endsWith("/") ? baseUrl + "embedding" : baseUrl + "/embedding";
         try {
-            Map<String, Object> body = Map.of(
-                    "input", query,
-                    "model", model == null || model.isBlank() ? "text-embedding-3-small" : model
-            );
-            @SuppressWarnings("unchecked")
-            Map<String, Object> resp = restTemplate.postForObject(url, body, Map.class);
-            if (resp == null) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("input", queryText.trim());
+            if (modelId != null && !modelId.isBlank()) {
+                body.put("model", modelId);
+            }
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn("QueryEmbedding: llm-gateway returned non-2xx: {}", response.getStatusCode());
                 return null;
             }
-            float[] vec = parseVector(resp);
-            if (vec == null || vec.length == 0) {
-                log.warn("QueryEmbeddingHelper: empty vector from llm-gateway");
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            List<Double> values = extractVector(root);
+            if (values == null || values.isEmpty()) {
+                log.warn("QueryEmbedding: llm-gateway response missing vector field");
                 return null;
             }
-            return toLiteral(vec);
+            return formatVectorLiteral(values);
         } catch (Exception e) {
-            log.warn("QueryEmbeddingHelper: embedding call failed (fallback to ILIKE): {}", e.getMessage());
+            log.warn("QueryEmbedding: llm-gateway call failed — fallback to ILIKE. url={}, error={}",
+                    url, e.getMessage());
             return null;
         }
     }
 
     /**
-     * 解析三种响应结构（OpenAI / DeepSeek / Gemini）：
-     * - OpenAI: {"data":[{"embedding":[...]}],"model":...,"usage":{...}}
-     * - DeepSeek: 同 OpenAI
-     * - Gemini: {"candidates":[{"content":{"parts":[{"text":"[v1,v2,...]"}]}}]}
+     * 解析多种 provider 响应结构，提取真实向量数组。
+     *
+     * <ol>
+     *   <li>{@code { data: [ { embedding: [...] } ] }}（OpenAI 风格）</li>
+     *   <li>{@code { data: [ [...] ] }}（扁平数组）</li>
+     *   <li>{@code { data: { embedding: [...] } }}</li>
+     *   <li>{@code { response: { embeddings:[ { values: [...] } ] } }}（Gemini 风格）</li>
+     *   <li>{@code { response: { embedding: [...] } }}</li>
+     *   <li>{@code { embedding: [...] }} / {@code { values: [...] }}</li>
+     * </ol>
      */
-    private float[] parseVector(Map<String, Object> resp) {
-        // OpenAI / DeepSeek: data[0].embedding
-        try {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> data = (List<Map<String, Object>>) resp.get("data");
-            if (data != null && !data.isEmpty()) {
-                @SuppressWarnings("unchecked")
-                List<Object> emb = (List<Object>) data.get(0).get("embedding");
-                return toVec(emb);
-            }
-        } catch (Exception ignored) {
-            // fallthrough
+    private List<Double> extractVector(JsonNode root) {
+        if (root == null || root.isNull()) {
+            return null;
         }
-        // Gemini: candidates[0].content.parts[0].text = "[v1,v2,...]"
-        try {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> candidates = (List<Map<String, Object>>) resp.get("candidates");
-            if (candidates != null && !candidates.isEmpty()) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                if (content != null) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                    if (parts != null && !parts.isEmpty()) {
-                        Object text = parts.get(0).get("text");
-                        if (text instanceof String s) {
-                            return parseLiteral(s);
-                        }
-                    }
-                }
+        JsonNode dataNode = root.path("data");
+        if (dataNode.isArray() && dataNode.size() > 0) {
+            JsonNode first = dataNode.get(0);
+            if (first.isObject() && first.path("embedding").isArray()) {
+                return readNumbers(first.path("embedding"));
             }
-        } catch (Exception ignored) {
-            // fallthrough
+            if (first.isArray()) {
+                return readNumbers(first);
+            }
+        }
+        if (dataNode.isObject() && dataNode.path("embedding").isArray()) {
+            return readNumbers(dataNode.path("embedding"));
+        }
+        JsonNode response = root.path("response");
+        if (response.isObject()) {
+            JsonNode embeddings = response.path("embeddings");
+            if (embeddings.isArray() && embeddings.size() > 0
+                    && embeddings.get(0).isObject()
+                    && embeddings.get(0).path("values").isArray()) {
+                return readNumbers(embeddings.get(0).path("values"));
+            }
+            if (response.path("embedding").isArray()) {
+                return readNumbers(response.path("embedding"));
+            }
+        }
+        if (root.path("embedding").isArray()) {
+            return readNumbers(root.path("embedding"));
+        }
+        if (root.path("values").isArray()) {
+            return readNumbers(root.path("values"));
+        }
+        if (root.isArray()) {
+            return readNumbers(root);
         }
         return null;
     }
 
-    private float[] toVec(List<Object> values) {
-        if (values == null || values.isEmpty()) return null;
-        float[] out = new float[values.size()];
-        for (int i = 0; i < values.size(); i++) {
-            Object v = values.get(i);
-            if (v instanceof Number n) {
-                out[i] = n.floatValue();
-            } else {
-                try {
-                    out[i] = Float.parseFloat(String.valueOf(v));
-                } catch (Exception e) {
-                    return null;
-                }
-            }
+    /**
+     * 数值 JsonNode 数组 → double 列表。
+     */
+    private List<Double> readNumbers(JsonNode array) {
+        List<Double> out = new ArrayList<>();
+        if (array == null || !array.isArray()) {
+            return out;
         }
-        return out;
-    }
-
-    private float[] parseLiteral(String literal) {
-        if (literal == null || literal.isBlank()) return null;
-        String s = literal.trim();
-        if (s.startsWith("[")) s = s.substring(1);
-        if (s.endsWith("]")) s = s.substring(0, s.length() - 1);
-        String[] parts = s.split(",");
-        float[] out = new float[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            try {
-                out[i] = Float.parseFloat(parts[i].trim());
-            } catch (Exception e) {
-                return null;
+        for (int i = 0; i < array.size(); i++) {
+            JsonNode item = array.get(i);
+            if (item != null && item.isNumber()) {
+                out.add(item.asDouble());
             }
         }
         return out;
     }
 
     /**
-     * 形如 [0.1,0.2,0.3]（含括号），适配 MyBatis {@code e.embedding <=> #{v}::vector}。
+     * double 列表 → PG vector 字面量（{@code [a,b,c]}）。
      */
-    private String toLiteral(float[] vec) {
-        StringBuilder sb = new StringBuilder(vec.length * 8);
+    static String formatVectorLiteral(List<Double> values) {
+        StringBuilder sb = new StringBuilder(values.size() * 12 + 2);
         sb.append('[');
-        for (int i = 0; i < vec.length; i++) {
-            if (i > 0) sb.append(',');
-            sb.append(vec[i]);
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(String.format(Locale.US, "%.6f", values.get(i)));
         }
         sb.append(']');
         return sb.toString();
