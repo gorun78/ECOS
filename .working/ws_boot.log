@@ -1,0 +1,68 @@
+﻿
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.2)
+
+2026-09-14T15:18:38.500+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.w.s.WorkspaceServiceApplication    : Starting WorkspaceServiceApplication using Java 17.0.10 with PID 82056 (D:\workspace\javaprojects\ECOS\ecos_backend\workspace\workspace-service\target\workspace-service-1.0.0-SNAPSHOT.jar started by guoro in C:\Users\guoro\Documents)
+2026-09-14T15:18:38.514+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.w.s.WorkspaceServiceApplication    : No active profile set, falling back to 1 default profile: "default"
+2026-09-14T15:18:45.370+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.370+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.370+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.370+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.370+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.371+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.371+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.371+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.371+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.m.s.mapper.ClassPathMapperScanner      : Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-09-14T15:18:45.419+08:00  WARN 82056 --- [ecos-workspace-service] [           main] o.s.c.a.ConfigurationClassPostProcessor  : Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-09-14T15:18:50.699+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18090 (http)
+2026-09-14T15:18:50.864+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-14T15:18:50.866+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-09-14T15:18:51.437+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-14T15:18:51.446+08:00  INFO 82056 --- [ecos-workspace-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 12547 ms
+2026-09-14T15:18:52.999+08:00  WARN 82056 --- [ecos-workspace-service] [           main] c.c.g.sysman.security.JwtTokenProvider   : jwt.private-key 未配置，生成临时 RSA 密钥对（仅限开发环境，重启后 token 失效）
+2026-09-14T15:18:54.599+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.sysman.security.JwtTokenProvider   : JwtTokenProvider initialized with RS256 keys
+2026-09-14T15:18:57.199+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.neo4j.driver.internal.DriverFactory    : Direct driver instance 1474657733 created for server address localhost:7687
+2026-09-14T15:18:57.229+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.w.service.ObjectKgSyncService      : ObjectKgSyncService init: 使用 runtime-access 统一 Driver
+2026-09-14T15:18:57.252+08:00  INFO 82056 --- [ecos-workspace-service] [           main] com.zaxxer.hikari.HikariDataSource       : WorkspaceHikariCP - Starting...
+2026-09-14T15:18:58.389+08:00  INFO 82056 --- [ecos-workspace-service] [           main] com.zaxxer.hikari.pool.HikariPool        : WorkspaceHikariCP - Added connection org.postgresql.jdbc.PgConnection@55665086
+2026-09-14T15:18:58.394+08:00  INFO 82056 --- [ecos-workspace-service] [           main] com.zaxxer.hikari.HikariDataSource       : WorkspaceHikariCP - Start completed.
+2026-09-14T15:18:58.567+08:00  WARN 82056 --- [ecos-workspace-service] [           main] c.c.g.w.controller.ObjectController      : Failed to load entities from ecos_ontology_entity: StatementCallback; bad SQL grammar [SELECT entity_code, table_name FROM ecos_ontology_entity WHERE status = 'published']. Falling back to demo tables.
+2026-09-14T15:18:58.567+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.w.controller.ObjectController      : Using demo entity tables as fallback
+2026-09-14T15:18:59.409+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.gzcm.workspace.workbook.RRuntime     : R runtime probe failed: Cannot run program "which": CreateProcess error=2, 系统找不到指定的文件。. Install with: sudo apt install r-base
+2026-09-14T15:19:00.015+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.r.l.c.LLMGatewayAutoConfiguration  : Hermes Engine auto-configuration initialized: enabled=true, defaultProvider=openrouter, defaultModel=deepseek/deepseek-chat
+2026-09-14T15:19:00.409+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.r.l.c.LLMGatewayAutoConfiguration  : Hermes OkHttpClient created: timeout=PT1M, retryMaxAttempts=3
+2026-09-14T15:19:03.330+08:00  WARN 82056 --- [ecos-workspace-service] [           main] c.c.g.r.e.MemoryEventBusServiceImpl      : [EventBus][MEMORY] fallback mode — Kafka 未启用 (ecs.event.kafka.enabled != true), 仅同 JVM 内存分发
+2026-09-14T15:19:03.904+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.s.c.service.impl.SysConfigService  : 缓存刷新完成，当前 142 条配置
+2026-09-14T15:19:03.906+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.s.c.service.impl.SysConfigService  : SysConfigService 初始化完成，已加载 142 条配置
+2026-09-14T15:19:04.038+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.e.o.c.OntologyConfigController     : Ontology engine defaults loaded (12 items)
+2026-09-14T15:19:04.895+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.e.ontology.OntologyEngineImpl      : Ontology engine started (was STOPPED)
+2026-09-14T15:19:04.896+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.e.ontology.OntologyEngineImpl      : Ontology engine auto-started on boot
+2026-09-14T15:19:05.045+08:00  WARN 82056 --- [ecos-workspace-service] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'ontologyGraphController' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/workspace/workspace-service/target/workspace-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/ontology-engine-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/engine/ontology/controller/OntologyGraphController.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.chinacreator.gzcm.common.service.IGraphService' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+2026-09-14T15:19:05.051+08:00  INFO 82056 --- [ecos-workspace-service] [           main] c.c.g.w.service.ObjectKgSyncService      : ObjectKgSyncService close: Neo4j Driver 由 runtime-access 管理, 不在此处 close
+2026-09-14T15:19:05.052+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.neo4j.driver.internal.InternalDriver   : Closing driver instance 1474657733
+2026-09-14T15:19:05.340+08:00  INFO 82056 --- [ecos-workspace-service] [           main] com.zaxxer.hikari.HikariDataSource       : WorkspaceHikariCP - Shutdown initiated...
+2026-09-14T15:19:05.360+08:00  INFO 82056 --- [ecos-workspace-service] [           main] com.zaxxer.hikari.HikariDataSource       : WorkspaceHikariCP - Shutdown completed.
+2026-09-14T15:19:05.391+08:00  INFO 82056 --- [ecos-workspace-service] [           main] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-09-14T15:19:05.480+08:00  INFO 82056 --- [ecos-workspace-service] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-14T15:19:05.719+08:00 ERROR 82056 --- [ecos-workspace-service] [           main] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in com.chinacreator.gzcm.engine.ontology.controller.OntologyGraphController required a bean of type 'com.chinacreator.gzcm.common.service.IGraphService' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'com.chinacreator.gzcm.common.service.IGraphService' in your configuration.
+

@@ -77,9 +77,7 @@ public class BeliefStore {
         return max == null ? 0 : max;
     }
 
-    /**
-     * 当前生效版本（最新版本）；domain 必填（变量在跨 domain 下重名时不可靠单查）。
-     */
+    /** 当前生效版本（最新版本）；domain 必填（变量在跨 domain 下重名时不可靠单查）。 */
     public Map<String, Object> findLatest(String variableName, String domain) {
         try {
             return jdbc.queryForMap(
@@ -87,6 +85,22 @@ public class BeliefStore {
                 "WHERE variable_name = ? AND domain = ? AND is_deleted = 0 " +
                 "ORDER BY version DESC LIMIT 1",
                 variableName, domain);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 指定版本查询（时间回放只读取数——V129 唯一索引 variable+domain+version 精确命中）。
+     *
+     * @return 版本行；无记录返回 null（由 Service 转 404）
+     */
+    public Map<String, Object> findIfExists(String variableName, String domain, int version) {
+        try {
+            return jdbc.queryForMap(
+                "SELECT " + BELIEF_COLUMNS + " FROM ecos_cognitive_belief " +
+                "WHERE variable_name = ? AND domain = ? AND version = ? AND is_deleted = 0",
+                variableName, domain, version);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }

@@ -5,7 +5,9 @@ import com.chinacreator.gzcm.common.cognitive.BeliefDistributionVO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefEvidenceUpdateDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefOverrideDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefSaveDTO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.counterfactual.CounterfactualResult;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveBeliefService;
+import com.chinacreator.gzcm.engine.cognitive2.service.mental.BeliefReplayService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,9 +40,13 @@ import java.util.List;
 public class CognitiveBeliefController {
 
     private final CognitiveBeliefService beliefService;
+    /** P3b: 时间回放（只读重算端点） */
+    private final BeliefReplayService beliefReplayService;
 
-    public CognitiveBeliefController(CognitiveBeliefService beliefService) {
+    public CognitiveBeliefController(CognitiveBeliefService beliefService,
+                                     BeliefReplayService beliefReplayService) {
         this.beliefService = beliefService;
+        this.beliefReplayService = beliefReplayService;
     }
 
     /** 列表 — domain 必填（缺省 400）；variableName 可选过滤同变量多版本。 */
@@ -93,5 +99,28 @@ public class CognitiveBeliefController {
             @PathVariable String variable,
             @RequestBody BeliefOverrideDTO dto) {
         return ApiResponse.success(beliefService.override(variable, dto));
+    }
+
+    /**
+     * P3b — 时间回放（GET 只读端点）：按指定历史版本 + 关联假设"当时有效"状态重算推演。
+     *
+     * <p>query 参数：domain（必填）/ sampleCount、seed（可选，缺省 1000/42，与实时推演同口径）/
+     * interventions、outcomeValues、weights（可选 JSON 串，同参同 seed 同结论可复现）。
+     * 返回四指标 + replayMeta（replayedVersion/believedDistribution/versionUpdatedAt/currentVersion）；
+     * 全程 0 写库（回放只读重算，V129 snapshot_version 语义启用点）。</p>
+     */
+    @GetMapping("/{variable}/{version}/replay")
+    public ApiResponse<CounterfactualResult> replay(
+            @PathVariable String variable,
+            @PathVariable int version,
+            @RequestParam String domain,
+            @RequestParam(required = false) String interventions,
+            @RequestParam(required = false) String outcomeValues,
+            @RequestParam(required = false) String weights,
+            @RequestParam(required = false) Integer sampleCount,
+            @RequestParam(required = false) Long seed) {
+        return ApiResponse.success(
+            beliefReplayService.replay(variable, version, domain, interventions, outcomeValues,
+                weights, sampleCount, seed));
     }
 }

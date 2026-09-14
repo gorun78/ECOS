@@ -59,6 +59,9 @@ public class CounterfactualResult {
     /** 占位指标摘要（按主变量口径的一句话数值描述，纯模板生成，零 LLM）。 */
     private String scenarioSummary;
 
+    /** 时间回放元信息（P3b 回放端点回填；非回放为 null）。 */
+    private ReplayMeta replayMeta;
+
     /** 请求回显。 */
     @Data
     public static class RequestEcho {
@@ -123,6 +126,38 @@ public class CounterfactualResult {
             this.hypothesisId = hypothesisId;
             this.status = status;
             this.invalidReason = invalidReason;
+        }
+    }
+
+    /** 时间回放元信息（P3b：指定历史版本只读重算凭证）。 */
+    @Data
+    public static class ReplayMeta {
+        /** 回放的 belief 历史版本号 */
+        private int replayedVersion;
+        /** 回放版本分布快照（[{outcome, prob}]，原文搬运只读） */
+        private List<ReplayDistPoint> believedDistribution;
+        /** 回放基准时刻（该版本行的 update_time，ISO 字符串） */
+        private String versionUpdatedAt;
+        /** 当时有效假设数（invalid_at 晚于回放基准时刻且 VALID 的假设数） */
+        private int assumptionsValidAtReplayTime;
+        /** 当前最新版本号（对比基准：同参当前重算入口） */
+        private int currentVersion;
+    }
+
+    /** 回放分布点（outcome + prob）。 */
+    @Data
+    public static class ReplayDistPoint {
+        /** 离散取值 */
+        private String outcome;
+        /** 概率 0~1 */
+        private double prob;
+
+        public ReplayDistPoint() {
+        }
+
+        public ReplayDistPoint(String outcome, double prob) {
+            this.outcome = outcome;
+            this.prob = prob;
         }
     }
 }

@@ -113,6 +113,33 @@ public class MentalEventPublisher {
         publish(payload);
     }
 
+    /**
+     * 推演结论作废事件（PMO-59 P3b 新增）— 假设失效联动作废引用它的未决 run。
+     *
+     * @param triggeredByEventId 触发作废的失效事件 id（cog_evt_ 前缀，溯源链）
+     * @param hypothesisId       失效假设主键
+     * @param hypothesisCode     业务唯一键
+     * @param supersededRuns     本次联动作废的 run 数
+     * @param autoDetected       失效是否自动检测触发
+     */
+    public void publishRunSuperseded(String triggeredByEventId, String hypothesisId,
+                                     String hypothesisCode, int supersededRuns, boolean autoDetected) {
+        Map<String, Object> payload = envelope("COGNITIVE_RUN_SUPERSEDED");
+        payload.put("triggeredByEventId", triggeredByEventId);
+        payload.put("hypothesisId", hypothesisId);
+        payload.put("hypothesisCode", hypothesisCode);
+        payload.put("supersededRuns", supersededRuns);
+        Map<String, Object> faultContext = new LinkedHashMap<>();
+        faultContext.put("phase", "run-supersede");
+        faultContext.put("triggeredByEventId", triggeredByEventId);
+        faultContext.put("hypothesisId", hypothesisId);
+        faultContext.put("supersededRuns", supersededRuns);
+        faultContext.put("autoDetected", autoDetected);
+        faultContext.put("reviewTag", REVIEW_TAG);
+        payload.put("faultContext", faultContext);
+        publish(payload);
+    }
+
     private Map<String, Object> envelope(String eventType) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("eventType", eventType);

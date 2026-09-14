@@ -85,6 +85,60 @@ public class CounterfactualSimulator {
      * @return 四指标 + 敏感性 Top3 + 假设前提留痕
      */
     public CounterfactualResult simulate(CounterfactualRequest request) {
+        return core(request, Map.of(), null);
+    }
+
+    /**
+     * 时间回放（P3b）：主变量绑定到指定历史版本行（其余变量取最新版本），
+     * asOf 取该版本行 update_time 作为"当时"基准——假设按当时有效状态过滤
+     * （invalid_at 晚于 asOf 或从未失效 = 当时有效）。全程只读重算，0 写库
+     * （V129 snapshot 版本字段语义启用点，禁用改历史数据）。
+     *
+     * @param request  推演请求（variableName/domain 必填，与目标版本行匹配）
+     * @param variable 回放变量名
+     * @param version  回放版本号
+     * @param currentVersion 当前最新版本号（对比基准回显）
+     * @return 四指标 + replayMeta 元信息
+     */
+    public CounterfactualResult replay(CounterfactualRequest request, String variable,
+                                       int version, int currentVersion) {
+        String domain = require(request.getDomain(), "domain");
+        Map<String, Object> row = beliefStore.findIfExists(variable, domain, version);
+        if (row == null) {
+            throw new BusinessException(404,
+                "COG-404: 不确定性判断版本不存在: variable=" + variable + ", domain=" + domain
+                    + ", version=" + version);
+        }
+        LocalDateTime asOf = evidenceStore.fieldTime(row, "update_time");
+        CounterfactualResult result = core(request, Map.of(variable, row), asOf);
+        // replayMeta 回填（版本快照只读搬运）
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> dist = (List<Map<String, Object>>) beliefStore
+            .toNormalizedRow(row, evidenceStore).get("distribution");
+        CounterfactualResult.ReplayMeta meta = new CounterfactualResult.ReplayMeta();
+        meta.setReplayedVersion(version);
+        List<CounterfactualResult.ReplayDistPoint> points = new ArrayList<>(dist.size());
+        for (Map<String, Object> p : dist) {
+            points.add(new CounterfactualResult.ReplayDistPoint(
+                String.valueOf(p.get("outcome")), p.get("prob") instanceof Number num ? num.doubleValue() : 0d));
+        }
+        meta.setBelievedDistribution(points);
+        meta.setVersionUpdatedAt(asOf == null ? null : asOf.toString());
+        meta.setAssumptionsValidAtReplayTime(result.getAssumptionRefs().size());
+        meta.setCurrentVersion(currentVersion);
+        result.setReplayMeta(meta);
+        return result;
+    }
+
+    /**
+     * 推演核心（simulate / replay 共用）：行覆盖（replay 用）+ asOf 假设时点过滤。
+     *
+     * @param rowOverrides 主变量历史行覆盖（空=全部取最新版本）
+     * @param asOf         假设有效性时点（null=当前；非 null=按当时有效状态过滤）
+     */
+    private CounterfactualResult core(CounterfactualRequest request,
+                                      Map<String, Map<String, Object>> rowOverrides,
+                                      LocalDateTime asOf) {
         if (request == null) {
             throw new BusinessException(400, "COG-400: 请求体必填");
         }
@@ -116,11 +170,12 @@ public class CounterfactualSimulator {
             }
         }
 
-        // 每个输入变量的分布 + outcome→数值映射（基线值）
+        // 每个输入变量的分布 + outcome→数值映射（基线值；rowOverrides 命中时取历史版本行——replay 语义）
         List<List<DistinctOutcome>> outcomeSets = new ArrayList<>(variables.size());
         List<Map<String, Double>> baseValueMaps = new ArrayList<>(variables.size());
         for (String v : variables) {
-            Map<String, Object> row = beliefStore.findLatest(v, domain);
+            Map<String, Object> overrideRow = rowOverrides.get(v);
+            Map<String, Object> row = overrideRow != null ? overrideRow : beliefStore.findLatest(v, domain);
             if (row == null) {
                 throw new BusinessException(404, "COG-404: 不确定性判断不存在: variable=" + v + ", domain=" + domain);
             }
@@ -188,15 +243,21 @@ public class CounterfactualSimulator {
         items.sort((a, b) -> Double.compare(b.getSensitivity(), a.getSensitivity()));
         result.getSensitivityTop3().addAll(items.subList(0, Math.min(3, items.size())));
 
-        // ── 5. 假设前提留痕（有效性过滤） ──
+        // ── 5. 假设前提留痕（有效性过滤；asOf 非 null 时按"当时有效"口径回放——
+        //    invalid_at 晚于 asOf 或从未失效的 VALID 假设视为当时有效） ──
         for (Map<String, Object> row : hypothesisStore.list(domain, null)) {
             String status = evidenceStore.fieldString(row, "status");
             String id = evidenceStore.fieldString(row, "id");
-            if ("VALID".equals(status)) {
+            LocalDateTime invalidAt = evidenceStore.fieldTime(row, "invalid_at");
+            boolean validNow = "VALID".equals(status);
+            boolean validAtAsOf = validNow
+                && (asOf == null || invalidAt == null || invalidAt.isAfter(asOf));
+            if (validAtAsOf) {
                 result.getAssumptionRefs().add(id);
             } else {
                 result.getExcludedAssumptions().add(new CounterfactualResult.ExcludedAssumption(
-                    id, status, evidenceStore.fieldString(row, "invalid_reason")));
+                    id, validNow ? "LATER_INVALIDATED" : status,
+                    evidenceStore.fieldString(row, "invalid_reason")));
             }
         }
 

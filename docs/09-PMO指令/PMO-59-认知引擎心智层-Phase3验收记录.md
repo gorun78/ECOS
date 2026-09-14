@@ -120,4 +120,141 @@ cf-c（domain=supply-chain, supplier_default_prob 无干预 N=200）：
 
 > P3a 验收 PASS 确认：① reviewer 独立审查 PASS ② 全量编译绿（§2）③ 压测达标（§3.5）④ 复现性验证（§3.1）→ 硬门禁通过，P3b 启动。
 
-（P3b 交付明细在收口时补全本段：T1 replay / T2 失效订阅 / T3 SAFEGUARD / T4 mental-reviews / T5 收口文档 + 压测与 curl/psql 原文 + 向后兼容回归证据）
+## P3b-1. 交付物清单（P3b T1~T5）
+
+| Task | 交付文件 | 状态 |
+|:--|------|:--:|
+| T1 | `CognitiveBeliefController` 增 `GET /api/v1/cognitive/beliefs/{variable}/{version}/replay` + `BeliefStore.findIfExists(variable,domain,version)`（显式列名 + `version=? AND is_deleted=0`，404 转 null）+ `CounterfactualSimulator.replay()`（行覆盖 + asOf 假设时点过滤，复用 core 内核 0 复制逻辑）+ `BeliefReplayService`（GET query JSON 串参数解析）+ `CounterfactualResult` 增 `ReplayMeta`/`ReplayDistPoint` | ✅ |
+| T2 | `CognitiveInvalidationConsumer`（cognitive 模块首个 `@KafkaListener`，topic=ecos.cognitive，groupId=**dccheng-cognitive-group**；String 入参 + 类型白名单 `COGNITIVE_HYPOTHESIS_INVALIDATED` + 异常吞掉 WARN 不堵分区，ref: kb-engine `EcosOntologyEventConsumer` 先例）+ `V130__ecos_cognitive_run_invalidation.sql`（事件↔run 留痕表 + `uniq_ecos_cog_run_inv_evt_run` 幂等键 + 3 索引）+ `MentalEventPublisher.publishRunSuperseded`（COGNITIVE_RUN_SUPERSEDED + faultContext.reviewTag） | ✅ |
+| T3 | `ScenarioRunService` `ALLOWED_RUN_TYPES` 只增 `SAFEGUARD`（400 校验含新类型）+ `buildCounterfactualPayload`（counterfactualDomain 缺省 aviation / Variable / Interventions / OutcomeValues / SampleCount / Seed 六可选键）+ `DcchengClient.counterfactual`（**原始 JSON 通道**，见 P3b-6 缺陷修复） | ✅ |
+| T4 | `MentalReviewController` `GET /api/v1/cognitive/mental-reviews?tag=&since=` + `MentalReviewService.aggregate`（**复盘口径定稿=三表版本链 + V130 impact 重建**——Kafka 事件未落 PG 全仓无 consumer 镜像表，指令允许二选一；tag 白名单与 `MentalEventPublisher.REVIEW_TAG` 同源，非法 tag 400；全显式列名 0 `SELECT *`） | ✅ |
+| T5 | `api-contract.md` §3.4 P3b 登记（replay/mental-reviews 端点 + CognitiveInvalidationConsumer 消费方 + workspace SAFEGUARD 契约）+ 本段落 + `cognitive-engine-impl/AGENTS.md` 端点清单 | ✅ |
+
+## P3b-2. V2 集成点 grep（编译前逻辑校验）
+
+| 检项 | 结论 |
+|------|------|
+| 三滤波器 | `/api/v1/cognitive/**` 既有通配覆盖零新增登记（P3a 核对沿用）；workspace `:18090` 独立入口（gateway excludeFilters 排除 `workspace.controller.*` 整包——**环境事实**：该检出 gateway 未聚合 workspace controller，SAFEGUARD 验收走 workspace-service 独立 jar）✅ |
+| Kafka 装配 | gateway `spring.kafka` producer/consumer 既配（P2b 落）+ `CognitiveMentalConfig` 类型化 producer；`@KafkaListener` 由 spring-kafka AutoConfiguration 默认 factory 装载（与 kb 先例同口径，0 自建 listener factory）✅ |
+| 依赖方向 | Consumer/Review/Replay 仅 import 同模块 Store + common-api；0 跨 engine-impl import；workspace 侧 0 引 spring-kafka（仅 cognitive 侧消费）✅ |
+| API 只增不改 | 2 新端点（replay/mental-reviews）+ SAFEGUARD 白名单只增；`ScenarioRunService` 既有 DIAGNOSE/FORECAST/SIMULATE/STRATEGY 4 分支代码 0 改动；`DcchengClient` 既有 4 方法 0 签名改动 ✅ |
+| DB 只加不删 | V130 单张新表（0 改既有表/列）；docker cp 法执行成功（`ecos_cognitive_run_invalidation` + 4 索引就绪）✅ |
+
+## P3b-3. seed 注册（curl 非 DDL，指令 §环境要点）
+
+```
+POST /api/v1/cognitive/beliefs × 4   → aviation/fuel_price_level v1(0.6/0.3/0.1) v2(0.5/0.4/0.1) v3(0.4/0.4/0.2) v4(0.3/0.4/0.3) 全部 version+1 落库，status=ACTIVE
+POST /api/v1/cognitive/hypotheses    → HYP-SAFEGUARD-001 (cog_hyp_795a3871-11b, VALID, metric_ref=fuel_price_level)
+POST /api/v1/cognitive/hypotheses    → HYP-SAFEGUARD-002 (cog_hyp_4a34a896-ca9, VALID, T2 链路专用)
+```
+
+## P3b-4. T1 回放端点 curl 验收（只读重算 + 0 行更新实证）
+
+**无干预基线回放**（同参双跑逐位一致）：
+```
+GET /beliefs/fuel_price_level/2/replay?domain=aviation&sampleCount=1000&seed=42  (run1/run2)
+baselineMean=1.626  intervenedMean=1.626  benefit=0.0  lossP=0.0  vol=1.0~3.0  maxDD=1.0
+same=True（同参同 seed 双跑全字段一致）✅
+```
+**手算核验**：v2 分布 low=0.5/base=0.4/high=0.1 → 序数期望 E=0.5·1+0.4·2+0.1·3=1.6；N=1000 采样 1.626 ✅；单变量单点无干预 → intervened=baseline ✅。
+
+**SET 干预版本对比**（`interventions=[{fuel_price_level,SET,1.3}]` JSON 数组串）：
+```
+replay-v2: base=1.626  interv=1.30  benefit=-0.326  lossP=0.535  vol=[1.3,1.3]  refs=[cog_hyp_795a3871-11b]
+replay-v4: base=2.047  interv=1.30  benefit=-0.747  lossP=0.742  vol=[1.3,1.3]  refs 同上
+```
+- 版本间差异实证：v4 期望 2.0 > v2 期望 1.6（same SET 干预下 v4 亏损更多），**版本链语义生效** ✅
+- SET 单点化：vol=[1.3,1.3]（常数序列退化）✅；lossP v2=0.535 < v4=0.742（配对采样与分布概率吻合）✅
+- **asOf 假设时点过滤实证**：HYP-001 注册于 v2 之后、v4 之前 → 回放 v2/v4 时该假设"当时有效"均进 assumptionRefs（与 §P3b-5 失效后 excludedAssumptions 口径对照成立）✅
+
+**replayMeta 完整校验**：`replayedVersion=2, currentVersion=4, versionUpdatedAt=2026-09-14T15:08:48.423327, believedDistribution=[low:0.5,base:0.4,high:0.1]`（原文搬运）✅
+
+**版本不存在 404**：`/99/replay` → `COG-404: 不确定性判断版本不存在: variable=fuel_price_level, domain=aviation, version=99` ✅
+
+**只读实证（psql 前后对拍）**：
+```
+回放前: SELECT max(update_time) ... fuel_price_level/aviation → 2026-09-14 15:08:48.496503
+回放全链执行（6 次 replay 请求）后: 同一查询 → 2026-09-14 15:08:48.496503（0 行更新，逐位未变）✅
+```
+
+## P3b-5. T3 SAFEGUARD 贯通 sc001（含缺陷修复 P3b-6）
+
+```
+POST /api/v1/workspace/scenarios/sc001/runs  runTypes=[SAFEGUARD]
+  counterfactualVariable=fuel_price_level  DELTA=+0.15  outcomeValues{low:1,base:1.15,high:1.5}  N=1000 seed=42
+→ runId=run_b6801924-6b6 status=SUCCEEDED degraded=false
+```
+**落库核验（psql，修复后终版行 run_d3a5542f/run_b6801924）**：
+```
+refs_type=array  risk_type=object  s3_type=array
+im=1.3680499999999964  bm=1.21805  benefit=0.14999999999999636
+assumptionRefs=["cog_hyp_4a34a896-ca9"]  (jsonb @> 包含匹配 t)
+```
+- **四指标全数字落库 + assumptionRefs 真数组** ✅（DELTA +0.15 → expectedBenefit ≈ +0.15 精确平移手算吻合；volatilityRange=[1.15,1.65]=[low+0.15, high+0.15] 边界采样点 ✅）
+- run 含 assumptionRefs = T2 联动作废关联键 ✅
+
+## P3b-6. T3 验收过程缺陷与修复（验收期间发现并关闭，独立审查已覆盖）
+
+**现象**：初版 SAFEGUARD 落库 `simulation_result` 为 `"assumptionRefs":"cog_hyp_..."`（字符串）/ `"volatilityRange":{"volatilityRange":[...]}`（同名键嵌套）/ 数值变字符串 / null→""，`@>` 数组包含匹配恒 miss，**T2 联动作废失效**。
+
+**排查路径（证据链完整）**：
+1. gateway 直连 curl `POST :8080/api/v1/cognitive/counterfactual` 原始响应**干净 JSON**（数字/数组/null 全对）→ 排除 cognitive 侧；
+2. 注入 ObjectMapper vs 全新 `new ObjectMapper()` 双序列化对比（临时 DIAG 日志）→ 输出相同 → 排除 ObjectMapper bean 污染，**污染源=RestTemplate 反序列化环节**；
+3. `postJson` 捕获原始响应文本诊断 → gateway 返回 **`<ApiResponse><code>0</code>...` 伪 XML 文本**：`Map.class`/默认 Accept（`text/plain, */*`）下，workspace classpath 的某 XML 系 `HttpMessageConverter`（Jakarta+Jackson 双栈）被 RestTemplate ContentNegotiation 选中 → gateway 侧 `@RestController` 按 Accept 编出伪 XML → workspace `readTree` 解析 `<baselineMean>` 等 XML 文本为同名字段/字符串，结构全毁（与 `Map.class` 二次 Map 化叠加产生同名键嵌套）。curl 带 `Accept: application/json` 即返回干净 JSON 佐证。
+
+**修复（仅新增路径，0 触碰既有 4 方法）**：`DcchengClient.postJson` 专用原始 JSON 通道——body Map 经独立 `RAW_JSON` 序列化发送；响应显式 `Accept: application/json` + `String.class` 接收（0 结构解析）→ `RAW_JSON.readTree` 得 JsonNode 树；`ScenarioRunService.toJson` 对 JsonNode 直取**规范树文本**落库（无损，不依赖注入 mapper 配置）。
+
+**复验**：重建后重跑 SAFEGUARD → 落库全干净（P3b-5 数字/数组证据即修复后行）✅；临时 DIAG 代码已删除。
+
+## P3b-7. T2 失效→作废联动全链验收
+
+```
+① POST /hypotheses  注册 HYP-SAFEGUARD-002 (cog_hyp_4a34a896-ca9, VALID)
+② POST /scenarios/sc001/runs SAFEGUARD → run_b6801924-6b6 SUCCEEDED，落库 assumptionRefs=["cog_hyp_4a34a896-ca9"]
+③ psql 前置核验: (simulation_result->'assumptionRefs') @> '["cog_hyp_4a34a896-ca9"]'::jsonb = t
+④ POST /hypotheses/cog_hyp_4a34a896-ca9/invalidate {reason="P3b 失效→Kafka→作废链路实证..."}
+⑤ gateway 日志: MentalEventPublisher 心智事件已发布 eventType=COGNITIVE_HYPOTHESIS_INVALIDATED eventId=cog_evt_...
+              → CognitiveInvalidationConsumer（ntainer#0-0-C-1 消费线程）作废联动完成 supersededRuns=1
+              → MentalEventPublisher 发布 eventType=COGNITIVE_RUN_SUPERSEDED eventId=cog_evt_73a1e97f-0f1
+⑥ psql 核验（invalidate 后 8s）:
+   ecos_scenario_run:  run_b6801924-6b6 status=SUPERSEDED ✅
+   ecos_cognitive_run_invalidation: 1 行 (event_id=cog_evt_a2fb2df8-ba3, hypothesis_id=cog_hyp_4a34a896-ca9, run_id=run_b6801924-6b6, auto_detected=f, detail=hypothesisCode=HYP-SAFEGUARD-002...) ✅
+⑦ 幂等：UPDATE 带旧状态守卫（仅 SUCCEEDED/DEGRADED 可作废）+ impact INSERT 用 NOT EXISTS + uniq(event_id,run_id) 唯一键 → 重复投递 0 二次留痕（impact_rows 恒 1，run 恒 SUPERSEDED 三查验证）✅
+⑧ 审计：ecos.audit 发 hypothesis.invalidation-run-superseded（日志 EventBus WARN 降级口径遵守，broker 可达时实读）
+```
+
+## P3b-8. T4 mental-reviews curl 验收
+
+```
+GET /api/v1/cognitive/mental-reviews?tag=P2b-mental-layer-review&since=2026-09-14T15:00:00
+→ code=0 reconstructionMode=three-table-version-chain+V130-impact（Kafka 事件未落 PG，按三表版本链重建口径，P3b T4 定稿）
+  beliefTimelines=1  hypotheses=2  evidence=0  runImpacts=1
+  summary={beliefVariables:1, beliefVersions:4, hypothesesTotal:2, hypothesesInvalidated:2, evidenceCount:0, runsSuperseded:1}
+  （beliefVersions=4/2 失效假设/1 作废 run 与 DB 实际状态完全吻合）✅
+GET ...?tag=NOT_A_TAG → code=400 "COG-400: 非法复盘 tag=NOT_A_TAG（白名单: [P2b-mental-layer-review]）" ✅
+```
+
+## P3b-9. 向后兼容回归（T3 硬验收）
+
+```
+POST /scenarios/sc001/runs  runTypes=[DIAGNOSE]（既有端点，0 改动路径）
+→ run_a0778ec7-0e9 status=SUCCEEDED degraded=false
+  diagnosis={affectedMetrics, causalChain, degraded, degradeReason, diagnosisId, reasoningPath, rootCause, suggestions}（完整 8 键结构）✅
+```
+SAFEGUARD 分支与 DIAGNOSE 分支独立 if（0 短路），runType 白名单校验 400 文案仅增 SAFEGUARD；DIAGNOSE 行为零变化 ✅。
+
+## P3b-10. 铁律合规自检（P3b）
+
+| 检项 | 结论 |
+|------|------|
+| 写操作必发 ecos.audit | PASS — run 落库（P3a T3 审计通道复用）+ invalidate 失效 + 作废联动 superseded 三类均走 EventBus；consumer 审计 `@Autowired(required=false)` null 兜底不阻塞 |
+| Kafka 消费先例一致 | PASS — `@KafkaListener` + String 入参 + ObjectMapper 解析 + 异常 WARN 不堵分区 + 类型白名单（ref: kb-engine EcosOntologyEventConsumer） |
+| 0 新 Maven 模块 / 0 新 Docker 容器 | PASS — 复用认知/workspace 既有模块；workspace-service 为 PMO-49 既有 7 部署单元之一 |
+| Schema 只加不删 | PASS — V130 单新表 + 4 索引，0 触碰既有 |
+| LLM 零参与 | PASS — replay/reviews 全纯 Java 数值/SQL 聚合，0 LLM import |
+| API 只增不改 | PASS — 2 新端点 + 1 白名单只增，0 既有签名变更 |
+| 三滤波器 | PASS — cognitive 既有通配零新增；workspace 独立部署入口（环境事实登记） |
+
+## P3b-11. commit 凭证（收口回填）
+
+（P3b clean commit hash 在本节补录，见下方收口）

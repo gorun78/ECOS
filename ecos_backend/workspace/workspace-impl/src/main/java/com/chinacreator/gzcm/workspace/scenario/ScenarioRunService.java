@@ -26,8 +26,9 @@ import java.util.*;
 public class ScenarioRunService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioRunService.class);
-    /** 允许的运行类型 */
-    private static final Set<String> ALLOWED_RUN_TYPES = Set.of("DIAGNOSE", "FORECAST", "SIMULATE", "STRATEGY");
+    /** 允许的运行类型（P3b 只增 SAFEGUARD：反事实推演守卫，既有 4 类型行为零变化） */
+    private static final Set<String> ALLOWED_RUN_TYPES =
+        Set.of("DIAGNOSE", "FORECAST", "SIMULATE", "STRATEGY", "SAFEGUARD");
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -70,7 +71,8 @@ public class ScenarioRunService {
 
         Map<String, Object> diagnosis = null;
         Map<String, Object> forecast = null;
-        Map<String, Object> simulation = null;
+        // Object：SIMULATE 为 Map；SAFEGUARD 为 JsonNode（原始 JSON 树保结构，避免 Map 通道污染）
+        Object simulation = null;
         Map<String, Object> strategy = null;
 
         // ── DIAGNOSE ──
@@ -119,6 +121,19 @@ public class ScenarioRunService {
             } catch (Exception e) {
                 degraded = true;
                 strategy = errorPayload("策略失败: " + e.getMessage());
+            }
+        }
+
+        // ── SAFEGUARD（PMO-59 P3b 新增：反事实推演守卫，与 SIMULATE 并列占用 simulation_result 槽位）──
+        if (runTypes.contains("SAFEGUARD")) {
+            try {
+                // 与 SIMULATE 同槽位互斥语义：二者并存时 SAFEGUARD 结果覆盖 simulation_result
+                // （SAFEGUARD 包含 assumptionRefs 留痕，是失效作废联动关联键，语义更强）
+                Map<String, Object> cfPayload = buildCounterfactualPayload(scenarioId, param);
+                simulation = dcchengClient.counterfactual(cfPayload);
+            } catch (Exception e) {
+                degraded = true;
+                simulation = errorPayload("反事实推演失败: " + e.getMessage());
             }
         }
 
@@ -204,6 +219,38 @@ public class ScenarioRunService {
         return new ArrayList<>(new LinkedHashSet<>(types));
     }
 
+    /**
+     * SAFEGUARD 反事实推演 payload 组装（PMO-59 P3b）。
+     *
+     * <p>param 可选键：counterfactualDomain（缺省 "aviation"，sc001 航空 AOC 贯通口径）/
+     * counterfactualVariable（推演主变量，缺省由 dccheng 侧 400 拒绝）/
+     * counterfactualInterventions（数组 [{variableName, op:SET/DELTA, value}]）/
+     * counterfactualOutcomeValues（{variable:{outcome:value}} 数值映射）/
+     * counterfactualSampleCount（缺省 1000）/ counterfactualSeed（缺省 42）。</p>
+     */
+    private Map<String, Object> buildCounterfactualPayload(String scenarioId, Map<String, Object> param) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("scenarioId", scenarioId);
+        payload.put("domain", param.get("counterfactualDomain") instanceof String s && !s.isBlank()
+                ? s : "aviation");
+        payload.put("variableName", param.get("counterfactualVariable"));
+        if (param.get("counterfactualInterventions") instanceof List<?> list) {
+            payload.put("interventions", list);
+        }
+        if (param.get("counterfactualOutcomeValues") instanceof Map<?, ?> m) {
+            Map<String, Object> baseline = new LinkedHashMap<>();
+            baseline.put("outcomeValues", m);
+            payload.put("baseline", baseline);
+        }
+        if (param.get("counterfactualSampleCount") instanceof Number num) {
+            payload.put("sampleCount", num.intValue());
+        }
+        if (param.get("counterfactualSeed") instanceof Number num) {
+            payload.put("seed", num.longValue());
+        }
+        return payload;
+    }
+
     private Map<String, Object> buildForecastPayload(Map<String, Object> param, String metric) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("metric", metric);
@@ -263,7 +310,16 @@ public class ScenarioRunService {
 
     private String toJson(Object o) {
         try {
-            return o == null ? "{}" : objectMapper.writeValueAsString(o);
+            if (o == null) {
+                return "{}";
+            }
+            // JsonNode（SAFEGUARD 反事实推演结果）直取规范树文本：
+            // 节点树 toString 为无损规范 JSON（数字/数组/嵌套原语义），
+            // 不经注入 ObjectMapper 的 MessageConverter 配置，杜绝数值转字符串的二次污染
+            if (o instanceof com.fasterxml.jackson.databind.JsonNode node) {
+                return node.toString();
+            }
+            return objectMapper.writeValueAsString(o);
         } catch (Exception e) {
             log.warn("运行结果 JSON 序列化失败: {}", e.getMessage());
             return "{}";
