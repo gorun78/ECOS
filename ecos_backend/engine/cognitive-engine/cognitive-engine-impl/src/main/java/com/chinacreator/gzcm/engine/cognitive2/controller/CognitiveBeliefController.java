@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.engine.cognitive2.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.cognitive.BeliefDistributionVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefEvidenceUpdateDTO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefOverrideDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefSaveDTO;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveBeliefService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,12 +24,14 @@ import java.util.List;
  *                                            Phase 1 验收记录残留风险 4 落点：跨域重名变量隔离）
  * GET  /api/v1/cognitive/beliefs/{id}      — 详情（含分布版本/覆写标记/证据溯源）
  * POST /api/v1/cognitive/beliefs           — 注册（首版或同变量同域下一 version；prob 和=1 强校验）
+ * POST /api/v1/cognitive/beliefs/{variable}/update-by-evidence — 新证据加权贝叶斯更新（P2b；
+ *       纯 Java 确定性似然，LLM 零参与；version+1 + last_evidence_id 溯源 + ecos.cognitive 事件；
+ *       当前最新版本为人工覆写时拒绝——专家意见优先于模型更新）
+ * POST /api/v1/cognitive/beliefs/{variable}/override            — 人工覆写（P2b；
+ *       manualOverride=true + reason 留痕；覆写后模型更新让位，直至下次人工覆写释放）
  * </pre>
  *
  * <p>术语：业务方统一称"不确定性判断"（原稿"信念"改称）；查询强制带 domain 参数校验。</p>
- *
- * <p>P2a 边界：新证据加权更新（{@code beliefs/{variable}/update-by-evidence}）与人工覆写
- * （{@code beliefs/{variable}/override}）P2b 落地（api-contract §3.4 已预登记，路径只增不改）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/cognitive/beliefs")
@@ -69,5 +73,25 @@ public class CognitiveBeliefController {
     @PostMapping
     public ApiResponse<BeliefDistributionVO> register(@RequestBody BeliefSaveDTO dto) {
         return ApiResponse.success(beliefService.register(dto));
+    }
+
+    /**
+     * P2b — 新证据加权更新（api-contract 预登记路径）。
+     * 纯 Java 贝叶斯：version+1 + last_evidence_id 溯源 + ecos.cognitive 事件；
+     * 当前最新版本为人工覆写时 400（专家意见优先）。
+     */
+    @PostMapping("/{variable}/update-by-evidence")
+    public ApiResponse<BeliefDistributionVO> updateByEvidence(
+            @PathVariable String variable,
+            @RequestBody BeliefEvidenceUpdateDTO dto) {
+        return ApiResponse.success(beliefService.updateByEvidence(variable, dto));
+    }
+
+    /** P2b — 人工覆写（api-contract 预登记路径）；manualOverride=true + reason 留痕，version=max+1。 */
+    @PostMapping("/{variable}/override")
+    public ApiResponse<BeliefDistributionVO> override(
+            @PathVariable String variable,
+            @RequestBody BeliefOverrideDTO dto) {
+        return ApiResponse.success(beliefService.override(variable, dto));
     }
 }

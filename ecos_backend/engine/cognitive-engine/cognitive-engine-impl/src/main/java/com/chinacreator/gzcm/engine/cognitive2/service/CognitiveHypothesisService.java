@@ -4,6 +4,8 @@ import com.chinacreator.gzcm.common.cognitive.HypothesisVO;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.cognitive2.dto.HypothesisSaveDTO;
+import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher;
+import com.chinacreator.gzcm.runtime.core.monitor.interfaces.IWarnLogService;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,10 +24,12 @@ import java.util.UUID;
 /**
  * 认知假设业务服务（PMO-59 P2a / ADR-9 心智层 H 库）— 表 {@code ecos_cognitive_hypothesis}（V128）。
  *
- * <p><b>P2a 范围</b>：注册 / 列表 / 详情 / 人工失效（status 切换 + invalid_at + invalid_reason 写）/ 归档。
- * 本单<IHypothesisLifecycleService> 契约只做"状态切换 + 失效时间写"；
- * <b>失效检测联动规则与告警链路 Phase 2b 实现</b>（{@code detectInvalidation} 的监测判定届时接入，
- * 本单人工失效端点即其兜底入口，契约前置不阻塞）。</p>
+ * <p><b>P2a</b>：注册 / 列表 / 详情 / 人工失效（status 切换 + invalid_at + invalid_reason 写）/ 归档。
+ * <b>P2b 增量</b>：失效统一经 {@link #invalidate(String, String, boolean)} 落库 —— 无论自动检测命中
+ * （{@code MentalInvalidationDetector.detectAndInvalidate} 经 CognitiveEvidenceService 登记后触发）
+ * 还是人工兜底（Controller {@code {id}/invalidate}），都在此单点发
+ * {@code ecos.cognitive} 失效事件 + 经 {@link IWarnLogService}（runtime-monitor）告警
+ * （warn 正文含 faultContext 结构化字段，周一故障复盘预留），杜绝双路径双发。</p>
  *
  * <p>写操作审计（铁律 §2.4#5）：经 {@link EventBusService} 发 Kafka {@code ecos.audit}；
  * 未装配/异常降级 WARN 不阻塞。</p>
@@ -39,6 +43,12 @@ public class CognitiveHypothesisService {
     private final HypothesisStore store;
     private final EvidenceStore evidenceStore;
     private final ObjectMapper objectMapper;
+    /** P2b: 心智事件发布器（失效事件单点发布，与 Detector 单向依赖无环） */
+    private final MentalEventPublisher eventPublisher;
+
+    /** P2b: 告警通道 — runtime-monitor 公共底座（铁律 §2.5）；可选装配（Bean 由 P2b config 注册），未装配 WARN 兜底 */
+    @Autowired(required = false)
+    private IWarnLogService warnLogService;
 
     /** 审计/事件通道 — 可选装配（required=false + null 兜底，与 CognitiveEvidenceService 同款） */
     @Autowired(required = false)
@@ -80,8 +90,22 @@ public class CognitiveHypothesisService {
         return row == null ? null : toVo(store.toNormalizedRow(row, evidenceStore));
     }
 
-    /** 人工失效（专家干预兜底）：status→INVALIDATED + is_valid=false + invalid_at/invalid_reason 留痕。 */
+    /** 人工失效（专家干预兜底）— 委托三参方法（autoDetected=false）。 */
     public HypothesisVO invalidate(String id, String reason) {
+        return invalidate(id, reason, false);
+    }
+
+    /**
+     * 失效统一入口（P2b：自动检测与人工兜底的单点收口）：status→INVALIDATED + is_valid=false
+     * + invalid_at/invalid_reason 留痕，随后发 {@code ecos.cognitive} 失效事件
+     * + 经 {@link IWarnLogService}（runtime-monitor）告警（正文含 faultContext 结构化字段，
+     * 周一故障复盘预留）+ ecos.audit 审计。
+     *
+     * @param id           假设主键
+     * @param reason       失效原因（检测器命中规则说明 / 人工兜底理由，必填留痕）
+     * @param autoDetected 是否来自自动检测（true=refuting 命中/高可信冲突/数值漂移；false=人工端点）
+     */
+    public HypothesisVO invalidate(String id, String reason, boolean autoDetected) {
         if (reason == null || reason.isBlank()) {
             throw new BusinessException(400, "COG-400: reason 必填（留痕审计）");
         }
@@ -97,9 +121,38 @@ public class CognitiveHypothesisService {
         if (!updated) {
             throw new BusinessException(400, "COG-400: 假设失效更新失败（并发冲突? 请重查状态）");
         }
-        // P2b 接入点: 失效自动检测 + ecos.cognitive 失效事件 + runtime-monitor 告警（本单仅人工失效留痕）
-        audit("hypothesis.invalidate", "ecos_cognitive_hypothesis", "success", "id=" + id);
-        return getDetail(id);
+        HypothesisVO vo = getDetail(id);
+        // 事件（ecos.cognitive）+ 告警（runtime-monitor, faultContext 结构化字段）— 降级 WARN 不阻塞
+        eventPublisher.publishHypothesisInvalidated(
+            vo.getId(), vo.getHypothesisCode(), vo.getDomain(),
+            reason.trim(), vo.getEvidenceIds(), autoDetected);
+        warnInvalidation(vo, autoDetected);
+        audit("hypothesis.invalidate", "ecos_cognitive_hypothesis", "success",
+            "id=" + id + ", autoDetected=" + autoDetected);
+        return vo;
+    }
+
+    /** 告警（铁律 §2.5 监控收敛 runtime-monitor）；未装配/异常降级 WARN 不阻塞。 */
+    private void warnInvalidation(HypothesisVO vo, boolean autoDetected) {
+        if (warnLogService == null) {
+            log.warn("认知失效告警无法落库: IWarnLogService 未装配, objId={}", vo.getId());
+            return;
+        }
+        try {
+            Map<String, Object> faultContext = new LinkedHashMap<>();
+            faultContext.put("phase", "hypothesis-invalidation");
+            faultContext.put("hypothesisId", vo.getId());
+            faultContext.put("domain", vo.getDomain());
+            faultContext.put("autoDetected", autoDetected);
+            faultContext.put("invalidAt", vo.getInvalidAt() == null ? null : vo.getInvalidAt().toString());
+            faultContext.put("reviewTag", MentalEventPublisher.REVIEW_TAG);
+            String body = "认知假设失效: " + vo.getHypothesisCode() + "（" + vo.getStatement() + "）"
+                + " autoDetected=" + autoDetected + " | faultContext=" + faultContext;
+            warnLogService.warn("COGNITIVE_HYPOTHESIS_INVALIDATED", vo.getId(),
+                "cognitive-mental-layer", body, "mental-scan");
+        } catch (Exception e) {
+            log.warn("认知失效告警落库失败 (ignored): objId={} err={}", vo.getId(), e.getMessage());
+        }
     }
 
     /** 归档：退出有效集合，保留历史可查。 */

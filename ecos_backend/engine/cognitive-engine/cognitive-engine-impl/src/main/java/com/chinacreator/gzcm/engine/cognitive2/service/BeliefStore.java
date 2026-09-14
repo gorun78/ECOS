@@ -117,6 +117,16 @@ public class BeliefStore {
     }
 
     /**
+     * 按变量名跨域列出（未删除，domain/version 倒序——补算扫描输入：evidence.metric → belief 候选集）。
+     */
+    public List<Map<String, Object>> listByVariable(String variableName) {
+        return jdbc.queryForList(
+            "SELECT " + BELIEF_COLUMNS + " FROM ecos_cognitive_belief " +
+            "WHERE is_deleted = 0 AND variable_name = ? ORDER BY domain, version DESC",
+            variableName);
+    }
+
+    /**
      * 行 → VO 消费映射：distribution JSONB 归一为 List&lt;Map&gt;（每项 {outcome, prob(double)}），
      * 对齐 common-api {@code BeliefDistributionVO.OutcomeProb}。
      */

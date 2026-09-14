@@ -3,7 +3,11 @@ package com.chinacreator.gzcm.engine.cognitive2.service;
 import com.chinacreator.gzcm.common.cognitive.BeliefDistributionVO;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefEvidenceUpdateDTO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefOverrideDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefSaveDTO;
+import com.chinacreator.gzcm.engine.cognitive2.service.mental.BayesianUpdater;
+import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,8 +31,8 @@ import java.util.UUID;
  *
  * <p><b>P2a 范围</b>：注册/查询（列表/详情，强制 domain 参数，Phase 1 残留风险 4 落点）/ 分布强校验
  * （prob 和=1，容差 1e-6；residual risk 3 落点）。
- * <b>新证据加权贝叶斯更新（version+1）与人工覆写端点 Phase 2b 实现</b>
- * （对应 {@code IUncertaintyJudgementService.updateByEvidence / override}，本单先落查询与注册基座）。</p>
+ * <b>P2b 增量</b>：新证据加权贝叶斯更新（{@link #updateByEvidence}，纯 Java 确定性似然→version+1）
+ * 与人工覆写（{@link #override}，manualOverride=true + reason 留痕，专家干预优先于模型更新）。</p>
  *
  * <p>写操作审计（铁律 §2.4#5）：经 {@link EventBusService} 发 Kafka {@code ecos.audit}；
  * 未装配/异常降级 WARN 不阻塞。LLM 零参与认知计算（ADR-5 口径，本类纯规则计算）。</p>
@@ -45,6 +49,8 @@ public class CognitiveBeliefService {
     private final BeliefStore store;
     private final EvidenceStore evidenceStore;
     private final ObjectMapper objectMapper;
+    /** P2b: 心智事件发布器（ecos.cognitive 版本变更事件；构造器注入） */
+    private final MentalEventPublisher eventPublisher;
 
     /** 审计/事件通道 — 可选装配（required=false + null 兜底） */
     @Autowired(required = false)
@@ -97,6 +103,96 @@ public class CognitiveBeliefService {
     public BeliefDistributionVO getDetail(String id) {
         Map<String, Object> row = store.findById(id);
         return row == null ? null : toVo(store.toNormalizedRow(row, evidenceStore));
+    }
+
+    /**
+     * P2b — 新证据加权更新（api-contract 预登记 {@code POST /{variable}/update-by-evidence}）：
+     * 取当前最新分布 → 纯 Java 贝叶斯更新（blob 显式似然优先，否则置顶收敛规则）→
+     * version=max+1 落库 + last_evidence_id 溯源 → 发 COGNITIVE_BELIEF_UPDATED 事件。
+     *
+     * <p>守卫：当前最新版本若为人工覆写（manualOverride=true），模型自动更新让位专家意见，
+     * 直接拒绝（400）——须先经人工覆写端点释放守卫。LLM 零参与（ADR-5 口径）。</p>
+     */
+    public BeliefDistributionVO updateByEvidence(String variableName, BeliefEvidenceUpdateDTO dto) {
+        String variable = require(variableName, "variableName");
+        String domain = require(dto == null ? null : dto.getDomain(), "domain");
+        String evidenceId = require(dto == null ? null : dto.getEvidenceId(), "evidenceId");
+
+        Map<String, Object> evidenceRow = evidenceStore.findById(evidenceId);
+        if (evidenceRow == null) {
+            throw new BusinessException(404, "COG-404: 证据不存在: id=" + evidenceId);
+        }
+        Map<String, Object> latest = store.findLatest(variable, domain);
+        if (latest == null) {
+            throw new BusinessException(404,
+                "COG-404: 不确定性判断不存在: variable=" + variable + ", domain=" + domain);
+        }
+
+        boolean manualGuarded = evidenceStore.fieldBoolean(latest, "is_manual_override");
+        if (manualGuarded) {
+            throw new BusinessException(400,
+                "COG-400: 当前最新版本为人工覆写，模型自动更新让位专家意见——请先经覆写端点释放守卫");
+        }
+
+        // 当前分布（归一化行内 distribution = List<Map {outcome, prob(double)}>）
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rawDist = (List<Map<String, Object>>) store
+            .toNormalizedRow(latest, evidenceStore).get("distribution");
+        List<BeliefSaveDTO.OutcomeProb> current = new ArrayList<>(rawDist.size());
+        for (Map<String, Object> point : rawDist) {
+            BeliefSaveDTO.OutcomeProb p = new BeliefSaveDTO.OutcomeProb();
+            p.setOutcome(String.valueOf(point.get("outcome")));
+            p.setProb(point.get("prob") instanceof Number n ? n.doubleValue() : 0d);
+            current.add(p);
+        }
+
+        // 证据可信度 + blob 显式似然（无显式似然则走默认置顶收敛规则）
+        double confidence = evidenceRow.get("confidence") instanceof Number n ? n.doubleValue() : 0.5d;
+        Map<String, Object> blob = evidenceStore.parseJsonObjectText(evidenceStore.fieldString(evidenceRow, "blob"));
+        Map<String, Double> likelihood = BayesianUpdater.parseLikelihood(blob);
+
+        // 更新后分布再做强校验（规则已归一化，此处兜底浮点漂移，保持入库口径与注册同款）
+        List<BeliefSaveDTO.OutcomeProb> updatedDist = BayesianUpdater.update(current, likelihood, confidence);
+        validateDistribution(updatedDist);
+
+        int version = store.maxVersion(variable, domain) + 1;
+        String id = "cog_blf_" + UUID.randomUUID().toString().substring(0, 12);
+        store.insert(id, variable, trimToNull(evidenceStore.fieldString(latest, "tenant_scope")), domain,
+            toDistributionJson(updatedDist), version, evidenceId, false, null, "ACTIVE");
+        eventPublisher.publishBeliefUpdated(variable, domain, version, evidenceId, false);
+        audit("belief.update-by-evidence", "ecos_cognitive_belief", "success",
+            "variable=" + variable + ", domain=" + domain + ", version=" + version + ", evidence=" + evidenceId);
+        return getLatest(variable, domain);
+    }
+
+    /**
+     * P2b — 人工覆写（api-contract 预登记 {@code POST /{variable}/override}）：
+     * 专家分布覆盖并置 manualOverride=true + overrideReason 留痕，version=max+1；
+     * 覆写后模型自动更新让位专家意见（{@link #updateByEvidence} 以 manualOverride 守卫拒绝），
+     * 直至下一次人工覆写主动释放。
+     */
+    public BeliefDistributionVO override(String variableName, BeliefOverrideDTO dto) {
+        String variable = require(variableName, "variableName");
+        if (dto == null) {
+            throw new BusinessException(400, "COG-400: 请求体必填");
+        }
+        String domain = require(dto.getDomain(), "domain");
+        if (dto.getOverrideReason() == null || dto.getOverrideReason().isBlank()) {
+            throw new BusinessException(400, "COG-400: overrideReason 必填（留痕审计）");
+        }
+        validateDistribution(dto.getDiscreteDistribution());
+
+        Map<String, Object> latest = store.findLatest(variable, domain);
+        String tenantScope = latest == null ? null : trimToNull(evidenceStore.fieldString(latest, "tenant_scope"));
+        int version = store.maxVersion(variable, domain) + 1;
+        String id = "cog_blf_" + UUID.randomUUID().toString().substring(0, 12);
+        store.insert(id, variable, tenantScope, domain, toDistributionJson(dto.getDiscreteDistribution()),
+            version, trimToNull(dto.getLastEvidenceId()), true, dto.getOverrideReason().trim(), "ACTIVE");
+        eventPublisher.publishBeliefUpdated(variable, domain, version, trimToNull(dto.getLastEvidenceId()), true);
+        audit("belief.override", "ecos_cognitive_belief", "success",
+            "variable=" + variable + ", domain=" + domain + ", version=" + version
+                + ", evidence=" + trimToNull(dto.getLastEvidenceId()));
+        return getLatest(variable, domain);
     }
 
     /**

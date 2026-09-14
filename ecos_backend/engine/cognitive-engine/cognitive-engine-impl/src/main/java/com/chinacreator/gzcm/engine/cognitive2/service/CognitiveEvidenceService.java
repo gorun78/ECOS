@@ -1,9 +1,12 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
 import com.chinacreator.gzcm.common.cognitive.EvidenceRecordVO;
+import com.chinacreator.gzcm.common.cognitive.HypothesisVO;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.cognitive2.dto.EvidenceSaveDTO;
+import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher;
+import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalInvalidationDetector;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +30,11 @@ import java.util.UUID;
  * 列表 / 详情 / 同事实多值自动冲突检测（登记时按 blob.fact + blob.metric 匹配、value 不等 →
  * {@code is_conflict=true} 并写入 {@code refuting_evidence_ids}，对向证据联动置 CONFLICTED）。</p>
  *
+ * <p><b>P2b 增量</b>：登记成功后 ① 发 {@code ecos.cognitive} 证据登记事件
+ * （{@link MentalEventPublisher}，补算扫描链路输入）；② 触发假设失效自动检测
+ * （{@link MentalInvalidationDetector}：refuting 命中/高可信冲突/数值漂移 → 假设 INVALIDATED
+ * + 失效事件 + runtime-monitor 告警）。检测异常不阻断登记主流程（告警降级 WARN）。</p>
+ *
  * <p>写操作审计（铁律 §2.4#5）：经 {@link EventBusService}（runtime-event 公共底座，
  * 铁律 §2.5 禁止自建 KafkaTemplate）发 Kafka {@code ecos.audit}；Bus 未装配/发送异常
  * 降级 WARN 不阻塞主流程。</p>
@@ -42,6 +50,12 @@ public class CognitiveEvidenceService {
 
     private final EvidenceStore store;
     private final ObjectMapper objectMapper;
+
+    /** P2b: 假设失效自动检测（登记后即时触发；detector→hypothesisService 单向依赖，无环） */
+    private final MentalInvalidationDetector invalidationDetector;
+
+    /** P2b: 心智事件发布（ecos.cognitive 证据登记事件） */
+    private final MentalEventPublisher eventPublisher;
 
     /** 审计通道 — 可选装配（与 ontology/data 引擎侧同款模式：required=false + null 兜底） */
     @Autowired(required = false)
@@ -101,7 +115,25 @@ public class CognitiveEvidenceService {
             }
         }
         audit("evidence.create", "ecos_cognitive_evidence", "success", "id=" + id);
-        return toVo(store.toNormalizedRow(store.findById(id)));
+        EvidenceRecordVO vo = toVo(store.toNormalizedRow(store.findById(id)));
+
+        // P2b: 登记事件（ecos.cognitive；冲突标记随事件带出，补算扫描链路输入）— 失败不阻塞
+        try {
+            Map<String, Object> evBlob = store.parseJsonObjectText(vo.getBlob());
+            eventPublisher.publishEvidenceRegistered(vo.getId(), code,
+                store.fieldString(evBlob, "fact"), store.fieldString(evBlob, "metric"),
+                vo.isConflict());
+            // P2b: 假设失效自动检测（命中→INVALIDATED + 失效事件 + runtime-monitor 告警）— 失败不阻塞
+            var invalidated = invalidationDetector.detectAndInvalidate(vo);
+            if (invalidated != null && !invalidated.isEmpty()) {
+                log.info("新证据登记触发假设失效 {} 条: 触发证据={} 命中={}",
+                    invalidated.size(), id, invalidated.stream().map(HypothesisVO::getHypothesisCode).toList());
+            }
+        } catch (Exception e) {
+            log.warn("证据登记后心智联动失败 (ignored, 登记主流程不受影响): evidence={} err={}",
+                id, e.getMessage());
+        }
+        return vo;
     }
 
     /** 证据列表（status/sourceType 可选过滤）。 */

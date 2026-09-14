@@ -29,6 +29,31 @@ spring:
   flyway:
     enabled: false
 
+  # PMO-59 P2b: 认知心智层 Kafka 事件通道 (ecos.cognitive / ecos.audit)
+  # 由 runtime-event EventBus 统一发送 (铁律 §2.5, 禁引擎自建 KafkaTemplate);
+  # spring-kafka AutoConfiguration 依据本配置激活 producer 装配,
+  # 类型化 KafkaTemplate<String,String> 由 CognitiveMentalConfig 补装配 (与 KafkaEventBusServiceImpl 同条件门)。
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: 1
+    consumer:
+      group-id: ${KAFKA_GROUP:dccheng-cognitive-group}
+      auto-offset-reset: earliest
+
+# PMO-59 P2b: 认知心智层配置
+# ① 事件总线上线 Kafka 路径 (runtime-event KafkaEventBusServiceImpl 激活; 内存 fallback 互斥让位):
+#    强类型 Payload 经 EventBus 发 ecos.cognitive / ecos.audit; broker 不可达降级 WARN 不阻塞
+# ② 心智层补算周期 (runtime-task MentalScanTask 周期, Duration 语义, 默认 10min)
+ecos:
+  event:
+    kafka:
+      enabled: true
+  cognitive:
+    scan-interval: 10m
+
 # MyBatis Configuration
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
