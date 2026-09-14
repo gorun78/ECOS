@@ -421,6 +421,10 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 >   | POST | `/api/v1/cognitive/beliefs/{variable}/update-by-evidence` | `BeliefEvidenceUpdateDTO {domain, evidenceId}`（P2b 新增） | 贝叶斯加权更新→version+1+last_evidence_id；**manualOverride 守卫**：最新版本为人工覆写时 400 拒绝（专家优先于模型） |
 >   | POST | `/api/v1/cognitive/beliefs/{variable}/override` | `BeliefOverrideDTO {domain, discreteDistribution, overrideReason, lastEvidenceId}`（P2b 新增） | 人工覆写→version+1+is_manual_override=true；覆写后模型自动更新让位直至下次覆写 |
 >   > ⚠️ 口径说明：PMO-59 P2b 指令表 T4 原文写 `PUT /override`，与本契约预登记及实现不一致——**按本契约预登记 POST 实现**（API 只增不改，预登记为准；审查知悉）。
+>   > ⚠️ **PMO-59 P3a 反事实推演（已实现，2026-09-14 经 gateway :8080 实证；三滤波器零新增登记）**：
+>   >   | Method | Path | 入参 | 语义 |
+>   >   |:-----:|:--|:--|:--|
+>   >   | POST | `/api/v1/cognitive/counterfactual` | `CounterfactualRequest {domain, variableName, scenarioId?, baseline{outcomeValues{variable:{outcome:数值}}?, weights{variable:权重}?}, interventions[{variableName, op:SET/DELTA, value}], sampleCount(默认1000 上限5000), seed(默认42)}` | do(A) 干预式反事实推演（`CounterfactualController`/`CounterfactualSimulator`）：读 belief 当前版本分布 + 假设有效性过滤 → 蒙特卡洛 N 次配对采样（SET=定点覆写 / DELTA=outcome 数值平移；线性响应 metric=Σw·x）→ 输出风险四指标（expectedBenefit/maxDrawdown/lossProbability/volatilityRange）+ 敏感性 Top3（outcome 数值 +5% 扰动解析响应）+ assumptionRefs/excludedAssumptions 留痕；纯 Java 数值 LLM 零参与；同 seed 双跑逐位一致（实证：N=100 seed=42 双跑全字段一致）；结果不落盘（ADR-9 推理结果口径）；审计发 `ecos.audit`（cognitive.counterfactual）。性能实证：N=1000 P99=128ms（<3s 预算）/ N=5000 P99=243ms（<10s 预算）
 > - **事件（已实现，P2b 实证）**：`ecos.cognitive` topic（KafkaTopics.COGNITIVE，gateway `ecos.event.kafka.enabled=true` + `spring.kafka` 仅增配置）——强类型 Payload 三类：`COGNITIVE_EVIDENCE_REGISTERED` / `COGNITIVE_HYPOTHESIS_INVALIDATED`（含 autoDetected 标志）/ `COGNITIVE_BELIEF_UPDATED`；统一携带 `faultContext`（phase/hypothesisId|evidenceId/autoDetected/reviewTag=`P2b-mental-layer-review`，周一故障复盘预留）。冲击链=证据登记即时检测（refuting 命中/高可信冲突/数值漂移三规则）+ `runtime-task` `COGNITIVE_MENTAL_SCAN` 定时补算（默认 10min，`ecos.cognitive.scan-interval` 可调），不做流式
 > - **审计**：全部写操作（evidence.create / hypothesis.create / hypothesis.invalidate / belief 注册/更新/覆写）发 Kafka `ecos.audit`（铁律 §2.4 #5，P2b 实读 7 条全核）
 
