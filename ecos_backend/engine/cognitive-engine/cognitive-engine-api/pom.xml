@@ -16,5 +16,11 @@
             <artifactId>common-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- PMO-59 P2a: SaveDTO 强类型入参按后端规范用 Lombok @Data (与 data-engine-api 同款声明) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 </project>

@@ -46,6 +46,29 @@
             <artifactId>kb-engine-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- PMO-59 P2a: 写操作审计/心智事件统一走 runtime-event 公共底座 (铁律 §2.5, 禁自建 KafkaTemplate)；
+             P2b: 定时补算委托 runtime-task 全局调度 (铁律 §2.5.3), 告警走 runtime-monitor (IWarnLogService) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-event</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-task</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-monitor</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- PMO-59 P2a: SaveDTO 强类型入参与 Service 构造器按后端规范用 Lombok (与 data-engine-impl 同款声明) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
             <!-- 测试 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

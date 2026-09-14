@@ -1,0 +1,1 @@
+{"runTypes":["SAFEGUARD"],"counterfactualVariable":"fuel_price_level","counterfactualInterventions":[{"variableName":"fuel_price_level","op":"DELTA","value":0.15}],"counterfactualOutcomeValues":{"fuel_price_level":{"low":1,"base":1.15,"high":1.5}},"counterfactualSampleCount":1000,"counterfactualSeed":42}
