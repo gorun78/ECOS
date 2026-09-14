@@ -149,7 +149,7 @@ function RcaResultView({
   // 无 rcaResult → 占位（采集中）
   if (!rcaResult) {
     return (
-      <div className={`mt-3 text-[10px] font-mono opacity-40 px-1 py-2 rounded-md ${styles.appBg} dark:bg-slate-800/40`}>
+      <div className={`mt-3 text-[10px] font-mono opacity-40 px-1 py-2 rounded-md ${styles.appBg}`}>
         {t("dw.dqRule.workOrders.rca_collectedAt")}
       </div>
     );
@@ -321,7 +321,7 @@ export default function WorkOrderTab() {
               onClick={() => setStatusFilter(statusFilter === st ? "" : st)}
               className={`rounded-md p-4 text-left cursor-pointer transition border ${
                 statusFilter === st ? styles.cardBorder : "transparent"
-              } ${styles.cardBg} hover:${styles.appBg} dark:hover:bg-slate-800/40`}
+              } ${styles.cardBg} hover:${styles.sidebarBg}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -398,8 +398,8 @@ export default function WorkOrderTab() {
               return (
                 <React.Fragment key={o.id}>
                   <div
-                    className={`flex items-center gap-3 px-4 py-3 border-b ${styles.cardBorder} dark:border-b-slate-800 ${
-                      expanded ? `${styles.appBg} dark:bg-slate-800/40` : `hover:${styles.appBg} dark:hover:bg-slate-800/20`
+                    className={`flex items-center gap-3 px-4 py-3 border-b ${styles.cardBorder} ${
+                      expanded ? `${styles.appBg}` : `hover:${styles.sidebarBg}`
                     } transition`}
                   >
                     {/* severity 徽章 */}
@@ -484,7 +484,7 @@ export default function WorkOrderTab() {
                             <button
                               onClick={() => doAction(o.id, "close")}
                               className={`h-6 px-2 rounded text-[10px] border cursor-pointer
-                                ${styles.cardBorder} ${styles.cardTextMuted} dark:text-slate-400 hover:${styles.appBg}`}
+                                ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg}`}
                               title={t("dw.dqRule.workOrders.action.close")}
                             >
                               <X className="w-3 h-3 inline" />
@@ -509,7 +509,7 @@ export default function WorkOrderTab() {
 
                   {/* 展开详情 */}
                   {expanded && (
-                    <div className={`px-5 py-3 ${styles.appBg} dark:bg-slate-800/30 border-b ${styles.cardBorder} dark:border-b-slate-800 space-y-2`}>
+                    <div className={`px-5 py-3 ${styles.appBg} border-b ${styles.cardBorder} space-y-2`}>
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[11px]">
                         <div>
                           <span className={`opacity-50 ${styles.cardTextMuted}`}>{t("dw.dqRule.workOrders.colDesc")}</span>
@@ -555,7 +555,7 @@ export default function WorkOrderTab() {
 
                   {/* 指派弹层 */}
                   {assignTarget === o.id && (
-                    <div className={`px-5 py-3 bg-blue-50/40 dark:bg-blue-900/20 border-b ${styles.cardBorder} dark:border-b-slate-800 flex items-center gap-2`}>
+                    <div className={`px-5 py-3 bg-blue-50/40 border-b ${styles.cardBorder} flex items-center gap-2`}>
                       <User className="w-4 h-4 text-blue-500 shrink-0" />
                       <input
                         autoFocus

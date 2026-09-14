@@ -178,7 +178,7 @@ export default function AlertCenterTab() {
               onClick={() => setLevelFilter(levelFilter === lvl ? "" : lvl)}
               className={`rounded-md p-4 text-left cursor-pointer transition border ${
                 levelFilter === lvl ? styles.cardBorder : "transparent"
-              } ${styles.cardBg} hover:${styles.sidebarBg} dark:hover:bg-slate-800/40`}
+              } ${styles.cardBg} hover:${styles.sidebarBg}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -279,7 +279,7 @@ export default function AlertCenterTab() {
                 return (
                   <tr
                     key={a.id}
-                    className={`border-b last:border-0 ${styles.cardBorder} hover:${styles.appBg} dark:hover:bg-slate-800/30 transition`}
+                    className={`border-b last:border-0 ${styles.cardBorder} ${styles.sidebarHoverBg} transition`}
                   >
                     {/* 级别 */}
                     <td className="px-3 py-2.5">

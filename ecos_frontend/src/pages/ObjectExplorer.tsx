@@ -618,7 +618,7 @@ export default function ObjectExplorer() {
                 )}
 
                 {activeDetailTab === "timeline" && (
-                  <div className="space-y-2 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-200">
+                  <div className="space-y-2 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--card-border,#E2E8F0)]">
                     {timelineLoading && detailTimeline.length === 0 ? (
                       <div className={`text-center py-12 text-xs ${styles.cardTextMuted}`}>
                         <Loader2 className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted} animate-spin`} />

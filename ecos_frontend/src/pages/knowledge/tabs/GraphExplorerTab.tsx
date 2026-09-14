@@ -270,7 +270,7 @@ export default function GraphExplorerTab() {
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
               placeholder={t('knowledge.graph.searchPlaceholder')}
-              className={`flex-1 px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder-slate-500 outline-none focus:border-blue-500`}
+              className={`flex-1 px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
             />
             <button
               onClick={handleSearch}
@@ -306,7 +306,7 @@ export default function GraphExplorerTab() {
               value={pathSource}
               onChange={(e) => setPathSource(e.target.value)}
               placeholder={t('knowledge.graph.pathSourcePlaceholder')}
-              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder-slate-500 outline-none focus:border-amber-500`}
+              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
             />
             <ArrowRight size={10} className={`${styles.muted} shrink-0`} />
             <input
@@ -314,7 +314,7 @@ export default function GraphExplorerTab() {
               value={pathTarget}
               onChange={(e) => setPathTarget(e.target.value)}
               placeholder={t('knowledge.graph.pathTargetPlaceholder')}
-              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder-slate-500 outline-none focus:border-amber-500`}
+              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
             />
             <button
               onClick={() => { if (pathSource && pathTarget) handleComputePath(); else showToast('error', t('knowledge.graph.pathRequired')); }}
@@ -588,7 +588,7 @@ export default function GraphExplorerTab() {
                     value={newNodeForm.label}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, label: e.target.value }))}
                     placeholder={t('knowledge.graph.nodeLabelPlaceholder')}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder-slate-500 outline-none focus:border-blue-500`}
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -598,7 +598,7 @@ export default function GraphExplorerTab() {
                     value={newNodeForm.nodeType}
                     onChange={(e) => setNewNodeForm(p => ({ ...p, nodeType: e.target.value }))}
                     placeholder={t('knowledge.graph.nodeTypePlaceholder')}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder-slate-500 outline-none focus:border-blue-500`}
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -608,7 +608,7 @@ export default function GraphExplorerTab() {
                     onChange={(e) => setNewNodeForm(p => ({ ...p, description: e.target.value }))}
                     placeholder={t('knowledge.graph.nodeDescriptionPlaceholder')}
                     rows={2}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder-slate-500 outline-none focus:border-blue-500 resize-none`}
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500 resize-none`}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -618,7 +618,7 @@ export default function GraphExplorerTab() {
                     onChange={(e) => setNewNodeForm(p => ({ ...p, properties: e.target.value }))}
                     placeholder='{"domain": "finance", "owner": "admin"}'
                     rows={2}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder-slate-500 outline-none focus:border-blue-500 resize-none font-mono`}
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500 resize-none font-mono`}
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -671,7 +671,7 @@ export default function GraphExplorerTab() {
                     value={newEdgeForm.relationship}
                     onChange={(e) => setNewEdgeForm(p => ({ ...p, relationship: e.target.value }))}
                     placeholder={t('knowledge.graph.relationshipPlaceholder')}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder-slate-500 outline-none focus:border-emerald-500`}
+                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-emerald-500`}
                   />
                 </div>
                 <div className="space-y-1.5">

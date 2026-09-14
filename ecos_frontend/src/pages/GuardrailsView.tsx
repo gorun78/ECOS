@@ -617,9 +617,9 @@ export default function GuardrailsView() {
                     <Binary size={18} />
                   </div>
                   <div className="space-y-0.5">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">安全策略编译器 (Security Policy Compiler)</span>
+                    <span className="text-[9px] text-[var(--muted-foreground,#94A3B8)] font-bold uppercase tracking-wider block">安全策略编译器 (Security Policy Compiler)</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-100">{selectedPolicy.name}</span>
+                      <span className="font-extrabold text-sm text-[var(--text-primary,#F8FAFC)]">{selectedPolicy.name}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase inline-flex items-center gap-1 ${selectedPolicy.status === 'COMPILED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${selectedPolicy.status === 'COMPILED' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                         <span>{selectedPolicy.status === 'COMPILED' ? 'COMPILED & DEPLOYED' : 'DRAFT (NEEDS COMPILATION)'}</span>
@@ -631,8 +631,8 @@ export default function GuardrailsView() {
                 <div className="flex items-center gap-3 shrink-0">
                   {selectedPolicy.compiledAt && (
                     <div className="text-right hidden sm:block">
-                      <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 justify-end"><Clock size={9} /> 上次编译</p>
-                      <p className="font-mono text-[10px] text-slate-300 font-bold">{selectedPolicy.compiledAt}</p>
+                      <p className="text-[10px] text-[var(--muted-foreground,#94A3B8)] font-semibold flex items-center gap-1 justify-end"><Clock size={9} /> 上次编译</p>
+                      <p className="font-mono text-[10px] text-[var(--muted-foreground,#CBD5E1)] font-bold">{selectedPolicy.compiledAt}</p>
                     </div>
                   )}
                   <button
@@ -669,7 +669,7 @@ export default function GuardrailsView() {
                           log.includes('✅') ? 'text-emerald-400 font-extrabold' :
                           log.includes('⚠️') ? 'text-amber-400 font-semibold' :
                           log.includes('🚫') || log.includes('ERROR') ? 'text-rose-400 font-bold' :
-                          log.includes('🔒') ? 'text-sky-400 font-medium' : 'text-slate-300'
+                          log.includes('🔒') ? 'text-sky-400 font-medium' : 'text-[var(--muted-foreground,#CBD5E1)]'
                         }>
                           {log}
                         </p>
@@ -1082,7 +1082,7 @@ function PolicyDetail({
                   log.includes('✅') ? 'text-emerald-400 font-bold' :
                   log.includes('⚠️') ? 'text-amber-400' :
                   log.includes('🚫') ? 'text-rose-400' :
-                  'text-slate-300'
+                  'text-[var(--muted-foreground,#CBD5E1)]'
                 }>{log}</p>
               ))}
             </div>

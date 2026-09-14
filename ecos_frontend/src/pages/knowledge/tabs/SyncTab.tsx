@@ -239,7 +239,7 @@ export default function SyncTab() {
             </div>
             <span className={`text-[8px] ${styles.muted} font-mono`}>STATUS: STABLE</span>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-2.5 font-mono text-[9px] leading-relaxed scrollbar-thin scrollbar-thumb-slate-800">
+          <div className="flex-1 overflow-y-auto space-y-2.5 font-mono text-[9px] leading-relaxed scrollbar-thin scrollbar-thumb-[#1E293B]">
             {syncLogs.length === 0 ? (
               <div className={`h-full flex flex-col items-center justify-center ${styles.muted} text-center space-y-1.5`}>
                 <Terminal size={24} className="text-[var(--card,#475569)]" />

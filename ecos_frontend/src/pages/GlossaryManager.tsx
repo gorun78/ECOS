@@ -51,22 +51,23 @@ const DeleteConfirm: React.FC<{
   onConfirm: () => void;
   onCancel: () => void;
   t: (key: string) => string;
-}> = ({ termName, onConfirm, onCancel, t }) => (
+  styles: ReturnType<typeof useTheme>["styles"];
+}> = ({ termName, onConfirm, onCancel, t, styles }) => (
   <div className="fixed inset-0 z-40 flex items-center justify-center">
     <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
     <div
-      className="relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+      className={`relative z-50 w-full max-w-sm mx-4 rounded-xl shadow-2xl p-6 ${styles.cardBg} border ${styles.cardBorder}`}
     >
-      <h3 className="text-base font-bold mb-2 text-slate-800 dark:text-slate-200">
+      <h3 className={`text-base font-bold mb-2 ${styles.cardText}`}>
         {t("glossary.delete_confirm_title")}
       </h3>
-      <p className="text-sm text-slate-500 dark:text-slate-300 mb-5">
+      <p className={`text-sm ${styles.cardTextMuted} mb-5`}>
         {t("glossary.delete_confirm_msg").replace("{name}", termName)}
       </p>
       <div className="flex gap-2 justify-end">
         <button
           onClick={onCancel}
-          className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent cursor-pointer text-sm text-slate-600 dark:text-slate-200"
+          className={`px-4 py-1.5 rounded-lg border ${styles.cardBorder} bg-transparent cursor-pointer text-sm ${styles.cardTextMuted} hover:opacity-80`}
         >
           {t("glossary.cancel")}
         </button>
@@ -293,6 +294,7 @@ export default function GlossaryManager() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           t={t}
+          styles={styles}
         />
       )}
 
@@ -365,7 +367,7 @@ export default function GlossaryManager() {
                 <div
                   key={term.id}
                   className={`flex items-center gap-2 px-3 py-2.5 border-b ${styles.cardBorder} cursor-pointer transition text-xs ${
-                    isActive ? "bg-indigo-50 border-l-2 border-l-indigo-500" : "hover:bg-slate-50"
+                    isActive ? "bg-indigo-50 border-l-2 border-l-indigo-500" : `hover:${styles.appBg}`
                   }`}
                   onClick={() => selectTerm(term)}
                 >

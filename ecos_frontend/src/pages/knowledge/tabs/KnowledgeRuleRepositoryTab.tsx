@@ -158,7 +158,7 @@ export default function KnowledgeRuleRepositoryTab() {
       <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border ${styles.inputBg} ${styles.inputBorder}`}>
         <Search size={14} className={styles.cardTextMuted} />
         <input type="text"
-          className={`bg-transparent outline-none text-xs ${styles.inputText} placeholder-slate-400 w-full`}
+          className={`bg-transparent outline-none text-xs ${styles.inputText} placeholder:${styles.muted} w-full`}
           placeholder={tl('搜索规则名或领域...', 'Search by name or domain...')}
           value={search} onChange={e => setSearch(e.target.value)}
         />

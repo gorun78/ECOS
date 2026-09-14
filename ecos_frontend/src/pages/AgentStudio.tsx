@@ -357,7 +357,7 @@ export default function AgentStudio() {
           </button>
           <input
             type="text"
-            className={`${styles.appBg} border ${styles.cardBorder} rounded-lg px-3.5 py-2 text-xs ${styles.cardText} placeholder-slate-400 outline-hidden focus:border-indigo-400 flex-1 sm:w-56 sm:flex-none font-sans`}
+            className={`${styles.appBg} border ${styles.cardBorder} rounded-lg px-3.5 py-2 text-xs ${styles.cardText} placeholder:${styles.muted} outline-hidden focus:border-indigo-400 flex-1 sm:w-56 sm:flex-none font-sans`}
             placeholder={selectedAgent ? g(`Ask ${selectedAgent.name}...`, `向 ${selectedAgent.name} 提问...`) : g("Ask agent...", "向 Agent 提问...")}
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}

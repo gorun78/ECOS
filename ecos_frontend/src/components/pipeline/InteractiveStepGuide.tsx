@@ -742,7 +742,7 @@ export default function InteractiveStepGuide({
                   <span className="text-[8px] bg-[#21262d] text-[#8b949e] px-1.5 py-0.2 rounded">PR #115 (dev/flight-enrichment)</span>
                 </div>
 
-                <div className="p-3 grid grid-cols-2 gap-4 divide-x divide-slate-800 h-36 overflow-y-auto select-text bg-[#0d1117]">
+                <div className="p-3 grid grid-cols-2 gap-4 divide-x divide-[#30363d] h-36 overflow-y-auto select-text bg-[#0d1117]">
                   <div>
                     <span className="text-[8px] text-red-400 uppercase tracking-wider block mb-1 font-sans">--- main (主生产分支)</span>
                     <pre className={`whitespace-pre-wrap ${styles.terminalText} opacity-60 font-mono`}>{mockFileDiffs[activeDiffFile].original}</pre>

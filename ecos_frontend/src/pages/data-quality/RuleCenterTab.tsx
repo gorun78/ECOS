@@ -61,6 +61,10 @@ function getCurrentUser(): string {
   );
 }
 
+/** 中性状态徽章结构帧 — 主题变量 + fallback（替代原硬编码 slate 结构色，跨 4 主题一致） */
+const NEUTRAL_BADGE_CLS =
+  "bg-[var(--muted,rgba(100,116,139,0.08))] border border-[color-mix(in_srgb,var(--card-border,#E2E8F0)_55%,transparent)]";
+
 /** 状态徽章元信息 — 仅用主题变量 classes（禁止硬编码 Tailwind 颜色） */
 const STATUS_META: Record<
   string,
@@ -69,7 +73,7 @@ const STATUS_META: Record<
   DRAFT: {
     label: "dw.dqRule.statusMachine.draft",
     icon: FileText,
-    cls: "bg-slate-100 text-slate-700 border border-slate-300 dark:bg-slate-500/10 dark:text-slate-300 dark:border-slate-500",
+    cls: `${NEUTRAL_BADGE_CLS} text-[var(--card-text,#334155)]`,
   },
   IN_REVIEW: {
     label: "dw.dqRule.statusMachine.submit",
@@ -89,7 +93,7 @@ const STATUS_META: Record<
   SUPERSEDED: {
     label: "dw.dqRule.statusMachine.supersede",
     icon: GitBranch,
-    cls: "bg-slate-100 text-slate-600 border border-slate-300 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500",
+    cls: `${NEUTRAL_BADGE_CLS} text-[#475569]/70`,
   },
   REJECTED: {
     label: "dw.dqRule.statusMachine.reject",
@@ -355,7 +359,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
           <div className="flex-1 overflow-y-auto overflow-x-auto">
             <table className="w-full text-xs align-middle">
               <thead className="sticky top-0 z-10">
-                <tr className={`${styles.appBg} dark:bg-slate-500/10 border-b ${styles.cardBorder}`}>
+                <tr className={`${styles.appBg} border-b ${styles.cardBorder}`}>
                   <th className="text-left p-2.5 font-semibold w-12">{t("dw.dqRule.colSeq")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.colName")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.category")}</th>

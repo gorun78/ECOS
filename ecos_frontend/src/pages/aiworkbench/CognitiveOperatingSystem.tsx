@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, CheckCircle, XCircle, Clock, Loader2, RotateCcw, Zap, ChevronRight, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
+import { useTheme } from '../../components/ThemeContext';
 
 const STAGES = [
   { id: 'DIAGNOSIS', labelZh: '诊断', label: 'Diagnosis', agent: 'agent-data', color: '#6366f1', descZh: '分析系统现状，识别数据质量与架构瓶颈', descEn: 'Analyze system state, identify data quality & architecture bottlenecks' },
@@ -16,6 +17,7 @@ const STAGE_ANGLES = STAGES.map((_, i) => (i * 2 * Math.PI / STAGES.length) - Ma
 
 export default function CognitiveOperatingSystem() {
   const { locale } = useLanguage();
+  const { styles } = useTheme();
   const [missionId, setMissionId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,7 +72,7 @@ export default function CognitiveOperatingSystem() {
       case 'COMPLETED': return <CheckCircle className="w-5 h-5 text-emerald-500" />;
       case 'FAILED': return <XCircle className="w-5 h-5 text-red-500" />;
       case 'STARTED': return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
-      default: return <Clock className="w-5 h-5 text-slate-400" />;
+      default: return <Clock className={`w-5 h-5 ${styles.cardTextMuted}`} />;
     }
   };
 
@@ -203,7 +205,7 @@ export default function CognitiveOperatingSystem() {
             const stage = STAGES.find(s => s.id === hoveredStage)!;
             const status = stageStatus(stage.id);
             return (
-              <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 border border-slate-800 rounded-lg p-3 text-xs">
+              <div className="absolute bottom-3 left-3 right-3 bg-[var(--overlay,rgba(15,23,42,0.9))] border border-[var(--border,#1E293B)] rounded-lg p-3 text-xs text-[var(--text-primary,#E2E8F0)]">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
                   <span className="font-bold">{tl(stage.labelZh, stage.label)}</span>
@@ -211,7 +213,7 @@ export default function CognitiveOperatingSystem() {
                     status === 'COMPLETED' ? 'bg-emerald-900/50 text-emerald-400' :
                     status === 'FAILED' ? 'bg-red-900/50 text-red-400' :
                     status === 'STARTED' ? 'bg-blue-900/50 text-blue-400' :
-                    'bg-slate-800 text-slate-400'
+                    'bg-[var(--muted,rgba(100,116,139,0.3))] text-[var(--muted-foreground,#94A3B8)]'
                   }`}>{status}</span>
                 </div>
                 <div className="text-[var(--muted-foreground)] text-[10px]">{tl(stage.descZh, stage.descEn)}</div>

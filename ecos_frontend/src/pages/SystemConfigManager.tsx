@@ -333,7 +333,7 @@ export default function SystemConfigManager() {
                 t('systemConfig.section.security'),
                 <Shield size={15} className="text-amber-400" />,
                 securityConfigs,
-                'bg-slate-50 dark:bg-slate-900'
+                styles.appBg
               )}
             </div>
           )}

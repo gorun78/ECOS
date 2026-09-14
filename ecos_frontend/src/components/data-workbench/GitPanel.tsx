@@ -81,8 +81,8 @@ const FLOW_STYLE_HARDCODED: Record<string, string> = {
   successBg: 'bg-emerald-50',
   dangerText: 'text-red-700',
   dangerBg: 'bg-red-50',
-  cardTextMuted: 'text-slate-500',
-  sidebarBg: 'bg-slate-100',
+  cardTextMuted: 'text-[#64748b]',
+  sidebarBg: 'bg-[rgb(148,163,184,0.14)]',
   infoText: 'text-blue-700',
   infoBg: 'bg-blue-50',
 };
