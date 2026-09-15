@@ -35,7 +35,7 @@ public class KnowledgeStatsAggregator {
                     "COALESCE((SELECT MAX(created_at) FROM ecos_knowledge.graph_node), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(updated_at) FROM ecos_knowledge.graph_edge), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(updated_at) FROM ecos_knowledge.knowledge_article), TIMESTAMP '1970-01-01 00:00:00+08')," +
-                    "COALESCE((SELECT MAX(created_at) FROM kb_ontology_snapshot), TIMESTAMP '1970-01-01 00:00:00+08')," +
+                    "COALESCE((SELECT MAX(created_at) FROM ecos_knowledge.kb_ontology_snapshot), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(updated_at) FROM kb_cognitive_pipeline), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(parse_at) FROM kb_lineage_event), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(TO_TIMESTAMP(changed_at / 1000.0)) FROM sys_rule_version), TIMESTAMP '1970-01-01 00:00:00+08')," +
@@ -61,17 +61,19 @@ public class KnowledgeStatsAggregator {
         vo.setComplianceRuleCount(count("SELECT COUNT(*) FROM sys_compliance_rule"));
         vo.setActiveComplianceRuleCount(count("SELECT COUNT(*) FROM sys_compliance_rule WHERE status = 'ACTIVE'"));
         vo.setRuleVersionCount(count("SELECT COUNT(*) FROM sys_rule_version"));
-        vo.setOntologySnapshotCount(count("SELECT COUNT(*) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
+        vo.setOntologySnapshotCount(count(
+                "SELECT COUNT(*) FROM ecos_knowledge.kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setOntologyVersionCount(count(
-                "SELECT COUNT(DISTINCT ontology_id) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
+                "SELECT COUNT(DISTINCT ontology_id) FROM ecos_knowledge.kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setKgSyncLogCount(count("SELECT COUNT(*) FROM ecos_knowledge.kg_sync_log"));
         vo.setCognitivePipelineCount(count("SELECT COUNT(*) FROM kb_cognitive_pipeline WHERE is_deleted = 0"));
         vo.setLineageEventCount(count("SELECT COUNT(*) FROM kb_lineage_event WHERE is_deleted = 0"));
         vo.setPublishedOntologyVersionCount(count(
-                "SELECT COUNT(DISTINCT ontology_id) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
+                "SELECT COUNT(DISTINCT ontology_id) FROM ecos_knowledge.kb_ontology_snapshot WHERE is_deleted = 0"));
 
         vo.setLastKgSyncAt(maxTimestamp("SELECT MAX(created_at) FROM ecos_knowledge.kg_sync_log"));
-        vo.setLastOntologySnapshotAt(maxTimestamp("SELECT MAX(created_at) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
+        vo.setLastOntologySnapshotAt(maxTimestamp(
+                "SELECT MAX(created_at) FROM ecos_knowledge.kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setLastUpdatedAt(maxTimestamp(GREATEST_TS_SQL));
 
         return vo;
