@@ -13,6 +13,7 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -180,7 +181,8 @@ class Wave31OntologyConvergenceTest {
     @DisplayName("C4: 乐观锁 — 版本号失配抛 IllegalStateException 带 ONT-409")
     void c4_optimisticLockVersionMismatch() {
         OntologyProposalService proposal = mock(OntologyProposalService.class);
-        OntologyVersionService svc = new OntologyVersionService(versionRepo, ontRepo, proposal);
+        OntologyVersionService svc = new OntologyVersionService(
+            versionRepo, ontRepo, proposal, mock(ApplicationEventPublisher.class), Optional.empty());
 
         // 提案 999 当前版本号=4, 客户端发 5 → mismatch
         when(proposal.optimisticTransition(eq("999"), eq("APPROVED"),
@@ -202,7 +204,8 @@ class Wave31OntologyConvergenceTest {
     @DisplayName("C5: publishFromProposal — 成功路径 + 冲突路径")
     void c5_publishFromProposalHappypathAndConflict() {
         OntologyProposalService proposal = mock(OntologyProposalService.class);
-        OntologyVersionService svc = new OntologyVersionService(versionRepo, ontRepo, proposal);
+        OntologyVersionService svc = new OntologyVersionService(
+            versionRepo, ontRepo, proposal, mock(ApplicationEventPublisher.class), Optional.empty());
 
         // ── 成功路径: 版本号匹配 → 走 publish 流程 ──
         OntologyVersion existing = new OntologyVersion();

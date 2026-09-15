@@ -8,7 +8,11 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.event.OntologyPublishedEvent;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionPreviousDiffVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionVO;
@@ -38,13 +42,21 @@ public class OntologyVersionService {
     private final OntologyVersionRepository versionRepository;
     private final OntologyRepository ontologyRepository;
     private final OntologyProposalService proposalService;
+    /** 发布事件内存路径（同 JVM {@code @EventListener} 消费）。 */
+    private final ApplicationEventPublisher appEventPublisher;
+    /** 发布事件 Kafka/总线路径（跨 JVM 路由）；runtime-event 未装配时为空。 */
+    private final Optional<EventBusService> eventBus;
 
     public OntologyVersionService(OntologyVersionRepository versionRepository,
                                    OntologyRepository ontologyRepository,
-                                   OntologyProposalService proposalService) {
+                                   OntologyProposalService proposalService,
+                                   ApplicationEventPublisher appEventPublisher,
+                                   Optional<EventBusService> eventBus) {
         this.versionRepository = versionRepository;
         this.ontologyRepository = ontologyRepository;
         this.proposalService = proposalService;
+        this.appEventPublisher = appEventPublisher;
+        this.eventBus = eventBus;
     }
 
     private String nextId() { return "ver" + ID_SEQ.incrementAndGet(); }
@@ -117,6 +129,9 @@ public class OntologyVersionService {
 
     /**
      * 发布版本：Draft → Published
+     *
+     * <p>PMO-50 T4：发布成功后经 {@link #fanOutOntologyPublished(String, String, String)}
+     * 事件双发，驱动 kb 侧 KG 同步（buszhi 金·I → dccheng 水·K）。
      */
     public Map<String, Object> publishVersion(String ontologyId, String versionId) {
         OntologyVersion ver = versionRepository.findById(versionId)
@@ -125,11 +140,12 @@ public class OntologyVersionService {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
         versionRepository.updateStatus(versionId, "Published");
+        fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
     }
 
     /**
-     * 强类型 VO 版（T16-2）；语义与旧版一致（Illustrated）。
+     * 强类型 VO 版（T16-2）；语义与旧版一致（Illustrated，含 PMO-50 T4 发布事件双发）。
      */
     public OntologyVersionVO publishVersionVO(String ontologyId, String versionId) {
         OntologyVersion ver = versionRepository.findById(versionId)
@@ -138,7 +154,43 @@ public class OntologyVersionService {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
         versionRepository.updateStatus(versionId, "Published");
+        fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toVO).orElse(null);
+    }
+
+    /**
+     * 发布事件双发（PMO-50 T4）— 必须覆盖全部发布路径，否则 kb 侧 KG 同步永不触发。
+     *
+     * <ol>
+     *   <li>Spring 内存事件 {@link ApplicationEventPublisher#publishEvent} — 同 JVM
+     *       {@code EcosOntologyEventConsumer#onOntologyPublished} 的 {@code @EventListener} 路径；</li>
+     *   <li>Kafka 事件总线 {@link EventBusService#publish} — 跨 JVM 路由（{@code ecos.event.kafka.enabled=true}
+     *       时入 Kafka）。
+     *       注：内存 fallback 下本路径被包成 {@code MemoryEnvelopeEvent}、无对应监听者，属预期无害重复。</li>
+     * </ol>
+     *
+     * <p>发布状态已提交，事件下发失败仅记日志，不阻塞主流程；载荷只含版本标识，不含本体业务文本。
+     */
+    private void fanOutOntologyPublished(String ontologyId, String versionNo, String actor) {
+        try {
+            OntologyPublishedEvent evt = OntologyPublishedEvent.of(
+                    ontologyId,
+                    versionNo,
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    actor == null || actor.isBlank() ? "system" : actor);
+            if (appEventPublisher != null) {
+                appEventPublisher.publishEvent(evt);
+            } else {
+                log.warn("publishVersion appEventPublisher null, spring-event path skipped ontologyId={}", ontologyId);
+            }
+            eventBus.ifPresentOrElse(
+                    bus -> bus.publish(KafkaTopics.ONTOLOGY_PUBLISHED, evt),
+                    () -> log.warn("publishVersion EventBusService unavailable, kafka path skipped topic={} version={}",
+                            KafkaTopics.ONTOLOGY_PUBLISHED, versionNo));
+        } catch (Exception e) {
+            log.error("publishVersion event fan-out failed ontologyId={} version={}", ontologyId, versionNo, e);
+        }
     }
 
     /**
@@ -322,6 +374,7 @@ public class OntologyVersionService {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
         versionRepository.updateStatus(versionId, "Published");
+        fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
     }
 
@@ -335,6 +388,7 @@ public class OntologyVersionService {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
         versionRepository.updateStatus(versionId, "Published");
+        fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toVO).orElse(null);
     }
 
