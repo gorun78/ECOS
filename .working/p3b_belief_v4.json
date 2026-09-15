@@ -1,1 +1,0 @@
-{"variableName":"fuel_price_level","domain":"aviation","tenantScope":"default","discreteDistribution":[{"outcome":"low","prob":0.3},{"outcome":"base","prob":0.4},{"outcome":"high","prob":0.3}]}

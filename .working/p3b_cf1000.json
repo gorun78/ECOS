@@ -1,1 +1,0 @@
-{"scenarioId":"sc001","domain":"aviation","variableName":"fuel_price_level","interventions":[{"variableName":"fuel_price_level","op":"DELTA","value":0.15}],"baseline":{"outcomeValues":{"fuel_price_level":{"low":1,"base":1.15,"high":1.5}}},"sampleCount":1000,"seed":42}
