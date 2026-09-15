@@ -364,9 +364,10 @@
 | 迁移补齐 | `7eb2144` | chore(知识工作台): 补回 V115 kg_sync_log 迁移脚本（修复 V114→V116 断号） |
 | 批 D 缺陷修复 | `447ce61` | fix(工作台): 统计聚合器 kb_ontology_snapshot 补 schema 限定对齐写入侧 |
 | 临时产物清理 | `54bb9fa` | chore: 清理历史临时校验产物（.working 脚本/日志、wave1 探测输出） |
-| 本报告 | 随本次提交 | docs: release/v2.1-alpha 合并审计报告 |
+| 本报告 | `069a71a` | docs: release/v2.1-alpha 合并审计报告（四任务回放完整性 + 阶段2端到端收口凭证） |
+| 探针产物忽略 | `c0331ad` | chore(构建): .gitignore 忽略一次性探针产物（.working/ 与根级 p3b 日志） |
 
-> 溯源命令：`git log --oneline --grep "2.1-alpha\|回放 stash\|本体发布事件"`；工作区干净后 `git status --short` 应为空（`.working/` 运行期日志已列入待清理）。
+> 溯源命令：`git log --oneline --grep "2.1-alpha\|回放 stash\|本体发布事件"`；`git status --short` 干净（`.working/` 与根级 `_p3b_*.log` 已入 `.gitignore`）。
 
 ### 11.6 阶段 2 结论
 
