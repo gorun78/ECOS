@@ -1,23 +1,29 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,6 +58,8 @@ public class KnowledgeExtractionService {
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String UPLOAD_DIR = System.getProperty("java.io.tmpdir") + "/ecos-extractions";
     private static final String AGENT_LOOP_URL = "http://localhost:8080/api/v1/agent-loop/chat";
+    /** 本体变更提案端点 — kb→ontology 跨引擎（与 AGENT_LOOP_URL 同款同 JVM 走网关 8080 约定） */
+    private static final String ONTOLOGY_PROPOSAL_URL = "http://localhost:8080/api/v1/ontology/proposals";
     private static final int PARSE_TIMEOUT_SEC = 120;
     private static final int LLM_TIMEOUT_SEC = 60;
     private static final int MAX_RETRY = 1;
@@ -460,6 +468,87 @@ public class KnowledgeExtractionService {
 
     public Map<String, Object> getTask(String id) {
         return jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", id);
+    }
+
+    /**
+     * 抽取实体转候选本体（PMO-50 T5）— 把审核面板选中的实体提交给 ontology-engine 生成「本体变更提案」。
+     *
+     * <p>kb 不直接写 ontology 表：逐个实体 POST ontology-engine
+     * {@code /api/v1/ontology/proposals}（proposalType=CREATE_ENTITY，初始状态 DRAFT）。
+     * 单实体失败不中止整批（错误隔离），失败明细随返回体下发。</p>
+     *
+     * @param request 待转候选本体的实体列表（前端审核面板选中项 + 来源抽取任务 ID）
+     * @return 提交数 / 成功数 / 提案 ID 列表 / 失败明细
+     */
+    public ExtractionPromoteResultVO promoteToCandidate(ExtractionPromoteRequest request) {
+        List<ExtractionPromoteRequest.EntityRef> entities =
+            (request == null || request.getEntities() == null) ? Collections.emptyList() : request.getEntities();
+        String extractionId = request == null ? null : request.getSourceExtractionId();
+        String author = StringUtils.hasText(extractionId) ? "extraction:" + extractionId : "extraction";
+
+        List<String> proposalIds = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
+        for (ExtractionPromoteRequest.EntityRef entity : entities) {
+            if (entity == null || !StringUtils.hasText(entity.getName())) {
+                failures.add("(空实体): 实体名称为空");
+                continue;
+            }
+            try {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("name", entity.getName());
+                payload.put("type", entity.getType());
+                payload.put("source", "extraction");
+                if (StringUtils.hasText(extractionId)) {
+                    payload.put("sourceExtractionId", extractionId);
+                }
+
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("domainCode", "default");
+                body.put("proposalType", "CREATE_ENTITY");
+                body.put("targetEntity", entity.getName());
+                body.put("author", author);
+                body.put("title", "抽取实体转候选本体: " + entity.getName());
+                body.put("payload", payload);
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
+                // 必须显式声明期望 JSON：缺 Accept 时服务端内容协商会命中 XML 转换器，
+                // 返回 <ApiResponse> 而非 JSON（与 AGENT_LOOP 调用同款加固）
+                headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+                ResponseEntity<String> resp = restTemplate.postForEntity(
+                    ONTOLOGY_PROPOSAL_URL,
+                    new HttpEntity<>(mapper.writeValueAsBytes(body), headers),
+                    String.class);
+
+                String raw = resp.getBody() == null ? "{}" : resp.getBody();
+                JsonNode root;
+                try {
+                    root = mapper.readTree(raw);
+                } catch (Exception parseErr) {
+                    log.warn("ontology proposal response not JSON: status={} body={}",
+                        resp.getStatusCode(), raw.length() > 300 ? raw.substring(0, 300) : raw);
+                    throw parseErr;
+                }
+                JsonNode proposalId = root.path("data").path("id");
+                if (!root.path("success").asBoolean(false) || proposalId.isMissingNode()) {
+                    failures.add(entity.getName() + ": " + root.path("message").asText("提案创建失败"));
+                    continue;
+                }
+                proposalIds.add(proposalId.asText());
+            } catch (Exception e) {
+                log.error("转候选本体失败 entity={} extractionId={}", entity.getName(), extractionId, e);
+                failures.add(entity.getName() + ": " + e.getMessage());
+            }
+        }
+
+        ExtractionPromoteResultVO result = new ExtractionPromoteResultVO();
+        result.setRequested(entities.size());
+        result.setCreated(proposalIds.size());
+        result.setProposalIds(proposalIds);
+        result.setFailures(failures);
+        log.info("promoteToCandidate extractionId={} requested={} created={} failed={}",
+            extractionId, entities.size(), proposalIds.size(), failures.size());
+        return result;
     }
 
     // ── 工具方法 ─────────────────────────────────────

@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeExtractionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,6 +107,21 @@ public class ExtractionController {
         } catch (Exception e) {
             log.error("驳回失败: id={}, {}", id, e.getMessage());
             return ApiResponse.badRequest("驳回失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 抽取实体转候选本体（PMO-50 T5）— 审核面板选中实体 → ontology「本体变更提案」。
+     *
+     * <p>单实体失败不中止整批，失败明细见返回体 {@code failures}。</p>
+     */
+    @PostMapping("/promote-to-candidate")
+    public ApiResponse<ExtractionPromoteResultVO> promoteToCandidate(@RequestBody ExtractionPromoteRequest request) {
+        try {
+            return ApiResponse.success(extractionService.promoteToCandidate(request));
+        } catch (Exception e) {
+            log.error("转候选本体失败: {}", e.getMessage(), e);
+            return ApiResponse.badRequest("转候选本体失败: " + e.getMessage());
         }
     }
 }
