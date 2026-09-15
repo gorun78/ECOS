@@ -24,6 +24,7 @@
   "extractReview.complete.title": "处理完成",
   "extractReview.edit": "编辑",
   "extractReview.noData": "暂无数据",
+  "extractReview.promoteToCandidate": "转候选本体（{n}）",
   "extractReview.rejectAll": "全部驳回",
   "extractReview.selected": "已选 {n} 项",
   "extractReview.sourceText": "源文本",

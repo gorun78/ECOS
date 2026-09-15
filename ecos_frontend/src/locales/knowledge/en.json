@@ -24,6 +24,7 @@
   "extractReview.complete.title": "Processing Complete",
   "extractReview.edit": "Edit",
   "extractReview.noData": "No data",
+  "extractReview.promoteToCandidate": "Promote to candidate ({n})",
   "extractReview.rejectAll": "Reject All",
   "extractReview.selected": "{n} selected",
   "extractReview.sourceText": "Source Text",

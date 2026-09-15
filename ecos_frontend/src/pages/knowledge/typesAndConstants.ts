@@ -98,6 +98,14 @@ export interface SyncLog {
   operation: string;
   status: string;
   message: string;
+  /** PMO-50 T2: kg_sync_log.job_id（V115 持久化后回填） */
+  jobId?: string;
+  /** PMO-50 T2: kg_sync_log.nodes */
+  nodes?: number;
+  /** PMO-50 T2: kg_sync_log.edges */
+  edges?: number;
+  /** PMO-50 T2: kg_sync_log.error_message */
+  errorMessage?: string;
 }
 
 /**

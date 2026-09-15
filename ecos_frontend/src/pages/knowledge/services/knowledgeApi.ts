@@ -27,6 +27,7 @@ const GLOSSARY_BASE = '/api/v1/ontology/glossary';
 const CATALOG_BASE = '/api/catalog';
 const COGNITIVE_BASE = '/api/v1/cognitive';
 const RULES_BASE = '/api/v1/knowledge/compliance-rules';
+const MAPPINGS_BASE = '/api/v1/ecos/mappings';
 
 // ── PMO-54 helpers ───────────────────────────────────────────────────────────
 
@@ -83,9 +84,27 @@ export async function findPath(source: string, target: string) {
   return apiFetchData(`${GRAPH_BASE}/path?s=${encodeURIComponent(source)}&t=${encodeURIComponent(target)}`);
 }
 
-// ── PMO-26 T1: Graph full-text search & path ──
-export async function graphSearch(query: string) {
-  return apiFetchData(`/api/v1/knowledge/graph/search?q=${encodeURIComponent(query)}`);
+// ── PMO-26 T1 / PMO-51 T2: Graph full-text search & path ──
+// PMO-51 T2 起后端 graph/search 仅保留 POST 通道（请求体 GraphSearchQuery），
+// 原 GET ?q= 已下线；此处保留字符串入参重载，供既有调用方零改动迁移。
+
+/** graphSearch POST 体（与后端 GraphSearchQuery 对齐） */
+export interface GraphSearchInput {
+  keyword: string;
+  nodeType?: string;
+  limit?: number;
+}
+
+/**
+ * POST /api/v1/knowledge/graph/search — 按 keyword（+ 可选 nodeType）双过滤返回 top N。
+ * @param input 关键词字符串（兼容旧签名）或 {@link GraphSearchInput}
+ */
+export async function graphSearch(input: string | GraphSearchInput) {
+  const body = typeof input === 'string' ? { keyword: input, limit: 20 } : input;
+  return apiFetchData('/api/v1/knowledge/graph/search', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 export async function graphPath(source: string, target: string) {
@@ -277,6 +296,11 @@ export async function updateCognitiveConfig(updates: Array<{ config_key: string;
   });
 }
 
+/** PMO-51 T6 — {@link updateCognitiveConfig} 别名（对齐 PMO task 命名约定） */
+export async function saveCognitiveConfig(updates: Array<{ config_key: string; config_value: string }>) {
+  return updateCognitiveConfig(updates);
+}
+
 export async function fetchLineageImpact(startNode: string) {
   try {
     return await apiFetchData(`/api/v1/lineage/impact?startNode=${encodeURIComponent(startNode)}`);
@@ -361,7 +385,85 @@ export async function fetchRuleVersions(ruleId: string): Promise<RuleVersion[]> 
   }
 }
 
-// ── PMO-54 — Overview / Dashboard ─────────────────────────────────────────────
+// ── PMO-51 T3: Knowledge ingest ─────────────────────────────────
+
+/** ingest 入参（与后端 KnowledgeIngestRequest 对齐） */
+export interface KnowledgeIngestInput {
+  entityId: string;
+  label?: string;
+  type?: string;
+  sourceRef?: string;
+  properties?: Record<string, string>;
+  payload?: Record<string, unknown>;
+}
+
+/**
+ * POST /api/v1/knowledge/ingest — 写 graph_node（entityId 幂等），命中返回 idempotent=true。
+ */
+export async function ingestKnowledge(req: KnowledgeIngestInput) {
+  return apiFetchData<{ nodeId?: string; idempotent?: boolean }>(`${KB_V1}/ingest`, {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+// ── PMO-51 T4: Global ontology mapping (read-only) ───────────────
+
+/**
+ * GET /api/v1/ecos/mappings/full — 全局 mapping（不分页），响应头带 ETag。
+ * @param etag 上一轮 ETag（W/"..."）；命中 304 时返回空数组
+ */
+export async function fetchAllMappings(etag?: string): Promise<unknown[] & { __etag?: string }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('token') || '';
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (etag) {
+    headers['If-None-Match'] = etag;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${MAPPINGS_BASE}/full`, { headers });
+  } catch (e) {
+    throw new Error(`fetchAllMappings failed: ${String(e)}`);
+  }
+  if (res.status === 304) {
+    return [] as unknown as (unknown[] & { __etag?: string });
+  }
+  if (!res.ok) {
+    throw new Error(`fetchAllMappings HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  if (json.code && json.code !== 200 && json.code !== 0) {
+    throw new Error(json.message || `Error ${json.code}`);
+  }
+  const etagNew = res.headers.get('etag') || '';
+  const data = json.data !== undefined ? json.data : json;
+  (data as { __etag?: string }).__etag = etagNew;
+  return data;
+}
+
+// ── PMO-50 T5: 抽取反哺候选本体 ─────────────────────────────────
+
+/** 抽取反哺候选本体入参 */
+export interface PromoteCandidateRequest {
+  entities: Array<{ name: string; type: string }>;
+  sourceExtractionId?: string;
+}
+
+/**
+ * POST /api/v1/knowledge/extract/promote-to-candidate — 将审核通过的抽取实体转为候选本体。
+ */
+export async function promoteToCandidate(body: PromoteCandidateRequest) {
+  return apiFetchData('/api/v1/knowledge/extract/promote-to-candidate', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+// ── PMO-54 — Overview / Dashboard ────────────────────────────────────────────
 
 export async function fetchGraphStats(): Promise<{
   graphNodeCount: number;
@@ -428,9 +530,12 @@ export interface JobPreview {
   samples?: Array<Record<string, unknown>>;
 }
 
-export async function previewGraphJob(jobId: string): Promise<JobPreview> {
+export async function previewGraphJob(jobId: string, type = 'ALL'): Promise<JobPreview> {
   try {
-    return await apiFetchData<JobPreview>(`${KB_V1}/sync/jobs/${encodeURIComponent(jobId)}/preview`);
+    return await apiFetchData<JobPreview>(
+      `${KB_V1}/sync/jobs/${encodeURIComponent(jobId)}/preview?type=${encodeURIComponent(type)}`,
+      { method: 'POST' }
+    );
   } catch {
     return { create: 0, update: 0, skip: 0 };
   }
@@ -757,6 +862,7 @@ export const knowledgeApi = {
   classifyAsset,
   fetchCognitiveConfig,
   updateCognitiveConfig,
+  saveCognitiveConfig,
   fetchLineageImpact,
   parseLineage,
   fetchIntegrationMetadata,
@@ -792,4 +898,9 @@ export const knowledgeApi = {
   saveEngineConfig,
   fetchDataWorkbenchSources,
   fetchMetadataDrift,
+  // PMO-51
+  ingestKnowledge,
+  fetchAllMappings,
+  // PMO-50 T5
+  promoteToCandidate,
 };
