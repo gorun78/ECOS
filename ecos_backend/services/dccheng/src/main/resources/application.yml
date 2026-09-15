@@ -64,6 +64,17 @@ ecos:
     enabled: false
   neo4j:
     enabled: ${ECOS_NEO4J_ENABLED:false}
+  # PMO-50 T1/T4: RAG 向量检索 + 本体事件消费者
+  # RAG embedding 调用地址: 微服务走 ileng-service,.dccheng 同 JVM 自调 18086
+  rag:
+    embedding-model: ${ECOS_RAG_EMB_MODEL:text-embedding-3-small}
+    llm-gateway-base: ${ECOS_RAG_LLM_BASE:}   # 空串=内部走 LLMGatewayService
+  # 本体版本发布消费者: 微服务内网直连 buszhi 18083 (ADR-7 内网可达)
+  ontology-base: ${ECOS_ONTOLOGY_BASE:http://localhost:18083/api/v1/ecos}
+  # DCCheng 双跑期 (gateway 与 dccheng 共进程时) 自动识别:
+  # 双跑时 event 走 Spring 同 JVM, REST 通过 X-ECOS- 头走 18083 也可
+  dccheng:
+    dually-hosted: ${ECOS_DUAL_HOSTED:false}
 
 management:
   endpoints:

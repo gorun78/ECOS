@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.engine.kb.repo.QueryEmbeddingHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ class RAGSearchServiceTest {
     private KnowledgeArticleMapper articleMapper;
     private KnowledgeEmbeddingMapper embeddingMapper;
     private JdbcTemplate jdbc;
+    private QueryEmbeddingHelper queryEmbeddingHelper;
     private KnowledgeRetrievalServiceImpl service;
 
     @BeforeEach
@@ -59,7 +61,12 @@ class RAGSearchServiceTest {
         articleMapper = mock(KnowledgeArticleMapper.class);
         embeddingMapper = mock(KnowledgeEmbeddingMapper.class);
         jdbc = mock(JdbcTemplate.class);
-        service = new KnowledgeRetrievalServiceImpl(articleMapper, embeddingMapper, nodeMapper, edgeMapper, jdbc);
+        queryEmbeddingHelper = mock(QueryEmbeddingHelper.class);
+        // PMO-50 T1: QueryEmbeddingHelper 默认返回 null → service 走 keyword fallback；
+        // 测试 mock searchByVector 仍然验证 mapper 调用链
+        service = new KnowledgeRetrievalServiceImpl(
+                articleMapper, embeddingMapper, nodeMapper, edgeMapper, jdbc,
+                queryEmbeddingHelper, "text-embedding-3-small", "");
     }
 
     /** 在 stub checkPgVector 前手动设 flag (反射), 避免触发真实 JDBC。 */
