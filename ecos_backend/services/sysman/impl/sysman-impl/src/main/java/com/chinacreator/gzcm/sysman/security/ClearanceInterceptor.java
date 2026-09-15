@@ -84,6 +84,9 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/pipeline/debug")
                 || path.startsWith("/api/v1/agents")
                 || path.startsWith("/api/v1/agent-loop")
+                // ── PMO-50 LLM 网关原语：embed/chat 公共底座豁免（与 /api/v1/agent-loop 同粒度，
+                //    kb-engine/cognitive-engine 走 gateway 8080 转发时不应被 clearance 拦截）
+                || path.startsWith("/api/v1/llm")
                 || path.startsWith("/api/v1/aip")
                 || path.startsWith("/api/ontology")
                 || path.startsWith("/api/integration")

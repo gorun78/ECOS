@@ -42,6 +42,9 @@ public class SecurityConfig {
                     "/api/v1/agent/**",
                     "/api/v1/agent-loop/**",
                     "/api/v1/agent-mesh/**",
+                    // ── PMO-50 LLM 网关原语 — 暴露 runtime/llm-gateway embed/chat，公共底座复用
+                    // (aiming 服务承载 /api/v1/llm/**，kb-engine/cognitive-engine 走 gateway 8080 转发)
+                    "/api/v1/llm/**",
                     // "◄ /api/v1/knowledge/** — 移除 (敏感正文, QA T5-007)"
                     // ── PMO-55 E-A: workspace 知识工作台三端点放行 (与 KnowledgeApiController /api/v1/knowledge/index-status 同前缀) ──
                     // 新增端点: /api/v1/knowledge/health | /stats | /engine-config — 仅查公开元数据 + 引擎 health
