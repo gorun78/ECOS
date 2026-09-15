@@ -4,7 +4,6 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
 import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
-import com.chinacreator.gzcm.engine.kb.service.KgSyncServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -35,14 +34,11 @@ public class GraphSyncController {
 
     private final KgSyncService kgSyncService;
     private final KgMapperService kgMapper;
-    private final KgSyncServiceImpl kgSyncServiceImpl;
 
     public GraphSyncController(KgSyncService kgSyncService,
-                               KgMapperService kgMapper,
-                               KgSyncServiceImpl kgSyncServiceImpl) {
+                               KgMapperService kgMapper) {
         this.kgSyncService = kgSyncService;
         this.kgMapper = kgMapper;
-        this.kgSyncServiceImpl = kgSyncServiceImpl;
     }
 
     @GetMapping("/status")
@@ -84,6 +80,14 @@ public class GraphSyncController {
     // ── PMO-50 T4.5: 预览/回滚/单 job 日志 ──────────────────
 
     /**
+     * GET /api/v1/knowledge/sync/jobs?limit=50 — 任务列表（PMO-54 GraphBuilderTab 消费）。
+     */
+    @GetMapping("/jobs")
+    public ApiResponse<List<Map<String, Object>>> listJobs(@RequestParam(defaultValue = "50") int limit) {
+        return ApiResponse.success(kgSyncService.listJobs(limit));
+    }
+
+    /**
      * POST /api/v1/knowledge/sync/jobs/{jobId}/preview?type=ALL
      * dry-run：返回本次 dry-run 将 create/update/skip 的对象计数（不落库）。
      */
@@ -115,7 +119,7 @@ public class GraphSyncController {
     @GetMapping("/jobs/{jobId}/logs")
     public ApiResponse<List<Map<String, Object>>> getJobLogs(@PathVariable String jobId,
                                                              @RequestParam(defaultValue = "100") int limit) {
-        return ApiResponse.success(kgSyncServiceImpl.getJobLogs(jobId, limit));
+        return ApiResponse.success(kgSyncService.getJobLogs(jobId, limit));
     }
 
     /**

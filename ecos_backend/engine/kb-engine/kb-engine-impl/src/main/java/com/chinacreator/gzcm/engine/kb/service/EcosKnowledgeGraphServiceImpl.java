@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.EcosKnowledgeGraphService;
+import com.chinacreator.gzcm.engine.kb.KgSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -29,9 +30,9 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
     private static final Logger log = LoggerFactory.getLogger(EcosKnowledgeGraphServiceImpl.class);
 
     private final JdbcTemplate jdbc;
-    private final KgSyncServiceImpl kgSyncService;
+    private final KgSyncService kgSyncService;
 
-    public EcosKnowledgeGraphServiceImpl(JdbcTemplate jdbc, @Lazy KgSyncServiceImpl kgSyncService) {
+    public EcosKnowledgeGraphServiceImpl(JdbcTemplate jdbc, @Lazy KgSyncService kgSyncService) {
         this.jdbc = jdbc;
         this.kgSyncService = kgSyncService;
     }

@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.engine.kb.dto.KnowledgeIngestRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeIngestResult;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -35,6 +37,7 @@ import java.util.Map;
  * <ul>
  *   <li>POST /api/v1/knowledge/ingest      — 写入实体（upsert 到 graph_node，幂等）</li>
  *   <li>POST /api/v1/knowledge/graph/build — 触发 runtime-task 异步全量构建，返回 jobId</li>
+ *   <li>POST /api/v1/knowledge/graph/build/preview — dry-run 预览 create/update/skip 计数（不落库）</li>
  * </ul>
  */
 @RestController
@@ -48,13 +51,16 @@ public class KnowledgeIngestController {
     private final KnowledgeNodeMapper nodeMapper;
     private final JdbcTemplate jdbcTemplate;
     private final KgSyncService kgSyncService;
+    private final KgMapperService kgMapper;
 
     public KnowledgeIngestController(KnowledgeNodeMapper nodeMapper,
                                      JdbcTemplate jdbcTemplate,
-                                     KgSyncService kgSyncService) {
+                                     KgSyncService kgSyncService,
+                                     KgMapperService kgMapper) {
         this.nodeMapper = nodeMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.kgSyncService = kgSyncService;
+        this.kgMapper = kgMapper;
     }
 
     // ── /ingest ──────────────────────────────────────────────────────
@@ -131,6 +137,22 @@ public class KnowledgeIngestController {
         } catch (Exception e) {
             log.error("Knowledge graph build failed: {}", e.getMessage(), e);
             return ApiResponse.internalError("图谱构建触发失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/v1/knowledge/graph/build/preview — dry-run 预览本次建图将 create/update/skip 的对象计数（不落库）。
+     *
+     * <p>前端 PMO-54 GraphBuilderTab「dry-run 预览」按钮消费；语义与
+     * {@code POST /api/v1/knowledge/sync/jobs/{jobId}/preview} 对齐，复用 {@link KgMapperService#previewDryRun(String)}。</p>
+     */
+    @PostMapping("/graph/build/preview")
+    public ApiResponse<Map<String, Object>> previewBuild(@RequestParam(defaultValue = "ALL") String type) {
+        try {
+            return ApiResponse.success(kgMapper.previewDryRun(type));
+        } catch (Exception e) {
+            log.error("Knowledge graph build preview failed: {}", e.getMessage(), e);
+            return ApiResponse.internalError("图谱构建预览失败: " + e.getMessage());
         }
     }
 

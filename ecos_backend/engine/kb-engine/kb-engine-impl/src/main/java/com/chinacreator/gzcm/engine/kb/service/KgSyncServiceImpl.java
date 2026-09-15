@@ -153,6 +153,7 @@ public class KgSyncServiceImpl implements KgSyncService {
      * 将 ontologies 对象映射到 graph_node/graph_edge（异步，T2/T4 共用入口）。
      * 通过 Spring {@code @Async} 走默认 taskExecutor；铁律 §2.5 #3 不允许自建 ScheduledExecutorService。
      */
+    @Override
     @Async
     public void runKgMapper(String objectType, String jobId) {
         try {
@@ -204,6 +205,7 @@ public class KgSyncServiceImpl implements KgSyncService {
     /**
      * 拉单个 job 维度的同步日志（PMO-50 T4 GraphSyncController /jobs/{jobId}/logs 复用）。
      */
+    @Override
     public List<Map<String, Object>> getJobLogs(String jobId, int limit) {
         if (jobId == null || jobId.isBlank()) {
             return Collections.emptyList();
@@ -220,6 +222,65 @@ public class KgSyncServiceImpl implements KgSyncService {
             log.warn("getJobLogs failed: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * 按 job 维度列出同步任务（取每个 job 最新一行），供 PMO-54 GraphBuilderTab 任务列表消费。
+     * 状态映射为前端 {@code GraphBuildJob.status} 枚举（PENDING/RUNNING/SUCCEEDED/FAILED）。
+     */
+    @Override
+    public List<Map<String, Object>> listJobs(int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT t.job_id AS \"jobId\", t.op AS \"operation\", t.status, " +
+                    "       t.error_message AS \"error\", t.created_at AS \"createdAt\", t.finished_at AS \"finishedAt\" " +
+                    "FROM (SELECT DISTINCT ON (job_id) job_id, op, status, error_message, created_at, finished_at " +
+                    "      FROM ecos_knowledge.kg_sync_log ORDER BY job_id, created_at DESC) t " +
+                    "ORDER BY t.created_at DESC LIMIT ?",
+                    safeLimit);
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                Map<String, Object> job = new LinkedHashMap<>();
+                job.put("jobId", row.getOrDefault("jobId", ""));
+                job.put("type", coerceJobType(row.get("operation")));
+                job.put("status", coerceJobStatus(row.get("status")));
+                job.put("createdAt", formatTs(row.get("createdAt")));
+                job.put("updatedAt", formatTs(row.get("finishedAt")));
+                job.put("error", row.getOrDefault("error", ""));
+                out.add(job);
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("listJobs failed (table missing?): {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** kg_sync_log.status → 前端 GraphBuildJob.status 枚举。 */
+    private String coerceJobStatus(Object raw) {
+        if (raw == null) {
+            return "PENDING";
+        }
+        switch (String.valueOf(raw).toUpperCase(Locale.ROOT)) {
+            case STATUS_RUNNING: return "RUNNING";
+            case STATUS_SUCCESS: return "SUCCEEDED";
+            case STATUS_FAILED: return "FAILED";
+            case "ROLLED_BACK": return "ROLLED_BACK";
+            default: return "PENDING";
+        }
+    }
+
+    /** kg_sync_log.op → 前端 GraphBuildJob.type 枚举（FULL/INCREMENTAL/DRY_RUN）。 */
+    private String coerceJobType(Object raw) {
+        String op = raw == null ? "" : String.valueOf(raw).toUpperCase(Locale.ROOT);
+        if (op.contains("FULL") || op.contains("NEO4J")) {
+            return "FULL";
+        }
+        if (op.contains("DRY")) {
+            return "DRY_RUN";
+        }
+        return "INCREMENTAL";
     }
 
     // ── 私有辅助 ──────────────────────────────────────
