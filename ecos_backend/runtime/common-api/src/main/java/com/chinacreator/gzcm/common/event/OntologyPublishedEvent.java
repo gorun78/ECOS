@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.common.event;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -48,7 +50,8 @@ import java.util.UUID;
 public class OntologyPublishedEvent implements Serializable {
 
     private static final long serialVersionUID = 1L;
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    /** 需注册 JavaTimeModule 才能处理 {@code Instant ts}（与 ApiResponse 同款约定） */
+    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @JsonProperty("id")
     private final String eventId;
@@ -65,9 +68,21 @@ public class OntologyPublishedEvent implements Serializable {
     @JsonProperty("ts")
     private final Instant ts;
 
-    public OntologyPublishedEvent(String eventId, String ontologyId, String version,
-                                  List<String> entityCodes, List<String> relationshipCodes,
-                                  String actor, Instant ts) {
+    /**
+     * 全参构造器 — 同时作为 Jackson 反序列化入口（Kafka 路径 {@code MAPPER.readValue}）。
+     *
+     * <p>本类字段全为 {@code final} 且无默认构造器，仅靠字段级 {@code @JsonProperty}
+     * Jackson 无法构造实例（报 {@code no Creators, like default constructor, exist}），
+     * 故必须显式标注 {@link JsonCreator} + 构造参数级 {@code @JsonProperty}。
+     */
+    @JsonCreator
+    public OntologyPublishedEvent(@JsonProperty("id") String eventId,
+                                  @JsonProperty("ontologyId") String ontologyId,
+                                  @JsonProperty("version") String version,
+                                  @JsonProperty("entityCodes") List<String> entityCodes,
+                                  @JsonProperty("relationshipCodes") List<String> relationshipCodes,
+                                  @JsonProperty("actor") String actor,
+                                  @JsonProperty("ts") Instant ts) {
         this.eventId = eventId;
         this.ontologyId = ontologyId;
         this.version = version;

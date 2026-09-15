@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.OntologyPublishedEvent;
 import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,7 +50,14 @@ public class EcosOntologyEventConsumer {
     private static final Logger log = LoggerFactory.getLogger(EcosOntologyEventConsumer.class);
     private static final String AUDIT_TOPIC = KafkaTopics.AUDIT;
     private static final String JOB_PREFIX = "kg-ont-";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    /**
+     * Kafka 反序列化用 mapper — 必须注册 JavaTimeModule，否则
+     * {@link OntologyPublishedEvent} 的 {@code Instant ts} 字段会报
+     * "Java 8 date/time type not supported by default"（生产者侧走 Spring 共享 mapper，
+     * 已默认支持 ISO-8601，消费侧需显式对齐）。
+     */
+    private static final ObjectMapper MAPPER =
+            new ObjectMapper().registerModule(new JavaTimeModule());
 
     private final JdbcTemplate jdbc;
     private final KgMapperService kgMapper;
