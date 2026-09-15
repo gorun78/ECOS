@@ -13,3 +13,8 @@ node_modules\*
 
 # Wave-32 scratch test logs (2026-09) — do not track ad-hoc exercise output
 wave32-*.log
+
+# 一次性探针/校验产物（2026-09 起）—— 运行期临时文件不入库
+.working/
+_p3b_*.log
+_t13_*.log
