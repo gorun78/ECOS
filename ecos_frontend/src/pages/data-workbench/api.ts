@@ -10,8 +10,7 @@ const DATANET_DS = '/datanet/datasource';           // DataSourceController
 const INTEGRATION  = '/api/integration/metadata';   // IntegrationMetadataController (connections + syncTasks)
 const PIPELINE_DEFS = '/api/v1/pipeline/definitions'; // PipelineController
 const DQ_RULES      = '/api/v1/ecos/dq/rules';         // DqController (camelCase 字段)
-const LINEAGE_NODES = '/api/v1/engine/data/lineage/nodes';
-const LINEAGE_EDGES = '/api/v1/engine/data/lineage/edges';
+const LINEAGE_TOPOL = '/api/v1/engine/data/lineage/topology';
 
 // ─── Auth helper ────────────────────────────────────────
 function authHeaders(): Record<string, string> {
@@ -433,36 +432,101 @@ export async function fetchDataHealthChecks(): Promise<DataHealthCheck[]> {
   }
 }
 
-/** Data Lineage — fetch nodes */
-export async function fetchLineageNodes(): Promise<unknown[]> {
+/** Data Lineage — 查询持久化拓扑（全局表级/字段级血缘全景图） */
+export async function fetchLineageTopology(): Promise<{
+  nodes: { id: string; type: string; label: string; table?: string; pipeline_task_id?: string; pipeline_task_name?: string }[];
+  edges: { id: string; source: string; target: string; transform?: string; pipeline_task_id?: string; pipeline_task_name?: string }[];
+  total_nodes: number;
+  total_edges: number;
+  from_db?: boolean;
+}> {
   try {
-    const data = await get<unknown[]>(LINEAGE_NODES);
-    return Array.isArray(data) ? data : [];
+    const data = await get<any>(LINEAGE_TOPOL);
+    return {
+      nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+      edges: Array.isArray(data?.edges) ? data.edges : [],
+      total_nodes: Number(data?.total_nodes) || 0,
+      total_edges: Number(data?.total_edges) || 0,
+      from_db: data?.from_db,
+    };
   } catch (e) {
-    console.warn('[data-workbench] fetchLineageNodes failed:', e);
-    return [];
+    console.warn('[data-workbench] fetchLineageTopology failed:', e);
+    return { nodes: [], edges: [], total_nodes: 0, total_edges: 0, from_db: false };
   }
 }
 
-/** Data Lineage — fetch edges */
-export async function fetchLineageEdges(): Promise<unknown[]> {
+/** Data Lineage — 影响度分析：从 startNode 做双向 N 层 BFS */
+export async function fetchLineageImpact(
+  startNode: string,
+  depth = 3
+): Promise<{
+  startNode: string;
+  canonicalStartNode: string;
+  matched: boolean;
+  depth: number;
+  severity: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
+  totalRisk: number;
+  downstream: { id: string; hop: number; label: string; riskScore: number }[];
+  upstream: { id: string; hop: number; label: string; riskScore: number }[];
+  branchCount: number;
+} | null> {
+  if (!startNode || !startNode.trim()) return null;
   try {
-    const data = await get<unknown[]>(LINEAGE_EDGES);
-    return Array.isArray(data) ? data : [];
+    const params = new URLSearchParams();
+    params.set('startNode', startNode);
+    params.set('depth', String(depth));
+    const url = '/api/v1/engine/data/lineage/impact?' + params.toString();
+    const res = await fetch(url, { headers: { ...authHeaders() } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const data: any = json?.data ?? json;
+    if (!data) return null;
+    const toArr = (v: unknown) => (Array.isArray(v) ? (v as any[]) : []);
+    return {
+      startNode: data.startNode as string,
+      canonicalStartNode: (data.canonicalStartNode as string) || data.startNode,
+      matched: Boolean(data.matched),
+      depth: Number(data.depth) || 1,
+      severity: (data.severity as string) || 'NONE',
+      totalRisk: Number(data.totalRisk) || 0,
+      downstream: toArr(data.downstream).map((n: any) => ({
+        id: n.id as string, hop: Number(n.hop) || 1,
+        label: n.label as string, riskScore: Number(n.riskScore) || 0,
+      })),
+      upstream: toArr(data.upstream).map((n: any) => ({
+        id: n.id as string, hop: Number(n.hop) || 1,
+        label: n.label as string, riskScore: Number(n.riskScore) || 0,
+      })),
+      branchCount: Number(data.branchCount) || 0,
+    };
   } catch (e) {
-    console.warn('[data-workbench] fetchLineageEdges failed:', e);
-    return [];
+    console.warn('[data-workbench] fetchLineageImpact failed:', e);
+    return null;
   }
 }
 
-/** Data Lineage — trigger build from pipeline execution records */
-export async function buildLineage(): Promise<boolean> {
+/** Data Lineage — 重建并持久化血缘（同步全量解析 pipeline_task） */
+export async function rebuildLineage(limit = 0): Promise<{
+  total_nodes: number; total_edges: number;
+  tasks_scanned: number; tasks_parsed: number; sql_failed: number;
+}> {
   try {
-    const res = await fetch('/api/v1/engine/data/lineage/build', { method: 'POST', headers: { ...authHeaders() } });
-    return res.ok;
+    const res = await fetch(`${LINEAGE_TOPOL}/rebuild?limit=${limit}`, {
+      method: 'POST', headers: { ...authHeaders() },
+    });
+    if (!res.ok) throw new Error(`${LINEAGE_TOPOL}/rebuild → ${res.status}`);
+    const json = await res.json();
+    const data = json?.data ?? json;
+    return {
+      total_nodes: Number(data?.total_nodes) || 0,
+      total_edges: Number(data?.total_edges) || 0,
+      tasks_scanned: Number(data?.tasks_scanned) || 0,
+      tasks_parsed: Number(data?.tasks_parsed) || 0,
+      sql_failed: Number(data?.sql_failed) || 0,
+    };
   } catch (e) {
-    console.warn('[data-workbench] buildLineage failed:', e);
-    return false;
+    console.warn('[data-workbench] rebuildLineage failed:', e);
+    return { total_nodes: 0, total_edges: 0, tasks_scanned: 0, tasks_parsed: 0, sql_failed: 0 };
   }
 }
 
