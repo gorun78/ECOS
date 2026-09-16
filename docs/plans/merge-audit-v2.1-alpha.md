@@ -598,6 +598,12 @@
 | 8 | `235a17b` | docs(审查) | 3 | Reviewer 门禁 | `deliverable_allowed=true` |
 | 9 | `deffd04` | docs(规范) | 2 | 铁律 §1.2 判据修正 | 工厂副本 v1.2 / 宪法源 v1.1 双文件同步 |
 | 10 | `cebd2d7` | docs(文档) | 1 | §12.8 遗留登记 | 本文件 |
+| 11 | `ba3c722` | chore(仓库) | 2 | ③ ecos-tests 入库 | A1~A6 全 PASS（§12.10.1） |
+| 12 | `dfec375` | fix(安全) | 1 | ② permitAll 收敛 | 匿名 6×403 / 带 token 全 200（§12.10.2） |
+| 13 | `c25ef80` | docs(数据引擎) | 1 | 过期三滤波器注释订正 | 后端 `mvn install` BUILD SUCCESS |
+| 14 | `2db4ac5` | docs(文档) | 1 | §12.10 记录 | 本文件 |
+
+> 第 11~14 行为 §12.10 追加批次。**本条 §12.9 回填 commit 自身不单列**（避免自引用），以 `git log --oneline 2db4ac5..HEAD` 溯源。
 
 **溯源命令**：`git log --oneline 162b081..HEAD` / 单批追溯 `git show --stat <hash>`
 
