@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Clock, AlertTriangle, Play, Plus, Trash2, Send, Shield, XCircle } from 'lucide-react';
+import { CheckCircle, CheckCheck, Clock, AlertTriangle, Play, Plus, Trash2, Send, Shield, ShieldCheck, XCircle } from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import {
@@ -19,7 +19,10 @@ interface ProposalPanelProps {
   objectTypes: ObjectType[];
 }
 
-const STATUS_BADGE: Record<ProposalStatus, { bg: string; text: string; icon: React.ReactNode }> = {
+type StatusBadgeStyle = { bg: string; text: string; icon: React.ReactNode };
+
+/** 存量徽章样式（存量硬编码 Tailwind 色，本次不清理）；EXECUTED / VERIFIED 见 resolveStatusBadge */
+const STATUS_BADGE: Record<Exclude<ProposalStatus, 'EXECUTED' | 'VERIFIED'>, StatusBadgeStyle> = {
   DRAFT: { bg: 'bg-slate-100', text: 'text-slate-700', icon: <Clock size={10} /> },
   PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', icon: <Clock size={10} /> },
   APPROVED: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: <CheckCircle size={10} /> },
@@ -146,6 +149,16 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
 
   const statusLabel = (s: ProposalStatus) => t(`ow.proposal.status.${s.toLowerCase()}`);
   const changeTypeLabel = (ct: string) => t(`ow.proposal.type.${ct}`);
+  /** 状态徽章：EXECUTED / VERIFIED 走主题令牌语义色；未知状态兜底 DRAFT，避免后端新增状态导致渲染崩溃 */
+  const resolveStatusBadge = (s: ProposalStatus): StatusBadgeStyle => {
+    if (s === 'EXECUTED') {
+      return { bg: styles.successBg, text: styles.successText, icon: <CheckCheck size={10} /> };
+    }
+    if (s === 'VERIFIED') {
+      return { bg: styles.infoBg, text: styles.infoText, icon: <ShieldCheck size={10} /> };
+    }
+    return STATUS_BADGE[s] ?? STATUS_BADGE.DRAFT;
+  };
 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-4`}>
@@ -268,7 +281,7 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
       ) : (
         <div className="space-y-2">
           {proposals.map(p => {
-            const badge = STATUS_BADGE[p.status];
+            const badge = resolveStatusBadge(p.status);
             const verification = verificationResults[p.id];
             const isActing = actionLoading === p.id;
 

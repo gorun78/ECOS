@@ -410,7 +410,7 @@ export interface UpdateDataDTO {
 // 本体提案 (Ontology Proposal) — T2.4
 // ================================================================
 
-export type ProposalStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+export type ProposalStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED" | "VERIFIED";
 
 export interface Proposal {
   id: string;

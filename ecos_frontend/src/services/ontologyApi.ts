@@ -43,6 +43,7 @@ import type {
   CreateDataDTO,
   UpdateDataDTO,
   Proposal,
+  ProposalStatus,
   CreateProposalDTO,
   UpdateProposalDTO,
   VerifyProposalResult,
@@ -615,30 +616,54 @@ export async function clearOntologyDataByType(objectTypeId: string) {
 
 const PROPOSAL_BASE = "/api/v1/ontology/proposals";
 
+/**
+ * 提案状态归一化（API 边界适配器）
+ *
+ * 后端本体提案域状态存在大小写混写：execute 写 "executed"、verify 写 "verified"，
+ * 而 approve 等走大写 "APPROVED"/"EXECUTED"。此处统一收敛为契约规范值（大写），
+ * 使 TS 声明 ProposalStatus 与运行期真实数据一致。
+ *
+ * @param raw 后端返回的原始状态字符串
+ * @returns 归一化后的大写状态
+ */
+export function normalizeProposalStatus(raw: string): ProposalStatus {
+  return String(raw).trim().toUpperCase() as ProposalStatus;
+}
+
+/** 归一化提案对象的 status 字段（其余字段原样透传） */
+function normalizeProposal(proposal: Proposal): Proposal {
+  return { ...proposal, status: normalizeProposalStatus(proposal.status) };
+}
+
 export async function fetchProposals(params?: { status?: string; targetType?: string }) {
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);
   if (params?.targetType) qs.set("targetType", params.targetType);
   const query = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetchData<Proposal[]>(`${PROPOSAL_BASE}${query}`);
+  const proposals = await apiFetchData<Proposal[]>(`${PROPOSAL_BASE}${query}`);
+  return proposals.map(normalizeProposal);
 }
 
 export async function fetchProposal(id: string) {
-  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`);
+  return normalizeProposal(await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`));
 }
 
 export async function createProposal(data: CreateProposalDTO) {
-  return apiFetchData<Proposal>(PROPOSAL_BASE, {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return normalizeProposal(
+    await apiFetchData<Proposal>(PROPOSAL_BASE, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  );
 }
 
 export async function updateProposal(id: string, data: UpdateProposalDTO) {
-  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
+  return normalizeProposal(
+    await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  );
 }
 
 export async function deleteProposal(id: string) {
@@ -646,29 +671,34 @@ export async function deleteProposal(id: string) {
 }
 
 export async function submitProposal(id: string) {
-  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/submit`, { method: "POST" });
+  return normalizeProposal(await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/submit`, { method: "POST" }));
 }
 
 export async function approveProposal(id: string, body: ReviewProposalDTO = {}) {
-  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/approve`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return normalizeProposal(
+    await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+  );
 }
 
 export async function rejectProposal(id: string, body: ReviewProposalDTO = {}) {
-  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/reject`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return normalizeProposal(
+    await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+  );
 }
 
-export async function verifyProposal(id: string) {
-  return apiFetchData<VerifyProposalResult>(`${PROPOSAL_BASE}/${id}/verify`, { method: "POST" });
+export async function verifyProposal(id: string): Promise<VerifyProposalResult> {
+  const result = await apiFetchData<VerifyProposalResult>(`${PROPOSAL_BASE}/${id}/verify`, { method: "POST" });
+  return { ...result, proposal: normalizeProposal(result.proposal) };
 }
 
 export async function executeProposal(id: string) {
-  return apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/execute`, { method: "POST" });
+  return normalizeProposal(await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/execute`, { method: "POST" }));
 }
 
 // ================================================================
