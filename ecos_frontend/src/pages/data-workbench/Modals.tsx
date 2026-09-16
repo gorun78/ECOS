@@ -1,5 +1,5 @@
 /**
- * Modals — Add Connection / Add Sync / Add Health Check panels
+ * Modals — Add Connection / Add Sync panels / External Interfaces drawer
  * Extracted from DataWorkbenchLayout.tsx
  * PMO-47 Wave3: type-specific ConfigForms + connection test
  * @license Apache-2.0
@@ -439,45 +439,6 @@ export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncCo
         <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
           <button onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs cursor-pointer`}>{locale === 'zh' ? '取消' : 'Cancel'}</button>
           <button onClick={onCreate} className={`px-3.5 py-1.5 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} font-semibold rounded text-xs cursor-pointer`}>{locale === 'zh' ? '初始化同步任务' : 'Create Sync Task'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface AddHealthCheckModalProps {
-  t: (key: string) => string;
-  locale: string;
-  newCheckName: string; setNewCheckName: (v: string) => void;
-  newCheckDs: string; setNewCheckDs: (v: string) => void;
-  newCheckType: string; setNewCheckType: (v: string) => void;
-  newCheckThreshold: string; setNewCheckThreshold: (v: string) => void;
-  onClose: () => void;
-  onCreate: () => void;
-}
-
-export function AddHealthCheckModal({ t, locale, newCheckName, setNewCheckName, newCheckDs, setNewCheckDs, newCheckType, setNewCheckType, newCheckThreshold, setNewCheckThreshold, onClose, onCreate }: AddHealthCheckModalProps) {
-  const { styles } = useTheme();
-  return (
-    <div className={`absolute inset-0 ${styles.overlayBg} backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none`}>
-      <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-md w-full overflow-hidden flex flex-col`}>
-        <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.cardBg}`}>
-          <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}><LucideIcon name="ShieldAlert" size={14} className={`${styles.warningText}`} /><span>{t('dw.txt.209a45')}</span></h3>
-          <button onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} p-1`}><LucideIcon name="X" size={14} /></button>
-        </div>
-        <div className="p-5 space-y-3 text-xs">
-          <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.58314a')}</label><input type="text" placeholder="e.g. Flights Row Count" value={newCheckName} onChange={e => setNewCheckName(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden`} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.4868c0')}</label><input type="text" placeholder="ds_flights_clean" value={newCheckDs} onChange={e => setNewCheckDs(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden font-mono`} /></div>
-            <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.6f03d0')}</label><select value={newCheckType} onChange={e => setNewCheckType(e.target.value)} className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.cardBg}`}><option value="row_count">{t('dw.txt.d84bfb')}</option><option value="null_check">{t('dw.txt.4d25b4')}</option><option value="schema_check">{t('dw.txt.645259')}</option><option value="freshness">{t('dw.txt.8a99dc')}</option></select></div>
-          </div>
-          {newCheckType !== 'schema_check' && (
-            <div className="space-y-1"><label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.txt.2063a2')}</label><input type="text" placeholder={newCheckType === 'row_count' ? '1000' : newCheckType === 'null_check' ? '2.0' : '120'} value={newCheckThreshold} onChange={e => setNewCheckThreshold(e.target.value)} className={`w-full px-3 py-1.5 border ${styles.inputBorder} rounded focus:outline-hidden font-mono`} /></div>
-          )}
-        </div>
-        <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
-          <button onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs cursor-pointer`}>{locale === 'zh' ? '取消' : 'Cancel'}</button>
-          <button onClick={onCreate} className={`px-3.5 py-1.5 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} font-semibold rounded text-xs cursor-pointer`}>{locale === 'zh' ? '保存规则' : 'Save Rule'}</button>
         </div>
       </div>
     </div>

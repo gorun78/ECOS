@@ -10,21 +10,29 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { showToastGlobal } from '../components/common/Toast';
 import type { ObjectType, Dataset } from './data-workbench/types';
 import LucideIcon from './data-workbench/LucideIcon';
 import ConnectionsTab from './data-workbench/tabs/ConnectionsTab';
-import HealthTab from './data-workbench/tabs/HealthTab';
 import DataLineageTab from './data-workbench/tabs/DataLineageTab';
 import PipelineBuilderTab from './data-workbench/tabs/PipelineBuilderTab';
 import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
-import { AddConnectionModal, AddSyncModal, AddHealthCheckModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
+import { AddConnectionModal, AddSyncModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
 import { useDataWorkbench } from './data-workbench/hooks/useDataWorkbench';
 
-type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'engine-config';
+type TabName = 'connections' | 'pipeline-builder' | 'lineage' | 'engine-config';
+
+/** 侧边栏条目：navigateTo 存在时为跨路由导航项，否则为工作台内 tab 切换。 */
+interface SideTabItem {
+  id: string;
+  icon: string;
+  i18nKey: string;
+  /** 目标路由路径，仅跨路由导航项需要（如「数据质量」→ 数据质量中心）。 */
+  navigateTo?: string;
+}
 
 interface DataWorkbenchLayoutProps {
   objectTypes?: ObjectType[];
@@ -37,17 +45,18 @@ interface DataWorkbenchLayoutProps {
 
 /**
  * 侧边栏主菜单（4 项，按用户指定顺序：数据源连接 → 数据管道 → 数据质量 → 数据血缘）。
+ * 「数据质量」为跨路由导航项，点击直接进入数据质量中心（#/dq_dashboard），不再内嵌质量检测 tab。
  * 引擎配置不在主菜单内，改为靠底展示（置于「物理数据监控仪表」之上），见下方 SIDE_BOTTOM_TABS。
  */
-const TAB_CONFIG: { id: TabName; icon: string; i18nKey: string }[] = [
+const TAB_CONFIG: SideTabItem[] = [
   { id: 'connections', icon: 'Database', i18nKey: 'dw.tab.connections' },
   { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
-  { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
+  { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health', navigateTo: '/dq_dashboard' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
 ];
 
 /** 侧边栏底部入口（与主菜单同一样式与选中态）。 */
-const SIDE_BOTTOM_TABS: { id: TabName; icon: string; i18nKey: string }[] = [
+const SIDE_BOTTOM_TABS: SideTabItem[] = [
   { id: 'engine-config', icon: 'Settings', i18nKey: 'dw.tab.engine_config' },
 ];
 
@@ -56,6 +65,7 @@ export default function DataWorkbenchLayout({
 }: DataWorkbenchLayoutProps = {}) {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
+  const navigate = useNavigate();
   const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
 
   const dw = useDataWorkbench(showToast, t);
@@ -84,11 +94,12 @@ export default function DataWorkbenchLayout({
   // ── UI toggles ──
   const [showExtIfaces, setShowExtIfaces] = useState(false);
 
-  /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。 */
-  const renderSideTab = (tab: { id: TabName; icon: string; i18nKey: string }) => {
-    const active = activeTab === tab.id;
+  /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。
+   *  带 navigateTo 的条目跳转目标路由（不参与 tab 选中态）。 */
+  const renderSideTab = (tab: SideTabItem) => {
+    const active = !tab.navigateTo && activeTab === tab.id;
     return (
-      <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+      <button key={tab.id} onClick={() => tab.navigateTo ? navigate(tab.navigateTo) : setActiveTab(tab.id)}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${active ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm` : `${styles.cardTextMuted} hover:opacity-80`}`}>
           <LucideIcon name={tab.icon} size={14} className={active ? styles.accentText : styles.cardTextMuted} />
           <span className="truncate">{t(tab.i18nKey)}</span>
@@ -124,7 +135,6 @@ export default function DataWorkbenchLayout({
         <div className="flex-1 flex overflow-hidden min-w-0">
           {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />}
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} triggerSync={dw.triggerSync} t={t} />}
-          {activeTab === 'health' && <HealthTab healthChecks={dw.healthChecks} setHealthChecks={dw.setHealthChecks} showToast={showToast} showAddCheck={dw.showAddCheck} setShowAddCheck={dw.setShowAddCheck} newCheckName={dw.nhName} setNewCheckName={dw.setNhName} newCheckDs={dw.nhDs} setNewCheckDs={dw.setNhDs} checkType={dw.nhType} setCheckType={dw.setNhType as any} newCheck={{}} t={t} />}
           {activeTab === 'lineage' && <DataLineageTab initialTable={initialLineageTable} />}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>
@@ -132,7 +142,6 @@ export default function DataWorkbenchLayout({
       {/* Modals */}
       {dw.showAddConn && <AddConnectionModal t={t} locale={locale} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} newConnPassword={dw.ncPassword} setNewConnPassword={dw.setNcPassword} newConnDatabase={dw.ncDatabase} setNewConnDatabase={dw.setNcDatabase} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} onClose={() => dw.setShowAddConn(false)} onCreate={dw.createConnection} onTestConnection={dw.testConnectionRaw} />}
       {dw.showAddSync && <AddSyncModal t={t} locale={locale} newSyncName={dw.nsName} setNewSyncName={dw.setNsName} newSyncConn={dw.nsConn} setNewSyncConn={dw.setNsConn} newSyncTable={dw.nsTable} setNewSyncTable={dw.setNsTable} newSyncMode={dw.nsMode} setNewSyncMode={dw.setNsMode as any} newSyncSched={dw.nsSched} setNewSyncSched={dw.setNsSched as any} connections={dw.connections} onClose={() => dw.setShowAddSync(false)} onCreate={dw.createSync} />}
-      {dw.showAddCheck && <AddHealthCheckModal t={t} locale={locale} newCheckName={dw.nhName} setNewCheckName={dw.setNhName} newCheckDs={dw.nhDs} setNewCheckDs={dw.setNhDs} newCheckType={dw.nhType} setNewCheckType={dw.setNhType as any} newCheckThreshold={dw.nhThr} setNewCheckThreshold={dw.setNhThr} onClose={() => dw.setShowAddCheck(false)} onCreate={dw.createHealth} />}
       {showExtIfaces && <ExternalInterfacesDrawer t={t} connections={dw.connections} onClose={() => setShowExtIfaces(false)} />}
     </div>
   );

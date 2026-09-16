@@ -185,19 +185,6 @@ export interface DataPipeline {
   nodes?: PipelineNode[];
 }
 
-export interface DataHealthCheck {
-  id: string;
-  name: string;
-  status: 'ok' | 'warning' | 'error' | 'pending' | 'passed' | 'failed';
-  message?: string;
-  checkType: 'null_check' | 'range_check' | 'uniqueness' | 'freshness' | 'custom_sql' | 'row_count' | 'schema_check';
-  lastChecked?: string;
-  targetTable?: string;
-  datasetId?: string;
-  threshold?: string;
-  config?: any;
-}
-
 // ── Pipeline Builder ──────────────────────────────────────────────
 
 /** 转换规则 */

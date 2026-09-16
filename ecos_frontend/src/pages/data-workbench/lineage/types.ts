@@ -4,19 +4,7 @@
  * @license Apache-2.0
  */
 
-import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck, ObjectType, Dataset } from '../types';
-
-// ─── Props ───────────────────────────────────────────────────
-
-export interface DataLineageTabProps {
-  connections: DataConnection[];
-  syncTasks: DataSyncTask[];
-  pipelines: DataPipeline[];
-  healthChecks: DataHealthCheck[];
-  objectTypes: ObjectType[];
-  datasets: Dataset[];
-}
-
+import type { DataConnection, DataSyncTask, DataPipeline, ObjectType, Dataset } from '../types';
 
 // ─── 自定义节点数据接口 ──────────────────────────────────────
 

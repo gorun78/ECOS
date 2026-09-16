@@ -3,13 +3,12 @@
  * 对接 databridge-v2 真实后端，含字段映射适配。
  * @license Apache-2.0
  */
-import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck, TableInfo, PipelineNode } from './types';
+import type { DataConnection, DataSyncTask, DataPipeline, TableInfo, PipelineNode } from './types';
 
 // ─── API 端点常量 ──────────────────────────────────────────
 const DATANET_DS = '/datanet/datasource';           // DataSourceController
 const INTEGRATION  = '/api/integration/metadata';   // IntegrationMetadataController (connections + syncTasks)
 const PIPELINE_DEFS = '/api/v1/pipeline/definitions'; // PipelineController
-const DQ_RULES      = '/api/v1/ecos/dq/rules';         // DqController (camelCase 字段)
 const LINEAGE_TOPOL = '/api/v1/engine/data/lineage/topology';
 
 // ─── Auth helper ────────────────────────────────────────
@@ -177,42 +176,6 @@ function mapPipelineStatus(s: string): DataPipeline['status'] {
     case 'error': case 'failed': return 'error';
     default: return 'draft';
   }
-}
-
-/** DQ Rule → DataHealthCheck */
-function mapDqRule(r: Record<string, unknown>): DataHealthCheck {
-  const ruleType = (r.ruleType as string) || (r.rule_type as string) || '';
-  return {
-    id: (r.id as string) || '',
-    name: (r.name as string) || (r.code as string) || '',
-    status: (r.enabled as boolean) ? 'ok' : 'pending',
-    checkType: mapDqCheckType(ruleType),
-    targetTable: (r.targetEntity as string) || (r.target_entity as string),
-    datasetId: (r.targetEntity as string),
-    threshold: (r.ruleExpression as string) || (r.rule_expression as string),
-    lastChecked: (r.updatedAt as string) || (r.updated_at as string),
-    message: (r.description as string) || '',
-    config: {
-      severity: r.severity as string,
-      params: r.params,
-      ruleExpression: r.ruleExpression || r.rule_expression,
-    },
-  };
-}
-
-function mapDqStatus(_s: string): DataHealthCheck['status'] {
-  return 'ok'; // DqController uses enabled boolean, simplified
-}
-
-function mapDqCheckType(t: string): DataHealthCheck['checkType'] {
-  const lower = t.toLowerCase();
-  if (lower.includes('null')) return 'null_check';
-  if (lower.includes('range')) return 'range_check';
-  if (lower.includes('unique')) return 'uniqueness';
-  if (lower.includes('fresh')) return 'freshness';
-  if (lower.includes('row_count') || lower.includes('count')) return 'row_count';
-  if (lower.includes('schema')) return 'schema_check';
-  return 'custom_sql';
 }
 
 // ─── 公开 API 函数 ─────────────────────────────────────────
@@ -415,20 +378,6 @@ export async function executePipeline(id: string): Promise<{ executionId?: strin
   } catch (e) {
     console.warn('[data-workbench] executePipeline failed:', e);
     return null;
-  }
-}
-
-/** 数据质量健康检查 — 从 DQ 规则转换（双包装解包） */
-export async function fetchDataHealthChecks(): Promise<DataHealthCheck[]> {
-  try {
-    // DqController 返回: {code:0, data:{data:[...], total:N}}
-    const wrapper = await get<{ data?: unknown[]; total?: number }>(DQ_RULES);
-    const data = wrapper?.data;
-    if (!data || !Array.isArray(data)) return [];
-    return data.map(mapDqRule);
-  } catch (e) {
-    console.warn('[data-workbench] fetchDataHealthChecks failed:', e);
-    return [];
   }
 }
 
@@ -1213,45 +1162,12 @@ export async function createSyncTask(payload: {
   }
 }
 
-/** 创建健康检查规则 → DqController POST /api/v1/ecos/dq/rules */
-export async function createHealthCheck(payload: {
-  name: string; ruleType: string; severity?: string;
-  targetEntity?: string; ruleExpression?: string; description?: string;
-}): Promise<DataHealthCheck | null> {
-  try {
-    const body = {
-      name: payload.name,
-      ruleType: payload.ruleType,
-      severity: payload.severity || 'MEDIUM',
-      targetEntity: payload.targetEntity || '',
-      ruleExpression: payload.ruleExpression || '',
-      description: payload.description || '',
-      enabled: true,
-    };
-    const rule = await post<Record<string, unknown>>(DQ_RULES, body);
-    return mapDqRule(rule);
-  } catch (e) {
-    console.warn('[data-workbench] createHealthCheck failed:', e);
-    return null;
-  }
-}
-
 /** 触发同步任务执行 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks/{id}/run */
 export async function triggerSyncRun(taskId: string): Promise<{ status?: string; runId?: string } | null> {
   try {
     return await post<{ status?: string; runId?: string }>(`/api/v1/engine/data/pipeline/tasks/${taskId}/run`, {});
   } catch (e) {
     console.warn('[data-workbench] triggerSyncRun failed:', e);
-    return null;
-  }
-}
-
-/** 执行健康检查 → DqController POST /api/v1/ecos/dq/check */
-export async function runHealthCheck(): Promise<Record<string, unknown> | null> {
-  try {
-    return await post<Record<string, unknown>>('/api/v1/ecos/dq/check', {});
-  } catch (e) {
-    console.warn('[data-workbench] runHealthCheck failed:', e);
     return null;
   }
 }

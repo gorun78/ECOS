@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type { DataConnection, DataSyncTask, DataPipeline, DataHealthCheck } from '../types';
+import type { DataConnection, DataSyncTask, DataPipeline } from '../types';
 import type { ConnType } from '../types';
 
 type ShowToast = (type: 'success' | 'info' | 'error', message: string) => void;
@@ -29,14 +29,12 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [syncTasks, setSyncTasks] = useState<DataSyncTask[]>([]);
   const [pipelines, setPipelines] = useState<DataPipeline[]>([]);
-  const [healthChecks, setHealthChecks] = useState<DataHealthCheck[]>([]);
 
   useEffect(() => {
-    import('../api').then(({ fetchDataConnections, fetchDataSyncTasks, fetchDataPipelines, fetchDataHealthChecks }) => {
+    import('../api').then(({ fetchDataConnections, fetchDataSyncTasks, fetchDataPipelines }) => {
       fetchDataConnections().then(setConnections).catch(console.error);
       fetchDataSyncTasks().then(setSyncTasks).catch(console.error);
       fetchDataPipelines().then(setPipelines).catch(console.error);
-      fetchDataHealthChecks().then(setHealthChecks).catch(console.error);
     }).catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -44,7 +42,6 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   // ── Selected IDs ──
   const [selConnId, setSelConnId] = useState<string>('');
   const [selTaskId, setSelTaskId] = useState<string>('');
-  const [selCheckId, setSelCheckId] = useState<string>('');
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
   const [computeEngine, setComputeEngine] = useState<ComputeEngine>('memory');
 
@@ -71,7 +68,6 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   // ── Modal toggles ──
   const [showAddConn, setShowAddConn] = useState(false);
   const [showAddSync, setShowAddSync] = useState(false);
-  const [showAddCheck, setShowAddCheck] = useState(false);
 
   // ── Connection form ──
   const [ncName, setNcName] = useState('');
@@ -105,12 +101,6 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   const [nsTable, setNsTable] = useState('');
   const [nsMode, setNsMode] = useState<'snapshot' | 'incremental' | 'append'>('snapshot');
   const [nsSched, setNsSched] = useState<'manual' | 'hourly' | 'daily' | 'cron'>('hourly');
-
-  // ── Health check form ──
-  const [nhName, setNhName] = useState('');
-  const [nhDs, setNhDs] = useState('');
-  const [nhType, setNhType] = useState<'row_count' | 'null_check' | 'schema_check' | 'freshness'>('row_count');
-  const [nhThr, setNhThr] = useState('1000');
 
   // ── Handlers ──
   const testConnection = useCallback(async (connId: string) => {
@@ -232,63 +222,14 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     }
   }, [nsName, nsTable, nsConn, nsMode, nsSched, connections, showToast, t]);
 
-  const createHealth = useCallback(async () => {
-    if (!nhName.trim()) { showToast('error', t('databench.layout.toast.healthNameRequired')); return; }
-    try {
-      const { createHealthCheck } = await import('../api');
-      const ruleType = nhType === 'row_count' ? 'COMPLETENESS'
-        : nhType === 'null_check' ? 'COMPLETENESS'
-        : nhType === 'freshness' ? 'TIMELINESS'
-        : nhType === 'schema_check' ? 'VALIDITY'
-        : 'ACCURACY';
-      const check = await createHealthCheck({
-        name: nhName,
-        ruleType,
-        targetEntity: nhDs,
-        ruleExpression: nhThr,
-        description: `${nhType} threshold: ${nhThr}`,
-      });
-      if (check) {
-        setHealthChecks(p => [...p, check]); setSelCheckId(check.id); setShowAddCheck(false);
-        showToast('success', t('databench.layout.toast.healthCreated', { name: nhName }));
-      } else {
-        showToast('error', t('databench.layout.toast.healthNameRequired'));
-      }
-    } catch (e: any) {
-      showToast('error', t('databench.layout.toast.healthNameRequired'));
-    }
-  }, [nhName, nhType, nhDs, nhThr, showToast, t]);
-
-  const runCheck = useCallback(async (checkId: string) => {
-    setHealthChecks(p => p.map(c => c.id === checkId ? { ...c, status: 'pending' as const, message: computeEngine === 'doris' ? t('databench.layout.health.dorisCheck') : t('databench.layout.health.memoryCheck') } : c));
-    try {
-      const { runHealthCheck } = await import('../api');
-      await runHealthCheck();
-      const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      setHealthChecks(p => p.map(c => {
-        if (c.id !== checkId) return c;
-        const finalStatus = c.checkType === 'freshness' ? 'warning' as const : 'passed' as const;
-        const msg = c.checkType === 'freshness' ? t('databench.layout.health.warningFreshness') : t('databench.layout.health.passed');
-        return { ...c, status: finalStatus, lastChecked: tn, message: msg };
-      }));
-      showToast('success', t('databench.layout.toast.healthCheckComplete'));
-    } catch (e: any) {
-      const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      setHealthChecks(p => p.map(c => c.id === checkId ? { ...c, status: 'failed' as const, lastChecked: tn, message: e.message } : c));
-      showToast('error', t('databench.layout.toast.healthCheckComplete'));
-    }
-  }, [computeEngine, showToast, t]);
-
   return {
     // data
     connections, setConnections,
     syncTasks, setSyncTasks,
     pipelines, setPipelines,
-    healthChecks, setHealthChecks,
     // selected ids
     selConnId, setSelConnId,
     selTaskId, setSelTaskId,
-    selCheckId, setSelCheckId,
     editingPipelineId, setEditingPipelineId,
     computeEngine, setComputeEngine,
     // pb output
@@ -299,7 +240,6 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     // modal toggles
     showAddConn, setShowAddConn,
     showAddSync, setShowAddSync,
-    showAddCheck, setShowAddCheck,
     // connection form
     ncName, setNcName,
     ncType, setNcType, handleNcTypeChange,
@@ -316,17 +256,10 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     nsTable, setNsTable,
     nsMode, setNsMode,
     nsSched, setNsSched,
-    // health form
-    nhName, setNhName,
-    nhDs, setNhDs,
-    nhType, setNhType,
-    nhThr, setNhThr,
     // handlers
     testConnection,
     createConnection,
     triggerSync,
     createSync,
-    createHealth,
-    runCheck,
   };
 }
