@@ -552,6 +552,22 @@
 
 2. **`git rev-parse` 陷阱写入脚本注释**（`--verify --quiet` 强制用法），防止后人重蹈本轮误判。
 
+**实测输出（2026-09-16，本仓库 `release/v2.1-alpha`）**
+
+| 检查 | 实测结果 |
+|:--|:--|
+| ① working tree 未提交变更 | 本批次 9 条 clean commit 之前报"存在未提交变更"（正确）；commit 后 Windows Git `git status --porcelain` 为空 |
+| ② 存活 stash | **7 个**（`stash@{0}`~`{6}`）—— 与 §一~§十一 的 P1 条目一致（5 个与四任务相关），**本批次未处置**（超出"血缘丢失"范围，需另立拆分） |
+| ③ 悬空对象 | 命中悬空 commit（如 `744ac4d3` 含 `ecos-tests/*.mjs`、`.working/*` 等 base 所缺内容）；**全量扫描耗时 > 4 min**（本仓库需 `git fsck` + 逐个 commit `numstat`），240s 限时未跑完，首次完整试跑 > 7 min |
+
+**⚠ 两点实测局限（据实标注，避免后人误信）**
+
+1. **工具链需与提交工具链一致**：经 WSL bash 运行时，检查 ① 会把 `ecos-git-repos/data-workbench` 误报为 modified（WSL 侧 `autocrlf`/untracked-cache 与 Windows Git 不一致所致）；Windows Git 下 `git status --porcelain` 为空。故**本脚本应在执行提交的同一工具链（本项目为 Windows Git）下运行**，否则检查 ① 存在假阳性。
+   - 本机 Git Bash（`C:\Program Files\Git\bin\bash.exe`）在当前环境**无法执行**（连 `echo` 均无输出，环境问题），故本轮实测经 WSL bash 完成，检查 ① 的假阳性已用 Windows Git 交叉核验排除。
+2. **检查 ③ 成本高**：全量悬空扫描 > 4 min，建议作为**交付前一次性门禁**而非高频钩子；若需高频化，应加悬空 commit 数量上限或结果缓存。
+
+**结论**：机制已建立且**可执行、可复算**；检查 ② 如实暴露 7 个未落地 stash → 脚本按设计返回 `RISK=1`（"存在未落地改动风险"），与仓库真实状态相符，**非误报**。
+
 ### 12.8 本轮遗留（不阻塞本次收口）
 
 - `ID_SEQ` 静态内存序列重启回退 → 409
