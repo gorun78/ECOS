@@ -577,6 +577,8 @@
 - `SimulationState` 为常量 `false`：内存模拟态已移除，真实漂移结论走 `GET /metadata/drift`；若产品侧仍需"模拟开关"需另立需求
 - `ecos-tests/` 尚未接入 CI（本轮为按需手动执行）；且该目录命中 `.gitignore` 的 `*ecos-tests*`，E2E 脚本**无法作为 commit 凭证**
 - 既有 `/api/v1/integration/**` permitAll 属**等效死条目**（已入重写表的前缀，鉴权层只见裸路径）；按"禁止魔改既有全局配置"保留，已在 `SecurityConfig.java` 注释警示
+- 本批次为 `ClearanceInterceptor` 补的 `path.startsWith("/api/v1/integration")` 同属**死条目**（HandlerInterceptor 在重写之后执行，只见裸路径）—— 按修正后的铁律 §1.2 ② 判定应只写裸路径。**未清理**（不扩大本轮改动范围，且无功能/安全影响），登记待清理
+- 铁律 §1.2 表述已按用户批准修正为三步判据（`.trae/rules/架构铁律.md` → v1.2；`docs/ARCHITECTURE-RULES.md` → v1.1）
 
 ### 12.9 本批次 commit 凭证（DONE 凭证 · 暂不推送）
 
