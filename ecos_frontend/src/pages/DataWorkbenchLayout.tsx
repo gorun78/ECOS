@@ -35,11 +35,19 @@ interface DataWorkbenchLayoutProps {
   onActiveTabChange?: (tab: TabName) => void;
 }
 
+/**
+ * 侧边栏主菜单（4 项，按用户指定顺序：数据源连接 → 数据管道 → 数据质量 → 数据血缘）。
+ * 引擎配置不在主菜单内，改为靠底展示（置于「物理数据监控仪表」之上），见下方 SIDE_BOTTOM_TABS。
+ */
 const TAB_CONFIG: { id: TabName; icon: string; i18nKey: string }[] = [
   { id: 'connections', icon: 'Database', i18nKey: 'dw.tab.connections' },
   { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
   { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
+];
+
+/** 侧边栏底部入口（与主菜单同一样式与选中态）。 */
+const SIDE_BOTTOM_TABS: { id: TabName; icon: string; i18nKey: string }[] = [
   { id: 'engine-config', icon: 'Settings', i18nKey: 'dw.tab.engine_config' },
 ];
 
@@ -76,6 +84,18 @@ export default function DataWorkbenchLayout({
   // ── UI toggles ──
   const [showExtIfaces, setShowExtIfaces] = useState(false);
 
+  /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。 */
+  const renderSideTab = (tab: { id: TabName; icon: string; i18nKey: string }) => {
+    const active = activeTab === tab.id;
+    return (
+      <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${active ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm` : `${styles.cardTextMuted} hover:opacity-80`}`}>
+          <LucideIcon name={tab.icon} size={14} className={active ? styles.accentText : styles.cardTextMuted} />
+          <span className="truncate">{t(tab.i18nKey)}</span>
+      </button>
+    );
+  };
+
   // ── Render ──
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${styles.appBg} relative overflow-hidden font-sans`}>
@@ -84,17 +104,13 @@ export default function DataWorkbenchLayout({
         <div className={`w-52 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col justify-between shrink-0 select-none`}>
           <div className="py-3 px-3 space-y-1 overflow-y-auto">
             <div className={`text-xs font-bold ${styles.cardText} px-2.5 mb-3`}>{t('databench.layout.sidebarTitle')}</div>
-            {TAB_CONFIG.map((tab) => {
-              return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${activeTab === tab.id ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm` : `${styles.cardTextMuted} hover:opacity-80`}`}>
-                    <LucideIcon name={tab.icon} size={14} className={activeTab === tab.id ? styles.accentText : styles.cardTextMuted} />
-                    <span className="truncate">{t(tab.i18nKey)}</span>
-                  </button>
-              );
-            })}
+            {TAB_CONFIG.map(renderSideTab)}
           </div>
           <div>
+            {/* 引擎配置：靠底展示，置于「物理数据监控仪表」之上 */}
+            <div className={`px-3 pt-3 pb-1 border-t ${styles.cardBorder}`}>
+              {SIDE_BOTTOM_TABS.map(renderSideTab)}
+            </div>
             <div className={`p-4 border-t ${styles.cardBorder} ${styles.cardBg} space-y-2 text-[10px] ${styles.cardTextMuted}`}>
               <div className={`font-semibold ${styles.cardText}`}>{t('dw.txt.419d9f')}</div>
               <div className="flex justify-between"><span>{t('dw.txt.f7d9ac')}</span><span className={`font-mono ${styles.cardText} font-semibold`}>{dw.connections.length} {t('dw.label.connections_count')}</span></div>
