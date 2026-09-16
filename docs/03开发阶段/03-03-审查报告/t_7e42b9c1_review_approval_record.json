@@ -1,0 +1,107 @@
+{
+  "artifact": "REVIEW_REPORT",
+  "name": "permitAll 收敛与测试资产入库批次 代码审查报告",
+  "version": "v1",
+  "status": "AUTO_CLOSED",
+  "human_review_required": false,
+  "workflow_mode": "L2",
+  "task_id": "t_7e42b9c1",
+  "artifact_ref": "release/v2.1-alpha 追加批次 commit ba3c722 / dfec375 / c25ef80 / 2db4ac5（5 文件；git diff --stat ba3c722^..HEAD = 5 files changed）",
+  "upstream_recommendations_closed": [
+    {
+      "from": "t_9f3c1a72_review_report.md §七 #2",
+      "recommendation": "另立专项收敛历史过宽 permitAll（/api/v1/engine/** 等），对齐 §2.4-6 默认 DENY",
+      "status": "CLOSED_WAVE1",
+      "commit": "dfec375",
+      "scope_note": "Wave 1 仅收敛 /api/v1/engine/**；其余 10+ 宽前缀登记为 Wave 2（§12.10.3-3）"
+    },
+    {
+      "from": "t_9f3c1a72_review_report.md §七 #3",
+      "recommendation": "ecos-tests/ 纳入版本控制或 CI，使测试资产成为凭证",
+      "status": "CLOSED",
+      "commit": "ba3c722"
+    }
+  ],
+  "gates": {
+    "P0_GATE": { "status": "PASS", "p0_count": 0 },
+    "P1_GATE": { "status": "PASS", "p1_count": 0, "threshold": 3 },
+    "SECURITY_GATE": { "status": "PASS", "critical": 0, "high": 0, "net_improvement": true, "closed_high_risk_surface": ["POST /api/v1/engine/data/query/execute (匿名 SQL 执行)"] },
+    "ARCH_GATE": { "status": "PASS", "p0_arch": 0, "p1_arch": 0 }
+  },
+  "review_history": [
+    {
+      "round": 1,
+      "SECURITY_GATE": "PASS",
+      "note": "首轮即 PASS，无修复循环。原因：本批次即上一轮 FAIL 暴露问题（S-001 同类放行面）的收敛执行批次"
+    }
+  ],
+  "defect_summary": { "total": 7, "P0": 0, "P1": 0, "P2": 5, "P3": 2, "closed": 2, "introduced_by_this_batch": 0 },
+  "gates_final": "PASS",
+  "deliverable_allowed": true,
+  "first_gate_step0": {
+    "status": "DEGRADED_PASS",
+    "reason": "直派模式无 SOURCE_PATCH_APPROVAL_RECORD（本环境不使用 Hermes 看板/swarm，已实证 daemon 不认领任务）",
+    "human_decision_evidence": "用户回复「2、是 3、是」明确批准本批次两项（② 收敛过宽 permitAll / ③ ecos-tests 纳入版本控制）",
+    "equivalent_evidence": [
+      "后端 mvn install -DskipTests → BUILD SUCCESS（含 Javadoc-only 改动的严谨复跑）",
+      "匿名/带 token 双态契约矩阵 19 项实测（匿名 6×403 + 2 例外 200 + /api/health 200 + 带 token 11×200）",
+      "Playwright E2E lineage-smoke.mjs A1~A6 全 PASS",
+      "浏览器网络抓包：#/engine-data 与 #/ontology_workbench 无 401/403"
+    ]
+  },
+  "acceptance_check": {
+    "req2_narrow_permitall": "PASS_WITH_NOTE（Wave 1 收敛 /api/v1/engine/** 完成并复验；note: 2 处匿名例外 + Wave 2 清单已登记 §12.10.3）",
+    "req3_ecos_tests_versioned": "PASS（.gitignore 移除 *ecos-tests*，lineage-smoke.mjs 入库；git ls-files 仅 3 个 .mjs，无敏感文件）",
+    "no_api_signature_change": "PASS（未改任何路径/参数签名/返回体）",
+    "no_consumer_breakage": "PASS（前端 56 处调用面全部经封装注入 Bearer；内部匿名消费方仅 2 处且已列为例外）"
+  },
+  "security_verification_evidence": {
+    "anonymous_expected_403": {
+      "/api/v1/engine/data/lineage/topology": 403,
+      "/api/v1/engine/data/udf/list": 403,
+      "/api/v1/engine/data/status": 403,
+      "/api/v1/engine/data/config": 403,
+      "/api/v1/engine/ontology/settings": 403,
+      "POST /api/v1/engine/data/query/execute": 403
+    },
+    "anonymous_expected_200_intentional": {
+      "/api/health": 200,
+      "/api/v1/engine/data/health": 200,
+      "/api/v1/engine/ontology/health": 200,
+      "/api/v1/engine/ontology/graph/full": 200
+    },
+    "authenticated_expected_200": {
+      "count": 11,
+      "sample": ["/api/v1/engine/data/query/history", "/api/v1/engine/data/query/templates", "/api/v1/engine/data/pipeline/tasks", "/api/v1/engine/data/settings", "/api/v1/engine/data/lineage/impact?startNode=", "/api/v1/engine/ontology/config"]
+    },
+    "anonymous_exceptions_registered": [
+      "/api/v1/engine/*/health — 内部消费方 workspace KnowledgeHealthAggregator（RestTemplate 无凭证）",
+      "/api/v1/engine/ontology/graph/** — 内部消费方 agent-service SearchOntologyGraphTool（RestTemplate 无凭证）"
+    ],
+    "frontend_engine_call_sites": 56,
+    "frontend_call_sites_with_bearer": 56,
+    "anonymous_callers_in_repo_remaining": 2
+  },
+  "prd_traceability": {
+    "S-201": "上游建议 #2 + 用户裁定「2、是」（收敛生效，正面结论）",
+    "S-202": "用户裁定「2、是」——内部消费方例外，已登记",
+    "S-203": "用户裁定「2、是」——/api/v1/ontology/** 受 ExecuteActionTool 无凭证直连阻塞",
+    "S-204": "需求③ 入库新增面 —— 测试脚本硬编码 dev 凭据",
+    "T-201": "需求③ ecos-tests 无法作为 DONE 凭证（已闭合）",
+    "T-202": "需求② ClearanceInterceptor/ClearanceMvcConfig 未同步收敛（Wave 2）",
+    "T-203": "需求② 副产品 —— ontology_workbench 既有 404",
+    "T-204": "需求② Wave 2 候选收敛清单"
+  },
+  "non_blocking_recommendations": [
+    "ecos-tests/lineage-smoke.mjs 凭据外置为环境变量，并去掉 token 前缀打印（该文件已入库，须独立 commit）",
+    "Wave 2 收敛专项：前置为实现内部调用鉴权机制（覆盖 KnowledgeHealthAggregator / SearchOntologyGraphTool / ExecuteActionTool 三处无凭证直连）；/api/v1/chat/stream 为 EventSource，须先定 token 传递方案",
+    "ClearanceInterceptor / ClearanceMvcConfig 的 /api/v1/engine/** blanket 豁免同步收敛（建议与 Wave 2 合并）",
+    "#/ontology_workbench 实体属性端点 404 单独立项排查"
+  ],
+  "report_path": "docs/03开发阶段/03-03-审查报告/t_7e42b9c1_review_report.md",
+  "dispatch_plan_path": "docs/03开发阶段/03-03-审查报告/t_7e42b9c1_dispatch_plan.json",
+  "audit_path": "docs/plans/merge-audit-v2.1-alpha.md",
+  "commit_evidence": "docs/plans/merge-audit-v2.1-alpha.md §12.9 第 11~14 行",
+  "timestamp": "2026-09-16T22:20:00+08:00",
+  "reviewer": "PM/Reviewer (skill: reviewer-code-review v3)"
+}

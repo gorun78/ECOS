@@ -1,0 +1,18 @@
+{
+  "task_id": "t_7e42b9c1",
+  "artifact_type": "SOURCE_PATCH",
+  "workflow_mode": "L2",
+  "artifact_ref": "release/v2.1-alpha 追加批次（② 收敛 /api/v1/engine/** 过宽 permitAll + ③ ecos-tests 纳入版本控制 + 过期注释订正 + 审计 §12.10）",
+  "dispatched_at": "2026-09-16T22:10:00+08:00",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "SOURCE_PATCH(permitall-narrowing-and-test-assets)",
+      "mode": "full",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT", "REVIEW_COMMENT"],
+  "final_gate_logic": "AND_ALL",
+  "notes": "L2 标准模式全量审查。审查范围：4 文件（SecurityConfig.java 13+/1-、TransformController.java 注释 5+/2-、.gitignore 3+/1-、ecos-tests/lineage-smoke.mjs 140+、merge-audit-v2.1-alpha.md 67+/2-）。重点：① 收敛是否破坏任何既有消费方（前端 56 处 engine 调用面 / 内部匿名消费方 / 定时任务）；② 收敛是否对齐铁律 §2.4-6 默认 DENY 与 §1.2 判据（重写先于鉴权 → 只写裸路径）；③ 例外项（engine/*/health、engine/ontology/graph/**）是否有据可依且已登记；④ ecos-tests 入库是否意外暴露敏感文件。该批次是上一轮审查报告（t_9f3c1a72）§七 改进建议 #2/#3 的执行落地。"
+}
