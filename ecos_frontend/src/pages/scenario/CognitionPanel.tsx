@@ -11,6 +11,10 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
 import type { BusinessScenario } from '../project-workbench/types';
+import CounterfactualTab from './CounterfactualTab';
+import ReplayTab from './ReplayTab';
+import OverrideTab from './OverrideTab';
+import MentalReviewTab from './MentalReviewTab';
 
 /** ScenarioRun 响应中诊断类结果 */
 interface DiagnosisResult {
@@ -99,6 +103,15 @@ const RUN_TYPES: Array<{ key: 'DIAGNOSE' | 'FORECAST' | 'SIMULATE' | 'STRATEGY';
   { key: 'STRATEGY', icon: 'Lightbulb' },
 ];
 
+/** 心智层子视图（PMO-59 P4b 人机干预面板：诊断/推演/回放/覆写/复盘） */
+const SUB_TABS: Array<{ key: 'diagnosis' | 'counterfactual' | 'replay' | 'override' | 'review'; icon: string; labelKey: string }> = [
+  { key: 'diagnosis', icon: 'BrainCircuit', labelKey: 'scenario.iv.tab.diagnosis' },
+  { key: 'counterfactual', icon: 'SlidersHorizontal', labelKey: 'scenario.iv.tab.counterfactual' },
+  { key: 'replay', icon: 'History', labelKey: 'scenario.iv.tab.replay' },
+  { key: 'override', icon: 'UserCog', labelKey: 'scenario.iv.tab.override' },
+  { key: 'review', icon: 'BellRing', labelKey: 'scenario.iv.tab.review' },
+];
+
 /** jsonb 字段在 JDBC queryForList 中为字符串，防御性解析 */
 function safeParseJson<T>(raw: string | null | undefined): T | null {
   if (!raw) return null;
@@ -129,6 +142,7 @@ export default function CognitionPanel({
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [openRuleId, setOpenRuleId] = useState<string | null>(null);
   const [openPrecedentId, setOpenPrecedentId] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<(typeof SUB_TABS)[number]['key']>('diagnosis');
 
   const fetchHistory = useCallback(async () => {
     if (!scenario) return;
@@ -197,6 +211,30 @@ export default function CognitionPanel({
 
   return (
     <div className="space-y-4">
+      {/* ── 心智层子视图切换（PMO-59 P4b 人机干预面板入口） ── */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {SUB_TABS.map((st) => (
+          <button
+            key={st.key}
+            onClick={() => setSubTab(st.key)}
+            className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors cursor-pointer flex items-center gap-1.5 ${
+              subTab === st.key
+                ? 'bg-indigo-600 text-white border-indigo-500'
+                : `${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50`
+            }`}
+          >
+            <LucideIcon name={st.icon} size={11} />
+            {t(st.labelKey)}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'counterfactual' && <CounterfactualTab />}
+      {subTab === 'replay' && <ReplayTab />}
+      {subTab === 'override' && <OverrideTab />}
+      {subTab === 'review' && <MentalReviewTab />}
+
+      <div className={subTab === 'diagnosis' ? 'space-y-4' : 'hidden'}>
       {/* ── 运行配置 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4 space-y-3`}>
         <div className="flex items-center gap-2">
@@ -516,6 +554,7 @@ export default function CognitionPanel({
             </table>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
