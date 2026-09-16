@@ -256,9 +256,20 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
 
   // ── Load editingPipeline.nodes → canvas (T3) ──
   // Reconstruct ReactFlow nodes/edges from the backend PipelineNode[].
+  //
+  // 🔴 依赖必须是「定义内容签名」而不是仅 id：列表接口只返回摘要（nodes 为空），
+  // 编辑器会先以摘要渲染一次、详情接口随后才带回真节点；若只依赖 id，
+  // 详情到达时 id 未变 → 本效果不再执行 → 画布恒空（Wave 3 缺陷① 残留）。
+  const loadedDefKey = `${editingPipeline?.id ?? ''}#${Array.isArray(editingPipeline?.nodes) ? editingPipeline.nodes.length : 0}`;
   useEffect(() => {
     const apiNodes = editingPipeline?.nodes;
-    if (apiNodes && Array.isArray(apiNodes) && apiNodes.length > 0) {
+    // 新建态（无 id）：清空画布，避免残留上一条管道的内容
+    if (!editingPipeline?.id) {
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+    if (Array.isArray(apiNodes) && apiNodes.length > 0) {
       const flowNodes: Node[] = [];
       const flowEdges: Edge[] = [];
       apiNodes.forEach((n, idx) => {
@@ -277,9 +288,13 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       });
       setNodes(flowNodes);
       setEdges(flowEdges);
+    } else {
+      // 所选管道确为空（或仍处摘要态）：清空，保证画布与所选管道一致
+      setNodes([]);
+      setEdges([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingPipeline?.id]);
+  }, [loadedDefKey]);
 
   // ── Node counter ──
   const nodeCounter = useRef(0);
