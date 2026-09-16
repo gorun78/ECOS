@@ -596,6 +596,8 @@
 | 6 | `e618af0` | chore(脚本) | 1 | D·跟踪机制 | 脚本可运行、退出码语义正确 |
 | 7 | `c9da89e` | docs(文档) | 1 | D·审计报告 §12 | 本文件 |
 | 8 | `235a17b` | docs(审查) | 3 | Reviewer 门禁 | `deliverable_allowed=true` |
+| 9 | `deffd04` | docs(规范) | 2 | 铁律 §1.2 判据修正 | 工厂副本 v1.2 / 宪法源 v1.1 双文件同步 |
+| 10 | `cebd2d7` | docs(文档) | 1 | §12.8 遗留登记 | 本文件 |
 
 **溯源命令**：`git log --oneline 162b081..HEAD` / 单批追溯 `git show --stat <hash>`
 
