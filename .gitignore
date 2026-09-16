@@ -7,7 +7,8 @@ node_modules\*
 .aider*
 *.m2*
 *win_tasks*
-*ecos-tests*
+# ecos-tests/ 已纳入版本控制（2026-09-16）：E2E 冒烟脚本是交付验收与 DONE 凭证的一部分，不再忽略；
+# 其内 node_modules 由上方 node_modules\* 规则继续排除
 *ecos-git-repos*
 
 
