@@ -33,8 +33,11 @@ import java.util.Map;
  * 经清洗/映射/校验/类型转换/聚合/计算 6 步 Pipeline 转成结构化信息，
  * 输出可喂给 ontology-engine 做本体对象落地。
  * <p>
- * <b>路由</b>：{@code /api/v1/engine/data/transform}（质量/lineage 同路径模式），
- * 三滤波器已覆盖（{@code /api/v1/engine/**} permitAll + ClearanceInterceptor 豁免）。
+ * <b>路由</b>：{@code /api/v1/engine/data/transform}（质量/lineage 同路径模式）。
+ * <b>鉴权</b>（2026-09-16 §1.2 收敛后）：原 blanket {@code /api/v1/engine/**} permitAll
+ * 已移除，本路径**不再匿名**，调用须带 Bearer（前端已带）；仅
+ * {@code /api/v1/engine/{type}/health} 与 {@code /api/v1/engine/ontology/graph/**}
+ * 保留匿名（内部消费方，见 {@code SecurityConfig} 注释）。
  * <p>
  * <b>架构定位</b>：此 Controller 仅作 ge D→I 转换的 API 暴露层，
  * 不写 DB、不调 LLM、不自建调度 — 所有能力委托 {@link ITransformService}。
