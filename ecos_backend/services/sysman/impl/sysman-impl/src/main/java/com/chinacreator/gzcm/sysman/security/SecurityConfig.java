@@ -83,6 +83,11 @@ public class SecurityConfig {
                     "/api/portal/**",
                     "/api/cognitive/**",
                     "/api/v1/integration/**",
+                    // ⚠ 勿为 /api/integration 补 permitAll（曾按铁律 §1.2 补过，已撤销）：
+                    // VersionPrefixRewriteFilter(@Order MIN+10) 先于 Spring Security(-100) 执行，
+                    // 鉴权层只见**裸路径**，补该条目＝放行未认证访问并暴露数据源 host/port/username/jdbcUrl
+                    // （同 M0 改造移除 /datanet/** 的 T3-006 缺陷，违反 §2.4-6 默认 DENY）。
+                    // 集成元数据端点双路径一律要求认证（前端调用均带 Bearer）。
                     "/api/v1/ontology/**",
                     "/api/v1/lineage/**",
                     "/api/v1/guardrails/**",
