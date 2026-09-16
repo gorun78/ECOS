@@ -3,7 +3,7 @@
  *
  * 验证 2026-09-16 从悬空 stash 回放的血缘地图改动在浏览器里真实可用：
  *   A1 页面未落入 ErrorBoundary / 未卡在 RequireAuth loading
- *   A2 「全链路数据血缘地图」Tab 存在且处于激活态
+ *   A2 「数据血缘」Tab 存在且处于激活态
  *   A3 ?lineageTable=test_table 被透传，单表查询输入框已回填
  *   A4 /api/v1/engine/data/lineage/* 请求成功（无 4xx/5xx）
  *   A5 console 无 error
@@ -25,7 +25,7 @@ const { chromium } = require('playwright');
 const API = 'http://localhost:8080';
 const APP = 'http://localhost:3000';
 const TARGET_TABLE = 'test_table';
-const TAB_LABEL = '全链路数据血缘地图';
+const TAB_LABEL = '数据血缘';
 
 const outDir = path.join(os.tmpdir(), 'ecos-lineage-smoke');
 fs.mkdirSync(outDir, { recursive: true });
