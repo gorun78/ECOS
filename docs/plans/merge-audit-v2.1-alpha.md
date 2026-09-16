@@ -375,3 +375,188 @@
 - §10.3.1 的**真缺口**（`OntologyVersionService` 事件无生产者）已补齐，且首次端到端运行暴露并修复了 Kafka 反序列化缺陷 → 本体发布 → KG 同步链路**首次真正打通**
 - 四任务（数据/知识/AI/场景工作台）在 2.1-alpha 的**回放完整性核对完毕**：i18n 清洗（阶段 1，`b7bc618`）+ 阶段 2（A~D）共 **10 个 clean commit**
 - 剩余 P2/P3 待办：`ID_SEQ` 持久化、`kg_sync_log` 成功路径台账、`GraphBuildPreview.samples` 子表、`GraphSyncTab` 存量 UI 等价性人工确认、kb/ontology `AGENTS.md` 依赖描述订正、`ExtractionReviewPanel` 硬编码色值
+
+---
+
+## 十二、数据工作台「血缘地图内容丢失」事故核查与收口（2026-09-16）
+
+> 触发：用户报告"血缘地图模块之前已实施的修改在当前版本中未体现"，要求 5 项动作：
+> ① 全模块完整性检查 ② 血缘地图版本控制记录根因 ③ 恢复正确版本 ④ 建立内容变更跟踪机制 ⑤ 全面测试。
+> 复杂度评估：L2 标准（功能点 5 / 模块 2 / 数据关联 3 / 外部依赖 2 / 并发 1 / 多页状态管理 6 = 19 分）。
+
+### 12.1 审计方法学（可复算，含一处必须记住的陷阱）
+
+**三态比对法**：对每个可疑文件取三份 blob 逐一对齐 —— `base`（丢失前基线）、`stash`（悬空 stash 树）、`HEAD`（当前分支）：
+
+- `HEAD == base` → **SAFE**：stash 版可无损回放（无并发演进）
+- `HEAD == stash` → **ALREADY**：已在 HEAD，无需动作
+- 其余 → **MERGE**：两侧各有独有内容，需逐处甄别后叠加
+
+量化命令：`git diff --numstat <stash> HEAD -- <path>`，**第 2 列 = stash 有而 HEAD 没有的行数**，即"真丢失量"；按此列降序即可把"真丢失"与"双向演进噪声"分开。
+
+> 🔴 **陷阱（本轮最大误判来源）**：`git rev-parse "<ref>:<path>"` 对**不存在的路径会原样回显参数字符串**而非报错。第一版脚本据此把 `IntegrationMetadataController` 误判为"stash 有改动"、把 HEAD 独有的 `IntegrationMetadataService` 误判为"base/stash 均存在"。
+> **必须用 `git rev-parse --verify --quiet "<ref>:<path>"`**（输出为空 = MISSING）。改用后全部判定修正。
+
+### 12.2 完整性检查结果（①）—— 三类，只有两类是真丢失
+
+| 集合 | 性质 | 文件（stash 独有行数 > HEAD 独有行数） |
+|:--|:--|:--|
+| **A · 血缘地图（真丢失）** | 实现整体未入 HEAD | `DataLineage.tsx`(580/140)、`DataLineageService.java`(379/40)、`api.ts`(84/20)、`DataLineageController.java`(66/17)、`DataLineageTab.tsx`(8/3) |
+| **C · 血缘跳转链路（真丢失，用户可感知）** | `/lineage` 死链修复整条未入 HEAD | `CatalogContextMenu.tsx`(8/1)、`DataWorkbenchLayout.tsx`(34/10)、`App.tsx`(5/2，仅注释差异) |
+| **B · 契约断裂（非丢失）** | HEAD 保留重构成果但端点缺失 | `IntegrationMetadataController.java`（stash 239 行胖控制器 → HEAD 65 行薄控制器 + 新 Service），详见 §12.5 |
+
+噪声（`HEAD` 为超集或双向演进，不回放）：`OntologySecurityInterceptor`(361/335)、`ScenarioManagementView`(108/722)、`EcosKnowledgeGraphServiceImpl`(67/146)、locale `*.json`、`ConnectionsTab.tsx`(1/1 对称)、`DqRuleSqlProvider.java`（stash 把私有构造器改 public，属防实例化降级）、ontology `LineageController.java`（HEAD 已是 PMO-52 T2 真实现超集，stash 为旧简版）。
+
+### 12.3 根因（②）—— 改动只活在一个被 drop 的悬空 stash
+
+- 修改**仅存在于悬空 commit** `024fdda`（subject `On feat/ontology-workbench-wave-a: t2 pre-changes`，author ECOS-PMO，2026-09-12 02:46:57 +0100，parents `0a5b9fa` + `756187e`）及内容相同的 `21d2003`
+- **9 个分支逐一核对，无一包含增强版** —— 即：它从未进入任何分支
+- 悬空成因：`git stash drop` 在未 apply/commit 前执行 → 对象失引用 → `git stash list` 再也看不到，只能靠 `git fsck --dangling` 发现
+- **为什么"看起来正常"**：`git status` 干净、`git log` 无异常、编译通过 —— 丢失发生在"提交边界之外"，任何只检查工作区与提交历史的常规手段都检测不到
+
+> 技术身份对应提交 `1fe0e2f`（`feat(integration): 批次 B' data 集成元数据 + ontology 血缘真解析/真多跳 impact`）**在 HEAD 祖先链中**，但它只落地了该批次的一部分 —— 这也解释了为什么"提交明明存在"而功能却缺失。
+
+### 12.4 恢复内容（③）
+
+**集合 A（5 文件，`HEAD == base` 无损回放）**
+- `DataLineage.tsx`：251 行 → 691 行（stash 新增 554 行中 511 行未入 HEAD）
+- `data-workbench/api.ts`：删除 3 个死函数（`fetchLineageNodes`/`fetchLineageEdges`/`buildLineage`，grep 确认无其他引用），新增 3 个真接口 `fetchLineageTopology` / `fetchLineageImpact` / `rebuildLineage`
+- `DataLineageController.java`：移除 `/nodes`、`/edges`、`/build`；新增 `GET /topology`、`POST /topology/rebuild`、`GET /impact`；`getLineage` 的 `tableName` 由必填改 `defaultValue=""`（放宽，符合"只增不改"）
+- `DataLineageService.java`：380 → 719 行；删除 `@PostConstruct` 构造器误用与 `init()`/`ensureSchema()`，改惰性 `tryCreateLineageTablesSafely()`；新增 `rebuildAndPersist` / `persistParsed` / `clearLineageData` / `getTopologyFromDb` / `getImpactOverview` / `matchStartNode` / `bfsImpact` / `emptyImpact`
+- `DataLineageTab.tsx`：新增 `initialTable` 透传
+
+**集合 C（跳转链路，2 文件叠加，1 文件不回放）**
+- `DataWorkbenchLayout.tsx`：**MERGE 叠加** —— 以 HEAD 为基底（保留 HEAD 独有的 `HealthTab`、`ENGINE_CONFIG_TAB`、`justify-between` 布局），叠入 stash 的 `?lineageTable=X` 链路（`useSearchParams` 解析 → 自动切血缘 Tab → 消费一次后清 query 避免状态污染）
+- `CatalogContextMenu.tsx`：修复死链 —— `navigate('/lineage')` 路由实际**未注册**（[main.tsx](file:///d:/workspace/javaprojects/ECOS/ecos_frontend/src/main.tsx) 只有 `<Route path="*" element={<WorldModelViewer />} />` 兜底，会落到错误页），改为 `navigate('/data-workbench?lineageTable=<table>')`
+- `App.tsx`：stash 相对 HEAD 仅 3 行注释差异，无功能 → 不回放
+
+**架构铁律 §4.1 合规化**：`DataLineage.tsx` 回放后含 17 处 `slate-*` 硬编码色（违反主题令牌铁律），逐处改写为 `useTheme().styles.*`（`cardText`/`cardTextMuted`/`divider`/`badgeBg`/`badgeText`/`infoBg`/`sidebarHoverBg`/`accentBg`/`accentBorder`/`appBg`）。`slate-` 残留已为 0；保留的 red/orange/amber/emerald/sky/blue 为语义色（符合铁律），`bg-white` 1 处（toggle 把手）保留。
+另修 1 处既有 bug：原 `style={{ borderColor: styles.cardBorder }}` 把主题 class 当作颜色值用（无效值），改为 className 化。
+
+### 12.5 集合 B（端点契约断裂）—— 精确结论与修复
+
+**修复前实测（带 admin token）**
+
+| 端点 | 实测 | 含义 |
+|:--|:--|:--|
+| `/api/integration/logs` | **200** | 控制器可达（未带 token 时为 403，易误判为"整体不可达"） |
+| `/api/integration/metadata` | **404** | 端点被 `1fe0e2f` 重构删除，前端 4 处调用 |
+| `/api/v1/integration/logs` | **404** | gateway 缺重写 |
+| `/api/v1/integration/metadata` | **404** | 重写缺失 + 端点缺失，双重 |
+
+**两个根因**
+1. **重写从未落地**：`IntegrationMetadataController` 映射在裸路径 `/api/integration`，其类注释白纸黑字写着"knowledgeApi 走 `/api/v1/integration/**`，gateway 重写到 `/api/integration`"——但 [VersionPrefixRewriteFilter.java](file:///d:/workspace/javaprojects/ECOS/ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/VersionPrefixRewriteFilter.java) 的 `V1_REWRITE_MAP` 里从来没有 integration 条目
+2. **端点被重构丢弃**：`1fe0e2f` 把 239 行胖控制器重构成"薄 Controller(65 行) + `IntegrationMetadataService`(359 行)"，重构只搬了 `/logs` 与 `POST /metadata/drift`，`GET /metadata` 整个丢失
+
+**修复（5 文件，API 只增不改）**
+
+| # | 文件 | 改动 |
+|:--|:--|:--|
+| ① | `VersionPrefixRewriteFilter.java` | `V1_REWRITE_MAP` 增 `Map.entry("/api/v1/integration/", "/api/integration/")`（已全库确认**无任何 Controller 映射在 `/api/v1/integration`**，不会打乱既有路由） |
+| ② | `SecurityConfig.java` | ~~permitAll 补裸路径 `/api/integration/**`（铁律 §1.2 双路径各写一遍）~~ **→ 已撤销，见 §12.5.1** |
+| ③ | `ClearanceInterceptor.java` | 豁免清单补 `path.startsWith("/api/v1/integration")` |
+| ④ | `IntegrationMetadataService.java` | 新增 `fetchIntegrationMetadata()` / `fetchDriftSample(boolean,String)` / `buildLineageOverview()` / `fetchRealDriftSamples()` / `mapDsToConn()` / `copyFirst()` / `mapTaskToSync()`（+277 行）；构造器注入新增 `DataSourceService`、`DataLineageService` |
+| ⑤ | `IntegrationMetadataController.java` | 新增 `GET /metadata`、`GET /metadata/drift`（薄委托，保留既有 `/logs` 与 `POST /metadata/drift`） |
+
+**契约设计要点**：`sources` 与 `connections` **同放 data 内层** —— 3 处前端调用方经 `apiFetchData` 解包后读 `data.sources`，而 [SyncTab.tsx:42](file:///d:/workspace/javaprojects/ECOS/ecos_frontend/src/pages/knowledge/tabs/SyncTab.tsx#L42) 用原生 `fetch().json()` 拿到的是未解包的 `ApiResponse` 信封、读 `raw.data.sources`，两种读法都必须满足。**前端零改动**，以补齐后端方式闭合契约。
+
+**修复后实测（带 admin token；匿名访问结论见 §12.5.1）**
+
+| 端点 | HTTP | 关键载荷 |
+|:--|:--|:--|
+| `/api/v1/integration/metadata` | 200 | `connections`/`sources`/`syncTasks` 各 **4 条真实数据**（如 `w7_ds_5dsvdf` POSTGRESQL status=connected）+ `lineage{nodes,links}` + `simulationState{false,false}` |
+| `/api/integration/metadata` | 200 | 同上 |
+| `/api/v1/integration/logs` | 200 | `logs: []` |
+| `/api/v1/integration/metadata/drift?sample=true` | 200 | `schemaDelta/fields/rows/samples/lineage/checkedAt` 齐备 |
+| `/api/integration/metadata/drift?sample=true&dsId=x` | 200 | 同上 |
+| 回归 `/api/v1/engine/data/lineage/topology` | 200 | 新重写未影响既有路由 |
+| 回归 `/api/v1/pipeline/definitions` | 200 | 同上 |
+
+**防造假约束**：`fetchDriftSample` 复用现有 `detectDriftAndSlaStatus("drift")` 的真实 DQ 结论（`attribution` 中 `kind=DQ_FAILURE` 条目）作 schemaDelta；`sample=true` 时取 `ecos_dq.dq_rule_check.sample_failures` 真实样本行，**无真实样本返回空数组，不塞假数据**。`dsId` 为前端契约参数：`ecos_dq.dq_rule` 无 datasource 外键，无法归因到具体数据源，故按引擎级真实漂移返回，已在方法 javadoc 中写明该取舍。
+
+### 12.5.1 安全回归自查与撤销（🔴 修复过程中自查发现，已闭合）
+
+**发现方式**：不是用户报告，而是走 Reviewer 门禁的 `SECURITY_GATE` 时**主动做未认证访问回归**时暴露。
+
+**现象（修复后、撤销前实测）**
+
+| 请求（无 token） | 撤销前 | 修复前基线 |
+|:--|:--|:--|
+| `/api/integration/metadata` | **200**（返 `connections` 含 host/port/username/jdbcUrl） | 403 |
+| `/api/v1/integration/metadata` | **200** | 403（重写缺失，实际不可达） |
+| `/api/integration/logs` | **200** | **403**（§12.5 表首行已记载该基线，可复算） |
+
+即修复动作 ② 把**未认证访问放行了**，暴露基础设施拓扑（host/port/username/jdbcUrl，不含密码）。与 M0 改造（2026-09-01）移除 `/datanet/**` permitAll 的缺陷同类 —— 当时判据正是"数据源凭据不可匿名（QA T3-006）"，违反铁律 §2.4-6 默认 DENY。
+
+**根因（一处必须记住的过滤器顺序）**
+
+铁律 §1.2「双路径各写一遍」的**默认前提不成立**：[VersionPrefixRewriteFilter.java](file:///d:/workspace/javaprojects/ECOS/ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/VersionPrefixRewriteFilter.java#L28-L30) 标注 `@Order(Ordered.HIGHEST_PRECEDENCE + 10)`（≈ `Integer.MIN_VALUE+10`），**远早于** Spring Security 的 `FilterChainProxy`（默认 order `-100`）。即 **路径重写先于鉴权**，鉴权层看到的**永远是裸路径**。
+
+推论（可复算）：
+- `/api/v1/integration/**` 这条**既有** permitAll 条目，对任何已进 `V1_REWRITE_MAP` 的前缀**不可达**（等效死条目）；
+- 真正的放行源只有我新增的 `/api/integration/**` 一条；
+
+**处置**：撤销修复动作 ②（仅回退我自己新增的条目），**不动**既有的 `/api/v1/integration/**`（禁止魔改既有全局配置；且其等效死条目、无安全影响）。撤销后两路径统一回到"要求认证"，且**未添加任何新豁免**。
+
+**撤销后复验（判据：匿名 403 / 带 token 200）**
+
+| 请求 | 预期 | 实测 |
+|:--|:--|:--|
+| 无 token `/api/integration/metadata` | 403 | 403 |
+| 无 token `/api/v1/integration/metadata` | 403 | 403 |
+| 无 token `/api/integration/logs` | 403（回到基线） | 403 |
+| 无 token `/api/v1/integration/metadata/drift?sample=true` | 403 | 403 |
+| 带 token 上述 4 条 | 200 | 200 |
+
+**前端影响面：零**。全库 8 处调用面（`data-workbench/api.ts:10`、`knowledgeApi.ts:325/333/341/798/820`、`SyncTab.tsx:42`、`DataWorkbenchImportTab.tsx:52/72`）**全部携带 `Authorization: Bearer`**；另确认无任何匿名调用方（含 `ecos-tests/`、docker health、定时任务）。
+
+**经验固化**（写入 [ecos_backend/scripts/check-controller-filter.sh](file:///d:/workspace/javaprojects/ECOS/ecos_backend/scripts/check-controller-filter.sh) 同目录的审计脚本注释）：判据从"铁律 §1.2 双路径各写一遍"修正为 **"先判路径是否落在 `V1_REWRITE_MAP` 内 —— 若在，鉴权层只见裸路径，只写裸路径豁免；再判该端点是否应匿名 —— 业务数据端点一律不写 permitAll"**。
+
+### 12.6 全面测试（⑤）—— 编译门 / 契约 / 浏览器 E2E
+
+**编译门**
+- 后端 `mvn install -DskipTests -Dmaven.test.skip=true` → **BUILD SUCCESS**
+  - 坑：运行中的 gateway jar 被文件锁 → `repackage` 报 `Unable to rename gateway-1.0.0-SNAPSHOT.jar`，须先停 8080 再构建（同 §11.4）
+  - 坑：PowerShell 下 `-Dmaven.test.skip=true` 会被拆成 `-Dmaven` + `.test.skip=true`，**必须给每个 `-D` 参数加引号**
+- 前端 `npx tsc --noEmit` → **exit=0**
+
+**浏览器 E2E（Playwright，新增 [ecos-tests/lineage-smoke.mjs](file:///d:/workspace/javaprojects/ECOS/ecos-tests/lineage-smoke.mjs)，项目既有测试目录）**
+
+以 `localStorage.token` 注入登录态 → 直达 `#/data-workbench?lineageTable=test_table`，六项全 PASS：
+
+| 断言 | 结果 |
+|:--|:--|
+| A1 无 ErrorBoundary 且工作台已渲染 | PASS（`boundary=false`, `hasTabLabel=true`） |
+| A2 血缘 Tab 存在且激活 | PASS（`active=true, activeCount=1`，判别依据：激活态带 `border-l-2`） |
+| A3 `?lineageTable=test_table` 回填单表查询框 | PASS |
+| A4 `/api/v1/engine/data/lineage/*` 请求成功 | PASS（topology 200×2） |
+| A5 console 无 error | PASS（`errors=0`） |
+| A6 无意外 4xx/5xx | PASS |
+
+截图证据：`%TEMP%\ecos-lineage-smoke\lineage.png`（可见「全链路数据血缘地图」Tab 高亮、`test_table` 已回填、"0 节点, 0 边"空态提示、force-directed 画布正常、无白屏）。
+
+**§12.5.1 撤销安全回归后复跑（同一脚本，ground truth 更新）**：六项仍全 PASS；且网络面板中 `/api/integration/metadata` **带 token 返 200**（脚本 A6 的"已知缺陷豁免"已不再被触发，`[]` 为空），证明撤销 permitAll 对前端**零影响**。全量访问清单：`/api/v1/auth/me`、`/api/health`×2、`/api/v1/task/stats`×2、`/api/v1/engine/data/lineage/topology`×2、`/api/integration/metadata`×2、`/api/v1/pipeline/definitions`×2、`/api/v1/ecos/dq/rules`×2 —— **全部 200**。
+
+> ⚠ 凭证局限（据实标注）：`ecos-tests/` 命中 [.gitignore](file:///d:/workspace/javaprojects/ECOS/.gitignore#L10) 的 `*ecos-tests*` 排除规则，故该 E2E 脚本**无法作为 commit 凭证**、未纳入版本控制（按"禁止魔改全局配置/ignore 规则"未擅自 `-f` 强加）。本批次 DONE 凭证以 §12.9 的 commit hash 与 §12.6/§12.5.1 的 curl 实测为准；E2E 脚本定位为**本地可复现工具**。
+
+> E2E 环境备注：本次 session 内 `browser_use` 子代理的 WebView 在数据工作台页持续"未就绪"（疑似其自带 webview 控制器问题），故改用项目既有 Playwright 方案取到 ground truth。**E2E 结论以 Playwright 为准。**
+> 血缘空态（0 节点）非缺陷：DB 内暂无含 SQL 的管道任务，`POST /topology/rebuild?limit=1` 实测 `tasks_scanned=1, tasks_parsed=0` 属预期。
+
+### 12.7 内容变更跟踪机制（④）
+
+从"检测不到"这个根因出发，落点两处：
+
+1. **可执行审计脚本 [ecos_backend/scripts/check-dangling-changes.sh](file:///d:/workspace/javaprojects/ECOS/ecos_backend/scripts/check-dangling-changes.sh)**（置于既有检查脚本目录，与 `check-controller-filter.sh` 同源）
+   三项检查：① working tree 未提交变更 ② 存活 stash ③ **悬空 commit 中含 base 分支所缺内容的文件**（用 `git fsck --dangling` + `git diff --numstat <dangling> <base>` 第 2 列定量）。退出码 0=可交付 / 1=有未落地风险。
+   用法：`bash ecos_backend/scripts/check-dangling-changes.sh [基线分支]`
+
+2. **`git rev-parse` 陷阱写入脚本注释**（`--verify --quiet` 强制用法），防止后人重蹈本轮误判。
+
+### 12.8 本轮遗留（不阻塞本次收口）
+
+- `ID_SEQ` 静态内存序列重启回退 → 409
+- `kg_sync_log` 成功路径不落台账
+- `ExtractionReviewPanel` 硬编码 `bg-violet-600` + 异常仅 `console.warn`
+- kb/ontology `AGENTS.md` 依赖描述订正
+- `SimulationState` 为常量 `false`：内存模拟态已移除，真实漂移结论走 `GET /metadata/drift`；若产品侧仍需"模拟开关"需另立需求
+- `ecos-tests/` 尚未接入 CI（本轮为按需手动执行）
