@@ -3,7 +3,14 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * 后端已就绪 (T2 已过三滤波器, T3 落地):
+ *  规则列表当前数据源 = legacy 只读端点 GET /api/v1/ecos/dq/rules (已实现: fetchEcosDqRules())
+ *    —— 与数据工作台「数据质量」页同一来源, 读表 ecos_dq_rule_v2 (26 条真实数据)。
+ *    治理端点 GET /api/v1/dq/rules (DqGovernanceController, 表 ecos_dq.dq_rule) 当前实测 404,
+ *    故规则中心的写操作 UI 已隐藏 (仅只读展示), 列表走 fetchEcosDqRules()。
+ *    以下治理类 API (fetchDqGovernanceRules / create / update / delete / dqRuleAction)
+ *    与评分/调度/告警/工单/报告 API 全部保留, 待 Phase 2 治理端点就绪后复用。
+ *
+ * 治理端点 (Phase 2 就绪后启用):
  *   GET /api/v1/dq/rules?{category}&{domain}&{status}&{pageNum}&{pageSize} → ApiResponse<List<DqRuleVO>>
  *   GET /api/v1/dq/rules/{id} → ApiResponse<DqRuleDetailVO>
  *   GET /api/v1/dq/rules/dimension-registry → ApiResponse<List<DqDimensionRegistryVO>>
@@ -17,6 +24,8 @@
 import { apiFetchData } from "../../api";
 
 const DQ_GOV_BASE = "/api/v1/dq";
+/** legacy 只读端点前缀 — 与数据工作台「数据质量」页同源 (DqController) */
+const DQ_LEGACY_BASE = "/api/v1/ecos/dq";
 
 /** T3 规则 VO — 与后端 DqRuleVO 字段对齐(驼峰) */
 export interface DqRuleVO {
@@ -109,6 +118,51 @@ export interface DqRuleVersionVO {
 
 /** 状态动作类型 */
 export type DqRuleActionType = 'submit' | 'approve' | 'reject' | 'deprecate' | 'supersede' | 'disable';
+
+/** legacy 规则行原始结构 — GET /api/v1/ecos/dq/rules 返回的元素 (camelCase) */
+interface EcosDqRuleRawVO {
+  id: string | number;
+  name?: string;
+  description?: string;
+  ruleType?: string;
+  config?: Record<string, unknown>;
+  severity?: string;
+  enabled?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * 规则列表(规则中心当前唯一数据源) — legacy 只读端点 GET /api/v1/ecos/dq/rules
+ *
+ * 与数据工作台「数据质量」页同源(读表 ecos_dq_rule_v2)。经 apiFetchData 解包后响应体为
+ * { data: EcosDqRuleRawVO[], total: number }, 规则数组在 resp.data。
+ * legacy 无 ruleCode / category / domain / targetKind / targetTable / targetField, 一律填空串(不编造);
+ * enabled 映射为 status: true → ACTIVE / false → DISABLED。
+ * 失败抛 Error(与 fetchDqGovernanceRules 一致), 由调用方 error 态 + 重试按钮处理。
+ */
+export async function fetchEcosDqRules(): Promise<DqRuleVO[]> {
+  const resp = await apiFetchData<{ data?: EcosDqRuleRawVO[]; total?: number } | EcosDqRuleRawVO[]>(
+    `${DQ_LEGACY_BASE}/rules`,
+  );
+  const arr = Array.isArray(resp) ? resp : resp?.data;
+  if (!Array.isArray(arr)) return [];
+  return arr.map((r) => ({
+    id: String(r.id),
+    ruleName: r.name ?? "",
+    ruleCode: "",
+    category: "",
+    domain: "",
+    ruleType: r.ruleType ?? "",
+    severity: r.severity ?? "",
+    targetKind: "",
+    status: r.enabled ? "ACTIVE" : "DISABLED",
+    version: 1,
+    parametersJson: JSON.stringify(r.config ?? {}),
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  }));
+}
 
 /**
  * 列表查询(支持 category / domain / status 三维筛选 + 分页)

@@ -1,65 +1,38 @@
 /**
- * PMO-48-B T9 — 数据质量中心 · 规则中心 Tab（状态机交互版）
+ * 数据质量中心 · 规则中心 Tab（Phase 1 只读）
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * 后端 T7c 状态机已落地（DRAFT / IN_REVIEW / ACTIVE / DEPRECATED / SUPERSEDED / REJECTED / DISABLED）
- * - 状态徽章映射 + 顶部按状态统计
- * - 列表行右上角操作按钮（按状态动态显示）
- * - 审核对话框（Approve 展示版本时间线 + Reject 必填 reason）
- * - 版本时间线抽屉
- * - 新建 / 编辑弹窗表单（ruleName / ruleType / targetKind 必填）
- * - 写操作成功 → 成功 toast → load() 静默重拉列表
+ * 数据源 = legacy 只读端点 GET /api/v1/ecos/dq/rules（见 api.ts fetchEcosDqRules），
+ * 与数据工作台「数据质量」页同源（读表 ecos_dq_rule_v2）。
+ * 治理端点 GET /api/v1/dq/rules 实测 404，后端不可达，故本 Tab 的写操作 UI
+ * （新建 / 编辑 / 审批 / 驳回 / 删除 / 废止 / 替代 / 版本历史）已移除，仅保留只读展示。
+ * - 状态徽章映射 + 顶部按状态统计（legacy 仅 ACTIVE / DISABLED 两类）
+ * - 规则类型 / 状态 / 关键词筛选全部为前端内存筛选（legacy 端点不支持服务端筛选）
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Check,
   Clock,
   FileText,
   Fingerprint,
   GitBranch,
   Hash,
-  History,
+  Info,
   Layers,
   Loader2,
-  Pencil,
-  Plus,
   RefreshCw,
   Send,
   ShieldCheck,
   Tag,
-  Trash2,
   X,
   XCircle,
 } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
-import { showToastGlobal } from "../../components/common/Toast";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
-import RuleReviewDialog from "./RuleReviewDialog";
-import VersionTimelineDrawer from "./VersionTimelineDrawer";
-import {
-  DqRuleActionType,
-  DqRuleDTO,
-  DqRuleVO,
-  createDqGovernanceRule,
-  deleteDqGovernanceRule,
-  dqRuleAction,
-  fetchDqGovernanceRules,
-  updateDqGovernanceRule,
-} from "./api";
+import { DqRuleVO, fetchEcosDqRules } from "./api";
 
 const PAGE_SIZE = 20;
-
-/** 当前登录用户名（后端 DqRuleActionDTO 维度对齐，便于审计） */
-function getCurrentUser(): string {
-  return (
-    localStorage.getItem("username") ||
-    localStorage.getItem("user_name") ||
-    "unknown"
-  );
-}
 
 /** 中性状态徽章结构帧 — 主题变量 + fallback（替代原硬编码 slate 结构色，跨 4 主题一致） */
 const NEUTRAL_BADGE_CLS =
@@ -117,19 +90,12 @@ function StatusBadge({ t, status }: { t: (k: string) => string; status: string }
   );
 }
 
-const CATEGORIES = ["BUSINESS", "TECHNICAL", "COMPLIANCE"] as const;
-const DOMAINS = ["CRM", "ERP", "DATA", "RISK", "OPS"] as const;
-const RULE_TYPES = ["NULL", "UNIQUE", "FRESHNESS", "RANGE", "FORMAT", "CUSTOM"] as const;
-const SEVERITIES = ["CRITICAL", "WARNING", "INFO"] as const;
-const TARGET_KINDS = ["TABLE", "COLUMN", "ROW"] as const;
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   NULL: FileText, UNIQUE: Fingerprint, REFRESH: Clock, FRESHNESS: Clock, RANGE: Hash, FORMAT: FileText, CUSTOM: Tag, DEFAULT: FileText,
 };
 
-interface RuleForm {
-  ruleName: string; ruleCode: string; category: string; domain: string; ruleType: string;
-  severity: string; targetKind: string; targetTable: string; targetField: string; parametersJson: string;
-}
+/** 状态筛选可选值 — legacy enabled 只有两种取值（对应 ACTIVE / DISABLED） */
+const STATUS_OPTIONS = ["ACTIVE", "DISABLED"] as const;
 
 interface RuleCenterTabProps {
   initialTableFilter?: string;
@@ -137,11 +103,10 @@ interface RuleCenterTabProps {
 
 export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps = {}) {
   const { styles } = useTheme();
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
 
-  // ── 筛选 ──
-  const [category, setCategory] = useState("");
-  const [domain, setDomain] = useState("");
+  // ── 前端筛选（legacy 端点无服务端筛选，全部为内存过滤）──
+  const [ruleType, setRuleType] = useState("");
   const [status, setStatus] = useState("");
   const [keyword, setKeyword] = useState("");
 
@@ -150,47 +115,30 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ── 抽屉 / 弹窗 ──
-  const [drawerRule, setDrawerRule] = useState<DqRuleVO | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [review, setReview] = useState<{ action: "approve" | "reject"; rule: DqRuleVO } | null>(null);
-  const [formVisible, setFormVisible] = useState(false);
-  const [formInitial, setFormInitial] = useState<DqRuleVO | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<DqRuleVO | null>(null);
-  const [confirmDeprecate, setConfirmDeprecate] = useState<DqRuleVO | null>(null);
-  const [confirmSupersede, setConfirmSupersede] = useState<DqRuleVO | null>(null);
-  const [userLabel] = useState<string>(() => getCurrentUser());
-
-  // 拉取列表（silent 用于写操作成功后静默刷新）
-  const load = async (silent = false) => {
-    if (!silent) { setLoading(true); setError(""); }
+  /** 拉取规则列表（legacy 只读端点） */
+  const load = async () => {
+    setLoading(true);
+    setError("");
     try {
-      const arr = await fetchDqGovernanceRules({
-        category: category || undefined,
-        domain: domain || undefined,
-        status: status || undefined,
-        pageNum: 1,
-        pageSize: 1000,
-      });
-      if (Array.isArray(arr)) {
-        const filtered =
-          initialTableFilter && arr
-            ? arr.filter((r) => (r.targetTable ?? "").toLowerCase() === initialTableFilter.toLowerCase())
-            : arr;
-        setRules(filtered);
-      } else {
-        setError(t("dw.dqRule.loadFailed"));
-      }
+      const arr = await fetchEcosDqRules();
+      // legacy 数据无 targetTable 字段：仅当返回结果中确有该字段时才按 initialTableFilter 过滤，
+      // 否则忽略该参数（否则过滤条件恒不命中，列表会恒为空）
+      const hasTargetTable = arr.some((r) => (r.targetTable ?? "").trim() !== "");
+      const next =
+        initialTableFilter && hasTargetTable
+          ? arr.filter((r) => (r.targetTable ?? "").toLowerCase() === initialTableFilter.toLowerCase())
+          : arr;
+      setRules(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : locale === "zh" ? "网络错误" : "Network error");
+      setError(e instanceof Error ? e.message : t("dw.dqRule.loadFailed"));
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [category, domain, status, initialTableFilter]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [initialTableFilter]);
 
-  // 顶部统计（按状态聚合）
+  // 顶部统计（按状态聚合；legacy 仅 ACTIVE / DISABLED 两类，其余计数 0 由渲染处自动隐藏）
   const stats = useMemo(() => {
     const out = { DRAFT: 0, IN_REVIEW: 0, ACTIVE: 0, DEPRECATED: 0, SUPERSEDED: 0, REJECTED: 0, DISABLED: 0, TOTAL: 0, ENABLED: 0 };
     for (const r of rules) {
@@ -202,68 +150,22 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
     return out;
   }, [rules]);
 
+  // 规则类型下拉选项 — 从已加载数据动态派生，不硬编码枚举
+  const ruleTypeOptions = useMemo(
+    () => Array.from(new Set(rules.map((r) => r.ruleType).filter(Boolean))).sort(),
+    [rules],
+  );
+
+  // 前端内存筛选：规则类型 + 状态 + 关键词（按规则名称匹配）
   const filtered = useMemo(() => {
-    if (!keyword) return rules;
-    const kw = keyword.toLowerCase();
-    return rules.filter((r) =>
-      (r.ruleName ?? "").toLowerCase().includes(kw) ||
-      (r.ruleCode ?? "").toLowerCase().includes(kw) ||
-      (r.targetTable ?? "").toLowerCase().includes(kw)
-    );
-  }, [rules, keyword]);
-
-  const runAction = async (action: DqRuleActionType, rule: DqRuleVO, payload?: { reason?: string }) => {
-    const res = await dqRuleAction(rule.id, action, {
-      ...payload,
-      submitter: action === "submit" ? userLabel : undefined,
-      approver: action === "approve" ? userLabel : undefined,
-      rejector: action === "reject" ? userLabel : undefined,
-      operator: action === "deprecate" || action === "supersede" || action === "disable" ? userLabel : undefined,
+    const kw = keyword.trim().toLowerCase();
+    return rules.filter((r) => {
+      if (ruleType && r.ruleType !== ruleType) return false;
+      if (status && (r.status ?? "").toUpperCase() !== status) return false;
+      if (kw && !(r.ruleName ?? "").toLowerCase().includes(kw)) return false;
+      return true;
     });
-    const keyMap: Record<DqRuleActionType, string> = {
-      submit: "dw.dqRule.statusMachine.ruleSubmitted",
-      approve: "dw.dqRule.statusMachine.ruleApproved",
-      reject: "dw.dqRule.statusMachine.ruleRejected",
-      deprecate: "dw.dqRule.statusMachine.ruleDeprecated",
-      supersede: "dw.dqRule.statusMachine.ruleSuperseded",
-      disable: "dw.dqRule.statusMachine.ruleDisabled",
-    };
-    showToastGlobal(res.success ? "success" : "error", res.success ? t(keyMap[action]) : t("dw.dqRule.statusMachine.actionFailed"));
-    if (res.success) void load(true);
-    return res;
-  };
-
-  const renderActions = (r: DqRuleVO) => {
-    const s = (r.status ?? "").toUpperCase();
-    const list: { icon: React.ComponentType<{ className?: string }>; label: string; danger?: boolean; onClick: () => void }[] = [];
-    if (s === "DRAFT") {
-      list.push({ icon: Send, label: t("dw.dqRule.statusMachine.submit"), onClick: () => void runAction("submit", r) });
-      list.push({ icon: Pencil, label: t("dw.dqRule.editRule"), onClick: () => { setFormInitial(r); setFormVisible(true); } });
-      list.push({ icon: Trash2, label: t("dw.dqRule.delete"), danger: true, onClick: () => setConfirmDelete(r) });
-    } else if (s === "IN_REVIEW") {
-      list.push({ icon: Check, label: t("dw.dqRule.statusMachine.approve"), onClick: () => setReview({ action: "approve", rule: r }) });
-      list.push({ icon: XCircle, label: t("dw.dqRule.statusMachine.reject"), danger: true, onClick: () => setReview({ action: "reject", rule: r }) });
-    } else if (s === "ACTIVE") {
-      list.push({ icon: Clock, label: t("dw.dqRule.statusMachine.deprecate"), onClick: () => setConfirmDeprecate(r) });
-      list.push({ icon: GitBranch, label: t("dw.dqRule.statusMachine.supersede"), onClick: () => setConfirmSupersede(r) });
-    } else if (s === "DEPRECATED") {
-      list.push({ icon: GitBranch, label: t("dw.dqRule.statusMachine.supersede"), onClick: () => setConfirmSupersede(r) });
-    } else if (s === "REJECTED") {
-      // REJECTED → 重新编辑回 DRAFT（后端 T7c PUT 已兼容回 DRAFT）
-      list.push({ icon: Pencil, label: t("dw.dqRule.editRule"), onClick: () => { setFormInitial(r); setFormVisible(true); } });
-    }
-    // SUPERSEDED / DISABLED → 无操作（任务说明：不加 enable，废弃端点未建）
-    list.push({ icon: History, label: t("dw.dqRule.statusMachine.history"), onClick: () => { setDrawerRule(r); setDrawerOpen(true); } });
-    return list;
-  };
-
-  const onSubmitRule = async (dto: DqRuleDTO) => {
-    const res = formInitial ? await updateDqGovernanceRule(formInitial.id, dto) : await createDqGovernanceRule(dto);
-    return res;
-  };
-
-  // 表单内联（避免外部文件循环导入）— 但已经独立出 RuleFormDialog 见下
-  // 见下方子组件
+  }, [rules, ruleType, status, keyword]);
 
   return (
     <div className="h-full flex flex-col">
@@ -293,32 +195,28 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
         </div>
       </div>
 
-      {/* 工具栏 */}
+      {/* 工具栏（只读：无新建/编辑入口） */}
       <div className={`flex flex-wrap items-center gap-2 mb-3 p-2.5 border rounded-xl shadow-3xs`} style={{ borderColor: styles.cardBorder }}>
-        <select value={category} onChange={(e) => setCategory(e.target.value)}
+        <select value={ruleType} onChange={(e) => setRuleType(e.target.value)}
+          aria-label={t("dw.dqRule.colType")}
           className={`px-2.5 py-1.5 text-xs border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg cursor-pointer`}>
-          <option value="">{t("dw.dqRule.categoryAll")}</option>
-          {["NULL", "UNIQUE", "REFRESH", "RANGE", "FORMAT", "CUSTOM"].map((c) => (
-            <option key={c} value={c}>{c}</option>
+          <option value="">{t("dw.dqRule.ruleTypeAll")}</option>
+          {ruleTypeOptions.map((rt) => (
+            <option key={rt} value={rt}>{rt}</option>
           ))}
         </select>
 
-        <select value={domain} onChange={(e) => setDomain(e.target.value)}
-          className={`px-2.5 py-1.5 text-xs border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg cursor-pointer`}>
-          <option value="">{t("dw.dqRule.domainAll")}</option>
-          {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-
         <select value={status} onChange={(e) => setStatus(e.target.value)}
+          aria-label={t("dw.dqRule.status")}
           className={`px-2.5 py-1.5 text-xs border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg cursor-pointer`}>
           <option value="">{t("dw.dqRule.statusAll")}</option>
-          {["DRAFT", "IN_REVIEW", "ACTIVE", "DEPRECATED", "SUPERSEDED", "REJECTED", "DISABLED"].map((s) => (
+          {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>{STATUS_META[s]?.label ? t(STATUS_META[s].label) : s}</option>
           ))}
         </select>
 
         <input value={keyword} onChange={(e) => setKeyword(e.target.value)}
-          placeholder={t("dw.dqRule.searchPlaceholder")}
+          placeholder={t("dw.dqRule.searchPlaceholderName")}
           className={`flex-1 min-w-[180px] px-3 py-1.5 text-xs border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50`} />
 
         <button onClick={() => void load()}
@@ -327,11 +225,11 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
           {t("dw.dqRule.refresh")}
         </button>
 
-        <button onClick={() => { setFormInitial(null); setFormVisible(true); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-bold rounded-lg shadow-xs transition cursor-pointer`}>
-          <Plus className="w-3.5 h-3.5" />
-          {t("dw.dqRule.newRule")}
-        </button>
+        {/* 只读提示：治理端点 404，写操作 UI 已隐藏 */}
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] border rounded-lg ${styles.cardBorder} ${styles.cardTextMuted}`}>
+          <Info className="w-3.5 h-3.5 shrink-0" />
+          {t("dw.dqRule.onlyReadPhase1")}
+        </span>
       </div>
 
       {/* 主区: 列表 */}
@@ -362,70 +260,35 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
                 <tr className={`${styles.appBg} border-b ${styles.cardBorder}`}>
                   <th className="text-left p-2.5 font-semibold w-12">{t("dw.dqRule.colSeq")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.colName")}</th>
-                  <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.category")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.colType")}</th>
-                  <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.domain")}</th>
-                  <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.targetKind")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.severity")}</th>
                   <th className="text-left p-2.5 font-semibold">{t("dw.dqRule.colStatus")}</th>
-                  <th className="text-right p-2.5 font-semibold w-56">{t("dw.dqRule.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.slice(0, PAGE_SIZE).map((r, i) => {
                   const statusMeta = STATUS_META[(r.status ?? "").toUpperCase()];
                   const StatusIcon = statusMeta?.icon ?? FileText;
+                  const TypeIcon = TYPE_ICONS[r.ruleType ?? ""] ?? FileText;
                   return (
                     <tr key={r.id} className={`border-b ${styles.cardBorder} transition-colors hover:bg-black/5 dark:hover:bg-white/5`}>
                       <td className={`p-2.5 ${styles.cardTextMuted} font-mono`}>{i + 1}</td>
                       <td className="p-2.5">
                         <div className="flex items-center gap-2">
                           <StatusIcon className={`w-3.5 h-3.5 ${styles.accentText} shrink-0`} />
-                          <div className="min-w-0">
-                            <div className={`font-bold ${styles.cardText} truncate`}>{r.ruleName}</div>
-                            <div className={`font-mono text-[10px] ${styles.cardTextMuted} truncate`}>{r.ruleCode}</div>
-                          </div>
+                          <span className={`font-bold ${styles.cardText} truncate`}>{r.ruleName}</span>
                         </div>
-                      </td>
-                      <td className="p-2.5">
-                        <span className={`px-2 py-0.5 rounded ${styles.badgeBg} ${styles.badgeText} text-[10px] font-mono font-bold`}>{r.category || "-"}</span>
                       </td>
                       <td className={`p-2.5 ${styles.cardTextMuted}`}>
                         <div className="flex items-center gap-1.5">
-                          {(() => { const T = TYPE_ICONS[r.ruleType ?? ""] ?? FileText; return <T className="w-3.5 h-3.5" />; })()}
+                          <TypeIcon className="w-3.5 h-3.5" />
                           <span className="font-mono text-[11px] truncate">{r.ruleType || "-"}</span>
                         </div>
-                      </td>
-                      <td className="p-2.5">
-                        <span className={`px-2 py-0.5 rounded-full ${styles.badgeBg} ${styles.badgeText} text-[10px] font-bold`}>{r.domain || "-"}</span>
-                      </td>
-                      <td className="p-2.5">
-                        <div className={`flex items-center gap-1.5 ${styles.cardTextMuted}`}>
-                          <Hash className="w-3 h-3 opacity-60" />
-                          <span className="font-mono text-[11px] truncate">{r.targetKind || "-"}</span>
-                        </div>
-                        {r.targetTable ? (
-                          <div className={`font-mono text-[10px] ${styles.cardTextMuted} opacity-70 truncate`}>{r.targetTable}</div>
-                        ) : null}
                       </td>
                       <td className="p-2.5">
                         <SeverityInline styles={styles} severity={r.severity} />
                       </td>
                       <td className="p-2.5"><StatusBadge t={t} status={r.status} /></td>
-                      <td className="p-2.5">
-                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                          {renderActions(r).map((a, ai) => (
-                            <button key={ai} onClick={a.onClick} aria-label={a.label} title={a.label}
-                              className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
-                                a.danger
-                                  ? `border-red-300/50 dark:border-red-500/40 ${styles.dangerText} hover:bg-red-50 dark:hover:bg-red-500/10`
-                                  : `${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/10`
-                              }`}>
-                              <a.icon className="w-3.5 h-3.5" />
-                            </button>
-                          ))}
-                        </div>
-                      </td>
                     </tr>
                   );
                 })}
@@ -439,58 +302,6 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
           </div>
         )}
       </div>
-
-      {/* 确认删除 */}
-      <ConfirmDialog visible={!!confirmDelete}
-        title={t("dw.dqRule.deleteConfirm")}
-        message={t("dw.dqRule.deleteMsg").replace("{name}", confirmDelete?.ruleName ?? "")}
-        confirmText={t("dw.dqRule.delete")} danger variant="danger"
-        onCancel={() => setConfirmDelete(null)}
-        onConfirm={() => confirmDelete && (async () => {
-          const res = await deleteDqGovernanceRule(confirmDelete.id);
-          showToastGlobal(res.success ? "success" : "error", res.success ? t("dw.dqRule.statusMachine.ruleDeleted") : t("dw.dqRule.statusMachine.actionFailed"));
-          setConfirmDelete(null);
-          if (res.success) void load(true);
-        })()} />
-
-      {/* 确认废止 */}
-      <ConfirmDialog visible={!!confirmDeprecate}
-        title={t("dw.dqRule.statusMachine.confirmDeprecate")}
-        message={t("dw.dqRule.statusMachine.deprecateMsg").replace("{name}", confirmDeprecate?.ruleName ?? "")}
-        confirmText={t("dw.dqRule.statusMachine.deprecate")} variant="warning"
-        onCancel={() => setConfirmDeprecate(null)}
-        onConfirm={() => confirmDeprecate && (async () => {
-          await runAction("deprecate", confirmDeprecate);
-          setConfirmDeprecate(null);
-        })()} />
-
-      {/* 确认替代 */}
-      <ConfirmDialog visible={!!confirmSupersede}
-        title={t("dw.dqRule.statusMachine.confirmSupersede")}
-        message={t("dw.dqRule.statusMachine.supersedeMsg").replace("{name}", confirmSupersede?.ruleName ?? "")}
-        confirmText={t("dw.dqRule.statusMachine.supersede")} variant="warning"
-        onCancel={() => setConfirmSupersede(null)}
-        onConfirm={() => confirmSupersede && (async () => {
-          await runAction("supersede", confirmSupersede);
-          setConfirmSupersede(null);
-        })()} />
-
-      {/* 审核对话框 */}
-      <RuleReviewDialog visible={!!review}
-        action={review?.action ?? "approve"}
-        rule={review?.rule ?? null}
-        operator={userLabel}
-        onClose={() => setReview(null)}
-        onConfirmed={() => void load(true)} />
-
-      {/* 版本时间线抽屉 */}
-      <VersionTimelineDrawer visible={drawerOpen} rule={drawerRule} onClose={() => setDrawerOpen(false)} />
-
-      {/* 新建/编辑表单弹窗 */}
-      <RuleFormDialog visible={formVisible} initial={formInitial}
-        onSubmit={onSubmitRule}
-        onClose={() => setFormVisible(false)}
-        onSubmitted={() => { void load(true); setFormVisible(false); setFormInitial(null); }} />
     </div>
   );
 }
@@ -504,168 +315,4 @@ function SeverityInline({ styles, severity }: { styles: ReturnType<typeof useThe
     : s === "INFO" ? `${styles.infoBg} ${styles.infoText} border ${styles.infoBorder}`
     : `${styles.successBg} ${styles.successText} border ${styles.successBorder}`;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>{severity || "-"}</span>;
-}
-
-/** 新建/编辑表单 — 与 RuleCenterTab 内联拆开，控制主文件 <800 行 */
-function RuleFormDialog({
-  visible, initial, onSubmit, onClose, onSubmitted,
-}: {
-  visible: boolean;
-  initial: DqRuleVO | null;
-  onSubmit: (dto: DqRuleDTO) => Promise<{ success: boolean; error?: string }>;
-  onClose: () => void;
-  onSubmitted: () => void;
-}) {
-  const { styles } = useTheme();
-  const { t } = useLanguage();
-  const [form, setForm] = useState<RuleForm>(() => ({
-    ruleName: "", ruleCode: "", category: "BUSINESS", domain: "DATA", ruleType: "NULL",
-    severity: "INFO", targetKind: "COLUMN", targetTable: "", targetField: "", parametersJson: "{}",
-  }));
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!visible) return;
-    const params = (() => {
-      const p = (initial as unknown as { parameters?: unknown })?.parameters;
-      try { return p ? JSON.stringify(p, null, 2) : initial?.parametersJson ?? "{}"; }
-      catch { return "{}"; }
-    })();
-    setForm({
-      ruleName: initial?.ruleName ?? "", ruleCode: initial?.ruleCode ?? "",
-      category: initial?.category ?? "BUSINESS", domain: initial?.domain ?? "DATA",
-      ruleType: initial?.ruleType ?? "NULL", severity: initial?.severity ?? "INFO",
-      targetKind: initial?.targetKind ?? "COLUMN", targetTable: initial?.targetTable ?? "",
-      targetField: initial?.targetField ?? "", parametersJson: params,
-    });
-    setError("");
-    setSaving(false);
-  }, [visible, initial]);
-
-  if (!visible) return null;
-
-  const set = <K extends keyof RuleForm>(k: K, v: RuleForm[K]) => setForm((p) => ({ ...p, [k]: v }));
-
-  const onConfirm = async () => {
-    if (!form.ruleName.trim()) { setError(t("dw.dqRule.form.ruleNameRequired")); return; }
-    const code = form.ruleCode.trim() || `DQ_${Date.now().toString(36).toUpperCase()}`;
-    if (!form.ruleType.trim()) { setError(t("dw.dqRule.form.ruleTypeRequired")); return; }
-    if (!form.targetKind.trim()) { setError(t("dw.dqRule.form.targetKindRequired")); return; }
-    let parameters: Record<string, unknown> | undefined;
-    if (form.parametersJson.trim() && form.parametersJson.trim() !== "{}") {
-      try {
-        const parsed = JSON.parse(form.parametersJson);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) parameters = parsed as Record<string, unknown>;
-      } catch { setError(t("dw.dqRule.form.paramsInvalidJson")); return; }
-    }
-    const dto: DqRuleDTO = {
-      ruleName: form.ruleName.trim(), ruleCode: code,
-      category: form.category, domain: form.domain,
-      ruleType: form.ruleType, severity: form.severity,
-      targetKind: form.targetKind,
-      targetTable: form.targetTable.trim() || undefined,
-      targetField: form.targetField.trim() || undefined,
-      parameters,
-    };
-    setSaving(true);
-    setError("");
-    const res = await onSubmit(dto);
-    setSaving(false);
-    if (res.success) {
-      showToastGlobal("success", initial ? t("dw.dqRule.statusMachine.ruleUpdated") : t("dw.dqRule.statusMachine.ruleCreated"));
-      onSubmitted();
-    } else {
-      setError(res.error ?? t("dw.dqRule.form.saveFailed"));
-    }
-  };
-
-  const fieldCls = `w-full px-3 py-1.5 text-xs border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50`;
-  const labelCls = `text-[11px] font-bold ${styles.cardTextMuted} mb-1 block font-mono uppercase`;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`relative z-50 w-full max-w-2xl mx-4 rounded-xl shadow-2xl ${styles.cardBg} border ${styles.cardBorder} flex flex-col max-h-[85vh]`}>
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${styles.cardBorder}`}>
-          <div className="flex items-center gap-2">
-            {initial ? <Pencil className={`w-4 h-4 ${styles.accentText}`} /> : <Plus className={`w-4 h-4 ${styles.accentText}`} />}
-            <span className={`font-bold text-sm ${styles.cardText}`}>
-              {initial ? t("dw.dqRule.editRule") : t("dw.dqRule.newRule")}
-            </span>
-          </div>
-          <button onClick={onClose}
-            className={`p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 ${styles.cardTextMuted} transition cursor-pointer`} aria-label="close">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.colName")} *</label>
-            <input value={form.ruleName} onChange={(e) => set("ruleName", e.target.value)} className={fieldCls} />
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.colCode")}</label>
-            <input value={form.ruleCode} onChange={(e) => set("ruleCode", e.target.value)} className={`${fieldCls} font-mono`} placeholder="DQ_xxx" />
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.category")}</label>
-            <select value={form.category} onChange={(e) => set("category", e.target.value)} className={fieldCls}>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.domain")}</label>
-            <select value={form.domain} onChange={(e) => set("domain", e.target.value)} className={fieldCls}>
-              {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.colType")} *</label>
-            <select value={form.ruleType} onChange={(e) => set("ruleType", e.target.value)} className={fieldCls}>
-              {RULE_TYPES.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.severity")}</label>
-            <select value={form.severity} onChange={(e) => set("severity", e.target.value)} className={fieldCls}>
-              {SEVERITIES.map((sv) => <option key={sv} value={sv}>{sv}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.targetKind")} *</label>
-            <select value={form.targetKind} onChange={(e) => set("targetKind", e.target.value)} className={fieldCls}>
-              {TARGET_KINDS.map((tk) => <option key={tk} value={tk}>{tk}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>{t("dw.dqRule.targetTable")}</label>
-            <input value={form.targetTable} onChange={(e) => set("targetTable", e.target.value)} className={`${fieldCls} font-mono`} placeholder="table.name" />
-          </div>
-          <div className="col-span-2">
-            <label className={labelCls}>{t("dw.dqRule.targetField")}</label>
-            <input value={form.targetField} onChange={(e) => set("targetField", e.target.value)} className={`${fieldCls} font-mono`} placeholder="column.name" />
-          </div>
-          <div className="col-span-2">
-            <label className={labelCls}>{t("dw.dqRule.parameters")}</label>
-            <textarea value={form.parametersJson} onChange={(e) => set("parametersJson", e.target.value)} rows={4}
-              className={`${fieldCls} font-mono resize-none`} placeholder='{"threshold": 0.95}' />
-          </div>
-          {error ? <div className={`col-span-2 text-xs ${styles.dangerText}`}>{error}</div> : null}
-        </div>
-
-        <div className={`flex items-center justify-end gap-2 px-5 py-3 border-t ${styles.cardBorder}`}>
-          <button onClick={onClose} disabled={saving}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border ${styles.cardBorder} ${styles.cardText} hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-40`}>
-            {t("dw.dqRule.cancel")}
-          </button>
-          <button onClick={() => void onConfirm()} disabled={saving}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold ${styles.accentBg} ${styles.accentHover} ${styles.cardText} transition cursor-pointer disabled:opacity-40`}>
-            {saving ? <Loader2 className="w-3.5 h-3.5 inline animate-spin" /> : (initial ? t("dw.dqRule.save") : t("dw.dqRule.create"))}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
