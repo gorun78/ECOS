@@ -1,0 +1,79 @@
+{
+  "artifact": "REVIEW_REPORT",
+  "name": "数据工作台血缘地图丢失恢复批次 代码审查报告",
+  "version": "v1",
+  "status": "AUTO_CLOSED",
+  "human_review_required": false,
+  "workflow_mode": "L2",
+  "task_id": "t_9f3c1a72",
+  "artifact_ref": "release/v2.1-alpha working tree（13 改动文件 + 1 新增脚本；git diff --stat HEAD = 13 files, +1648/-225）",
+  "gates": {
+    "P0_GATE": { "status": "PASS", "p0_count": 0 },
+    "P1_GATE": { "status": "PASS", "p1_count": 0, "threshold": 3 },
+    "SECURITY_GATE": { "status": "PASS", "critical": 0, "high": 0, "closed_regressions": ["S-001"] },
+    "ARCH_GATE": { "status": "PASS", "p0_arch": 0, "p1_arch": 0 }
+  },
+  "review_history": [
+    { "round": 1, "SECURITY_GATE": "FAIL", "high": 1, "finding": "S-001 未认证可读取基础设施元数据 host/port/username/jdbcUrl（本批次新增 /api/integration/** permitAll 所致）", "action": "撤销该条 permitAll，不动既有 /api/v1/integration/**（禁止魔改全局配置）" },
+    { "round": 2, "SECURITY_GATE": "PASS", "high": 0, "evidence": "匿名 5×403 / 带 token 5×200 / 回归 2×200 全部实测" }
+  ],
+  "defect_summary": { "total": 6, "P0": 0, "P1": 0, "P2": 4, "P3": 2, "closed": 1 },
+  "gates_final": "PASS",
+  "deliverable_allowed": true,
+  "first_gate_step0": {
+    "status": "DEGRADED_PASS",
+    "reason": "直派模式无 SOURCE_PATCH_APPROVAL_RECORD（本环境不使用 Hermes 看板/swarm，已实证 daemon 不认领任务）",
+    "equivalent_evidence": [
+      "后端 mvn install -DskipTests → BUILD SUCCESS (07:20 min)",
+      "前端 npx tsc --noEmit → exit=0",
+      "契约实测 9 条端点（匿名/认证双态）",
+      "Playwright E2E 六项 A1~A6 全 PASS"
+    ]
+  },
+  "acceptance_check": {
+    "req1_completeness_scan": "PASS（三类：血缘地图 A / 跳转链路 C 为真丢失；集合B 为契约断裂非丢失；噪声已排除，见 audit §12.2）",
+    "req2_root_cause": "PASS（改动只活在悬空 commit 024fdda/21d2003，从未进入任何分支；git status 干净、git log 无异常，丢失发生在提交边界之外，见 §12.3）",
+    "req3_restore": "PASS（A 5 文件无损回放 + C 2 文件含 1 处 MERGE 叠加 + 17 处 slate-* 主题令牌合规化）",
+    "req4_tracking_mechanism": "PASS_WITH_NOTE（ecos_backend/scripts/check-dangling-changes.sh 三项检查已建立；note: ecos-tests/ 被 .gitignore 排除，E2E 脚本无法作凭证 → T-1）",
+    "req5_full_test": "PASS（编译门 + 9 端点契约 + E2E 六项 + 安全回归复验）"
+  },
+  "security_verification_evidence": {
+    "anonymous_expected_403": {
+      "/api/integration/metadata": 403,
+      "/api/v1/integration/metadata": 403,
+      "/api/integration/logs": 403,
+      "/api/v1/integration/logs": 403,
+      "/api/v1/integration/metadata/drift?sample=true": 403
+    },
+    "authenticated_expected_200": {
+      "/api/integration/metadata": 200,
+      "/api/v1/integration/metadata": 200,
+      "/api/integration/logs": 200,
+      "/api/v1/integration/logs": 200,
+      "/api/v1/integration/metadata/drift?sample=true": 200
+    },
+    "regression_endpoints": {
+      "/api/v1/engine/data/lineage/topology": 200,
+      "/api/v1/pipeline/definitions": 200
+    },
+    "anonymous_callers_in_repo": 0,
+    "frontend_call_sites_with_bearer": 8
+  },
+  "prd_traceability": {
+    "S-001": "需求 ①②③（恢复过程引入的回归，已闭合）",
+    "A-1": "需求 ③ 恢复血缘地图原契约",
+    "T-1": "需求 ④ 变更跟踪机制 / ⑤ 测试凭证",
+    "T-2": "需求 ② 根因分析（过滤器顺序）"
+  },
+  "non_blocking_recommendations": [
+    "修正架构铁律 §1.2 表述：重写先于鉴权时，只写裸路径豁免（已在该文件注释固化，铁律正文须用户批准后修改）",
+    "另立专项收敛历史过宽 permitAll（/api/v1/engine/** 等），对齐 §2.4-6 默认 DENY",
+    "ecos-tests/ 纳入版本控制或 CI，使测试资产成为凭证"
+  ],
+  "report_path": "docs/03开发阶段/03-03-审查报告/t_9f3c1a72_review_report.md",
+  "dispatch_plan_path": "docs/03开发阶段/03-03-审查报告/t_9f3c1a72_dispatch_plan.json",
+  "audit_path": "docs/plans/merge-audit-v2.1-alpha.md",
+  "commit_evidence_pending": "docs/plans/merge-audit-v2.1-alpha.md §12.9（分批 clean commit 后回填，用户决策：暂不推送）",
+  "timestamp": "2026-09-16T13:35:00+08:00",
+  "reviewer": "PM/Reviewer (skill: reviewer-code-review v3)"
+}

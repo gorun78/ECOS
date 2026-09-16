@@ -1,0 +1,18 @@
+{
+  "task_id": "t_9f3c1a72",
+  "artifact_type": "SOURCE_PATCH",
+  "workflow_mode": "L2",
+  "artifact_ref": "release/v2.1-alpha working tree（血缘地图回放 A + 跳转链路 C + 集合B 端点契约 + 安全回归撤销 + 变更跟踪脚本 + 审计报告 §十二）",
+  "dispatched_at": "2026-09-16T13:30:00+08:00",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "SOURCE_PATCH(data-workbench-lineage-restore)",
+      "mode": "full",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT", "REVIEW_COMMENT"],
+  "final_gate_logic": "AND_ALL",
+  "notes": "L2 标准模式全量审查。审查范围：13 改动文件（6 staged + 7 unstaged）+ 1 新增脚本。重点：① 架构铁律 §5.1 #5 API 只增不改 / §1.2 三滤波器 / §2.4 安全接入与默认 DENY / §4.1 主题令牌 / §4.3 i18n；② 集合B 是否引入路由冲突、安全豁免过宽；③ 是否存在假数据/mock；④ 是否遗漏安全集成项（§2.4-8 grep 卡）。审查中已主动执行匿名访问回归，发现 1 处 HIGH 安全回归（放行未认证读取基础设施元数据），已撤销并复验闭合。"
+}
