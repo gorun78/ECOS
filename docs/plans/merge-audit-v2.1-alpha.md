@@ -575,7 +575,7 @@
 - `ExtractionReviewPanel` 硬编码 `bg-violet-600` + 异常仅 `console.warn`
 - kb/ontology `AGENTS.md` 依赖描述订正
 - `SimulationState` 为常量 `false`：内存模拟态已移除，真实漂移结论走 `GET /metadata/drift`；若产品侧仍需"模拟开关"需另立需求
-- `ecos-tests/` 尚未接入 CI（本轮为按需手动执行）；且该目录命中 `.gitignore` 的 `*ecos-tests*`，E2E 脚本**无法作为 commit 凭证**
+- `ecos-tests/` 尚未接入 CI（本轮为按需手动执行）。~~该目录命中 `.gitignore` 的 `*ecos-tests*`，E2E 脚本无法作为 commit 凭证~~ → **已闭合（2026-09-16，`ba3c722`）**：移除 `*ecos-tests*` 忽略规则并将 `lineage-smoke.mjs` 入库；详见 §12.10
 - 既有 `/api/v1/integration/**` permitAll 属**等效死条目**（已入重写表的前缀，鉴权层只见裸路径）；按"禁止魔改既有全局配置"保留，已在 `SecurityConfig.java` 注释警示
 - 本批次为 `ClearanceInterceptor` 补的 `path.startsWith("/api/v1/integration")` 同属**死条目**（HandlerInterceptor 在重写之后执行，只见裸路径）—— 按修正后的铁律 §1.2 ② 判定应只写裸路径。**未清理**（不扩大本轮改动范围，且无功能/安全影响），登记待清理
 - 铁律 §1.2 表述已按用户批准修正为三步判据（`.trae/rules/架构铁律.md` → v1.2；`docs/ARCHITECTURE-RULES.md` → v1.1）
@@ -603,3 +603,68 @@
 
 **过程留痕（据实）**：首次提交时**误将先前会话已预置于 index 的 6 个文件**一并提交（`git commit` 提交的是**整个 index**，非本次 `git add` 的文件），致批次边界破坏（前后端混提）。已以 `git reset --mixed 162b081` 回退 3 个**本地未推送**提交并按文件显式分批重建；工作区内容零丢失（回退后 `git status` 与回退前逐项一致：13 改动 + 4 未跟踪）。
 **教训固化**：分批提交前必须核对 `git diff --cached --name-only`，不能只看 `git status --porcelain` 的 `M ` / ` M` 两列差异。
+
+### 12.10 追加批次（2026-09-16 用户裁定「② 收敛过宽 permitAll / ③ ecos-tests 入库」）
+
+> 触发：上一批次 §12.8 遗留登记后，向用户提出两项待裁定，用户回复「2、是 3、是」批准。
+> 本条为**安全面收敛 + 交付凭证补齐**，不改任何业务逻辑与 API 签名。
+
+#### 12.10.1 需求③ — `ecos-tests/` 纳入版本控制（已闭合）
+
+| 项 | 内容 |
+|:--|:--|
+| 根因 | `.gitignore:10` 的 `*ecos-tests*` 使新增 E2E 脚本无法入库，**E2E 无法作为 DONE 凭证** |
+| 改动 | 删除该忽略规则，替换为说明注释（内层 `node_modules` 仍由既有规则排除） |
+| 实证 | `git ls-files ecos-tests` 显示 2 个脚本早已被跟踪，仅 `lineage-smoke.mjs` 未跟踪 → 移除规则后 `git status --porcelain` 仅多出该项，**无意外暴露** |
+| 顺带 | `lineage-smoke.mjs` 移除已失效的 `KNOWN_DEFECT = '/api/integration/metadata'` 豁免，A6 恢复**严格判定** |
+| 验证 | 改前/改后各跑一次，A1~A6 全 PASS、console errors=0 |
+| 凭证 | `ba3c722` |
+
+#### 12.10.2 需求② — 收敛历史过宽 `permitAll`（Wave 1 已完成并验证）
+
+**改前匿名探针（gateway :8080，无 Authorization）**
+
+| 结果 | 端点 |
+|:--:|:--|
+| **200** | `/api/health`、`/api/v1/engine/data/health`、`/api/v1/engine/data/status`、`/api/v1/engine/data/config`、`/api/v1/engine/data/udf/list`、**`/api/v1/engine/data/lineage/topology`**、`/api/v1/engine/ontology/graph/full`、`/api/v1/engine/ontology/settings`、`/api/v1/task/stats`、`/api/v1/pipeline/definitions` |
+| 403 | `/api/v1/agent/copilot/*`、`/api/v1/ecos/dq/rules`、`/api/v1/system/dict/user_status`、`/api/v1/integration/metadata`、`/api/v1/twins/`、`/api/v1/integration/` |
+| 404 | `/api/v1/sysconfig/`、`/api/v1/datasource/`、`/api/v1/query/`、`/api/v1/monitor/`、`/api/v1/knowledge-bases`、`/api/workbook/`、`/api/v1/ontology/`、`/api/v1/llm/models`、`/api/v1/mfa/` |
+
+→ 关键事实：`/api/v1/engine/**` 的 blanket permitAll 使**匿名可读血缘拓扑、匿名可列 UDF、匿名读 ontology 设置**，且 **`POST /api/v1/engine/data/query/execute` 匿名可执行 SQL**（违反铁律 §2.4-6 默认 DENY、§2.4-1/2 行级列级过滤前置）。
+
+**改动**（单文件 13 增 1 删）：[SecurityConfig.java](file:///d:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/SecurityConfig.java)
+
+```
+-  "/api/v1/engine/**",
++  "/api/v1/engine/*/health",              // 内部消费方：workspace KnowledgeHealthAggregator（RestTemplate 无凭证）
++  "/api/v1/engine/ontology/graph/**",     // 内部消费方：agent-service SearchOntologyGraphTool（无凭证，登记例外）
++  // 其余 /api/v1/engine/** 一律 authenticated
+```
+
+配套 `V1_REWRITE_MAP` 无 `/api/v1/engine/` 条目 → KEEP，按修正后铁律 §1.2 ② 只写裸路径即正确，**第 1 层免改**。
+
+**改动后回归矩阵（决定性证据）**
+
+| 结果 | 端点 | 判定 |
+|:--|:--|:--|
+| anon=**403** / token=200 | `engine/data/lineage/topology`、`engine/data/udf/list`、`engine/data/status`、`engine/data/config`、`engine/ontology/settings`、`POST engine/data/query/execute` | ✅ 收敛生效 |
+| anon=200 / token=200 | `engine/data/health`、`engine/ontology/health` | ✅ 有意公开（内部健康聚合） |
+| anon=200 / token=200 | `engine/ontology/graph/full` |  登记例外（内部 agent 工具无凭证） |
+| anon=200 / token=200 | `/api/health` | ✅ 有意公开 |
+| token 扫描 11 项全 200 | `query/history`、`query/templates`、`pipeline/tasks`、`data/settings`、`lineage/impact?startNode=`、`engine/{ai,security,knowledge,cognitive}` 的 health/status、`ontology/config`、`ontology/graph/full` | ✅ 带凭证零回退（无 401/403） |
+
+**E2E（涉前端页面，铁律 §5.4 V4 三项）**
+
+- `lineage-smoke.mjs`：A1~A6 全 PASS，13 次 API 全 200，console errors=0
+- `#/engine-data`（EngineMonitor）：`engine/data/{health,settings,status}` 全 200，无 401/403（首帧 `/api/v1/auth/me [401]` 属登录前噪声）
+- `#/ontology_workbench`：`ecos/ontologies`、`ontology/domains`、`ecos/relationships` 全 200，**收敛未破坏该页**
+
+#### 12.10.3 本轮新增遗留（登记，不阻塞）
+
+1. **`/api/v1/engine/ontology/graph/**` 匿名例外**：被 `agent-service` 的 `SearchOntologyGraphTool` 以 RestTemplate 直连 :8080 且不带凭证所阻塞。待「内部调用鉴权机制」落地后收敛。
+2. **`ClearanceInterceptor` / `ClearanceMvcConfig` 未同步收敛**：两者仍含 `/api/v1/engine/**` blanket 豁免。**本轮有意不改**——permitAll 层已足以阻断匿名访问，而改动 HandlerInterceptor 会引入已登录用户的 clearance 判定风险，需先设计判定规则（Wave 2）。
+3. **Wave 2 候选收敛清单**（改前实测匿名可达）：`/api/v1/pipeline/**`（匿名可读 definitions）、`/api/v1/task/**`（匿名 200，mock 数据）、`/api/v1/query/**`、`/api/v1/monitor/**`、`/api/v1/sysconfig/**`、`/api/v1/datasource/**`(+`/datasource/**`)、`/api/v1/mfa/**`、`/api/v1/llm/**`、`/api/knowledge-bases`、`/api/v1/ontology/**`（受 `ExecuteActionTool` 无凭证直连阻塞）、`/api/pipeline/debug/**`（SSE，需保留）。
+   - 其中 `/api/v1/chat/stream` 为 `EventSource`（浏览器无法携带 Authorization 头）→ 收敛前须先定 token 传递方案（query 参数或短期票据），否则会导致 AI 工作台对话断流。
+4. **`#/ontology_workbench` 既有 404**（与本次改动无关）：`GET /api/v1/ecos/ontologies/ont001/entities/{id}/properties`（ent511/ent101/ent102/ent104/ent501/ent002/ent003/ent_hw002/ent_hw003 共 9 次）。
+5. **`TransformController.java` 过期注释已订正**：原自述「三滤波器已覆盖（`/api/v1/engine/**` permitAll + ClearanceInterceptor 豁免）」在收敛后失真，改为按新判据描述（本路径不再匿名，仅 health/graph 例外）。
+6. **`codebase-memory-mcp` 不可用（据实说明）**：自定义指令要求调用链分析须走 `codebase-analysis` 技能（codebase-memory-mcp 工具链），实测 `list_projects` 返回 `{"projects":[],"total":0}` 且工具集**无** `index_repository` → 无可索引项目，本节分析退回 Grep/Read 完成。
