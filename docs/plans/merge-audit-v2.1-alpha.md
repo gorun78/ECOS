@@ -674,3 +674,49 @@
 4. **`#/ontology_workbench` 既有 404**（与本次改动无关）：`GET /api/v1/ecos/ontologies/ont001/entities/{id}/properties`（ent511/ent101/ent102/ent104/ent501/ent002/ent003/ent_hw002/ent_hw003 共 9 次）。
 5. **`TransformController.java` 过期注释已订正**：原自述「三滤波器已覆盖（`/api/v1/engine/**` permitAll + ClearanceInterceptor 豁免）」在收敛后失真，改为按新判据描述（本路径不再匿名，仅 health/graph 例外）。
 6. **`codebase-memory-mcp` 不可用（据实说明）**：自定义指令要求调用链分析须走 `codebase-analysis` 技能（codebase-memory-mcp 工具链），实测 `list_projects` 返回 `{"projects":[],"total":0}` 且工具集**无** `index_repository` → 无可索引项目，本节分析退回 Grep/Read 完成。
+
+### 12.11 追加批次（2026-09-16 数据工作台三项 UI/缺陷修复）
+
+**来源**：用户直派指令（原文）：`数据工作台修改：1、菜单名依次改为：数据源连接、数据管道、数据质量、数据血缘 2、引擎配置靠底展示，放div之上；3、数据管道：点击左边的数据管道，画布上未加载管道内容`
+
+#### 12.11.1 三项改动落地
+
+| # | 需求 | 落地文件 | 关键实现 |
+|:--|:--|:--|:--|
+| 1 | 侧边菜单改名（4 项） | `locales/dw/{zh-CN,en}.json` | `dw.tab.{connections,pipeline_builder,health,lineage}` → 数据源连接 / 数据管道 / 数据质量 / 数据血缘（en: Data Sources / Data Pipelines / Data Quality / Data Lineage） |
+| 2 | 引擎配置靠底（置于监控 `div` 之上） | `DataWorkbenchLayout.tsx` | `TAB_CONFIG` 收敛为 4 项；新增 `SIDE_BOTTOM_TABS`（engine-config）渲染于侧边栏底部、`物理数据监控仪表` 之上；抽出 `renderSideTab` 共用按钮渲染保证样式/选中态一致 |
+| 3 | 点选管道后画布不加载 | `PipelineFlowEditor.tsx` | 加载副作用依赖由 `[editingPipeline?.id]` 改为**内容签名** `[loadedDefKey]`（`id#nodes.length`），并补「新建态 / 空定义」清屏分支 |
+
+#### 12.11.2 需求③ 根因（§4.8-1 列表/详情配对铁律的残留破坏）
+
+- 列表接口 `GET /api/v1/pipeline/definitions` 只返摘要（**无 `nodes` 字段**）；编辑器选中后先以摘要渲染一次（`nodes` 空 → 副作用空跑），详情接口 `GET /api/v1/pipeline/definitions/{id}` 随后返回 `nodes.length=3`。
+- 原副作用只依赖 `id`：**详情晚到时 id 未变 → 副作用不再执行 → 画布恒空**。故缺陷不在 `PipelineBuilderTab`（其 list/detail 配对 `canvasPipeline = detail ?? selectedPipeline` 本身正确），而在编辑器的 effect 依赖键。
+- 实测（改前）：详情接口 200 且 `nodes.length=3`，而画布 `.react-flow__node` = 0 → 佐证接口正常、缺陷在前端渲染。
+
+#### 12.11.3 验证证据（铁律 §5.4 四步法）
+
+| 步 | 项 | 结果 |
+|:--|:--|:--|
+| V3 | `npm run lint`（`tsc --noEmit`） | exit 0 |
+| V4-a | 侧边栏菜单项与顺序 | `['数据源连接','数据管道','数据质量','数据血缘','引擎配置']`，主菜单恰 4 项且顺序符合要求 |
+| V4-b | 引擎配置位置 | 侧边栏文本索引 `引擎配置=27` < `物理数据监控仪表=32` → 位于其**之上**且处底部区块 |
+| V4-c | 需求③ 回归（真实 id 路径） | 点选首条管道 `.react-flow__node` **0 → 3**；连续切换 3 条管道得 **3 / 5 / 3**（与各自定义一致，无残留/串台）；点「新建」→ **0/0**（清屏生效） |
+| V4-d | console / network | console errors = 0；`/api/` 4xx-5xx = 0 |
+| V4-e | 引擎配置 Tab 可达 | 切换 `引擎配置` 渲染成功，无 ErrorBoundary |
+| V4-f | E2E 回归 | `ecos-tests/lineage-smoke.mjs` A1~A6 **全 PASS**（`TAB_LABEL` 已同步为「数据血缘」），13 次 API 全 200 |
+
+#### 12.11.4 本批次 commit 凭证（DONE 凭证 · 暂不推送）
+
+| commit | message | 文件 |
+|:--|:--|:--|
+| `13c10a9` | `feat(数据工作台): 侧边菜单文案精简为数据源连接/数据管道/数据质量/数据血缘` | `dw/zh-CN.json`、`dw/en.json`、`ecos-tests/lineage-smoke.mjs` |
+| `75e2340` | `feat(数据工作台): 主菜单收敛为4项并将引擎配置入口移至侧边栏底部` | `DataWorkbenchLayout.tsx` |
+| `baeb7ac` | `fix(数据工作台): 修复点选数据管道后画布未加载管道内容` | `PipelineFlowEditor.tsx` |
+
+`git status --porcelain` 为空；分支 `release/v2.1-alpha`；`git diff HEAD~3 --stat` = 5 files changed, 52 insertions(+), 21 deletions(-)。
+
+#### 12.11.5 本轮遗留（登记，不阻塞）
+
+1. **内容签名的残余边界**：`loadedDefKey` 以 `nodes.length` 为签名。当前**无任何代码路径**会在同一 `id` 下重取详情，故实际不触发；若后续为编辑器加「同管道详情重取」，须改为更细签名（如 `id#nodes.length#updatedAt`）。
+2. **页面标题仍为旧长名**：`dw.txt.102168`（数据源与物理连接）、`dw.txt.1b23b5`（数据质量健康检测）、`dw.txt.0f541b`（全链路数据血缘地图）为**页面标题类 key**，非菜单项，本次未改（用户仅要求菜单名）。如需统一需另行确认。
+3. 上一批次遗留项全部保持开放：S-204（`lineage-smoke.mjs` 硬编码 dev 凭据）、Wave 2 收敛清单、`ClearanceInterceptor` blanket 豁免、`#/ontology_workbench` 实体属性端点 404。

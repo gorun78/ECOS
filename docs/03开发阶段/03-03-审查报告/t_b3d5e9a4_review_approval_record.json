@@ -1,0 +1,84 @@
+{
+  "artifact": "REVIEW_REPORT",
+  "name": "数据工作台三项改动（菜单改名 / 引擎配置靠底 / 画布加载修复）代码审查报告",
+  "version": "v1",
+  "status": "AUTO_CLOSED",
+  "human_review_required": false,
+  "workflow_mode": "L2",
+  "task_id": "t_b3d5e9a4",
+  "artifact_ref": "release/v2.1-alpha commit 13c10a9 / 75e2340 / baeb7ac（5 文件；git diff HEAD~3 --stat = 5 files changed, 52 insertions(+), 21 deletions(-)）",
+  "upstream_recommendations_closed": [],
+  "gates": {
+    "P0_GATE": { "status": "PASS", "p0_count": 0 },
+    "P1_GATE": { "status": "PASS", "p1_count": 0, "threshold": 3 },
+    "SECURITY_GATE": { "status": "PASS", "critical": 0, "high": 0, "net_improvement": false, "new_surface": false, "note": "纯前端 UI/渲染改动，未新增端点、未改鉴权、未改数据访问路径，攻击面零变化" },
+    "ARCH_GATE": { "status": "PASS", "p0_arch": 0, "p1_arch": 0 }
+  },
+  "review_history": [
+    {
+      "round": 1,
+      "SECURITY_GATE": "PASS",
+      "note": "首轮即 PASS，无修复循环"
+    }
+  ],
+  "defect_summary": { "total": 2, "P0": 0, "P1": 0, "P2": 0, "P3": 2, "closed": 0, "introduced_by_this_batch": 0 },
+  "gates_final": "PASS",
+  "deliverable_allowed": true,
+  "first_gate_step0": {
+    "status": "DEGRADED_PASS",
+    "reason": "直派模式无 SOURCE_PATCH_APPROVAL_RECORD（本环境不使用 Hermes 看板/swarm，已实证 daemon 不认领任务）",
+    "human_decision_evidence": "用户直派指令原文：「数据工作台修改：1、菜单名依次改为：数据源连接、数据管道、数据质量、数据血缘 2、引擎配置靠底展示，放div之上；3、数据管道：点击左边的数据管道，画布上未加载管道内容」",
+    "equivalent_evidence": [
+      "前端编译门 npm run lint (tsc --noEmit) → exit 0",
+      "浏览器 E2E（隔离上下文，避免干扰用户会话）：侧边栏 4 项主菜单 + 引擎配置底部入口，顺序/位置均实测通过",
+      "浏览器 E2E：点选管道 .react-flow__node 0 → 3；连续切换 3 条管道得 3 / 5 / 3；点「新建」→ 0/0",
+      "console errors = 0；/api/ 4xx-5xx = 0",
+      "ecos-tests/lineage-smoke.mjs A1~A6 全 PASS（13 次 API 全 200）"
+    ]
+  },
+  "acceptance_check": {
+    "req1_menu_rename": "PASS（zh/en 双侧 dw.tab.{connections,pipeline_builder,health,lineage} 已改；浏览器实测标签依次为 数据源连接 / 数据管道 / 数据质量 / 数据血缘）",
+    "req2_engine_config_bottom": "PASS（TAB_CONFIG 收敛为 4 项，engine-config 移入 SIDE_BOTTOM_TABS；浏览器实测侧边栏文本「引擎配置」索引 27 < 「物理数据监控仪表」索引 32 → 位于其上方且处底部区块；Tab 切换渲染正常无 ErrorBoundary）",
+    "req3_canvas_load": "PASS（依赖键由 id 改为内容签名 id#nodes.length；实测 0→3、切换 3/5/3、新建清屏 0/0）",
+    "compile_gate": "PASS（npm run lint exit 0）",
+    "no_theme_violation": "PASS（新增/改动样式全部走 styles.* 主题令牌，无新增硬编码 Tailwind 颜色，铁律 §4.1）",
+    "no_hardcoded_chinese": "PASS（菜单文案全部经 t(tab.i18nKey) 取用，无硬编码中文字面量，铁律 §4.3）",
+    "no_api_signature_change": "PASS（未改任何 API 路径/参数签名/返回体，未改鉴权配置，铁律 §1.1/§1.2）"
+  },
+  "verification_evidence": {
+    "sidebar_labels": ["数据源连接", "数据管道", "数据质量", "数据血缘", "引擎配置"],
+    "sidebar_block_order": ["数据工作台 + 4 主菜单", "引擎配置 → 物理数据监控仪表 → 外部数据接口"],
+    "sidebar_text_index": { "engine_config": 27, "monitor_meter": 32 },
+    "canvas_regression": {
+      "first_select": { "nodes_before": 0, "nodes_after": 3, "edges_after": 0 },
+      "switch_seq": [
+        { "index": 1, "nodes": 3 },
+        { "index": 2, "nodes": 5 },
+        { "index": 0, "nodes": 3 }
+      ],
+      "after_new": { "nodes": 0, "edges": 0 }
+    },
+    "console_errors": 0,
+    "api_4xx_5xx": 0,
+    "e2e_regression": { "script": "ecos-tests/lineage-smoke.mjs", "result": "PASS", "assertions": "A1~A6 全 PASS", "api_calls": "13 次全 200" },
+    "root_cause": "列表接口只返摘要（无 nodes 字段），编辑器先以摘要渲染一次（副作用空跑），详情晚到且 id 未变 → 依赖 [editingPipeline?.id] 的副作用不再执行 → 画布恒空（违反铁律 §4.8-1 列表/详情配对）"
+  },
+  "prd_traceability": {
+    "DW-301": "需求① 菜单改名（正面交付）",
+    "DW-302": "需求② 引擎配置靠底展示（正面交付）",
+    "DW-303": "需求③ 画布加载修复（正面交付）",
+    "DW-304": "需求③ 残值 —— 内容签名以 nodes.length 为粒度（P3，当前无触发路径）",
+    "DW-305": "需求① 副产品 —— 页面标题类 key 仍为旧长名（P3，用户仅要求菜单名）"
+  },
+  "non_blocking_recommendations": [
+    "若后续为编辑器加「同一管道详情重取」路径，须把 loadedDefKey 细化为 id#nodes.length#updatedAt，避免同 id 同节点数但内容变化时不刷新",
+    "页面标题类 key（dw.txt.102168 / dw.txt.1b23b5 / dw.txt.0f541b）仍为旧长文案，若需与菜单统一须另行确认后再改",
+    "上一批次遗留保持开放：S-204（lineage-smoke.mjs 硬编码 dev 凭据）、Wave 2 permitAll 收敛清单、ClearanceInterceptor blanket 豁免未同步、#/ontology_workbench 实体属性端点 404"
+  ],
+  "report_path": "docs/03开发阶段/03-03-审查报告/t_b3d5e9a4_review_report.md",
+  "dispatch_plan_path": "docs/03开发阶段/03-03-审查报告/t_b3d5e9a4_dispatch_plan.json",
+  "audit_path": "docs/plans/merge-audit-v2.1-alpha.md §12.11",
+  "commit_evidence": "git log --oneline -3 → baeb7ac / 75e2340 / 13c10a9（release/v2.1-alpha，未推送）",
+  "timestamp": "2026-09-17T06:20:00+08:00",
+  "reviewer": "PM/Reviewer (skill: reviewer-code-review v3)"
+}

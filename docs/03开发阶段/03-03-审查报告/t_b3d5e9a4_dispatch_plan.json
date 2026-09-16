@@ -1,0 +1,18 @@
+{
+  "task_id": "t_b3d5e9a4",
+  "artifact_type": "SOURCE_PATCH",
+  "workflow_mode": "L2",
+  "artifact_ref": "release/v2.1-alpha 数据工作台三项改动（菜单改名 / 引擎配置靠底 / 点选管道画布不加载修复）commit 13c10a9 + 75e2340 + baeb7ac",
+  "dispatched_at": "2026-09-17T06:10:00+08:00",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "SOURCE_PATCH(data-workbench-sidebar-and-canvas-fix)",
+      "mode": "full",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT", "REVIEW_COMMENT"],
+  "final_gate_logic": "AND_ALL",
+  "notes": "L2 标准模式全量审查。审查范围：5 文件（dw/zh-CN.json 4+/4-、dw/en.json 4+/4-、DataWorkbenchLayout.tsx 25+/9-、PipelineFlowEditor.tsx 17+/2-、ecos-tests/lineage-smoke.mjs 2+/2-）。重点：① 菜单改名后 i18n 中英双侧 key 是否齐全（禁硬编码中文，铁律 §4.3）；② 侧边栏重构是否破坏既有 Tab 切换/选中态/引擎配置可达性；③ 画布加载修复是否真正消除「列表摘要先到、详情后到」竞态，是否引入清屏副作用（覆盖新建态/空定义）；④ 是否引入硬编码颜色（铁律 §4.1）、是否改动任何 API 路径/签名（铁律 §1.1）；⑤ ecos-tests 脚本文案依赖同步是否让既有 E2E 保持绿。用户直派指令原文见 docs/plans/merge-audit-v2.1-alpha.md §12.11。"
+}
