@@ -559,4 +559,27 @@
 - `ExtractionReviewPanel` 硬编码 `bg-violet-600` + 异常仅 `console.warn`
 - kb/ontology `AGENTS.md` 依赖描述订正
 - `SimulationState` 为常量 `false`：内存模拟态已移除，真实漂移结论走 `GET /metadata/drift`；若产品侧仍需"模拟开关"需另立需求
-- `ecos-tests/` 尚未接入 CI（本轮为按需手动执行）
+- `ecos-tests/` 尚未接入 CI（本轮为按需手动执行）；且该目录命中 `.gitignore` 的 `*ecos-tests*`，E2E 脚本**无法作为 commit 凭证**
+- 既有 `/api/v1/integration/**` permitAll 属**等效死条目**（已入重写表的前缀，鉴权层只见裸路径）；按"禁止魔改既有全局配置"保留，已在 `SecurityConfig.java` 注释警示
+
+### 12.9 本批次 commit 凭证（DONE 凭证 · 暂不推送）
+
+> 依据 `.trae/rules/Git提交规范.md`「commit hash 即 DONE 凭证，working tree 未提交变更一律不算交付」。
+> 分支：`release/v2.1-alpha`（非主干，允许直接提交）；**本地提交，按用户决策暂不 push**。
+> 提交后 `git status --porcelain` 输出为空（除本条 §12.9 回填自身）。
+
+| # | commit | 类型(模块) | 文件数 | 归属 | 验收 |
+|:--|:--|:--|:--:|:--|:--|
+| 1 | `411d8e0` | fix(数据引擎) | 2 | A·血缘后端 | 血缘三端点 200（§12.6） |
+| 2 | `8f18129` | fix(数据工作台) | 3 | A·血缘前端 | E2E A1~A6 全 PASS |
+| 3 | `a71b6d8` | fix(数据工作台) | 2 | C·跳转链路 | E2E A2/A3 PASS |
+| 4 | `351ea31` | fix(数据引擎) | 4 | B·端点契约 | 带 token 5×200（§12.5.1） |
+| 5 | `49f92da` | docs(安全) | 1 | B·安全回归撤销留痕 | 匿名 5×403（§12.5.1） |
+| 6 | `e618af0` | chore(脚本) | 1 | D·跟踪机制 | 脚本可运行、退出码语义正确 |
+| 7 | `c9da89e` | docs(文档) | 1 | D·审计报告 §12 | 本文件 |
+| 8 | `235a17b` | docs(审查) | 3 | Reviewer 门禁 | `deliverable_allowed=true` |
+
+**溯源命令**：`git log --oneline 162b081..HEAD` / 单批追溯 `git show --stat <hash>`
+
+**过程留痕（据实）**：首次提交时**误将先前会话已预置于 index 的 6 个文件**一并提交（`git commit` 提交的是**整个 index**，非本次 `git add` 的文件），致批次边界破坏（前后端混提）。已以 `git reset --mixed 162b081` 回退 3 个**本地未推送**提交并按文件显式分批重建；工作区内容零丢失（回退后 `git status` 与回退前逐项一致：13 改动 + 4 未跟踪）。
+**教训固化**：分批提交前必须核对 `git diff --cached --name-only`，不能只看 `git status --porcelain` 的 `M ` / ` M` 两列差异。
