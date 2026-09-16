@@ -9,15 +9,16 @@ import { useTheme } from '../../../components/ThemeContext';
 import { apiFetch } from '../../../api';
 
 // ── 业务对象选项 ──────────────────────────────────────────
+// 文案统一走 i18n：knowledge.compliance.objectType.<value>
 const BUSINESS_OBJECTS = [
-  { value: 'medical_device', labelZh: '医疗器械', labelEn: 'Medical Device' },
-  { value: 'pharmaceutical', labelZh: '药品', labelEn: 'Pharmaceutical' },
-  { value: 'cosmetics', labelZh: '化妆品', labelEn: 'Cosmetics' },
-  { value: 'food', labelZh: '食品', labelEn: 'Food' },
-  { value: 'health_supplement', labelZh: '保健食品', labelEn: 'Health Supplement' },
-  { value: 'biologics', labelZh: '生物制品', labelEn: 'Biologics' },
-  { value: 'in_vitro_diagnostic', labelZh: '体外诊断试剂', labelEn: 'In Vitro Diagnostic' },
-];
+  'medical_device',
+  'pharmaceutical',
+  'cosmetics',
+  'food',
+  'health_supplement',
+  'biologics',
+  'in_vitro_diagnostic',
+] as const;
 
 // ── 类型 ──────────────────────────────────────────────────
 
@@ -223,9 +224,9 @@ export default function KnowledgeComplianceCheckTab() {
               <option value="">
                 {t("knowledge.knowledgecompli.244")}
               </option>
-              {BUSINESS_OBJECTS.map(obj => (
-                <option key={obj.value} value={obj.value}>
-                  {zh ? obj.labelZh : obj.labelEn}
+              {BUSINESS_OBJECTS.map(value => (
+                <option key={value} value={value}>
+                  {t(`knowledge.compliance.objectType.${value}`)}
                 </option>
               ))}
             </select>
