@@ -102,7 +102,19 @@ public class SecurityConfig {
                     "/api/v1/agent-runtime/**",
                     "/api/v1/evolution/**",
                     "/api/v1/cognitive/**",
-                    "/api/v1/engine/**",
+                    // ── 2026-09-16 收敛: 原 blanket "/api/v1/engine/**" 已移除 ──
+                    // 该通配使全部引擎业务端点匿名可读（实测匿名 200：lineage/topology、
+                    // data/query（匿名 SQL 执行）、data/udf/list、ontology/settings、
+                    // ontology/graph/full、data/status、data/config），违反 §2.4-6 默认 DENY。
+                    // 现收敛为「仅健康检查公开」+ 一处内部消费方例外：
+                    //   /api/v1/engine/*/health — workspace KnowledgeHealthAggregator 以 RestTemplate
+                    //                             直连 :8080 聚合各引擎健康，不带凭证（不可移除）
+                    //   /api/v1/engine/ontology/graph/** — agent-service SearchOntologyGraphTool 以
+                    //                             RestTemplate 直连 :8080 且无凭证；待内部调用鉴权
+                    //                             机制落地后收敛（登记 §12.8 遗留）
+                    // 其余 /api/v1/engine/** 一律 authenticated（前端调用均带 Bearer）。
+                    "/api/v1/engine/*/health",
+                    "/api/v1/engine/ontology/graph/**",
                     // ── PMO-38 T5: 新增 4 条 permitAll (sysman/knowledge-bases/sysconfig 三组) ──
                     // ── PMO-39 T5: 双路径全覆盖 — 5 新端点的 /api/ 与 /api/v1/ ──
                     // cognitive T1: /plan, /plan/{id}, /optimize
