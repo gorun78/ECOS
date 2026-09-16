@@ -61,7 +61,12 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/v1/knowledge-bases",  "/api/knowledge-bases"),
         // /api/v1/sysconfig/ → /api/sysconfig/ (T4 双路径)
         Map.entry("/api/v1/sysconfig/",     "/api/sysconfig/"),
-        Map.entry("/api/v1/marketplace/",   "/api/marketplace/")
+        Map.entry("/api/v1/marketplace/",   "/api/marketplace/"),
+        // ── 集合B 修复: /api/v1/integration/ → /api/integration/ ──
+        // IntegrationMetadataController 映射在裸路径 /api/integration，其类注释声明 gateway
+        // 会做此重写但实现从未落地，导致 knowledgeApi 的 4 处 v1 调用全部 404。
+        // 全库确认无任何 Controller 映射在 /api/v1/integration（仅三滤波器豁免清单出现过该字面量）。
+        Map.entry("/api/v1/integration/",   "/api/integration/")
     );
 
     /**

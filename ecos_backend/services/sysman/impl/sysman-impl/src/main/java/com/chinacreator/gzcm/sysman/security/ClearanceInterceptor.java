@@ -90,6 +90,9 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/aip")
                 || path.startsWith("/api/ontology")
                 || path.startsWith("/api/integration")
+                // 集合B 修复: 补 v1 形式（铁律 §1.2 双路径各写一遍；gateway 重写与
+                // Spring Security 过滤链先后顺序不可假设，此处需自行覆盖）
+                || path.startsWith("/api/v1/integration")
                 || path.startsWith("/api/metadata")
                 || path.startsWith("/api/lineage")
                 || path.startsWith("/api/agent-mesh")

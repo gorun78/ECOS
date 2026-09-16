@@ -1,9 +1,14 @@
 package com.chinacreator.gzcm.engine.data.integration;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.PipelineTaskService;
+import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.quality.service.DqSecurityService;
+import com.chinacreator.gzcm.engine.data.service.DataLineageService;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,10 +44,17 @@ public class IntegrationMetadataService {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationMetadataService.class);
 
+    /** connectionConfig JSON 解析器（数据源连接配置 → host/port/database/username） */
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private final JdbcTemplate jdbc;
     private final PipelineTaskService pipelineTaskService;
     /** DQ 治理安全桥接 — 统一走 security-engine REST 审计（同 DQ 先例，禁止各引擎自建 KafkaTemplate） */
     private final DqSecurityService dqSecurityService;
+    /** 数据源注册服务 — /metadata 的 connections/sources 真实来源（td_datasource） */
+    private final DataSourceService dataSourceService;
+    /** 血缘服务 — /metadata 的 lineage 概览真实来源（ecos_data_lineage_node/edge） */
+    private final DataLineageService dataLineageService;
 
     /** 统一事件总线（runtime-event）— 审计主通道发 Kafka ecos.audit，不可用时降级 DQ REST 审计 */
     @Autowired(required = false)
@@ -50,10 +62,14 @@ public class IntegrationMetadataService {
 
     public IntegrationMetadataService(JdbcTemplate jdbc,
                                       PipelineTaskService pipelineTaskService,
-                                      DqSecurityService dqSecurityService) {
+                                      DqSecurityService dqSecurityService,
+                                      DataSourceService dataSourceService,
+                                      DataLineageService dataLineageService) {
         this.jdbc = jdbc;
         this.pipelineTaskService = pipelineTaskService;
         this.dqSecurityService = dqSecurityService;
+        this.dataSourceService = dataSourceService;
+        this.dataLineageService = dataLineageService;
     }
 
     /**
@@ -251,6 +267,120 @@ public class IntegrationMetadataService {
     }
 
     /**
+     * 联邦元数据聚合载荷 — 供 {@code GET /api/integration/metadata}（含 v1 重写路径）使用。
+     *
+     * <p>全部数据来自真实表，无 mock / 硬编码：</p>
+     * <ul>
+     *   <li>connections ← {@link DataSourceService#listAll()}（td_datasource）</li>
+     *   <li>sources ← 与 connections 同形同值（前端 3 处调用方读 data.sources）</li>
+     *   <li>syncTasks ← {@link PipelineTaskService#listTasks(int, int)}（ecos_pipeline_task）</li>
+     *   <li>lineage ← {@link DataLineageService#listNodes()} / {@link DataLineageService#listEdges()}</li>
+     * </ul>
+     *
+     * <p>{@code sources} 与 {@code connections} 同放 data 内层：knowledgeApi 部分调用方经
+     * apiFetchData 解包后读 {@code data.sources}，SyncTab 用原生 fetch 拿到 ApiResponse
+     * 信封后读 {@code raw.data.sources}，两种读法都需满足。</p>
+     *
+     * @return data 载荷（connections / sources / syncTasks / lineage / simulationState）
+     */
+    public Map<String, Object> fetchIntegrationMetadata() {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // connections / sources：td_datasource 真实数据源（字段映射同前端 mapDsToConn 语义）
+        List<Map<String, Object>> connections = new ArrayList<>();
+        try {
+            List<DataSourceEntity> dataSources = dataSourceService.listAll();
+            if (dataSources != null) {
+                for (DataSourceEntity ds : dataSources) {
+                    connections.add(mapDsToConn(ds));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("查询数据源列表失败: {}", e.getMessage());
+        }
+        result.put("connections", connections);
+        result.put("sources", new ArrayList<>(connections));
+
+        // syncTasks：ecos_pipeline_task 真实任务列表
+        List<Map<String, Object>> syncTasks = new ArrayList<>();
+        try {
+            Map<String, Object> taskPage = pipelineTaskService.listTasks(1, 100);
+            Object listObj = taskPage != null ? taskPage.get("list") : null;
+            if (listObj instanceof List<?> taskList) {
+                for (Object task : taskList) {
+                    if (task instanceof Map<?, ?> rawTask) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> taskRow = (Map<String, Object>) rawTask;
+                        syncTasks.add(mapTaskToSync(taskRow));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("查询同步任务列表失败: {}", e.getMessage());
+        }
+        result.put("syncTasks", syncTasks);
+
+        result.put("lineage", buildLineageOverview());
+
+        // simulationState：不维护内存模拟态，始终返回健康（真实漂移结论走 GET /metadata/drift）
+        Map<String, Object> simState = new LinkedHashMap<>();
+        simState.put("isSchemaDriftActive", false);
+        simState.put("isSlaBreachActive", false);
+        result.put("simulationState", simState);
+        return result;
+    }
+
+    /**
+     * Schema 漂移样本载荷 — 供 {@code GET /api/integration/metadata/drift} 使用。
+     *
+     * <p>漂移结论复用 {@link #detectDriftAndSlaStatus(String)}（type=drift）：其
+     * {@code attribution} 中 {@code kind=DQ_FAILURE} 的真实条目即 schemaDelta 来源。
+     * {@code sample=true} 时按失败规则 ID 取 {@code ecos_dq.dq_rule_check.sample_failures}
+     * （真实样本行）展开为 rows/samples；无真实样本时返回空数组（前端 loadDrift 已按空数组兜底），
+     * 绝不填充假数据。</p>
+     *
+     * <p>{@code dsId} 为前端契约参数：{@code ecos_dq.dq_rule} 无 datasource 外键（仅
+     * target_kind/target_id/target_table/target_pipeline_id），无法把 DQ 检查归因到具体数据源，
+     * 故按引擎级真实漂移返回，不伪造数据源级样本。</p>
+     *
+     * @param sample 是否附带真实样例行
+     * @param dsId   数据源 ID（前端契约参数，当前无法用于归因，见上文说明）
+     * @return 载荷（schemaDelta / fields / rows / samples / lineage / checkedAt）
+     */
+    public Map<String, Object> fetchDriftSample(boolean sample, String dsId) {
+        Map<String, Object> drift = detectDriftAndSlaStatus("drift");
+
+        List<Map<String, Object>> schemaDelta = new ArrayList<>();
+        Object attribution = drift.get("attribution");
+        if (attribution instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> rawItem
+                        && "DQ_FAILURE".equals(String.valueOf(rawItem.get("kind")))) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> entry = (Map<String, Object>) rawItem;
+                    schemaDelta.add(entry);
+                }
+            }
+        }
+
+        List<Map<String, Object>> rows = sample
+                ? fetchRealDriftSamples(schemaDelta)
+                : new ArrayList<>();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaDelta", schemaDelta);
+        // 前端字段名兼容：loadDrift 读 fields，fetchMetadataDrift 优先读 schemaDelta
+        result.put("fields", schemaDelta);
+        result.put("rows", rows);
+        result.put("samples", rows);
+        result.put("lineage", buildLineageOverview());
+        result.put("checkedAt", drift.get("checkedAt"));
+        log.debug("fetchDriftSample: sample={}, dsId={}, schemaDelta={}, samples={}",
+                sample, dsId, schemaDelta.size(), rows.size());
+        return result;
+    }
+
+    /**
      * 写操作审计 — 主通道 EventBusService（runtime-event）发 Kafka ecos.audit（铁律 §2.4 #5）；
      * EventBusService 不可用时降级 DqSecurityService → security-engine REST 审计。失败不阻塞主流程。
      */
@@ -278,6 +408,152 @@ public class IntegrationMetadataService {
     }
 
     // ── 内部方法 ──────────────────────────────
+
+    /** 血缘概览（真实持久化节点/边）；{@code links} 为前端兼容字段名（对应 edges）。 */
+    private Map<String, Object> buildLineageOverview() {
+        Map<String, Object> lineage = new LinkedHashMap<>();
+        try {
+            List<Map<String, Object>> nodes = dataLineageService.listNodes();
+            List<Map<String, Object>> edges = dataLineageService.listEdges();
+            lineage.put("nodes", nodes != null ? nodes : new ArrayList<>());
+            lineage.put("links", edges != null ? edges : new ArrayList<>());
+        } catch (Exception e) {
+            log.warn("查询血缘概览失败: {}", e.getMessage());
+            lineage.put("nodes", new ArrayList<>());
+            lineage.put("links", new ArrayList<>());
+        }
+        return lineage;
+    }
+
+    /**
+     * 取真实漂移样本行：按 schemaDelta 中的失败规则 ID，从
+     * {@code ecos_dq.dq_rule_check.sample_failures}（JSONB，近 1h 未通过检查）展开。
+     * 无样本记录时返回空列表（前端已按空数组兜底），不伪造数据。
+     */
+    private List<Map<String, Object>> fetchRealDriftSamples(List<Map<String, Object>> schemaDelta) {
+        List<Map<String, Object>> samples = new ArrayList<>();
+        if (schemaDelta.isEmpty()) {
+            return samples;
+        }
+        Set<String> ruleIds = new LinkedHashSet<>();
+        for (Map<String, Object> entry : schemaDelta) {
+            Object ruleId = entry.get("ruleId");
+            if (ruleId != null && !ruleId.toString().isBlank()) {
+                ruleIds.add(ruleId.toString());
+            }
+        }
+        if (ruleIds.isEmpty()) {
+            return samples;
+        }
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT rule_id, sample_failures::text AS sample_failures " +
+                "FROM ecos_dq.dq_rule_check " +
+                "WHERE executed_at >= NOW() - interval '1 hour' " +
+                "  AND passed = FALSE AND sample_failures IS NOT NULL " +
+                "ORDER BY executed_at DESC LIMIT 20");
+            for (Map<String, Object> row : rows) {
+                Object ruleId = row.get("rule_id");
+                if (ruleId == null || !ruleIds.contains(ruleId.toString())) {
+                    continue;
+                }
+                Object rawJson = row.get("sample_failures");
+                if (rawJson == null || rawJson.toString().isBlank()) {
+                    continue;
+                }
+                List<Map<String, Object>> parsed = MAPPER.readValue(rawJson.toString(),
+                        new TypeReference<List<Map<String, Object>>>() { });
+                for (Map<String, Object> item : parsed) {
+                    Map<String, Object> sampleRow = new LinkedHashMap<>(item);
+                    sampleRow.putIfAbsent("ruleId", ruleId.toString());
+                    samples.add(sampleRow);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("查询真实漂移样本失败（返回空样本）: {}", e.getMessage());
+        }
+        return samples;
+    }
+
+    /**
+     * 将 DataSourceEntity 映射为前端 connection / source 结构。
+     * datasourceId→id, datasourceName→name, datasourceType→type,
+     * connectionConfig(JSON) 解析 host/port/database/username，status 归一
+     * active→connected / error→error / 其他→unknown。
+     */
+    private Map<String, Object> mapDsToConn(DataSourceEntity ds) {
+        Map<String, Object> conn = new LinkedHashMap<>();
+        conn.put("id", ds.getDatasourceId());
+        conn.put("name", ds.getDatasourceName());
+        conn.put("type", ds.getDatasourceType());
+
+        String status = ds.getStatus();
+        if (status == null) {
+            status = "unknown";
+        } else if ("active".equalsIgnoreCase(status)) {
+            status = "connected";
+        } else if ("error".equalsIgnoreCase(status)) {
+            status = "error";
+        }
+        conn.put("status", status);
+
+        // config: 解析 connectionConfig JSON 提取 host/port/database/username（密码类字段不取用）
+        Map<String, Object> config = new LinkedHashMap<>();
+        String cfg = ds.getConnectionConfig();
+        if (cfg != null && !cfg.isBlank()) {
+            try {
+                Map<String, Object> parsed = MAPPER.readValue(cfg, new TypeReference<Map<String, Object>>() { });
+                copyFirst(parsed, config, "host", "host");
+                copyFirst(parsed, config, "port", "port");
+                copyFirst(parsed, config, "database", "database", "dbName", "databaseName");
+                copyFirst(parsed, config, "username", "username", "user");
+                if (parsed.containsKey("jdbcUrl")) {
+                    config.put("jdbcUrl", parsed.get("jdbcUrl"));
+                }
+            } catch (Exception e) {
+                log.debug("解析 connectionConfig 失败 (ds={}): {}", ds.getDatasourceId(), e.getMessage());
+            }
+        }
+        if (ds.getLastTestTime() != null) {
+            config.put("lastTested", ds.getLastTestTime().toString());
+        }
+        conn.put("config", config);
+
+        // tablesAvailable: 真实表结构需查 catalog，此处返回空列表避免 mock
+        conn.put("tablesAvailable", new ArrayList<>());
+        return conn;
+    }
+
+    /** 从 parsed 中按候选键取第一个非空值放入 config 的 targetKey。 */
+    private void copyFirst(Map<String, Object> parsed, Map<String, Object> config,
+                           String targetKey, String... candidateKeys) {
+        for (String key : candidateKeys) {
+            Object val = parsed.get(key);
+            if (val != null) {
+                config.put(targetKey, val);
+                return;
+            }
+        }
+    }
+
+    /** 将 ecos_pipeline_task 行映射为前端 syncTask 结构。 */
+    private Map<String, Object> mapTaskToSync(Map<String, Object> task) {
+        Map<String, Object> sync = new LinkedHashMap<>();
+        sync.put("id", task.getOrDefault("id", ""));
+        sync.put("name", task.getOrDefault("name", ""));
+        sync.put("engine", "ECOS Pipeline 2.0");
+        Object cron = task.get("cron_expression");
+        sync.put("schedule", cron != null ? cron : "");
+        Object statusObj = task.get("status");
+        sync.put("status", statusObj != null ? statusObj.toString().toLowerCase() : "unknown");
+        sync.put("slaMinutes", 0);
+        sync.put("actualDelayMinutes", 0);
+        Object updatedAt = task.get("updated_at");
+        if (updatedAt != null) {
+            sync.put("lastRunTime", updatedAt.toString());
+        }
+        return sync;
+    }
 
     /** 将 td_audit_log 行映射为前端日志结构。 */
     private Map<String, Object> mapAuditRow(Map<String, Object> row) {
