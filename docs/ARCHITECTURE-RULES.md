@@ -1,7 +1,11 @@
 # ECOS 架构铁律 — 所有PMO指令强制执行
 
-> 版本: 1.0 | 2026-08-07 | 基于 Phase 1-2 实战教训 + 后端AGENTS.md + 前端GEMINI.md + 六引擎契约
+> 版本: 1.1 | 2026-09-16 | 基于 Phase 1-2 实战教训 + 后端AGENTS.md + 前端GEMINI.md + 六引擎契约
 > 此文件是ECOS开发的**宪法**。每条PMO指令必须在开头引用，违反任一铁律=验收不通过。
+>
+> **2026-09-16 v1.1 变更**（§1.2 三滤波器「豁免写法」判据修正 · 用户批准）: 实证**路径重写先于鉴权**（`VersionPrefixRewriteFilter` `@Order(MIN+10)` 早于 Spring Security `-100`，鉴权层只见裸路径），废止「双路径各写一遍」的机械表述，改为三步判据（是否应匿名 → 是否在 `V1_REWRITE_MAP` 内 → 匿名回归）。触发事故：误补 `/api/integration/**` permitAll 致未认证可读数据源 `host/port/username/jdbcUrl`（同 T3-006，违反 §2.4-6），已撤销。
+>
+> ⚠ 本文件的架构描述仍为 v1.0 单体态（微服务 v2 尚未同步）；工厂副本 `.trae/rules/架构铁律.md` 已至 v1.2，冲突时以工厂副本为准（见文末同步说明）。
 
 ---
 
@@ -110,10 +114,23 @@ public class XxxController {
 | 层 | 文件 | 操作 |
 |:--|------|------|
 | 1 | `gateway/.../VersionPrefixRewriteFilter.java` | 确认V1_REWRITE_MAP中路径映射正确。Controller用`/api/v1/XXX`→REMOVE对应重写规则；用`/api/XXX`→KEEP |
-| 2 | `sysman/.../security/SecurityConfig.java` | permitAll加`/api/v1/XXX/**` 和 `/api/XXX/**` 两种形式 |
-| 3 | `sysman/.../security/ClearanceInterceptor.java` | 豁免列表加`/api/v1/XXX` 和 `/api/XXX` 两种形式 |
+| 2 | `sysman/.../security/SecurityConfig.java` | **先判该端点是否应匿名**：业务数据端点一律**不写** permitAll（默认 DENY，§2.4-6）。确需匿名时按下方「豁免写法判据」② 决定写哪些形式 |
+| 3 | `sysman/.../security/ClearanceInterceptor.java` | 豁免列表 —— **HandlerInterceptor 层，路径重写已生效 → 只写最终路径形态**，判据同 ② |
 
 **Ant路径陷阱**：`/api/v1/agent/**` 不一定匹配 `/api/v1/agent-loop/chat`（含连字符的路径）。必须显式写出完整前缀，不依赖父级`/**`通配。
+
+🔴 **过滤器顺序事实（2026-09-16 实证，决定豁免写法）**：`VersionPrefixRewriteFilter` 标注 `@Order(Ordered.HIGHEST_PRECEDENCE + 10)`（≈ `Integer.MIN_VALUE + 10`），**远早于** Spring Security 的 `FilterChainProxy`（默认 order `-100`）—— 即**路径重写先于鉴权**。推论：
+
+1. **鉴权层（`SecurityConfig.permitAll`）看到的永远是裸路径**。凡前缀已在 `V1_REWRITE_MAP` 内（如 `/api/v1/integration/`）：补 `/api/v1/XXX/**` 是**死条目**，真正放行的是 `/api/XXX/**`；反之，若该端点本应受保护却补了 `/api/XXX/**`，即**直接放行未认证访问**（实证：2026-09-16 误补致未认证可读数据源 `host/port/username/jdbcUrl`，同 M0 改造 T3-006 缺陷，违反 §2.4-6）。
+2. **`ClearanceInterceptor` 是 HandlerInterceptor，在 DispatcherServlet 内执行、重写已生效** → 它**只见最终路径形态**，对重写表内的前缀只需写裸路径。
+
+**豁免写法判据（替代原「双路径各写一遍」的机械表述）**：
+
+| 步 | 判据 | 动作 |
+|:--|:--|:--|
+| ① | 该端点是否应匿名？ | **否 → permitAll 一律不写**（业务数据端点默认 DENY，§2.4-6） |
+| ② | 该前缀是否在 `V1_REWRITE_MAP` 内？ | **是 → 鉴权/豁免层只写最终路径（裸路径）**；写 v1 形式属死条目<br>**否 → `/api/v1/XXX/**` 与 `/api/XXX/**` 两形式各写一遍** |
+| ③ | 收尾强制 | **匿名回归**：无 token 期望 403、带 token 期望 200（禁止只验带 token 的 200） |
 
 ### 1.3 依赖注入铁律
 
