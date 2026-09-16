@@ -117,9 +117,16 @@ export default function CatalogContextMenu({ node, x, y, onClose }: CatalogConte
     return () => document.removeEventListener("mousedown", handler, true);
   }, [onClose]);
 
+  // 平移"查看血缘"：navigate('/lineage') 路由实际上没注册,这里改为跳转到数据工作台,
+  // 血缘 Tab 默认位置在:data-workbench#lineage(React-router-data 参数)。
+  // 后端将按 path=data-workbench + highlight=<table> 接收(上层 Layout 兼容解析)。
+  const openLineage = (tbl: string) => {
+    navigate(`/data-workbench?lineageTable=${encodeURIComponent(tbl)}`);
+  };
+
   const items = [
     { icon: Eye, label: locale === "zh" ? "预览数据" : "Preview Data", action: () => setShowPreview(true) },
-    { icon: GitBranch, label: locale === "zh" ? "查看血缘" : "View Lineage", action: () => navigate(`/lineage?highlight=${encodeURIComponent(node.name)}`) },
+    { icon: GitBranch, label: locale === "zh" ? "查看血缘" : "View Lineage", action: () => openLineage(node.name) },
     { icon: Shield, label: locale === "zh" ? "配置DQ规则" : "Configure DQ Rules", action: () => navigate(`/dq_dashboard?table=${encodeURIComponent(node.name)}`) },
   ];
 

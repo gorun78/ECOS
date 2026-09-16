@@ -9,7 +9,8 @@
  * @license Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { showToastGlobal } from '../components/common/Toast';
@@ -51,10 +52,26 @@ export default function DataWorkbenchLayout({
 
   const dw = useDataWorkbench(showToast, t);
 
+  // ── URL query 支持:/data-workbench?lineageTable=X 自动切到血缘 tab + 透传表名 ──
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialLineageTable = searchParams.get('lineageTable') || undefined;
+
   // ── Tab navigation ──
   const [localActiveTab, setLocalActiveTab] = useState<TabName>('connections');
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = (tab: string) => onActiveTabChange ? onActiveTabChange(tab as TabName) : setLocalActiveTab(tab as TabName);
+
+  // 当 ?lineageTable=X 存在时,自动切到血缘 tab(消费一次后清掉参数避免状态污染)
+  useEffect(() => {
+    if (initialLineageTable) {
+      setActiveTab('lineage');
+      // 清空 query,避免下次进入或刷新时又触发
+      const next = new URLSearchParams(searchParams);
+      next.delete('lineageTable');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLineageTable]);
 
   // ── UI toggles ──
   const [showExtIfaces, setShowExtIfaces] = useState(false);
@@ -92,7 +109,7 @@ export default function DataWorkbenchLayout({
           {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />}
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} triggerSync={dw.triggerSync} t={t} />}
           {activeTab === 'health' && <HealthTab healthChecks={dw.healthChecks} setHealthChecks={dw.setHealthChecks} showToast={showToast} showAddCheck={dw.showAddCheck} setShowAddCheck={dw.setShowAddCheck} newCheckName={dw.nhName} setNewCheckName={dw.setNhName} newCheckDs={dw.nhDs} setNewCheckDs={dw.setNhDs} checkType={dw.nhType} setCheckType={dw.setNhType as any} newCheck={{}} t={t} />}
-          {activeTab === 'lineage' && <DataLineageTab />}
+          {activeTab === 'lineage' && <DataLineageTab initialTable={initialLineageTable} />}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>
       </div>
