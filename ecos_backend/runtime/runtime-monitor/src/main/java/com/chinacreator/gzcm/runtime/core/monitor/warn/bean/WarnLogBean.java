@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public class WarnLogBean implements Serializable {
 
@@ -24,6 +25,12 @@ public class WarnLogBean implements Serializable {
 	private String ishanded;
 	private String ishandedname;
 	private List<String> logids;
+	/** 告警级别 INFO/WARN/ERROR（PMO-59 P4a 落库字段） */
+	private String warn_level;
+	/** 结构化故障上下文（PMO-59 P4a 落库字段，JSONB 承接） */
+	private Map<String, Object> fault_context;
+	/** 复盘聚合标签（PMO-59 P4a 落库字段，与 MentalEventPublisher.REVIEW_TAG 同源） */
+	private String review_tag;
 
 	
 	
@@ -155,6 +162,30 @@ public class WarnLogBean implements Serializable {
 
 	public void setWarn_type(String warn_type) {
 		this.warn_type = warn_type;
+	}
+
+	public String getWarn_level() {
+		return warn_level;
+	}
+
+	public void setWarn_level(String warn_level) {
+		this.warn_level = warn_level;
+	}
+
+	public Map<String, Object> getFault_context() {
+		return fault_context;
+	}
+
+	public void setFault_context(Map<String, Object> fault_context) {
+		this.fault_context = fault_context;
+	}
+
+	public String getReview_tag() {
+		return review_tag;
+	}
+
+	public void setReview_tag(String review_tag) {
+		this.review_tag = review_tag;
 	}
 
 }

@@ -149,7 +149,8 @@ public class CognitiveHypothesisService {
             String body = "认知假设失效: " + vo.getHypothesisCode() + "（" + vo.getStatement() + "）"
                 + " autoDetected=" + autoDetected + " | faultContext=" + faultContext;
             warnLogService.warn("COGNITIVE_HYPOTHESIS_INVALIDATED", vo.getId(),
-                "cognitive-mental-layer", body, "mental-scan");
+                "cognitive-mental-layer", body, "mental-scan",
+                faultContext, MentalEventPublisher.REVIEW_TAG);
         } catch (Exception e) {
             log.warn("认知失效告警落库失败 (ignored): objId={} err={}", vo.getId(), e.getMessage());
         }

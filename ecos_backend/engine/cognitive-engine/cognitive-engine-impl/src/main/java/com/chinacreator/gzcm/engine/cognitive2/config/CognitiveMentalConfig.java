@@ -6,12 +6,14 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 
@@ -51,12 +53,20 @@ public class CognitiveMentalConfig {
 
     /**
      * 告警日志服务（runtime-monitor 公共底座；补强既有 impl 的 Spring 装配缺口）。
+     *
+     * <p>PMO-59 P4a：装配时一并注入 {@link JdbcTemplate}，使告警落库 {@code ecos_warn_log}（V131），
+     * 关闭 P2b「告警内存态，进程重启即失」残留风险；JdbcTemplate 缺失时退化为纯内存态（仅 WARN，不阻断启动）。</p>
      */
     @Bean
     @ConditionalOnMissingBean(IWarnLogService.class)
-    public IWarnLogService cognitiveWarnLogService() {
-        log.info("[CognitiveMental] IWarnLogService 已按 PMO-59 授权例外补装配 (runtime-monitor 缺口补强)");
-        return new WarnLogServiceImpl();
+    public IWarnLogService cognitiveWarnLogService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            log.warn("[CognitiveMental] IWarnLogService 已装配，但 JdbcTemplate 缺失 → 告警仅内存态（不落库）");
+        } else {
+            log.info("[CognitiveMental] IWarnLogService 已装配 + 告警落库通道启用 (ecos_warn_log, PMO-59 P4a)");
+        }
+        return new WarnLogServiceImpl(jdbcTemplate);
     }
 
     /** Kafka 启用且 spring-kafka 在 classpath 时，生成本配置自有的 producer factory（类型化键值）。 */

@@ -27,6 +27,12 @@ import java.util.TreeMap;
  *
  * <p>tag 参数白名单校验：复盘 tag 与 {@link MentalEventPublisher#REVIEW_TAG} 同源
  * （用户确认决策 ② 预留口径），非法 tag 400 拒绝（防无差别全量导出）。</p>
+ *
+ * <p><b>PMO-59 P4a T4（告警维度对接口径）</b>：新增只读段 {@code warnAlerts} —— 读 runtime-monitor
+ * 告警落库表 {@code ecos_warn_log}（DDL V131），关联键 = {@code review_tag} 与复盘 {@code tag}
+ * <b>同源等值</b>（生产侧由 {@code CognitiveHypothesisService} 落同一 REVIEW_TAG），
+ * 避免出现"事件口径 / 告警口径"双口径。报告既有键与结构契约<b>零变化（只增键）</b>；
+ * 表不可用（V131 未执行）时该段降级空列表，不阻断其余段落。</p>
  */
 @Service
 public class MentalReviewService {
@@ -68,10 +74,13 @@ public class MentalReviewService {
         resp.put("hypotheses", hypotheses(sinceTs));
         resp.put("evidence", evidenceTimeline(sinceTs));
         resp.put("runImpacts", runImpacts(sinceTs));
+        List<Map<String, Object>> warnAlerts = warnAlerts(tagNorm, sinceTs);
+        resp.put("warnAlerts", warnAlerts);
         resp.put("summary", buildSummary((List<Map<String, Object>>) resp.get("beliefTimelines"),
             (List<Map<String, Object>>) resp.get("hypotheses"),
             (List<Map<String, Object>>) resp.get("evidence"),
-            (List<Map<String, Object>>) resp.get("runImpacts")));
+            (List<Map<String, Object>>) resp.get("runImpacts"),
+            warnAlerts));
         return resp;
     }
 
@@ -208,7 +217,8 @@ public class MentalReviewService {
     private Map<String, Object> buildSummary(List<Map<String, Object>> beliefTimelines,
                                              List<Map<String, Object>> hypotheses,
                                              List<Map<String, Object>> evidence,
-                                             List<Map<String, Object>> runImpacts) {
+                                             List<Map<String, Object>> runImpacts,
+                                             List<Map<String, Object>> warnAlerts) {
         int beliefVersions = 0;
         for (Map<String, Object> g : beliefTimelines) {
             beliefVersions += ((List<?>) g.get("versions")).size();
@@ -221,7 +231,57 @@ public class MentalReviewService {
             (int) hypotheses.stream().filter(h -> !Boolean.TRUE.equals(h.get("isValid"))).count());
         summary.put("evidenceCount", evidence.size());
         summary.put("runsSuperseded", runImpacts.size());
+        summary.put("warnAlerts", warnAlerts.size());
         return summary;
+    }
+
+    /**
+     * 告警留痕（runtime-monitor {@code ecos_warn_log} 只读 join — PMO-59 P4a T4 口径对接）。
+     *
+     * <p>关联口径：{@code ecos_warn_log.review_tag} 与复盘 {@code tag} <b>同源</b>
+     * （生产侧由 {@code CognitiveHypothesisService} 落 {@link MentalEventPublisher#REVIEW_TAG}），
+     * 故按 tag 等值 + 时间下界只读查询，不改报告结构契约（只增键）。</p>
+     *
+     * <p>V131 为手工执行 DDL：表不可用时本段降级空列表 + WARN，不阻断复盘其余段落。</p>
+     */
+    private List<Map<String, Object>> warnAlerts(String reviewTag, LocalDateTime since) {
+        StringBuilder sql = new StringBuilder(
+            "SELECT id, log_id, warn_type, warn_level, warn_objid, warn_objname, warn_message, " +
+            "fault_context, review_tag, warn_time FROM ecos_warn_log " +
+            "WHERE is_deleted = 0 AND review_tag = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(reviewTag);
+        if (since != null) {
+            sql.append(" AND warn_time >= ?");
+            args.add(java.sql.Timestamp.valueOf(since));
+        }
+        sql.append(" ORDER BY warn_time DESC, id");
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbc.queryForList(sql.toString(), args.toArray());
+        } catch (Exception e) {
+            log.warn("告警留痕查询失败 (ignored, 降级空列表): tag={} err={}", reviewTag, e.getMessage());
+            return new ArrayList<>();
+        }
+        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> w = new LinkedHashMap<>();
+            w.put("id", evidenceStore.fieldString(row, "id"));
+            w.put("logId", evidenceStore.fieldString(row, "log_id"));
+            w.put("warnType", evidenceStore.fieldString(row, "warn_type"));
+            w.put("warnLevel", evidenceStore.fieldString(row, "warn_level"));
+            w.put("warnObjId", evidenceStore.fieldString(row, "warn_objid"));
+            w.put("warnObjName", evidenceStore.fieldString(row, "warn_objname"));
+            w.put("warnMessage", evidenceStore.fieldString(row, "warn_message"));
+            Object faultContext = row.get("fault_context");
+            w.put("faultContext", faultContext == null
+                ? null : evidenceStore.parseJsonObjectText(String.valueOf(faultContext)));
+            w.put("reviewTag", evidenceStore.fieldString(row, "review_tag"));
+            w.put("warnTime", evidenceStore.fieldTime(row, "warn_time") == null
+                ? null : evidenceStore.fieldTime(row, "warn_time").toString());
+            out.add(w);
+        }
+        return out;
     }
 
     /** since 参数解析（可选；非法 ISO 格式 400）。 */
