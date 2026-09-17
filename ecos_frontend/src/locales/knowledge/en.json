@@ -175,6 +175,13 @@
   "knowledge.glossarytab.草稿": "Draft",
   "knowledge.glossarytab.领域_如_data_business_technology": "Domain",
 
+  "knowledge.group.overview": "Overview",
+  "knowledge.group.ingest": "Ingest",
+  "knowledge.group.model": "Knowledge Model",
+  "knowledge.group.retrieval": "Retrieval & Eval",
+  "knowledge.group.operate": "Operate & Comply",
+  "knowledge.group.config": "Configuration",
+
   "knowledge.nav.overview": "Overview",
   "knowledge.nav.import": "Data Import",
   "knowledge.nav.upload": "Extraction Upload",

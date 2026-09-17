@@ -112,6 +112,13 @@
   "extractReview.complete.subtitle": "抽取结果已提交，返回继续上传或查看其他任务",
   "extractReview.noData": "暂无数据",
 
+  "knowledge.group.overview": "总览",
+  "knowledge.group.ingest": "知识摄入",
+  "knowledge.group.model": "知识建模",
+  "knowledge.group.retrieval": "检索与评估",
+  "knowledge.group.operate": "运营与合规",
+  "knowledge.group.config": "系统配置",
+
   "knowledge.nav.overview": "总览",
   "knowledge.nav.import": "数据导入",
   "knowledge.nav.upload": "知识抽取",
