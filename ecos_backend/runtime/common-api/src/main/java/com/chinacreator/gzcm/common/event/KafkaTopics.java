@@ -13,6 +13,9 @@ public final class KafkaTopics {
     public static final String WORKFLOW = "ecos.workflow";
     public static final String AGENT = "ecos.agent";
     public static final String KNOWLEDGE = "ecos.knowledge";
+    /** PMO-59 P2b / ADR-9: 认知心智层事件专用 topic — 假设失效等认知状态变更事件,
+     *  消费侧 groupId=dccheng-cognitive-group（{@code CognitiveInvalidationConsumer}）。 */
+    public static final String COGNITIVE = "ecos.cognitive";
     public static final String AUDIT = "ecos.audit";
 
     public static String topicForAggregate(String aggregateType) {
