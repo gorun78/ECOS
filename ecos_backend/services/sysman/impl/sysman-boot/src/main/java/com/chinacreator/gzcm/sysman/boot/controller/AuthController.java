@@ -183,6 +183,9 @@ public class AuthController {
 
         // 查询租户ID
         Map<String, Object> extraClaims = new java.util.HashMap<>();
+        // 用户名入 claim：下游按登录态取身份时（如本体提案 author/reviewer）需要真实用户名，
+        // 仅凭 sub(userId) 无法还原，且业务表存的是用户名而非内部 ID
+        extraClaims.put("username", username);
         try {
             List<Map<String, Object>> tenantRows = authService.findTenantByUsername(username);
             if (tenantRows != null && !tenantRows.isEmpty()) {

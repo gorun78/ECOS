@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -43,7 +42,6 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
 public class OntologyService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyService.class);
-    private static final AtomicInteger ID_SEQ = new AtomicInteger(500);
 
     private final OntologyRepository repository;
     private final OntologyMappingStore mappingStore;
@@ -53,7 +51,15 @@ public class OntologyService {
         this.mappingStore = mappingStore;
     }
 
-    private String nextId() { return String.valueOf(ID_SEQ.incrementAndGet()); }
+    /**
+     * 业务主键：委托仓库按目标表既有最大后缀自增（重启安全）；方法级加锁避免并发取到同一序号。
+     *
+     * @param prefix 主键前缀（ent / prop / rel）
+     * @param table  目标表名（仓库侧白名单校验）
+     */
+    private synchronized String nextId(String prefix, String table) {
+        return repository.nextId(prefix, table);
+    }
 
     // ═══════════════ Strong-Typed Facades (T16-1, 2026-09-12) ═══════════════════
     // 旧 Map 签名方法保留（Wave31 / OntologyProposalController / OntologyDomainApiController 调用方）；
@@ -69,7 +75,7 @@ public class OntologyService {
 
     public OntologyEntityVO createEntity(String ontologyId, OntologyEntitySaveDTO dto) {
         OntologyEntity entity = new OntologyEntity();
-        String id = "ent" + nextId();
+        String id = nextId("ent", "ecos_ontology_entity");
         entity.setId(id);
         entity.setOntologyId(ontologyId);
         entity.setCode(dto.getCode() != null ? dto.getCode() : "");
@@ -143,11 +149,12 @@ public class OntologyService {
 
     public OntologyPropertyVO createProperty(String entityId, OntologyPropertySaveDTO dto) {
         OntologyProperty prop = new OntologyProperty();
-        String id = "prop" + nextId();
+        String id = nextId("prop", "ecos_ontology_property");
         prop.setId(id);
         prop.setEntityId(entityId);
         prop.setCode(dto.getCode() != null ? dto.getCode() : "");
         prop.setName(dto.getName() != null ? dto.getName() : "");
+        prop.setDescription(dto.getDescription());
         prop.setPropertyType(dto.getPropertyType() != null ? dto.getPropertyType() : "STRING");
         prop.setRequiredFlag(dto.getRequiredFlag() != null ? dto.getRequiredFlag() : 0);
         prop.setSearchableFlag(dto.getSearchableFlag() != null ? dto.getSearchableFlag() : 0);
@@ -174,8 +181,8 @@ public class OntologyService {
 
     public Optional<OntologyPropertyVO> updateProperty(String propId, OntologyPropertySaveDTO dto) {
         return repository.findPropertyById(propId).map(existing -> {
-            repository.updateProperty(propId, dto.getCode(), dto.getName(), dto.getPropertyType(),
-                dto.getRequiredFlag(), dto.getSearchableFlag(),
+            repository.updateProperty(propId, dto.getCode(), dto.getName(), dto.getDescription(), dto.getPropertyType(),
+                dto.getRequiredFlag(), dto.getSearchableFlag(), dto.getUniqueFlag(),
                 dto.getFunctionType(), dto.getFunctionExpression());
             return repository.findPropertyById(propId).map(this::propToVO).orElse(null);
         });
@@ -197,7 +204,7 @@ public class OntologyService {
 
     public OntologyRelationshipVO createRelationship(String sourceEntityId, OntologyRelationshipSaveDTO dto) {
         OntologyRelationship rel = new OntologyRelationship();
-        String id = "rel" + nextId();
+        String id = nextId("rel", "ecos_ontology_relationship");
         rel.setId(id);
         rel.setSourceEntityId(sourceEntityId);
         rel.setTargetEntityId(dto.getTargetEntityId() != null ? dto.getTargetEntityId() : "");
@@ -299,6 +306,7 @@ public class OntologyService {
         vo.setEntityId(p.getEntityId());
         vo.setCode(p.getCode());
         vo.setName(p.getName());
+        vo.setDescription(p.getDescription());
         vo.setPropertyType(p.getPropertyType());
         vo.setRequiredFlag(p.getRequiredFlag());
         vo.setSearchableFlag(p.getSearchableFlag());
@@ -381,7 +389,7 @@ public class OntologyService {
 
     public Map<String, Object> createEntity(String ontologyId, Map<String, Object> body) {
         OntologyEntity entity = new OntologyEntity();
-        String id = "ent" + nextId();
+        String id = nextId("ent", "ecos_ontology_entity");
         entity.setId(id);
         entity.setOntologyId(ontologyId);
         entity.setCode(String.valueOf(body.getOrDefault("code", "")));
@@ -438,11 +446,12 @@ public class OntologyService {
 
     public Map<String, Object> createProperty(String entityId, Map<String, Object> body) {
         OntologyProperty prop = new OntologyProperty();
-        String id = "prop" + nextId();
+        String id = nextId("prop", "ecos_ontology_property");
         prop.setId(id);
         prop.setEntityId(entityId);
         prop.setCode(String.valueOf(body.getOrDefault("code", "")));
         prop.setName(String.valueOf(body.getOrDefault("name", "")));
+        prop.setDescription(body.containsKey("description") ? String.valueOf(body.get("description")) : null);
         prop.setPropertyType(String.valueOf(body.getOrDefault("propertyType", "STRING")));
         prop.setRequiredFlag(toInt(body.getOrDefault("requiredFlag", 0)));
         prop.setSearchableFlag(toInt(body.getOrDefault("searchableFlag", 0)));
@@ -472,6 +481,7 @@ public class OntologyService {
         return repository.findPropertyById(propId).map(existing -> {
             String code = body.containsKey("code") ? String.valueOf(body.get("code")) : null;
             String name = body.containsKey("name") ? String.valueOf(body.get("name")) : null;
+            String description = body.containsKey("description") ? String.valueOf(body.get("description")) : null;
             String propertyType = body.containsKey("propertyType") ? String.valueOf(body.get("propertyType")) : null;
             Integer requiredFlag = body.containsKey("requiredFlag") ? toInt(body.get("requiredFlag")) : null;
             Integer searchableFlag = body.containsKey("searchableFlag") ? toInt(body.get("searchableFlag")) : null;
@@ -485,7 +495,7 @@ public class OntologyService {
             Double maxValue = body.containsKey("maxValue") ? toDouble(body.get("maxValue")) : null;
             String functionType = body.containsKey("functionType") ? String.valueOf(body.get("functionType")) : null;
             String functionExpression = body.containsKey("functionExpression") ? String.valueOf(body.get("functionExpression")) : null;
-            repository.updateProperty(propId, code, name, propertyType, requiredFlag, searchableFlag,
+            repository.updateProperty(propId, code, name, description, propertyType, requiredFlag, searchableFlag, uniqueFlag,
                 functionType, functionExpression);
             return repository.findPropertyById(propId).map(this::propToMap).orElse(null);
         });
@@ -511,7 +521,7 @@ public class OntologyService {
 
     public Map<String, Object> createRelationship(String sourceEntityId, Map<String, Object> body) {
         OntologyRelationship rel = new OntologyRelationship();
-        String id = "rel" + nextId();
+        String id = nextId("rel", "ecos_ontology_relationship");
         rel.setId(id);
         rel.setSourceEntityId(sourceEntityId);
         rel.setTargetEntityId(String.valueOf(body.getOrDefault("targetEntityId", "")));
@@ -558,6 +568,7 @@ public class OntologyService {
         m.put("entityId", p.getEntityId());
         m.put("code", p.getCode());
         m.put("name", p.getName());
+        m.put("description", p.getDescription());
         m.put("propertyType", p.getPropertyType());
         m.put("requiredFlag", p.getRequiredFlag());
         m.put("searchableFlag", p.getSearchableFlag());

@@ -29,8 +29,13 @@ export interface PropertyType {
   displayName: string;
   apiName: string;
   dataType: PropertyDataType;
+  /** 主键标识 — 对应后端 ecos_ontology_property.unique_flag */
   isPrimaryKey: boolean;
   description: string;
+  /** 必填 — 对应后端 ecos_ontology_property.required_flag */
+  required?: boolean;
+  /** 可搜索 — 对应后端 ecos_ontology_property.searchable_flag */
+  searchable?: boolean;
   /** 可选 — 引用的共享属性 ID */
   sharedPropertyId?: string;
 }
@@ -432,11 +437,27 @@ export interface Proposal {
 
 export interface CreateProposalDTO {
   title: string;
+  /**
+   * 变更目标本体（对象类型 id）。
+   * 仅作 UI 归属展示与列表过滤使用；后端 proposal_type 由 proposalType 承载，
+   * 不再从 targetType 兜底解析（历史契约错位已修正）。
+   */
   targetType: string;
-  targetId?: string;
+  /**
+   * 提案类型（后端 ecos_ontology_proposals.proposal_type）。
+   * 取值 UPDATE_ENTITY / CREATE_ENTITY / ADD_PROPERTY / MODIFY_PROPERTY / DELETE_PROPERTY / ADD_RELATIONSHIP。
+   */
+  proposalType: string;
+  /** 目标实体 id（后端 target_entity） */
+  targetEntity?: string;
+  /** 本体 id（写入 payload，执行时定位实体所属本体） */
+  ontologyId?: string;
+  /** 业务域编码（后端 domain_code；缺省时后端回退 default） */
+  domainCode?: string;
   changeType?: "CREATE" | "UPDATE" | "DELETE";
   payload?: Record<string, any>;
   description?: string;
+  /** 提案人 — 后端以登录态为准，此字段仅作降级兜底 */
   proposedBy?: string;
 }
 

@@ -10,13 +10,17 @@
  *   POST   /api/v1/ecos/ontologies/{id}/entities     → 创建实体
  *   PUT    /api/v1/ecos/ontologies/{id}/entities/{e} → 更新实体
  *   DELETE /api/v1/ecos/ontologies/{id}/entities/{e} → 删除实体
- *   GET    /api/v1/ecos/ontologies/{id}/entities/{e}/properties  → 属性列表
- *   POST   /api/v1/ecos/ontologies/{id}/entities/{e}/properties  → 创建属性
- *   PUT    /api/v1/ecos/ontologies/{id}/entities/{e}/properties/{p} → 更新属性
- *   DELETE /api/v1/ecos/ontologies/{id}/entities/{e}/properties/{p} → 删除属性
- *   GET    /api/v1/ecos/ontologies/{id}/relationships → 关系列表
- *   POST   /api/v1/ecos/ontologies/{id}/relationships → 创建关系
- *   DELETE /api/v1/ecos/ontologies/{id}/relationships/{r} → 删除关系
+ *   GET    /api/v1/ecos/entities/{e}/properties      → 属性列表
+ *   POST   /api/v1/ecos/entities/{e}/properties      → 创建属性
+ *   PUT    /api/v1/ecos/entities/{e}/properties/{p}  → 更新属性
+ *   DELETE /api/v1/ecos/entities/{e}/properties/{p}  → 删除属性
+ *   GET    /api/v1/ecos/relationships                → 全部关系
+ *   POST   /api/v1/ecos/entities/{e}/relationships   → 创建关系
+ *   DELETE /api/v1/ecos/relationships/{r}            → 删除关系
+ *
+ * 注意：属性/关系端点为「实体域」而非「本体域」——后端
+ * OntologyPropertyController / OntologyRelationshipController 的 canonical 路径不含
+ * {ontologyId} 段，故本层不再拼 ontPath。
  */
 
 import { apiFetchData } from "../api";
@@ -56,6 +60,7 @@ import type {
   LineageImpactResult,
   ParseLineageResult,
 } from "../types/ontology";
+import type { ObjectType, PropertyType, LinkType } from "../types/ontology";
 
 // ── 配置常量 ──────────────────────────────────────────────
 
@@ -79,26 +84,31 @@ export interface OntologyEntity {
   name: string;
   description?: string;
   entityType: string;
+  /** 所属业务域 id（后端实体可选返回，用于对象类型归域展示） */
+  domainId?: string;
   sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
-/** 本体实体属性 (Property) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/entities/{e}/properties 项 */
+/** 本体实体属性 (Property) 基础结构 — 对应后端 GET /api/v1/ecos/entities/{e}/properties 项 */
 export interface OntologyProperty {
   id: string;
   entityId: string;
   code: string;
   name: string;
   propertyType: string;
+  /** 属性说明（对应后端 ecos_ontology_property.description） */
+  description?: string;
   functionType?: string;
   functionExpression?: string;
   requiredFlag: number;
   searchableFlag: number;
+  uniqueFlag?: number;
   sortOrder?: number;
 }
 
-/** 本体关系 (Relationship) 基础结构 — 对应后端 GET /api/v1/ecos/ontologies/{id}/relationships 项 */
+/** 本体关系 (Relationship) 基础结构 — 对应后端 GET /api/v1/ecos/relationships 项 */
 export interface OntologyRelationship {
   id: string;
   sourceEntityId: string;
@@ -219,24 +229,34 @@ export async function deleteEntity(id: string, ontologyId: string = DEFAULT_ONTO
 
 // ================================================================
 // 属性 CRUD
+// 后端 canonical 端点为实体域 (OntologyPropertyController @ /api/v1/ecos/entities)，
+// 不含 {ontologyId} 段 —— 传入 ontologyId 会被拼成不存在的路径而 404。
 // ================================================================
+
+/** 属性集合端点（实体域） */
+const entityPropsPath = (entityId: string) => `${BASE}/entities/${entityId}/properties`;
+
+/** 单个属性端点（实体域） */
+const entityPropPath = (entityId: string, propId: string) =>
+  `${entityPropsPath(entityId)}/${propId}`;
 
 /**
  * 获取实体的属性列表
+ * GET /api/v1/ecos/entities/{entityId}/properties
  */
-export async function fetchProperties(entityId: string, ontologyId: string = DEFAULT_ONTOLOGY_ID): Promise<Property[]> {
-  return apiFetchData<Property[]>(ontPath(ontologyId, `/entities/${entityId}/properties`));
+export async function fetchProperties(entityId: string): Promise<Property[]> {
+  return apiFetchData<Property[]>(entityPropsPath(entityId));
 }
 
 /**
  * 创建实体属性
+ * POST /api/v1/ecos/entities/{entityId}/properties
  */
 export async function createProperty(
   entityId: string,
-  data: CreatePropertyDTO,
-  ontologyId: string = DEFAULT_ONTOLOGY_ID
+  data: CreatePropertyDTO
 ): Promise<Property> {
-  return apiFetchData<Property>(ontPath(ontologyId, `/entities/${entityId}/properties`), {
+  return apiFetchData<Property>(entityPropsPath(entityId), {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -244,35 +264,25 @@ export async function createProperty(
 
 /**
  * 更新实体属性
+ * PUT /api/v1/ecos/entities/{entityId}/properties/{propId}
  */
 export async function updateProperty(
   entityId: string,
   propId: string,
-  data: UpdatePropertyDTO,
-  ontologyId: string = DEFAULT_ONTOLOGY_ID
+  data: UpdatePropertyDTO
 ): Promise<Property> {
-  return apiFetchData<Property>(
-    ontPath(ontologyId, `/entities/${entityId}/properties/${propId}`),
-    {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }
-  );
+  return apiFetchData<Property>(entityPropPath(entityId, propId), {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
 }
 
 /**
- * 删除实体属性
- * DELETE /api/v1/ecos/ontologies/{ont001}/entities/{entityId}/properties/{propId}
+ * 删除实体属性（后端为逻辑删除）
+ * DELETE /api/v1/ecos/entities/{entityId}/properties/{propId}
  */
-export async function deleteProperty(
-  entityId: string,
-  propId: string,
-  ontologyId: string = DEFAULT_ONTOLOGY_ID
-): Promise<void> {
-  await apiFetchData(
-    ontPath(ontologyId, `/entities/${entityId}/properties/${propId}`),
-    { method: "DELETE" }
-  );
+export async function deleteProperty(entityId: string, propId: string): Promise<void> {
+  await apiFetchData(entityPropPath(entityId, propId), { method: "DELETE" });
 }
 
 // ================================================================
@@ -281,33 +291,102 @@ export async function deleteProperty(
 
 /**
  * 获取全部关系列表
- * 使用全局关系端点 GET /api/v1/ecos/relationships
- * （前端按 ontologyId 过滤，因后端无 ontology-scoped 关系端点）
+ * GET /api/v1/ecos/relationships（全局端点，无 ontology-scoped 关系端点）
  */
-export async function fetchRelationships(ontologyId: string = DEFAULT_ONTOLOGY_ID): Promise<Relationship[]> {
-  // 后端实际端点: GET /api/v1/ecos/relationships（全局）
-  // 返回全部关系，前端按实体归属过滤到当前本体
+export async function fetchRelationships(): Promise<Relationship[]> {
   return apiFetchData<Relationship[]>(`${BASE}/relationships`);
 }
 
 /**
  * 创建关系
+ * POST /api/v1/ecos/entities/{sourceEntityId}/relationships
+ * （source 由 path 传入，body 携带 targetEntityId/code/name/relationshipType）
  */
-export async function createRelationship(
-  data: CreateRelationshipDTO,
-  ontologyId: string = DEFAULT_ONTOLOGY_ID
-): Promise<Relationship> {
-  return apiFetchData<Relationship>(ontPath(ontologyId, "/relationships"), {
+export async function createRelationship(data: CreateRelationshipDTO): Promise<Relationship> {
+  const { sourceEntityId, ...body } = data;
+  return apiFetchData<Relationship>(`${BASE}/entities/${sourceEntityId}/relationships`, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
 }
 
 /**
- * 删除关系
+ * 删除关系（后端为逻辑删除）
+ * DELETE /api/v1/ecos/relationships/{relId}
  */
-export async function deleteRelationship(relId: string, ontologyId: string = DEFAULT_ONTOLOGY_ID): Promise<void> {
-  await apiFetchData(ontPath(ontologyId, `/relationships/${relId}`), { method: "DELETE" });
+export async function deleteRelationship(relId: string): Promise<void> {
+  await apiFetchData(`${BASE}/relationships/${relId}`, { method: "DELETE" });
+}
+
+// ================================================================
+// VO → 工作台领域模型 映射
+// 收敛 useOntologyData / OntologyWorkbenchLayout 的重复映射逻辑，
+// 保证「列表加载」与「创建后重拉」两条路径产出一致。
+// ================================================================
+
+/** 后端 propertyType（大写枚举）→ 前端 PropertyDataType（小写） */
+export function normalizePropertyDataType(raw?: string): PropertyType['dataType'] {
+  const value = String(raw || 'string').trim().toLowerCase();
+  const allowed: PropertyType['dataType'][] = [
+    'string', 'integer', 'decimal', 'boolean', 'date', 'timestamp', 'geopoint',
+  ];
+  return (allowed as string[]).includes(value) ? (value as PropertyType['dataType']) : 'string';
+}
+
+/** 后端属性 VO → 前端 PropertyType */
+export function mapPropertyToPropertyType(p: OntologyProperty): PropertyType {
+  return {
+    id: String(p.id),
+    displayName: p.name || p.code || '',
+    apiName: p.code || '',
+    dataType: normalizePropertyDataType(p.propertyType),
+    isPrimaryKey: Number(p.uniqueFlag ?? 0) === 1,
+    description: p.description || '',
+    required: Number(p.requiredFlag ?? 0) === 1,
+    searchable: Number(p.searchableFlag ?? 0) === 1,
+  };
+}
+
+/** 后端实体 VO + 属性 VO 列表 → 前端 ObjectType */
+export function mapEntityToObjectType(
+  entity: OntologyEntity,
+  properties: OntologyProperty[] = []
+): ObjectType {
+  const props = properties.map(mapPropertyToPropertyType);
+  return {
+    id: String(entity.id),
+    displayName: entity.name || entity.code || '',
+    apiName: entity.code || '',
+    description: entity.description || '',
+    icon: entity.entityType === 'MASTER' ? 'Database' : 'FileText',
+    color: entity.entityType === 'MASTER'
+      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+      : 'border-teal-500 bg-teal-50 text-teal-700',
+    primaryKey: props.find(p => p.isPrimaryKey)?.id || 'id',
+    titleProperty: props.length > 0 ? props[0].id : 'id',
+    status: 'ACTIVE',
+    properties: props,
+    mapping: (entity as any).mapping || undefined,
+    domainId: entity.domainId || undefined,
+  };
+}
+
+/** 后端关系 VO → 前端 LinkType */
+export function mapRelationshipToLinkType(rel: OntologyRelationship): LinkType {
+  const cardinality =
+    rel.relationshipType === 'ONE_TO_ONE' ? '1:1'
+      : rel.relationshipType === 'MANY_TO_MANY' ? 'N:N'
+        : '1:N';
+  return {
+    id: String(rel.id),
+    displayName: rel.name || `${rel.sourceEntityId}→${rel.targetEntityId}`,
+    apiName: rel.code || '',
+    description: '',
+    sourceObjectType: rel.sourceEntityId,
+    targetObjectType: rel.targetEntityId,
+    cardinality: cardinality as LinkType['cardinality'],
+    mapping: { type: 'foreign_key', foreignKeyMapping: { sourceKey: '', targetKey: '' } },
+  };
 }
 
 // ================================================================
@@ -630,9 +709,58 @@ export function normalizeProposalStatus(raw: string): ProposalStatus {
   return String(raw).trim().toUpperCase() as ProposalStatus;
 }
 
-/** 归一化提案对象的 status 字段（其余字段原样透传） */
-function normalizeProposal(proposal: Proposal): Proposal {
-  return { ...proposal, status: normalizeProposalStatus(proposal.status) };
+/**
+ * 后端提案 VO 的宽松形态。
+ * 后端 `OntologyProposalVO` 直出列为 author / targetEntity / proposalType / reviewerComment，
+ * 而 title / description / changeType 内嵌在 payload JSONB 中，与前端 Proposal 声明不同名。
+ */
+type RawProposalVO = Partial<Proposal> & {
+  author?: string;
+  targetEntity?: string;
+  proposalType?: string;
+  reviewerComment?: string;
+  payload?: Record<string, any>;
+};
+
+/** proposal_type → changeType 反向推断（payload 未携带 changeType 时的兜底） */
+const PROPOSAL_TYPE_TO_CHANGE: Record<string, 'CREATE' | 'UPDATE' | 'DELETE'> = {
+  CREATE_ENTITY: 'CREATE',
+  ADD_PROPERTY: 'CREATE',
+  ADD_RELATIONSHIP: 'CREATE',
+  UPDATE_ENTITY: 'UPDATE',
+  MODIFY_PROPERTY: 'UPDATE',
+  DELETE_PROPERTY: 'DELETE',
+};
+
+/**
+ * 归一化提案对象（API 边界适配器）
+ *
+ * 后端 VO 与前端 Proposal 的字段错位收敛点：
+ * - status           ← 大小写混写 → 统一大写
+ * - title/description ← payload JSONB 内嵌
+ * - changeType       ← payload 内嵌，缺失时按 proposalType 推断
+ * - proposedBy       ← author
+ * - targetType/targetId ← targetEntity
+ * - reviewComment    ← reviewerComment
+ */
+function normalizeProposal(proposal: RawProposalVO): Proposal {
+  const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : {};
+  const proposalType = String(proposal.proposalType || '').trim();
+  return {
+    ...(proposal as Proposal),
+    status: normalizeProposalStatus(String(proposal.status || '')),
+    title: proposal.title || payload.title || proposalType,
+    description: proposal.description || payload.description || '',
+    changeType: proposal.changeType
+      || payload.changeType
+      || PROPOSAL_TYPE_TO_CHANGE[proposalType.toUpperCase()]
+      || 'UPDATE',
+    proposedBy: proposal.proposedBy || proposal.author || '',
+    targetType: proposal.targetType || proposal.targetEntity || '',
+    targetId: proposal.targetId || proposal.targetEntity || '',
+    reviewComment: proposal.reviewComment || proposal.reviewerComment || '',
+    payload,
+  };
 }
 
 export async function fetchProposals(params?: { status?: string; targetType?: string }) {

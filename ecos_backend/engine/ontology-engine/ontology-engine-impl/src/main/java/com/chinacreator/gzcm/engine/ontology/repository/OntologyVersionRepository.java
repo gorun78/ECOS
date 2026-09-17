@@ -103,6 +103,21 @@ public class OntologyVersionRepository {
         return jdbc.query("SELECT * FROM ecos_ontology_version ORDER BY created_at DESC", ROW_MAPPER);
     }
 
+    /**
+     * 生成下一个版本主键（{@code ver} + 数字后缀）。
+     *
+     * <p>基于库内既有 ID 的最大数字后缀自增，替代原内存自增计数器 —— 后者在进程重启后
+     * 会从头计数，与库内既有 {@code ver5001/ver5002} 撞主键，导致版本创建与提案执行失败。
+     *
+     * @return 下一个可用版本 ID，如 {@code ver5003}
+     */
+    public String nextId() {
+        Long max = jdbc.queryForObject(
+            "SELECT COALESCE(MAX(NULLIF(regexp_replace(id, '\\D', '', 'g'), '')::bigint), 5000) "
+                + "FROM ecos_ontology_version", Long.class);
+        return "ver" + ((max == null ? 5000L : max) + 1L);
+    }
+
     public Optional<OntologyVersion> findPreviousVersion(String ontologyId, java.time.LocalDateTime beforeTime) {
         List<OntologyVersion> list = jdbc.query(
             "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",

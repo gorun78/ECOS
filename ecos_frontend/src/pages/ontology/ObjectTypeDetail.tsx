@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
-import { Compass, Trash2, AlertTriangle } from 'lucide-react';
+import { Compass, Trash2, AlertTriangle, GitPullRequest } from 'lucide-react';
 import DynamicIcon from '../../components/ontology/DynamicIcon';
 import { fetchMappings, createMapping, updateMapping, fetchLineageImpact } from '../../services/ontologyApi';
 
@@ -34,6 +34,8 @@ interface ObjectTypeViewProps {
   onNavigateToLink: (linkId: string) => void;
   onNavigateToAction: (actionId: string) => void;
   onExploreData?: (id: string) => void;
+  /** 基于当前对象类型发起变更提案（由工作台聚焦提案面板并展开表单） */
+  onCreateProposal?: (id: string) => void;
 }
 
 export default function ObjectTypeView({
@@ -48,7 +50,8 @@ export default function ObjectTypeView({
   onDelete,
   onNavigateToLink,
   onNavigateToAction,
-  onExploreData
+  onExploreData,
+  onCreateProposal
 }: ObjectTypeViewProps) {
   const [activeTab, setActiveTab] = useState<'metadata' | 'properties' | 'mapping' | 'links' | 'actions' | 'lineage'>('properties');
   const [newPropName, setNewPropName] = useState('');
@@ -182,10 +185,27 @@ export default function ObjectTypeView({
     onUpdate({ ...objectType, properties: updatedProps, mapping: { ...mapping, propertyMappings: updatedMappings } });
   };
 
-  const handleTogglePrimaryKey = (propId: string) => {
+  /**
+   * 切换属性标志位（本地草稿态）
+   * - isPrimaryKey → 同时更新 objectType.primaryKey（全表唯一）
+   * - required     → 仅更新该属性的 required 标记
+   * 变更需经提案审批后由后端落库生效（本体模型变更必须走版本发布流程）
+   */
+  const handleTogglePropertyFlag = (propId: string, field: 'isPrimaryKey' | 'required') => {
+    if (field === 'isPrimaryKey') {
+      const nextPrimary = objectType.primaryKey === propId ? '' : propId;
+      onUpdate({
+        ...objectType,
+        primaryKey: nextPrimary,
+        properties: objectType.properties.map(p => ({ ...p, isPrimaryKey: p.id === nextPrimary }))
+      });
+      return;
+    }
     onUpdate({
-      ...objectType, primaryKey: propId,
-      properties: objectType.properties.map(p => ({ ...p, isPrimaryKey: p.id === propId }))
+      ...objectType,
+      properties: objectType.properties.map(p =>
+        p.id === propId ? { ...p, required: !p.required } : p
+      )
     });
   };
 
@@ -223,6 +243,12 @@ export default function ObjectTypeView({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onCreateProposal && (
+            <button onClick={() => onCreateProposal(objectType.id)}
+              className={`text-xs ${styles.accentText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.accentBorder} transition-colors flex items-center gap-1.5 font-semibold`}>
+              <GitPullRequest size={13} />{t('ow.btn.createProposal')}
+            </button>
+          )}
           {onExploreData && (
             <button onClick={() => onExploreData(objectType.id)}
               className={`text-xs ${styles.accentText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.accentBorder} transition-colors flex items-center gap-1.5 font-semibold`}>
@@ -261,7 +287,7 @@ export default function ObjectTypeView({
             newPropName={newPropName} setNewPropName={setNewPropName}
             newPropType={newPropType} setNewPropType={setNewPropType}
             handleAddProperty={handleAddProperty}
-            handleTogglePrimaryKey={handleTogglePrimaryKey}
+            handleTogglePropertyFlag={handleTogglePropertyFlag}
             handlePropertyFieldChange={handlePropertyFieldChange}
             handleRemoveProperty={handleRemoveProperty}
             sharedProperties={sharedProperties}

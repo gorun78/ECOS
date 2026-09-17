@@ -15,7 +15,8 @@ export interface PropertiesTabProps extends ObjectDetailTabProps {
   newPropType: 'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint';
   setNewPropType: (v: 'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint') => void;
   handleAddProperty: () => void;
-  handleTogglePrimaryKey: (propId: string) => void;
+  /** 切换属性标志位（主键 ↔ unique_flag；必填 ↔ required_flag） */
+  handleTogglePropertyFlag: (propId: string, field: 'isPrimaryKey' | 'required') => void;
   handlePropertyFieldChange: (propId: string, field: keyof PropertyType, value: any) => void;
   handleRemoveProperty: (propId: string) => void;
   sharedProperties: SharedProperty[];

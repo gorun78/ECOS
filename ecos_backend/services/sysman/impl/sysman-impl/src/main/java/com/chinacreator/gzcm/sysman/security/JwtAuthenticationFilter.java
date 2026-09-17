@@ -125,7 +125,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 同时设置 UserContext (供 ClearanceInterceptor 使用)
             UserContext context = new UserContext();
             context.setUserId(userId);
-            context.setUsername(claims.get("username", String.class));
+            // Access Token 未签发 username claim（JwtTokenProvider 仅写 sub/roles/tenant_id），
+            // 缺失时回查 TD_USER 补全，避免下游按登录态取用户名时恒为 null（提案 author/reviewer 等）
+            String username = claims.get("username", String.class);
+            if (username == null || username.isBlank()) {
+                username = loadUsername(userId);
+            }
+            context.setUsername(username);
             context.setTenantId(claims.get("tenant_id", String.class));
             UserContext.setCurrent(context);
             
@@ -162,6 +168,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         chain.doFilter(request, response);
+    }
+
+    /**
+     * 按 userId 回查用户名（Token 缺 username claim 时的兜底，查不到则退回 userId 以保证身份非空）。
+     * <p>注意：public.td_user 的列名为大写（USER_ID/USERNAME），需带双引号限定。
+     *
+     * @param userId JWT subject（用户ID）
+     * @return 用户名，查询失败时返回 userId
+     */
+    private String loadUsername(String userId) {
+        try {
+            List<String> names = jdbcTemplate.queryForList(
+                "SELECT \"USERNAME\" FROM td_user WHERE \"USER_ID\" = ?", String.class, userId);
+            if (names != null && !names.isEmpty() && names.get(0) != null) {
+                return names.get(0);
+            }
+        } catch (Exception e) {
+            log.debug("Failed to resolve username for userId={}: {}", userId, e.getMessage());
+        }
+        return userId;
     }
 
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {

@@ -29,6 +29,7 @@ import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVerifyVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
+import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -170,7 +171,9 @@ public class OntologyProposalController {
         }
         targetEntity = targetEntity.trim();
 
-        String author = firstNonBlank(dto.getAuthor(), dto.getProposedByAlt());
+        // 提交人身份优先取登录态（UserContext 由 JwtAuthenticationFilter 在带 token 时填充），
+        // DTO 字段仅作降级兜底（历史匿名调用方兼容）。
+        String author = firstNonBlank(UserContext.getCurrentUsername(), dto.getAuthor(), dto.getProposedByAlt());
         if (author == null) {
             author = "system";
         }
@@ -375,20 +378,37 @@ public class OntologyProposalController {
                             + ", expected " + expectedFrom + " to transition to " + target);
         }
 
+        // 审批类流转（APPROVED / REJECTED）强制「提交人 ≠ 审核人」：
+        // 审核人身份优先取登录态，body.reviewer 仅作降级兜底；两者皆不可得则拒绝（禁止匿名审批）。
+        String reviewer = null;
+        boolean isReviewAction = STATUS_APPROVED.equals(target) || STATUS_REJECTED.equals(target);
+        if (isReviewAction) {
+            reviewer = firstNonBlank(UserContext.getCurrentUsername(),
+                    body != null ? body.getReviewer() : null);
+            if (reviewer == null || reviewer.isBlank()) {
+                return ApiResponse.badRequest(
+                        "ONT-008: cannot resolve reviewer identity, login required for approve/reject");
+            }
+            reviewer = reviewer.trim();
+            String author = String.valueOf(existing.getOrDefault("author", "")).trim();
+            if (reviewer.equalsIgnoreCase(author)) {
+                return ApiResponse.badRequest(
+                        "ONT-007: reviewer '" + reviewer + "' must differ from author '" + author + "'");
+            }
+        }
+
         StringBuilder sql = new StringBuilder("UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW()");
         List<Object> params = new ArrayList<>();
         params.add(target);
 
         // 兼容旧 reviewer / reviewerComment 字段
-        if (body != null) {
-            if (body.getReviewer() != null) {
-                sql.append(", reviewer=?");
-                params.add(body.getReviewer());
-            }
-            if (body.getReviewComment() != null) {
-                sql.append(", reviewer_comment=?");
-                params.add(body.getReviewComment());
-            }
+        if (reviewer != null && !reviewer.isEmpty()) {
+            sql.append(", reviewer=?");
+            params.add(reviewer);
+        }
+        if (body != null && body.getReviewComment() != null) {
+            sql.append(", reviewer_comment=?");
+            params.add(body.getReviewComment());
         }
 
         sql.append(" WHERE id=?::bigint");
@@ -495,18 +515,23 @@ public class OntologyProposalController {
         }
 
         String status = String.valueOf(existing.get("status"));
-        if (!"verified".equals(status) && !"approved".equals(status) && !"pending".equals(status)
-                && !STATUS_APPROVED.equals(status) && !STATUS_PENDING.equals(status)) {
+        if (!"verified".equalsIgnoreCase(status) && !STATUS_APPROVED.equalsIgnoreCase(status)
+                && !STATUS_PENDING.equalsIgnoreCase(status)) {
             return ApiResponse.badRequest(
                     "ONT-004: Proposal must be verified/approved/pending to execute, current: " + status);
         }
 
-        proposalService.update("UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW() WHERE id=?::bigint",
-                "executed", id);
+        // 真正执行 payload（建版本 → 执行变更 → 发布版本 → 回填 EXECUTED），
+        // 与 approve-and-publish 共用同一闭环逻辑，避免「只改状态不落库」的空转。
+        try {
+            executeAndPublish(id, existing, UserContext.getCurrentUsername());
+        } catch (Exception e) {
+            log.error("Proposal {} execute failed: {}", id, e.getMessage(), e);
+            return ApiResponse.badRequest("ONT-006: Execution failed: " + e.getMessage());
+        }
 
         Map<String, Object> updated = proposalService.queryForMap(
                 "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
-        log.info("Proposal {} executed", id);
         return ApiResponse.success(toVO(updated));
     }
 
@@ -543,54 +568,29 @@ public class OntologyProposalController {
                     "ONT-004: Proposal '" + id + "' must be PENDING or APPROVED, current: " + currentStatus);
         }
 
-        // 2. 更新为 APPROVED，记录审批信息
-        // T16-3: body 改强类型 SaveDTO；reviewer 取自 dto.reviewer，reviewComment 取自 dto.reviewComment
-        String reviewer = body != null && body.getReviewer() != null ? body.getReviewer() : "";
+        // 2. 解析审批人身份并强制「提交人 ≠ 审核人」（同 transition 判据，禁止自审自批）
+        String proposalAuthor = String.valueOf(proposal.getOrDefault("author", "")).trim();
+        String reviewer = firstNonBlank(UserContext.getCurrentUsername(),
+                body != null ? body.getReviewer() : null);
+        if (reviewer == null || reviewer.isBlank()) {
+            return ApiResponse.badRequest(
+                    "ONT-008: cannot resolve reviewer identity, login required for approve");
+        }
+        reviewer = reviewer.trim();
+        if (reviewer.equalsIgnoreCase(proposalAuthor)) {
+            return ApiResponse.badRequest(
+                    "ONT-007: reviewer '" + reviewer + "' must differ from author '" + proposalAuthor + "'");
+        }
         String reviewerComment = body != null && body.getReviewComment() != null ? body.getReviewComment() : "";
 
         proposalService.approve(id, STATUS_APPROVED, reviewer, reviewerComment);
 
-        String domainCode = String.valueOf(proposal.getOrDefault("domain_code", "default"));
-        String proposalType = String.valueOf(proposal.getOrDefault("proposal_type", ""));
-
-        // 3. 创建版本（使用 domain_code 作为 ontologyId）
-        Long versionIdLong = null;
-        String versionIdStr = null;
+        // 3-6. 建版本 → 执行变更 → 发布 → 回填 EXECUTED（与 execute 端点同一闭环）
+        String versionIdStr;
         try {
-            Map<String, Object> versionBody = new LinkedHashMap<>();
-            versionBody.put("changeLog", "Approve-and-publish from proposal " + id
-                    + ": " + proposalType);
-            versionBody.put("publisher", reviewer.isEmpty() ? "system" : reviewer);
-            // T16-3: 版本 payload 动态嵌套豁免（versionService 历史契约）
-            Map<String, Object> version = versionService.createVersion(domainCode, versionBody);
-            versionIdStr = String.valueOf(version.get("id"));
-
-            // 4. 执行 payload（根据类型创建实体/属性/关系）
-            executePayload(domainCode, proposalType, proposal);
-
-            // 5. 发布版本
-            versionService.publishVersion(domainCode, versionIdStr);
-
-            // 获取版本号用于回填
-            Object verNo = version.get("versionNo");
-            if (verNo != null) {
-                try {
-                    versionIdLong = Long.valueOf(String.valueOf(verNo));
-                } catch (NumberFormatException nfe) {
-                    versionIdLong = null;
-                }
-            }
-
-            // 6. 更新提案为 EXECUTED，回填 version_id
-            if (versionIdLong != null) {
-                proposalService.markExecutedWithVersion(id, STATUS_EXECUTED, versionIdLong);
-            } else {
-                proposalService.markExecuted(id, STATUS_EXECUTED);
-            }
-
-            log.info("Proposal {} approve-and-publish complete: versionId={}", id, versionIdStr);
+            versionIdStr = executeAndPublish(id, proposal, reviewer);
         } catch (Exception e) {
-            log.error("Proposal {} approve-and-publish failed at step 3-5: {}", id, e.getMessage(), e);
+            log.error("Proposal {} approve-and-publish failed: {}", id, e.getMessage(), e);
             return ApiResponse.badRequest("ONT-006: Execution failed: " + e.getMessage());
         }
 
@@ -605,66 +605,283 @@ public class OntologyProposalController {
     }
 
     /**
-     * 根据提案类型执行 payload，创建对应的本体元素。
+     * 执行提案变更并发布本体版本（闭环核心）。
+     *
+     * <p>步骤：创建版本 → 执行 payload → 发布版本 → 提案状态回填 EXECUTED（带 version_id）。
+     * 供 {@code /execute} 与 {@code /approve-and-publish} 共用，确保「状态流转」与「模型落库」
+     * 原子一致，避免只改状态不落库的空转。
+     *
+     * @param proposalId 提案 ID
+     * @param proposal   提案行数据（含 domain_code / proposal_type / payload）
+     * @param actor      执行人（审批人 / 当前登录用户），空则记为 system
+     * @return 版本 ID
      */
-    private void executePayload(String domainCode, String proposalType, Map<String, Object> proposal) {
-        Object payloadObj = proposal.get("payload");
-        Map<?, ?> payload = null;
-        if (payloadObj != null) {
+    private String executeAndPublish(String proposalId, Map<String, Object> proposal, String actor) {
+        String domainCode = String.valueOf(proposal.getOrDefault("domain_code", "default"));
+        String proposalType = String.valueOf(proposal.getOrDefault("proposal_type", ""));
+
+        Map<String, Object> versionBody = new LinkedHashMap<>();
+        versionBody.put("changeLog", "Execute proposal " + proposalId + ": " + proposalType);
+        versionBody.put("publisher", (actor == null || actor.isBlank()) ? "system" : actor);
+
+        Map<String, Object> version = versionService.createVersion(domainCode, versionBody);
+        String versionIdStr = String.valueOf(version.get("id"));
+
+        executePayload(domainCode, proposalType, proposal);
+
+        versionService.publishVersion(domainCode, versionIdStr);
+
+        Long versionNo = null;
+        Object verNo = version.get("versionNo");
+        if (verNo != null) {
             try {
-                if (payloadObj instanceof Map<?, ?> m) {
-                    payload = m;
-                } else {
-                    payload = MAPPER.readValue(String.valueOf(payloadObj), Map.class);
-                }
-            } catch (Exception e) {
-                log.warn("Cannot parse payload for proposal execution: {}", e.getMessage());
-                return;
+                versionNo = Long.valueOf(String.valueOf(verNo));
+            } catch (NumberFormatException nfe) {
+                log.warn("Cannot parse versionNo '{}' for proposal {}", verNo, proposalId);
             }
         }
-        if (payload == null) {
+        if (versionNo != null) {
+            proposalService.markExecutedWithVersion(proposalId, STATUS_EXECUTED, versionNo);
+        } else {
+            proposalService.markExecuted(proposalId, STATUS_EXECUTED);
+        }
+        log.info("Proposal {} executed & published: versionId={}, type={}", proposalId, versionIdStr, proposalType);
+        return versionIdStr;
+    }
+
+    /**
+     * 根据提案类型执行 payload，将变更真正落库。
+     *
+     * <p>支持的类型：
+     * <ul>
+     *   <li>{@code CREATE_ENTITY} — 创建实体（payload.entity 或 payload 平铺字段）</li>
+     *   <li>{@code UPDATE_ENTITY} — 更新实体元数据，并应用属性变更集
+     *       （{@code propertiesAdded / propertiesUpdated / propertiesRemoved}）</li>
+     *   <li>{@code ADD_PROPERTY} — 新增属性（payload.property 或平铺字段）</li>
+     *   <li>{@code MODIFY_PROPERTY} — 更新属性（需 payload.propertyId）</li>
+     *   <li>{@code DELETE_PROPERTY} — 逻辑删除属性（需 payload.propertyId）</li>
+     *   <li>{@code ADD_RELATIONSHIP} — 创建关系</li>
+     * </ul>
+     * 目标实体所属本体优先取 {@code payload.ontologyId}，缺省回退提案 domain_code。
+     */
+    private void executePayload(String domainCode, String proposalType, Map<String, Object> proposal) {
+        Map<String, Object> payloadMap = parsePayload(proposal);
+        if (payloadMap == null) {
             log.info("No payload to execute for proposal type={}", proposalType);
             return;
         }
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> payloadMap = (Map<String, Object>) payload;
+        String ontologyId = objToString(payloadMap.getOrDefault("ontologyId", domainCode));
+        String entityId = resolveEntityId(payloadMap);
 
         switch (proposalType.toUpperCase()) {
-            case "CREATE_ENTITY":
-                Map<String, Object> entityBody = new LinkedHashMap<>(payloadMap);
+            case "CREATE_ENTITY": {
+                Map<String, Object> entityBody = asMap(payloadMap.get("entity"));
+                if (entityBody == null) {
+                    entityBody = new LinkedHashMap<>(payloadMap);
+                }
+                entityBody.remove("ontologyId");
                 if (!entityBody.containsKey("code")) {
                     entityBody.put("code", entityBody.getOrDefault("apiName", "auto_entity"));
                 }
                 if (!entityBody.containsKey("name")) {
                     entityBody.put("name", entityBody.getOrDefault("displayName", "Auto Entity"));
                 }
-                ontologyService.createEntity(domainCode, entityBody);
-                log.info("Created entity via proposal: code={}", entityBody.get("code"));
+                ontologyService.createEntity(ontologyId, entityBody);
+                log.info("Created entity via proposal: code={} ontologyId={}", entityBody.get("code"), ontologyId);
                 break;
-            case "ADD_PROPERTY":
-            case "MODIFY_PROPERTY":
-                Map<String, Object> propBody = new LinkedHashMap<>(payloadMap);
-                String entityId = String.valueOf(propBody.getOrDefault("entityId",
-                        propBody.getOrDefault("entityCode",
-                        propBody.getOrDefault("targetEntity", propBody.getOrDefault("entity_code", "")))));
-                if (!entityId.isEmpty()) {
-                    ontologyService.createProperty(entityId, propBody);
-                    log.info("Added/Modified property via proposal: entityId={}", entityId);
+            }
+            case "UPDATE_ENTITY": {
+                if (entityId.isEmpty()) {
+                    log.warn("UPDATE_ENTITY proposal has no entityId, skip");
+                    break;
                 }
+                Map<String, Object> entityFields = asMap(payloadMap.get("entity"));
+                if (entityFields != null) {
+                    ontologyService.updateEntity(entityId, entityFields);
+                }
+                applyPropertyChanges(entityId, payloadMap);
+                log.info("Updated entity via proposal: entityId={}", entityId);
                 break;
-            case "ADD_RELATIONSHIP":
-                Map<String, Object> relBody = new LinkedHashMap<>(payloadMap);
-                String sourceEntityId = String.valueOf(relBody.getOrDefault("sourceEntityId",
-                        relBody.getOrDefault("source_entity", domainCode)));
+            }
+            case "ADD_PROPERTY": {
+                if (entityId.isEmpty()) {
+                    log.warn("ADD_PROPERTY proposal has no entityId, skip");
+                    break;
+                }
+                // 提案面板以变更集数组提交（propertiesAdded），优先按数组逐个落库
+                List<?> addedProps = asList(payloadMap.get("propertiesAdded"));
+                if (!addedProps.isEmpty()) {
+                    for (Object o : addedProps) {
+                        Map<String, Object> prop = asMap(o);
+                        if (prop == null || !hasPropertyCode(prop)) {
+                            log.warn("ADD_PROPERTY skip malformed item: entityId={}, item={}", entityId, o);
+                            continue;
+                        }
+                        ontologyService.createProperty(entityId, prop);
+                    }
+                    log.info("Added {} propert(y/ies) via proposal: entityId={}", addedProps.size(), entityId);
+                    break;
+                }
+                Map<String, Object> propBody = asMap(payloadMap.get("property"));
+                if (propBody == null) {
+                    propBody = new LinkedHashMap<>(payloadMap);
+                }
+                // 无 code 视为无效属性体（历史行为会把整个 payload 当属性体，插出空属性），拒绝落库
+                if (!hasPropertyCode(propBody)) {
+                    log.warn("ADD_PROPERTY proposal has no property code, skip: entityId={}", entityId);
+                    break;
+                }
+                ontologyService.createProperty(entityId, propBody);
+                log.info("Added property via proposal: entityId={}", entityId);
+                break;
+            }
+            case "MODIFY_PROPERTY": {
+                // 提案面板以变更集数组提交（propertiesUpdated），优先按数组批量更新
+                if (!asList(payloadMap.get("propertiesUpdated")).isEmpty()) {
+                    applyPropertyChanges(entityId, payloadMap);
+                    log.info("Modified {} propert(y/ies) via change-set: entityId={}",
+                            asList(payloadMap.get("propertiesUpdated")).size(), entityId);
+                    break;
+                }
+                String propId = resolvePropertyId(payloadMap);
+                Map<String, Object> propBody = asMap(payloadMap.get("property"));
+                if (propBody == null) {
+                    propBody = new LinkedHashMap<>(payloadMap);
+                }
+                propBody.remove("propertyId");
+                propBody.remove("propId");
+                if (propId == null) {
+                    // 无属性 ID → 回退为新增（保持历史 ADD/MODIFY 同义行为）；无 code 则拒绝，避免空属性落库
+                    if (!entityId.isEmpty()) {
+                        if (hasPropertyCode(propBody)) {
+                            ontologyService.createProperty(entityId, propBody);
+                            log.info("MODIFY_PROPERTY without id → created: entityId={}", entityId);
+                        } else {
+                            log.warn("MODIFY_PROPERTY has neither propertyId nor code, skip: entityId={}", entityId);
+                        }
+                    }
+                    break;
+                }
+                ontologyService.updateProperty(propId, propBody);
+                log.info("Modified property via proposal: propId={}", propId);
+                break;
+            }
+            case "DELETE_PROPERTY": {
+                // 提案面板以变更集数组提交（propertiesRemoved），优先按数组批量删除
+                if (!asList(payloadMap.get("propertiesRemoved")).isEmpty()) {
+                    applyPropertyChanges(entityId, payloadMap);
+                    log.info("Deleted {} propert(y/ies) via change-set: entityId={}",
+                            asList(payloadMap.get("propertiesRemoved")).size(), entityId);
+                    break;
+                }
+                String propId = resolvePropertyId(payloadMap);
+                if (propId == null) {
+                    log.warn("DELETE_PROPERTY proposal has no propertyId, skip");
+                    break;
+                }
+                ontologyService.deleteProperty(propId);
+                log.info("Deleted property via proposal: propId={}", propId);
+                break;
+            }
+            case "ADD_RELATIONSHIP": {
+                Map<String, Object> relBody = asMap(payloadMap.get("relationship"));
+                if (relBody == null) {
+                    relBody = new LinkedHashMap<>(payloadMap);
+                }
+                String sourceEntityId = firstNonBlank(objToString(relBody.get("sourceEntityId")),
+                        objToString(relBody.get("source_entity")), entityId);
+                if (sourceEntityId == null || sourceEntityId.isEmpty()) {
+                    log.warn("ADD_RELATIONSHIP proposal has no sourceEntityId, skip");
+                    break;
+                }
                 ontologyService.createRelationship(sourceEntityId, relBody);
-                log.info("Created relationship via proposal");
+                log.info("Created relationship via proposal: source={}", sourceEntityId);
                 break;
+            }
             default:
                 log.info("Proposal type '{}' execution is no-op (no entity/property/relationship creation)",
                         proposalType);
                 break;
         }
+    }
+
+    /** 应用属性变更集（propertiesAdded / propertiesUpdated / propertiesRemoved）。 */
+    private void applyPropertyChanges(String entityId, Map<String, Object> payloadMap) {
+        for (Object o : asList(payloadMap.get("propertiesAdded"))) {
+            Map<String, Object> prop = asMap(o);
+            // 无 code 的条目视为无效，拒绝落库（避免空属性污染模型）
+            if (prop != null && hasPropertyCode(prop)) {
+                ontologyService.createProperty(entityId, prop);
+            }
+        }
+        for (Object o : asList(payloadMap.get("propertiesUpdated"))) {
+            Map<String, Object> prop = asMap(o);
+            if (prop == null) {
+                continue;
+            }
+            String propId = resolvePropertyId(prop);
+            if (propId == null) {
+                continue;
+            }
+            prop.remove("id");
+            prop.remove("propertyId");
+            ontologyService.updateProperty(propId, prop);
+        }
+        for (Object o : asList(payloadMap.get("propertiesRemoved"))) {
+            String propId = o instanceof Map<?, ?> m ? resolvePropertyId(asMap(m)) : objToString(o);
+            if (propId != null && !propId.isBlank()) {
+                ontologyService.deleteProperty(propId);
+            }
+        }
+    }
+
+    /** 解析提案 payload（JSONB → Map）；不可解析返回 null。 */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parsePayload(Map<String, Object> proposal) {
+        Object payloadObj = proposal.get("payload");
+        if (payloadObj == null) {
+            return null;
+        }
+        try {
+            if (payloadObj instanceof Map<?, ?> m) {
+                return new LinkedHashMap<>((Map<String, Object>) m);
+            }
+            return MAPPER.readValue(String.valueOf(payloadObj), Map.class);
+        } catch (Exception e) {
+            log.warn("Cannot parse payload for proposal execution: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** 解析目标实体 ID（兼容 entityId / entity_id / targetEntity / entityCode）。 */
+    private static String resolveEntityId(Map<String, Object> payloadMap) {
+        String id = firstNonBlank(
+                objToString(payloadMap.get("entityId")),
+                objToString(payloadMap.get("entity_id")),
+                objToString(payloadMap.get("targetEntity")),
+                objToString(payloadMap.get("entityCode")),
+                objToString(payloadMap.get("entity_code")));
+        return id == null ? "" : id.trim();
+    }
+
+    /** 解析属性 ID（兼容 propertyId / propId / id）。 */
+    private static String resolvePropertyId(Map<String, Object> payloadMap) {
+        return firstNonBlank(
+                objToString(payloadMap.get("propertyId")),
+                objToString(payloadMap.get("propId")),
+                objToString(payloadMap.get("id")));
+    }
+
+    /** 安全取嵌套 Map（非 Map 返回 null，返回可变副本）。 */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object o) {
+        return o instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : null;
+    }
+
+    /** 安全取 List（非 List 返回空列表）。 */
+    private static List<?> asList(Object o) {
+        return o instanceof List<?> l ? l : List.of();
     }
 
     // ═══════════════ T16-3 工具方法 ═══════════════════
@@ -713,5 +930,14 @@ public class OntologyProposalController {
     /** Object → String（null 安全）。 */
     private static String objToString(Object o) {
         return o == null ? null : o.toString();
+    }
+
+    /** 属性请求体是否含可用 code（提案落库前的有效性判据，防空属性入库）。 */
+    private static boolean hasPropertyCode(Map<String, Object> propBody) {
+        if (propBody == null) {
+            return false;
+        }
+        String code = firstNonBlank(objToString(propBody.get("code")), objToString(propBody.get("apiName")));
+        return code != null && !code.isBlank();
     }
 }

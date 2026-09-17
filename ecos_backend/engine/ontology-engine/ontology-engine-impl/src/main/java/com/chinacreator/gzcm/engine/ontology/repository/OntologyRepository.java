@@ -22,6 +22,10 @@ import com.chinacreator.gzcm.engine.ontology.model.OntologyVersion;
 @Repository
 public class OntologyRepository {
 
+    /** 允许参与主键生成的表（白名单，防表名拼接注入） */
+    private static final java.util.Set<String> ALLOWED_ID_TABLES = java.util.Set.of(
+        "ecos_ontology_entity", "ecos_ontology_property", "ecos_ontology_relationship");
+
     private final JdbcTemplate jdbc;
 
     public OntologyRepository(JdbcTemplate jdbc) {
@@ -51,9 +55,11 @@ public class OntologyRepository {
         p.setEntityId(rs.getString("entity_id"));
         p.setCode(rs.getString("code"));
         p.setName(rs.getString("name"));
+        p.setDescription(rs.getString("description"));
         p.setPropertyType(rs.getString("property_type"));
         p.setRequiredFlag(rs.getInt("required_flag"));
         p.setSearchableFlag(rs.getInt("searchable_flag"));
+        p.setUniqueFlag(rs.getInt("unique_flag"));
         p.setSortOrder(rs.getInt("sort_order"));
         p.setFunctionType(rs.getString("function_type"));
         p.setFunctionExpression(rs.getString("function_expression"));
@@ -78,6 +84,27 @@ public class OntologyRepository {
     }
 
     // ═══════════════ Entity CRUD ═══════════════════
+
+    /**
+     * 生成下一个业务主键（{@code prefix} + 数字后缀）。
+     *
+     * <p>基于目标表内既有 ID 的最大数字后缀自增，替代原内存自增计数器 —— 后者在进程重启后
+     * 会从头计数，与库内既有 {@code ent501/prop501/rel501} 撞主键，导致属性/实体新增失败。
+     * <p>表名来自本类内部的受限枚举校验，不接受外部输入，无注入面。
+     *
+     * @param prefix 主键前缀（ent / prop / rel）
+     * @param table  目标表名（须在 {@link #ALLOWED_ID_TABLES} 白名单内）
+     * @return 下一个可用主键，如 {@code prop502}
+     */
+    public String nextId(String prefix, String table) {
+        if (!ALLOWED_ID_TABLES.contains(table)) {
+            throw new IllegalArgumentException("ONT-000: table not allowed for id generation: " + table);
+        }
+        Long max = jdbc.queryForObject(
+            "SELECT COALESCE(MAX(NULLIF(regexp_replace(id, '\\D', '', 'g'), '')::bigint), 500) "
+                + "FROM " + table + " WHERE id LIKE ?", Long.class, prefix + "%");
+        return prefix + ((max == null ? 500L : max) + 1L);
+    }
 
     public List<OntologyEntity> findEntitiesByOntology(String ontologyId) {
         return jdbc.query(
@@ -126,7 +153,7 @@ public class OntologyRepository {
 
     public List<OntologyProperty> findPropertiesByEntity(String entityId) {
         return jdbc.query(
-            "SELECT * FROM ecos_ontology_property WHERE entity_id = ? ORDER BY sort_order",
+            "SELECT * FROM ecos_ontology_property WHERE entity_id = ? AND is_deleted = 0 ORDER BY sort_order",
             PROP_MAPPER, entityId);
     }
 
@@ -138,28 +165,36 @@ public class OntologyRepository {
 
     public int insertProperty(OntologyProperty prop) {
         return jdbc.update("""
-            INSERT INTO ecos_ontology_property (id, entity_id, code, name, property_type, required_flag, searchable_flag, sort_order, function_type, function_expression, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            """, prop.getId(), prop.getEntityId(), prop.getCode(), prop.getName(),
-            prop.getPropertyType(), prop.getRequiredFlag(), prop.getSearchableFlag(),
+            INSERT INTO ecos_ontology_property (id, entity_id, code, name, description, property_type, required_flag, searchable_flag, unique_flag, sort_order, function_type, function_expression, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            """, prop.getId(), prop.getEntityId(), prop.getCode(), prop.getName(), prop.getDescription(),
+            prop.getPropertyType(), prop.getRequiredFlag(), prop.getSearchableFlag(), prop.getUniqueFlag(),
             prop.getSortOrder(),
             prop.getFunctionType(), prop.getFunctionExpression());
     }
 
-    public int updateProperty(String id, String code, String name, String propertyType,
-                               Integer requiredFlag, Integer searchableFlag,
+    /**
+     * 更新属性。
+     *
+     * <p>COALESCE 语义：入参为 null 表示不更新该字段。注意 {@code description} 允许清空 ——
+     * 前端以空串表达「清空描述」，空串非 null，可正常覆盖。
+     */
+    public int updateProperty(String id, String code, String name, String description, String propertyType,
+                               Integer requiredFlag, Integer searchableFlag, Integer uniqueFlag,
                                String functionType, String functionExpression) {
         return jdbc.update("""
             UPDATE ecos_ontology_property SET
                 code = COALESCE(?, code),
                 name = COALESCE(?, name),
+                description = COALESCE(?, description),
                 property_type = COALESCE(?, property_type),
                 required_flag = COALESCE(?, required_flag),
                 searchable_flag = COALESCE(?, searchable_flag),
+                unique_flag = COALESCE(?, unique_flag),
                 function_type = COALESCE(?, function_type),
                 function_expression = COALESCE(?, function_expression)
-            WHERE id = ?
-            """, code, name, propertyType, requiredFlag, searchableFlag,
+            WHERE id = ? AND is_deleted = 0
+            """, code, name, description, propertyType, requiredFlag, searchableFlag, uniqueFlag,
             functionType, functionExpression, id);
     }
 

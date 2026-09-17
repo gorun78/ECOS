@@ -41,9 +41,12 @@ import {
   createEntity,
   deleteEntity,
   fetchEntities,
+  fetchProperties,
   createRelationship,
   deleteRelationship,
   fetchRelationships,
+  mapEntityToObjectType,
+  mapRelationshipToLinkType,
   DEFAULT_ONTOLOGY_ID,
   createExportTask,
   fetchWorkbenchDomains,
@@ -80,6 +83,8 @@ export default function OntologyWorkbenchLayout() {
   const [exporting, setExporting] = useState(false);
   // T10: 新建导出任务后的列表刷新信号（ExportTasksView 监听自增即重拉任务列表）
   const [exportTasksSignal, setExportTasksSignal] = useState(0);
+  // 详情页「发起变更提案」信号：自增后 ProposalPanel 自动展开表单并锁定当前对象类型
+  const [proposalFormSignal, setProposalFormSignal] = useState(0);
 
   // ── Load Initial Data via custom hook ──
   // T8: domains 不再由 fetchOntologies(本体表) 映射 — 改由 reloadDomains 拉取
@@ -152,6 +157,27 @@ export default function OntologyWorkbenchLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * 重拉对象类型及其属性（提案执行完成后的闭环刷新）
+   * 与 useOntologyData 的加载路径一致：实体列表 + 逐实体属性 → mapEntityToObjectType，
+   * 确保提案落库后的变更（新增/修改/删除属性）立即可见。
+   */
+  const reloadObjects = async () => {
+    try {
+      const rawEntities = await fetchEntities(DEFAULT_ONTOLOGY_ID);
+      const entities = rawEntities || [];
+      const propsResponses = await Promise.all(
+        entities.map((entity: any) => fetchProperties(entity.id).catch((): any[] => [])),
+      );
+      const list: ObjectType[] = entities.map((entity: any, idx: number) =>
+        mapEntityToObjectType(entity, propsResponses[idx] || []),
+      );
+      setObjectTypes(list);
+    } catch (e: any) {
+      showToast('error', t('ow.msg.dataLoadFailed'));
+    }
+  };
+
   // ── CREATE ──
   const handleCreateNewElement = async (type: CreatableType) => {
     const defaultNum = Date.now().toString().slice(-4);
@@ -165,29 +191,14 @@ export default function OntologyWorkbenchLayout() {
           entityType: 'MASTER',
         });
         showToast('success', t('ow.msg.objectCreated').replace('{name}', created.name));
-        // Reload from backend
+        // Reload from backend（实体列表 + 各实体属性，映射收敛到 mapEntityToObjectType）
         const entities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
-        const list: ObjectType[] = (entities || []).map((e: any) => ({
-          id: e.id,
-          displayName: e.name || e.code,
-          apiName: e.code || e.name,
-          description: e.description || '',
-          icon: 'Database',
-          color: 'border-indigo-500 bg-indigo-50 text-indigo-700',
-          primaryKey: 'id',
-          titleProperty: 'id',
-          status: 'PUBLISHED',
-          properties: (Array.isArray(e.properties) ? e.properties : []).map((pAny: any, i: number) => ({
-            id: pAny.id || `p_${i}`,
-            displayName: pAny.displayName || pAny.name || pAny.code || `Prop_${i}`,
-            apiName: pAny.apiName || pAny.code || pAny.name || `prop_${i}`,
-            dataType: (pAny.dataType || pAny.type || 'string') as 'string',
-            isPrimaryKey: Boolean(pAny.isPrimaryKey),
-            description: pAny.description || '',
-          })),
-          mapping: e.mapping || { datasetId: '', propertyMappings: {} },
-          domainId: e.domainId || null,
-        }));
+        const propsResponses = await Promise.all(
+          (entities || []).map((e: any) => fetchProperties(e.id).catch((): any[] => []))
+        );
+        const list: ObjectType[] = (entities || []).map((e: any, idx: number) =>
+          mapEntityToObjectType(e, propsResponses[idx] || [])
+        );
         updateObjectTypes(list);
       } catch (e: any) {
         showToast('error', t('ow.msg.createFailed').replace('{error}', String(e.message)));
@@ -204,20 +215,10 @@ export default function OntologyWorkbenchLayout() {
           name: t('ow.link.defaultName').replace('{n}', defaultNum),
           code: `custom_link_${defaultNum}`,
           relationshipType: 'ONE_TO_MANY',
-        }, DEFAULT_ONTOLOGY_ID);
+        });
         showToast('success', t('ow.msg.linkCreated'));
-        const rels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
-        const list: LinkType[] = (rels || []).map((r: any) => ({
-          id: r.id,
-          displayName: r.name || '',
-          apiName: r.code || '',
-          description: '',
-          sourceObjectType: r.source_entity_id,
-          targetObjectType: r.target_entity_id,
-          cardinality: (r.relationship_type === 'ONE_TO_ONE' ? '1:1' : r.relationship_type === 'MANY_TO_MANY' ? 'N:N' : '1:N') as any,
-          mapping: { type: 'foreign_key' as const },
-        }));
-        updateLinkTypes(list);
+        const rels = await fetchRelationships().catch((): any[] => []);
+        updateLinkTypes((rels || []).map(mapRelationshipToLinkType));
       } catch (e: any) {
         showToast('error', t('ow.msg.linkCreateFailed').replace('{error}', String(e.message)));
       }
@@ -298,7 +299,7 @@ export default function OntologyWorkbenchLayout() {
       }
     } else if (category === 'link') {
       try {
-        await deleteRelationship(id, DEFAULT_ONTOLOGY_ID);
+        await deleteRelationship(id);
         showToast('success', t('ow.msg.linkDeleted'));
         updateLinkTypes(linkTypes.filter(lt => lt.id !== id));
       } catch (e: any) {
@@ -384,7 +385,9 @@ export default function OntologyWorkbenchLayout() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        {/* min-h-0：flex 纵向布局下 overflow-auto 子项的最小高度会退化为 0，
+            若不显式声明，详情区会被下方提案面板挤成 0 高度（对象详情与属性表不可见） */}
+        <div className="flex-1 min-h-0 overflow-auto">
         {selectedCategory === 'overview' && (
           <OverviewView
             objectTypes={objectTypes}
@@ -456,6 +459,7 @@ export default function OntologyWorkbenchLayout() {
                 setSelectedCategory('explorer');
                 setSelectedId(null);
               }}
+              onCreateProposal={() => setProposalFormSignal(v => v + 1)}
             />
           );
         })()}
@@ -569,9 +573,17 @@ export default function OntologyWorkbenchLayout() {
         )}
         </div>
 
-        {/* Proposal Panel — collapsible bottom drawer */}
+        {/* Proposal Panel — 目标锁定当前选中对象类型；执行完成后回刷实体/属性形成闭环。
+            max-h + 自身滚动：提案列表会随数量增长，不加约束会把上方详情区挤塌 */}
         {selectedCategory === 'object' && (
-          <ProposalPanel objectTypes={objectTypes} />
+          <div className="shrink-0 max-h-[45%] overflow-y-auto">
+            <ProposalPanel
+              objectTypes={objectTypes}
+              selectedObjectType={objectTypes.find(o => o.id === selectedId) ?? null}
+              openFormSignal={proposalFormSignal}
+              onProposalExecuted={reloadObjects}
+            />
+          </div>
         )}
       </main>
 

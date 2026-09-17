@@ -14,6 +14,8 @@ import {
   fetchEntities,
   fetchProperties,
   fetchRelationships,
+  mapEntityToObjectType,
+  mapRelationshipToLinkType,
   DEFAULT_ONTOLOGY_ID,
 } from '../services/ontologyApi';
 import type {
@@ -39,7 +41,7 @@ export function useOntologyData(
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 1. Load ontologies (domains)
+        // 1. 加载本体列表（作为业务域展示的兜底源，权威源见 Layout.reloadDomains）
         const ontologies = await fetchOntologies().catch(() => [] as any[]);
         const domainList: OntologyDomain[] = (ontologies || []).map((o: any) => ({
           id: o.id || o.code,
@@ -50,57 +52,22 @@ export function useOntologyData(
           color: 'border-blue-500 bg-blue-50 text-blue-700',
         }));
 
-        // 2. Load entities for the primary ontology
+        // 2. 加载主本体的实体，并并发拉取各实体属性
+        //    （属性端点为实体域 /api/v1/ecos/entities/{id}/properties，不再拼 ontologyId）
         const rawEntities = await fetchEntities(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
-        const normals = rawEntities || [];
-        // T1: 把"for await fetchProperties"改为"Promise.all 并发",
-        // 将 N+1 次串行请求降为 1 次 entities + N 次并发 properties(总仍 N+1 次但网络往返只有 2 轮,首屏时间取决于最慢的一次 properties)
+        const entities = rawEntities || [];
         const propsResponses = await Promise.all(
-          normals.map((entity: any) =>
-            fetchProperties(entity.id, DEFAULT_ONTOLOGY_ID).catch((): any[] => [])
+          entities.map((entity: any) =>
+            fetchProperties(entity.id).catch((): any[] => [])
           )
         );
-        const entityList: ObjectType[] = normals.map((entity: any, idx: number) => {
-          const rawProps = propsResponses[idx] || [];
-          const props: { id: string; displayName: string; apiName: string; dataType: string; isPrimaryKey: boolean; description: string }[] = (rawProps || []).map((p: any) => ({
-            id: p.id || p.apiName || p.name,
-            displayName: p.displayName || p.name || p.apiName,
-            apiName: p.apiName || p.name,
-            dataType: p.dataType || 'string',
-            isPrimaryKey: p.isPrimaryKey || p.primaryKey || false,
-            description: p.description || '',
-          }));
-          return {
-            id: entity.id,
-            displayName: entity.name || entity.code,
-            apiName: entity.code || entity.name,
-            description: entity.description || '',
-            icon: entity.entityType === 'MASTER' ? 'Database' : 'FileText',
-            color: entity.entityType === 'MASTER'
-              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-              : 'border-teal-500 bg-teal-50 text-teal-700',
-            primaryKey: props.find(p => p.isPrimaryKey)?.id || 'id',
-            titleProperty: props.length > 0 ? props[0].id : 'id',
-            status: 'PUBLISHED',
-            properties: props,
-            mapping: entity.mapping || null,
-            domainId: entity.domainId || null,
-          } as ObjectType;
-        });
+        const entityList: ObjectType[] = entities.map((entity: any, idx: number) =>
+          mapEntityToObjectType(entity, propsResponses[idx] || [])
+        );
 
-        // 3. Load relationships
-        const rawRels = await fetchRelationships(DEFAULT_ONTOLOGY_ID).catch((): any[] => []);
-        const relList: LinkType[] = (rawRels || []).map((r: any) => ({
-          id: r.id,
-          displayName: r.name || `${r.source_entity_id}→${r.target_entity_id}`,
-          apiName: r.code || '',
-          description: '',
-          sourceObjectType: r.source_entity_id,
-          targetObjectType: r.target_entity_id,
-          cardinality: (r.relationship_type === 'ONE_TO_ONE' ? '1:1' :
-                        r.relationship_type === 'MANY_TO_MANY' ? 'N:N' : '1:N') as any,
-          mapping: { type: 'foreign_key' as const, foreignKeyMapping: {} },
-        })) as LinkType[];
+        // 3. 加载全部关系（全局端点）
+        const rawRels = await fetchRelationships().catch((): any[] => []);
+        const relList: LinkType[] = (rawRels || []).map(mapRelationshipToLinkType);
 
         onLoaded({ domains: domainList, objectTypes: entityList, linkTypes: relList });
       } catch (err) {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, CheckCheck, Clock, AlertTriangle, Play, Plus, Trash2, Send, Shield, ShieldCheck, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { CheckCircle, CheckCheck, Clock, AlertTriangle, Play, Plus, Trash2, Send, Shield, ShieldCheck, XCircle, Link2 } from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import {
@@ -11,12 +11,21 @@ import {
   rejectProposal,
   executeProposal,
   deleteProposal,
+  fetchProperties,
+  DEFAULT_ONTOLOGY_ID,
 } from '../../services/ontologyApi';
-import type { Proposal, ProposalStatus, CreateProposalDTO, VerifyProposalResult, ReviewProposalDTO } from '../../types/ontology';
+import type { Proposal, ProposalStatus, CreateProposalDTO, VerifyProposalResult, ReviewProposalDTO, PropertyType } from '../../types/ontology';
 import type { ObjectType } from '../../types/ontology';
 
 interface ProposalPanelProps {
+  /** 全部对象类型（提案目标下拉的候选集） */
   objectTypes: ObjectType[];
+  /** 当前在详情页选中的对象类型 —— 有值时提案目标锁定为该本体 */
+  selectedObjectType?: ObjectType | null;
+  /** 自增信号：详情页点击「发起变更提案」时触发，>0 即自动展开表单 */
+  openFormSignal?: number;
+  /** 提案执行完成回调 —— 由工作台重拉实体/属性，使变更在界面上可见 */
+  onProposalExecuted?: () => void;
 }
 
 type StatusBadgeStyle = { bg: string; text: string; icon: React.ReactNode };
@@ -29,9 +38,51 @@ const STATUS_BADGE: Record<Exclude<ProposalStatus, 'EXECUTED' | 'VERIFIED'>, Sta
   REJECTED: { bg: 'bg-red-50', text: 'text-red-700', icon: <XCircle size={10} /> },
 };
 
-const CHANGE_TYPES = ['CREATE', 'UPDATE', 'DELETE'] as const;
+/** 提案类型 → 变更类别（写入 payload.changeType，兼容后端历史字段） */
+const PROPOSAL_KINDS = [
+  'UPDATE_ENTITY',
+  'ADD_PROPERTY',
+  'MODIFY_PROPERTY',
+  'DELETE_PROPERTY',
+  'CREATE_ENTITY',
+  'ADD_RELATIONSHIP',
+] as const;
 
-export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
+type ProposalKind = (typeof PROPOSAL_KINDS)[number];
+
+const KIND_CHANGE_TYPE: Record<ProposalKind, 'CREATE' | 'UPDATE' | 'DELETE'> = {
+  UPDATE_ENTITY: 'UPDATE',
+  ADD_PROPERTY: 'CREATE',
+  MODIFY_PROPERTY: 'UPDATE',
+  DELETE_PROPERTY: 'DELETE',
+  CREATE_ENTITY: 'CREATE',
+  ADD_RELATIONSHIP: 'CREATE',
+};
+
+/** 变更集：基于「后端现存属性」与「本地草稿属性」的差集 */
+interface PropertyChangeSet {
+  added: Record<string, any>[];
+  updated: Record<string, any>[];
+  removed: string[];
+}
+
+const EMPTY_CHANGE_SET: PropertyChangeSet = { added: [], updated: [], removed: [] };
+
+/** 读取当前登录用户名（与 api.ts 的 localStorage 身份存储保持一致） */
+const readCurrentUser = (): string => {
+  try {
+    return localStorage.getItem('username') || '';
+  } catch {
+    return '';
+  }
+};
+
+export default function ProposalPanel({
+  objectTypes,
+  selectedObjectType = null,
+  openFormSignal = 0,
+  onProposalExecuted,
+}: ProposalPanelProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -39,12 +90,15 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formTargetType, setFormTargetType] = useState('');
-  const [formChangeType, setFormChangeType] = useState<string>('CREATE');
+  const [formKind, setFormKind] = useState<ProposalKind>('UPDATE_ENTITY');
   const [formDescription, setFormDescription] = useState('');
   const [verificationResults, setVerificationResults] = useState<Record<string, VerifyProposalResult>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [reviewModal, setReviewModal] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null);
   const [reviewComment, setReviewComment] = useState('');
+  /** 目标本体的后端现存属性 ID 集合（表单展开时抓取，作为差集基线） */
+  const [originalPropertyIds, setOriginalPropertyIds] = useState<Set<string> | null>(null);
+  const [currentUser, setCurrentUser] = useState<string>(() => readCurrentUser());
 
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
   const showToast = useCallback((type: 'success' | 'info' | 'error', message: string) => {
@@ -65,23 +119,123 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
 
   useEffect(() => { loadProposals(); }, [loadProposals]);
 
+  // 登录态可能在会话内变化（切换账号/重新登录），列表刷新时同步
+  useEffect(() => { setCurrentUser(readCurrentUser()); }, [proposals]);
+
+  // 详情页「发起变更提案」信号 → 自动展开表单
+  useEffect(() => {
+    if (openFormSignal > 0) {
+      setShowForm(true);
+    }
+  }, [openFormSignal]);
+
+  // 表单展开时抓取目标本体后端现存属性，作为「新增/修改/删除」判定基线
+  useEffect(() => {
+    if (!showForm || !selectedObjectType) {
+      setOriginalPropertyIds(null);
+      return;
+    }
+    let cancelled = false;
+    fetchProperties(selectedObjectType.id)
+      .then(list => {
+        if (!cancelled) {
+          setOriginalPropertyIds(new Set((list || []).map(p => String(p.id))));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOriginalPropertyIds(new Set());
+        }
+      });
+    return () => { cancelled = true; };
+  }, [showForm, selectedObjectType?.id]);
+
+  /** 提案目标：优先取详情页选中的本体（锁定），否则取表单下拉选择 */
+  const targetObjectType = selectedObjectType ?? objectTypes.find(ot => ot.id === formTargetType) ?? null;
+
+  /** 本地草稿属性 → 后端属性请求体 */
+  const toPropertyBody = (p: PropertyType, withId = false): Record<string, any> => {
+    const body: Record<string, any> = {
+      code: p.apiName || p.displayName,
+      name: p.displayName,
+      description: p.description || '',
+      propertyType: String(p.dataType || 'string').toUpperCase(),
+      requiredFlag: p.required ? 1 : 0,
+      uniqueFlag: p.isPrimaryKey ? 1 : 0,
+      searchableFlag: p.searchable ? 1 : 0,
+    };
+    if (withId) {
+      body.id = p.id;
+      body.propertyId = p.id;
+    }
+    return body;
+  };
+
+  /** 变更集：本地草稿属性与后端现存属性的差集（提交后由后端执行落库） */
+  const changeSet: PropertyChangeSet = useMemo(() => {
+    if (!targetObjectType || originalPropertyIds === null) {
+      return EMPTY_CHANGE_SET;
+    }
+    const localIds = new Set(targetObjectType.properties.map(p => String(p.id)));
+    return {
+      added: targetObjectType.properties
+        .filter(p => !originalPropertyIds.has(String(p.id)))
+        .map(p => toPropertyBody(p)),
+      updated: targetObjectType.properties
+        .filter(p => originalPropertyIds.has(String(p.id)))
+        .map(p => toPropertyBody(p, true)),
+      removed: [...originalPropertyIds].filter(id => !localIds.has(id)),
+    };
+  }, [targetObjectType, originalPropertyIds]);
+
+  const resetForm = () => {
+    setShowForm(false);
+    setFormTitle('');
+    setFormTargetType('');
+    setFormKind('UPDATE_ENTITY');
+    setFormDescription('');
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim() || !formTargetType) return;
+    if (!formTitle.trim() || !targetObjectType) {
+      if (!targetObjectType) {
+        showToast('error', t('ow.msg.selectObjectFirst'));
+      }
+      return;
+    }
+    // 身份校验：未登录不得发起提案 —— 否则提交人只能落为 system 兜底，自审拦截将失效
+    if (!currentUser) {
+      showToast('error', t('ow.msg.loginRequired'));
+      return;
+    }
     try {
       const dto: CreateProposalDTO = {
         title: formTitle.trim(),
-        targetType: formTargetType,
-        changeType: formChangeType as 'CREATE' | 'UPDATE' | 'DELETE',
+        targetType: targetObjectType.id,
+        proposalType: formKind,
+        targetEntity: targetObjectType.id,
+        ontologyId: DEFAULT_ONTOLOGY_ID,
+        domainCode: DEFAULT_ONTOLOGY_ID,
+        changeType: KIND_CHANGE_TYPE[formKind],
         description: formDescription.trim(),
+        payload: {
+          ontologyId: DEFAULT_ONTOLOGY_ID,
+          entityId: targetObjectType.id,
+          entity: {
+            code: targetObjectType.apiName,
+            name: targetObjectType.displayName,
+            description: targetObjectType.description,
+          },
+          propertiesAdded: changeSet.added,
+          propertiesUpdated: changeSet.updated,
+          propertiesRemoved: changeSet.removed,
+        },
+        proposedBy: currentUser || undefined,
       };
       await createProposal(dto);
       showToast('success', t('ow.msg.proposalCreated'));
-      setShowForm(false);
-      setFormTitle('');
-      setFormTargetType('');
-      setFormChangeType('CREATE');
-      setFormDescription('');
+      resetForm();
       loadProposals();
     } catch {
       showToast('error', t('ow.msg.proposalFailed'));
@@ -101,8 +255,30 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
     }
   };
 
-  const handleSubmit = (id: string) => handleAction(id, () => submitProposal(id), 'ow.msg.proposalSubmitted');
-  const handleExecute = (id: string) => handleAction(id, () => executeProposal(id), 'ow.msg.proposalExecuted');
+  /** 提交审批：前置身份校验 —— 未登录不得提交（后端以登录态为准记录提交人） */
+  const handleSubmit = (id: string) => {
+    if (!currentUser) {
+      showToast('error', t('ow.msg.loginRequired'));
+      return;
+    }
+    handleAction(id, () => submitProposal(id), 'ow.msg.proposalSubmitted');
+  };
+
+  const handleExecute = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await executeProposal(id);
+      showToast('success', t('ow.msg.proposalExecuted'));
+      loadProposals();
+      // 闭环：执行完成后通知工作台重拉实体/属性，使变更立即可见
+      onProposalExecuted?.();
+    } catch {
+      showToast('error', t('ow.msg.proposalFailed'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       await deleteProposal(id);
@@ -119,6 +295,8 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
       const result = await verifyProposal(id);
       setVerificationResults(prev => ({ ...prev, [id]: result }));
       showToast('info', t('ow.msg.proposalVerified'));
+      // 写后刷新：验证会变更提案状态（verified/rejected），重拉列表以驱动「执行」按钮显隐
+      loadProposals();
     } catch {
       showToast('error', t('ow.msg.proposalFailed'));
     } finally {
@@ -126,9 +304,26 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
     }
   };
 
+  /** 审批人 = 提交人时禁止自审自批（前端拦截，后端 ONT-007 二次兜底） */
+  const isSelfReview = (p: Proposal) =>
+    !!currentUser && !!p.proposedBy && p.proposedBy.toLowerCase() === currentUser.toLowerCase();
+
   const handleReviewSubmit = async () => {
     if (!reviewModal) return;
-    const dto: ReviewProposalDTO = { reviewComment: reviewComment.trim() || undefined };
+    if (!currentUser) {
+      showToast('error', t('ow.msg.loginRequired'));
+      return;
+    }
+    const target = proposals.find(p => p.id === reviewModal.id);
+    if (target && isSelfReview(target)) {
+      showToast('error', t('ow.msg.reviewerMustDiffer'));
+      setReviewModal(null);
+      return;
+    }
+    const dto: ReviewProposalDTO = {
+      reviewer: currentUser,
+      reviewComment: reviewComment.trim() || undefined,
+    };
     const action = reviewModal.action === 'approve'
       ? () => approveProposal(reviewModal.id, dto)
       : () => rejectProposal(reviewModal.id, dto);
@@ -148,7 +343,7 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
   };
 
   const statusLabel = (s: ProposalStatus) => t(`ow.proposal.status.${s.toLowerCase()}`);
-  const changeTypeLabel = (ct: string) => t(`ow.proposal.type.${ct}`);
+  const kindLabel = (kind: string) => t(`ow.proposal.kind.${kind}`);
   /** 状态徽章：EXECUTED / VERIFIED 走主题令牌语义色；未知状态兜底 DRAFT，避免后端新增状态导致渲染崩溃 */
   const resolveStatusBadge = (s: ProposalStatus): StatusBadgeStyle => {
     if (s === 'EXECUTED') {
@@ -159,6 +354,10 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
     }
     return STATUS_BADGE[s] ?? STATUS_BADGE.DRAFT;
   };
+
+  /** 提案列表项的目标本体展示名（后端 target_entity 即对象类型 id） */
+  const targetName = (p: Proposal) =>
+    objectTypes.find(ot => ot.id === p.targetType || ot.id === p.targetId)?.displayName || p.targetType || '-';
 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-4`}>
@@ -174,7 +373,13 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
         </div>
         {!showForm && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              if (!selectedObjectType && objectTypes.length === 0) {
+                showToast('error', t('ow.msg.selectObjectFirst'));
+                return;
+              }
+              setShowForm(true);
+            }}
             className={`${styles.accentBg} hover:opacity-90 text-white text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 shadow-xs`}
           >
             <Plus size={14} />
@@ -192,13 +397,41 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
             </h4>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={resetForm}
               className={`${styles.muted} hover:opacity-80 p-1 rounded`}
             >
               <XCircle size={16} />
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+          {/* 目标本体：详情页选中时锁定展示，否则提供下拉选择 */}
+          <div className="space-y-1">
+            <label className={`text-[11px] font-bold ${styles.muted} uppercase tracking-wider block`}>
+              {t('ow.label.proposalTarget')}
+            </label>
+            {selectedObjectType ? (
+              <div className={`flex items-center gap-2 px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg}`}>
+                <Link2 size={13} className={styles.accentText} />
+                <span className={`font-semibold ${styles.cardText}`}>{selectedObjectType.displayName}</span>
+                <span className={`font-mono ${styles.muted}`}>{selectedObjectType.apiName}</span>
+                <span className={`ml-auto text-[10px] ${styles.muted}`}>{t('ow.label.basedOnObject')}</span>
+              </div>
+            ) : (
+              <select
+                value={formTargetType}
+                onChange={e => setFormTargetType(e.target.value)}
+                className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg}`}
+                required
+              >
+                <option value="">--</option>
+                {objectTypes.map(ot => (
+                  <option key={ot.id} value={ot.id}>{ot.displayName}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className={`text-[11px] font-bold ${styles.muted} uppercase tracking-wider block`}>
                 {t('ow.label.displayName')}
@@ -214,35 +447,20 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
             </div>
             <div className="space-y-1">
               <label className={`text-[11px] font-bold ${styles.muted} uppercase tracking-wider block`}>
-                {t('ow.label.proposalTarget')}
-              </label>
-              <select
-                value={formTargetType}
-                onChange={e => setFormTargetType(e.target.value)}
-                className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg}`}
-                required
-              >
-                <option value="">--</option>
-                {objectTypes.map(ot => (
-                  <option key={ot.id} value={ot.id}>{ot.displayName}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className={`text-[11px] font-bold ${styles.muted} uppercase tracking-wider block`}>
                 {t('ow.label.proposalType')}
               </label>
               <select
-                value={formChangeType}
-                onChange={e => setFormChangeType(e.target.value)}
+                value={formKind}
+                onChange={e => setFormKind(e.target.value as ProposalKind)}
                 className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg}`}
               >
-                {CHANGE_TYPES.map(ct => (
-                  <option key={ct} value={ct}>{changeTypeLabel(ct)}</option>
+                {PROPOSAL_KINDS.map(kind => (
+                  <option key={kind} value={kind}>{kindLabel(kind)}</option>
                 ))}
               </select>
             </div>
           </div>
+
           <div className="space-y-1">
             <label className={`text-[11px] font-bold ${styles.muted} uppercase tracking-wider block`}>
               {t('ow.label.description')}
@@ -254,10 +472,23 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
               className={`w-full h-16 px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg}`}
             />
           </div>
+
+          {/* 变更明细：本地草稿 vs 后端现存属性的差集，作为提案执行内容 */}
+          {selectedObjectType && (
+            <div className={`text-[11px] ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg p-3 space-y-1`}>
+              <div className="font-semibold">{t('ow.label.proposalChangeSet')}</div>
+              <div className="flex items-center gap-3">
+                <span className="text-emerald-600">{t('ow.label.changeSetAdded')}: {changeSet.added.length}</span>
+                <span className="text-blue-600">{t('ow.label.changeSetUpdated')}: {changeSet.updated.length}</span>
+                <span className="text-red-600">{t('ow.label.changeSetRemoved')}: {changeSet.removed.length}</span>
+              </div>
+            </div>
+          )}
+
           <div className={`flex justify-end gap-2 border-t ${styles.cardBorder} pt-3`}>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={resetForm}
               className={`px-3.5 py-1.5 rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} text-xs font-semibold ${styles.cardBg}`}
             >
               {t('ow.btn.cancel')}
@@ -284,6 +515,7 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
             const badge = resolveStatusBadge(p.status);
             const verification = verificationResults[p.id];
             const isActing = actionLoading === p.id;
+            const selfReview = isSelfReview(p);
 
             return (
               <div key={p.id} className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-3 space-y-2`}>
@@ -296,14 +528,18 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
                         {statusLabel(p.status)}
                       </span>
                       <span className={`text-[10px] ${styles.muted} font-mono`}>
-                        {changeTypeLabel(p.changeType)}
+                        {kindLabel(p.changeType)}
                       </span>
                     </div>
                     <p className={`text-[11px] ${styles.muted} mt-0.5 truncate`}>{p.description}</p>
                     <div className={`flex items-center gap-3 mt-1 text-[10px] ${styles.muted}`}>
                       <span>{t('ow.label.proposalAuthor')}: {p.proposedBy || '-'}</span>
-                      <span>{t('ow.label.proposalTarget')}: {objectTypes.find(ot => ot.id === p.targetType)?.displayName || p.targetType}</span>
+                      <span>{t('ow.label.proposalTarget')}: {targetName(p)}</span>
+                      {p.reviewer ? <span>{t('ow.label.proposalReviewer')}: {p.reviewer}</span> : null}
                     </div>
+                    {selfReview && p.status === 'PENDING' && (
+                      <p className="text-[10px] text-amber-600 mt-1">{t('ow.msg.reviewerMustDiffer')}</p>
+                    )}
                   </div>
                 </div>
 
@@ -311,7 +547,7 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
                   <div className={`text-[11px] p-2 rounded-lg border ${verification.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
                     <div className="flex items-center gap-1 font-semibold">
                       {verification.valid ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
-                      {t('ow.label.proposalVerified')}: {verification.valid ? '✓' : '✗'}
+                      {t('ow.label.proposalVerified')}: {verification.valid ? '✓' : ''}
                     </div>
                     {verification.issues.length > 0 && (
                       <ul className="mt-1 pl-4 list-disc space-y-0.5">
@@ -355,7 +591,8 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
                       </button>
                       <button
                         onClick={() => setReviewModal({ id: p.id, action: 'approve' })}
-                        disabled={isActing}
+                        disabled={isActing || selfReview}
+                        title={selfReview ? t('ow.msg.reviewerMustDiffer') : undefined}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50"
                       >
                         <CheckCircle size={10} />
@@ -363,7 +600,8 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
                       </button>
                       <button
                         onClick={() => setReviewModal({ id: p.id, action: 'reject' })}
-                        disabled={isActing}
+                        disabled={isActing || selfReview}
+                        title={selfReview ? t('ow.msg.reviewerMustDiffer') : undefined}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50"
                       >
                         <XCircle size={10} />
@@ -371,7 +609,8 @@ export default function ProposalPanel({ objectTypes }: ProposalPanelProps) {
                       </button>
                     </>
                   )}
-                  {p.status === 'APPROVED' && (
+                  {/* 已验证(VERIFIED) 或已审批(APPROVED) 均可执行 —— 与后端 execute 端点受理状态对齐 */}
+                  {(p.status === 'APPROVED' || p.status === 'VERIFIED') && (
                     <button
                       onClick={() => handleExecute(p.id)}
                       disabled={isActing}

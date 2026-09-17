@@ -26,6 +26,9 @@ public class OntologyPropertyVO {
     /** 属性名称 */
     private String name;
 
+    /** 属性描述（本体工作台属性编辑器） */
+    private String description;
+
     /** 属性类型（如 STRING / INTEGER / DECIMAL / DATE） */
     private String propertyType;
 

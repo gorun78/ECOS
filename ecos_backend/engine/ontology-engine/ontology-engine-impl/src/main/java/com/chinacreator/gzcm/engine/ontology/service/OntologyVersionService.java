@@ -3,7 +3,6 @@ package com.chinacreator.gzcm.engine.ontology.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -36,7 +35,6 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
 public class OntologyVersionService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyVersionService.class);
-    private static final AtomicInteger ID_SEQ = new AtomicInteger(5000);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final OntologyVersionRepository versionRepository;
@@ -59,7 +57,8 @@ public class OntologyVersionService {
         this.eventBus = eventBus;
     }
 
-    private String nextId() { return "ver" + ID_SEQ.incrementAndGet(); }
+    /** 版本主键：库内最大后缀自增（重启安全）；方法级加锁避免并发取到同一序号。 */
+    private synchronized String nextId() { return versionRepository.nextId(); }
 
     public List<Map<String, Object>> listVersions(String ontologyId) {
         return versionRepository.findByOntology(ontologyId).stream()
@@ -461,15 +460,33 @@ public class OntologyVersionService {
         }
     }
 
+    /**
+     * 计算该本体的下一个版本号：取全部版本（含 Draft / Published）中的最大版本号，patch 位递增。
+     *
+     * <p>不可只依据 Published 版本 —— 存在未发布的 Draft 版本时会重复生成同一版本号，
+     * 撞唯一约束 {@code (ontology_id, version_no)}，导致提案执行失败。
+     *
+     * @param ontologyId 本体 ID
+     * @return 下一个版本号，如 {@code 1.0.1}；无历史版本时返回 {@code 1.0.0}
+     */
     private String computeNextVersion(String ontologyId) {
-        var latest = versionRepository.findLatestPublished(ontologyId);
-        if (latest.isEmpty()) return "1.0.0";
-        String[] parts = latest.get().getVersionNo().split("\\.");
-        int major = Integer.parseInt(parts[0]);
-        int minor = Integer.parseInt(parts[1]);
-        int patch = Integer.parseInt(parts[2]);
-        patch++;
-        return major + "." + minor + "." + patch;
+        return versionRepository.findByOntology(ontologyId).stream()
+            .map(OntologyVersion::getVersionNo)
+            .filter(no -> no != null && no.matches("\\d+\\.\\d+\\.\\d+"))
+            .max(Comparator.comparingLong(this::versionWeight))
+            .map(no -> {
+                String[] parts = no.split("\\.");
+                return parts[0] + "." + parts[1] + "." + (Integer.parseInt(parts[2]) + 1);
+            })
+            .orElse("1.0.0");
+    }
+
+    /** 版本号排序权重（major/minor/patch 加权，用于取最大值） */
+    private long versionWeight(String versionNo) {
+        String[] parts = versionNo.split("\\.");
+        return Long.parseLong(parts[0]) * 1_000_000L
+            + Long.parseLong(parts[1]) * 1_000L
+            + Long.parseLong(parts[2]);
     }
 
     private Map<String, Object> entityToSnapshot(OntologyEntity e) {

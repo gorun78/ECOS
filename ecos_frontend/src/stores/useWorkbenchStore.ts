@@ -352,7 +352,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           const entities = await fetchEntities(ontologyId);
           let relationships: Relationship[] = [];
           try {
-            relationships = await fetchRelationships(ontologyId);
+            relationships = await fetchRelationships();
           } catch {
             // 关系API可能不存在，忽略
             console.warn('fetchRelationships failed for ontology:', ontologyId);
@@ -622,7 +622,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         set({ error: null });
         try {
           const ontologyId = get().currentOntologyId;
-          const newRel = await apiCreateRelationship(data, ontologyId);
+          const newRel = await apiCreateRelationship(data);
 
           set((state) => {
             const relationships = [...state.relationships, newRel];
@@ -659,7 +659,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           const ontologyId = get().currentOntologyId;
           const relToDelete = get().relationships.find((r) => r.id === relId);
           const relName = relToDelete?.name || relId;
-          await apiDeleteRelationship(relId, ontologyId);
+          await apiDeleteRelationship(relId);
 
           set((state) => ({
             relationships: state.relationships.filter(

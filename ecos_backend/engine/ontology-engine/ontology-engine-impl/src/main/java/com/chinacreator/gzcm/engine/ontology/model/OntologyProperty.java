@@ -11,6 +11,8 @@ public class OntologyProperty {
     private String entityId;
     private String code;
     private String name;
+    /** 属性描述（本体工作台属性编辑器，对应 description 列） */
+    private String description;
     private String propertyType;
     private int requiredFlag;
     private int searchableFlag;
@@ -41,6 +43,9 @@ public class OntologyProperty {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public String getPropertyType() { return propertyType; }
     public void setPropertyType(String propertyType) { this.propertyType = propertyType; }

@@ -5,7 +5,7 @@
 import React from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
-import { Plus, Key, X } from 'lucide-react';
+import { Plus, Key, X, CircleDot } from 'lucide-react';
 import type { PropertiesTabProps } from './types';
 
 export default function PropertiesTab({
@@ -13,7 +13,7 @@ export default function PropertiesTab({
   newPropName, setNewPropName,
   newPropType, setNewPropType,
   handleAddProperty,
-  handleTogglePrimaryKey,
+  handleTogglePropertyFlag,
   handlePropertyFieldChange,
   handleRemoveProperty,
   sharedProperties,
@@ -63,6 +63,7 @@ export default function PropertiesTab({
           <thead>
             <tr className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.sidebarText} font-medium`}>
               <th className="py-2.5 px-4 w-12 text-center">{t('ow.label.primaryKey')}</th>
+              <th className="py-2.5 px-4 w-12 text-center">{t('ow.label.required')}</th>
               <th className="py-2.5 px-4">{t('ow.label.displayName')}</th>
               <th className="py-2.5 px-4">{t('ow.label.apiFieldName')}</th>
               <th className="py-2.5 px-4">{t('ow.label.dataType')}</th>
@@ -76,7 +77,7 @@ export default function PropertiesTab({
               <tr key={prop.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="py-2.5 px-4 text-center">
                   <button
-                    onClick={() => handleTogglePrimaryKey(prop.id)}
+                    onClick={() => handleTogglePropertyFlag(prop.id, 'isPrimaryKey')}
                     className={`p-1.5 rounded-full transition-colors ${
                       objectType.primaryKey === prop.id
                         ? 'text-amber-500 hover:bg-amber-50'
@@ -85,6 +86,19 @@ export default function PropertiesTab({
                     title={objectType.primaryKey === prop.id ? t('ow.btn.currentPrimaryKey') : t('ow.btn.setPrimaryKey')}
                   >
                     <Key size={14} className={objectType.primaryKey === prop.id ? 'fill-amber-500' : ''} />
+                  </button>
+                </td>
+                <td className="py-2.5 px-4 text-center">
+                  <button
+                    onClick={() => handleTogglePropertyFlag(prop.id, 'required')}
+                    className={`p-1.5 rounded-full transition-colors ${
+                      prop.required
+                        ? 'text-rose-500 hover:bg-rose-50'
+                        : `${styles.cardTextMuted} opacity-30 hover:opacity-60 ${styles.sidebarHoverBg}`
+                    }`}
+                    title={prop.required ? t('ow.btn.unsetRequired') : t('ow.btn.setRequired')}
+                  >
+                    <CircleDot size={14} />
                   </button>
                 </td>
                 <td className="py-2.5 px-4">

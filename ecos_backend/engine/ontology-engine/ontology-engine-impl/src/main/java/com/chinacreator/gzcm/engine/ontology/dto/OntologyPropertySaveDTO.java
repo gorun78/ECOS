@@ -18,6 +18,9 @@ public class OntologyPropertySaveDTO {
     /** 属性名称（新增必填） */
     private String name;
 
+    /** 属性描述（null=不更新；空串=清空） */
+    private String description;
+
     /** 属性类型（默认 STRING） */
     private String propertyType;
 

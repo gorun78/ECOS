@@ -278,19 +278,27 @@ export interface UpdateEntityDTO {
 export interface CreatePropertyDTO {
   code: string;
   name: string;
+  /** 属性描述（本体工作台属性编辑器） */
+  description?: string;
   propertyType: string;
   requiredFlag?: number;
+  /** 唯一/主键标识：1=主键(唯一)，0=普通属性 */
+  uniqueFlag?: number;
   searchableFlag?: number;
   sortOrder?: number;
   functionType?: string;
   functionExpression?: string;
 }
 
-/** 更新属性请求体 */
+/** 更新属性请求体（字段缺省或 null 表示不更新，遵循后端 COALESCE 语义） */
 export interface UpdatePropertyDTO {
   name?: string;
+  /** 属性描述（空串=清空） */
+  description?: string;
   propertyType?: string;
   requiredFlag?: number;
+  /** 唯一/主键标识：1=主键(唯一)，0=普通属性 */
+  uniqueFlag?: number;
   searchableFlag?: number;
   sortOrder?: number;
   functionType?: string;
