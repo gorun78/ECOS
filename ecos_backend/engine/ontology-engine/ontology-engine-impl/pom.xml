@@ -21,12 +21,15 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- PMO-57 T3 (2026-09-13): 反向依赖断链 — 删除 buszhi-impl 依赖。
-             原历史残留（阶段5 worldmodel→buszhi 已吸收，源码 0 import），
-             实际 import 面仅 workflow 双 Controller（workflow 业务按架构铁律
-             §0.3.1 归 buszhi 服务层），随 PMO-57 T2 物理删除后本模块
-             0 处 buszhi import，引擎层不再引用任何服务层 artifact。
-             workflow 端点单点 = buszhi 侧 /api/v1/ecos/workflows。 -->
+        <!-- dccheng-api/impl + worldmodel-impl: 阶段 5 已吸收 —
+             dccheng→自身 (cognitive 内部吸收), worldmodel→buszhi
+             (源码已 0 import com.chinacreator.gzcm.{dccheng,worldmodel},
+              pom 只是历史残留 dependency)。Wave-10 CI root-cause. -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>buszhi-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
 
         <!-- Spring Boot Web -->
         <dependency>

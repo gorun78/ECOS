@@ -13,9 +13,6 @@ public final class KafkaTopics {
     public static final String WORKFLOW = "ecos.workflow";
     public static final String AGENT = "ecos.agent";
     public static final String KNOWLEDGE = "ecos.knowledge";
-    /** PMO-59 Phase 1 (ADR-9 心智层): 认知心智状态事件专用 topic — 新证据冲击/假设失效/不确定性判断更新
-     *  (dccheng cognitive 生产, 订阅方 Phase 2+ 接入; 本 Phase 仅登记常量, 无生产/消费代码)。 */
-    public static final String COGNITIVE = "ecos.cognitive";
     public static final String AUDIT = "ecos.audit";
 
     public static String topicForAggregate(String aggregateType) {

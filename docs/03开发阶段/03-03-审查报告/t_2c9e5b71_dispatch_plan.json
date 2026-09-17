@@ -1,0 +1,18 @@
+{
+  "task_id": "t_2c9e5b71",
+  "artifact_type": "SOURCE_PATCH",
+  "workflow_mode": "L2",
+  "artifact_ref": "release/v2.1-alpha 追加批次（② 数据工作台「数据质量」菜单直跳数据质量中心并移除质量检测页 commit 2f22c55；③ 数据质量中心规则中心统一读取 ecos_dq_rule_v2 真实规则并收敛为只读 commit b9ed62d）",
+  "dispatched_at": "2026-09-16T22:25:00+08:00",
+  "targets": [
+    {
+      "skill": "reviewer-code-review",
+      "artifact": "SOURCE_PATCH(dq-entry-collapse-and-rule-center-same-source)",
+      "mode": "full",
+      "order": 1
+    }
+  ],
+  "expected_outputs": ["REVIEW_REPORT", "REVIEW_COMMENT"],
+  "final_gate_logic": "AND_ALL",
+  "notes": "L2 标准模式全量审查。审查范围 git diff 70bd48f..HEAD（11 files changed, 148 insertions(+), 873 deletions(-)）：2f22c55（7 文件，+27/-457，含物理删除 HealthTab.tsx 224 行、AddHealthCheckModal、DataHealthCheck 类型、DataLineageTabProps 死接口、data-workbench DQ 适配层）与 b9ed62d（4 文件，+121/-416，RuleCenterTab.tsx 由治理端点切 legacy 只读端点并移除全部写操作 UI）。重点：① 需求逐条落地核验（菜单直跳 + 同源数据）；② 铁律 §4.1/§4.2/§4.3/§4.8 与 §5.1 禁止清单（#11 编译门、#12 列表摘要渲染编辑态）；③ API 只增不改（纯前端批次，须确认未触碰后端三滤波器）；④ 死代码残留（HealthTab / AddHealthCheckModal / healthChecks / DataHealthCheck / DQ 适配层 / 治理写操作引用）；⑤ 安全面（无敏感信息、无 token 打印、未放宽鉴权）；⑥ 回归风险（筛选恒空、?table= 深链恒空、状态机按钮报错）。另需独立复跑前端编译门并核对是否夹带其他并发会话改动（ontology 5 文件）。"
+}

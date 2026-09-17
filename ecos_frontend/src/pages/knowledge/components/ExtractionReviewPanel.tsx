@@ -9,13 +9,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   Check, X, Edit3, RotateCw, ChevronDown, Network, ShieldAlert,
-  Layers, Send, Ban, CheckSquare, Square, FileText, Sparkles,
+  Layers, Send, Ban, CheckSquare, Square, FileText,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { apiFetch } from '../../../api';
-import { promoteToCandidate } from '../services/knowledgeApi';
 
 // ── XSS Whitelist: Only allow <mark> highlight tags ────────────────────────
 
@@ -66,7 +65,6 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [promoting, setPromoting] = useState(false);
   const [done, setDone] = useState(false);
 
   // Highlight source text with entity names
@@ -132,22 +130,6 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
     finally { setSubmitting(false); }
   }, [extractionId]);
 
-  // PMO-50 T5: 抽取反哺——将选中实体转为候选本体
-  const handlePromoteToCandidate = useCallback(async () => {
-    if (!selectedEntities.length) return;
-    setPromoting(true);
-    try {
-      await promoteToCandidate({
-        entities: selectedEntities.map(e => ({ name: e.name, type: e.type })),
-        sourceExtractionId: extractionId,
-      });
-    } catch (e: any) {
-      console.warn('Promote to candidate failed:', e);
-    } finally {
-      setPromoting(false);
-    }
-  }, [extractionId, selectedEntities]);
-
   const tabItems: Array<{key:'entities'|'relations'|'rules';labelKey:string;Icon:typeof Network;count:number}> = [
     { key:'entities', labelKey:'extractReview.tabs.entities', Icon: Layers, count: entities.length },
     { key:'relations', labelKey:'extractReview.tabs.relations', Icon: Network, count: relations.length },
@@ -176,12 +158,6 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
         </button>
         <div className="flex items-center gap-2">
           <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('extractReview.selected', { n: totalSelected })}</span>
-          <button onClick={handlePromoteToCandidate} disabled={promoting || selectedEntities.length === 0}
-            title={t('extractReview.promoteToCandidate', { n: selectedEntities.length })}
-            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
-            {promoting ? <RotateCw size={11} className="animate-spin" /> : <Sparkles size={11} />}
-            {t('extractReview.promoteToCandidate', { n: selectedEntities.length })}
-          </button>
           <button onClick={handleReject} disabled={submitting}
             className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
             <Ban size={11} /> {t('extractReview.rejectAll')}

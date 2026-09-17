@@ -20,11 +20,14 @@ import {
   Hash,
   Info,
   Layers,
+  ListChecks,
   Loader2,
   RefreshCw,
   Send,
   ShieldCheck,
+  ShieldOff,
   Tag,
+  Target,
   X,
   XCircle,
 } from "lucide-react";
@@ -90,8 +93,29 @@ function StatusBadge({ t, status }: { t: (k: string) => string; status: string }
   );
 }
 
+/**
+ * 规则类型 → 图标映射
+ * 同时覆盖 legacy 端点（ecos_dq_rule_v2 的 rule_type：NOT_NULL/COMPLETENESS/VALIDITY/
+ * UNIQUENESS/ACCURACY/CONSISTENCY）与治理端点枚举（Phase 2 复用）；
+ * 未命中键由调用点 `?? FileText` 兜底为通用图标。
+ */
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  NULL: FileText, UNIQUE: Fingerprint, REFRESH: Clock, FRESHNESS: Clock, RANGE: Hash, FORMAT: FileText, CUSTOM: Tag, DEFAULT: FileText,
+  // legacy 端点枚举
+  NOT_NULL: ShieldOff,
+  COMPLETENESS: ListChecks,
+  VALIDITY: ShieldCheck,
+  UNIQUENESS: Fingerprint,
+  ACCURACY: Target,
+  CONSISTENCY: GitBranch,
+  TIMELINESS: Clock,
+  FRESHNESS: Clock,
+  // 治理端点枚举（Phase 2 复用）
+  NULL: FileText,
+  UNIQUE: Fingerprint,
+  REFRESH: Clock,
+  RANGE: Hash,
+  FORMAT: FileText,
+  CUSTOM: Tag,
 };
 
 /** 状态筛选可选值 — legacy enabled 只有两种取值（对应 ACTIVE / DISABLED） */
@@ -306,13 +330,27 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
   );
 }
 
+/**
+ * 严重度 → 主题语义级别映射
+ * 同时覆盖 legacy 端点（HIGH/MEDIUM/LOW）与治理端点（CRITICAL/WARNING/INFO）两套枚举；
+ * 未命中键（含空值）落到 success 系列兜底。
+ */
+const SEVERITY_LEVEL: Record<string, "danger" | "warning" | "info"> = {
+  CRITICAL: "danger",
+  HIGH: "danger",
+  WARNING: "warning",
+  MEDIUM: "warning",
+  INFO: "info",
+  LOW: "info",
+};
+
 /** 行内严重度徽章（紧凑版本，主题色） */
 function SeverityInline({ styles, severity }: { styles: ReturnType<typeof useTheme>["styles"]; severity?: string }) {
-  const s = (severity ?? "").toUpperCase();
+  const level = SEVERITY_LEVEL[(severity ?? "").toUpperCase()];
   const cls =
-    s === "CRITICAL" ? `${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder}`
-    : s === "WARNING" ? `${styles.warningBg} ${styles.warningText} border ${styles.warningBorder}`
-    : s === "INFO" ? `${styles.infoBg} ${styles.infoText} border ${styles.infoBorder}`
+    level === "danger" ? `${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder}`
+    : level === "warning" ? `${styles.warningBg} ${styles.warningText} border ${styles.warningBorder}`
+    : level === "info" ? `${styles.infoBg} ${styles.infoText} border ${styles.infoBorder}`
     : `${styles.successBg} ${styles.successText} border ${styles.successBorder}`;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>{severity || "-"}</span>;
 }

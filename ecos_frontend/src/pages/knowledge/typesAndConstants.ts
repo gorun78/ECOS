@@ -98,14 +98,6 @@ export interface SyncLog {
   operation: string;
   status: string;
   message: string;
-  /** PMO-50 T2: kg_sync_log.job_id（V115 持久化后回填） */
-  jobId?: string;
-  /** PMO-50 T2: kg_sync_log.nodes */
-  nodes?: number;
-  /** PMO-50 T2: kg_sync_log.edges */
-  edges?: number;
-  /** PMO-50 T2: kg_sync_log.error_message */
-  errorMessage?: string;
 }
 
 /**
@@ -237,55 +229,62 @@ export const KB_EVAL_LEVELS = [1, 2, 3, 4, 5] as const;
 
 // ── Tab structure ─────────────────────────────────────────────────────────────
 
-/**
- * 知识工作台 6 分组 / 15 Tab 结构。
- * 文案一律由 i18n 提供：分组名 `knowledge.group.<group.id>`、子项名 `knowledge.nav.<tab.id>`，
- * 本常量只保留结构信息（id / icon），禁止内联文案。
- */
 export const KNOWLEDGE_TAB_GROUPS = [
   {
     id: 'overview',
+    labelZh: '总览',
+    label: 'Overview',
     tabs: [
-      { id: 'overview' as const, icon: 'LayoutDashboard' as const },
+      { id: 'overview' as const, labelZh: '总览', label: 'Overview', icon: 'LayoutDashboard' as const },
     ],
   },
   {
     id: 'ingest',
+    labelZh: '知识摄入',
+    label: 'Ingest',
     tabs: [
-      { id: 'import' as const, icon: 'Download' as const },
-      { id: 'upload' as const, icon: 'FileText' as const },
-      { id: 'review' as const, icon: 'ListChecks' as const },
+      { id: 'import' as const, labelZh: '数据导入', label: 'Data Import', icon: 'Download' as const },
+      { id: 'upload' as const, labelZh: '知识抽取', label: 'Extraction Upload', icon: 'FileText' as const },
+      { id: 'review' as const, labelZh: '抽取审核', label: 'Extraction Review', icon: 'ListChecks' as const },
     ],
   },
   {
     id: 'model',
+    labelZh: '知识建模',
+    label: 'Knowledge Model',
     tabs: [
-      { id: 'ontology_model' as const, icon: 'Workflow' as const },
-      { id: 'graph_build' as const, icon: 'Database' as const },
-      { id: 'vector_index' as const, icon: 'Binary' as const },
-      { id: 'classification' as const, icon: 'Tag' as const },
+      { id: 'ontology_model' as const, labelZh: '本体模型', label: 'Ontology Model', icon: 'Workflow' as const },
+      { id: 'graph_build' as const, labelZh: '图谱构建', label: 'Graph Build', icon: 'Database' as const },
+      { id: 'vector_index' as const, labelZh: '向量库', label: 'Vector Index', icon: 'Binary' as const },
+      { id: 'classification' as const, labelZh: '分类体系', label: 'Classification', icon: 'Tag' as const },
     ],
   },
   {
     id: 'retrieval',
+    labelZh: '检索与评估',
+    label: 'Retrieval & Eval',
     tabs: [
-      { id: 'rag' as const, icon: 'Zap' as const },
-      { id: 'graph_explorer' as const, icon: 'Network' as const },
-      { id: 'rules' as const, icon: 'ShieldCheck' as const },
-      { id: 'eval' as const, icon: 'Gauge' as const },
+      { id: 'rag' as const, labelZh: 'RAG 实验台', label: 'RAG Lab', icon: 'Zap' as const },
+      { id: 'graph_explorer' as const, labelZh: '图谱探索', label: 'Graph Explorer', icon: 'Network' as const },
+      { id: 'rules' as const, labelZh: '规则库', label: 'Rule Repository', icon: 'ShieldCheck' as const },
+      { id: 'eval' as const, labelZh: '质量评测', label: 'Knowledge Eval', icon: 'Gauge' as const },
     ],
   },
   {
     id: 'operate',
+    labelZh: '运营与合规',
+    label: 'Operate & Comply',
     tabs: [
-      { id: 'lifecycle' as const, icon: 'GitBranch' as const },
-      { id: 'compliance' as const, icon: 'Shield' as const },
+      { id: 'lifecycle' as const, labelZh: '生命周期', label: 'Lifecycle', icon: 'GitBranch' as const },
+      { id: 'compliance' as const, labelZh: '合规检查', label: 'Compliance Check', icon: 'Shield' as const },
     ],
   },
   {
     id: 'config',
+    labelZh: '系统配置',
+    label: 'Configuration',
     tabs: [
-      { id: 'engine_config' as const, icon: 'Settings' as const },
+      { id: 'engine_config' as const, labelZh: '引擎配置', label: 'Engine Config', icon: 'Settings' as const },
     ],
   },
 ] as const;

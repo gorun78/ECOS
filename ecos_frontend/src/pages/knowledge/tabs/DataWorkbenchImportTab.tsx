@@ -125,7 +125,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-4 gap-3`}>
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 ${styles.cardBorder} pb-4 gap-3`}>
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <Download size={16} className="text-blue-600" />
@@ -144,14 +144,14 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* 左侧：数据源清单 */}
-        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden`}>
-          <div className={`px-4 py-3 border-b ${styles.appBorder} flex items-center justify-between`}>
+        <div className={`${styles.cardBg} border border-slate-200 ${styles.cardBorder} rounded-xl overflow-hidden`}>
+          <div className={`px-4 py-3 border-b border-slate-100 ${styles.appBorder} flex items-center justify-between`}>
             <span className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
               <Database size={13} className="text-indigo-500" /> {tl('数据源', 'Data Sources')} ({sources.length})
             </span>
             <span className={`text-[9px] font-mono ${styles.muted}`}>/api/integration/metadata</span>
           </div>
-          <div className={`divide-y ${styles.divider} max-h-[460px] overflow-y-auto`}>
+          <div className={`divide-y divide-slate-100 ${styles.sidebarBorder} max-h-[460px] overflow-y-auto`}>
             {isLoading ? (
               <div className={`p-10 text-center ${styles.muted} text-xs`}>{tl('加载中...', 'Loading...')}</div>
             ) : sources.length === 0 ? (
@@ -178,11 +178,11 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
               </button>
             ))}
           </div>
-          <div className={`p-3 border-t ${styles.appBorder}`}>
+          <div className={`p-3 border-t border-slate-100 ${styles.appBorder}`}>
             <button
               onClick={handleEnqueue}
               disabled={!selectedSource}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:cursor-not-allowed"
             >
               <Plus size={12} /> {tl('并入摄入队列', 'Enqueue to Import Queue')}
             </button>

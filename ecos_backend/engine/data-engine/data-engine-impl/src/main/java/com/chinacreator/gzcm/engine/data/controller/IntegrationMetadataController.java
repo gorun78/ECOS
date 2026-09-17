@@ -13,12 +13,6 @@ import java.util.Map;
  *
  * <p>路径保持前端兼容（knowledgeApi 走 /api/v1/integration/**，gateway 重写到 /api/integration）：</p>
  * <ul>
- *   <li>GET  /api/integration/metadata        — 联邦元数据聚合
- *       （connections/sources 查 td_datasource、syncTasks 查 ecos_pipeline_task、lineage 查血缘
- *       持久化表、simulationState）</li>
- *   <li>GET  /api/integration/metadata/drift  — Schema 漂移样本
- *       （schemaDelta/fields 来自 DQ 检查结论，sample=true 时附 dq_rule_check.sample_failures
- *       真实样本行，lineage 为真实血缘概览）</li>
  *   <li>GET  /api/integration/logs            — 真实审计日志（td_audit_log / ecos_audit_log /
  *       ecos_object_timeline 优先级回退，time range + limit 过滤，时间倒序）</li>
  *   <li>POST /api/integration/metadata/drift  — 真实 Schema 漂移 / SLA 断流检测
@@ -38,30 +32,6 @@ public class IntegrationMetadataController {
 
     public IntegrationMetadataController(IntegrationMetadataService integrationMetadataService) {
         this.integrationMetadataService = integrationMetadataService;
-    }
-
-    /**
-     * GET /api/integration/metadata — 联邦元数据聚合载荷。
-     *
-     * <p>返回 connections / sources / syncTasks / lineage / simulationState，全部取自真实表。</p>
-     */
-    @org.springframework.web.bind.annotation.GetMapping("/metadata")
-    public ApiResponse<Map<String, Object>> fetchIntegrationMetadata() {
-        return ApiResponse.success(integrationMetadataService.fetchIntegrationMetadata());
-    }
-
-    /**
-     * GET /api/integration/metadata/drift — Schema 漂移样本。
-     *
-     * @param sample 是否附带真实样例行（可选，缺省不附）
-     * @param dsId   数据源 ID（可选，前端契约参数）
-     */
-    @org.springframework.web.bind.annotation.GetMapping("/metadata/drift")
-    public ApiResponse<Map<String, Object>> fetchMetadataDrift(
-            @org.springframework.web.bind.annotation.RequestParam(name = "sample", required = false) Boolean sample,
-            @org.springframework.web.bind.annotation.RequestParam(name = "dsId", required = false) String dsId) {
-        boolean withSample = sample != null && sample;
-        return ApiResponse.success(integrationMetadataService.fetchDriftSample(withSample, dsId));
     }
 
     /**

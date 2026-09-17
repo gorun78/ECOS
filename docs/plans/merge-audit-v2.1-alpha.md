@@ -720,3 +720,73 @@
 1. **内容签名的残余边界**：`loadedDefKey` 以 `nodes.length` 为签名。当前**无任何代码路径**会在同一 `id` 下重取详情，故实际不触发；若后续为编辑器加「同管道详情重取」，须改为更细签名（如 `id#nodes.length#updatedAt`）。
 2. **页面标题仍为旧长名**：`dw.txt.102168`（数据源与物理连接）、`dw.txt.1b23b5`（数据质量健康检测）、`dw.txt.0f541b`（全链路数据血缘地图）为**页面标题类 key**，非菜单项，本次未改（用户仅要求菜单名）。如需统一需另行确认。
 3. 上一批次遗留项全部保持开放：S-204（`lineage-smoke.mjs` 硬编码 dev 凭据）、Wave 2 收敛清单、`ClearanceInterceptor` blanket 豁免、`#/ontology_workbench` 实体属性端点 404。
+
+### 12.12 追加批次（2026-09-16 数据质量入口收敛与规则中心同源）
+
+**来源**：用户直派指令（原文）：
+> 数据工作台：
+> 1、点击数据质量直接进入数据质量中心，目前数据质量检测去掉；
+> 2、数据质量中心的规则中心与现有数据质量页面中显示的规则保持同一数据来源
+
+**已裁定方案**：① 侧边「数据质量」直接跳 `/dq_dashboard` 并**删除** HealthTab（数据质量检测）；② 规则中心统一读 **legacy 端点 `GET /api/v1/ecos/dq/rules`**（与数据质量页同源），治理端点就绪前**隐藏写操作 UI**。
+
+#### 12.12.1 需求逐条落地表
+
+| # | 需求 | 落地文件 | 关键实现 | 判定 |
+|:--|:--|:--|:--|:--|
+| 1 | 「数据质量」直跳数据质量中心 | `DataWorkbenchLayout.tsx:54,100,102` | `TAB_CONFIG` 该项加 `navigateTo: '/dq_dashboard'`；新增 `SideTabItem` 结构；`active = !tab.navigateTo && activeTab === tab.id`（跨路由项不参与选中态）；`onClick` 分流 `navigate()` / `setActiveTab()` | ✅ |
+| 1′ | 「数据质量检测」去掉 | `tabs/HealthTab.tsx`（物理删除 224 行）、`Modals.tsx`（删 `AddHealthCheckModal`）、`useDataWorkbench.ts`（删 `healthChecks/selCheckId/showAddCheck/nh*` 与 `createHealth/runCheck`）、`types.ts`（删 `DataHealthCheck`）、`lineage/types.ts`（删死接口 `DataLineageTabProps`）、`api.ts`（删 DQ 适配层 `mapDqRule/mapDqStatus/mapDqCheckType/fetchDataHealthChecks/createHealthCheck/runHealthCheck` 与 `DQ_RULES` 常量） | 全链清理，`TabName` 联合类型同步收敛为 4 项 | ✅ |
+| 2 | 规则中心与数据质量页同源 | `data-quality/api.ts:28,144`、`RuleCenterTab.tsx` | 新增 `DQ_LEGACY_BASE='/api/v1/ecos/dq'` + `fetchEcosDqRules()`（`enabled`→`ACTIVE/DISABLED`，legacy 缺失的 `ruleCode/category/domain/targetKind` 留空不编造）；筛选改前端内存过滤（类型选项由数据动态派生 + 状态 + 关键词），移除业务域筛选；写操作 UI 全隐藏 + 只读提示；表格收敛为 序号/规则名称/类型/严重度/状态 | ✅ |
+| 2′ | 附带修复 | `data-quality/api.ts` 头注释 | 修复 `*/` 提前闭合块注释导致的 40 处 tsc 语法错误（编译门必要项，非越界） | ✅ |
+
+#### 12.12.2 关键事实与根因（含 404 根因**订正**）
+
+1. **【订正】`GET /api/v1/dq/rules` 的 404 不是路由/组件扫描问题，而是服务层异常被兜底成 404**。本批次审查给出确定性证据链（带 admin JWT 实测）：
+
+| 步骤 | 实测 | 排除项 |
+|:--|:--|:--|
+| ① `GET /api/v1/dq/rules/dimension-registry`（**同 Controller** `DqGovernanceController`） | **200** + 6 维度数据 | 排除「组件扫描 / 路由未注册 / 三滤波器 403」 |
+| ② `GET /api/v1/dq/rules/xyz` | **404** + `"DQ 规则 xyz 不存在"` | 排除「Mapper/Service Bean 不可用」——`findById` 已执行并返回 null |
+| ③ `GET /api/v1/dq/rules?pageSize=201` | **400** + `"DQ 规则列表 pageSize 上限 200"`（`DqGovernanceServiceImpl.java:61`） | **决定性**：`listRules` **已进入方法体**，异常发生在其后的 mapper 查询段 |
+| ④ `\d ecos_dq.dq_rule` | 表存在、列齐全（含 `is_deleted`） | 排除「表缺失 / 列不匹配」 |
+| ⑤ 手工执行 `listByFilter` 生成的完整 SQL | `(0 rows)` 正常返回 | **订正「表 0 行导致 404」的推测**——0 行应返回空页而非 404 |
+
+> 结论：404 响应体 `{"code":404,"message":"端点暂未开放或服务未就绪…"}` 与 `GlobalExceptionHandler.java:193-202` 的 `handleAny(Exception)` 兜底文案**逐字一致**，即异常被统一映射为 404。**未排除的唯一怀疑点**：`DqRuleMapper` 的两个 `@SelectProvider` 方法（`listByFilter`/`countByFilter`）运行期调用失败（典型为 provider 参数名解析 / `-parameters` 编译开关类问题）。因 gateway 无 logback 文件 appender（日志仅输出至启动终端），本次审查**无法钉死到具体行**，据实登记为未闭合项。
+
+2. **数据源同源已实测**：legacy `GET /api/v1/ecos/dq/rules` → 200，`data.data` 26 条，首行 `{"id":"26","name":"w8","ruleType":"NOT_NULL","severity":"HIGH","enabled":true}`；DB `ecos_dq_rule_v2` = 26 行（`rule_type`：NOT_NULL 18 / COMPLETENESS 3 / VALIDITY 2 / ACCURACY 1 / UNIQUENESS 1 / CONSISTENCY 1；`severity`：HIGH 21 / MEDIUM 3 / LOW 2；`enabled`：t 26/26）。`apiFetchData`（`src/api.ts:255`）已解外层 `.data`，`fetchEcosDqRules` 再取 `resp.data`，双包装解包层级正确。
+
+3. **运行态非陈旧部署**：gateway fat-jar mtime `2026-09-16 20:55:59`，java 进程 StartTime `2026-09-16 20:56:16` → 运行的即当前构建，上述 404 现象非旧包残留所致。
+
+#### 12.12.3 验证证据（lint / E2E / 探针）
+
+| 类别 | 项 | 结果 |
+|:--|:--|:--|
+| V3 编译门 | `cd ecos_frontend; npm run lint`（`tsc --noEmit`）——**审查独立复跑** | **exit 0** |
+| V4 浏览器 E2E（PM 执行，审查未复跑） | 侧栏 4 项 `['数据源连接','数据管道','数据质量','数据血缘','引擎配置']`；点「数据质量」→ `location.hash === '#/dq_dashboard'`；规则中心 `共 26 条 · 当前显示 26 条`，表格行 20（`PAGE_SIZE=20`）；表头 `['#','规则名称','类型','严重度','状态']`；前 3 行 `['1','w8','NOT_NULL','HIGH','生效']`、`['2','新规则','NOT_NULL','HIGH','生效']`、`['3','新规则','NOT_NULL','HIGH','生效']`；中/英双语 raw key 泄漏 0（English 表头 `['#','Rule Name','Type','Severity','Status']`）；只读提示可见、无「新建规则」按钮；`consoleErrors: []`、`badResponses: []` | 全 PASS |
+| 后端探针（审查独立执行，admin JWT） | `GET /api/v1/ecos/dq/rules` → **200**（total=26）；`GET /api/v1/dq/rules` → **404**（兜底文案）；`GET /api/v1/dq/rules/dimension-registry` → **200**；`GET /api/v1/dq/schedules` → **200**；`GET /api/v1/dq/rules/xyz` → **404**（"不存在"）；`GET /api/v1/dq/rules?pageSize=201` → **400**（"pageSize 上限 200"） | 见 12.12.2 证据链 |
+| 静态核查（审查独立执行） | `HealthTab\|AddHealthCheckModal\|DataHealthCheck\|healthChecks\|fetchDataHealthChecks\|createHealthCheck\|runHealthCheck\|mapDqRule\|DataLineageTabProps\|selCheckId\|showAddCheck\|nh*` 全库 grep → **No matches found**；`Test-Path …/tabs/HealthTab.tsx` → **False**；`dw.tab.health` 双语齐备（`dw/en.json:675` / `dw/zh-CN.json:680`）；新增 2 key（`ruleTypeAll`/`searchPlaceholderName`）zh+en 双边齐备；新增行零硬编码结构色/十六进制、零 `console.log`/token/`<svg>`/`dangerouslySetInnerHTML`；`git show --name-only` 11 文件全为 `ecos_frontend/**` | PASS |
+| 夹带核查 | `git diff --stat 70bd48f..HEAD` = 11 files；并发会话的 ontology 5 文件仅处工作区未暂存态（` M`），**未夹带** | PASS |
+| 门禁 | P0=0 / P1=0 / SECURITY=无 CRITICAL-HIGH / ARCH=无 P0-P1 违规 → **四门禁全 PASS，`deliverable_allowed = true`** | PASS |
+
+#### 12.12.4 本批次 commit 凭证（DONE 凭证 · 暂不推送）
+
+| commit | message | 文件 |
+|:--|:--|:--|
+| `2f22c55` | `feat(数据工作台): 数据质量菜单直跳数据质量中心并移除质量检测页` | `DataWorkbenchLayout.tsx`、`data-workbench/{Modals.tsx,api.ts,types.ts,hooks/useDataWorkbench.ts,lineage/types.ts}`、`tabs/HealthTab.tsx`（删除）——7 files, +27/-457 |
+| `b9ed62d` | `feat(数据质量): 规则中心统一读取 ecos_dq_rule_v2 真实规则并收敛为只读` | `data-quality/{RuleCenterTab.tsx,api.ts}`、`locales/dw/{zh-CN,en}.json`——4 files, +121/-416 |
+
+分支 `release/v2.1-alpha`；审查期间 `git diff --stat 70bd48f..HEAD` = 11 files changed, 148 insertions(+), 873 deletions(-)。
+
+**⚠ 审查期间 HEAD 前移（并发会话，**不在本批次范围**）**：审查收尾时重跑 `git log` 发现 HEAD 由 `b9ed62d` 前移至 `e480988`（`fix(本体工作台): 修复提案状态大小写不一致导致的徽章渲染崩溃`，5 files，+73/-26 —— 即审查被明令不得触碰的 ontology 5 文件，属**另一批次**）；`70bd48f..HEAD` 随之变为 16 files, 221 insertions(+), 899 deletions(-)。本批次门禁判定**仅覆盖 `2f22c55` + `b9ed62d` 的 11 文件**，`e480988` 未做审查，建议 PM 另立审查项。
+
+#### 12.12.5 遗留与建议
+
+1. **P2-1 治理端点 404 根因未闭合**（既有后端缺陷，非本批次引入）：建议取 gateway 控制台堆栈定位（或为 gateway 补 `logback-spring.xml` 文件 appender），修复 `DqRuleMapper` 两个 `@SelectProvider` 的运行期调用；并建议 `GlobalExceptionHandler.handleAny` 与真 404（`NoResourceFoundException`）分档——当前把「服务端异常」与「路由不存在」统一映射为 404，**掩盖真实根因**。该项为 **Phase 2 写操作的前置阻塞**。
+2. **P3-D1 `?table=` 深链静默失效**：`RuleCenterTab.tsx:126-130` 的「有 `targetTable` 才过滤」逻辑本身正确（避免恒空），但 `fetchEcosDqRules` 不填 `targetTable`（`api.ts:150-164`）→ `CatalogContextMenu.tsx:130` 的「配置DQ规则」跳转不再产生过滤效果。建议只读阶段补一行提示。
+3. **P3-D2 严重度配色失真**：`SeverityInline`（`RuleCenterTab.tsx:310-317`）仅识别 CRITICAL/WARNING/INFO，而 DB 实际为 HIGH 21/MEDIUM 3/LOW 2 → **21 条 HIGH 渲染为 success 绿**。建议补 HIGH/MEDIUM/LOW 映射。
+4. **P3-D3 类型图标失真**：`TYPE_ICONS`（`RuleCenterTab.tsx:93-95`）键与 legacy `rule_type`（NOT_NULL/COMPLETENESS/…）**无交集**，全部退化为 `FileText`，`DEFAULT` 为死键。建议改键为 6 维度。
+5. **P3-D4 孤儿组件与预留 API**：`RuleReviewDialog.tsx`、`VersionTimelineDrawer.tsx` 已无 importer（仅自引用）；`api.ts` 的 `fetchDqGovernanceRules`/`create`/`update`/`delete`/`dqRuleAction`/`fetchDqGovernanceVersions` 仅被这两者引用——属**有意保留待 Phase 2**，登记不阻断。
+6. **P3-D5 孤儿 i18n key**：`dw.dqRule.{newRule,categoryAll,domainAll,searchPlaceholder,deleteConfirm,delete,form.*}`、`dw.txt.209a45`、`databench.layout.toast.health*` 在写 UI/`AddHealthCheckModal` 移除后零引用；i18n 冗余不违反铁律，Phase 2 决策后统一清理或复用。
+7. 上一批次遗留项保持开放：S-204（`lineage-smoke.mjs` 硬编码 dev 凭据）、Wave 2 收敛清单、`ClearanceInterceptor` blanket 豁免、`#/ontology_workbench` 实体属性端点 404。
+
+> 审查制品：`docs/03开发阶段/03-03-审查报告/t_2c9e5b71_{dispatch_plan.json,review_report.md,review_approval_record.json}`（L2 全量，四门禁 PASS，`deliverable_allowed = true`）。

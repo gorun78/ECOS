@@ -83,7 +83,8 @@ interface KnowledgeViewProps {
 
 export default function KnowledgeView({ onBack, activeTab: controlledTab }: KnowledgeViewProps) {
   const { styles } = useTheme();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const isZh = locale === 'zh-CN';
   const [internalTab, setInternalTab] = useState<KnowledgeTabId>('overview');
   const [showToast] = useState(false);
   const [starred] = useState<Record<string, boolean>>({});
@@ -138,7 +139,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
             return (
               <div key={group.id} className="mb-3">
                 <div className="px-4 pb-1.5 text-[10px] font-mono tracking-wider uppercase opacity-50">
-                  {t(`knowledge.group.${group.id}`)}
+                  {isZh ? group.labelZh : group.label}
                 </div>
                 {groupTabs.map(tab => {
                   const isActive = activeTab === tab.id;
@@ -153,7 +154,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
                     >
                       <Star className="w-3.5 h-3.5 opacity-50" style={isActive ? { color: '#fff' } : {}} />
                       <span className="truncate">
-                        {t(`knowledge.nav.${tab.id}`)}
+                        {isZh ? tab.labelZh : tab.label}
                       </span>
                     </button>
                   );
@@ -182,7 +183,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
         >
           <div className="flex items-center gap-2 text-sm">
             <TabIcon className="w-4 h-4" />
-            <span className="font-medium">{activeGroup ? t(`knowledge.group.${activeGroup.id}`) : ''}</span>
+            <span className="font-medium">{activeGroup ? (isZh ? activeGroup.labelZh : activeGroup.label) : ''}</span>
             <span className="text-xs opacity-50">/</span>
             <span className="font-semibold">{t(`knowledge.nav.${activeTab}`)}</span>
           </div>

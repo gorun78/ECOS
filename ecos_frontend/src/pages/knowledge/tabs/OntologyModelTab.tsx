@@ -226,9 +226,9 @@ export default function OntologyModelTab() {
       {showExportModal && (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${styles.overlayBg} backdrop-blur-xs animate-fade-in`}>
           <div className={`${styles.cardBg} rounded-2xl max-w-2xl w-full border ${styles.cardBorder} shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
-            <div className="bg-[var(--card,#020617)] text-white p-4 flex items-center justify-between">
+            <div className="bg-slate-950 text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2"><Download size={15} className="text-blue-400" /><span className="font-black text-xs">{t("knowledge.ontologytab.rag_先验知识元数据包")}</span></div>
-              <button onClick={() => setShowExportModal(false)} className={`text-[var(--card,#94A3B8)] hover:text-white opacity-80 hover:opacity-100 font-bold cursor-pointer`}><X size={16} /></button>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white font-bold cursor-pointer"><X size={16} /></button>
             </div>
             <div className="p-5 overflow-y-auto space-y-4">
               <pre className={`p-4 ${styles.accentHover} ${styles.cardBorder} rounded-xl font-mono text-[9px] whitespace-pre-wrap leading-relaxed select-text max-h-[350px] overflow-y-auto`}>{exportedMarkdown}</pre>
