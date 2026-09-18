@@ -1,41 +1,60 @@
 /**
- * DataEngineConfigPanelTypes — 配置类型定义与分组构建
+ * DataEngineConfigPanelTypes — 配置类型定义与单项元数据
  * 从 DataEngineConfigPanel 拆分而来。
- * PMO-3J-T6: label/description 走 i18nKey；Doris 配置组三版本感知（standard 灰显）。
+ *
+ * 分层归属（段 / 子分区）由后端 GET /api/v1/engine/data/settings/groups 决定，
+ * 本文件只保留「单项元数据」（控件类型 / 默认值 / 枚举 / 灰显），避免分组双真相源。
+ * PMO-3J-T6: label/description 走 i18nKey；Doris 配置项三版本感知（standard 灰显）。
  * @license Apache-2.0
  */
 import React from 'react';
-import {
-  Cpu, Database, HardDrive, Workflow, ShieldCheck, GitBranch, Wrench,
-} from 'lucide-react';
+import { Database, Layers, Boxes, Wrench } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────
 
 /** ECOS 产品版本：standard（标准）/ enterprise（企业）/ flagship（旗舰） */
 export type EcosEdition = 'standard' | 'enterprise' | 'flagship';
 
-export interface ConfigItem {
-  key: string;
-  /** i18n key for the item label, resolved at render time via t() */
-  labelKey: string;
-  /** i18n key for the item description, resolved at render time via t() */
-  descriptionKey: string;
+/** 单项配置的类型元数据（不含分组信息 —— 分组由后端 /groups 驱动） */
+export interface ConfigItemMeta {
   type: 'string' | 'int' | 'float' | 'bool' | 'enum' | 'password';
   defaultValue: string | number | boolean;
-  options?: string[]; // for enum type
+  /** enum 类型的候选值 */
+  options?: string[];
   sensitive?: boolean;
-  subgroup: string;
   /** 运行时灰显标记（如 standard 版 Doris 配置） */
   disabled?: boolean;
   /** 灰显原因的 i18n key */
   disabledReasonKey?: string;
 }
 
+/** 面板中的单项配置 = 元数据（本地定义）+ 归属（后端注入） */
+export interface ConfigItem extends ConfigItemMeta {
+  /** config_key */
+  key: string;
+  /** 项标签 i18n key */
+  labelKey: string;
+  /** 项描述 i18n key */
+  descriptionKey: string;
+  /** 所属子分区 id（后端 /groups 注入），用于段内分区渲染 */
+  subgroup: string;
+}
+
+/** 段内子分区声明（顺序即渲染顺序） */
+export interface ConfigSubGroup {
+  id: string;
+  /** 子分区标签 i18n key */
+  labelKey: string;
+}
+
 export interface ConfigGroup {
-  id: string;       // subgroup key, e.g. "execution"
-  /** i18n key for the group label, resolved at render time via t() */
+  /** 段 id：near-source | dw | semantic | global */
+  id: string;
+  /** 段标签 i18n key */
   labelKey: string;
   icon: React.ReactNode;
+  /** 段内子分区；空数组时按 items 平铺渲染 */
+  subgroups: ConfigSubGroup[];
   items: ConfigItem[];
   modified: boolean;
 }
@@ -47,6 +66,20 @@ export interface ConfigValues {
 export interface DefaultValues {
   [key: string]: string | number | boolean;
 }
+
+// ── i18n key 生成器 ───────────────────────────────────────────
+
+/** 段标签 i18n key */
+export const groupLabelKey = (segmentId: string): string => `dw.cfg.group.${segmentId}`;
+
+/** 子分区标签 i18n key */
+export const subgroupLabelKey = (subgroupId: string): string => `dw.cfg.subgroup.${subgroupId}`;
+
+/** 配置项标签 i18n key */
+export const itemLabelKey = (configKey: string): string => `dw.cfg.label.${configKey}`;
+
+/** 配置项描述 i18n key */
+export const itemDescriptionKey = (configKey: string): string => `dw.cfg.desc.${configKey}`;
 
 // ── Edition detection ─────────────────────────────────────────
 
@@ -65,141 +98,153 @@ export function detectEdition(): EcosEdition {
   return 'standard';
 }
 
-/** Doris 配置项的 key 前缀，standard 版需灰显 */
-const DORIS_KEY_PREFIX = 'dw.execution.doris.';
 /** Doris 灰显原因 i18n key */
 const DORIS_DISABLED_REASON_KEY = 'dw.cfg.doris.disabledReason';
 
-// ── Config Item Definitions ──────────────────────────────────
+// ── 段图标 ────────────────────────────────────────────────────
+
+/** 段 id → 图标（图标仅用 lucide-react；未知段回退 Wrench） */
+const SEGMENT_ICONS: Record<string, React.ReactNode> = {
+  'near-source': <Database size={15} />,
+  dw: <Layers size={15} />,
+  semantic: <Boxes size={15} />,
+  global: <Wrench size={15} />,
+};
+
+/** 取段图标 */
+export function segmentIcon(segmentId: string): React.ReactNode {
+  return SEGMENT_ICONS[segmentId] ?? <Wrench size={15} />;
+}
+
+// ── 元数据构造器 ──────────────────────────────────────────────
+
+const bool = (defaultValue: boolean): ConfigItemMeta => ({ type: 'bool', defaultValue });
+const int = (defaultValue: number): ConfigItemMeta => ({ type: 'int', defaultValue });
+const float = (defaultValue: number): ConfigItemMeta => ({ type: 'float', defaultValue });
+const text = (defaultValue = ''): ConfigItemMeta => ({ type: 'string', defaultValue });
+const enumOf = (defaultValue: string, options: string[]): ConfigItemMeta =>
+  ({ type: 'enum', defaultValue, options });
+const password = (defaultValue: string): ConfigItemMeta =>
+  ({ type: 'password', defaultValue, sensitive: true });
+
+// ── 68 项单项元数据（与后端 DataEngineConfigController.DEFAULTS 对齐） ──
 
 /**
- * 构建配置分组。
+ * 构建单项元数据表：config_key → ConfigItemMeta。
+ * 数量与后端 DEFAULTS 一一对应（68 项），后端返回的每个 key 都能取到元数据。
+ *
  * @param edition 当前产品版本；standard 版时 Doris 配置项灰显。
  */
-export function buildConfigGroups(edition: EcosEdition = 'standard'): ConfigGroup[] {
-  const isDorisDisabled = edition === 'standard';
+export function buildItemMeta(edition: EcosEdition = 'standard'): Record<string, ConfigItemMeta> {
+  const meta: Record<string, ConfigItemMeta> = {};
+  const put = (key: string, m: ConfigItemMeta): void => {
+    meta[key] = m;
+  };
+  /** standard 版灰显包装（Doris 配置项） */
+  const doris = (m: ConfigItemMeta): ConfigItemMeta =>
+    edition === 'standard'
+      ? { ...m, disabled: true, disabledReasonKey: DORIS_DISABLED_REASON_KEY }
+      : m;
 
-  // 给 Doris 配置项附加 disabled + disabledReasonKey（standard 版）
-  const dorisItem = (
-    key: string,
-    labelKey: string,
-    descriptionKey: string,
-    type: ConfigItem['type'],
-    defaultValue: string | number | boolean,
-  ): ConfigItem => ({
-    key,
-    labelKey,
-    descriptionKey,
-    type,
-    defaultValue,
-    subgroup: 'execution',
-    disabled: isDorisDisabled ? true : undefined,
-    disabledReasonKey: isDorisDisabled ? DORIS_DISABLED_REASON_KEY : undefined,
-  });
+  // ── 近源层 · 数据湖 ──
+  put('dw.lake.enabled', bool(false));
+  put('dw.lake.datasource_id', text());
+  put('dw.lake.storage_format', enumOf('parquet', ['parquet', 'orc', 'avro']));
+  put('dw.lake.partition_by', text('dt'));
+  put('dw.lake.retention_days', int(90));
 
-  return [
-    {
-      id: 'execution',
-      labelKey: 'dw.cfg.group.execution',
-      icon: <Cpu size={15} />,
-      items: [
-        { key: 'dw.execution.mode', labelKey: 'dw.cfg.label.dw.execution.mode', descriptionKey: 'dw.cfg.desc.dw.execution.mode', type: 'enum', defaultValue: 'memory', options: ['memory', 'doris'], subgroup: 'execution' },
-        { key: 'dw.execution.memory.max_rows', labelKey: 'dw.cfg.label.dw.execution.memory.max_rows', descriptionKey: 'dw.cfg.desc.dw.execution.memory.max_rows', type: 'int', defaultValue: 100000, subgroup: 'execution' },
-        { key: 'dw.execution.memory.threads', labelKey: 'dw.cfg.label.dw.execution.memory.threads', descriptionKey: 'dw.cfg.desc.dw.execution.memory.threads', type: 'int', defaultValue: 4, subgroup: 'execution' },
-        dorisItem('dw.execution.doris.host', 'dw.cfg.label.dw.execution.doris.host', 'dw.cfg.desc.dw.execution.doris.host', 'string', 'localhost'),
-        dorisItem('dw.execution.doris.port', 'dw.cfg.label.dw.execution.doris.port', 'dw.cfg.desc.dw.execution.doris.port', 'int', 9030),
-        dorisItem('dw.execution.doris.user', 'dw.cfg.label.dw.execution.doris.user', 'dw.cfg.desc.dw.execution.doris.user', 'string', 'root'),
-        dorisItem('dw.execution.doris.database', 'dw.cfg.label.dw.execution.doris.database', 'dw.cfg.desc.dw.execution.doris.database', 'string', 'ecos_dw'),
-        dorisItem('dw.execution.doris.batch_size', 'dw.cfg.label.dw.execution.doris.batch_size', 'dw.cfg.desc.dw.execution.doris.batch_size', 'int', 10000),
-        { key: 'dw.execution.timeout', labelKey: 'dw.cfg.label.dw.execution.timeout', descriptionKey: 'dw.cfg.desc.dw.execution.timeout', type: 'int', defaultValue: 600, subgroup: 'execution' },
-      ],
-      modified: false,
-    },
-    {
-      id: 'data-lake',
-      labelKey: 'dw.cfg.group.data-lake',
-      icon: <Database size={15} />,
-      items: [
-        { key: 'dw.lake.enabled', labelKey: 'dw.cfg.label.dw.lake.enabled', descriptionKey: 'dw.cfg.desc.dw.lake.enabled', type: 'bool', defaultValue: false, subgroup: 'data-lake' },
-        { key: 'dw.lake.datasource_id', labelKey: 'dw.cfg.label.dw.lake.datasource_id', descriptionKey: 'dw.cfg.desc.dw.lake.datasource_id', type: 'string', defaultValue: '', subgroup: 'data-lake' },
-        { key: 'dw.lake.storage_format', labelKey: 'dw.cfg.label.dw.lake.storage_format', descriptionKey: 'dw.cfg.desc.dw.lake.storage_format', type: 'enum', defaultValue: 'parquet', options: ['parquet', 'orc', 'avro'], subgroup: 'data-lake' },
-        { key: 'dw.lake.partition_by', labelKey: 'dw.cfg.label.dw.lake.partition_by', descriptionKey: 'dw.cfg.desc.dw.lake.partition_by', type: 'string', defaultValue: 'dt', subgroup: 'data-lake' },
-        { key: 'dw.lake.retention_days', labelKey: 'dw.cfg.label.dw.lake.retention_days', descriptionKey: 'dw.cfg.desc.dw.lake.retention_days', type: 'int', defaultValue: 90, subgroup: 'data-lake' },
-      ],
-      modified: false,
-    },
-    {
-      id: 'object-storage',
-      labelKey: 'dw.cfg.group.object-storage',
-      icon: <HardDrive size={15} />,
-      items: [
-        { key: 'dw.storage.type', labelKey: 'dw.cfg.label.dw.storage.type', descriptionKey: 'dw.cfg.desc.dw.storage.type', type: 'enum', defaultValue: 'minio', options: ['minio', 's3', 'oss'], subgroup: 'object-storage' },
-        { key: 'dw.storage.minio.endpoint', labelKey: 'dw.cfg.label.dw.storage.minio.endpoint', descriptionKey: 'dw.cfg.desc.dw.storage.minio.endpoint', type: 'string', defaultValue: 'http://localhost:9000', subgroup: 'object-storage' },
-        { key: 'dw.storage.minio.access_key', labelKey: 'dw.cfg.label.dw.storage.minio.access_key', descriptionKey: 'dw.cfg.desc.dw.storage.minio.access_key', type: 'string', defaultValue: 'minioadmin', subgroup: 'object-storage' },
-        { key: 'dw.storage.minio.secret_key', labelKey: 'dw.cfg.label.dw.storage.minio.secret_key', descriptionKey: 'dw.cfg.desc.dw.storage.minio.secret_key', type: 'password', defaultValue: 'minioadmin', sensitive: true, subgroup: 'object-storage' },
-        { key: 'dw.storage.minio.bucket', labelKey: 'dw.cfg.label.dw.storage.minio.bucket', descriptionKey: 'dw.cfg.desc.dw.storage.minio.bucket', type: 'string', defaultValue: 'ecos-data', subgroup: 'object-storage' },
-        { key: 'dw.storage.minio.region', labelKey: 'dw.cfg.label.dw.storage.minio.region', descriptionKey: 'dw.cfg.desc.dw.storage.minio.region', type: 'string', defaultValue: 'us-east-1', subgroup: 'object-storage' },
-        { key: 'dw.storage.minio.ssl', labelKey: 'dw.cfg.label.dw.storage.minio.ssl', descriptionKey: 'dw.cfg.desc.dw.storage.minio.ssl', type: 'bool', defaultValue: false, subgroup: 'object-storage' },
-      ],
-      modified: false,
-    },
-    {
-      id: 'pipeline',
-      labelKey: 'dw.cfg.group.pipeline',
-      icon: <Workflow size={15} />,
-      items: [
-        { key: 'dw.pipeline.max_steps', labelKey: 'dw.cfg.label.dw.pipeline.max_steps', descriptionKey: 'dw.cfg.desc.dw.pipeline.max_steps', type: 'int', defaultValue: 20, subgroup: 'pipeline' },
-        { key: 'dw.pipeline.parallel_steps', labelKey: 'dw.cfg.label.dw.pipeline.parallel_steps', descriptionKey: 'dw.cfg.desc.dw.pipeline.parallel_steps', type: 'int', defaultValue: 4, subgroup: 'pipeline' },
-        { key: 'dw.pipeline.default_chunk_size', labelKey: 'dw.cfg.label.dw.pipeline.default_chunk_size', descriptionKey: 'dw.cfg.desc.dw.pipeline.default_chunk_size', type: 'int', defaultValue: 10000, subgroup: 'pipeline' },
-        { key: 'dw.pipeline.temp_table_prefix', labelKey: 'dw.cfg.label.dw.pipeline.temp_table_prefix', descriptionKey: 'dw.cfg.desc.dw.pipeline.temp_table_prefix', type: 'string', defaultValue: 'ecos_tmp_', subgroup: 'pipeline' },
-        { key: 'dw.pipeline.temp_table_ttl_hours', labelKey: 'dw.cfg.label.dw.pipeline.temp_table_ttl_hours', descriptionKey: 'dw.cfg.desc.dw.pipeline.temp_table_ttl_hours', type: 'int', defaultValue: 24, subgroup: 'pipeline' },
-        { key: 'dw.pipeline.retry_max', labelKey: 'dw.cfg.label.dw.pipeline.retry_max', descriptionKey: 'dw.cfg.desc.dw.pipeline.retry_max', type: 'int', defaultValue: 3, subgroup: 'pipeline' },
-        { key: 'dw.pipeline.retry_backoff_ms', labelKey: 'dw.cfg.label.dw.pipeline.retry_backoff_ms', descriptionKey: 'dw.cfg.desc.dw.pipeline.retry_backoff_ms', type: 'int', defaultValue: 5000, subgroup: 'pipeline' },
-      ],
-      modified: false,
-    },
-    {
-      id: 'quality',
-      labelKey: 'dw.cfg.group.quality',
-      icon: <ShieldCheck size={15} />,
-      items: [
-        { key: 'dw.quality.sample_rate', labelKey: 'dw.cfg.label.dw.quality.sample_rate', descriptionKey: 'dw.cfg.desc.dw.quality.sample_rate', type: 'float', defaultValue: 1.0, subgroup: 'quality' },
-        { key: 'dw.quality.sample_max_rows', labelKey: 'dw.cfg.label.dw.quality.sample_max_rows', descriptionKey: 'dw.cfg.desc.dw.quality.sample_max_rows', type: 'int', defaultValue: 1000000, subgroup: 'quality' },
-        { key: 'dw.quality.stale_threshold_hours', labelKey: 'dw.cfg.label.dw.quality.stale_threshold_hours', descriptionKey: 'dw.cfg.desc.dw.quality.stale_threshold_hours', type: 'int', defaultValue: 24, subgroup: 'quality' },
-        { key: 'dw.quality.default_alert_score', labelKey: 'dw.cfg.label.dw.quality.default_alert_score', descriptionKey: 'dw.cfg.desc.dw.quality.default_alert_score', type: 'int', defaultValue: 80, subgroup: 'quality' },
-        { key: 'dw.quality.concurrent_checks', labelKey: 'dw.cfg.label.dw.quality.concurrent_checks', descriptionKey: 'dw.cfg.desc.dw.quality.concurrent_checks', type: 'int', defaultValue: 2, subgroup: 'quality' },
-        { key: 'dw.quality.check_timeout', labelKey: 'dw.cfg.label.dw.quality.check_timeout', descriptionKey: 'dw.cfg.desc.dw.quality.check_timeout', type: 'int', defaultValue: 300, subgroup: 'quality' },
-      ],
-      modified: false,
-    },
-    {
-      id: 'lineage',
-      labelKey: 'dw.cfg.group.lineage',
-      icon: <GitBranch size={15} />,
-      items: [
-        { key: 'dw.lineage.enabled', labelKey: 'dw.cfg.label.dw.lineage.enabled', descriptionKey: 'dw.cfg.desc.dw.lineage.enabled', type: 'bool', defaultValue: true, subgroup: 'lineage' },
-        { key: 'dw.lineage.parser', labelKey: 'dw.cfg.label.dw.lineage.parser', descriptionKey: 'dw.cfg.desc.dw.lineage.parser', type: 'enum', defaultValue: 'sql', options: ['sql', 'spark', 'dbt'], subgroup: 'lineage' },
-        { key: 'dw.lineage.max_depth', labelKey: 'dw.cfg.label.dw.lineage.max_depth', descriptionKey: 'dw.cfg.desc.dw.lineage.max_depth', type: 'int', defaultValue: 10, subgroup: 'lineage' },
-        { key: 'dw.lineage.cache_ttl_minutes', labelKey: 'dw.cfg.label.dw.lineage.cache_ttl_minutes', descriptionKey: 'dw.cfg.desc.dw.lineage.cache_ttl_minutes', type: 'int', defaultValue: 30, subgroup: 'lineage' },
-        { key: 'dw.lineage.neo4j_enabled', labelKey: 'dw.cfg.label.dw.lineage.neo4j_enabled', descriptionKey: 'dw.cfg.desc.dw.lineage.neo4j_enabled', type: 'bool', defaultValue: false, subgroup: 'lineage' },
-      ],
-      modified: false,
-    },
-    {
-      id: 'general',
-      labelKey: 'dw.cfg.group.general',
-      icon: <Wrench size={15} />,
-      items: [
-        { key: 'dw.sync.batch_size', labelKey: 'dw.cfg.label.dw.sync.batch_size', descriptionKey: 'dw.cfg.desc.dw.sync.batch_size', type: 'int', defaultValue: 5000, subgroup: 'general' },
-        { key: 'dw.sync.max_retries', labelKey: 'dw.cfg.label.dw.sync.max_retries', descriptionKey: 'dw.cfg.desc.dw.sync.max_retries', type: 'int', defaultValue: 3, subgroup: 'general' },
-        { key: 'dw.query.max_rows', labelKey: 'dw.cfg.label.dw.query.max_rows', descriptionKey: 'dw.cfg.desc.dw.query.max_rows', type: 'int', defaultValue: 10000, subgroup: 'general' },
-        { key: 'dw.query.timeout', labelKey: 'dw.cfg.label.dw.query.timeout', descriptionKey: 'dw.cfg.desc.dw.query.timeout', type: 'int', defaultValue: 30, subgroup: 'general' },
-        { key: 'dw.cache.ttl_seconds', labelKey: 'dw.cfg.label.dw.cache.ttl_seconds', descriptionKey: 'dw.cfg.desc.dw.cache.ttl_seconds', type: 'int', defaultValue: 300, subgroup: 'general' },
-        { key: 'dw.engine.auto_start', labelKey: 'dw.cfg.label.dw.engine.auto_start', descriptionKey: 'dw.cfg.desc.dw.engine.auto_start', type: 'bool', defaultValue: true, subgroup: 'general' },
-        // 数据表目录历史版本保留份数（Git 元数据存档，超限自动清理最旧版本）
-        { key: 'dw.metadata.history_versions', labelKey: 'dw.cfg.label.dw.metadata.history_versions', descriptionKey: 'dw.cfg.desc.dw.metadata.history_versions', type: 'int', defaultValue: 50, subgroup: 'general' },
-      ],
-      modified: false,
-    },
-  ];
+  // ── 近源层 · 对象存储 ──
+  put('dw.storage.type', enumOf('minio', ['minio', 's3', 'oss']));
+  put('dw.storage.minio.endpoint', text('http://localhost:9000'));
+  put('dw.storage.minio.access_key', text('minioadmin'));
+  put('dw.storage.minio.secret_key', password('minioadmin'));
+  put('dw.storage.minio.bucket', text('ecos-data'));
+  put('dw.storage.minio.region', text('us-east-1'));
+  put('dw.storage.minio.ssl', bool(false));
+
+  // ── 近源层 · 数据同步 ──
+  put('dw.sync.batch_size', int(5000));
+  put('dw.sync.max_retries', int(3));
+
+  // ── 近源层 · 数据源接入 ──
+  put('dw.datasource.page_size', int(20));
+  put('dw.datasource.conn_timeout', int(30000));
+
+  // ── DW 层 · 执行引擎 ──
+  put('dw.execution.mode', enumOf('memory', ['memory', 'doris']));
+  put('dw.execution.memory.max_rows', int(100000));
+  put('dw.execution.memory.threads', int(4));
+  put('dw.execution.doris.host', doris(text('localhost')));
+  put('dw.execution.doris.port', doris(int(9030)));
+  put('dw.execution.doris.user', doris(text('root')));
+  put('dw.execution.doris.database', doris(text('ecos_dw')));
+  put('dw.execution.doris.batch_size', doris(int(10000)));
+  put('dw.execution.timeout', int(600));
+
+  // ── DW 层 · 管道基础 ──
+  put('dw.pipeline.max_steps', int(20));
+  put('dw.pipeline.parallel_steps', int(4));
+  put('dw.pipeline.default_chunk_size', int(10000));
+  put('dw.pipeline.temp_table_prefix', text('ecos_tmp_'));
+  put('dw.pipeline.temp_table_ttl_hours', int(24));
+  put('dw.pipeline.retry_max', int(3));
+  put('dw.pipeline.retry_backoff_ms', int(5000));
+
+  // ── DW 层 · 管道高级 ──
+  put('dw.pipeline.log_storage', text('db'));
+  put('dw.pipeline.log_retention_days', int(30));
+  put('dw.pipeline.resume_enabled', bool(true));
+  put('dw.pipeline.resume_max_retries', int(3));
+  put('dw.pipeline.keep_history', bool(false));
+  put('dw.pipeline.history_max_versions', int(10));
+  put('dw.pipeline.preview_mode', text('sample'));
+  put('dw.pipeline.preview_max_rows', int(1000));
+  put('dw.pipeline.alert_on_failure', bool(true));
+  put('dw.pipeline.alert_on_success', bool(false));
+  put('dw.pipeline.template_repo_url', text());
+  put('dw.pipeline.monaco_theme', enumOf('vs-dark', ['vs', 'vs-dark', 'hc-black', 'hc-light']));
+
+  // ── DW 层 · 数据质量 ──
+  put('dw.quality.sample_rate', float(1.0));
+  put('dw.quality.sample_max_rows', int(1000000));
+  put('dw.quality.stale_threshold_hours', int(24));
+  put('dw.quality.default_alert_score', int(80));
+  put('dw.quality.concurrent_checks', int(2));
+  put('dw.quality.check_timeout', int(300));
+
+  // ── DW 层 · 血缘 ──
+  put('dw.lineage.enabled', bool(true));
+  put('dw.lineage.parser', enumOf('sql', ['sql', 'spark', 'dbt']));
+  put('dw.lineage.max_depth', int(10));
+  put('dw.lineage.cache_ttl_minutes', int(30));
+  put('dw.lineage.neo4j_enabled', bool(false));
+
+  // ── DW 层 · 查询 ──
+  put('dw.query.max_rows', int(10000));
+  put('dw.query.timeout', int(30));
+
+  // ── DW 层 · 缓存 ──
+  put('dw.cache.ttl_seconds', int(300));
+
+  // ── DW 层 · 数据目录 ──
+  put('dw.catalog.search_limit', int(500));
+
+  // ── DW 层 · 元数据 ──
+  put('dw.metadata.collect_timeout', int(60));
+  put('dw.metadata.history_versions', int(50));
+
+  // ── 全局 · 引擎 ──
+  put('dw.engine.auto_start', bool(true));
+
+  // ── 全局 · 通知 ──
+  put('dw.notify.channel', text('internal'));
+
+  // ── 全局 · Copilot ──
+  put('dw.copilot.enabled', bool(false));
+  put('dw.copilot.provider', text('openai'));
+  put('dw.copilot.model', text('gpt-4o'));
+  put('dw.copilot.temperature', float(0.2));
+  put('dw.copilot.max_tokens', int(4096));
+
+  return meta;
 }

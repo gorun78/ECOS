@@ -11,9 +11,13 @@ import java.util.*;
 
 /**
  * 数据工作台配置 API — 管理数据引擎相关 sys_config 配置。
- * <p>
- * 配置位于 config_group='data-engine'，通过 config_key 前缀进一步分子组：
- * execution / lake / storage / pipeline / quality / lineage / general。
+ * <p>配置位于 config_group='data-engine'，提供两套并行的分组视图（互不影响，config_key 不变）：
+ * <ul>
+ *   <li>{@code GET /settings} — 旧子组视图：execution / lake / storage / pipeline / quality /
+ *       lineage / general，前端按 {@code dw.{子组}.{短键}} 反拼取值（务必保持稳定）</li>
+ *   <li>{@code GET /settings/groups} — 数据湖分层分段视图：near-source（近源层）/ dw（DW 层）/
+ *       semantic（语义层占位）/ global（全局），项保留完整 config_key，供分层配置面板使用</li>
+ * </ul>
  */
 @RestController
 @RequestMapping("/api/v1/engine/data/settings")
@@ -120,6 +124,87 @@ public class DataEngineConfigController {
         // remaining dw.* keys fall into "general"
     }
 
+    /** 分段顺序（UI 左侧导航顺序） */
+    private static final List<String> SEGMENT_ORDER =
+            List.of("near-source", "dw", "semantic", "global");
+
+    /**
+     * 分段用：config_key 前缀 → 子分区 id。
+     * <p>与 {@link #PREFIX_TO_SUBGROUP} 相互独立 —— 后者服务于旧 {@code GET /settings} 的拼键逻辑
+     * （前端 flattenConfig 依赖），本表服务于分层分段（{@code GET /settings/groups}），两者不得混用。
+     */
+    private static final Map<String, String> SEGMENT_PREFIX_TO_SUBGROUP = new LinkedHashMap<>();
+    static {
+        // ── 近源层：数据湖 / 对象存储 / 同步 / 数据源接入 ──
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.lake.",       "lake");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.storage.",    "storage");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.sync.",       "sync");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.datasource.", "datasource");
+        // ── DW 层：执行 / 管道 / 质量 / 血缘 / 查询 / 缓存 / 目录 / 元数据 ──
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.execution.",  "execution");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.pipeline.",   "pipeline");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.quality.",    "quality");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.lineage.",    "lineage");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.query.",      "query");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.cache.",      "cache");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.catalog.",    "catalog");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.metadata.",   "metadata");
+        // ── 全局：引擎 / 通知 / Copilot ──
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.engine.",     "engine");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.notify.",     "notify");
+        SEGMENT_PREFIX_TO_SUBGROUP.put("dw.copilot.",    "copilot");
+    }
+
+    /**
+     * 精确 key → 子分区覆盖：把 {@code dw.pipeline.} 前缀下的 Pipeline 2.0 运行期配置
+     * 细分到 {@code pipeline-advanced}，与基础管道参数（{@code pipeline}）分开展示。
+     */
+    private static final Map<String, String> KEY_OVERRIDE_SUBGROUP = new LinkedHashMap<>();
+    static {
+        for (String k : List.of(
+                "dw.pipeline.log_storage", "dw.pipeline.log_retention_days",
+                "dw.pipeline.resume_enabled", "dw.pipeline.resume_max_retries",
+                "dw.pipeline.keep_history", "dw.pipeline.history_max_versions",
+                "dw.pipeline.preview_mode", "dw.pipeline.preview_max_rows",
+                "dw.pipeline.alert_on_failure", "dw.pipeline.alert_on_success",
+                "dw.pipeline.template_repo_url", "dw.pipeline.monaco_theme")) {
+            KEY_OVERRIDE_SUBGROUP.put(k, "pipeline-advanced");
+        }
+    }
+
+    /** 子分区 → 段（semantic 段当前无配置项，仅作占位段） */
+    private static final Map<String, String> SUBGROUP_TO_SEGMENT = Map.ofEntries(
+            Map.entry("lake", "near-source"), Map.entry("storage", "near-source"),
+            Map.entry("sync", "near-source"), Map.entry("datasource", "near-source"),
+            Map.entry("execution", "dw"), Map.entry("pipeline", "dw"),
+            Map.entry("pipeline-advanced", "dw"), Map.entry("quality", "dw"),
+            Map.entry("lineage", "dw"), Map.entry("query", "dw"),
+            Map.entry("cache", "dw"), Map.entry("catalog", "dw"),
+            Map.entry("metadata", "dw"),
+            Map.entry("engine", "global"), Map.entry("notify", "global"),
+            Map.entry("copilot", "global"));
+
+    /** 未命中任何前缀的配置项兜底归属段 / 子分区 */
+    private static final String FALLBACK_SEGMENT = "global";
+
+    /** 未命中任何前缀的配置项兜底子分区 */
+    private static final String FALLBACK_SUBGROUP = "general";
+
+    /**
+     * 子分区展示顺序（段内）。未列入的子分区排在末尾并保持库中返回顺序，
+     * 保证 UI 小节顺序稳定、不随 sys_config 行序漂移。
+     */
+    private static final List<String> SUBGROUP_ORDER = List.of(
+            // near-source
+            "lake", "storage", "sync", "datasource",
+            // dw
+            "execution", "pipeline", "pipeline-advanced", "quality", "lineage",
+            "query", "cache", "catalog", "metadata",
+            // global
+            "engine", "notify", "copilot",
+            // 兜底
+            FALLBACK_SUBGROUP);
+
     // ── 端点 ──────────────────────────────────────────────
 
     /**
@@ -129,21 +214,42 @@ public class DataEngineConfigController {
     @GetMapping
     public ApiResponse<Map<String, Map<String, String>>> getAllConfig() {
         try {
-            List<Map<String, Object>> rows = sysConfigService.getByGroup("data-engine");
-            if (rows.isEmpty()) {
-                // lazy init — 首次访问自动插入默认配置
-                initDefaultRows();
-                rows = sysConfigService.getByGroup("data-engine");
-            } else {
-                // 补插缺失的默认配置项（版本迭代新增 key 时自动补齐，幂等）
-                ensureMissingDefaults(rows);
-                rows = sysConfigService.getByGroup("data-engine");
-            }
-            return ApiResponse.success(groupBySubGroup(rows));
+            return ApiResponse.success(groupBySubGroup(loadConfigRows()));
         } catch (Exception e) {
             log.error("获取数据引擎配置失败", e);
             return ApiResponse.internalError("获取配置失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * GET /api/v1/engine/data/settings/groups
+     * 按数据湖分层分段返回配置：near-source（近源层）/ dw（DW 层）/ semantic（语义层占位）/ global（全局）。
+     * <p>段与子分区的归属由本端点决定，是前端分层展示的唯一真相源；段名/子分区名的显示文案由前端 i18n 决定。
+     * <p>响应结构：{@code data.segments[].id}（段）+ {@code data.segments[].subgroups[].id/configs}（子分区与配置）。
+     */
+    @GetMapping("/groups")
+    public ApiResponse<Map<String, Object>> getConfigBySegment() {
+        try {
+            return ApiResponse.success(groupBySegment(loadConfigRows()));
+        } catch (Exception e) {
+            log.error("获取数据引擎分段配置失败", e);
+            return ApiResponse.internalError("获取配置失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 加载 data-engine 配置行；首次访问自动插入默认值，并补齐版本迭代新增的 key（幂等）。
+     */
+    private List<Map<String, Object>> loadConfigRows() {
+        List<Map<String, Object>> rows = sysConfigService.getByGroup("data-engine");
+        if (rows.isEmpty()) {
+            // lazy init — 首次访问自动插入默认配置
+            initDefaultRows();
+        } else {
+            // 补插缺失的默认配置项（版本迭代新增 key 时自动补齐，幂等）
+            ensureMissingDefaults(rows);
+        }
+        return sysConfigService.getByGroup("data-engine");
     }
 
     /** 插入默认配置行 (SysConfigService.ensureDefaultConfigs 可能在 schema 就绪前执行) */
@@ -277,5 +383,87 @@ public class DataEngineConfigController {
                   .put(shortKey, value != null ? value : "");
         }
         return groups;
+    }
+
+    /**
+     * 将配置行按数据湖分层分段。
+     * <p>段顺序固定为 {@link #SEGMENT_ORDER}；段内子分区按 {@link #SUBGROUP_ORDER} 固定顺序；
+     * 段内项保留完整 config_key（前端直接以 key 取值，不再反拼），未归类项落 global/general 兜底不丢弃。
+     *
+     * @param rows 配置行（含 config_key / config_value）
+     * @return {@code {"segments": [{"id": 段, "subgroups": [{"id": 子分区, "configs": {key: value}}]}]}}
+     */
+    private Map<String, Object> groupBySegment(List<Map<String, Object>> rows) {
+        Map<String, Map<String, LinkedHashMap<String, String>>> bySegment = new LinkedHashMap<>();
+
+        for (Map<String, Object> row : rows) {
+            String key = (String) row.get("config_key");
+            if (key == null) {
+                continue;
+            }
+            String value = (String) row.get("config_value");
+
+            String subgroup = resolveSegmentSubgroup(key);
+            String segment = subgroup != null ? SUBGROUP_TO_SEGMENT.get(subgroup) : null;
+            if (segment == null) {
+                segment = FALLBACK_SEGMENT;
+                subgroup = FALLBACK_SUBGROUP;
+            }
+
+            bySegment.computeIfAbsent(segment, k -> new LinkedHashMap<>())
+                     .computeIfAbsent(subgroup, k -> new LinkedHashMap<>())
+                     .put(key, value != null ? value : "");
+        }
+
+        List<Map<String, Object>> segments = new ArrayList<>();
+        for (String segmentId : SEGMENT_ORDER) {
+            List<Map<String, Object>> subgroupList = new ArrayList<>();
+            Map<String, LinkedHashMap<String, String>> subgroups = bySegment.get(segmentId);
+            if (subgroups != null) {
+                List<String> orderedIds = new ArrayList<>(subgroups.keySet());
+                // 稳定排序：已知子分区按 SUBGROUP_ORDER，未知的保持库中返回顺序排在其后
+                orderedIds.sort(Comparator.comparingInt(
+                        (String id) -> {
+                            int idx = SUBGROUP_ORDER.indexOf(id);
+                            return idx < 0 ? Integer.MAX_VALUE : idx;
+                        }));
+                for (String subgroupId : orderedIds) {
+                    Map<String, Object> subgroup = new LinkedHashMap<>();
+                    subgroup.put("id", subgroupId);
+                    subgroup.put("configs", subgroups.get(subgroupId));
+                    subgroupList.add(subgroup);
+                }
+            }
+            Map<String, Object> segment = new LinkedHashMap<>();
+            segment.put("id", segmentId);
+            segment.put("subgroups", subgroupList);
+            segments.add(segment);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("segments", segments);
+        return result;
+    }
+
+    /**
+     * 解析配置项所属子分区：精确 key 覆盖优先，其次最长前缀匹配。
+     *
+     * @param key config_key
+     * @return 子分区 id；无匹配返回 null
+     */
+    private String resolveSegmentSubgroup(String key) {
+        String override = KEY_OVERRIDE_SUBGROUP.get(key);
+        if (override != null) {
+            return override;
+        }
+        String matched = null;
+        int matchedLen = -1;
+        for (Map.Entry<String, String> e : SEGMENT_PREFIX_TO_SUBGROUP.entrySet()) {
+            if (key.startsWith(e.getKey()) && e.getKey().length() > matchedLen) {
+                matched = e.getValue();
+                matchedLen = e.getKey().length();
+            }
+        }
+        return matched;
     }
 }
