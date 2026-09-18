@@ -425,6 +425,7 @@ export const miniMapNodeColor = (node: Node): string => {
     case 'TRANSFORM_UDF': return '#06b6d4';
     case 'JOIN': return '#8b5cf6';
     case 'SINK': return '#22c55e';
+    case 'SINK_MINIO': return '#6366f1';
     case 'OUTPUT_OBJECT': return '#64748b';
     default: return '#94a3b8';
   }

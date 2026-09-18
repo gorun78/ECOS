@@ -52,6 +52,14 @@ mybatis:
     cache-enabled: true
     lazy-loading-enabled: false
 
+# 数据湖 MinIO 初始参数（近源库）
+# 优先级：环境变量 MINIO_ENDPOINT/MINIO_ACCESS_KEY/MINIO_SECRET_KEY > 此处 yml > 代码默认值
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:ecos-datalake}
+
 # PMO-49 D1: 收窄 MyBatis 类型别名扫包到 engine.data 域
 # + ADR-7 X-ECOS-* 头校验开关
 ecos:

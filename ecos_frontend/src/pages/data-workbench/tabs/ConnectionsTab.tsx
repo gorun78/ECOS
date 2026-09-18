@@ -10,6 +10,7 @@ import { useLanguage } from "../../../components/LanguageContext";
 import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, triggerCollectSync, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff, fetchFields, type DataFieldMeta } from '../api';
 import HistoryVersionCompareModal from '../HistoryVersionCompareModal';
 import CollectProgressPanel from '../CollectProgressPanel';
+import IngestSubPanel from './IngestSubPanel';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
   { value: 'MANUAL', key: 'dw.strategy.manual' },
@@ -511,6 +512,10 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                         ? new Date(String(conn.metadataConfig.lastCollectTime)).toLocaleString()
                         : t('dw.strategy.neverCollected')}
                     </div>
+
+                    {/* 数据采集（采集型管道 → 数据湖 MinIO 近源库）—— 与元数据采集同面板 */}
+                    <IngestSubPanel conn={conn} showToast={showToast} />
+
                     {/* 活跃采集任务状态指示器 — 对接异步任务中心 */}
                     {activeTasks.length > 0 && (
                       <div className={`space-y-1.5 p-2 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>

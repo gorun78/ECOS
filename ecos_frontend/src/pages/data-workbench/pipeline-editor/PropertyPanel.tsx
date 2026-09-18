@@ -578,6 +578,45 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                   </>
                 )}
 
+                {/* SINK_MINIO — 数据采集 → 数据湖近源库 */}
+                {nodeType === 'SINK_MINIO' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkMinioTable')}</FieldLabel>
+                      <input type="text" value={nodeConfig.table || ''}
+                        onChange={(e) => setConfigField('table', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="orders" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkMinioObjectName')}</FieldLabel>
+                      <input type="text" value={nodeConfig.objectName || ''}
+                        onChange={(e) => setConfigField('objectName', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="datalake/orders_20260101.csv" />
+                      <p className={`text-[10px] ${styles.muted} mt-0.5`}>
+                        {t('dw.pipeline.prop.sinkMinioObjectHint')}
+                      </p>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkMinioBucket')}</FieldLabel>
+                      <input type="text" value={nodeConfig.bucket || ''}
+                        onChange={(e) => setConfigField('bucket', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="ecos-datalake" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkMinioFormat')}</FieldLabel>
+                      <select value={nodeConfig.format ?? 'csv'}
+                        onChange={(e) => setConfigField('format', e.target.value as 'csv')}
+                        className={inputCls(styles)}
+                      >
+                        <option value="csv">CSV</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
                 {/* OUTPUT_OBJECT */}
                 {nodeType === 'OUTPUT_OBJECT' && (
                   <>

@@ -101,6 +101,7 @@ function mapDsType(t: string): DataConnection['type'] {
   if (lower.includes('postgres')) return 'postgresql';
   if (lower.includes('mysql')) return 'mysql';
   if (lower.includes('doris')) return 'doris';
+  if (lower.includes('clickhouse')) return 'clickhouse';
   if (lower.includes('oracle')) return 'oracle';
   if (lower.includes('sqlserver') || lower.includes('mssql')) return 'mssql';
   if (lower.includes('dm') || lower.includes('dameng')) return 'dm';
@@ -535,19 +536,20 @@ function buildConnectionConfig(c: {
   if (c.username) cfg.username = c.username;
   if (c.password) cfg.password = c.password;
 
-  // ── JDBC 类 (postgresql/mysql/doris/oracle/mssql/dm/kingbase/gaussdb) ──
-  const jdbcTypes = ['postgresql', 'mysql', 'doris', 'oracle', 'mssql', 'dm', 'kingbase', 'gaussdb'];
+  // ── JDBC 类 (postgresql/mysql/doris/clickhouse/oracle/mssql/dm/kingbase/gaussdb) ──
+  const jdbcTypes = ['postgresql', 'mysql', 'doris', 'clickhouse', 'oracle', 'mssql', 'dm', 'kingbase', 'gaussdb'];
   if (jdbcTypes.includes(c.type)) {
     // 各数据库驱动映射
     const driverMap: Record<string, string> = {
       postgresql: 'postgresql', mysql: 'mysql', doris: 'mysql',
+      clickhouse: 'clickhouse',
       oracle: 'oracle', mssql: 'sqlserver', dm: 'dm',
       kingbase: 'postgresql', gaussdb: 'postgresql',
     };
     const driver = driverMap[c.type] || 'postgresql';
     const db = c.database || c.schema || '';
     const defaultPortMap: Record<string, number> = {
-      postgresql: 5432, mysql: 3306, doris: 9030,
+      postgresql: 5432, mysql: 3306, doris: 9030, clickhouse: 8123,
       oracle: 1521, mssql: 1433, dm: 5236, kingbase: 54321, gaussdb: 5432,
     };
     const portNum = c.port || defaultPortMap[c.type] || 5432;
@@ -1308,5 +1310,136 @@ export async function fetchSchemaPreview(payload: {
     return { fields, tableNames };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// 数据采集 API（采集型管道 SOURCE_JDBC → SINK_MINIO，MinIO 近源库）
+// ────────────────────────────────────────────────────────────
+
+export interface IngestTarget {
+  datasourceId: string;
+  name: string;
+  type: string;
+}
+
+export interface IngestTaskItem {
+  table: string;
+  definitionId: string;
+  taskId: string;
+  status: string;
+}
+
+/** 可用目标数据湖（MINIO 类型数据源） */
+export async function fetchIngestTargets(): Promise<IngestTarget[]> {
+  try {
+    const data = await get<unknown[] | Record<string, unknown>>('/api/v1/datanet/ingest/targets');
+    const arr = Array.isArray(data) ? data : (data?.items as unknown[] | undefined) ?? [];
+    return arr.map((t: unknown) => {
+      const m = t as Record<string, unknown>;
+      return {
+        datasourceId: (m.datasourceId as string) || '',
+        name: (m.name as string) || (m.datasourceName as string) || '',
+        type: (m.type as string) || '',
+      };
+    });
+  } catch (e) {
+    console.warn('[data-workbench] fetchIngestTargets failed:', e);
+    return [];
+  }
+}
+
+/** 即时采集：提交采集型管道到 runtime-task，返回各表 taskId */
+export async function runDataIngest(datasourceId: string, tableNames: string[]): Promise<{
+  datasourceId: string; submitted: boolean; taskCount: number; tasks: IngestTaskItem[];
+} | null> {
+  try {
+    const body = { datasourceId, tableNames };
+    const data = await post<Record<string, unknown>>('/api/v1/datanet/ingest/run', body);
+    return {
+      datasourceId: (data?.datasourceId as string) || datasourceId,
+      submitted: Boolean(data?.submitted),
+      taskCount: Number(data?.taskCount) || 0,
+      tasks: Array.isArray(data?.tasks)
+        ? (data.tasks as unknown[]).map((t: unknown) => {
+            const m = t as Record<string, unknown>;
+            return {
+              table: (m.table as string) || '',
+              definitionId: (m.definitionId as string) || '',
+              taskId: (m.taskId as string) || '',
+              status: (m.status as string) || 'SUBMITTED',
+            };
+          })
+        : [],
+    };
+  } catch (e) {
+    console.warn('[data-workbench] runDataIngest failed:', e);
+    return null;
+  }
+}
+
+/** 查询采集任务状态（前端轮询进度） */
+export async function fetchIngestStatus(taskId: string): Promise<{
+  available: boolean; status?: string; progress?: number;
+  result?: unknown; errorMessage?: string;
+} | null> {
+  try {
+    return await get<{ available: boolean; status?: string; progress?: number; result?: unknown; errorMessage?: string }>(
+      `/api/v1/datanet/ingest/status/${encodeURIComponent(taskId)}`
+    );
+  } catch (e) {
+    console.warn('[data-workbench] fetchIngestStatus failed:', e);
+    return null;
+  }
+}
+
+/** 保存定时采集策略（cron 为空 = 停用） */
+export async function saveIngestSchedule(
+  datasourceId: string, tableNames: string[], cron: string
+): Promise<{ enabled: boolean; cron: string; tables: string[] } | null> {
+  try {
+    const body = { datasourceId, tableNames, cron };
+    return await post<{ enabled: boolean; cron: string; tables: string[] }>('/api/v1/datanet/ingest/schedule', body);
+  } catch (e) {
+    console.warn('[data-workbench] saveIngestSchedule failed:', e);
+    return null;
+  }
+}
+
+/** 查询定时采集策略 */
+export async function fetchIngestSchedule(datasourceId: string): Promise<{
+  enabled: boolean; cron: string; tables: string[];
+} | null> {
+  try {
+    return await get<{ enabled: boolean; cron: string; tables: string[] }>(
+      `/api/v1/datanet/ingest/schedule/${encodeURIComponent(datasourceId)}`
+    );
+  } catch (e) {
+    console.warn('[data-workbench] fetchIngestSchedule failed:', e);
+    return null;
+  }
+}
+
+/** 数据湖（MinIO 近源库）健康状态 */
+export async function fetchDatalakeStatus(): Promise<{
+  endpoint?: string; bucket?: string; status?: string; initialized?: boolean; accessKey?: string;
+} | null> {
+  try {
+    return await get<{ endpoint?: string; bucket?: string; status?: string; initialized?: boolean; accessKey?: string }>(
+      '/api/v1/datanet/datalake/status'
+    );
+  } catch (e) {
+    console.warn('[data-workbench] fetchDatalakeStatus failed:', e);
+    return null;
+  }
+}
+
+/** 初始化数据湖（ensure bucket，幂等） */
+export async function initDatalake(): Promise<{ bucket?: string; status?: string } | null> {
+  try {
+    return await post<{ bucket?: string; status?: string }>('/api/v1/datanet/datalake/init', {});
+  } catch (e) {
+    console.warn('[data-workbench] initDatalake failed:', e);
+    return null;
   }
 }

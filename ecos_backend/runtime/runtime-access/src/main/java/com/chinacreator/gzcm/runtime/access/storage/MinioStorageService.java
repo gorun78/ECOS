@@ -6,6 +6,7 @@ import io.minio.messages.Bucket;
 import io.minio.messages.Item;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -39,20 +40,54 @@ public class MinioStorageService {
     private static final String DEFAULT_ENDPOINT = "http://localhost:9000";
     private static final String DEFAULT_ACCESS_KEY = "minioadmin";
     private static final String DEFAULT_SECRET_KEY = "minioadmin";
-    private static final String BUCKET_NAME = "ecos-datalake";
+    private static final String DEFAULT_BUCKET = "ecos-datalake";
 
     private final String endpoint;
     private final String accessKey;
     private final String secretKey;
 
+    /** yml 配置注入（minio.endpoint 等），优先于环境变量与默认值；为空时走兜底 */
+    @Value("${minio.endpoint:}")
+    private String cfgEndpoint;
+    @Value("${minio.access-key:}")
+    private String cfgAccessKey;
+    @Value("${minio.secret-key:}")
+    private String cfgSecretKey;
+    @Value("${minio.bucket:}")
+    private String cfgBucket;
+
     private volatile MinioClient client;
     private volatile boolean initialized = false;
 
     public MinioStorageService() {
-        // 从环境变量/配置文件读取，fallback 到默认值
+        // 从环境变量读取，fallback 到默认值（yml 配置在 @Value 注入后优先）
         this.endpoint = System.getenv().getOrDefault("MINIO_ENDPOINT", DEFAULT_ENDPOINT);
         this.accessKey = System.getenv().getOrDefault("MINIO_ACCESS_KEY", DEFAULT_ACCESS_KEY);
         this.secretKey = System.getenv().getOrDefault("MINIO_SECRET_KEY", DEFAULT_SECRET_KEY);
+    }
+
+    /** 生效端点：yml 配置 > 环境变量 > 默认值 */
+    private String effectiveEndpoint() {
+        return isBlank(cfgEndpoint) ? endpoint : cfgEndpoint;
+    }
+
+    /** 生效 access key：yml 配置 > 环境变量 > 默认值 */
+    private String effectiveAccessKey() {
+        return isBlank(cfgAccessKey) ? accessKey : cfgAccessKey;
+    }
+
+    /** 生效 secret key：yml 配置 > 环境变量 > 默认值 */
+    private String effectiveSecretKey() {
+        return isBlank(cfgSecretKey) ? secretKey : cfgSecretKey;
+    }
+
+    /** 生效 bucket：yml 配置 > 默认值 */
+    private String effectiveBucket() {
+        return isBlank(cfgBucket) ? DEFAULT_BUCKET : cfgBucket;
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     /**
@@ -64,11 +99,11 @@ public class MinioStorageService {
                 if (client == null) {
                     try {
                         client = MinioClient.builder()
-                                .endpoint(endpoint)
-                                .credentials(accessKey, secretKey)
+                                .endpoint(effectiveEndpoint())
+                                .credentials(effectiveAccessKey(), effectiveSecretKey())
                                 .build();
                         initialized = true;
-                        log.info("P3-1 MinioClient initialized: endpoint={}", endpoint);
+                        log.info("P3-1 MinioClient initialized: endpoint={}", effectiveEndpoint());
                     } catch (Exception e) {
                         log.error("P3-1 Failed to create MinioClient: {}", e.getMessage());
                         throw new RuntimeException("MinIO client init failed", e);
@@ -85,15 +120,16 @@ public class MinioStorageService {
     public void ensureBucket() {
         try {
             MinioClient mc = getClient();
-            boolean found = mc.bucketExists(BucketExistsArgs.builder().bucket(BUCKET_NAME).build());
+            String bucket = effectiveBucket();
+            boolean found = mc.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
             if (!found) {
-                mc.makeBucket(MakeBucketArgs.builder().bucket(BUCKET_NAME).build());
-                log.info("P3-1 MinIO bucket '{}' created", BUCKET_NAME);
+                mc.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+                log.info("P3-1 MinIO bucket '{}' created", bucket);
             } else {
-                log.debug("P3-1 MinIO bucket '{}' already exists", BUCKET_NAME);
+                log.debug("P3-1 MinIO bucket '{}' already exists", bucket);
             }
         } catch (Exception e) {
-            log.warn("P3-1 Failed to ensure MinIO bucket '{}': {}", BUCKET_NAME, e.getMessage());
+            log.warn("P3-1 Failed to ensure MinIO bucket '{}': {}", effectiveBucket(), e.getMessage());
         }
     }
 
@@ -117,7 +153,7 @@ public class MinioStorageService {
 
             mc.uploadObject(
                     UploadObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
+                            .bucket(effectiveBucket())
                             .object(objectName)
                             .filename(filePath.toString())
                             .contentType(contentType)
@@ -127,9 +163,9 @@ public class MinioStorageService {
             long fileSize = Files.size(filePath);
             result.put("status", "success");
             result.put("size_bytes", fileSize);
-            result.put("bucket", BUCKET_NAME);
+            result.put("bucket", effectiveBucket());
 
-            log.info("P3-1 Uploaded to MinIO: {}/{} ({} bytes)", BUCKET_NAME, objectName, fileSize);
+            log.info("P3-1 Uploaded to MinIO: {}/{} ({} bytes)", effectiveBucket(), objectName, fileSize);
 
         } catch (Exception e) {
             log.error("P3-1 Failed to upload object '{}': {}", objectName, e.getMessage());
@@ -153,7 +189,7 @@ public class MinioStorageService {
             MinioClient mc = getClient();
             mc.putObject(
                     PutObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
+                            .bucket(effectiveBucket())
                             .object(objectName)
                             .stream(new ByteArrayInputStream(data), data.length, -1)
                             .contentType(contentType != null ? contentType : "application/octet-stream")
@@ -162,9 +198,9 @@ public class MinioStorageService {
 
             result.put("status", "success");
             result.put("size_bytes", data.length);
-            result.put("bucket", BUCKET_NAME);
+            result.put("bucket", effectiveBucket());
 
-            log.info("P3-1 Uploaded to MinIO (bytes): {}/{} ({} bytes)", BUCKET_NAME, objectName, data.length);
+            log.info("P3-1 Uploaded to MinIO (bytes): {}/{} ({} bytes)", effectiveBucket(), objectName, data.length);
 
         } catch (Exception e) {
             log.error("P3-1 Failed to upload object '{}': {}", objectName, e.getMessage());
@@ -183,7 +219,7 @@ public class MinioStorageService {
             MinioClient mc = getClient();
             try (InputStream stream = mc.getObject(
                     GetObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
+                            .bucket(effectiveBucket())
                             .object(objectName)
                             .build())) {
                 return stream.readAllBytes();
@@ -203,7 +239,7 @@ public class MinioStorageService {
             MinioClient mc = getClient();
             Iterable<Result<Item>> results = mc.listObjects(
                     ListObjectsArgs.builder()
-                            .bucket(BUCKET_NAME)
+                            .bucket(effectiveBucket())
                             .prefix(prefix != null ? prefix : "")
                             .recursive(true)
                             .build());
@@ -230,9 +266,10 @@ public class MinioStorageService {
         Map<String, Object> health = new LinkedHashMap<>();
         try {
             MinioClient mc = getClient();
-            boolean bucketExists = mc.bucketExists(BucketExistsArgs.builder().bucket(BUCKET_NAME).build());
-            health.put("endpoint", endpoint);
-            health.put("bucket", BUCKET_NAME);
+            String bucket = effectiveBucket();
+            boolean bucketExists = mc.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+            health.put("endpoint", effectiveEndpoint());
+            health.put("bucket", bucket);
             health.put("status", bucketExists ? "UP" : "DEGRADED");
             health.put("initialized", initialized);
         } catch (Exception e) {
@@ -244,11 +281,15 @@ public class MinioStorageService {
     }
 
     public String getBucketName() {
-        return BUCKET_NAME;
+        return effectiveBucket();
     }
 
     public String getEndpoint() {
-        return endpoint;
+        return effectiveEndpoint();
+    }
+
+    public String getAccessKey() {
+        return effectiveAccessKey();
     }
 
     public boolean isInitialized() {

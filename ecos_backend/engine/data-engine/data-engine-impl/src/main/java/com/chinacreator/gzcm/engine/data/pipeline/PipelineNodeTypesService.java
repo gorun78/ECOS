@@ -58,6 +58,10 @@ public class PipelineNodeTypesService {
                         props("datasourceId", "string", "table", "string", "mode", "string",
                                 "batchSize", "number", "inlineData", "object"),
                         List.of("table")),
+                entry("SINK_MINIO", "Sink MinIO", "MinioStorageService(数据湖近源库)", "全版本", "Database",
+                        props("bucket", "string", "objectName", "string", "table", "string",
+                                "format", "string", "columns", "array", "inlineData", "object"),
+                        List.of("table")),
                 entry("OUTPUT_OBJECT", "Output Object", "系统JdbcTemplate", "全版本", "HardDrive",
                         props("targetTable", "string", "mode", "string", "batchSize", "number", "rows", "array"),
                         List.of("targetTable"))
@@ -101,7 +105,7 @@ public class PipelineNodeTypesService {
         if ("JOIN".equals(type)) {
             return "JOIN";
         }
-        if ("SINK".equals(type) || "OUTPUT_OBJECT".equals(type)) {
+        if ("SINK".equals(type) || "OUTPUT_OBJECT".equals(type) || "SINK_MINIO".equals(type)) {
             return "SINK";
         }
         return "TRANSFORM";

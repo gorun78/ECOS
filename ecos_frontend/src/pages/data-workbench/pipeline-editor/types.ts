@@ -15,6 +15,7 @@ export type PipelineNodeType =
   | 'TRANSFORM_UDF'
   | 'JOIN'
   | 'SINK'
+  | 'SINK_MINIO'
   | 'OUTPUT_OBJECT';
 
 export type NodeStatus = 'idle' | 'running' | 'success' | 'error';
@@ -63,6 +64,12 @@ export interface NodeConfig {
     targetDatasourceId?: string;
     targetTable?: string;
     target_columns?: string;
+    // ── SINK_MINIO (数据采集 → 数据湖近源库) ──
+    bucket?: string;
+    objectName?: string;
+    table?: string;
+    format?: 'csv';
+    columns?: string[];
     // ── OUTPUT_OBJECT ──
     mode?: 'append' | 'overwrite';
     batchSize?: number;

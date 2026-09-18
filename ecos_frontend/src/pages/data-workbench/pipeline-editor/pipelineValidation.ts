@@ -42,11 +42,12 @@ const REQUIRED_CONFIG_FIELDS: Record<PipelineNodeType, readonly string[]> = {
   TRANSFORM_UDF: ['udfId'],
   JOIN: ['joinType'],
   SINK: ['targetTable'],
+  SINK_MINIO: ['table'],
   OUTPUT_OBJECT: ['targetTable'],
 };
 
 const SOURCE_TYPES = new Set<PipelineNodeType>(['SOURCE_JDBC', 'SOURCE_CSV', 'SOURCE_REST', 'SOURCE_CDC']);
-const OUTPUT_TYPES = new Set<PipelineNodeType>(['OUTPUT_OBJECT', 'SINK']);
+const OUTPUT_TYPES = new Set<PipelineNodeType>(['OUTPUT_OBJECT', 'SINK', 'SINK_MINIO']);
 
 /** ReadNodeConfig helper — stable across node id changes. */
 function readNodeConfig(node: Node): NodeConfig {

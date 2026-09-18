@@ -116,6 +116,15 @@ export function buildPaletteItems(
       borderColor: styles.successBorder,
     },
     {
+      type: 'SINK_MINIO',
+      labelKey: 'dw.pipeline.node.sinkMinio',
+      label: t('dw.pipeline.node.sinkMinio'),
+      icon: ({ size, className }) => <Database size={size} className={className} />,
+      color: styles.accentText,
+      bgColor: styles.accentBg,
+      borderColor: styles.accentBorder,
+    },
+    {
       type: 'OUTPUT_OBJECT',
       labelKey: 'dw.pipeline.node.outputObject',
       label: t('dw.pipeline.node.outputObject'),
@@ -140,6 +149,7 @@ export const PALETTE_LABELS: Record<PipelineNodeType, string> = {
   TRANSFORM_UDF: 'Transform UDF',
   JOIN: 'Join',
   SINK: 'Sink',
+  SINK_MINIO: 'Sink MinIO',
   OUTPUT_OBJECT: 'Output Object',
 };
 
@@ -153,5 +163,6 @@ export const PIPELINE_NODE_TYPES: PipelineNodeType[] = [
   'TRANSFORM_UDF',
   'JOIN',
   'SINK',
+  'SINK_MINIO',
   'OUTPUT_OBJECT',
 ];
