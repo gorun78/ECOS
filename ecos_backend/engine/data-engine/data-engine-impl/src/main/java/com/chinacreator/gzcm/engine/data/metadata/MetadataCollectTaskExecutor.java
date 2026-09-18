@@ -52,6 +52,11 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
     private final MetadataRowCountService rowCountService;
     private final com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync;
     private final MetadataCollectGitArchive gitArchive;
+    /**
+     * 用于取「解密回填密码后」的连接配置（PMO-49 起密码只存 password_enc）。
+     * 本类处于 DataSourceServiceImpl 依赖链下游，加 @Lazy 断环。
+     */
+    private final com.chinacreator.gzcm.engine.data.DataSourceService dataSourceService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final Map<String, Boolean> cancelFlags = new ConcurrentHashMap<>();
@@ -61,12 +66,15 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                                        ConnectorFactory connectorFactory,
                                        MetadataRowCountService rowCountService,
                                        com.chinacreator.gzcm.engine.data.service.ResourceSyncService resourceSync,
-                                       MetadataCollectGitArchive gitArchive) {
+                                       MetadataCollectGitArchive gitArchive,
+                                       @org.springframework.context.annotation.Lazy
+                                       com.chinacreator.gzcm.engine.data.DataSourceService dataSourceService) {
         this.dsRepository = dsRepository;
         this.connectorFactory = connectorFactory;
         this.rowCountService = rowCountService;
         this.resourceSync = resourceSync;
         this.gitArchive = gitArchive;
+        this.dataSourceService = dataSourceService;
     }
 
     @Override
@@ -121,7 +129,10 @@ public class MetadataCollectTaskExecutor implements ITaskExecutor {
                     () -> {
                         com.chinacreator.gzcm.runtime.access.connector.Connector connector =
                                 connectorFactory.getConnector(connectorType);
-                        return connector.listResources(ds.getConnectionConfig(),
+                        // PMO-49：connection_config 中密码已剥离，须取解密回填后的配置方能建连
+                        String resolvedConfig = dataSourceService.getResolvedConnectionConfig(ds.getDatasourceId());
+                        return connector.listResources(
+                                resolvedConfig != null ? resolvedConfig : ds.getConnectionConfig(),
                                 ds.getOrgId(), ds.getDatasourceName());
                     });
             if (resources == null) {

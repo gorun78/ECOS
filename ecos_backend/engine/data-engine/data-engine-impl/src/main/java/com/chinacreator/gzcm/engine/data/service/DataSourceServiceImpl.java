@@ -435,6 +435,15 @@ public class DataSourceServiceImpl implements DataSourceService {
         log.info("Updated metadataConfig: datasource={}, json={}", datasourceId, json);
     }
 
+    @Override
+    public String getResolvedConnectionConfig(String datasourceId) {
+        DataSourceEntity ds = getInternal(datasourceId);
+        if (ds == null) {
+            return null;
+        }
+        return resolvePassword(ds.getConnectionConfig(), ds.getPasswordEncrypted());
+    }
+
     private String buildMetadataConfigJson(DataSourceDTO dto, String fallbackStrategy) {
         try {
             @SuppressWarnings("unchecked")

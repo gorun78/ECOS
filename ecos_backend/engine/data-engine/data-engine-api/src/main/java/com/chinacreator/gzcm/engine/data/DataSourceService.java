@@ -60,4 +60,18 @@ public interface DataSourceService {
      * @param json         完整的 MetadataStrategyConfig JSON 串
      */
     void updateMetadataConfig(String datasourceId, String json);
+
+    /**
+     * 返回「解密回填密码后」的连接配置，供真实建立连接的场景使用
+     * （元数据采集、表结构预览等）。
+     *
+     * <p>PMO-49 起密码只以密文存于 {@code password_enc}，{@code connection_config} 中的
+     * 密码字段已剥离；读取路径需经 security-engine 解密回填后才能建连，否则报
+     * 「SCRAM-based authentication, but no password was provided」。
+     * 本方法仅内存回填，不写库、不回显。
+     *
+     * @param datasourceId 数据源 ID
+     * @return 已回填密码的 connectionConfig JSON；数据源不存在时返回 {@code null}
+     */
+    String getResolvedConnectionConfig(String datasourceId);
 }

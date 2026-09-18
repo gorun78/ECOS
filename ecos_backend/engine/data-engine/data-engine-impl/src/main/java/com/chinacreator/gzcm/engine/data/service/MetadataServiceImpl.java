@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.common.data.model.DataField;
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.MetadataService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
@@ -10,6 +11,7 @@ import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -30,15 +32,23 @@ public class MetadataServiceImpl implements MetadataService {
     private final DataSourceRepository dataSourceRepository;
     private final ConnectorFactory connectorFactory;
     private final ResourceSyncService resourceSyncService;
+    private final DataSourceService dataSourceService;
 
+    /**
+     * @param dataSourceService 用于取「解密回填密码后」的连接配置。本类位于
+     *        DataSourceServiceImpl → MetadataAsyncTrigger → MetadataCollectionService →
+     *        MetadataServiceImpl 依赖链下游，直接注入会形成循环依赖，故加 {@link Lazy} 断环。
+     */
     public MetadataServiceImpl(JdbcTemplate jdbc,
                                DataSourceRepository dataSourceRepository,
                                ConnectorFactory connectorFactory,
-                               ResourceSyncService resourceSyncService) {
+                               ResourceSyncService resourceSyncService,
+                               @Lazy DataSourceService dataSourceService) {
         this.jdbc = jdbc;
         this.dataSourceRepository = dataSourceRepository;
         this.connectorFactory = connectorFactory;
         this.resourceSyncService = resourceSyncService;
+        this.dataSourceService = dataSourceService;
     }
 
     @Override
@@ -49,9 +59,13 @@ public class MetadataServiceImpl implements MetadataService {
         }
 
         // Connector 发现表/视图清单（连接失败时异常上抛，由调用方决定任务失败语义）
+        // PMO-49 起密码只以密文存 password_enc、connection_config 中已剥离，
+        // 此处必须取解密回填后的配置，否则建连报「no password was provided」。
         Connector connector = connectorFactory.getConnector(ds.getDatasourceType());
+        String resolvedConfig = dataSourceService.getResolvedConnectionConfig(datasourceId);
         List<DataResource> resources = connector.listResources(
-                ds.getConnectionConfig(), ds.getOrgId(), ds.getDatasourceName());
+                resolvedConfig != null ? resolvedConfig : ds.getConnectionConfig(),
+                ds.getOrgId(), ds.getDatasourceName());
 
         // 逐表落库（幂等 upsert）；行数不在此统计（rowCnt=null 保持 -1，由异步任务按 countMethod 统计）
         int ok = 0;
