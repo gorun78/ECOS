@@ -94,7 +94,7 @@ export interface DataConnection {
 }
 
 export type ConnType =
-  | 'postgresql' | 'mysql' | 'doris'
+  | 'postgresql' | 'mysql' | 'doris' | 'clickhouse'
   | 'oracle' | 'mssql' | 'dm' | 'kingbase' | 'gaussdb'
   | 's3' | 'oss' | 'minio'
   | 'csv'
@@ -105,12 +105,13 @@ export type ConnType =
   | 'mongodb'
   | 'fs';
 
-/** PMO-48-T5: 17 项连接类型(分类排序: 关系型→国产→对象存储→文件→消息→API) */
+/** PMO-48-T5: 18 项连接类型(分类排序: 关系型→国产→对象存储→文件→消息→API) */
 export const CONNECTION_TYPES: { value: ConnType; i18nKey: string; tier: 'relational' | 'domestic' | 'object-storage' | 'file' | 'message' | 'api' }[] = [
   // 关系型
   { value: 'postgresql', i18nKey: 'dw.connType.postgresql', tier: 'relational' },
   { value: 'mysql', i18nKey: 'dw.connType.mysql', tier: 'relational' },
   { value: 'doris', i18nKey: 'dw.connType.doris', tier: 'relational' },
+  { value: 'clickhouse', i18nKey: 'dw.connType.clickhouse', tier: 'relational' },
   { value: 'oracle', i18nKey: 'dw.connType.oracle', tier: 'relational' },
   { value: 'mssql', i18nKey: 'dw.connType.mssql', tier: 'relational' },
   // 国产库

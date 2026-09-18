@@ -62,7 +62,7 @@ export function AddConnectionModal({
   // PMO-48-T5: P-2 — 新建路径不调 catalog，不卡死
   // CLR 1/3 整卡高亮渲染由上层 ConnectionsTab 负责
 
-  const isJdbc = ['postgresql', 'mysql', 'doris', 'oracle', 'mssql', 'dm', 'kingbase', 'gaussdb'].includes(newConnType);
+  const isJdbc = ['postgresql', 'mysql', 'doris', 'clickhouse', 'oracle', 'mssql', 'dm', 'kingbase', 'gaussdb'].includes(newConnType);
   const isMongo = newConnType === 'mongodb';
   const isKafka = newConnType === 'kafka';
   const isMinio = newConnType === 'minio';
@@ -141,6 +141,8 @@ export function AddConnectionModal({
         return <JdbcConfigForm t={t} kind="mysql" {...commonJdbc} />;
       case 'doris':
         return <JdbcConfigForm t={t} kind="doris" {...commonJdbc} />;
+      case 'clickhouse':
+        return <JdbcConfigForm t={t} kind="clickhouse" {...commonJdbc} />;
       case 'oracle':
         return <JdbcConfigForm t={t} kind="oracle" {...commonJdbc} />;
       case 'mssql':

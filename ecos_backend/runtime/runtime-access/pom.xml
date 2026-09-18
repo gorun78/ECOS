@@ -96,6 +96,14 @@
                     <version>5.1.0-og</version>
                     <optional>true</optional>
                 </dependency>
+                <!-- ClickHouse JDBC driver (shaded `all` classifier，含 http client 依赖) -->
+                <dependency>
+                    <groupId>com.clickhouse</groupId>
+                    <artifactId>clickhouse-jdbc</artifactId>
+                    <version>0.6.5</version>
+                    <classifier>all</classifier>
+                    <optional>true</optional>
+                </dependency>
             </dependencies>
         </profile>
     </profiles>

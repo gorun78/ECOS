@@ -86,7 +86,7 @@ export interface JdbcProps {
 
 /** PMO-48-T5: 各数据库驱动默认端口 */
 const DB_DEFAULT_PORTS: Record<string, string> = {
-  postgresql: '5432', mysql: '3306', doris: '9030',
+  postgresql: '5432', mysql: '3306', doris: '9030', clickhouse: '8123',
   oracle: '1521', mssql: '1433', dm: '5236', kingbase: '54321', gaussdb: '5432',
 };
 
@@ -96,7 +96,7 @@ export function JdbcConfigForm({
   password, setPassword, ssl, setSsl,
   schema, setSchema, warehouse, setWarehouse,
   dbType, setDbType, actualKind,
-}: JdbcProps & { kind: 'postgresql' | 'mysql' | 'doris' | 'oracle' | 'mssql' | 'dm' | 'kingbase' | 'gaussdb' }) {
+}: JdbcProps & { kind: 'postgresql' | 'mysql' | 'doris' | 'clickhouse' | 'oracle' | 'mssql' | 'dm' | 'kingbase' | 'gaussdb' }) {
   const effectiveKind = actualKind || kind;
   const dbDefault = DB_DEFAULT_PORTS[effectiveKind] || '5432';
   // 标准版 facade 类型 (gaussdb/minio/fs) 不应在此渲染，由上层门控

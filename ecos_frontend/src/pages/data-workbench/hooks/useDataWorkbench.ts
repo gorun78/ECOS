@@ -89,7 +89,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     // 按类型重置 common 字段默认值
     setNcPort(t === 'oracle' ? 1521 : t === 'mssql' ? 1433 : t === 'dm' ? 5236
       : t === 'kingbase' ? 54321 : t === 'gaussdb' ? 5432
-      : t === 'doris' ? 9030 : t === 'mysql' ? 3306
+      : t === 'doris' ? 9030 : t === 'clickhouse' ? 8123 : t === 'mysql' ? 3306
       : t === 'minio' ? 9000 : t === 'mongodb' ? 27017
       : t === 'kafka' ? 9092 : t === 'sap' ? 3300
       : t === 'sftp' ? 22 : 5432);

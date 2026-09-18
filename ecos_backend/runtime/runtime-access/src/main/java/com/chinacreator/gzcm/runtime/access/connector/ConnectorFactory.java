@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * 已注册的连接器类型：
  * <ul>
  *   <li>JDBC — 关系型数据库（JdbcConnector），别名:
- *       POSTGRESQL / MYSQL / ORACLE / SQLSERVER / DORIS / MARIADB / HSQLDB / DB2 / MONGODB</li>
+ *       POSTGRESQL / MYSQL / ORACLE / SQLSERVER / CLICKHOUSE / DORIS / MARIADB / HSQLDB / DB2 / MONGODB</li>
  *   <li>SOURCE_CSV — CSV/Excel 文件导入（CsvConnector）</li>
  *   <li>SOURCE_REST — REST API 数据源（RestApiConnector）</li>
  * </ul>
@@ -51,6 +51,7 @@ public class ConnectorFactory {
             Map.entry("MYSQL", "JDBC"),
             Map.entry("ORACLE", "JDBC"),
             Map.entry("SQLSERVER", "JDBC"),
+            Map.entry("CLICKHOUSE", "JDBC"),
             Map.entry("DORIS", "JDBC"),
             Map.entry("MARIADB", "JDBC"),
             Map.entry("HSQLDB", "JDBC"),

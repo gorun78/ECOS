@@ -148,6 +148,9 @@ public class JdbcConnector implements Connector {
                 return "jdbc:kingbase8://" + host + ":" + port + "/" + cfg.getOrDefault("database", "");
             case "GAUSS":
                 return "jdbc:opengauss://" + host + ":" + port + "/" + cfg.getOrDefault("database", "");
+            case "CLICKHOUSE":
+                return "jdbc:clickhouse://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
+                    + "?connect_timeout=10000&socket_timeout=10000";
             case "MYSQL":
                 return "jdbc:mysql://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
                     + "?connectTimeout=10000&socketTimeout=10000&useSSL=false";
@@ -165,6 +168,7 @@ public class JdbcConnector implements Connector {
             case "DM": return "5236";
             case "KINGBASE": return "54321";
             case "GAUSS": return "5432";
+            case "CLICKHOUSE": return "8123";
             case "MYSQL": return "3306";
             case "POSTGRESQL":
             default: return "5432";
@@ -181,6 +185,7 @@ public class JdbcConnector implements Connector {
             if (jdbcUrl.startsWith("jdbc:dm:")) return "dm.jdbc.driver.DmDriver";
             if (jdbcUrl.startsWith("jdbc:kingbase8")) return "com.kingbase8.Driver";
             if (jdbcUrl.startsWith("jdbc:opengauss") || jdbcUrl.startsWith("jdbc:gaussdb")) return "org.opengauss.Driver";
+            if (jdbcUrl.startsWith("jdbc:clickhouse")) return "com.clickhouse.jdbc.ClickHouseDriver";
             if (jdbcUrl.startsWith("jdbc:postgresql")) return "org.postgresql.Driver";
             if (jdbcUrl.startsWith("jdbc:mysql")) return "com.mysql.cj.jdbc.Driver";
         }
@@ -190,6 +195,7 @@ public class JdbcConnector implements Connector {
             case "DM": return "dm.jdbc.driver.DmDriver";
             case "KINGBASE": return "com.kingbase8.Driver";
             case "GAUSS": return "org.opengauss.Driver";
+            case "CLICKHOUSE": return "com.clickhouse.jdbc.ClickHouseDriver";
             case "MYSQL": return "com.mysql.cj.jdbc.Driver";
             case "POSTGRESQL":
             default: return "org.postgresql.Driver";

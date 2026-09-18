@@ -51,7 +51,7 @@ public class DataSourceServiceImpl implements DataSourceService {
     /** PMO-45: 支持的全部数据源类型（与数据模型 7 种基础类型对齐） */
     public static final Set<String> SUPPORTED_TYPES = Set.of(
             "POSTGRESQL", "MYSQL", "ORACLE", "MSSQL",
-            "DM", "KINGBASE", "GAUSS", "MINIO", "FILESYSTEM"
+            "DM", "KINGBASE", "GAUSS", "CLICKHOUSE", "MINIO", "FILESYSTEM"
     );
 
     /** PMO-45: MINIO 对象存储 — enterprise/ultimate 版本才可用 */
