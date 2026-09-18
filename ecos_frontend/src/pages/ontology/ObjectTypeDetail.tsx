@@ -12,9 +12,9 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { Compass, Trash2, AlertTriangle, GitPullRequest } from 'lucide-react';
 import DynamicIcon from '../../components/ontology/DynamicIcon';
-import { fetchMappings, createMapping, updateMapping, fetchLineageImpact } from '../../services/ontologyApi';
+import { fetchMappings, createMapping, updateMapping, fetchLineageImpact, updateEntity, reassignObjectDomain, fetchDwDatasetColumns } from '../../services/ontologyApi';
 
-import type { ObjectType, PropertyType, Dataset, LinkType, ActionType, SharedProperty, InterfaceType, OntologyDomain, OntologyMappingRecord, LineageImpactResult } from '../../types/ontology';
+import type { ObjectType, PropertyType, Dataset, DatasetColumn, LinkType, ActionType, SharedProperty, InterfaceType, OntologyDomain, OntologyMappingRecord, LineageImpactResult } from '../../types/ontology';
 import PropertiesTab from './object/PropertiesTab';
 import MetadataTab from './object/MetadataTab';
 import MappingTab from './object/MappingTab';
@@ -36,6 +36,8 @@ interface ObjectTypeViewProps {
   onExploreData?: (id: string) => void;
   /** 基于当前对象类型发起变更提案（由工作台聚焦提案面板并展开表单） */
   onCreateProposal?: (id: string) => void;
+  /** 全局轻提示（保存结果反馈）；未注入时静默不提示（不影响功能） */
+  onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
 }
 
 export default function ObjectTypeView({
@@ -51,24 +53,38 @@ export default function ObjectTypeView({
   onNavigateToLink,
   onNavigateToAction,
   onExploreData,
-  onCreateProposal
+  onCreateProposal,
+  onToast
 }: ObjectTypeViewProps) {
   const [activeTab, setActiveTab] = useState<'metadata' | 'properties' | 'mapping' | 'links' | 'actions' | 'lineage'>('properties');
   const [newPropName, setNewPropName] = useState('');
   const [newPropType, setNewPropType] = useState<'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint'>('string');
   const [mappingRecord, setMappingRecord] = useState<OntologyMappingRecord | null>(null);
   const [mappingDirty, setMappingDirty] = useState(false);
+  /** 基础信息 Tab 未保存标记（改动后启用保存按钮） */
+  const [metaDirty, setMetaDirty] = useState(false);
+  const [metaSaving, setMetaSaving] = useState(false);
+  /** 基础信息保存基线：进入该对象时的域归属，用于判断是否需调用域变更端点 */
+  const [metaBaseline, setMetaBaseline] = useState<{ domainId?: string }>({});
   const [impactResult, setImpactResult] = useState<LineageImpactResult | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
 
   const mapping = objectType.mapping || { datasetId: '', propertyMappings: {} };
-  const selectedDataset = datasets.find(d => d.id === mapping.datasetId) || datasets[0];
+  /** DW 层数据对象的列定义缓存（选中时懒加载，避免对全部对象做 N+1 列查询） */
+  const [datasetColumns, setDatasetColumns] = useState<Record<string, DatasetColumn[]>>({});
+  const baseDataset = datasets.find(d => d.id === mapping.datasetId) || datasets[0];
+  const selectedDataset = baseDataset
+    ? { ...baseDataset, columns: datasetColumns[baseDataset.id] ?? baseDataset.columns }
+    : undefined;
 
   const { t } = useLanguage();
   const { styles } = useTheme();
 
   useEffect(() => {
     let cancelled = false;
+    // 切换对象：重置基础信息编辑态，并以当前域归属作为保存基线
+    setMetaDirty(false);
+    setMetaBaseline({ domainId: objectType.domainId });
     fetchMappings({ objectId: objectType.id })
       .then(records => {
         if (cancelled) return;
@@ -85,6 +101,26 @@ export default function ObjectTypeView({
       .catch(() => {});
     return () => { cancelled = true; };
   }, [objectType.id]);
+
+  // DW 层数据对象列定义懒加载：选中对象后才拉取其列，避免对全部 DW 对象做 N+1 查询
+  useEffect(() => {
+    const datasetId = baseDataset?.id;
+    if (!datasetId || datasetColumns[datasetId]) {
+      return;
+    }
+    let cancelled = false;
+    fetchDwDatasetColumns(datasetId)
+      .then(cols => {
+        if (!cancelled) {
+          setDatasetColumns(prev => ({ ...prev, [datasetId]: cols }));
+        }
+      })
+      .catch((e: any) => {
+        // 列定义拉取失败不阻断页面，但必须显式提示（左栏将显示 0 列，不得静默空白）
+        onToast?.('error', t('ow.msg.datasetColumnsFailed').replace('{error}', String(e?.message || e)));
+      });
+    return () => { cancelled = true; };
+  }, [baseDataset?.id, datasetColumns]);
 
   const handleSaveMapping = async () => {
     try {
@@ -125,7 +161,48 @@ export default function ObjectTypeView({
 
   // ── Handlers ──
   const handleMetaChange = (key: keyof ObjectType, value: any) => {
+    setMetaDirty(true);
     onUpdate({ ...objectType, [key]: value });
+  };
+
+  /**
+   * 保存基础信息：基础字段与域归属走两个端点。
+   *
+   * <p>基础字段 → PUT /api/v1/ecos/ontologies/{ontologyId}/entities/{id}
+   * （后端 updateEntity SQL 不含 domain_id，故域变更必须走专用端点）；
+   * 域归属 → PUT /api/v1/ontology/objects/{id}/domain（后端按 code 或 id 解析后落域主键）。
+   */
+  const handleSaveMetadata = async () => {
+    if (metaSaving) {
+      return;
+    }
+    const domainChanged = (objectType.domainId || '') !== (metaBaseline.domainId || '');
+    setMetaSaving(true);
+    try {
+      // 基础字段与域归属是两个端点：先落基础字段（不可因域校验失败而一起丢失），
+      // 再处理域变更；域置空不受后端支持，单独提示且不影响基础字段已保存的结果。
+      await updateEntity(objectType.id, {
+        code: objectType.apiName,
+        name: objectType.displayName,
+        description: objectType.description,
+      });
+      if (domainChanged && !objectType.domainId) {
+        onToast?.('error', t('ow.msg.domainClearUnsupported'));
+        setMetaDirty(false);
+        return;
+      }
+      if (domainChanged) {
+        // 传域主键（ecos_ontology_entity.domain_id 的外键目标），后端按 id 落库
+        await reassignObjectDomain(objectType.id, { domainId: objectType.domainId as string });
+      }
+      setMetaBaseline({ domainId: objectType.domainId });
+      setMetaDirty(false);
+      onToast?.('success', t('ow.msg.metaSaved').replace('{name}', objectType.displayName));
+    } catch (err: any) {
+      onToast?.('error', t('ow.msg.metaSaveFailed').replace('{error}', String(err?.message || err)));
+    } finally {
+      setMetaSaving(false);
+    }
   };
 
   const handleDatasetChange = (datasetId: string) => {
@@ -294,8 +371,9 @@ export default function ObjectTypeView({
           />
         )}
         {activeTab === 'metadata' && (
-          <MetadataTab objectType={objectType} onUpdate={onUpdate}
-            handleMetaChange={handleMetaChange} domains={domains} interfaces={interfaces} />
+          <MetadataTab objectType={objectType}
+            handleMetaChange={handleMetaChange} domains={domains} interfaces={interfaces}
+            metaDirty={metaDirty} metaSaving={metaSaving} onSaveMetadata={handleSaveMetadata} />
         )}
         {activeTab === 'mapping' && (
           <MappingTab objectType={objectType} onUpdate={onUpdate}

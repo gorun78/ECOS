@@ -5,7 +5,7 @@
 import React from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
-import { Layers } from 'lucide-react';
+import { Layers, Save } from 'lucide-react';
 import type { MetadataTabProps } from './types';
 
 export default function MetadataTab({
@@ -13,6 +13,9 @@ export default function MetadataTab({
   handleMetaChange,
   domains,
   interfaces,
+  metaDirty,
+  metaSaving,
+  onSaveMetadata,
 }: MetadataTabProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
@@ -159,6 +162,26 @@ export default function MetadataTab({
           })}
         </div>
         <p className={`text-[10px] ${styles.muted}`}>{t('ow.label.interfacesHint')}</p>
+      </div>
+
+      {/* 保存栏：脏标记 + 禁用态，交互与数据映射 Tab 的保存保持一致 */}
+      <div className={`flex items-center justify-end gap-3 border-t ${styles.divider} pt-4`}>
+        {metaDirty && (
+          <span className={`text-[10px] font-semibold ${styles.accentText}`}>{t('ow.label.metaDirty')}</span>
+        )}
+        <button
+          type="button"
+          onClick={onSaveMetadata}
+          disabled={!metaDirty || metaSaving}
+          className={`text-xs px-3 py-1.5 rounded font-medium border transition-colors flex items-center gap-1 ${
+            metaDirty && !metaSaving
+              ? `${styles.badgeBg} ${styles.accentBorder} ${styles.accentText}`
+              : `${styles.cardBorder} ${styles.cardTextMuted}`
+          }`}
+        >
+          <Save size={13} />
+          {metaSaving ? t('ow.btn.saving') : t('ow.btn.saveMeta')}
+        </button>
       </div>
     </div>
   );

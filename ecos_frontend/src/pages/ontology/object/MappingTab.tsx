@@ -68,6 +68,13 @@ export default function MappingTab({
         </div>
       </div>
 
+      {/* DW 层无可用数据对象时显式提示，避免下拉与左栏静默空白 */}
+      {datasets.length === 0 && (
+        <div className={`border ${styles.cardBorder} rounded-lg ${styles.cardBg} p-4 text-xs ${styles.muted}`}>
+          {t('ow.msg.noDwDataset')}
+        </div>
+      )}
+
       {/* Split Screen Mapping Grid */}
       <div className="grid grid-cols-2 gap-8 relative">
         {/* Left Column: Raw Datasource */}

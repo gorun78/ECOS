@@ -267,6 +267,8 @@ export interface CreateEntityDTO {
 
 /** 更新实体请求体 */
 export interface UpdateEntityDTO {
+  /** 实体编码（后端 updateEntity 支持 code/name/description/entityType） */
+  code?: string;
   name?: string;
   description?: string;
   entityType?: string;

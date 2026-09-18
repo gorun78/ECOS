@@ -22,10 +22,22 @@ export interface PropertiesTabProps extends ObjectDetailTabProps {
   sharedProperties: SharedProperty[];
 }
 
-export interface MetadataTabProps extends ObjectDetailTabProps {
+/**
+ * 基础信息 Tab props —— 不继承 ObjectDetailTabProps：
+ * 该 Tab 只读 objectType 并通过 handleMetaChange 回写，不消费 onUpdate，
+ * 声明独立契约可避免传入无用的 onUpdate。
+ */
+export interface MetadataTabProps {
+  objectType: ObjectType;
   handleMetaChange: (key: keyof ObjectType, value: any) => void;
   domains: OntologyDomain[];
   interfaces: InterfaceType[];
+  /** 基础信息是否存在未保存改动 */
+  metaDirty: boolean;
+  /** 保存请求进行中（禁用按钮防重复提交） */
+  metaSaving: boolean;
+  /** 保存基础信息（基础字段 + 域归属） */
+  onSaveMetadata: () => void;
 }
 
 export interface MappingTabProps extends ObjectDetailTabProps {

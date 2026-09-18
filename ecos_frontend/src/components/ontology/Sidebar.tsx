@@ -217,7 +217,8 @@ export default function Sidebar({
     savePromise
       .then((vo) => {
         const savedDomain: OntologyDomain = {
-          id: vo?.code || code,
+          // id 取域表主键（与实体表 domain_id 外键口径一致），code 单独保留供删除/更新端点使用
+          id: vo?.id || code,
           code: vo?.code || code,
           displayName: vo?.name || savedName,
           description: vo?.description || savedDescription,
@@ -233,16 +234,18 @@ export default function Sidebar({
         onUpdateDomains(newDomains);
 
         // 对象归属：本地即时映射 + 后端 best-effort reassign（新增绑定逐对象 PUT）
+        // 本地 domainId 用域主键（与实体表 domain_id 口径一致）；PUT body 用 domainCode（后端两者皆可解析）
         const assignedSet = new Set(formAssignedObjects);
+        const savedDomainKey = savedDomain.id;
         const updatedObjects = allObjectTypes.map(ot => {
           const shouldHave = assignedSet.has(ot.id);
-          if (shouldHave && (ot.domainId || undefined) !== code) {
+          if (shouldHave && (ot.domainId || undefined) !== savedDomainKey) {
             reassignObjectDomain(ot.id, { domainCode: code }).catch((rErr: any) => {
               console.warn('T8 reassignObjectDomain failed:', ot.id, rErr?.message || rErr);
             });
           }
-          if (shouldHave) return { ...ot, domainId: code };
-          if (ot.domainId === code) return { ...ot, domainId: undefined };
+          if (shouldHave) return { ...ot, domainId: savedDomainKey };
+          if (ot.domainId === savedDomainKey) return { ...ot, domainId: undefined };
           return ot;
         });
         onUpdateObjectTypes(updatedObjects);
@@ -1001,7 +1004,7 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* 📖 术语库快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
+      {/* 📖 Wiki 快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
       <div className={`border-t ${styles.appBorder} px-3 py-3`}>
         <button
           onClick={() => onSelectCategory('glossary', null)}

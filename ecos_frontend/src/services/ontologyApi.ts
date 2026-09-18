@@ -60,7 +60,7 @@ import type {
   LineageImpactResult,
   ParseLineageResult,
 } from "../types/ontology";
-import type { ObjectType, PropertyType, LinkType } from "../types/ontology";
+import type { ObjectType, PropertyType, LinkType, Dataset, DatasetColumn, ActionType, ActionRule, ActionValidationRule } from "../types/ontology";
 
 // ── 配置常量 ──────────────────────────────────────────────
 
@@ -589,6 +589,116 @@ export async function deleteMapping(id: string) {
 
 export async function fetchMappableObjects() {
   return apiFetchData(`${MAPPING_BASE}/objects`);
+}
+
+// ================================================================
+// DW 层数据对象（数据映射取数来源）
+//
+// 依据《数据湖存储分层规范》§四「各工作台读写边界」：本体工作台对近源层（RAW，MinIO）
+// 禁止直读、对 DW 层（CURATED）只读。故数据映射的数据源必须是 layer=CURATED 的
+// td_data_resource 记录，不得列近源层资源，更不得直连外部源系统。
+//   GET /api/v1/engine/data/layers/CURATED      → DW 层对象列表（含 resource_id 等）
+//   GET /api/v1/datanet/metadata/fields/{id}    → 该对象的列定义（懒加载）
+// ================================================================
+
+const DATA_LAYER_BASE = "/api/v1/engine/data/layers";
+const DATA_FIELDS_BASE = "/api/v1/datanet/metadata/fields";
+
+/**
+ * 获取 DW 层（CURATED）数据对象列表，映射为工作台 Dataset（列定义由
+ * {@link fetchDwDatasetColumns} 按需加载，避免对全部对象做 N+1 列查询）。
+ */
+export async function fetchDwDatasets(): Promise<Dataset[]> {
+  // 后端返回包装体 {layer, resources, total}（非裸数组），兼容裸数组形态
+  const resp: any = await apiFetchData<any>(`${DATA_LAYER_BASE}/CURATED`);
+  const raw: any[] = Array.isArray(resp) ? resp : (resp?.resources ?? []);
+  return (raw || [])
+    .filter(r => r && r.resource_id)
+    .map((r): Dataset => ({
+      id: String(r.resource_id),
+      name: String(r.resource_name || r.resource_id),
+      path: String(r.source_path || `${r.datasource_id || ''}.${r.resource_name || ''}`),
+      columns: [],
+      sampleData: [],
+    }));
+}
+
+/** 获取指定 DW 层数据对象的列定义（name/type）。 */
+export async function fetchDwDatasetColumns(resourceId: string): Promise<DatasetColumn[]> {
+  const fields = await apiFetchData<any[]>(`${DATA_FIELDS_BASE}/${encodeURIComponent(resourceId)}`);
+  return (fields || [])
+    .filter(f => f && f.fieldName)
+    .map(f => ({ name: String(f.fieldName), type: String(f.dataType || '') }));
+}
+
+// ================================================================
+// 操作类型 (Action Types) — 真实后端 /api/v1/ontology/action-types
+//
+// 后端载体：ecos_action_type（id/name/description/object_type_id/preconditions/post_actions/
+// audit_required/enabled）。前端 ActionType 为富模型（参数/规则/校验），故在此做一次映射：
+//   object_type_id → 注入一个 dataType='object' 的参数（对象详情「操作」Tab 依赖该参数匹配）
+//   preconditions  → validationRules（前置条件即校验规则）
+//   post_actions   → rules（写回动作映射为 modify_object）
+// ================================================================
+
+const ACTION_TYPE_BASE = "/api/v1/ontology/action-types";
+
+/** 安全解析后端 JSON 数组文本；非法/空值返回空数组（不抛错，避免整页失败） */
+function parseJsonArray(raw: unknown): any[] {
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 获取全部操作类型（后端枚举 → 前端富模型）。
+ */
+export async function fetchActionTypes(): Promise<ActionType[]> {
+  const raw = await apiFetchData<any[]>(ACTION_TYPE_BASE);
+  return (raw || []).map((r): ActionType => {
+    const objectTypeId = r.objectTypeId ? String(r.objectTypeId) : "";
+    const preconditions = parseJsonArray(r.preconditions);
+    const postActions = parseJsonArray(r.postActions);
+    return {
+      id: String(r.id),
+      displayName: String(r.name || r.id),
+      apiName: String(r.name || r.id),
+      description: r.description ? String(r.description) : "",
+      parameters: objectTypeId
+        ? [{
+            id: `${r.id}_target`,
+            displayName: "目标对象",
+            dataType: "object",
+            objectTypeId,
+            isRequired: true,
+            description: "该操作作用的实例对象",
+          }]
+        : [],
+      validationRules: preconditions.map((p: any, idx: number): ActionValidationRule => {
+        const expression = `${p?.field ?? ""} ${p?.op ?? ""} ${p?.value ?? ""}`.trim();
+        return {
+          id: `${r.id}_pre_${idx}`,
+          displayName: expression,
+          expression,
+          errorMessage: expression,
+        };
+      }),
+      rules: postActions.map((a: any, idx: number): ActionRule => ({
+        id: `${r.id}_post_${idx}`,
+        type: "modify_object",
+        targetParameterId: `${r.id}_target`,
+        propertyEdits: a?.field
+          ? [{ propertyId: String(a.field), valueExpression: String(a.value ?? "") }]
+          : [],
+      })),
+    };
+  });
 }
 
 // ================================================================

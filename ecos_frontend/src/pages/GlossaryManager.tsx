@@ -1,5 +1,5 @@
 /**
- * GlossaryManager — 术语全生命周期管理
+ * GlossaryManager — 词条全生命周期管理
  * CRUD + 状态流转 + 搜索筛选 + Toast 通知
  *
  * @license SPDX-License-Identifier: Apache-2.0
@@ -19,7 +19,7 @@ import {
 } from "../services/glossary";
 import { useDict } from "../hooks/useDict";
 
-const DOMAINS = ["数据管理", "AI技术", "业务术语", "技术架构", "安全合规", "其他"];
+const DOMAINS = ["数据管理", "AI技术", "业务词条", "技术架构", "安全合规", "其他"];
 
 // ── Toast component ──
 const Toast: React.FC<{
@@ -86,7 +86,7 @@ const DeleteConfirm: React.FC<{
 // Main Component
 // ═══════════════════════════════════════════
 export default function GlossaryManager() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   // ── data state ──
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
@@ -116,7 +116,8 @@ export default function GlossaryManager() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── dict hook ──
-  const { getLabel, getColor, getOptions } = useDict('glossary_status');
+  // 传入 locale：useDict 仅在 locale === 'en' 时取 dictLabelEn，否则英文态会回落到中文标签
+  const { getLabel, getColor, getOptions } = useDict('glossary_status', locale);
 
   // ── helper ──
   const showToast = useCallback((type: "success" | "error", msg: string) => {
@@ -360,8 +361,9 @@ export default function GlossaryManager() {
             </div>
           ) : (
             filteredTerms.map(term => {
-              const color = getColor(term.status, 'DRAFT');
-              const label = getLabel(term.status, 'DRAFT');
+              // 字典缺失时的回退用主题令牌 + 本地化文案，避免把状态码/非法 class 直接渲染
+              const color = getColor(term.status, `${styles.badgeBg} ${styles.badgeText}`);
+              const label = getLabel(term.status, t("glossary.status.draft"));
               const isActive = term.id === selectedId;
               return (
                 <div
@@ -452,8 +454,8 @@ export default function GlossaryManager() {
           {selected && (
             <div>
               <div className={`text-[11px] font-semibold ${styles.cardTextMuted} mb-1`}>{t("glossary.field.status")}</div>
-              <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${getColor(selected.status, 'DRAFT')}`}>
-                {getLabel(selected.status)}
+              <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${getColor(selected.status, `${styles.badgeBg} ${styles.badgeText}`)}`}>
+                {getLabel(selected.status, t("glossary.status.draft"))}
               </span>
             </div>
           )}

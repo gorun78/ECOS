@@ -50,7 +50,15 @@ import {
   DEFAULT_ONTOLOGY_ID,
   createExportTask,
   fetchWorkbenchDomains,
+  fetchDwDatasets,
+  fetchActionTypes,
 } from '../services/ontologyApi';
+import {
+  DEMO_FUNCTION_TYPES,
+  DEMO_INTERFACES,
+  DEMO_SHARED_PROPERTIES,
+  applyEnterpriseDemoBindings,
+} from '../data/enterpriseOntologyDemo';
 import type { CreateExportDTO } from '../types/ontology';
 import { useOntologyData } from '../hooks/useOntologyData';
 import type { Entity } from '../types/workbench';
@@ -92,9 +100,9 @@ export default function OntologyWorkbenchLayout() {
   //     消除"本体表当域源 + 写域表"的双源不一致。
   // useOntologyData 仍负责 objectTypes/linkTypes 种子加载(主逻辑不动)。
   useOntologyData(({ objectTypes: loadedObjects, linkTypes: loadedLinks }) => {
-    setObjectTypes(loadedObjects);
+    setObjectTypes(applyEnterpriseDemoBindings(loadedObjects));
     setLinkTypes(loadedLinks);
-    // Keep action/interface/shared-prop/function/dataset as empty (no backend yet)
+    // action/interface/shared-prop/function 见下方专门的数据加载 effect
   });
 
   // ── Toast Helper ──
@@ -136,7 +144,9 @@ export default function OntologyWorkbenchLayout() {
     try {
       const vos = await fetchWorkbenchDomains();
       const list: OntologyDomain[] = (vos || []).map((v: any) => ({
-        id: v.code || v.id,
+        // id 必须取域表主键（ecos_domain.id）—— 实体表 domain_id 外键指向它，
+        // 用 code 作 id 会导致对象详情「所属域」下拉无法回显、侧边栏分组失配
+        id: v.id ?? v.code,
         code: v.code,
         displayName: v.name || v.code || v.id,
         description: v.description || '',
@@ -158,6 +168,60 @@ export default function OntologyWorkbenchLayout() {
   }, []);
 
   /**
+   * 加载数据映射的数据源 —— DW 层（CURATED）数据对象。
+   *
+   * 依据《数据湖存储分层规范》§四：本体工作台禁止直读近源层（MinIO RAW），
+   * 只能从 DW 层取数。列定义在选中对象时由 ObjectTypeDetail 懒加载。
+   */
+  useEffect(() => {
+    let cancelled = false;
+    fetchDwDatasets()
+      .then(list => {
+        if (!cancelled) {
+          setDatasets(list);
+        }
+      })
+      .catch((e: any) => {
+        // 后端不可达：保持空列表并显式提示，不静默空白
+        if (!cancelled) {
+          showToast('error', t('ow.msg.dwDatasetLoadFailed').replace('{error}', String(e?.message || e)));
+        }
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * 加载操作类型 —— 真实后端 /api/v1/ontology/action-types（表 ecos_action_type）。
+   */
+  useEffect(() => {
+    let cancelled = false;
+    fetchActionTypes()
+      .then(list => {
+        if (!cancelled) {
+          setActionTypes(list);
+        }
+      })
+      .catch((e: any) => {
+        if (!cancelled) {
+          showToast('error', t('ow.msg.actionTypesLoadFailed').replace('{error}', String(e?.message || e)));
+        }
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * 加载逻辑函数 / 接口规范 / 共享属性 —— 后端暂无数据源，使用企业 demo 数据集
+   * （见 data/enterpriseOntologyDemo.ts）。
+   */
+  useEffect(() => {
+    setFunctionTypes(DEMO_FUNCTION_TYPES);
+    setInterfaces(DEMO_INTERFACES);
+    setSharedProperties(DEMO_SHARED_PROPERTIES);
+  }, []);
+
+  /**
    * 重拉对象类型及其属性（提案执行完成后的闭环刷新）
    * 与 useOntologyData 的加载路径一致：实体列表 + 逐实体属性 → mapEntityToObjectType，
    * 确保提案落库后的变更（新增/修改/删除属性）立即可见。
@@ -172,7 +236,7 @@ export default function OntologyWorkbenchLayout() {
       const list: ObjectType[] = entities.map((entity: any, idx: number) =>
         mapEntityToObjectType(entity, propsResponses[idx] || []),
       );
-      setObjectTypes(list);
+      setObjectTypes(applyEnterpriseDemoBindings(list));
     } catch (e: any) {
       showToast('error', t('ow.msg.dataLoadFailed'));
     }
@@ -199,7 +263,7 @@ export default function OntologyWorkbenchLayout() {
         const list: ObjectType[] = (entities || []).map((e: any, idx: number) =>
           mapEntityToObjectType(e, propsResponses[idx] || [])
         );
-        updateObjectTypes(list);
+        updateObjectTypes(applyEnterpriseDemoBindings(list));
       } catch (e: any) {
         showToast('error', t('ow.msg.createFailed').replace('{error}', String(e.message)));
       }
@@ -460,6 +524,7 @@ export default function OntologyWorkbenchLayout() {
                 setSelectedId(null);
               }}
               onCreateProposal={() => setProposalFormSignal(v => v + 1)}
+              onToast={showToast}
             />
           );
         })()}
@@ -565,9 +630,10 @@ export default function OntologyWorkbenchLayout() {
           );
         })()}
 
-        {/* 术语库 */}
+        {/* Wiki */}
         {selectedCategory === 'glossary' && (
-          <div className="p-4">
+          // h-full + min-h-0：GlossaryManager 是 h-full flex 布局，父级不给确定高度会塌成 0
+          <div className="p-4 h-full min-h-0">
             <GlossaryTab />
           </div>
         )}
