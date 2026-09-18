@@ -228,3 +228,67 @@ VALUES
  '企业运营本体初始版本（演示种子数据）', 'admin', now());
 
 -- ⑧ 提案 / 动作 / 业务数据 / 规则：保持为空（已由 ① 清空，演示数据不播种流程与实例数据）
+
+-- ============================================================================
+-- ⑨ 操作类型（ecos_action_type）— 企业运营场景 demo
+--
+-- object_type_id 存**本体实体主键**（ent001..ent011）：前端 ObjectTypeDetail 的
+-- 「操作」Tab 按 `param.objectTypeId === objectType.id` 匹配，故必须用实体主键而非实体 code。
+-- preconditions / post_actions 为 JSON 数组文本（前端映射为规则展示）。
+--
+-- 清理：ecos_action_type 存量为历史测试数据（approve_order / test_action），
+-- 与本本体无关，整表清空后重播。
+-- ============================================================================
+DELETE FROM public.ecos_action_type;
+
+INSERT INTO public.ecos_action_type
+    (id, name, description, object_type_id, preconditions, post_actions, audit_required, enabled, created_at, updated_at)
+VALUES
+('act_emp_transfer', '员工调岗', '将员工调动至目标部门并更新所属部门编码',
+ 'ent002', '[{"field":"emp_status","op":"eq","value":"ACTIVE"}]',
+ '[{"type":"update_field","field":"dept_code","value":"${targetDeptCode}"}]', true, true, now(), now()),
+('act_emp_leave', '员工离职', '办理离职并置在职状态为已离职',
+ 'ent002', '[{"field":"emp_status","op":"eq","value":"ACTIVE"}]',
+ '[{"type":"update_field","field":"emp_status","value":"LEFT"}]', true, true, now(), now()),
+('act_customer_upgrade', '客户等级调整', '按年度贡献度调整客户等级',
+ 'ent004', '[{"field":"customer_status","op":"eq","value":"ACTIVE"}]',
+ '[{"type":"update_field","field":"customer_level","value":"${targetLevel}"}]', false, true, now(), now()),
+('act_customer_lost', '客户流失标记', '将客户标记为已流失',
+ 'ent004', '[{"field":"customer_status","op":"eq","value":"ACTIVE"}]',
+ '[{"type":"update_field","field":"customer_status","value":"LOST"}]', true, true, now(), now()),
+('act_order_approve', '订单审批', '审批通过待处理订单',
+ 'ent006', '[{"field":"payment_status","op":"eq","value":"UNPAID"}]',
+ '[{"type":"update_field","field":"payment_status","value":"PARTIAL"}]', true, true, now(), now()),
+('act_order_deliver', '订单发货', '将订单交付状态推进为已交付',
+ 'ent006', '[{"field":"delivery_status","op":"eq","value":"PENDING"}]',
+ '[{"type":"update_field","field":"delivery_status","value":"DELIVERING"}]', false, true, now(), now()),
+('act_project_close', '项目结项', '完成项目结项并归档',
+ 'ent005', '[{"field":"project_status","op":"eq","value":"DELIVERED"}]',
+ '[{"type":"update_field","field":"project_status","value":"CLOSED"}]', true, true, now(), now()),
+('act_project_budget_adjust', '项目预算调整', '调整项目预算金额',
+ 'ent005', '[{"field":"project_status","op":"in","value":"INIT,RUNNING"}]',
+ '[{"type":"update_field","field":"budget","value":"${newBudget}"}]', true, true, now(), now()),
+('act_supplier_freeze', '供应商冻结', '因质量或交付问题冻结供应商',
+ 'ent007', '[{"field":"supplier_status","op":"eq","value":"ACTIVE"}]',
+ '[{"type":"update_field","field":"supplier_status","value":"FROZEN"}]', true, true, now(), now()),
+('act_contract_effective', '合同生效', '将已签署合同置为生效中',
+ 'ent008', '[{"field":"contract_status","op":"eq","value":"DRAFT"}]',
+ '[{"type":"update_field","field":"contract_status","value":"EFFECTIVE"}]', true, true, now(), now()),
+('act_contract_terminate', '合同终止', '提前终止执行中的合同',
+ 'ent008', '[{"field":"contract_status","op":"eq","value":"PERFORMING"}]',
+ '[{"type":"update_field","field":"contract_status","value":"TERMINATED"}]', true, true, now(), now()),
+('act_asset_scrap', '资产报废', '将已达报废条件资产置为已报废',
+ 'ent009', '[{"field":"asset_status","op":"in","value":"IN_USE,IDLE"}]',
+ '[{"type":"update_field","field":"asset_status","value":"SCRAPPED"}]', true, true, now(), now()),
+('act_opp_advance', '销售机会推进', '推进销售机会阶段并更新赢单概率',
+ 'ent010', '[{"field":"stage","op":"in","value":"初步接触,方案,报价"}]',
+ '[{"type":"update_field","field":"stage","value":"${nextStage}"}]', false, true, now(), now()),
+('act_dept_merge', '部门合并', '将下级部门并入目标部门',
+ 'ent001', '[{"field":"dept_status","op":"eq","value":"ACTIVE"},{"field":"dept_level","op":"gt","value":"1"}]',
+ '[{"type":"update_field","field":"parent_dept_code","value":"${targetDeptCode}"}]', true, true, now(), now()),
+('act_product_offsale', '产品停售', '将产品置为停售',
+ 'ent003', '[{"field":"product_status","op":"eq","value":"ON_SALE"}]',
+ '[{"type":"update_field","field":"product_status","value":"OFF_SALE"}]', false, true, now(), now()),
+('act_category_disable', '产品分类停用', '停用不再使用的产品分类',
+ 'ent011', '[{"field":"category_status","op":"eq","value":"ACTIVE"}]',
+ '[{"type":"update_field","field":"category_status","value":"INACTIVE"}]', false, true, now(), now());
