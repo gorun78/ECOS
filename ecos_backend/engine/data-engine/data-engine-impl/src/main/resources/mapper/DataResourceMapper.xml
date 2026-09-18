@@ -21,22 +21,32 @@
         <result property="updateBy" column="update_by"/>
         <result property="updateTime" column="update_time"/>
         <result property="layer" column="layer"/>
+        <result property="zone" column="zone"/>
     </resultMap>
 
+    <!--
+      layer / zone 采用条件列：调用方未设置时不写入，
+      保留 DB 默认值（layer DEFAULT 'RAW'，见 V54）与既有元数据采集行为不变。
+    -->
     <insert id="insert">
         INSERT INTO td_data_resource (
             resource_id, resource_name, resource_type, org_id, org_name,
             datasource_id, source_path, description, tags, status,
             field_count, record_count, last_sync_time, create_by, create_time
+            <if test="layer != null">, layer</if>
+            <if test="zone != null">, zone</if>
         ) VALUES (
             #{resourceId}, #{resourceName}, #{resourceType}, #{orgId}, #{orgName},
             #{datasourceId}, #{sourcePath}, #{description}, #{tags}, #{status},
             #{fieldCount}, #{recordCount}, #{lastSyncTime}, #{createBy}, NOW()
+            <if test="layer != null">, #{layer}</if>
+            <if test="zone != null">, #{zone}</if>
         )
     </insert>
 
     <update id="update">
-        UPDATE td_data_resource SET
+        UPDATE td_data_resource
+        <set>
             resource_name = #{resourceName},
             resource_type = #{resourceType},
             description = #{description},
@@ -46,12 +56,23 @@
             record_count = #{recordCount},
             last_sync_time = #{lastSyncTime},
             update_by = #{updateBy},
-            update_time = NOW()
+            update_time = NOW(),
+            <if test="layer != null">layer = #{layer},</if>
+            <if test="zone != null">zone = #{zone},</if>
+        </set>
         WHERE resource_id = #{resourceId}
     </update>
 
     <select id="findById" resultMap="DataResourceMap">
         SELECT * FROM td_data_resource WHERE resource_id = #{id}
+    </select>
+
+    <!-- 数据湖对象 / DW 层表按 source_path 定位（source_path 非唯一，取最新一条） -->
+    <select id="findBySourcePath" resultMap="DataResourceMap">
+        SELECT * FROM td_data_resource
+        WHERE source_path = #{sourcePath}
+        ORDER BY create_time DESC
+        LIMIT 1
     </select>
 
     <select id="findByDatasource" resultMap="DataResourceMap">

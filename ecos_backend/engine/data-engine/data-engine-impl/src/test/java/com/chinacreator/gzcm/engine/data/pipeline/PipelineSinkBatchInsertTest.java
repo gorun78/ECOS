@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.engine.data.UdfService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
+import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,9 @@ class PipelineSinkBatchInsertTest {
         ConnectorFactory cf = mock(ConnectorFactory.class);
         when(cf.getConnector("JDBC")).thenReturn(jdbcConnector);
         this.service = new PipelineExecutionService(repository, cf,
-                mock(JdbcTemplate.class), dataSourceService, mock(UdfService.class));
+                mock(JdbcTemplate.class), dataSourceService, mock(UdfService.class),
+                mock(MinioStorageService.class),
+                mock(com.chinacreator.gzcm.engine.data.service.DataLakeResourceService.class));
     }
 
     @Test

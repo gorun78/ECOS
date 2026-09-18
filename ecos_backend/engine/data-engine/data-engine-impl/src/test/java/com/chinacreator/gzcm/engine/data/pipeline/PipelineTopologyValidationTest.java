@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
+import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,7 +58,9 @@ class PipelineTopologyValidationTest {
         this.dataSourceService = mock(com.chinacreator.gzcm.engine.data.DataSourceService.class);
         this.udfService = mock(com.chinacreator.gzcm.engine.data.UdfService.class);
         this.service = new PipelineExecutionService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService,
+                mock(MinioStorageService.class),
+                mock(com.chinacreator.gzcm.engine.data.service.DataLakeResourceService.class));
     }
 
     // ─── A. 环检测 ────────────────────────────────────

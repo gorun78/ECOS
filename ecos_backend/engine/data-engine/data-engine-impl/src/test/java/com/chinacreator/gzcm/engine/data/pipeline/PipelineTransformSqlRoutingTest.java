@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.engine.data.UdfService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
+import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,9 @@ class PipelineTransformSqlRoutingTest {
         this.dataSourceService = mock(DataSourceService.class);
         this.udfService = mock(UdfService.class);
         this.service = new PipelineExecutionService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService,
+                mock(MinioStorageService.class),
+                mock(com.chinacreator.gzcm.engine.data.service.DataLakeResourceService.class));
     }
 
     // ─── A. SELECT 走 queryForList ────────────────────────────

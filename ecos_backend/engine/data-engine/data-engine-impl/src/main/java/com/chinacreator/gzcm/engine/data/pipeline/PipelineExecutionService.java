@@ -6,12 +6,14 @@ import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
 import com.chinacreator.gzcm.engine.data.service.UdfSandbox;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.CsvConnector;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import com.chinacreator.gzcm.runtime.access.connector.RestApiConnector;
+import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
 import com.chinacreator.gzcm.runtime.core.logging.ILoggingService;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
@@ -49,6 +51,8 @@ public class PipelineExecutionService {
     private final JdbcTemplate jdbc;
     private final DataSourceService dataSourceService;
     private final UdfService udfService;
+    private final MinioStorageService minioStorageService;
+    private final DataLakeResourceService dataLakeResourceService;
 
     /** 可选注入，无 bean 时不影响核心流程 */
     @Autowired(required = false)
@@ -65,12 +69,16 @@ public class PipelineExecutionService {
                                      ConnectorFactory connectorFactory,
                                      JdbcTemplate jdbc,
                                      DataSourceService dataSourceService,
-                                     UdfService udfService) {
+                                     UdfService udfService,
+                                     MinioStorageService minioStorageService,
+                                     DataLakeResourceService dataLakeResourceService) {
         this.repository = repository;
         this.connectorFactory = connectorFactory;
         this.jdbc = jdbc;
         this.dataSourceService = dataSourceService;
         this.udfService = udfService;
+        this.minioStorageService = minioStorageService;
+        this.dataLakeResourceService = dataLakeResourceService;
     }
 
     // ==================== 执行入口 ====================
@@ -134,6 +142,9 @@ public class PipelineExecutionService {
             logInfo("Pipeline nodes sorted: {} nodes, order: {}",
                     sorted.size(), sorted.stream().map(PipelineNode::getNodeId).toList());
 
+            // 近源层对象 key 的 {source} 段（取 DAG 中首个 SOURCE_JDBC 节点的 datasourceId）
+            String lakeSource = resolveLakeSource(sorted);
+
             long totalRows = 0;
             int total = sorted.size();
             // 上游结果表：nodeId → 该节点执行产出的行（供 JOIN/SINK/TRANSFORM_UDF 消费）
@@ -148,7 +159,7 @@ public class PipelineExecutionService {
 
                 long nodeRows;
                 try {
-                    nodeRows = executeNode(node, nodeResults);
+                    nodeRows = executeNode(node, nodeResults, lakeSource);
                 } catch (Exception e) {
                     if (callback != null) {
                         callback.onStepComplete(cbTaskId, node.getNodeId(), node.getType(), false, e.getMessage());
@@ -202,12 +213,34 @@ public class PipelineExecutionService {
     // ==================== 节点执行 ====================
 
     /**
+     * 解析近源层对象 key 的 {source} 段 —— 取 DAG 中首个 SOURCE_JDBC 节点的 datasourceId。
+     * <p>无 SOURCE_JDBC 节点或未配置 datasourceId 时回退 {@code default}。
+     *
+     * @param nodes 拓扑序节点列表
+     * @return 数据源标识
+     */
+    private String resolveLakeSource(List<PipelineNode> nodes) {
+        for (PipelineNode n : nodes) {
+            if (!"SOURCE_JDBC".equals(n.getType())) {
+                continue;
+            }
+            String dsId = strOrNull(parseConfig(n.getConfig()).get("datasourceId"));
+            if (dsId != null && !dsId.isEmpty()) {
+                return dsId;
+            }
+        }
+        return "default";
+    }
+
+    /**
      * 执行单个节点。
      *
      * @param node        节点
      * @param nodeResults 已执行节点的结果表（nodeId → 行），JOIN/SINK 消费上游数据
+     * @param lakeSource  近源层对象 key 的 {source} 段（SINK_MINIO 默认对象名使用）
      */
-    private long executeNode(PipelineNode node, Map<String, List<Map<String, Object>>> nodeResults) throws Exception {
+    private long executeNode(PipelineNode node, Map<String, List<Map<String, Object>>> nodeResults,
+                             String lakeSource) throws Exception {
         Map<String, Object> config = parseConfig(node.getConfig());
         String type = node.getType();
 
@@ -252,6 +285,7 @@ public class PipelineExecutionService {
                 yield merged.size();
             }
             case "SINK" -> executeSink(node, config, nodeResults);
+            case "SINK_MINIO" -> executeSinkMinio(node, config, nodeResults, lakeSource);
             case "OUTPUT_OBJECT" -> executeOutputObject(config);
             default -> throw new ValidationException("type", "不支持的节点类型: " + type);
         };
@@ -607,6 +641,8 @@ public class PipelineExecutionService {
             batchValues.add(arr);
         }
         int written = jdbcConnector.executeBatch(ds.getConnectionConfig(), insertSql, batchValues, Math.max(1, batchSize));
+        // 标记 DW 层（layer=CURATED）；失败不影响写入结果
+        dataLakeResourceService.markCurated(table);
         logInfo("SINK done: table={}, mode={}, rows={}, batchSize={}", table, mode, written, batchSize);
         return written;
     }
@@ -637,6 +673,103 @@ public class PipelineExecutionService {
         sb.append(String.join("", placeholders));
         sb.append(")");
         return sb.toString();
+    }
+
+    /**
+     * SINK_MINIO：将上游节点产出行（或 inlineData）序列化为 CSV 后上传数据湖近源层（MinIO）。
+     * <p>config 字段：bucket(可选，默认数据湖配置 bucket)、objectName(可选，默认
+     * {@code raw/structured/{source}/{table}/dt={yyyy-MM-dd}/{table}_{yyyyMMddHHmmss}.csv})、
+     * table(必填，对象名前缀)、format(可选，仅支持 csv)、columns(可选，指定列顺序)、
+     * inlineData(可选内联行)。
+     * <p>上传成功后登记/标记 td_data_resource（layer=RAW, zone=STRUCTURED）并返回行数；
+     * MinIO 不可用或上传失败抛 BusinessException（执行失败可回溯）。
+     *
+     * @param lakeSource 近源层对象 key 的 {source} 段
+     */
+    private long executeSinkMinio(PipelineNode node, Map<String, Object> config,
+                                  Map<String, List<Map<String, Object>>> nodeResults,
+                                  String lakeSource) throws Exception {
+        Object tableObj = configFirst(config, "table", "objectPrefix");
+        if (tableObj == null || tableObj.toString().isEmpty()) {
+            throw new ValidationException("table", "SINK_MINIO: table 必填");
+        }
+        String table = tableObj.toString();
+
+        String format = String.valueOf(config.getOrDefault("format", "csv")).toLowerCase();
+        if (!"csv".equals(format)) {
+            throw new ValidationException("format", "SINK_MINIO: format 仅支持 csv");
+        }
+
+        // 行来源: 节点 inlineData 优先，否则取上游节点产出行（DAG 前驱合并）
+        List<Map<String, Object>> rows = readInlineRows(config.get("inlineData"));
+        if (rows.isEmpty()) {
+            rows = collectInputs(node, nodeResults);
+        }
+        if (rows.isEmpty()) {
+            log.info("SINK_MINIO: no data rows (table={}), skip", table);
+            return 0;
+        }
+
+        // 列集: config.columns 优先，否则首行键集（保持行序稳定）
+        List<String> columns = normalizeStringList(config.get("columns"));
+        if (columns.isEmpty()) {
+            columns = new ArrayList<>(rows.get(0).keySet());
+        }
+
+        // 对象名: 显式 objectName > raw/structured/{source}/{table}/dt={yyyy-MM-dd}/{table}_{ts}.csv
+        String objectName = strOrNull(config.get("objectName"));
+        if (objectName == null || objectName.isEmpty()) {
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            String ts = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+            String dt = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            objectName = "raw/structured/" + lakeSource + "/" + table + "/dt=" + dt + "/" + table + "_" + ts + ".csv";
+        }
+
+        byte[] csvBytes = toCsv(rows, columns);
+        Map<String, Object> upload = minioStorageService.putObject(objectName, csvBytes, "text/csv; charset=UTF-8");
+        if (!"success".equals(upload.get("status"))) {
+            throw new BusinessException("SINK_MINIO 上传失败: " + upload.get("message"));
+        }
+        // 登记/标记近源层对象（layer=RAW, zone=STRUCTURED）；失败不影响上传结果
+        dataLakeResourceService.markNearSourceStructured(
+                table, objectName, lakeSource, columns.size(), (long) rows.size());
+        logInfo("SINK_MINIO done: object={}, rows={}, bucket={}", objectName, rows.size(), upload.get("bucket"));
+        return rows.size();
+    }
+
+    /** 将行集序列化为 CSV（UTF-8）。值 null → 空串；含逗号/引号/换行 → 双引号包裹。 */
+    private byte[] toCsv(List<Map<String, Object>> rows, List<String> columns) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < columns.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append(escapeCsv(columns.get(i)));
+        }
+        sb.append('\n');
+        for (Map<String, Object> row : rows) {
+            for (int i = 0; i < columns.size(); i++) {
+                if (i > 0) sb.append(',');
+                Object v = row.get(columns.get(i));
+                sb.append(escapeCsv(v == null ? "" : String.valueOf(v)));
+            }
+            sb.append('\n');
+        }
+        return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** CSV 字段转义：含逗号/引号/换行/回车时用双引号包裹并转义内部引号。 */
+    private String escapeCsv(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.indexOf(',') >= 0 || value.indexOf('"') >= 0
+                || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
+    }
+
+    private String strOrNull(Object v) {
+        return v == null ? null : String.valueOf(v);
     }
 
     // ==================== 调试链委托入口（供 PipelineDebugService 复用） ====================
@@ -986,6 +1119,8 @@ public class PipelineExecutionService {
             count++;
         }
 
+        // 标记 DW 层（layer=CURATED）；失败不影响写入结果
+        dataLakeResourceService.markCurated(targetTable);
         logInfo("OUTPUT_OBJECT: inserted {} rows into {}", count, targetTable);
         return count;
     }

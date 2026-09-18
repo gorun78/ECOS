@@ -71,6 +71,9 @@ public class DataResource {
     /** 数据分层: SOURCE/RAW/CURATED/SEMANTIC/APPLICATION */
     private String layer;
 
+    /** 近源区（仅 layer=RAW 时有效）: STRUCTURED=结构化近源 / UNSTRUCTURED=非结构化近源 */
+    private String zone;
+
     // ===== Getters/Setters =====
 
     public String getResourceId() { return resourceId; }
@@ -126,4 +129,7 @@ public class DataResource {
 
     public String getLayer() { return layer; }
     public void setLayer(String layer) { this.layer = layer; }
+
+    public String getZone() { return zone; }
+    public void setZone(String zone) { this.zone = zone; }
 }
