@@ -377,7 +377,12 @@ public class PipelineDebugService {
             case "SOURCE_JDBC" -> execSourceJdbcCapture(s, config);
             case "SOURCE_CSV" -> execSourceCsvCapture(s, config);
             case "SOURCE_REST" -> execSourceRestCapture(s, config);
-            case "SOURCE_CDC" -> throw new BusinessException("SOURCE_CDC 仅 flagship 版本支持");
+            case "SOURCE_CDC" -> {
+                // D12：SOURCE_CDC 仅在节点枚举中登记，调试执行器未实现 —— 显式拒绝（与 PipelineExecutionService 同源）
+                log.warn("SOURCE_CDC 节点未实现，显式拒绝调试执行: nodeId={}", node.getNodeId());
+                throw new BusinessException(
+                        "SOURCE_CDC 节点尚未实现，请使用 SOURCE_JDBC / SOURCE_CSV / SOURCE_REST");
+            }
             case "TRANSFORM_SQL" -> execTransformSqlCapture(s, config);
             case "TRANSFORM_UDF" -> execUdfTransformCapture(s, node, config);
             case "JOIN" -> execJoinCapture(s, node, config);

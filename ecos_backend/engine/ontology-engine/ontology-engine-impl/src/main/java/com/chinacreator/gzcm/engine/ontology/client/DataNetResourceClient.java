@@ -112,7 +112,7 @@ public class DataNetResourceClient {
      * <p>端点：{@code GET /api/v1/datanet/metadata/fields/{resourceId}}（已有端点），
      * 响应 {@code {code, success, message, data: DataField[]}}，元素含 {@code fieldName / dataType}。
      *
-     * @param resourceId 数据资源 ID（{@code td_data_resource.resource_id}）
+     * @param resourceId 数据资源 ID（data-engine 数据资源主键 resource_id）
      * @return 字段行列表
      * @throws DataAccessException datanet service 不可达或响应非法时抛出
      */

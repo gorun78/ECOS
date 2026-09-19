@@ -24,7 +24,7 @@ public class OntologyMappingValidateDTO {
     /** 本体实体 id 或 code（对应 {@code entity_code}）；批量校验时用于过滤 */
     private String entityCode;
 
-    /** 目标 DW 数据资源 id（{@code td_data_resource.resource_id}）；保存前内联校验用 */
+    /** 目标 DW 数据资源 id（data-engine 数据资源主键 resource_id）；保存前内联校验用 */
     private String datasetId;
 
     /** 内联字段映射（保存前校验用） */

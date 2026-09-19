@@ -268,7 +268,12 @@ public class PipelineExecutionService {
                 logInfo("SOURCE_REST done: url={}, rows={}", config.get("url"), rows.size());
                 yield rows.size();
             }
-            case "SOURCE_CDC" -> throw new BusinessException("SOURCE_CDC 仅 flagship 版本支持");
+            case "SOURCE_CDC" -> {
+                // D12：SOURCE_CDC 仅在节点枚举中登记，执行器未实现 —— 显式拒绝（不落 default、不返回空）
+                log.warn("SOURCE_CDC 节点未实现，显式拒绝执行: nodeId={}", node.getNodeId());
+                throw new BusinessException(
+                        "SOURCE_CDC 节点尚未实现，请使用 SOURCE_JDBC / SOURCE_CSV / SOURCE_REST");
+            }
             case "TRANSFORM_SQL" -> executeTransformSql(config);
             case "TRANSFORM_UDF" -> {
                 List<Map<String, Object>> out = runUdfTransform(node, config, nodeResults).rows;

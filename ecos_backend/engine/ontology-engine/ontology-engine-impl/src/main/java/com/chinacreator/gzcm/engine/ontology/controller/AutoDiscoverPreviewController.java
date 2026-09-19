@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,6 +22,12 @@ import java.util.*;
  *       — 预览可发现的实体（dryRun=true，不落库）</li>
  * </ul>
  *
+ * <p>PMO-B7 T1 (D11)：列定义取数由「直查 data-engine 数据资源 / 数据字段元数据表」
+ * 改为经 data-engine REST
+ * （复用 {@link AutoDiscoverService#loadCuratedResources()} /
+ * {@link AutoDiscoverService#resolveResourceFields}），
+ * 符合 §0.5 边界铁律「本体工作台仅只读 DW 层」。
+ *
  * @author PMO-40 Batch3
  */
 @RestController
@@ -31,8 +38,12 @@ public class AutoDiscoverPreviewController {
 
     private final JdbcTemplate jdbc;
 
-    public AutoDiscoverPreviewController(JdbcTemplate jdbc) {
+    /** DW 层取数源（经 data-engine REST，禁直查 td_data_*）。 */
+    private final AutoDiscoverService autoDiscoverService;
+
+    public AutoDiscoverPreviewController(JdbcTemplate jdbc, AutoDiscoverService autoDiscoverService) {
         this.jdbc = jdbc;
+        this.autoDiscoverService = autoDiscoverService;
     }
 
     /**
@@ -91,25 +102,15 @@ public class AutoDiscoverPreviewController {
             List<Map<String, Object>> entityPreviews = new ArrayList<>();
             int totalFields = 0;
 
+            // DW(CURATED) 层资源清单一次拉取（data-engine 不可达时抛 DataAccessException → 默认拒绝）
+            List<Map<String, Object>> curatedResources = autoDiscoverService.loadCuratedResources();
+            // 列定义缓存（resource_id → 字段列表），避免循环请求
+            Map<String, List<Map<String, Object>>> fieldsCache = new LinkedHashMap<>();
+
             for (String resourceName : resourceNames) {
-                // 1) 查字段（只读，不写库）
-                List<Map<String, Object>> fields;
-                try {
-                    fields = jdbc.queryForList(
-                        "SELECT f.field_name AS \"fieldName\", " +
-                        "       f.field_type AS \"dataType\", " +
-                        "       COALESCE(f.description, '') AS \"comment\", " +
-                        "       f.nullable    AS \"nullable\" " +
-                        "FROM td_data_field f " +
-                        "INNER JOIN td_data_resource r " +
-                        "  ON f.resource_id = r.resource_id " +
-                        "WHERE r.resource_name = ? AND r.datasource_id = ? " +
-                        "ORDER BY f.field_order LIMIT 200",
-                        resourceName, datasourceId);
-                } catch (Exception e) {
-                    log.warn("Preview: cannot query fields for resource={}: {}", resourceName, e.getMessage());
-                    fields = Collections.emptyList();
-                }
+                // 1) 列定义（只读，不写库）—— 走 data-engine REST，禁直查 td_data_*
+                List<Map<String, Object>> fields = autoDiscoverService.resolveResourceFields(
+                        curatedResources, fieldsCache, datasourceId, resourceName);
 
                 if (fields.isEmpty()) {
                     Map<String, Object> skip = new LinkedHashMap<>();

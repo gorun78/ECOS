@@ -17,16 +17,25 @@ import java.util.stream.Collectors;
  *
  * <p>Wave B-2 · T13 (来源: 肖国荣 / 日期: 2026-09-12 / 责任人: fullstack-implementer)</p>
  *
- * <p>T13 改造: 原 {@code getResourceFields} 用 JdbcTemplate 直查 datanet 引擎表
- * {@code td_data_field} / {@code td_data_resource} (跨引擎指定, 违反铁律 §0.3.1 微服务边界),
+ * <p>T13 改造: 原 {@code getResourceFields} 用 JdbcTemplate 直查 data-engine 的数据资源
+ * / 数据字段两张元数据表 (跨引擎指定, 违反铁律 §0.3.1 微服务边界),
  * 改为 delegate 到 {@link DataNetResourceClient} 走 datanet service REST。
  * 本类仍保留 JdbcTemplate 用于查询本体自己的表 (ecos_ontology_entity / ecos_domain /
  * ecos_ontology_property / ecos_entity_table_mapping), 属本引擎合理范围。</p>
+ *
+ * <p>PMO-B7 T1 (D11) 加固: 取数源统一收敛为 DW(CURATED) 层资源清单
+ * （{@link DataNetResourceClient#listResourcesByLayer(String)}）+
+ * 列定义（{@link DataNetResourceClient#listMetadataFields(String)}）；
+ * data-engine 不可达时按默认拒绝抛 {@link com.chinacreator.gzcm.common.exception.DataAccessException}
+ * （架构铁律 §2.4-6 精神），**不再静默降级返回空集**（D1 教训）。</p>
  */
 @Service
 public class AutoDiscoverService {
 
     private static final Logger log = LoggerFactory.getLogger(AutoDiscoverService.class);
+
+    /** 取数源分层：DW 层（本体工作台仅允许只读 DW 层，见 §0.5 边界铁律）。 */
+    private static final String DW_LAYER = "CURATED";
 
     private final JdbcTemplate jdbc;
     private final DataNetResourceClient dataNetClient;
@@ -39,8 +48,14 @@ public class AutoDiscoverService {
     public List<Map<String, Object>> autoDiscover(String domainCode, String datasourceId, List<String> resourceNames) {
         List<Map<String, Object>> results = new ArrayList<>();
 
+        // DW 层资源清单一次拉取（避免循环调 REST）；data-engine 不可达时抛 DataAccessException（默认拒绝）
+        List<Map<String, Object>> curatedResources = loadCuratedResources();
+        // 列定义缓存：resource_id → 字段列表，避免同一资源重复请求（禁循环查库）
+        Map<String, List<Map<String, Object>>> fieldsCache = new LinkedHashMap<>();
+
         for (String resourceName : resourceNames) {
-            List<Map<String, Object>> fields = getResourceFields(datasourceId, resourceName);
+            List<Map<String, Object>> fields =
+                    resolveResourceFields(curatedResources, fieldsCache, datasourceId, resourceName);
             if (fields.isEmpty()) {
                 log.warn("No fields found for resource: {}", resourceName);
                 continue;
@@ -172,22 +187,57 @@ public class AutoDiscoverService {
     }
 
     /**
-     * 拿数据资源下的候选字段(用于本体自动发现预览)。
+     * 拉取 DW（CURATED）层资源清单。
      *
-     * <p>Wave B-2 T13: 从 JdbcTemplate 直查 datanet 引擎表 (td_data_field / td_data_resource)
-     * 改为 delegate 到 {@link DataNetResourceClient} 走 datanet service REST。
-     * endpoint `GET /api/v1/datanet/resources/{resourceId}/fields` 尚未落地
-     * (TODO PMO-06 T19 补 endpoint 合同), client 在端点不可达时返回空列表,
-     * 不阻断 autoDiscover 主流程, 自动发现候选将为空但不 500。</p>
+     * <p>本体工作台对 DW 层**只读**（§0.5 边界铁律），取数一律经 data-engine REST，
+     * 禁止直查 data-engine 元数据表。data-engine 不可达或响应非法时，
+     * {@link DataNetResourceClient#listResourcesByLayer(String)} 抛
+     * {@link com.chinacreator.gzcm.common.exception.DataAccessException}（默认拒绝）。
+     *
+     * @return CURATED 层资源行（含 {@code resource_id / resource_name / datasource_id}）
      */
-    private List<Map<String, Object>> getResourceFields(String datasourceId, String resourceName) {
-        try {
-            // T13: 调 datanet service REST 拿字段候选 (不直查 td_* 跨引擎表)
-            return dataNetClient.listResourceFields(resourceName);
-        } catch (Exception e) {
-            log.warn("Cannot fetch fields via datanet REST for {}: {}", resourceName, e.getMessage());
+    public List<Map<String, Object>> loadCuratedResources() {
+        return dataNetClient.listResourcesByLayer(DW_LAYER);
+    }
+
+    /**
+     * 从 DW 层资源清单定位资源并取列定义（供自动发现与预览共用，避免同类逻辑重复实现）。
+     *
+     * <p>「DW 层确无该资源」属正常业务语义 → 返回空列表（调用方按「无字段数据」处理）；
+     * 「data-engine 不可达」→ 由 {@link DataNetResourceClient#listMetadataFields(String)} 抛
+     * {@link com.chinacreator.gzcm.common.exception.DataAccessException}（默认拒绝，不静默降级）。
+     *
+     * @param curatedResources DW 层资源清单（调用方一次拉取）
+     * @param fieldsCache      列定义缓存（resource_id → 字段列表），避免循环请求
+     * @param datasourceId     数据源 ID（非空时参与资源匹配）
+     * @param resourceName     资源名（表名）
+     * @return 列定义列表；DW 层无该资源时为空列表
+     */
+    public List<Map<String, Object>> resolveResourceFields(List<Map<String, Object>> curatedResources,
+                                                           Map<String, List<Map<String, Object>>> fieldsCache,
+                                                           String datasourceId,
+                                                           String resourceName) {
+        String resourceId = null;
+        for (Map<String, Object> row : curatedResources) {
+            if (!resourceName.equals(objToString(row.get("resource_name")))) {
+                continue;
+            }
+            String rowDatasourceId = objToString(row.get("datasource_id"));
+            if (datasourceId != null && !datasourceId.isBlank()
+                    && rowDatasourceId != null && !datasourceId.equals(rowDatasourceId)) {
+                continue;
+            }
+            resourceId = objToString(row.get("resource_id"));
+            if (resourceId != null && !resourceId.isBlank()) {
+                break;
+            }
+        }
+        if (resourceId == null || resourceId.isBlank()) {
+            log.warn("DW(CURATED) 层未找到资源: datasourceId={}, resourceName={}", datasourceId, resourceName);
             return Collections.emptyList();
         }
+        // data-engine 不可达时 listMetadataFields 抛 DataAccessException，向上传播（默认拒绝）
+        return fieldsCache.computeIfAbsent(resourceId, dataNetClient::listMetadataFields);
     }
 
     private Map<String, Object> createOntologyEntity(String entityCode, String tableName, String domainCode) {
