@@ -8,6 +8,12 @@ public class KnowledgeEmbedding {
     private int tokenCount;
     private String model;
     private long createdAt;
+    /** 分片序号（chunk_index，B4 向量写入用） */
+    private Integer chunkIndex;
+    /** 双写过渡：JSONB 列 embedding 的字符串值（形如 [0.1,0.2,...]，B4 向量写入用） */
+    private String embeddingJson;
+    /** pgvector 列 embedding_vec 的字面量（形如 [0.1,0.2,...]，B4 向量写入用） */
+    private String embeddingVec;
 
     public KnowledgeEmbedding() {}
 
@@ -23,4 +29,10 @@ public class KnowledgeEmbedding {
     public void setModel(String model) { this.model = model; }
     public long getCreatedAt() { return createdAt; }
     public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+    public Integer getChunkIndex() { return chunkIndex; }
+    public void setChunkIndex(Integer chunkIndex) { this.chunkIndex = chunkIndex; }
+    public String getEmbeddingJson() { return embeddingJson; }
+    public void setEmbeddingJson(String embeddingJson) { this.embeddingJson = embeddingJson; }
+    public String getEmbeddingVec() { return embeddingVec; }
+    public void setEmbeddingVec(String embeddingVec) { this.embeddingVec = embeddingVec; }
 }

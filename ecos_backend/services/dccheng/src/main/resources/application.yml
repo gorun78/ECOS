@@ -69,6 +69,8 @@ ecos:
   rag:
     embedding-model: ${ECOS_RAG_EMB_MODEL:text-embedding-3-small}
     llm-gateway-base: ${ECOS_RAG_LLM_BASE:}   # 空串=内部走 LLMGatewayService
+    # B4: 须与 V137 的 embedding_vec 列维度一致，不一致时写入侧跳过并 log.warn
+    embedding-dimension: ${ECOS_RAG_EMB_DIM:1536}
   # 本体版本发布消费者: 微服务内网直连 buszhi 18083 (ADR-7 内网可达)
   ontology-base: ${ECOS_ONTOLOGY_BASE:http://localhost:18083/api/v1/ecos}
   # DCCheng 双跑期 (gateway 与 dccheng 共进程时) 自动识别:

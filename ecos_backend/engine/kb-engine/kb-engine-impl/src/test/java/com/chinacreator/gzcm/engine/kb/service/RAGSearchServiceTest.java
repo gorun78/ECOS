@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.engine.kb.repo.PgVectorSupport;
 import com.chinacreator.gzcm.engine.kb.repo.QueryEmbeddingHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
 
@@ -50,7 +50,7 @@ class RAGSearchServiceTest {
     private KnowledgeEdgeMapper edgeMapper;
     private KnowledgeArticleMapper articleMapper;
     private KnowledgeEmbeddingMapper embeddingMapper;
-    private JdbcTemplate jdbc;
+    private PgVectorSupport pgVectorSupport;
     private QueryEmbeddingHelper queryEmbeddingHelper;
     private KnowledgeRetrievalServiceImpl service;
 
@@ -60,13 +60,13 @@ class RAGSearchServiceTest {
         edgeMapper = mock(KnowledgeEdgeMapper.class);
         articleMapper = mock(KnowledgeArticleMapper.class);
         embeddingMapper = mock(KnowledgeEmbeddingMapper.class);
-        jdbc = mock(JdbcTemplate.class);
+        pgVectorSupport = mock(PgVectorSupport.class);
         queryEmbeddingHelper = mock(QueryEmbeddingHelper.class);
         // PMO-50 T1: QueryEmbeddingHelper 默认返回 null → service 走 keyword fallback；
         // 测试 mock searchByVector 仍然验证 mapper 调用链
         service = new KnowledgeRetrievalServiceImpl(
-                articleMapper, embeddingMapper, nodeMapper, edgeMapper, jdbc,
-                queryEmbeddingHelper, "text-embedding-3-small", "");
+                articleMapper, embeddingMapper, nodeMapper, edgeMapper,
+                queryEmbeddingHelper, pgVectorSupport, "text-embedding-3-small", "");
     }
 
     /** 在 stub checkPgVector 前手动设 flag (反射), 避免触发真实 JDBC。 */
@@ -273,10 +273,7 @@ class RAGSearchServiceTest {
     @DisplayName("checkPgVectorExtension: pg_extension 不存在时 pgVectorAvailable=false (PG 缺失降级)")
     void checkPgVectorExtensionUnavailableWhenNoExtension() {
         setPgVectorAvailable(true); // 强制 set 为 true, 验证 method 内部会覆盖为 false
-        when(jdbc.queryForMap("SELECT extname, extversion FROM pg_extension WHERE extname = 'vector'"))
-                .thenThrow(new org.springframework.jdbc.BadSqlGrammarException(
-                        "SELECT extname FROM pg_extension", "no vector extension",
-                        new java.sql.SQLException("relation pg_extension does not exist")));
+        when(pgVectorSupport.isAvailable()).thenReturn(false);
         service.checkPgVectorExtension();
 
         // 通过 graphHealth 间接断言 flag 已被置为 false (graphHealth 结构不依赖 count mock 是否命中)
@@ -291,11 +288,13 @@ class RAGSearchServiceTest {
     @DisplayName("checkPgVectorExtension: 扩展存在 → flag=true")
     void checkPgVectorExtensionAvailableWhenExtensionPresent() {
         setPgVectorAvailable(false);
-        when(jdbc.queryForMap("SELECT extname, extversion FROM pg_extension WHERE extname = 'vector'"))
-                .thenReturn(Map.of("extname", "vector", "extversion", "0.7.0"));
+        when(pgVectorSupport.isAvailable()).thenReturn(true);
         service.checkPgVectorExtension();
-        setPgVectorAvailable(true); // 验证可被 flag 语义覆盖; 业务侧 pgvector 可用
-        assertTrue(true, "sanity: pgvector 可用");
+
+        when(nodeMapper.count()).thenReturn(1L);
+        when(edgeMapper.count()).thenReturn(1L);
+        Map<String, Object> h = service.graphHealth();
+        assertEquals(true, h.get("pgVectorAvailable"), "扩展存在时 pgVectorAvailable 必须为 true");
     }
 
     // ── createArticle ──

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEmbedding;
+import com.chinacreator.gzcm.engine.kb.repo.PgVectorSupport;
 import com.chinacreator.gzcm.engine.kb.repo.QueryEmbeddingHelper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
@@ -12,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -23,13 +23,17 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeRetrievalServiceImpl.class);
 
+    /** Top-K 上限（防慢 SQL：向量检索 LIMIT 与关键词回退 LIMIT 均受此约束） */
+    private static final int MAX_TOP_K = 50;
+
     private final KnowledgeArticleMapper articleMapper;
     private final KnowledgeEmbeddingMapper embeddingMapper;
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
-    private final JdbcTemplate jdbcTemplate;
     // PMO-50 T1: RAG 向量检索真实化 — 注入 llm-gateway 取真实向量
     private final QueryEmbeddingHelper queryEmbeddingHelper;
+    // B4: pgvector 可用性单点判定（与向量写入共用）
+    private final PgVectorSupport pgVectorSupport;
     private final String embeddingModel;
     private final String llmGatewayBase;
 
@@ -39,8 +43,8 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                                          KnowledgeEmbeddingMapper embeddingMapper,
                                          KnowledgeNodeMapper nodeMapper,
                                          KnowledgeEdgeMapper edgeMapper,
-                                         JdbcTemplate jdbcTemplate,
                                          @Lazy QueryEmbeddingHelper queryEmbeddingHelper,
+                                         PgVectorSupport pgVectorSupport,
                                          @Value("${ecos.rag.embedding-model:text-embedding-3-small}")
                                          String embeddingModel,
                                          @Value("${ecos.rag.llm-gateway-base:}")
@@ -49,27 +53,18 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         this.embeddingMapper = embeddingMapper;
         this.nodeMapper = nodeMapper;
         this.edgeMapper = edgeMapper;
-        this.jdbcTemplate = jdbcTemplate;
         this.queryEmbeddingHelper = queryEmbeddingHelper;
+        this.pgVectorSupport = pgVectorSupport;
         this.embeddingModel = embeddingModel;
         this.llmGatewayBase = llmGatewayBase;
     }
 
     /**
-     * 检查 pg_vector 扩展是否已安装。
+     * 同步 pgvector 可用性（探测逻辑集中在 {@link PgVectorSupport}，失败不阻断启动）。
      */
     @PostConstruct
     public void checkPgVectorExtension() {
-        try {
-            Map<String, Object> row = jdbcTemplate.queryForMap(
-                    "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector'");
-            String version = (String) row.getOrDefault("extversion", "unknown");
-            pgVectorAvailable = true;
-            log.info("✅ pgvector extension verified — version {}", version);
-        } catch (Exception e) {
-            pgVectorAvailable = false;
-            log.warn("⚠️  pgvector extension NOT available — vector search disabled. Error: {}", e.getMessage());
-        }
+        pgVectorAvailable = pgVectorSupport.isAvailable();
     }
 
     @Override
@@ -106,46 +101,56 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     @Override
     public Map<String, Object> ragQuery(String queryText, int topK, double threshold) {
         long startTime = System.currentTimeMillis();
+        // B4: topK 收敛到 [1, MAX_TOP_K]，防慢 SQL
+        int effectiveTopK = Math.min(Math.max(topK, 1), MAX_TOP_K);
         log.info("RAG query: query='{}', topK={}, threshold={}, pgvector={}",
-                queryText, topK, threshold, pgVectorAvailable);
+                queryText, effectiveTopK, threshold, pgVectorAvailable);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("query", queryText);
-        result.put("topK", topK);
+        result.put("topK", effectiveTopK);
         result.put("threshold", threshold);
 
         List<Map<String, Object>> sources = new ArrayList<>();
 
         if (queryText != null && !queryText.isBlank()) {
             if (pgVectorAvailable) {
-                // PMO-50 T1: 真实向量检索 — 先走 llm-gateway 取 query 向量；
-                // 失败/不可用时（llm-gateway-base 空、库空、网络异常）回退 ILIKE 关键词
+                // B4: 真实向量检索 — 嵌入走 llm-gateway（QueryEmbeddingHelper），
+                // 命中 embedding_vec + HNSW（余弦距离 <=>）；任一步失败必须显式告警后降级
                 String queryVector = queryEmbeddingHelper.embed(queryText, embeddingModel, llmGatewayBase);
                 boolean vectorSuccess = false;
-                if (queryVector != null) {
+                if (queryVector == null) {
+                    log.warn("RAG 降级关键词检索：嵌入向量获取失败/为空（model={}, gatewayBase='{}', query='{}'）",
+                            embeddingModel, llmGatewayBase, queryText);
+                } else {
                     try {
-                        List<Map<String, Object>> vectorResults = embeddingMapper.searchByVector(queryVector, topK);
+                        List<Map<String, Object>> vectorResults = embeddingMapper.searchByVector(queryVector, effectiveTopK);
                         if (vectorResults != null && !vectorResults.isEmpty()) {
                             for (Map<String, Object> row : vectorResults) {
                                 Map<String, Object> source = new LinkedHashMap<>();
                                 source.put("chunkId", row.getOrDefault("id", ""));
-                                source.put("content", row.getOrDefault("chunkText", ""));
+                                source.put("content", row.getOrDefault("chunktext", ""));
                                 source.put("score", row.getOrDefault("score", 0.0));
-                                source.put("source", row.getOrDefault("articleId", ""));
+                                source.put("source", row.getOrDefault("articleid", ""));
                                 sources.add(source);
                             }
                             vectorSuccess = !sources.isEmpty();
-                            log.debug("Vector search (real embedding) returned {} results", sources.size());
+                            log.debug("Vector search (embedding_vec + HNSW) returned {} results", sources.size());
                         }
                     } catch (Exception e) {
-                        log.warn("Vector search failed (real embedding): {} — fallback ILIKE", e.getMessage());
+                        log.warn("RAG 降级关键词检索：向量检索异常（query='{}'）: {}", queryText, e.getMessage(), e);
+                    }
+                    if (!vectorSuccess) {
+                        log.warn("RAG 降级关键词检索：向量检索无命中（embedding_vec 可能为 NULL 或维度不符，query='{}'）",
+                                queryText);
                     }
                 }
                 if (!vectorSuccess) {
-                    sources = fallbackKeywordSearch(queryText, topK);
+                    sources = fallbackKeywordSearch(queryText, effectiveTopK);
                 }
             } else {
-                sources = fallbackKeywordSearch(queryText, topK);
+                log.warn("RAG 降级关键词检索：pgvector 扩展不可用（镜像需内置 pgvector，query='{}'）", queryText);
+                sources = fallbackKeywordSearch(queryText, effectiveTopK);
             }
         }
 
