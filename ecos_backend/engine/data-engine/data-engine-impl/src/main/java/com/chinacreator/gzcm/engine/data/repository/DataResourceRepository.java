@@ -13,6 +13,20 @@ public interface DataResourceRepository {
 
     int update(DataResource resource);
 
+    /**
+     * 精确改写分层与近源区（可把 zone 显式置空）。
+     * <p>{@link #update} 的 zone 为条件列（null 不写），无法清空旧值；当登记层从 RAW
+     * 变为非 RAW 时需用本方法把 zone 强制置空，以严格符合分层合法性矩阵。
+     *
+     * @param resourceId 资源 ID
+     * @param layer      数据分层（DataLayer 枚举名，必填）
+     * @param zone       近源区（非近源层传 null）
+     * @return 影响行数
+     */
+    int updateLayerZone(@Param("resourceId") String resourceId,
+                        @Param("layer") String layer,
+                        @Param("zone") String zone);
+
     DataResource findById(@Param("id") String id);
 
     /**

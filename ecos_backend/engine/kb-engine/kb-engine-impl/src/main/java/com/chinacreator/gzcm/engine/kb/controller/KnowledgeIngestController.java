@@ -2,22 +2,28 @@ package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
 import com.chinacreator.gzcm.engine.kb.dto.GraphBuildRequest;
+import com.chinacreator.gzcm.engine.kb.dto.KnowledgeDocIngestResultVO;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeIngestRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeIngestResult;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.engine.kb.service.KnowledgeDocIngestService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -49,12 +55,51 @@ public class KnowledgeIngestController {
     private final JdbcTemplate jdbcTemplate;
     private final KgSyncService kgSyncService;
 
+    /** 非结构化文档登记与解析编排（B5-1 / A3 过渡态）。 */
+    private final KnowledgeDocIngestService docIngestService;
+
     public KnowledgeIngestController(KnowledgeNodeMapper nodeMapper,
                                      JdbcTemplate jdbcTemplate,
-                                     KgSyncService kgSyncService) {
+                                     KgSyncService kgSyncService,
+                                     KnowledgeDocIngestService docIngestService) {
         this.nodeMapper = nodeMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.kgSyncService = kgSyncService;
+        this.docIngestService = docIngestService;
+    }
+
+    // ── /docs/ingest ─────────────────────────────────────────────────
+
+    /**
+     * POST /api/v1/knowledge/docs/ingest — 非结构化文档登记与解析（B5-1，SOP-2 / A3）。
+     *
+     * <p>原文写近源层并登记 {@code RAW/UNSTRUCTURED/LAKE_OBJECT}；解析文本分块落
+     * kb 自有过渡表 {@code kb_doc_chunk}，并登记为 {@code CURATED} 资源；随后复用
+     * B4 向量写入服务做嵌入（失败不阻断分块落库）。
+     *
+     * @param file         上传文件（multipart 表单字段 file）
+     * @param source       上游数据源标识（可选，默认 kb-upload）
+     * @param docId        文档 ID（可选，默认生成）
+     * @param chunkSize    分块大小（可选，默认取配置；∈ {256,512,1024,2048}）
+     * @param chunkOverlap 分块重叠（可选，默认取配置）
+     * @return 结构化结果（含状态/分块数/向量写入数）
+     */
+    @PostMapping(value = "/docs/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<KnowledgeDocIngestResultVO> ingestDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "source", required = false) String source,
+            @RequestParam(value = "docId", required = false) String docId,
+            @RequestParam(value = "chunkSize", required = false) Integer chunkSize,
+            @RequestParam(value = "chunkOverlap", required = false) Integer chunkOverlap) {
+        try {
+            return ApiResponse.success(docIngestService.ingest(file, source, docId, chunkSize, chunkOverlap));
+        } catch (ValidationException e) {
+            log.warn("文档登记与解析入参非法: {}", e.getMessage());
+            return ApiResponse.badRequest(e.getMessage());
+        } catch (Exception e) {
+            log.error("文档登记与解析失败: {}", e.getMessage(), e);
+            return ApiResponse.internalError("文档登记与解析失败: " + e.getMessage());
+        }
     }
 
     // ── /ingest ──────────────────────────────────────────────────────

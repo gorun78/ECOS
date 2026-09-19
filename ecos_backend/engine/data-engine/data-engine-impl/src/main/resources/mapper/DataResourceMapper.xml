@@ -63,6 +63,15 @@
         WHERE resource_id = #{resourceId}
     </update>
 
+    <!-- 精确改写 layer/zone（zone 允许传 null，用于把非近源层的陈旧 zone 清空） -->
+    <update id="updateLayerZone">
+        UPDATE td_data_resource
+        SET layer = #{layer},
+            zone = #{zone},
+            update_time = NOW()
+        WHERE resource_id = #{resourceId}
+    </update>
+
     <select id="findById" resultMap="DataResourceMap">
         SELECT * FROM td_data_resource WHERE resource_id = #{id}
     </select>

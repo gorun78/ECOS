@@ -24,6 +24,8 @@
 | /api/v1/engine/data/layers/{layer}/resources/{id}/sample | GET | 分层资源实例行抽样（PMO-B3-1 T2） |
 | /api/v1/engine/data/functions | GET | 计算函数 |
 | /api/v1/engine/data/copilot | POST | 数据Copilot |
+| /api/v1/datanet/datalake/unstructured | POST | 登记非结构化原文对象（B5-1，D5 生产者侧；组装 key `raw/unstructured/{source}/{docId}/{fileName}`，登记 RAW/UNSTRUCTURED/LAKE_OBJECT） |
+| /api/v1/datanet/metadata/resources | POST | 通用数据资源登记（B5-1；供知识工作台登记解析文本为 CURATED；强制校验 layer/zone 合法性矩阵） |
 
 ## 我的数据库表
 - 数据源定义表、管道任务表、血缘关系表、质量规则表

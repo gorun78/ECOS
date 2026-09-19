@@ -43,6 +43,17 @@
   - `/api/v1/knowledge/ecos-graph` — Ecos 通用兼容端点（`EcosKnowledgeGraphController`，2 method：
     `GET /` 取图快照 / `POST /sync` 同步到 Neo4j）。
     注意：gateway 侧同名 Controller 用 base `/api/v1/ecos/knowledge-graph`，本模块侧路径独立，勿混。
+  - `POST /api/v1/knowledge/docs/ingest` — 非结构化文档登记与解析（`KnowledgeIngestController`，
+    B5-1 / ADR-2 A3 过渡态，multipart：`file` + 可选 `source`/`docId`/`chunkSize`/`chunkOverlap`）：
+    原文写近源层 `raw/unstructured/{source}/{docId}/{fileName}`（复用 runtime-access `MinioStorageService`）
+    → REST 登记数据工作台 `POST /api/v1/datanet/datalake/unstructured`（RAW/UNSTRUCTURED/LAKE_OBJECT）
+    → 复用 `DocumentParserService` 解析 → 滑动窗口切分落 kb 自有过渡表 `ecos_knowledge.kb_doc_chunk`
+    → 复用 B4 `KnowledgeVectorWriteService` 向量化 → REST 登记 `POST /api/v1/datanet/metadata/resources`
+    （layer=CURATED, source_path=ecos_knowledge.kb_doc_chunk）。状态机 `queued→parsing→extracting→done/failed`
+    落 `ecos_knowledge.kb_doc`（V138）。**A3 禁令**：kb 不直写 DW 层 CURATED 表（A2 永久否决）。
+    关键类：`service/KnowledgeDocIngestService`、`doc/mapper/{KbDocMapper,KbDocChunkMapper}`、
+    `doc/model/{KbDoc,KbDocChunk}`；chunkSize 取值须 ∈ {256,512,1024,2048}（与前端 `CHUNK_SIZE_OPTIONS` 对齐），
+    默认由 `ecos.kb.doc.chunk-size`(512)/`ecos.kb.doc.chunk-overlap`(64) 配置。
 - 实例抽取（PMO-B3-2）：`KbEntityInstanceExtractionService` — 经 REST 只读消费本体映射契约
   （`GET /api/v1/ontology/entity-mappings?ontologyId=`）与 DW 层实例行
   （`GET /api/v1/engine/data/layers/CURATED/resources/{id}/rows?watermark=&limit=`），

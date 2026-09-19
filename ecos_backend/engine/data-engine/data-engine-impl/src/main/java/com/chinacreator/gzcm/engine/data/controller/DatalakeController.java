@@ -1,6 +1,10 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.data.dto.DataResourceVO;
+import com.chinacreator.gzcm.engine.data.dto.UnstructuredRegisterDTO;
+import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,9 +17,10 @@ import java.util.Map;
  * <p>
  * 端点：
  * <ul>
- *   <li>GET  /api/v1/datanet/datalake/status   — 健康状态 + 配置（secretKey 脱敏）</li>
- *   <li>POST /api/v1/datanet/datalake/init     — 初始化：确保 bucket 存在</li>
- *   <li>GET  /api/v1/datanet/datalake/objects  — 列出数据湖对象（prefix 过滤，如 datalake/）</li>
+ *   <li>GET  /api/v1/datanet/datalake/status          — 健康状态 + 配置（secretKey 脱敏）</li>
+ *   <li>POST /api/v1/datanet/datalake/init            — 初始化：确保 bucket 存在</li>
+ *   <li>GET  /api/v1/datanet/datalake/objects         — 列出数据湖对象（prefix 过滤，如 datalake/）</li>
+ *   <li>POST /api/v1/datanet/datalake/unstructured    — 登记非结构化原文对象（B5-1，D5 生产者侧）</li>
  * </ul>
  * <p>对应需求：设置好数据湖 MinIO 初始参数，并作为数据采集（采集型管道）的默认近源库目标。
  */
@@ -25,8 +30,31 @@ public class DatalakeController {
 
     private final MinioStorageService minioStorageService;
 
-    public DatalakeController(MinioStorageService minioStorageService) {
+    /** 数据湖分层资源登记服务（B5-1：非结构化原文登记）。 */
+    private final DataLakeResourceService dataLakeResourceService;
+
+    public DatalakeController(MinioStorageService minioStorageService,
+                              DataLakeResourceService dataLakeResourceService) {
         this.minioStorageService = minioStorageService;
+        this.dataLakeResourceService = dataLakeResourceService;
+    }
+
+    /**
+     * 登记非结构化原文对象（数据湖存储分层规范 §三/§五/§六）。
+     *
+     * <p>组装对象 key {@code raw/unstructured/{source}/{docId}/{originalFileName}} 并登记
+     * {@code td_data_resource}（layer=RAW, zone=UNSTRUCTURED, resource_type=LAKE_OBJECT）。
+     *
+     * @param req 登记入参（强类型）
+     * @return 登记结果（ApiResponse&lt;DataResourceVO&gt;）
+     */
+    @PostMapping("/unstructured")
+    public ApiResponse<DataResourceVO> registerUnstructured(@RequestBody UnstructuredRegisterDTO req) {
+        try {
+            return ApiResponse.success(dataLakeResourceService.registerUnstructured(req));
+        } catch (ValidationException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        }
     }
 
     /**

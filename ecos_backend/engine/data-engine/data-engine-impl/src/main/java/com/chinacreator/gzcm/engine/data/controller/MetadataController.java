@@ -1,8 +1,13 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
+import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.data.model.DataField;
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.MetadataService;
+import com.chinacreator.gzcm.engine.data.dto.DataResourceRegisterDTO;
+import com.chinacreator.gzcm.engine.data.dto.DataResourceVO;
+import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.service.MetadataCollectionService;
@@ -56,6 +61,9 @@ public class MetadataController {
     private final MetadataService metadataService;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+    /** 数据湖分层资源登记服务（B5-1：通用资源登记，供知识工作台登记解析文本）。 */
+    private final DataLakeResourceService dataLakeResourceService;
+
     private static final com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>> MAP_TYPE =
             new com.fasterxml.jackson.core.type.TypeReference<>() {};
 
@@ -67,7 +75,8 @@ public class MetadataController {
                               MetadataAsyncTrigger asyncTrigger,
                               MetadataCollectGitArchive gitArchive,
                               MetadataService metadataService,
-                              org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                              org.springframework.jdbc.core.JdbcTemplate jdbc,
+                              DataLakeResourceService dataLakeResourceService) {
         this.collectionService = collectionService;
         this.taskService = taskService;
         this.scheduler = scheduler;
@@ -77,6 +86,7 @@ public class MetadataController {
         this.gitArchive = gitArchive;
         this.metadataService = metadataService;
         this.jdbc = jdbc;
+        this.dataLakeResourceService = dataLakeResourceService;
     }
 
     // ===== 既有端点（签名不变） =====
@@ -101,6 +111,25 @@ public class MetadataController {
     @GetMapping("/resources/all")
     public List<Map<String, Object>> getAllResources() {
         return collectionService.getAllResources();
+    }
+
+    /**
+     * 通用数据资源登记（B5-1，方案 §5.3「知识→数据 登记数据资源」）。
+     *
+     * <p>A3 过渡态下知识工作台据此把「解析文本」登记为 {@code layer=CURATED} 资源；
+     * 强制校验 layer 合法性枚举与 zone 合法性矩阵（非 RAW 层 zone 必须为空）。
+     * 按 source_path 幂等（已存在则更新，不产生重复行）。
+     *
+     * @param req 登记入参（强类型）
+     * @return 登记结果（ApiResponse&lt;DataResourceVO&gt;）
+     */
+    @PostMapping("/resources")
+    public ApiResponse<DataResourceVO> registerResource(@RequestBody DataResourceRegisterDTO req) {
+        try {
+            return ApiResponse.success(dataLakeResourceService.registerResource(req));
+        } catch (ValidationException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        }
     }
 
     @GetMapping("/preview/{resourceId}")

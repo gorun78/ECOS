@@ -29,6 +29,12 @@
             <artifactId>ontology-engine-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- B5-1: 非结构化原文写近源层复用 runtime-access MinioStorageService（铁律 §2.5-1：禁 new Driver） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         <!-- Lombok (PMO-50 T5: ExtractionPromoteRequest / ExtractionPromoteResultVO 使用 @Data。
              与 data-engine-impl / ontology-engine-impl 同款显式 provided 声明 —— 仅靠传递依赖
              会出现"找不到符号 setName/setRequested"；版本 1.18.36 与 Spring Boot 3.2.2 BOM 对齐) -->
