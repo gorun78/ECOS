@@ -319,11 +319,11 @@ flowchart TB
 | B3 | DW 实例读取端点 + 图谱实例抽取（契约驱动，含 `materialized` 列） | D2、Q2 | ✅ 完成 `2c893c7`（读取侧）+ `ca723ae`（抽取侧） |
 | B4 | 向量链路修复（新增 vector 列 + HNSW + chunk 写入） | D3、D4 | ✅ 完成 `42af9c4`；附 `9ebbeb9` 固化 pgvector 扩展挂载 |
 | B5 | 非结构化登记链路 + 6 个 404 端点补齐（含 `kb_doc_chunk` 过渡表） | D5、D6、Q1 | ✅ 完成 `db3b003`（A3 登记链路）+ `45fe57d`（端点补齐） |
-| B6 | 管道 `SOURCE_MINIO` + 解析节点（A1 目标态） | D5、D10 | 🟡 部分完成：`a625549`（`SOURCE_MINIO` + 格式/分区配置消费）；**解析节点与 `doc`/`doc_chunk` 落 DW 层未实施**（见下「B6-2 待裁决」） |
-| B7 | 越界修正 + 规范文档同步（Q6 需单独授权改规则文件） | D11、D12、Q6 | ✅ 完成 `d470e38`（越界归零 + CDC 显式拒绝） |
+| B6 | 管道 `SOURCE_MINIO` + 解析节点（A1 目标态） | D5、D10 | ✅ 完成 `a625549`（`SOURCE_MINIO` + 格式/分区配置消费）+ `206c0d5`（解析能力上移 runtime-access + `TRANSFORM_DOC_PARSE` + `ecos_dw.doc`/`doc_chunk`） |
+| B7 | 越界修正 + 规范文档同步（Q6 需单独授权改规则文件） | D11、D12、Q6 | ✅ 完成 `d470e38`（越界归零 + CDC 显式拒绝）；规范 §七 已二次同步（分层规范 v1.2） |
 | B8 | Tab 分组重排（7 组）+ `knowledge.group.{store,govern}` i18n 词条补齐，**排在 B5 之后** | Q5 | ✅ 完成 `ff23c44` |
 
-**B6-2 待裁决（解析节点下沉）**：A1 目标态要求「文档解析节点下沉数据工作台」，但现有解析实现 `DocumentParserService`（Tika / MinerU）位于 `kb-engine-impl`。按架构铁律 §2.1「引擎间只调 API 不调 Impl」，data-engine 不能引用该类；按 §2.5-6「补强而非自建」，正解是**把文档解析能力上移 `runtime-access`** 作为公共基础能力（data-engine 与 kb-engine 共用），代价是向 `runtime-access` 引入 Tika 相关依赖。该动作涉及公共底座依赖变更，需单独裁决后再实施；在此之前 **A3 过渡态（B5 已交付）保持有效**，非结构化链路不受影响。
+**B6-2 落地记录（2026-09-19，用户裁决「实施：解析能力上移 runtime-access」）**：文档解析（Tika / MinerU）与 chunk 切分已上移 `runtime-access`（`runtime/access/document/`）成为公共基础能力，kb-engine 原实现删除并改为复用（符合架构铁律 §2.5-6）；data-engine 新增 `TRANSFORM_DOC_PARSE` 节点，按 §三 规范组 key、解析后落 DW 层 `ecos_dw.doc` / `doc_chunk` 并标记 `layer=CURATED`，写入权归数据工作台。**A3 过渡态（`kb_doc_chunk`）按方案 §3.3 保留，待下一批次退出**。
 
 ---
 
