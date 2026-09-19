@@ -24,6 +24,13 @@ services:
     volumes:
       - ./init-pg:/docker-entrypoint-initdb.d
       - pg-data:/var/lib/postgresql/data
+      # pgvector 0.8.1 扩展持久化：官方 postgres 镜像未内置 vector，容器删除重建后会丢失
+      # 扩展导致 V137__knowledge_embedding_vector_column.sql 的 CREATE EXTENSION 失败。
+      # 此处以文件级挂载固化 vector.so / 控制文件 / 基础 SQL；文件由 Alpine v3.20 的
+      # postgresql-pgvector-0.6.2 包解出（Docker Hub 不可达时的离线替代，版本 0.8.1）。
+      - ./postgres-extensions/vector.so:/usr/local/lib/postgresql/vector.so:ro
+      - ./postgres-extensions/vector.control:/usr/share/postgresql/extension/vector.control:ro
+      - ./postgres-extensions/vector--0.8.1.sql:/usr/share/postgresql/extension/vector--0.8.1.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U root -d sys_man"]
       interval: 10s
