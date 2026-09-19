@@ -115,8 +115,9 @@
   "knowledge.group.overview": "总览",
   "knowledge.group.ingest": "知识摄入",
   "knowledge.group.model": "知识建模",
-  "knowledge.group.retrieval": "检索与评估",
-  "knowledge.group.operate": "运营与合规",
+  "knowledge.group.store": "知识存储",
+  "knowledge.group.retrieval": "知识检索",
+  "knowledge.group.govern": "知识治理",
   "knowledge.group.config": "系统配置",
 
   "knowledge.nav.overview": "总览",

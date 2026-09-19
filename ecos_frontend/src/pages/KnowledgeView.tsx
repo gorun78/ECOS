@@ -1,5 +1,5 @@
 // @ts-nocheck
-// 知识工作台主导航（PMO-55 批次 D：15 Tab / 6 组）
+// 知识工作台主导航（B8 / Q5：15 Tab / 7 组）
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -147,7 +147,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
                       key={tab.id}
                       onClick={() => handleTabSwitch(tab.id)}
                       className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors border-l-2 ${
-                        isActive ? `${styles.accentBg} font-semibold border-orange-500` : `border-transparent hover:opacity-70`
+                        isActive ? `${styles.accentBg} ${styles.accentBorder} font-semibold` : `border-transparent hover:opacity-70`
                       }`}
                       style={isActive ? { color: '#fff' } : { color: styles.cardText }}
                     >
@@ -166,7 +166,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
         {/* 底部状态 */}
         <div className="px-4 py-3 border-t text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ borderColor: styles.cardBorder }}>
           <div className="flex items-center gap-1.5">
-            <span style={{ color: 'rgb(51, 208, 97)' }}>●</span>
+            <span className={styles.successText}>●</span>
             <span>{t('knowledge.engine')}</span>
           </div>
           <div className="mt-0.5 opacity-70">KB · Cogn · Sec · Data</div>

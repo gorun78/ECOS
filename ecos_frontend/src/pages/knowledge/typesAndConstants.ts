@@ -250,8 +250,13 @@ export const KNOWLEDGE_TAB_GROUPS = [
     tabs: [
       { id: 'ontology_model' as const, icon: 'Workflow' as const },
       { id: 'graph_build' as const, icon: 'Database' as const },
-      { id: 'vector_index' as const, icon: 'Binary' as const },
       { id: 'classification' as const, icon: 'Tag' as const },
+    ],
+  },
+  {
+    id: 'store',
+    tabs: [
+      { id: 'vector_index' as const, icon: 'Binary' as const },
     ],
   },
   {
@@ -259,13 +264,13 @@ export const KNOWLEDGE_TAB_GROUPS = [
     tabs: [
       { id: 'rag' as const, icon: 'Zap' as const },
       { id: 'graph_explorer' as const, icon: 'Network' as const },
-      { id: 'rules' as const, icon: 'ShieldCheck' as const },
-      { id: 'eval' as const, icon: 'Gauge' as const },
     ],
   },
   {
-    id: 'operate',
+    id: 'govern',
     tabs: [
+      { id: 'rules' as const, icon: 'ShieldCheck' as const },
+      { id: 'eval' as const, icon: 'Gauge' as const },
       { id: 'lifecycle' as const, icon: 'GitBranch' as const },
       { id: 'compliance' as const, icon: 'Shield' as const },
     ],

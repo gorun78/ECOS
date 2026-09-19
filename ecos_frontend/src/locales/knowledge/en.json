@@ -178,8 +178,9 @@
   "knowledge.group.overview": "Overview",
   "knowledge.group.ingest": "Ingest",
   "knowledge.group.model": "Knowledge Model",
-  "knowledge.group.retrieval": "Retrieval & Eval",
-  "knowledge.group.operate": "Operate & Comply",
+  "knowledge.group.store": "Knowledge Store",
+  "knowledge.group.retrieval": "Retrieval",
+  "knowledge.group.govern": "Knowledge Governance",
   "knowledge.group.config": "Configuration",
 
   "knowledge.nav.overview": "Overview",
