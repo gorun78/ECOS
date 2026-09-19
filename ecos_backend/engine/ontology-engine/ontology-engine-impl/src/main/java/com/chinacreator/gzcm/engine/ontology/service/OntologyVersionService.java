@@ -169,14 +169,19 @@ public class OntologyVersionService {
      * </ol>
      *
      * <p>发布状态已提交，事件下发失败仅记日志，不阻塞主流程；载荷只含版本标识，不含本体业务文本。
+     *
+     * <p>PMO-B2（缺陷 D7 修复）：{@code entityCodes / relationshipCodes} 不再使用硬编码空列表占位，
+     * 改为从本体引擎自有表 {@code ecos_ontology_entity} / {@code ecos_ontology_relationship}
+     * 按 ontologyId 实查填充，供 kb 侧比对增量清单计算 CREATE / UPDATE / DEPRECATE（方案 §2.2）。
+     * 本体确实无对象时返回空列表（数据事实），查询异常仅记 error 日志并以空列表继续下发。
      */
     private void fanOutOntologyPublished(String ontologyId, String versionNo, String actor) {
         try {
             OntologyPublishedEvent evt = OntologyPublishedEvent.of(
                     ontologyId,
                     versionNo,
-                    Collections.emptyList(),
-                    Collections.emptyList(),
+                    loadEntityCodes(ontologyId),
+                    loadRelationshipCodes(ontologyId),
                     actor == null || actor.isBlank() ? "system" : actor);
             if (appEventPublisher != null) {
                 appEventPublisher.publishEvent(evt);
@@ -189,6 +194,48 @@ public class OntologyVersionService {
                             KafkaTopics.ONTOLOGY_PUBLISHED, versionNo));
         } catch (Exception e) {
             log.error("publishVersion event fan-out failed ontologyId={} version={}", ontologyId, versionNo, e);
+        }
+    }
+
+    /**
+     * 查本体下全部实体 code（发布事件增量清单用）。
+     *
+     * @param ontologyId 本体 ID
+     * @return 去重去空后的实体 code 列表；本体无实体时为空列表
+     */
+    private List<String> loadEntityCodes(String ontologyId) {
+        try {
+            return ontologyRepository.findEntitiesByOntology(ontologyId).stream()
+                .map(OntologyEntity::getCode)
+                .filter(code -> code != null && !code.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("loadEntityCodes failed ontologyId={}", ontologyId, e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 查本体下全部关系 code（发布事件增量清单用）。
+     *
+     * <p>关系经 {@code source_entity_id} 归属本体（{@link OntologyRepository#findRelationshipsByOntology}）。
+     *
+     * @param ontologyId 本体 ID
+     * @return 去重去空后的关系 code 列表；本体无关系时为空列表
+     */
+    private List<String> loadRelationshipCodes(String ontologyId) {
+        try {
+            return ontologyRepository.findRelationshipsByOntology(ontologyId).stream()
+                .map(row -> row.get("code"))
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .filter(code -> !code.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("loadRelationshipCodes failed ontologyId={}", ontologyId, e);
+            return new ArrayList<>();
         }
     }
 

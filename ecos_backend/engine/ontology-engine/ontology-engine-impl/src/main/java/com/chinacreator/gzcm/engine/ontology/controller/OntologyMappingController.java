@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingCreateDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingValidateDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingValidationVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingVO;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyMappingService;
@@ -42,6 +44,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li>POST   /api/v1/ontology/mappings            — 创建映射</li>
  *   <li>PUT    /api/v1/ontology/mappings/{id}       — 更新映射</li>
  *   <li>DELETE /api/v1/ontology/mappings/{id}       — 删除映射</li>
+ *   <li>POST   /api/v1/ontology/mappings/validate   — 映射一致性校验（C4 映射有效性）</li>
  *   <li>GET    /api/v1/ontology/mappings/objects    — 可被映射的本体对象列表（委托 OntologyService）</li>
  * </ul>
  *
@@ -259,6 +262,24 @@ public class OntologyMappingController {
     @GetMapping("/objects")
     public ApiResponse<List<OntologyEntityVO>> listMappableObjects() {
         return ApiResponse.success(ontologyService.listEntitiesVO(""));
+    }
+
+    // ═══════════════ 映射一致性校验（C4） ═══════════════
+
+    /**
+     * POST /api/v1/ontology/mappings/validate — 映射一致性校验（方案 §2.3 C4 映射有效性）。
+     *
+     * <p>校验映射指向的 DW 表 / 列是否存在、类型是否兼容；DW 元数据经 data-engine REST 获取。
+     * 校验失败不返回 500：统一返回 {@code ApiResponse.success}，由 {@code data.valid=false}
+     * + {@code data.issues[]} 表达结果，{@code data.rejectCode=INVALID_MAPPING} 供 kb 侧
+     * 拒绝该实体实例抽取。
+     *
+     * @param dto 校验范围（mappingId / 内联 datasetId+fieldMappings / entityCode / 全量）
+     */
+    @PostMapping("/validate")
+    public ApiResponse<OntologyMappingValidationVO> validateMappings(
+            @RequestBody OntologyMappingValidateDTO dto) {
+        return ApiResponse.success(mappingService.validateMappings(dto));
     }
 
     // ═══════════════ 内部辅助方法 ═══════════════════

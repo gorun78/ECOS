@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.chinacreator.gzcm.common.exception.DataAccessException;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -67,5 +69,69 @@ public class DataNetResourceClient {
             log.warn("datanet fields 端点不可用 ({}), 自动发现候选将为空. {}", url, e.getMessage());
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * 按分层拉取数据资源清单（PMO-B2 C4 映射校验用）。
+     *
+     * <p>端点：{@code GET /api/v1/engine/data/layers/{layer}}（已有端点），
+     * 响应 {@code ApiResponse<Map>}，资源数组在 {@code data.resources}。
+     *
+     * @param layer 分层名（映射校验固定用 {@code CURATED}，即 DW 层）
+     * @return 资源行列表（含 {@code resource_id / resource_name / source_path}）
+     * @throws DataAccessException datanet service 不可达或响应非法时抛出（调用方据此区分「元数据不可用」与「表不存在」）
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listResourcesByLayer(String layer) {
+        String url = datanetBaseUrl + "/api/v1/engine/data/layers/" + layer;
+        try {
+            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
+            Object data = body == null ? null : body.get("data");
+            if (data instanceof Map<?, ?> dataMap) {
+                Object resources = dataMap.get("resources");
+                if (resources instanceof List) {
+                    return (List<Map<String, Object>>) resources;
+                }
+            }
+            if (data instanceof List) {
+                return (List<Map<String, Object>>) data;
+            }
+            throw new DataAccessException("datanet 分层资源响应非法: " + url);
+        } catch (DataAccessException e) {
+            log.error("datanet 分层资源端点响应非法 ({})", url, e);
+            throw e;
+        } catch (Exception e) {
+            log.error("datanet 分层资源端点不可用 ({})", url, e);
+            throw new DataAccessException("datanet 分层资源端点不可用: " + url, e);
+        }
+    }
+
+    /**
+     * 拉取数据资源的列定义（PMO-B2 C4 映射校验用）。
+     *
+     * <p>端点：{@code GET /api/v1/datanet/metadata/fields/{resourceId}}（已有端点），
+     * 响应 {@code {code, success, message, data: DataField[]}}，元素含 {@code fieldName / dataType}。
+     *
+     * @param resourceId 数据资源 ID（{@code td_data_resource.resource_id}）
+     * @return 字段行列表
+     * @throws DataAccessException datanet service 不可达或响应非法时抛出
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listMetadataFields(String resourceId) {
+        String url = datanetBaseUrl + "/api/v1/datanet/metadata/fields/" + resourceId;
+        try {
+            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
+            Object data = body == null ? null : body.get("data");
+            if (data instanceof List) {
+                return (List<Map<String, Object>>) data;
+            }
+            throw new DataAccessException("datanet 元数据字段响应非法: " + url);
+        } catch (DataAccessException e) {
+            log.error("datanet 元数据字段端点响应非法 ({})", url, e);
+            throw e;
+        } catch (Exception e) {
+            log.error("datanet 元数据字段端点不可用 ({})", url, e);
+            throw new DataAccessException("datanet 元数据字段端点不可用: " + url, e);
+        }
     }
 }

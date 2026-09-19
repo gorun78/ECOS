@@ -30,6 +30,7 @@
 ## 端点 / 补丁
 - 兼容双路径：`/api/v1/ecos/{ontologies|entities|domains|versions|workflows|objects}` (gateway / 前端)
   + `/api/v1/engine/ontology/*`（引擎自身健康检查 + 统计 + 域入驻）。
+- 映射一致性校验（PMO-B2 T2 / 方案 §2.3 C4）：`POST /api/v1/ontology/mappings/validate`（`OntologyMappingController`，入参 `OntologyMappingValidateDTO`，出参 `ApiResponse<OntologyMappingValidationVO>`）— 校验映射指向的 DW 表/列存在性与类型兼容，DW 元数据经 `DataNetResourceClient` 走 data-engine REST（`GET /api/v1/engine/data/layers/CURATED` + `GET /api/v1/datanet/metadata/fields/{id}`）；失败返回 200 + `valid=false` + `issues[]` + `rejectCode=INVALID_MAPPING`，不抛 500。
 - Domain 入驻落地（`OntologyDomainApiController`）：
 ```java
 @RestController

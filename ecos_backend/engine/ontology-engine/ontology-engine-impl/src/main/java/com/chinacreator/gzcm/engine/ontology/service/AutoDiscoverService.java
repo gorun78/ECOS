@@ -290,7 +290,13 @@ public class AutoDiscoverService {
         return sb.toString();
     }
 
-    private String mapSqlType(String sqlType) {
+    /**
+     * SQL 类型 → 本体属性类型映射（STRING / NUMBER / BOOLEAN / DATETIME）。
+     *
+     * <p>PMO-B2 T2：由 private 提升为包级 static，供
+     * {@link OntologyMappingService} 的 C4 映射校验复用（禁止重复实现同类逻辑）。
+     */
+    static String mapSqlType(String sqlType) {
         if (sqlType == null) return "STRING";
         String t = sqlType.toUpperCase();
         if (t.contains("INT") || t.contains("BIGINT") || t.contains("SMALLINT") || t.contains("TINYINT") || t.contains("NUMERIC") || t.contains("DECIMAL") || t.contains("FLOAT") || t.contains("DOUBLE"))
