@@ -12,6 +12,15 @@ public class KnowledgeEdge {
     private String propertiesJson;
     private LocalDateTime createdAt;
 
+    /** 溯源：本体业务 ID（对齐 kb_ontology_snapshot.ontology_id，D9） */
+    private String ontologyId;
+    /** 溯源：生成本边时的本体版本（对齐 kb_ontology_snapshot.version，D9） */
+    private String ontologyVersion;
+    /** 溯源：实例抽取来源的 DW 层数据资源 ID（B3 实例抽取写入） */
+    private String sourceResourceId;
+    /** 溯源：实例抽取来源的 DW 表主键值（B3 实例抽取写入） */
+    private String sourcePk;
+
     public KnowledgeEdge() {}
 
     public KnowledgeEdge(String id, String sourceNodeId, String targetNodeId, String relationship, double weight) {
@@ -36,4 +45,12 @@ public class KnowledgeEdge {
     public void setPropertiesJson(String propertiesJson) { this.propertiesJson = propertiesJson; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getOntologyId() { return ontologyId; }
+    public void setOntologyId(String ontologyId) { this.ontologyId = ontologyId; }
+    public String getOntologyVersion() { return ontologyVersion; }
+    public void setOntologyVersion(String ontologyVersion) { this.ontologyVersion = ontologyVersion; }
+    public String getSourceResourceId() { return sourceResourceId; }
+    public void setSourceResourceId(String sourceResourceId) { this.sourceResourceId = sourceResourceId; }
+    public String getSourcePk() { return sourcePk; }
+    public void setSourcePk(String sourcePk) { this.sourcePk = sourcePk; }
 }

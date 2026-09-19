@@ -23,8 +23,10 @@ public interface KnowledgeNodeMapper {
     @Select("SELECT id, label, node_type as nodeType, description, properties as propertiesJson, domain, created_at as createdAt, updated_at as updatedAt FROM ecos_knowledge.graph_node")
     List<KnowledgeNode> findAll();
 
-    @Insert("INSERT INTO ecos_knowledge.graph_node (id, label, node_type, description, properties, domain, created_at, updated_at) " +
-            "VALUES (#{id}, #{label}, #{nodeType, jdbcType=VARCHAR}, #{description, jdbcType=VARCHAR}, #{propertiesJson, jdbcType=VARCHAR}, #{domain, jdbcType=VARCHAR}, #{createdAt}, #{updatedAt})")
+    @Insert("INSERT INTO ecos_knowledge.graph_node (id, label, node_type, description, properties, domain, created_at, updated_at, " +
+            "ontology_id, ontology_version, source_resource_id, source_pk) " +
+            "VALUES (#{id}, #{label}, #{nodeType, jdbcType=VARCHAR}, #{description, jdbcType=VARCHAR}, #{propertiesJson, jdbcType=VARCHAR}, #{domain, jdbcType=VARCHAR}, #{createdAt}, #{updatedAt}, " +
+            "#{ontologyId, jdbcType=VARCHAR}, #{ontologyVersion, jdbcType=VARCHAR}, #{sourceResourceId, jdbcType=VARCHAR}, #{sourcePk, jdbcType=VARCHAR})")
     int insert(KnowledgeNode node);
 
     @Select("SELECT COUNT(*) FROM ecos_knowledge.graph_node")

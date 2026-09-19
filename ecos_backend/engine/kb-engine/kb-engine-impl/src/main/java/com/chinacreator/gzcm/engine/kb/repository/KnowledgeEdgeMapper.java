@@ -20,8 +20,10 @@ public interface KnowledgeEdgeMapper {
     @Select("SELECT id, source_id as sourceNodeId, target_id as targetNodeId, type as relationship, weight, properties as propertiesJson, created_at as createdAt FROM ecos_knowledge.graph_edge")
     List<KnowledgeEdge> findAll();
 
-    @Insert("INSERT INTO ecos_knowledge.graph_edge (id, source_id, target_id, type, weight, properties, created_at) " +
-            "VALUES (#{id}, #{sourceNodeId}, #{targetNodeId}, #{relationship}, #{weight}, #{propertiesJson, jdbcType=VARCHAR}, #{createdAt})")
+    @Insert("INSERT INTO ecos_knowledge.graph_edge (id, source_id, target_id, type, weight, properties, created_at, " +
+            "ontology_id, ontology_version, source_resource_id, source_pk) " +
+            "VALUES (#{id}, #{sourceNodeId}, #{targetNodeId}, #{relationship}, #{weight}, #{propertiesJson, jdbcType=VARCHAR}, #{createdAt}, " +
+            "#{ontologyId, jdbcType=VARCHAR}, #{ontologyVersion, jdbcType=VARCHAR}, #{sourceResourceId, jdbcType=VARCHAR}, #{sourcePk, jdbcType=VARCHAR})")
     int insert(KnowledgeEdge edge);
 
     @Select("SELECT COUNT(*) FROM ecos_knowledge.graph_edge")

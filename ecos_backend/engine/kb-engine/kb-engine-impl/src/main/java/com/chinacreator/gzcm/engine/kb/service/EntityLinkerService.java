@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import org.slf4j.Logger;
@@ -12,7 +13,7 @@ import java.util.*;
 /**
  * 实体链接服务 — 将抽取的实体自动关联到本体对象类型。
  * <p>
- * 输入实体名称+类型 → 查询ontology本体类型 → 编辑距离+语义匹配 → Neo4j关系 MAPS_TO。
+ * 输入实体名称+类型 → 查询本体快照 entity_codes（kb_ontology_snapshot）→ 编辑距离+语义匹配 → Neo4j关系 MAPS_TO。
  * T1知识抽取审核通过后自动触发。
  * </p>
  *
@@ -143,19 +144,23 @@ public class EntityLinkerService {
     private List<OntologyType> queryOntologyTypes(String domain) {
         List<OntologyType> types = new ArrayList<>();
         try {
-            // 查询ontology_objects表
+            // 本体类型候选来源 = 本体快照的 entity_codes（kb_ontology_snapshot，V116）
+            // 替代已废弃的幻影表 ontology_objects（B1 缺陷 D1 修正）
             List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, name, path FROM ontology_objects WHERE domain LIKE ? OR name LIKE ? LIMIT 50",
-                "%" + domain + "%", "%" + domain + "%");
+                "SELECT s.ontology_id AS ontology_id, e AS entity_code " +
+                "FROM ecos_knowledge.kb_ontology_snapshot s, " +
+                "     jsonb_array_elements_text(s.entity_codes) AS e " +
+                "WHERE s.is_deleted = 0 AND e ILIKE ? " +
+                "ORDER BY s.ontology_id LIMIT 50",
+                "%" + domain + "%");
             for (Map<String, Object> row : rows) {
-                types.add(new OntologyType(
-                    String.valueOf(row.get("id")),
-                    String.valueOf(row.get("name")),
-                    String.valueOf(row.getOrDefault("path", String.valueOf(row.get("name"))))
-                ));
+                String ontologyId = String.valueOf(row.get("ontology_id"));
+                String code = String.valueOf(row.get("entity_code"));
+                types.add(new OntologyType(code, code, ontologyId + "/" + code));
             }
         } catch (Exception e) {
-            log.warn("查询本体类型失败: {}", e.getMessage());
+            log.error("查询本体类型失败: domain={}", domain, e);
+            throw new DataAccessException("查询本体类型失败: domain=" + domain, e);
         }
         return types;
     }

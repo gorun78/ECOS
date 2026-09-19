@@ -1,204 +1,131 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
-import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
-import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
-import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
-import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.common.exception.DataAccessException;
+import com.chinacreator.gzcm.common.exception.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * 本体对象 → 图谱节点/边 映射服务（PMO-50 T2/T4 共享）。
+ * 本体快照 → 图谱版本对齐服务（PMO 批次 B1，缺陷 D1 / D9）。
  *
- * <p>封装"从 ontology_objects / object_relationships 读 → 写 graph_node/graph_edge"的公共逻辑，
- * 供 {@link KgSyncServiceImpl#runKgMapper(String, String)}（T2）与
- * {@code EcosOntologyEventConsumer}（T4）复用。
+ * <p>B1 修正要点：
+ * <ol>
+ *   <li><b>数据源修正（D1）</b>：原实现读 {@code ontology_objects} / {@code object_relationships}
+ *       两张全仓无 DDL 的幻影表，且异常被吞成空集 → 本体发布后图谱实际产出 0 节点 0 边。
+ *       现改为读本体快照表 {@code ecos_knowledge.kb_ontology_snapshot}（V116，含
+ *       {@code ontology_id} + {@code version} + {@code schema_hash} + entity/relationship codes），
+ *       它是本体版本的唯一权威对齐基准。</li>
+ *   <li><b>异常不吞</b>：快照读取失败或快照缺失一律 {@code log.error}（含 ontologyId / 异常堆栈）
+ *       并抛 {@link DataAccessException} / {@link NotFoundException}（{@code DataBridgeException} 子类），
+ *       禁止「catch 后返回空集」的静默降级。</li>
+ *   <li><b>版本对齐（D9）</b>：以快照的 {@code ontology_id} / {@code ontology_version}
+ *       对齐既有 {@code graph_node} / {@code graph_edge} 记录（V134 溯源列），实现
+ *       「图谱版本 = 本体版本」。</li>
+ *   <li><b>骨架范围（Q4 裁决）</b>：<b>不物化本体实体为图节点</b>。类型只作为节点属性
+ *       （{@code graph_node.node_type}）+ 类型索引；本体 schema 骨架视图由
+ *       {@code kb_ontology_snapshot} 单独渲染。图谱实例节点由后续批次（B3，契约驱动抽取）写入。</li>
+ * </ol>
  *
- * <ul>
- *   <li>节点 = ontology_objects 中按 {@code objectType} 过滤的对象 → graph_node
- *       （label 幂等：已存在则更新 node_type/description/domain；
- *       新建时 id 带 {@code kg-<jobId>-} 前缀便于 rollback 定位）</li>
- *   <li>边 = object_relationships 中 source_type/target_type 名称映射到本批 nameToNodeId，
- *       写 graph_edge（自环跳过）</li>
- *   <li>幂等：label 已存在即跳过 update（避免新增 mapper 方法违反 ArchUnit 规则），
- *       但补 node_type/description/domain 三列空值；</li>
- *   <li>错误隔离：单条 try/catch，保证整批不断链。</li>
- * </ul>
- *
- * <p>objectType="ALL" 表示全量；其他值按 ontology_objects.type 范围过滤。
+ * <p>调用方：{@link KgSyncServiceImpl#runKgMapper(String, String)}（手动触发，T2）与
+ * {@code EcosOntologyEventConsumer#runSync}（本体发布事件，T4）。
  */
 @Service
 public class KgMapperService {
 
     private static final Logger log = LoggerFactory.getLogger(KgMapperService.class);
 
-    private final JdbcTemplate jdbc;
-    private final KnowledgeNodeMapper nodeMapper;
-    private final KnowledgeEdgeMapper edgeMapper;
+    /** 全量范围标识：对齐全部生效本体快照。 */
+    private static final String SCOPE_ALL = "ALL";
 
-    public KgMapperService(JdbcTemplate jdbc,
-                           KnowledgeNodeMapper nodeMapper,
-                           KnowledgeEdgeMapper edgeMapper) {
+    private final JdbcTemplate jdbc;
+
+    public KgMapperService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.nodeMapper = nodeMapper;
-        this.edgeMapper = edgeMapper;
     }
 
     /**
-     * 触发一次对象 → KG 同步。
+     * 触发一次本体 → 图谱版本对齐。
      *
-     * @param objectType "ALL" 全量；其他值按 ontology_objects.type 过滤
-     * @param jobId      job 标识，写到新建 node/edge id 前缀，供 T4 rollback 按 job 维度定位
-     * @return { nodes, edges, skipped, ontologyObjectCount }
+     * @param ontologyId 本体 ID；{@code ALL} 或空表示全部生效本体
+     * @param jobId      job 标识，写入审计与 {@code kg_sync_log} 供溯源
+     * @return { nodes, edges, skipped, ontologyObjectCount, ontologyId, ontologyVersions,
+     *           entityCount, relationshipCount }
      */
-    public Map<String, Object> syncFromOntology(String objectType, String jobId) {
-        int nodeOk = 0;
-        int nodeSkip = 0;
-        int edgeOk = 0;
-        int edgeSkip = 0;
+    public Map<String, Object> syncFromOntology(String ontologyId, String jobId) {
+        String scope = (ontologyId == null || ontologyId.isBlank()) ? SCOPE_ALL : ontologyId.trim();
         String jobPrefix = jobId == null || jobId.isBlank() ? "" : jobId;
 
-        // 1. 读本体对象（容忍缺失表 → 空结果，不抛）
-        List<Map<String, Object>> objects = readObjects(objectType);
+        // 1. 读本体快照（唯一权威来源；缺失或读取失败直接抛业务异常，不静默降级）
+        List<OntologySnapshot> snapshots = readSnapshots(scope);
 
-        // 2. 写 graph_node（id 带 job 前缀供 rollback 剥除定位）
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, String> nameToNodeId = new HashMap<>();
-        for (Map<String, Object> obj : objects) {
-            String name = safeStr(obj.get("name"));
-            String type = safeStr(obj.get("type"));
-            String id = safeStr(obj.get("id"));
-            String path = safeStr(obj.get("path"));
-            if (name.isBlank()) {
-                nodeSkip++;
-                continue;
-            }
-            try {
-                KnowledgeNode exist = safeFindNodeByLabel(name);
-                if (exist != null) {
-                    // 已存在：按需赋值（禁空值覆盖有效值）
-                    if (!type.isBlank() && (exist.getNodeType() == null || exist.getNodeType().isBlank())) {
-                        exist.setNodeType(type);
-                    }
-                    if (!path.isBlank() && (exist.getDescription() == null || exist.getDescription().isBlank())) {
-                        exist.setDescription(path);
-                    }
-                    if (!type.isBlank() && (exist.getDomain() == null || exist.getDomain().isBlank())) {
-                        exist.setDomain(type);
-                    }
-                    exist.setUpdatedAt(now);
-                    // 现有 KnowledgeNodeMapper 仅 insert + count；update 路径暂时跳过（避免新增 mapper 方法）
-                    nodeOk++;
-                    nameToNodeId.put(name, exist.getId());
-                } else {
-                    KnowledgeNode n = new KnowledgeNode();
-                    // id 带 job 前缀：rollback 按 LIKE 'kg-<jobId>-%' 剥
-                    n.setId("kg-" + jobPrefix + "-" + (id.isBlank() ? UUID.randomUUID() : id));
-                    n.setLabel(name);
-                    n.setNodeType(type);
-                    n.setDescription(path);
-                    n.setDomain(type);
-                    n.setPropertiesJson(buildPropsJson(id, jobPrefix));
-                    n.setCreatedAt(now);
-                    n.setUpdatedAt(now);
-                    try {
-                        nodeMapper.insert(n);
-                        nodeOk++;
-                        nameToNodeId.put(name, n.getId());
-                    } catch (Exception insertEx) {
-                        log.warn("KgMapper: node insert failed for label='{}': {}", name, insertEx.getMessage());
-                        nodeSkip++;
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("KgMapper: map object failed name='{}': {}", name, e.getMessage());
-                nodeSkip++;
-            }
+        // 2. 版本对齐（D9）：把快照的 ontology_id / ontology_version 打到既有图谱记录上
+        int alignedNodes = 0;
+        int alignedEdges = 0;
+        int entityCount = 0;
+        int relationshipCount = 0;
+        List<String> versions = new ArrayList<>(snapshots.size());
+        for (OntologySnapshot snap : snapshots) {
+            entityCount += snap.entityCount();
+            relationshipCount += snap.relationshipCount();
+            versions.add(snap.ontologyId() + "@" + snap.version());
+            alignedNodes += alignNodeVersion(snap);
+            alignedEdges += alignEdgeVersion(snap);
         }
 
-        // 3. 写 graph_edge（按 source_type/target_type 名称解析本批 node id）
-        List<Map<String, Object>> rels = readRelationships();
-        for (Map<String, Object> r : rels) {
-            String srcName = safeStr(r.get("source_type"));
-            String trgName = safeStr(r.get("target_type"));
-            String relType = safeStr(r.get("name"));
-            String relId = safeStr(r.get("id"));
-            if (srcName.isBlank() || trgName.isBlank() || relType.isBlank()) {
-                edgeSkip++;
-                continue;
-            }
-            String srcId = nameToNodeId.get(srcName);
-            String trgId = nameToNodeId.get(trgName);
-            if (srcId == null || trgId == null) {
-                edgeSkip++;
-                continue;
-            }
-            if (srcId.equals(trgId)) {
-                edgeSkip++;
-                continue;
-            }
-            try {
-                KnowledgeEdge edge = new KnowledgeEdge();
-                edge.setId("kgrel-" + jobPrefix + "-" + (relId.isBlank() ? UUID.randomUUID() : relId));
-                edge.setSourceNodeId(srcId);
-                edge.setTargetNodeId(trgId);
-                edge.setRelationship(relType);
-                edge.setWeight(1.0);
-                edge.setPropertiesJson(buildPropsJson(relId, jobPrefix));
-                edge.setCreatedAt(now);
-                safeInsertEdge(edge);
-                edgeOk++;
-            } catch (Exception e) {
-                edgeSkip++;
-                log.warn("KgMapper: edge insert failed src='{}' trg='{}': {}", srcName, trgName, e.getMessage());
-            }
-        }
-
-        log.info("KgMapper: done object_type='{}' → objects={}, nodes={}, edges={}, skippedNodes={}, skippedEdges={}",
-                objectType, objects.size(), nodeOk, edgeOk, nodeSkip, edgeSkip);
-        emitAudit("kg_sync_progress", "objectType=" + objectType + " jobId=" + jobPrefix
-                + " nodes=" + nodeOk + " edges=" + edgeOk);
+        log.info("KgMapper: done scope='{}' jobId='{}' → snapshots={}, alignedNodes={}, alignedEdges={}, "
+                        + "entities={}, relationships={}, versions={}",
+                scope, jobPrefix, snapshots.size(), alignedNodes, alignedEdges,
+                entityCount, relationshipCount, versions);
+        emitAudit("kg_sync_progress", "scope=" + scope + " jobId=" + jobPrefix
+                + " alignedNodes=" + alignedNodes + " alignedEdges=" + alignedEdges
+                + " versions=" + versions);
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("nodes", nodeOk);
-        out.put("edges", edgeOk);
-        out.put("skipped", nodeSkip + edgeSkip);
-        out.put("ontologyObjectCount", objects.size());
+        out.put("nodes", alignedNodes);
+        out.put("edges", alignedEdges);
+        out.put("skipped", 0);
+        out.put("ontologyObjectCount", entityCount);
+        out.put("ontologyId", scope);
+        out.put("ontologyVersions", versions);
+        out.put("entityCount", entityCount);
+        out.put("relationshipCount", relationshipCount);
         return out;
     }
 
     /**
-     * dry-run 预览（PMO-50 T4 /jobs/{jobId}/preview）：
-     * 返回 { create, update, skip } 将本次同步对 graph 的变更影响计数，不真正写。
+     * dry-run 预览（PMO-50 T4 /jobs/{jobId}/preview）：返回本次同步将产生的变更计数，不写库。
+     *
+     * <p>B1 按 Q4 裁决不物化本体实体为图节点，故 {@code create/update/skip} 恒为 0；
+     * 骨架范围（实体/关系计数 + 对齐版本）由 {@code entityCount} / {@code relationshipCount} /
+     * {@code ontologyVersions} 给出，供前端骨架视图核对。
      */
-    public Map<String, Object> previewDryRun(String objectType) {
-        List<Map<String, Object>> objects = readObjects(objectType);
-        int create = 0;
-        int update = 0;
-        int skip = 0;
-        for (Map<String, Object> obj : objects) {
-            String name = safeStr(obj.get("name"));
-            if (name.isBlank()) {
-                skip++;
-                continue;
-            }
-            KnowledgeNode exist = safeFindNodeByLabel(name);
-            if (exist == null) {
-                create++;
-            } else {
-                update++;
-            }
+    public Map<String, Object> previewDryRun(String ontologyId) {
+        String scope = (ontologyId == null || ontologyId.isBlank()) ? SCOPE_ALL : ontologyId.trim();
+        List<OntologySnapshot> snapshots = readSnapshots(scope);
+
+        int entityCount = 0;
+        int relationshipCount = 0;
+        List<String> versions = new ArrayList<>(snapshots.size());
+        for (OntologySnapshot snap : snapshots) {
+            entityCount += snap.entityCount();
+            relationshipCount += snap.relationshipCount();
+            versions.add(snap.ontologyId() + "@" + snap.version());
         }
+
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("create", create);
-        out.put("update", update);
-        out.put("skip", skip);
+        out.put("create", 0);
+        out.put("update", 0);
+        out.put("skip", 0);
+        out.put("ontologyId", scope);
+        out.put("ontologyVersions", versions);
+        out.put("entityCount", entityCount);
+        out.put("relationshipCount", relationshipCount);
         return out;
     }
 
@@ -210,7 +137,7 @@ public class KgMapperService {
         int nodeDel = 0;
         int edgeDel = 0;
         if (jobId == null || jobId.isBlank()) {
-            throw new IllegalArgumentException("jobId required");
+            throw new BusinessException("jobId 不能为空");
         }
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
@@ -246,61 +173,88 @@ public class KgMapperService {
 
     // ── 私有辅助 ──────────────────────────────────────
 
-    private KnowledgeNode safeFindNodeByLabel(String label) {
+    /**
+     * 读取本体快照（版本对齐基准）。
+     *
+     * <p>只读 {@code kb_ontology_snapshot}：{@code scope=ALL} 时每个本体取最新一条生效快照，
+     * 否则按 {@code ontology_id} 取最新一条。读取失败抛 {@link DataAccessException}，
+     * 快照缺失抛 {@link NotFoundException}，两者均先 {@code log.error}（含堆栈）。
+     *
+     * @param scope 本体 ID 或 {@link #SCOPE_ALL}
+     * @return 快照投影列表（非空）
+     */
+    private List<OntologySnapshot> readSnapshots(String scope) {
+        List<Map<String, Object>> rows;
         try {
-            return nodeMapper.findByLabel(label);
-        } catch (Exception e) {
-            log.debug("KgMapper: findByLabel failed label='{}': {}", label, e.getMessage());
-            return null;
-        }
-    }
-
-    private void safeInsertEdge(KnowledgeEdge edge) {
-        try {
-            edgeMapper.insert(edge);
-        } catch (Exception e) {
-            log.debug("KgMapper: edge exists or failed (id={}): {}", edge.getId(), e.getMessage());
-        }
-    }
-
-    private List<Map<String, Object>> readObjects(String objectType) {
-        try {
-            if ("ALL".equalsIgnoreCase(objectType) || objectType == null || objectType.isBlank()) {
-                return jdbc.queryForList(
-                        "SELECT id, name, type, path FROM ontology_objects LIMIT 1000");
+            if (SCOPE_ALL.equalsIgnoreCase(scope)) {
+                rows = jdbc.queryForList(
+                        "SELECT DISTINCT ON (ontology_id) ontology_id, version, " +
+                        "       jsonb_array_length(entity_codes) AS entity_count, " +
+                        "       jsonb_array_length(relationship_codes) AS relationship_count " +
+                        "FROM ecos_knowledge.kb_ontology_snapshot " +
+                        "WHERE is_deleted = 0 " +
+                        "ORDER BY ontology_id, created_at DESC");
+            } else {
+                rows = jdbc.queryForList(
+                        "SELECT ontology_id, version, " +
+                        "       jsonb_array_length(entity_codes) AS entity_count, " +
+                        "       jsonb_array_length(relationship_codes) AS relationship_count " +
+                        "FROM ecos_knowledge.kb_ontology_snapshot " +
+                        "WHERE is_deleted = 0 AND ontology_id = ? " +
+                        "ORDER BY created_at DESC LIMIT 1",
+                        scope);
             }
-            return jdbc.queryForList(
-                    "SELECT id, name, type, path FROM ontology_objects WHERE type = ? LIMIT 1000",
-                    objectType);
         } catch (Exception e) {
-            log.warn("KgMapper: ontology_objects read failed: {}", e.getMessage());
-            return Collections.emptyList();
+            log.error("KgMapper: 读取本体快照失败 scope={}", scope, e);
+            throw new DataAccessException("读取本体快照失败: ontologyId=" + scope, e);
         }
-    }
 
-    private List<Map<String, Object>> readRelationships() {
-        try {
-            return jdbc.queryForList(
-                    "SELECT id, source_type, target_type, name FROM object_relationships LIMIT 1000");
-        } catch (Exception e) {
-            log.warn("KgMapper: object_relationships read failed: {}", e.getMessage());
-            return Collections.emptyList();
+        if (rows.isEmpty()) {
+            log.error("KgMapper: 本体快照不存在，无法对齐图谱版本 scope={}", scope);
+            throw new NotFoundException("本体快照不存在，无法对齐图谱版本: ontologyId=" + scope);
         }
+
+        List<OntologySnapshot> snapshots = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            snapshots.add(new OntologySnapshot(
+                    str(row.get("ontology_id")),
+                    str(row.get("version")),
+                    intVal(row.get("entity_count")),
+                    intVal(row.get("relationship_count"))));
+        }
+        return snapshots;
     }
 
-    private String buildPropsJson(String srcId, String jobPrefix) {
-        return "{\"ontologyId\":\"" + escape(srcId) + "\",\"jobId\":\"" + escape(jobPrefix) + "\"}";
+    /**
+     * 版本对齐（graph_node）：把快照版本打到该本体已落库的节点上（幂等，已对齐行不重复写）。
+     *
+     * @return 受影响行数
+     */
+    private int alignNodeVersion(OntologySnapshot snap) {
+        return jdbc.update(
+                "UPDATE ecos_knowledge.graph_node SET ontology_version = ?, updated_at = NOW() " +
+                "WHERE ontology_id = ? AND (ontology_version IS NULL OR ontology_version <> ?)",
+                snap.version(), snap.ontologyId(), snap.version());
     }
 
-    private String safeStr(Object o) {
+    /**
+     * 版本对齐（graph_edge）：语义同 {@link #alignNodeVersion(OntologySnapshot)}。
+     *
+     * @return 受影响行数
+     */
+    private int alignEdgeVersion(OntologySnapshot snap) {
+        return jdbc.update(
+                "UPDATE ecos_knowledge.graph_edge SET ontology_version = ?, updated_at = NOW() " +
+                "WHERE ontology_id = ? AND (ontology_version IS NULL OR ontology_version <> ?)",
+                snap.version(), snap.ontologyId(), snap.version());
+    }
+
+    private String str(Object o) {
         return o == null ? "" : String.valueOf(o);
     }
 
-    private String escape(String s) {
-        if (s == null) {
-            return "";
-        }
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    private int intVal(Object o) {
+        return o instanceof Number ? ((Number) o).intValue() : 0;
     }
 
     /**
@@ -319,5 +273,17 @@ public class KgMapperService {
 
     private String sanitize(String s) {
         return s == null ? "" : s.replace("\"", "'").replace("\\", "/");
+    }
+
+    /**
+     * 本体快照只读投影（版本对齐基准）。
+     *
+     * @param ontologyId        本体业务 ID
+     * @param version           本体版本
+     * @param entityCount       快照内实体 code 数
+     * @param relationshipCount 快照内关系 code 数
+     */
+    private record OntologySnapshot(String ontologyId, String version,
+                                    int entityCount, int relationshipCount) {
     }
 }

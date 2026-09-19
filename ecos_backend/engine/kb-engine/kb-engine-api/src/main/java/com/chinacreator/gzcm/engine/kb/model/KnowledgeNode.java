@@ -13,6 +13,15 @@ public class KnowledgeNode {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    /** 溯源：本体业务 ID（对齐 kb_ontology_snapshot.ontology_id，D9） */
+    private String ontologyId;
+    /** 溯源：生成本节点时的本体版本（对齐 kb_ontology_snapshot.version，D9） */
+    private String ontologyVersion;
+    /** 溯源：实例抽取来源的 DW 层数据资源 ID（B3 实例抽取写入） */
+    private String sourceResourceId;
+    /** 溯源：实例抽取来源的 DW 表主键值（B3 实例抽取写入） */
+    private String sourcePk;
+
     public KnowledgeNode() {}
 
     public KnowledgeNode(String id, String label, String nodeType, String description, String propertiesJson) {
@@ -39,4 +48,12 @@ public class KnowledgeNode {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getOntologyId() { return ontologyId; }
+    public void setOntologyId(String ontologyId) { this.ontologyId = ontologyId; }
+    public String getOntologyVersion() { return ontologyVersion; }
+    public void setOntologyVersion(String ontologyVersion) { this.ontologyVersion = ontologyVersion; }
+    public String getSourceResourceId() { return sourceResourceId; }
+    public void setSourceResourceId(String sourceResourceId) { this.sourceResourceId = sourceResourceId; }
+    public String getSourcePk() { return sourcePk; }
+    public void setSourcePk(String sourcePk) { this.sourcePk = sourcePk; }
 }
