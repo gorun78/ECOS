@@ -166,7 +166,9 @@ public class OntologyMappingController {
             return ApiResponse.badRequest("ONT-MAP-003: Failed to serialize field mappings: " + e.getMessage());
         }
 
-        mappingService.insertMapping(id, objectId, sourceName, sourceType, sourceUri, fieldMappingsJson);
+        // Q2 裁决：materialized 未传时由 Service 按默认 true 落库
+        mappingService.insertMapping(id, objectId, sourceName, sourceType, sourceUri,
+                fieldMappingsJson, dto.getMaterialized());
 
         // 同步到 OntologyMappingStore 供 OntologyService.entityToMap() 读取
         Map<String, Object> apiMap = buildApiMap(id, objectId, sourceType, sourceName, sourceUri,
@@ -219,6 +221,11 @@ public class OntologyMappingController {
         if (dto.getSourceUri() != null) {
             sql.append(", table_schema=?");
             params.add(dto.getSourceUri());
+        }
+        // Q2 裁决：materialized 仅"非 null"时覆盖（与上方部分更新语义一致）
+        if (dto.getMaterialized() != null) {
+            sql.append(", materialized=?");
+            params.add(dto.getMaterialized());
         }
 
         try {

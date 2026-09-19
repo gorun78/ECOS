@@ -31,6 +31,7 @@
 - 兼容双路径：`/api/v1/ecos/{ontologies|entities|domains|versions|workflows|objects}` (gateway / 前端)
   + `/api/v1/engine/ontology/*`（引擎自身健康检查 + 统计 + 域入驻）。
 - 映射一致性校验（PMO-B2 T2 / 方案 §2.3 C4）：`POST /api/v1/ontology/mappings/validate`（`OntologyMappingController`，入参 `OntologyMappingValidateDTO`，出参 `ApiResponse<OntologyMappingValidationVO>`）— 校验映射指向的 DW 表/列存在性与类型兼容，DW 元数据经 `DataNetResourceClient` 走 data-engine REST（`GET /api/v1/engine/data/layers/CURATED` + `GET /api/v1/datanet/metadata/fields/{id}`）；失败返回 200 + `valid=false` + `issues[]` + `rejectCode=INVALID_MAPPING`，不抛 500。
+- 映射契约查询（PMO-B3-1 T4 / 方案 §5.3「实例抽取入口」）：`GET /api/v1/ontology/entity-mappings?ontologyId=`（`OntologyEntityMappingController`，出参 `ApiResponse<List<OntologyMappingVO>>`）— 按 `ontologyId` 经本引擎自有表 `ecos_ontology_entity` 解析实体集合后过滤 `ecos_entity_table_mapping`（`ontologyId` 空 = 全量），响应含 `entityCode / resourceName / datasetId / fieldMappings / materialized`，供 kb-engine 图谱实例抽取（B3-2）消费。
 - Domain 入驻落地（`OntologyDomainApiController`）：
 ```java
 @RestController

@@ -20,6 +20,8 @@
 | /api/v1/engine/data/query | POST | 数据查询 |
 | /api/v1/engine/data/settings | GET/PUT | 引擎配置 |
 | /api/v1/engine/data/layers | GET | 数据分层 |
+| /api/v1/engine/data/layers/{layer}/resources/{id}/rows | GET | 分层资源实例行增量读取（水位线，PMO-B3-1 T2） |
+| /api/v1/engine/data/layers/{layer}/resources/{id}/sample | GET | 分层资源实例行抽样（PMO-B3-1 T2） |
 | /api/v1/engine/data/functions | GET | 计算函数 |
 | /api/v1/engine/data/copilot | POST | 数据Copilot |
 

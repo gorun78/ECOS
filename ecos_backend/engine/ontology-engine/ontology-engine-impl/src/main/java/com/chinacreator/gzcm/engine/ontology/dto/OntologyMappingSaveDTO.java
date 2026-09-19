@@ -28,4 +28,7 @@ public class OntologyMappingSaveDTO {
 
     /** 扩展属性（JSON 字符串，{@code field_mappings} 列 jsonb） */
     private String fieldMappingsJson;
+
+    /** 是否参与图谱实例化（Q2 裁决新增列；{@code null} 时按默认 {@code true} 落库） */
+    private Boolean materialized;
 }

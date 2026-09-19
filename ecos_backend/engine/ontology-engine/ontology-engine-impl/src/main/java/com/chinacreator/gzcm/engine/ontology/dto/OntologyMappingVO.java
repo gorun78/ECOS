@@ -40,8 +40,14 @@ public class OntologyMappingVO {
     /** 来源类型（= domain_code） */
     private String sourceType;
 
+    /** 本体实体编码（= entity_code，与 objectId 同源；B3-2 实例抽取入口显式字段） */
+    private String entityCode;
+
     /** 来源名称（= entity_name，缺省 resource_name） */
     private String sourceName;
+
+    /** 目标 DW 表名（= resource_name；B3-2 实例抽取入口显式字段） */
+    private String resourceName;
 
     /** 来源 URI（= table_schema） */
     private String sourceUri;
@@ -57,6 +63,9 @@ public class OntologyMappingVO {
 
     /** 状态（默认 ACTIVE） */
     private String status;
+
+    /** 是否参与实例化（Q2 裁决新增列，默认 true；false = 显式关闭图谱实例化） */
+    private Boolean materialized;
 
     /** 创建时间 ISO 字符串 */
     private String createdAt;

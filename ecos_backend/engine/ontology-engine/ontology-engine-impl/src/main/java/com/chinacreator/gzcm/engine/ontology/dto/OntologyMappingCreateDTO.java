@@ -49,4 +49,7 @@ public class OntologyMappingCreateDTO {
 
     /** 状态（扩展属性 status，默认 ACTIVE） */
     private String status;
+
+    /** 是否参与图谱实例化（Q2 裁决新增列，默认 true；false = 显式关闭） */
+    private Boolean materialized;
 }

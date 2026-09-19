@@ -53,6 +53,16 @@ public class OntologyMappingService {
     /** 问题码：指定的映射主键不存在。 */
     private static final String CODE_MAPPING_NOT_FOUND = "MAPPING_NOT_FOUND";
 
+    /** 映射表显式列清单（禁 {@code SELECT *}，架构铁律 §六 SQL 规范；含 Q2 新增列 materialized）。 */
+    private static final String MAPPING_COLUMNS =
+            "id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, "
+                    + "field_mappings, materialized, created_at, updated_at";
+
+    /** 映射表显式列清单（带 {@code m.} 别名，联表查询用）。 */
+    private static final String MAPPING_COLUMNS_ALIASED =
+            "m.id, m.entity_code, m.entity_name, m.domain_code, m.datasource_id, m.resource_name, "
+                    + "m.table_schema, m.field_mappings, m.materialized, m.created_at, m.updated_at";
+
     private final JdbcTemplate jdbc;
 
     /** data-engine REST 客户端（DW 层资源 + 列定义，禁止直查 td_data_* 跨引擎表）。 */
@@ -67,7 +77,8 @@ public class OntologyMappingService {
      * 查询映射列表（可按 objectId / sourceType 过滤）。返回原始行。
      */
     public List<Map<String, Object>> listMappings(String objectId, String sourceType) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ecos_entity_table_mapping WHERE 1=1");
+        StringBuilder sql = new StringBuilder(
+                "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
         if (objectId != null && !objectId.isBlank()) {
@@ -102,7 +113,7 @@ public class OntologyMappingService {
     public Map<String, Object> findMappingById(String id) {
         try {
             return jdbc.queryForMap(
-                    "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+                    "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
@@ -118,14 +129,18 @@ public class OntologyMappingService {
 
     /**
      * 插入新映射记录。
+     *
+     * @param materialized 是否参与图谱实例化（Q2 裁决）；{@code null} 时按默认 {@code true} 落库
      */
     public void insertMapping(String id, String objectId, String sourceName,
-                              String sourceType, String sourceUri, String fieldMappingsJson) {
+                              String sourceType, String sourceUri, String fieldMappingsJson,
+                              Boolean materialized) {
         jdbc.update(
-                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())",
+                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, materialized, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, NOW(), NOW())",
                 id, objectId, sourceName, sourceType, "",
-                sourceName, sourceUri, fieldMappingsJson);
+                sourceName, sourceUri, fieldMappingsJson,
+                materialized == null ? Boolean.TRUE : materialized);
     }
 
     /**
@@ -133,11 +148,8 @@ public class OntologyMappingService {
      * {@link OntologyMappingSaveDTO} 强类型入参，便于审计与可读性。
      */
     public void insertMappingVO(String id, OntologyMappingSaveDTO dto) {
-        jdbc.update(
-                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())",
-                id, dto.getObjectId(), dto.getSourceName(), dto.getSourceType(), "",
-                dto.getSourceName(), dto.getSourceUri(), dto.getFieldMappingsJson());
+        insertMapping(id, dto.getObjectId(), dto.getSourceName(), dto.getSourceType(),
+                dto.getSourceUri(), dto.getFieldMappingsJson(), dto.getMaterialized());
     }
 
     /**
@@ -146,7 +158,7 @@ public class OntologyMappingService {
     public Map<String, Object> updateMapping(String id, StringBuilder sql, List<Object> params) {
         jdbc.update(sql.toString(), params.toArray());
         return jdbc.queryForMap(
-                "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+                "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
     }
 
     /**
@@ -155,7 +167,7 @@ public class OntologyMappingService {
     public OntologyMappingVO updateMappingVO(String id, StringBuilder sql, List<Object> params) {
         jdbc.update(sql.toString(), params.toArray());
         Map<String, Object> row = jdbc.queryForMap(
-                "SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+                "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
         return toVO(row);
     }
 
@@ -165,12 +177,41 @@ public class OntologyMappingService {
     public Map<String, Object> deleteMapping(String id) {
         Map<String, Object> existing;
         try {
-            existing = jdbc.queryForMap("SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+            existing = jdbc.queryForMap(
+                    "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
         jdbc.update("DELETE FROM ecos_entity_table_mapping WHERE id=?", id);
         return existing;
+    }
+
+    /**
+     * 按本体 ID 查询映射契约全量（方案 §5.3「实例抽取入口」）。
+     *
+     * <p>{@code ontologyId} 经本引擎自有表 {@code ecos_ontology_entity.ontology_id} 解析为
+     * 实体集合（{@code id} 与 {@code code} 双匹配，兼容 {@code entity_code} 存 id 或 code 的历史差异），
+     * 再过滤映射表。{@code ontologyId} 为空时返回全量映射（等价旧列表端点语义）。
+     *
+     * @param ontologyId 本体业务 ID（可空）
+     * @return 映射契约 VO 列表（含 {@code materialized}）
+     */
+    public List<OntologyMappingVO> listMappingsByOntology(String ontologyId) {
+        if (isBlank(ontologyId)) {
+            return listMappingsVO(null, null);
+        }
+        String sql = "SELECT " + MAPPING_COLUMNS_ALIASED + " FROM ecos_entity_table_mapping m "
+                + "WHERE m.entity_code IN ("
+                + "SELECT e.id FROM public.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0 "
+                + "UNION "
+                + "SELECT e.code FROM public.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0"
+                + ") ORDER BY m.created_at DESC";
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, ontologyId, ontologyId);
+        List<OntologyMappingVO> result = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            result.add(toVO(row));
+        }
+        return result;
     }
 
     // ═══════════════ C4 映射一致性校验（PMO-B2 T2） ═══════════════
@@ -518,12 +559,18 @@ public class OntologyMappingService {
         vo.setDatasetId(attrs.getOrDefault("datasetId", domainCode));
         vo.setObjectType(String.valueOf(attrs.getOrDefault("objectType", "ENTITY")));
         vo.setSourceType(domainCode);
+        // B3-2 实例抽取入口显式字段：entityCode / resourceName
+        vo.setEntityCode(entityCode);
+        vo.setResourceName(resourceName);
         vo.setSourceName(entityName.isEmpty() ? resourceName : entityName);
         vo.setSourceUri(tableSchema);
         vo.setFieldMappings(toFieldList(attrs.getOrDefault("fieldMappings", new ArrayList<>())));
         vo.setPropertyMappings(toPropMap(attrs.getOrDefault("propertyMappings", new LinkedHashMap<>())));
         vo.setDescription(String.valueOf(attrs.getOrDefault("description", "")));
         vo.setStatus(String.valueOf(attrs.getOrDefault("status", "ACTIVE")));
+        // Q2 裁决：materialized 为表列（非扩展属性），null 视为默认 true
+        Object materialized = row.get("materialized");
+        vo.setMaterialized(materialized == null ? Boolean.TRUE : Boolean.valueOf(String.valueOf(materialized)));
         vo.setCreatedAt(String.valueOf(row.getOrDefault("created_at", "")));
         vo.setUpdatedAt(String.valueOf(row.getOrDefault("updated_at", "")));
         return vo;
