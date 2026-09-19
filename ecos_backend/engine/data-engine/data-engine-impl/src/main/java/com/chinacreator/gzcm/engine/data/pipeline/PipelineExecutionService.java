@@ -1,11 +1,13 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.engine.data.dto.DataResourceRegisterDTO;
 import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
 import com.chinacreator.gzcm.engine.data.service.LakeObjectKeys;
 import com.chinacreator.gzcm.engine.data.service.UdfSandbox;
@@ -14,6 +16,10 @@ import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.CsvConnector;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import com.chinacreator.gzcm.runtime.access.connector.RestApiConnector;
+import com.chinacreator.gzcm.runtime.access.document.DocumentChunk;
+import com.chinacreator.gzcm.runtime.access.document.DocumentChunkSplitter;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseResult;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
 import com.chinacreator.gzcm.runtime.core.logging.ILoggingService;
@@ -28,6 +34,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -66,6 +73,14 @@ public class PipelineExecutionService {
     /** 系统配置（读取 dw.lake.partition_by / dw.lake.storage_format）；可选注入，无 bean 时走默认值 */
     @Autowired(required = false)
     private SysConfigService sysConfigService;
+
+    /** 文档解析公共能力（runtime-access，B6-2 上移）；可选注入，未装配时解析节点显式拒绝 */
+    @Autowired(required = false)
+    private DocumentParseService documentParseService;
+
+    /** 文档分块公共能力（runtime-access，B6-2 上移）；可选注入，未装配时解析节点显式拒绝 */
+    @Autowired(required = false)
+    private DocumentChunkSplitter documentChunkSplitter;
 
     /** 失败告警开关：dw.pipeline.alert_on_failure=true 时触发 IAlertService */
     @Value("${dw.pipeline.alert_on_failure:false}")
@@ -303,6 +318,8 @@ public class PipelineExecutionService {
             }
             case "SINK" -> executeSink(node, config, nodeResults);
             case "SINK_MINIO" -> executeSinkMinio(node, config, nodeResults, lakeSource);
+            // B6-2：非结构化文档解析节点（近源层对象 → 解析 → 分块 → 落 DW 层 doc/doc_chunk）
+            case "TRANSFORM_DOC_PARSE" -> executeDocParse(config, lakeSource);
             case "OUTPUT_OBJECT" -> executeOutputObject(config);
             default -> throw new ValidationException("type", "不支持的节点类型: " + type);
         };
@@ -581,6 +598,262 @@ public class PipelineExecutionService {
     private String lakeStorageFormat() {
         return LakeObjectKeys.resolveStorageFormat(
                 sysConfigService != null ? sysConfigService.getString(LakeObjectKeys.CFG_STORAGE_FORMAT) : null);
+    }
+
+    // ==================== TRANSFORM_DOC_PARSE：文档解析节点（B6-2 / ADR-2 A1 目标态） ====================
+
+    /** DW 层文档表（数据工作台唯一写入，铁律 §0.5-1） */
+    private static final String DW_DOC_TABLE = "ecos_dw.doc";
+
+    /** DW 层分块表 */
+    private static final String DW_DOC_CHUNK_TABLE = "ecos_dw.doc_chunk";
+
+    /** 管道写入的审计操作者标识 */
+    private static final String DW_ACTOR = "pipeline";
+
+    /**
+     * TRANSFORM_DOC_PARSE：近源层非结构化对象 → 解析文本 → 分块 → 落 DW 层 {@code doc}/{@code doc_chunk}。
+     *
+     * <p>config（方案 §4 F3 / §2.5-6）：
+     * <ul>
+     *   <li>{@code source}：对象 key 的 {source} 段（可空，回退 DAG 内 SOURCE_JDBC 的 datasourceId，再回退 default）</li>
+     *   <li>{@code docId}：文档 ID，必填</li>
+     *   <li>{@code chunkSize}：分块大小，默认 512，取值须 ∈ {256,512,1024,2048}（与前端一致）</li>
+     *   <li>{@code chunkOverlap}：分块重叠，默认 64，须 ≥0 且 &lt; chunkSize</li>
+     *   <li>{@code objectName}：显式对象名（可选，优先）；未指定时按 {@code originalFileName} 组装，
+     *       再退化到 {@code raw/unstructured/{source}/{docId}/} 前缀取最新对象</li>
+     * </ul>
+     *
+     * <p>解析与切分一律复用 runtime-access 公共能力（{@link DocumentParseService} /
+     * {@link DocumentChunkSplitter}），禁止本类重复实现。写入后标记目标表 {@code layer=CURATED}（§六）。
+     *
+     * @param config     节点配置
+     * @param lakeSource DAG 级 {source} 兜底值
+     * @return 落库分块数
+     */
+    private long executeDocParse(Map<String, Object> config, String lakeSource) {
+        if (documentParseService == null || documentChunkSplitter == null) {
+            throw new BusinessException("TRANSFORM_DOC_PARSE: 文档解析公共能力不可用（runtime-access 未装配）");
+        }
+        String source = firstNonBlank(strOrNull(config.get("source")), lakeSource, "default");
+        String docId = strOrNull(config.get("docId"));
+        if (docId == null || docId.isBlank()) {
+            throw new ValidationException("docId", "TRANSFORM_DOC_PARSE: docId 必填");
+        }
+        String objectName = resolveDocParseObjectName(config, source, docId);
+        int chunkSize = documentChunkSplitter.resolveChunkSize(toInteger(config.get("chunkSize")), null);
+        int chunkOverlap = documentChunkSplitter.resolveChunkOverlap(
+                toInteger(config.get("chunkOverlap")), chunkSize, null);
+        String fileName = objectName.substring(objectName.lastIndexOf('/') + 1);
+        String contentType = guessContentType(fileName);
+
+        byte[] data;
+        try {
+            data = minioStorageService.getObject(objectName);
+        } catch (Exception e) {
+            logError("TRANSFORM_DOC_PARSE: 读取近源层对象失败 object={}", objectName, e);
+            throw new BusinessException("TRANSFORM_DOC_PARSE: 读取近源层对象失败 " + objectName + ": " + e.getMessage());
+        }
+        if (data == null || data.length == 0) {
+            throw new BusinessException("TRANSFORM_DOC_PARSE: 近源层对象为空或不存在: " + objectName);
+        }
+
+        java.nio.file.Path tempFile = null;
+        upsertDocQueued(docId, source, fileName, objectName, contentType, data.length);
+        try {
+            tempFile = java.nio.file.Files.createTempFile("ecos-docparse-", "-" + fileName);
+            java.nio.file.Files.write(tempFile, data);
+
+            updateDocStatus(docId, "parsing");
+            DocumentParseResult parsed = documentParseService.parse(tempFile);
+            String text = parsed.text() == null ? "" : parsed.text();
+
+            updateDocStatus(docId, "extracting");
+            List<DocumentChunk> chunks = documentChunkSplitter.split(text, chunkSize, chunkOverlap);
+            if (!chunks.isEmpty()) {
+                insertDocChunks(docId, chunks);
+            }
+            markDocDone(docId, chunks.size());
+            ensureDocTablesCurated();
+            logInfo("TRANSFORM_DOC_PARSE done: docId={}, object={}, chunks={}, chunkSize={}, overlap={}",
+                    docId, objectName, chunks.size(), chunkSize, chunkOverlap);
+            return chunks.size();
+        } catch (Exception e) {
+            logError("TRANSFORM_DOC_PARSE: 解析/落库失败 docId={}, object={}", docId, objectName, e);
+            markDocFailed(docId, e.getMessage());
+            if (e instanceof DataBridgeException dbe) {
+                throw dbe;
+            }
+            throw new BusinessException("TRANSFORM_DOC_PARSE 执行失败: " + e.getMessage());
+        } finally {
+            deleteTempQuietly(tempFile);
+        }
+    }
+
+    /**
+     * 解析解析节点待读对象名：显式 {@code objectName} 优先 → {@code originalFileName} 组装 →
+     * 前缀 {@code raw/unstructured/{source}/{docId}/} 取最新对象。
+     */
+    private String resolveDocParseObjectName(Map<String, Object> config, String source, String docId) {
+        String explicit = strOrNull(config.get("objectName"));
+        if (explicit != null && !explicit.isBlank()) {
+            return LakeObjectKeys.requireExplicitObjectKey(explicit);
+        }
+        String fileName = firstNonBlank(strOrNull(config.get("originalFileName")),
+                strOrNull(config.get("fileName")));
+        if (fileName != null) {
+            return LakeObjectKeys.unstructuredObjectKey(source, docId, fileName);
+        }
+        String prefix = LakeObjectKeys.unstructuredPrefix(source, docId);
+        return latestLakeObject(minioStorageService.listObjects(prefix), prefix);
+    }
+
+    /** 文档行 upsert（queued）：同 doc_id 重解析走 ON CONFLICT，不产生重复行。 */
+    private void upsertDocQueued(String docId, String source, String fileName, String objectKey,
+                                 String contentType, long sizeBytes) {
+        jdbc.update(
+                "INSERT INTO " + DW_DOC_TABLE + " (id, doc_id, source, original_file_name, object_key, "
+                        + "content_type, size_bytes, parse_status, chunk_count, create_time, update_time, "
+                        + "create_by, update_by, is_deleted) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', 0, NOW(), NOW(), ?, ?, FALSE) "
+                        + "ON CONFLICT (doc_id) DO UPDATE SET source = EXCLUDED.source, "
+                        + "original_file_name = EXCLUDED.original_file_name, object_key = EXCLUDED.object_key, "
+                        + "content_type = EXCLUDED.content_type, size_bytes = EXCLUDED.size_bytes, "
+                        + "parse_status = 'queued', error_message = NULL, chunk_count = 0, "
+                        + "update_time = NOW(), update_by = EXCLUDED.update_by, is_deleted = FALSE",
+                newId(), docId, source, fileName, objectKey, contentType, sizeBytes, DW_ACTOR, DW_ACTOR);
+    }
+
+    /** 文档状态流转（parsing/extracting）。 */
+    private void updateDocStatus(String docId, String status) {
+        jdbc.update("UPDATE " + DW_DOC_TABLE + " SET parse_status = ?, error_message = NULL, "
+                + "update_time = NOW(), update_by = ? WHERE doc_id = ? AND is_deleted = FALSE",
+                status, DW_ACTOR, docId);
+    }
+
+    /** 文档终态 done（记录分块数与解析完成时间）。 */
+    private void markDocDone(String docId, int chunkCount) {
+        jdbc.update("UPDATE " + DW_DOC_TABLE + " SET parse_status = 'done', chunk_count = ?, "
+                + "parsed_at = NOW(), error_message = NULL, update_time = NOW(), update_by = ? "
+                + "WHERE doc_id = ? AND is_deleted = FALSE",
+                chunkCount, DW_ACTOR, docId);
+    }
+
+    /** 文档落 failed 终态；此处失败仅告警，不覆盖原始异常。 */
+    private void markDocFailed(String docId, String errorMessage) {
+        try {
+            jdbc.update("UPDATE " + DW_DOC_TABLE + " SET parse_status = 'failed', error_message = ?, "
+                    + "update_time = NOW(), update_by = ? WHERE doc_id = ? AND is_deleted = FALSE",
+                    truncateForColumn(errorMessage, 2000), DW_ACTOR, docId);
+        } catch (Exception e) {
+            logWarnQuietly("TRANSFORM_DOC_PARSE: 落 failed 状态失败（忽略）: docId={}", docId, e);
+        }
+    }
+
+    /** 批量 upsert 分块（同 (doc_id, chunk_index) 走 ON CONFLICT，重解析不产生重复行）。 */
+    private void insertDocChunks(String docId, List<DocumentChunk> chunks) {
+        String sql = "INSERT INTO " + DW_DOC_CHUNK_TABLE + " (id, chunk_id, doc_id, chunk_index, content, "
+                + "char_start, char_end, metadata, status, create_time, update_time, create_by, update_by, is_deleted) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, '{}'::jsonb, 'active', NOW(), NOW(), ?, ?, FALSE) "
+                + "ON CONFLICT (doc_id, chunk_index) DO UPDATE SET content = EXCLUDED.content, "
+                + "char_start = EXCLUDED.char_start, char_end = EXCLUDED.char_end, status = 'active', "
+                + "update_time = NOW(), update_by = EXCLUDED.update_by, is_deleted = FALSE";
+        List<Object[]> batchArgs = new ArrayList<>(chunks.size());
+        for (DocumentChunk chunk : chunks) {
+            batchArgs.add(new Object[]{
+                    newId(), deterministicChunkId(docId, chunk.chunkIndex()), docId, chunk.chunkIndex(),
+                    chunk.content(), chunk.charStart(), chunk.charEnd(), DW_ACTOR, DW_ACTOR});
+        }
+        jdbc.batchUpdate(sql, batchArgs);
+    }
+
+    /**
+     * 登记/标记本节点写入的两张 DW 层表为 {@code layer=CURATED}（§六 写入与标记责任）。
+     *
+     * <p>复用 {@link DataLakeResourceService#registerResource}（即 {@code POST /api/v1/datanet/metadata/resources}
+     * 的同一服务层实现）：未登记则新增，已登记则幂等更新分层与近源区。
+     * 标记失败不得使管道执行失败（仅 warn，铁律 §2.5-6 / 分层规范 §六）。
+     */
+    private void ensureDocTablesCurated() {
+        registerCuratedTable("DW 文档表（ecos_dw.doc）", DW_DOC_TABLE);
+        registerCuratedTable("DW 文档分块表（ecos_dw.doc_chunk）", DW_DOC_CHUNK_TABLE);
+    }
+
+    /** 幂等登记单张 DW 层表为 CURATED（zone 保持 NULL，合法性矩阵）。 */
+    private void registerCuratedTable(String resourceName, String sourcePath) {
+        try {
+            DataResourceRegisterDTO dto = new DataResourceRegisterDTO();
+            dto.setResourceName(resourceName);
+            dto.setResourceType("TABLE");
+            dto.setLayer("CURATED");
+            dto.setZone(null);
+            dto.setSourcePath(sourcePath);
+            dto.setDescription("A1 目标态：数据工作台文档解析节点产出");
+            dataLakeResourceService.registerResource(dto);
+        } catch (Exception e) {
+            log.warn("TRANSFORM_DOC_PARSE: DW 层资源登记失败（忽略，不阻断管道）: table={}, err={}",
+                    sourcePath, e.getMessage());
+        }
+    }
+
+    /** 随机的 32 位十六进制主键（去连字符 UUID）。 */
+    private static String newId() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /** 与 docId#chunkIndex 绑定的确定性分块业务键（重解析稳定，规避 chunk_id 唯一冲突）。 */
+    private static String deterministicChunkId(String docId, int chunkIndex) {
+        return UUID.nameUUIDFromBytes((docId + "#" + chunkIndex).getBytes(StandardCharsets.UTF_8))
+                .toString().replace("-", "");
+    }
+
+    /** 按文件名后缀推断 content-type（未知回退 application/octet-stream）。 */
+    private static String guessContentType(String fileName) {
+        String name = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
+        if (name.endsWith(".pdf")) {
+            return "application/pdf";
+        }
+        if (name.endsWith(".docx")) {
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+        if (name.endsWith(".xlsx")) {
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        }
+        if (name.endsWith(".pptx")) {
+            return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        }
+        if (name.endsWith(".html") || name.endsWith(".htm")) {
+            return "text/html";
+        }
+        if (name.endsWith(".txt") || name.endsWith(".md")) {
+            return "text/plain";
+        }
+        return "application/octet-stream";
+    }
+
+    /** 段落截断（防超列长）。 */
+    private static String truncateForColumn(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    /** 临时文件静默清理（失败仅告警）。 */
+    private void deleteTempQuietly(java.nio.file.Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            java.nio.file.Files.deleteIfExists(path);
+        } catch (java.io.IOException e) {
+            logWarnQuietly("TRANSFORM_DOC_PARSE: 临时文件清理失败: {}", path, e);
+        }
+    }
+
+    /** 告警日志（不抛异常）。 */
+    private void logWarnQuietly(String pattern, Object... args) {
+        log.warn(pattern, args);
     }
 
     /** 依次取首个非空白值（全为空返回 null）。 */
@@ -1210,6 +1483,15 @@ public class PipelineExecutionService {
         return executeSinkMinio(node, config, nodeResults, lakeSource);
     }
 
+    /**
+     * 供 PipelineDebugService 调用的 TRANSFORM_DOC_PARSE 执行入口（复用主执行器解析/落库逻辑）。
+     *
+     * @return 落库分块数
+     */
+    public long executeDocParsePublic(Map<String, Object> config, String lakeSource) {
+        return executeDocParse(config, lakeSource);
+    }
+
     /** 静态版：解析数据源。 */
     private static DataSourceEntity resolveDatasourcePublic(Object dsIdObj, String requiredMsg,
                                                             DataSourceService dataSourceService) {
@@ -1637,6 +1919,25 @@ public class PipelineExecutionService {
         if (val == null) return def;
         if (val instanceof Number n) return n.intValue();
         try { return Integer.parseInt(val.toString()); } catch (Exception e) { return def; }
+    }
+
+    /** 解析可空整数（null/非法返回 null，供分块参数「未配置」判定）。 */
+    private Integer toInteger(Object val) {
+        if (val == null) {
+            return null;
+        }
+        if (val instanceof Number n) {
+            return n.intValue();
+        }
+        String text = val.toString().trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException e) {
+            throw new ValidationException("chunkSize", "非法整数值: " + val);
+        }
     }
 
     private long toLong(Object val, long def) {

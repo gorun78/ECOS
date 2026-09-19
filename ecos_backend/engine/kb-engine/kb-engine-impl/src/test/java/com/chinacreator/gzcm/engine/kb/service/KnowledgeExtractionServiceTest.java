@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
+import com.chinacreator.gzcm.runtime.access.document.MinerUHttpParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,8 +53,8 @@ class KnowledgeExtractionServiceTest {
 
     @BeforeEach
     void setUp() {
-        DocumentParserService parser =
-                new DocumentParserService(new MinerUHttpParser());
+        DocumentParseService parser =
+                new DocumentParseService(new MinerUHttpParser());
         service = new KnowledgeExtractionService(jdbc, ruleMapper, kgWriter, parser, entityLinker);
     }
 

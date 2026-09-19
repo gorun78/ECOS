@@ -14,6 +14,7 @@ export type PipelineNodeType =
   | 'SOURCE_MINIO'
   | 'TRANSFORM_SQL'
   | 'TRANSFORM_UDF'
+  | 'TRANSFORM_DOC_PARSE'
   | 'JOIN'
   | 'SINK'
   | 'SINK_MINIO'
@@ -55,6 +56,11 @@ export interface NodeConfig {
     udfId?: string;
     udfName?: string;
     params?: Record<string, unknown>;
+    // ── TRANSFORM_DOC_PARSE (B6-2 文档解析节点) ──
+    /** 分块大小，取值 ∈ {256,512,1024,2048}，默认 512 */
+    chunkSize?: number;
+    /** 分块重叠，须 ≥0 且 < chunkSize，默认 64 */
+    chunkOverlap?: number;
     // ── JOIN (Wave 5) ──
     joinKeys?: string[];
     joinType?: 'inner' | 'left' | 'right' | 'full' | 'cross';

@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
+import com.chinacreator.gzcm.runtime.access.document.MinerUHttpParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,7 @@ class KnowledgeExtractionServiceWave2CTest {
     private JdbcTemplate mockJdbc;
     private ComplianceRuleMapper mockRuleMapper;
     private KGWriterService mockKgWriter;
-    private DocumentParserService mockDocParser;
+    private DocumentParseService mockDocParser;
     private EntityLinkerService mockEntityLinker;
 
     @BeforeEach
@@ -34,7 +36,7 @@ class KnowledgeExtractionServiceWave2CTest {
         mockJdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
         mockRuleMapper = org.mockito.Mockito.mock(ComplianceRuleMapper.class);
         mockKgWriter = org.mockito.Mockito.mock(KGWriterService.class);
-        mockDocParser = new DocumentParserService(new MinerUHttpParser());
+        mockDocParser = new DocumentParseService(new MinerUHttpParser());
         mockEntityLinker = org.mockito.Mockito.mock(EntityLinkerService.class);
 
         service = new KnowledgeExtractionService(

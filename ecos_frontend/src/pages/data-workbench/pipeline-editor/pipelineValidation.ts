@@ -43,6 +43,8 @@ const REQUIRED_CONFIG_FIELDS: Record<PipelineNodeType, readonly string[]> = {
   SOURCE_MINIO: [],
   TRANSFORM_SQL: ['transformSql'],
   TRANSFORM_UDF: ['udfId'],
+  // TRANSFORM_DOC_PARSE（B6-2）：docId 为必填；chunkSize/chunkOverlap 有后端默认值与合法性校验
+  TRANSFORM_DOC_PARSE: ['docId'],
   JOIN: ['joinType'],
   SINK: ['targetTable'],
   SINK_MINIO: ['table'],

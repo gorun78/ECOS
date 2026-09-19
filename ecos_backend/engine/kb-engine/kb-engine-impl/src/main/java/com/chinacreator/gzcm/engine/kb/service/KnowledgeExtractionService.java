@@ -8,6 +8,8 @@ import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseResult;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -81,13 +83,14 @@ public class KnowledgeExtractionService {
     private final RestTemplate restTemplate;
     private final ComplianceRuleMapper ruleMapper;
     private final KGWriterService kgWriter;
-    private final DocumentParserService documentParserService;
+    /** 文档解析公共能力（runtime-access，B6-2 上移；kb 复用不再自建） */
+    private final DocumentParseService documentParserService;
     private final EntityLinkerService entityLinkerService;
 
     public KnowledgeExtractionService(JdbcTemplate jdbc,
                                       ComplianceRuleMapper ruleMapper,
                                       KGWriterService kgWriter,
-                                      DocumentParserService documentParserService,
+                                      DocumentParseService documentParserService,
                                       EntityLinkerService entityLinkerService) {
         this.jdbc = jdbc;
         this.ruleMapper = ruleMapper;
@@ -142,13 +145,13 @@ public class KnowledgeExtractionService {
         updateStatus(id, "PARSING");
         String text;
         try {
-            DocumentParserService.ParseResult parseResult = documentParserService.parse(filePath);
-            text = parseResult.getText();
+            DocumentParseResult parseResult = documentParserService.parse(filePath);
+            text = parseResult.text();
             jdbc.update(
                 "UPDATE extraction_drafts SET parsed_text = ?, status = 'EXTRACTING', " +
                 "file_type = ?, page_count = ?, char_count = ? WHERE id = ?",
-                text, parseResult.getFileType(), parseResult.getPageCount(),
-                parseResult.getCharCount(), id
+                text, parseResult.fileType(), parseResult.pageCount(),
+                parseResult.charCount(), id
             );
         } catch (Exception e) {
             handleError(id, "解析失败: " + e.getMessage(), "PARSING");

@@ -34,7 +34,7 @@ type TFunc = (key: string, params?: Record<string, string | number>) => string;
 /**
  * Build palette items with theme styles and i18n labels.
  * Must be called inside a component (needs `styles` from useTheme and `t` from useLanguage).
- * Wave 5: extended to all 9 P2-01 types (was 6); B6-1: + SOURCE_MINIO → 11.
+ * Wave 5: extended to all 9 P2-01 types (was 6); B6-1: + SOURCE_MINIO; B6-2: + TRANSFORM_DOC_PARSE → 12.
  */
 export function buildPaletteItems(
   styles: Record<string, string>,
@@ -108,6 +108,16 @@ export function buildPaletteItems(
       borderColor: styles.infoBorder,
     },
     {
+      // B6-2：非结构化文档解析节点（近源层对象 → 解析 → 分块 → DW 层 doc/doc_chunk）
+      type: 'TRANSFORM_DOC_PARSE',
+      labelKey: 'dw.pipeline.node.transformDocParse',
+      label: t('dw.pipeline.node.transformDocParse'),
+      icon: ({ size, className }) => <FileText size={size} className={className} />,
+      color: styles.infoText,
+      bgColor: styles.infoBg,
+      borderColor: styles.infoBorder,
+    },
+    {
       type: 'JOIN',
       labelKey: 'dw.pipeline.node.join',
       label: t('dw.pipeline.node.join'),
@@ -158,6 +168,7 @@ export const PALETTE_LABELS: Record<PipelineNodeType, string> = {
   SOURCE_MINIO: 'Source MinIO',
   TRANSFORM_SQL: 'Transform SQL',
   TRANSFORM_UDF: 'Transform UDF',
+  TRANSFORM_DOC_PARSE: 'Transform Doc Parse',
   JOIN: 'Join',
   SINK: 'Sink',
   SINK_MINIO: 'Sink MinIO',
@@ -173,6 +184,7 @@ export const PIPELINE_NODE_TYPES: PipelineNodeType[] = [
   'SOURCE_MINIO',
   'TRANSFORM_SQL',
   'TRANSFORM_UDF',
+  'TRANSFORM_DOC_PARSE',
   'JOIN',
   'SINK',
   'SINK_MINIO',

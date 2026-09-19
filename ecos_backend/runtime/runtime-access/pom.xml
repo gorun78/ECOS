@@ -40,6 +40,19 @@
             <version>8.5.10</version>
         </dependency>
 
+        <!-- B6-2: 文档解析公共能力（Tika）。版本沿用 kb-engine-impl 既有声明 2.9.2，避免版本漂移。
+             经用户授权，本次唯一允许新增的依赖。 -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+
         <!-- PMO-45: JDBC driver deps — placed in profile `jdbc-drivers` below.
              Activate with: mvn -Pjdbc-drivers ...
              These are optional=true so even when active they are NOT propagated to consumers.

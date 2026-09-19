@@ -60,6 +60,13 @@ public class PipelineNodeTypesService {
                 entry("TRANSFORM_UDF", "Transform UDF", "UdfSandbox", "全版本", "Braces",
                         props("udfId", "string", "udfName", "string", "params", "object"),
                         List.of("udfId")),
+                // B6-2：非结构化文档解析节点（A1 目标态）。近源层对象 → 解析 → 分块 → 落 DW 层 doc/doc_chunk，
+                // 解析/切分复用 runtime-access 公共能力。chunkSize 须 ∈ {256,512,1024,2048}（与前端一致），
+                // chunkOverlap < chunkSize，由执行器强制校验；对象名未显式指定时按 source/docId 组前缀取对象。
+                entry("TRANSFORM_DOC_PARSE", "Transform Doc Parse", "runtime-access DocumentParseService", "全版本", "FileText",
+                        props("source", "string", "docId", "string", "chunkSize", "number",
+                                "chunkOverlap", "number", "originalFileName", "string", "objectName", "string"),
+                        List.of("docId")),
                 entry("JOIN", "Join", "内存合并(按joinKeys)", "全版本", "GitMerge",
                         props("joinType", "string", "joinKeys", "array", "inlineData", "object", "datasourceId", "string"),
                         List.of()),

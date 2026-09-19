@@ -371,7 +371,7 @@ public class PipelineDebugService {
     }
 
     /**
-     * 节点执行 — 与 PipelineExecutionService.executeNode 的语义一致（11 类型）。
+     * 节点执行 — 与 PipelineExecutionService.executeNode 的语义一致（12 类型）。
      * 保留 sample（前 SAMPLE_LIMIT 行）与列名以支撑数据预览 / 变量快照。
      */
     private NodeResult executeNode(Session s, PipelineNode node) throws Exception {
@@ -390,6 +390,8 @@ public class PipelineDebugService {
             }
             case "TRANSFORM_SQL" -> execTransformSqlCapture(s, config);
             case "TRANSFORM_UDF" -> execUdfTransformCapture(s, node, config);
+            // B6-2：文档解析节点（复用主执行器解析/分块/落 DW 层逻辑）
+            case "TRANSFORM_DOC_PARSE" -> execDocParseCapture(s, config);
             case "JOIN" -> execJoinCapture(s, node, config);
             case "SINK" -> execSinkCapture(s, node, config);
             case "SINK_MINIO" -> execSinkMinioCapture(s, node, config);
@@ -578,6 +580,23 @@ public class PipelineDebugService {
         long nodeMs = System.currentTimeMillis() - start;
         List<String> cols = out.isEmpty() ? Collections.emptyList() : new ArrayList<>(out.get(0).keySet());
         return new NodeResult((long) out.size(), cols, cols, snapshot, nowIso(), nodeMs, copySample(out));
+    }
+
+    /**
+     * TRANSFORM_DOC_PARSE 调试执行 — 复用主执行器的文档解析/分块/落 DW 层逻辑（B6-2）。
+     */
+    private NodeResult execDocParseCapture(Session s, Map<String, Object> config) {
+        long start = System.currentTimeMillis();
+        long chunks = pipelineExecutionService.executeDocParsePublic(config,
+                PipelineExecutionService.resolveLakeSourcePublic(s.nodes));
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("docId", config.get("docId"));
+        snapshot.put("chunkSize", config.getOrDefault("chunkSize", 512));
+        snapshot.put("chunkOverlap", config.getOrDefault("chunkOverlap", 64));
+        snapshot.put("chunksWritten", chunks);
+        snapshot.put("rowsProcessed", s.totalRows + chunks);
+        return new NodeResult(chunks, null, null, snapshot, nowIso(),
+                System.currentTimeMillis() - start, null);
     }
 
     /**

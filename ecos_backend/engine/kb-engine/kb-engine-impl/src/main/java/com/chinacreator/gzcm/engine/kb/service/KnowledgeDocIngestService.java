@@ -13,6 +13,10 @@ import com.chinacreator.gzcm.engine.kb.dto.DatalakeUnstructuredRegisterRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeDocIngestResultVO;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeVectorWriteItem;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeVectorWriteResultVO;
+import com.chinacreator.gzcm.runtime.access.document.DocumentChunk;
+import com.chinacreator.gzcm.runtime.access.document.DocumentChunkSplitter;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseResult;
+import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
@@ -29,7 +33,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,16 +52,14 @@ import java.util.UUID;
  * <p><b>A1 技术债退出条件</b>：SOURCE_MINIO + 文档解析节点落地后 1 个批次内，本服务的
  * 切分/落库职责迁出至数据工作台解析节点，{@code kb_doc_chunk} 迁入 DW 层（见方案 §3.3）。
  *
- * <p>解析复用既有 {@link DocumentParserService}（Tika &lt;5MB / MinerU ≥5MB）；
+ * <p>解析复用 runtime-access 公共能力 {@link DocumentParseService}（Tika &lt;5MB / MinerU ≥5MB）；
+ * 切分复用 {@link DocumentChunkSplitter}（B6-2 上移，kb 不再自建）；
  * 向量化复用既有 {@link KnowledgeVectorWriteService}（文本→llm-gateway 批量嵌入→upsert embedding_vec）。
  */
 @Service
 public class KnowledgeDocIngestService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeDocIngestService.class);
-
-    /** 允许的分块大小（与前端 CHUNK_SIZE_OPTIONS = [256,512,1024,2048] 对齐） */
-    private static final Set<Integer> ALLOWED_CHUNK_SIZES = Set.of(256, 512, 1024, 2048);
 
     /** 解析文本登记为 CURATED 资源时的 source_path（库表定位用 schema.table） */
     private static final String PARSED_TEXT_SOURCE_PATH = "ecos_knowledge.kb_doc_chunk";
@@ -84,7 +85,10 @@ public class KnowledgeDocIngestService {
 
     private final KbDocMapper kbDocMapper;
     private final KbDocChunkMapper kbDocChunkMapper;
-    private final DocumentParserService documentParserService;
+    /** 文档解析公共能力（runtime-access，B6-2 上移；kb 复用不再自建） */
+    private final DocumentParseService documentParserService;
+    /** 文档分块公共能力（runtime-access，B6-2 上移；与 data-engine 解析节点共用同一实现） */
+    private final DocumentChunkSplitter documentChunkSplitter;
     private final KnowledgeVectorWriteService vectorWriteService;
     private final MinioStorageService minioStorageService;
     private final RestTemplate restTemplate;
@@ -94,7 +98,8 @@ public class KnowledgeDocIngestService {
 
     public KnowledgeDocIngestService(KbDocMapper kbDocMapper,
                                      KbDocChunkMapper kbDocChunkMapper,
-                                     DocumentParserService documentParserService,
+                                     DocumentParseService documentParserService,
+                                     DocumentChunkSplitter documentChunkSplitter,
                                      KnowledgeVectorWriteService vectorWriteService,
                                      MinioStorageService minioStorageService,
                                      RestTemplate restTemplate,
@@ -104,6 +109,7 @@ public class KnowledgeDocIngestService {
         this.kbDocMapper = kbDocMapper;
         this.kbDocChunkMapper = kbDocChunkMapper;
         this.documentParserService = documentParserService;
+        this.documentChunkSplitter = documentChunkSplitter;
         this.vectorWriteService = vectorWriteService;
         this.minioStorageService = minioStorageService;
         this.restTemplate = restTemplate;
@@ -171,13 +177,14 @@ public class KnowledgeDocIngestService {
             updateStatus(effectiveDocId, STATUS_PARSING, null, null, null);
             tempFile = Files.createTempFile("ecos-kb-doc-", "-" + fileName);
             Files.write(tempFile, bytes);
-            DocumentParserService.ParseResult parseResult = documentParserService.parse(tempFile);
-            String text = parseResult.getText() == null ? "" : parseResult.getText();
+            DocumentParseResult parseResult = documentParserService.parse(tempFile);
+            String text = parseResult.text() == null ? "" : parseResult.text();
 
             // 4) 抽块（状态 extracting）
             updateStatus(effectiveDocId, STATUS_EXTRACTING, null, null, null);
-            List<KbDocChunk> chunks = split(text, effectiveDocId, effectiveSource,
-                    effectiveChunkSize, effectiveChunkOverlap);
+            List<KbDocChunk> chunks = toKbChunks(
+                    documentChunkSplitter.split(text, effectiveChunkSize, effectiveChunkOverlap),
+                    effectiveDocId, effectiveSource);
             if (!chunks.isEmpty()) {
                 kbDocChunkMapper.batchUpsert(chunks);
             }
@@ -270,41 +277,26 @@ public class KnowledgeDocIngestService {
     // ═══════════════ 分块 / 向量化 ═══════════════
 
     /**
-     * 滑动窗口切分（字符级，重叠 overlap）。
+     * 把 runtime-access 公共切分结果映射为 kb 自有实体（A3 过渡表 {@code kb_doc_chunk}）。
      *
-     * <p><b>A3 过渡实现</b>：方案 §4 规定「chunk 切分应在数据工作台解析节点」为 A1 目标态；
-     * A3 过渡期由 kb 代做，A1 落地后须迁出（技术债退出条件见方案 §3.3）。
+     * <p>切分逻辑唯一实现在 {@link DocumentChunkSplitter}（B6-2 上移），本方法只做字段映射，
+     * 不再自带切分算法（避免两处实现漂移，铁律 §2.5-6）。
      */
-    private List<KbDocChunk> split(String text, String docId, String source, int chunkSize, int overlap) {
-        List<KbDocChunk> chunks = new ArrayList<>();
-        if (text == null || text.isEmpty()) {
-            return chunks;
-        }
-        int length = text.length();
-        int start = 0;
-        int index = 0;
-        while (start < length) {
-            int end = Math.min(start + chunkSize, length);
-            String content = text.substring(start, end);
-            if (!content.isBlank()) {
-                KbDocChunk chunk = new KbDocChunk();
-                chunk.setId(UUID.randomUUID().toString().replace("-", ""));
-                chunk.setDocId(docId);
-                chunk.setSource(source);
-                chunk.setChunkIndex(index);
-                chunk.setContent(content);
-                chunk.setCharStart(start);
-                chunk.setCharEnd(end);
-                chunk.setMetadata("{}");
-                chunk.setStatus(CHUNK_ACTIVE);
-                chunk.setEmbeddingId(embeddingId(docId, index));
-                chunks.add(chunk);
-                index++;
-            }
-            if (end >= length) {
-                break;
-            }
-            start = end - overlap;
+    private List<KbDocChunk> toKbChunks(List<DocumentChunk> source, String docId, String sourceTag) {
+        List<KbDocChunk> chunks = new ArrayList<>(source.size());
+        for (DocumentChunk chunk : source) {
+            KbDocChunk entity = new KbDocChunk();
+            entity.setId(UUID.randomUUID().toString().replace("-", ""));
+            entity.setDocId(docId);
+            entity.setSource(sourceTag);
+            entity.setChunkIndex(chunk.chunkIndex());
+            entity.setContent(chunk.content());
+            entity.setCharStart(chunk.charStart());
+            entity.setCharEnd(chunk.charEnd());
+            entity.setMetadata("{}");
+            entity.setStatus(CHUNK_ACTIVE);
+            entity.setEmbeddingId(embeddingId(docId, chunk.chunkIndex()));
+            chunks.add(entity);
         }
         return chunks;
     }
@@ -355,22 +347,14 @@ public class KnowledgeDocIngestService {
         }
     }
 
+    /** 解析生效分块大小（委托 runtime-access 公共校验，配置默认值来自 ecos.kb.doc.chunk-size）。 */
     private int resolveChunkSize(Integer requested) {
-        int value = requested == null ? defaultChunkSize : requested;
-        if (!ALLOWED_CHUNK_SIZES.contains(value)) {
-            throw new ValidationException("chunkSize",
-                    "非法分块大小: " + value + "（合法值: 256/512/1024/2048）");
-        }
-        return value;
+        return documentChunkSplitter.resolveChunkSize(requested, defaultChunkSize);
     }
 
+    /** 解析生效分块重叠（委托 runtime-access 公共校验，配置默认值来自 ecos.kb.doc.chunk-overlap）。 */
     private int resolveChunkOverlap(Integer requested, int chunkSize) {
-        int value = requested == null ? defaultChunkOverlap : requested;
-        if (value < 0 || value >= chunkSize) {
-            throw new ValidationException("chunkOverlap",
-                    "分块重叠须 ≥0 且小于 chunkSize(" + chunkSize + ")，当前=" + value);
-        }
-        return value;
+        return documentChunkSplitter.resolveChunkOverlap(requested, chunkSize, defaultChunkOverlap);
     }
 
     /** 文件名去路径并限长，避免对象 key 越出 {docId}/ 目录。 */

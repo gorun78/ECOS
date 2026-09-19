@@ -535,6 +535,7 @@
   "dw.pipeline.node.sourceRest": "REST API",
   "dw.pipeline.node.transformSql": "SQL Transform",
   "dw.pipeline.node.transformUdf": "UDF Transform",
+  "dw.pipeline.node.transformDocParse": "Doc Parse (Unstructured → DW)",
   "dw.pipeline.node.join": "Join",
   "dw.pipeline.node.sink": "Sink Writer",
   "dw.pipeline.node.sinkMinio": "Sink MinIO (Data Lake)",

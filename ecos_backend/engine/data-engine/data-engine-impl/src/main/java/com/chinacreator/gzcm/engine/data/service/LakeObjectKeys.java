@@ -188,6 +188,20 @@ public final class LakeObjectKeys {
     }
 
     /**
+     * 组装非结构化近源层**前缀**（读取时按前缀列对象，B6-2 解析节点未显式指定对象名时用）。
+     *
+     * @param source 上游标识（{@code {source}} 段）
+     * @param docId  文档 ID
+     * @return 形如 {@code raw/unstructured/kb/doc-1/}
+     * @throws ValidationException 段非法
+     */
+    public static String unstructuredPrefix(String source, String docId) {
+        String safeSource = requireSegment("source", source);
+        String safeDocId = requireSegment("docId", docId);
+        return PREFIX_UNSTRUCTURED + safeSource + "/" + safeDocId + "/";
+    }
+
+    /**
      * 校验显式指定的对象名（节点 {@code objectName} 配置，含旧前缀 {@code datalake/} 兼容读取场景）。
      *
      * @param objectKey 显式对象名

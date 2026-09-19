@@ -535,6 +535,7 @@
   "dw.pipeline.node.sourceRest": "REST API",
   "dw.pipeline.node.transformSql": "SQL 转换",
   "dw.pipeline.node.transformUdf": "UDF 转换",
+  "dw.pipeline.node.transformDocParse": "文档解析（非结构化 → DW 层）",
   "dw.pipeline.node.join": "JOIN 关联",
   "dw.pipeline.node.sink": "SINK 写入",
   "dw.pipeline.node.sinkMinio": "SINK MinIO（数据湖近源库）",

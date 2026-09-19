@@ -183,8 +183,8 @@ class PipelineControllerTest {
     @DisplayName("NodeTypes 目录 — 强制枚举契约与 VALID_NODE_TYPES 同源（架构铁律 §4.8.2）")
     void nodeTypesCatalogSizeMatchesValidNodeTypes() {
         // 与 PipelineServiceImplTest.nodeTypesCatalogMatchesValidNodeTypes 互补：
-        // 这里断言 PUBLIC 目录是 11 类（含 B6-1 新增 SOURCE_MINIO），关键子集包含前端基础 5 类 + PMO-36 新增 4 类
-        assertEquals(11, PipelineNodeTypesCatalog.SUPPORTED.size());
+        // 这里断言 PUBLIC 目录是 12 类（含 B6-1 SOURCE_MINIO、B6-2 TRANSFORM_DOC_PARSE），关键子集包含前端基础 5 类 + PMO-36 新增 4 类
+        assertEquals(12, PipelineNodeTypesCatalog.SUPPORTED.size());
         assertTrue(PipelineNodeTypesCatalog.SUPPORTED.containsAll(java.util.Set.of(
                 "SOURCE_JDBC", "SOURCE_CSV", "SOURCE_REST", "TRANSFORM_SQL", "OUTPUT_OBJECT")));
     }
