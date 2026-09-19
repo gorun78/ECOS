@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
+import com.chinacreator.gzcm.engine.data.service.LakeObjectKeys;
 import com.chinacreator.gzcm.engine.data.service.UdfSandbox;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
@@ -17,6 +18,7 @@ import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
 import com.chinacreator.gzcm.runtime.core.logging.ILoggingService;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
+import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -60,6 +62,10 @@ public class PipelineExecutionService {
 
     @Autowired(required = false)
     private IAlertService alertService;
+
+    /** 系统配置（读取 dw.lake.partition_by / dw.lake.storage_format）；可选注入，无 bean 时走默认值 */
+    @Autowired(required = false)
+    private SysConfigService sysConfigService;
 
     /** 失败告警开关：dw.pipeline.alert_on_failure=true 时触发 IAlertService */
     @Value("${dw.pipeline.alert_on_failure:false}")
@@ -143,7 +149,7 @@ public class PipelineExecutionService {
                     sorted.size(), sorted.stream().map(PipelineNode::getNodeId).toList());
 
             // 近源层对象 key 的 {source} 段（取 DAG 中首个 SOURCE_JDBC 节点的 datasourceId）
-            String lakeSource = resolveLakeSource(sorted);
+            String lakeSource = resolveLakeSourcePublic(sorted);
 
             long totalRows = 0;
             int total = sorted.size();
@@ -215,16 +221,21 @@ public class PipelineExecutionService {
     /**
      * 解析近源层对象 key 的 {source} 段 —— 取 DAG 中首个 SOURCE_JDBC 节点的 datasourceId。
      * <p>无 SOURCE_JDBC 节点或未配置 datasourceId 时回退 {@code default}。
+     * <p>public static：供调试链（PipelineDebugService）复用，避免两处实现漂移。
      *
      * @param nodes 拓扑序节点列表
      * @return 数据源标识
      */
-    private String resolveLakeSource(List<PipelineNode> nodes) {
+    public static String resolveLakeSourcePublic(List<PipelineNode> nodes) {
+        if (nodes == null) {
+            return "default";
+        }
         for (PipelineNode n : nodes) {
             if (!"SOURCE_JDBC".equals(n.getType())) {
                 continue;
             }
-            String dsId = strOrNull(parseConfig(n.getConfig()).get("datasourceId"));
+            Object dsIdObj = parseConfig(n.getConfig()).get("datasourceId");
+            String dsId = dsIdObj == null ? null : String.valueOf(dsIdObj);
             if (dsId != null && !dsId.isEmpty()) {
                 return dsId;
             }
@@ -268,6 +279,7 @@ public class PipelineExecutionService {
                 logInfo("SOURCE_REST done: url={}, rows={}", config.get("url"), rows.size());
                 yield rows.size();
             }
+            case "SOURCE_MINIO" -> executeSourceMinio(node, config, nodeResults, lakeSource);
             case "SOURCE_CDC" -> {
                 // D12：SOURCE_CDC 仅在节点枚举中登记，执行器未实现 —— 显式拒绝（不落 default、不返回空）
                 log.warn("SOURCE_CDC 节点未实现，显式拒绝执行: nodeId={}", node.getNodeId());
@@ -335,6 +347,250 @@ public class PipelineExecutionService {
         logInfo("SOURCE_REST executing via Connector: url={}, method={}",
                 url, config.getOrDefault("method", "GET"));
         return restConnector.fetchData(config);
+    }
+
+    // ==================== SOURCE_MINIO：近源层（MinIO）读取（B6-1） ====================
+
+    /**
+     * SOURCE_MINIO：从数据湖近源层（MinIO）读取对象作为管道输入，让「管道基于近源层处理」成立。
+     *
+     * <p>config：
+     * <ul>
+     *   <li>{@code zone}：STRUCTURED（默认）/ UNSTRUCTURED；非法值抛 ValidationException</li>
+     *   <li>{@code source}：对象 key 的 {source} 段（可空，回退 DAG 内 SOURCE_JDBC 的 datasourceId，再回退 default）</li>
+     *   <li>结构化：{@code table} 必填；{@code dt}（可选，YYYY-MM-DD）限定分区日</li>
+     *   <li>非结构化：{@code docId} + {@code originalFileName} 必填</li>
+     *   <li>{@code objectName}：显式对象名（可选，优先；兼容旧前缀 {@code datalake/} 只读）</li>
+     *   <li>{@code format}：可选，缺省按对象名后缀推断、再回退 {@code dw.lake.storage_format}；当前仅 csv 可读</li>
+     *   <li>{@code delimiter}/{@code header}/{@code encoding}：CSV 读取参数（与 SOURCE_CSV 一致）</li>
+     * </ul>
+     *
+     * <p>对象 key 一律由 {@link LakeObjectKeys} 按分层规范 §三 组装（禁止硬编码 {@code raw/structured/}）；
+     * 结构化未显式指定对象名时按前缀列对象并取**最新**分区对象。
+     *
+     * @param node        节点
+     * @param config      节点配置
+     * @param nodeResults 已执行节点结果表（本节点产出行写入）
+     * @param lakeSource  DAG 级 {source} 兜底值
+     * @return 读取行数
+     */
+    private long executeSourceMinio(PipelineNode node, Map<String, Object> config,
+                                    Map<String, List<Map<String, Object>>> nodeResults,
+                                    String lakeSource) {
+        String zone = resolveLakeZone(config.get("zone"));
+        String objectName = resolveSourceMinioObjectName(config, zone, lakeSource);
+        String format = resolveLakeFormat(config.get("format"), objectName);
+        if (!"csv".equals(format)) {
+            log.warn("SOURCE_MINIO: format={} 读取器未就绪, object={}", format, objectName);
+            throw new BusinessException("SOURCE_MINIO: " + format
+                    + " 读取器未就绪（本项目未引入该格式依赖），请读取 csv 对象或调整 dw.lake.storage_format");
+        }
+        byte[] data;
+        try {
+            data = minioStorageService.getObject(objectName);
+        } catch (Exception e) {
+            logError("SOURCE_MINIO: 读取近源层对象失败 object={}", objectName, e);
+            throw new BusinessException("SOURCE_MINIO: 读取近源层对象失败 " + objectName + ": " + e.getMessage());
+        }
+        if (data == null || data.length == 0) {
+            throw new BusinessException("SOURCE_MINIO: 近源层对象为空或不存在: " + objectName);
+        }
+        List<Map<String, Object>> rows = parseLakeCsv(data, config);
+        nodeResults.put(node.getNodeId(), rows);
+        logInfo("SOURCE_MINIO done: object={}, rows={}", objectName, rows.size());
+        return rows.size();
+    }
+
+    /** 解析 zone 配置（默认 STRUCTURED；非法值显式拒绝）。 */
+    private String resolveLakeZone(Object raw) {
+        if (raw == null || String.valueOf(raw).isBlank()) {
+            return LakeObjectKeys.ZONE_STRUCTURED;
+        }
+        String zone = String.valueOf(raw).trim().toUpperCase(Locale.ROOT);
+        if (LakeObjectKeys.ZONE_STRUCTURED.equals(zone) || LakeObjectKeys.ZONE_UNSTRUCTURED.equals(zone)) {
+            return zone;
+        }
+        throw new ValidationException("zone",
+                "SOURCE_MINIO: zone 仅支持 STRUCTURED / UNSTRUCTURED，实际: " + raw);
+    }
+
+    /**
+     * 解析 SOURCE_MINIO 待读对象名：显式 objectName 优先，否则按 zone 组装（结构化取最新分区对象）。
+     */
+    private String resolveSourceMinioObjectName(Map<String, Object> config, String zone, String lakeSource) {
+        String explicit = strOrNull(config.get("objectName"));
+        if (explicit != null && !explicit.isBlank()) {
+            return LakeObjectKeys.requireExplicitObjectKey(explicit);
+        }
+        String source = firstNonBlank(strOrNull(config.get("source")), lakeSource, "default");
+        if (LakeObjectKeys.ZONE_UNSTRUCTURED.equals(zone)) {
+            String docId = strOrNull(config.get("docId"));
+            if (docId == null || docId.isBlank()) {
+                throw new ValidationException("docId", "SOURCE_MINIO(UNSTRUCTURED): docId 必填（或显式指定 objectName）");
+            }
+            String fileName = firstNonBlank(strOrNull(config.get("originalFileName")),
+                    strOrNull(config.get("fileName")));
+            if (fileName == null || fileName.isBlank()) {
+                throw new ValidationException("originalFileName",
+                        "SOURCE_MINIO(UNSTRUCTURED): originalFileName 必填（或显式指定 objectName）");
+            }
+            return LakeObjectKeys.unstructuredObjectKey(source, docId, fileName);
+        }
+        String table = strOrNull(config.get("table"));
+        if (table == null || table.isBlank()) {
+            throw new ValidationException("table",
+                    "SOURCE_MINIO(STRUCTURED): table 必填（或显式指定 objectName）");
+        }
+        String prefix = LakeObjectKeys.structuredPrefix(source, table, lakePartitionField(),
+                strOrNull(config.get("dt")));
+        return latestLakeObject(minioStorageService.listObjects(prefix), prefix);
+    }
+
+    /** 取前缀下最新对象（按 lastModified 倒序；无对象抛业务异常，不静默返回空）。 */
+    private String latestLakeObject(List<Map<String, Object>> objects, String prefix) {
+        Map<String, Object> latest = null;
+        long latestMs = Long.MIN_VALUE;
+        if (objects != null) {
+            for (Map<String, Object> obj : objects) {
+                String name = strOrNull(obj.get("name"));
+                if (name == null || name.isBlank() || name.endsWith("/")) {
+                    continue;
+                }
+                long ms = parseEpochMillis(obj.get("lastModified"));
+                if (latest == null || ms >= latestMs) {
+                    latest = obj;
+                    latestMs = ms;
+                }
+            }
+        }
+        if (latest == null) {
+            throw new BusinessException("SOURCE_MINIO: 近源层前缀下无对象: " + prefix);
+        }
+        return LakeObjectKeys.requireExplicitObjectKey(strOrNull(latest.get("name")));
+    }
+
+    /** 解析对象 lastModified（ISO-8601 文本）为毫秒；无法解析返回 0。 */
+    private static long parseEpochMillis(Object lastModified) {
+        if (lastModified == null) {
+            return 0L;
+        }
+        String text = String.valueOf(lastModified);
+        try {
+            return java.time.Instant.parse(text).toEpochMilli();
+        } catch (Exception e) {
+            try {
+                return java.time.OffsetDateTime.parse(text).toInstant().toEpochMilli();
+            } catch (Exception ignored) {
+                return 0L;
+            }
+        }
+    }
+
+    /**
+     * 解析生效存储格式：节点显式 {@code format} > 对象名后缀推断 > {@code dw.lake.storage_format}（默认 parquet）。
+     *
+     * @param nodeFormatRaw 节点 format 配置（可空）
+     * @param objectName    已解析对象名（可空，用于后缀推断）
+     * @return 小写格式名
+     */
+    private String resolveLakeFormat(Object nodeFormatRaw, String objectName) {
+        String explicit = explicitLakeFormat(nodeFormatRaw, objectName);
+        return explicit != null ? explicit : lakeStorageFormat();
+    }
+
+    /**
+     * 解析调用方**显式要求**的湖存储格式（节点 {@code format} 配置优先，其次对象名后缀）。
+     *
+     * <p>与 {@link #resolveLakeFormat} 的差异：本方法不把 {@code dw.lake.storage_format}
+     * 全局期望值视为显式要求，用于区分两种语义 ——
+     * 「用户明确要求了不支持的格式」（应报错）与「用户未指定、仅全局配置期望该格式」
+     * （应保持既有能力并告警，避免既有管道由可用变失败）。
+     *
+     * @param nodeFormatRaw 节点 format 配置原值
+     * @param objectName    节点 objectName 配置（可为 null）
+     * @return 小写格式名；无显式指定时返回 {@code null}
+     */
+    private String explicitLakeFormat(Object nodeFormatRaw, String objectName) {
+        String nodeFormat = strOrNull(nodeFormatRaw);
+        if (nodeFormat != null && !nodeFormat.isBlank()) {
+            return nodeFormat.trim().toLowerCase(Locale.ROOT);
+        }
+        return suffixFormat(objectName);
+    }
+
+    /**
+     * 按对象名后缀推断存储格式。
+     *
+     * @param objectName 对象名（可为 null）
+     * @return 小写格式名；无可用后缀时返回 {@code null}
+     */
+    private String suffixFormat(String objectName) {
+        if (objectName == null) {
+            return null;
+        }
+        String lower = objectName.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt")) {
+            return "csv";
+        }
+        if (lower.endsWith(".json")) {
+            return "json";
+        }
+        if (lower.endsWith(".parquet")) {
+            return "parquet";
+        }
+        return null;
+    }
+
+    /**
+     * 解析近源层 CSV 对象字节为行列表。
+     * <p>复用 runtime-access {@link CsvConnector}（落临时文件后按既有连接配置读取），
+     * delimiter/header/encoding 语义与 SOURCE_CSV 完全一致，避免二次实现 CSV 解析。
+     */
+    private List<Map<String, Object>> parseLakeCsv(byte[] data, Map<String, Object> config) {
+        java.nio.file.Path tmp = null;
+        try {
+            tmp = java.nio.file.Files.createTempFile("ecos-lake-", ".csv");
+            java.nio.file.Files.write(tmp, data);
+            Map<String, Object> csvConfig = new LinkedHashMap<>(config);
+            csvConfig.put("filePath", tmp.toAbsolutePath().toString());
+            return readSourceCsvRows(csvConfig);
+        } catch (Exception e) {
+            throw new BusinessException("SOURCE_MINIO: CSV 解析失败: " + e.getMessage());
+        } finally {
+            if (tmp != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(tmp);
+                } catch (java.io.IOException e) {
+                    log.debug("SOURCE_MINIO: 临时文件清理失败: {}", e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * 读取数据湖默认分区字段（{@code dw.lake.partition_by}，默认 {@code dt}；非法值回退并 warn）。
+     */
+    private String lakePartitionField() {
+        return LakeObjectKeys.resolvePartitionField(
+                sysConfigService != null ? sysConfigService.getString(LakeObjectKeys.CFG_PARTITION_BY) : null);
+    }
+
+    /**
+     * 读取数据湖存储格式（{@code dw.lake.storage_format}，默认 {@code parquet}）。
+     */
+    private String lakeStorageFormat() {
+        return LakeObjectKeys.resolveStorageFormat(
+                sysConfigService != null ? sysConfigService.getString(LakeObjectKeys.CFG_STORAGE_FORMAT) : null);
+    }
+
+    /** 依次取首个非空白值（全为空返回 null）。 */
+    private static String firstNonBlank(String... candidates) {
+        for (String candidate : candidates) {
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate.trim();
+            }
+        }
+        return null;
     }
 
     /**
@@ -681,11 +937,13 @@ public class PipelineExecutionService {
     }
 
     /**
-     * SINK_MINIO：将上游节点产出行（或 inlineData）序列化为 CSV 后上传数据湖近源层（MinIO）。
-     * <p>config 字段：bucket(可选，默认数据湖配置 bucket)、objectName(可选，默认
-     * {@code raw/structured/{source}/{table}/dt={yyyy-MM-dd}/{table}_{yyyyMMddHHmmss}.csv})、
-     * table(必填，对象名前缀)、format(可选，仅支持 csv)、columns(可选，指定列顺序)、
-     * inlineData(可选内联行)。
+     * SINK_MINIO：将上游节点产出行（或 inlineData）序列化后上传数据湖近源层（MinIO）。
+     * <p>config 字段：bucket(可选，默认数据湖配置 bucket)、objectName(可选，默认由
+     * {@link LakeObjectKeys#structuredObjectKey} 按分层规范 §三 组装：
+     * {@code raw/structured/{source}/{table}/{dw.lake.partition_by}=yyyy-MM-dd}/{table}_{yyyyMMddHHmmss}.csv})、
+     * table(必填，对象名前缀)、format(可选，生效顺序：节点 format > 对象名后缀 > {@code dw.lake.storage_format})、
+     * columns(可选，指定列顺序)、inlineData(可选内联行)。
+     * <p>当前仅 csv 可写：format 解析为 parquet/orc/avro 时抛明确业务异常（禁止静默写成 csv 却声称 parquet）。
      * <p>上传成功后登记/标记 td_data_resource（layer=RAW, zone=STRUCTURED）并返回行数；
      * MinIO 不可用或上传失败抛 BusinessException（执行失败可回溯）。
      *
@@ -700,9 +958,23 @@ public class PipelineExecutionService {
         }
         String table = tableObj.toString();
 
-        String format = String.valueOf(config.getOrDefault("format", "csv")).toLowerCase();
-        if (!"csv".equals(format)) {
-            throw new ValidationException("format", "SINK_MINIO: format 仅支持 csv");
+        // 生效格式：仅按「节点 format > 对象名后缀」判定用户是否**显式要求**某格式；
+        // dw.lake.storage_format 属全局期望值，不作为显式要求（避免未配置 format 的既有节点由可用变失败）
+        String explicitFormat = explicitLakeFormat(config.get("format"), strOrNull(config.get("objectName")));
+        if (explicitFormat != null && !"csv".equals(explicitFormat)) {
+            log.warn("SINK_MINIO: format={} 写入器未就绪 (table={})，可用格式 csv（节点 format 或 dw.lake.storage_format 配置）",
+                    explicitFormat, table);
+            throw new BusinessException("SINK_MINIO: " + explicitFormat
+                    + " 写入器未就绪，请配置 dw.lake.storage_format=csv（或节点 format=csv）；本项目未引入 " + explicitFormat + " 依赖");
+        }
+        if (explicitFormat == null) {
+            // 未显式指定格式：沿用既有 csv 写入能力；全局配置期望的格式写入器未就绪时不阻断既有管道
+            // （分层规范 §七 记录的 SINK_MINIO 仅支持 csv 缺口，能力补齐前保持向后兼容）
+            String configuredFormat = lakeStorageFormat();
+            if (!"csv".equals(configuredFormat)) {
+                log.warn("SINK_MINIO: dw.lake.storage_format={} 写入器未就绪，本次按 csv 写入 (table={})",
+                        configuredFormat, table);
+            }
         }
 
         // 行来源: 节点 inlineData 优先，否则取上游节点产出行（DAG 前驱合并）
@@ -721,13 +993,12 @@ public class PipelineExecutionService {
             columns = new ArrayList<>(rows.get(0).keySet());
         }
 
-        // 对象名: 显式 objectName > raw/structured/{source}/{table}/dt={yyyy-MM-dd}/{table}_{ts}.csv
+        // 对象名: 显式 objectName 优先（兼容既有行为）；否则由 LakeObjectKeys 按分层规范 §三 组装
         String objectName = strOrNull(config.get("objectName"));
-        if (objectName == null || objectName.isEmpty()) {
-            java.time.LocalDateTime now = java.time.LocalDateTime.now();
-            String ts = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-            String dt = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            objectName = "raw/structured/" + lakeSource + "/" + table + "/dt=" + dt + "/" + table + "_" + ts + ".csv";
+        if (objectName == null || objectName.isBlank()) {
+            objectName = LakeObjectKeys.structuredObjectKey(lakeSource, table, lakePartitionField(), "csv", null);
+        } else {
+            objectName = LakeObjectKeys.requireExplicitObjectKey(objectName);
         }
 
         byte[] csvBytes = toCsv(rows, columns);
@@ -915,6 +1186,28 @@ public class PipelineExecutionService {
         }
         int written = jc.executeBatch(ds.getConnectionConfig(), insertSql, batchValues, Math.max(1, batchSize));
         return written;
+    }
+
+    /**
+     * 供 PipelineDebugService 调用的 SOURCE_MINIO 执行入口（复用主执行器近源层读取逻辑）。
+     *
+     * @return 读取行数
+     */
+    public long executeSourceMinioPublic(PipelineNode node, Map<String, Object> config,
+                                         Map<String, List<Map<String, Object>>> nodeResults,
+                                         String lakeSource) {
+        return executeSourceMinio(node, config, nodeResults, lakeSource);
+    }
+
+    /**
+     * 供 PipelineDebugService 调用的 SINK_MINIO 执行入口（复用主执行器近源层写入 + 分层登记逻辑）。
+     *
+     * @return 写入行数
+     */
+    public long executeSinkMinioPublic(PipelineNode node, Map<String, Object> config,
+                                       Map<String, List<Map<String, Object>>> nodeResults,
+                                       String lakeSource) throws Exception {
+        return executeSinkMinio(node, config, nodeResults, lakeSource);
     }
 
     /** 静态版：解析数据源。 */
@@ -1295,7 +1588,7 @@ public class PipelineExecutionService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> parseConfig(String configStr) {
+    private static Map<String, Object> parseConfig(String configStr) {
         try {
             if (configStr == null || configStr.isEmpty()) return Collections.emptyMap();
             return mapper.readValue(configStr, new TypeReference<Map<String, Object>>() {});

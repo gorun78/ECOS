@@ -512,6 +512,63 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
                   </div>
                 )}
 
+                {/* SOURCE_MINIO — 数据湖近源层读取（B6-1） */}
+                {nodeType === 'SOURCE_MINIO' && (
+                  <>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sourceMinioZone')}</FieldLabel>
+                      <select value={nodeConfig.zone ?? 'STRUCTURED'}
+                        onChange={(e) => setConfigField('zone', e.target.value as 'STRUCTURED' | 'UNSTRUCTURED')}
+                        className={inputCls(styles)}
+                      >
+                        <option value="STRUCTURED">{t('dw.pipeline.prop.sourceMinioZoneStructured')}</option>
+                        <option value="UNSTRUCTURED">{t('dw.pipeline.prop.sourceMinioZoneUnstructured')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sourceMinioSource')}</FieldLabel>
+                      <input type="text" value={nodeConfig.source || ''}
+                        onChange={(e) => setConfigField('source', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="ds-1" />
+                      <p className={`text-[10px] ${styles.muted} mt-0.5`}>
+                        {t('dw.pipeline.prop.sourceMinioSourceHint')}
+                      </p>
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sourceMinioTable')}</FieldLabel>
+                      <input type="text" value={nodeConfig.table || ''}
+                        onChange={(e) => setConfigField('table', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="orders" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sourceMinioDocId')}</FieldLabel>
+                      <input type="text" value={nodeConfig.docId || ''}
+                        onChange={(e) => setConfigField('docId', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="doc-1" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sourceMinioFileName')}</FieldLabel>
+                      <input type="text" value={nodeConfig.originalFileName || ''}
+                        onChange={(e) => setConfigField('originalFileName', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="manual.csv" />
+                    </div>
+                    <div>
+                      <FieldLabel styles={styles}>{t('dw.pipeline.prop.sinkMinioObjectName')}</FieldLabel>
+                      <input type="text" value={nodeConfig.objectName || ''}
+                        onChange={(e) => setConfigField('objectName', e.target.value)}
+                        className={inputCls(styles)}
+                        placeholder="raw/structured/ds-1/orders/dt=2026-09-19/orders_20260919103000.csv" />
+                      <p className={`text-[10px] ${styles.muted} mt-0.5`}>
+                        {t('dw.pipeline.prop.sourceMinioObjectHint')}
+                      </p>
+                    </div>
+                  </>
+                )}
+
                 {/* TRANSFORM_SQL */}
                 {nodeType === 'TRANSFORM_SQL' && (
                   <>

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>架构铁律 §4.8.2「枚举边界一致」：前端 NodePalette（节点面板）、
  * 后端 PipelineServiceImpl.VALID_NODE_TYPES、以及前端
  * pipelineValidation.ts REQUIRED_FIELDS_BY_TYPE 三方必须同源；
- * 本测试锁定后端目录 = 前端 5 + PMO-36 4（共 9 类），防漂移。
+ * 本测试锁定后端目录 = 前端 5 + PMO-36 4 + SINK_MINIO 1 + SOURCE_MINIO 1（共 11 类），防漂移。
  */
 class PipelineNodeTypesCatalogTest {
 
@@ -36,8 +36,15 @@ class PipelineNodeTypesCatalogTest {
     }
 
     @Test
-    @DisplayName("目录总量锁定为 9（与前端枚举下边界对齐）")
+    @DisplayName("目录含数据湖节点 SINK_MINIO / SOURCE_MINIO（B6-1）")
+    void catalogCoversLakeNodeTypes() {
+        assertTrue(PipelineNodeTypesCatalog.SUPPORTED.contains("SINK_MINIO"));
+        assertTrue(PipelineNodeTypesCatalog.SUPPORTED.contains("SOURCE_MINIO"));
+    }
+
+    @Test
+    @DisplayName("目录总量锁定为 11（与前端枚举下边界对齐）")
     void catalogSizeLocked() {
-        assertEquals(9, PipelineNodeTypesCatalog.SUPPORTED.size());
+        assertEquals(11, PipelineNodeTypesCatalog.SUPPORTED.size());
     }
 }

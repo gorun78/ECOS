@@ -18,10 +18,11 @@ public final class PipelineNodeTypesCatalog {
     /**
      * 节点类型全集 = 前端 5（SOURCE_JDBC/SOURCE_CSV/SOURCE_REST/TRANSFORM_SQL/OUTPUT_OBJECT）
      * + PMO-36 新增 4（SOURCE_CDC/TRANSFORM_UDF/JOIN/SINK，Wave 2 交付）
-     * + 数据采集 1（SINK_MINIO，数据湖近源库写入，Wave 新增）。
+     * + 数据采集 1（SINK_MINIO，数据湖近源库写入，Wave 新增）
+     * + 近源层读取 1（SOURCE_MINIO，B6-1 新增，让「管道基于近源层处理」成立）。
      */
     public static final Set<String> SUPPORTED = Set.of(
-            "SOURCE_JDBC", "SOURCE_CSV", "SOURCE_REST", "SOURCE_CDC",
+            "SOURCE_JDBC", "SOURCE_CSV", "SOURCE_REST", "SOURCE_CDC", "SOURCE_MINIO",
             "TRANSFORM_SQL", "OUTPUT_OBJECT", "TRANSFORM_UDF", "JOIN", "SINK",
             "SINK_MINIO"
     );

@@ -118,7 +118,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService#execTransformSqlCapture — SELECT 走 queryForList（不调 update）")
     void debugServiceTransformSqlSelectRoutesToQueryForList() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
 
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =
@@ -156,7 +156,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService TRANSFORM_UDF — 执行器 switch 已补 TRANSFORM_UDF 分支")
     void debugServiceUdfTransformRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
         // mock UDF 数据
         when(udfService.getById("udf-1")).thenReturn(Map.of(
                 "name", "doubling_udf",
@@ -194,7 +194,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService JOIN — 执行器 switch 已补 JOIN 分支")
     void debugServiceJoinRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =
                 new PipelineDebugStartDTO.PipelineDebugDefinitionDTO();
@@ -230,7 +230,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService SINK — 执行器 switch 已补 SINK 分支")
     void debugServiceSinkRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
         // mock 数据源
         DataSourceEntity ds = new DataSourceEntity();
         ds.setDatasourceId("ds-1");
@@ -284,7 +284,7 @@ class PipelineTransformSqlRoutingTest {
         // 3 节点 DAG: s → t → e
         // 输入顺序故意打乱: e(依赖t), t(依赖s), s(无依赖)
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
         // 通过 createSession 触发 topologicalSort
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =

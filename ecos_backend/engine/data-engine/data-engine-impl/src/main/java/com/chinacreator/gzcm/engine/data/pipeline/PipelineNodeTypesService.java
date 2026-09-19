@@ -45,6 +45,15 @@ public class PipelineNodeTypesService {
                 entry("SOURCE_CDC", "Source CDC", "未实现(仅旗舰版)", "仅flagship", "Radio",
                         props("datasourceId", "string", "topic", "string"),
                         List.of()),
+                // B6-1：近源层（MinIO）读取节点。必填字段随 zone 分支（STRUCTURED 需 table；
+                // UNSTRUCTURED 需 docId + originalFileName；显式 objectName 时均免），由执行器强制校验，
+                // 故目录 requiredFields 为空集，避免误伤显式对象名用法。
+                entry("SOURCE_MINIO", "Source MinIO", "MinioStorageService(数据湖近源层)", "全版本", "Database",
+                        props("zone", "string", "source", "string", "table", "string",
+                                "docId", "string", "originalFileName", "string", "objectName", "string",
+                                "dt", "string", "format", "string", "delimiter", "string",
+                                "header", "boolean", "encoding", "string"),
+                        List.of()),
                 entry("TRANSFORM_SQL", "Transform SQL", "系统JdbcTemplate", "全版本", "Settings",
                         props("sql", "string", "timeout", "number"),
                         List.of("sql")),

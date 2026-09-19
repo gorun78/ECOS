@@ -34,7 +34,7 @@ type TFunc = (key: string, params?: Record<string, string | number>) => string;
 /**
  * Build palette items with theme styles and i18n labels.
  * Must be called inside a component (needs `styles` from useTheme and `t` from useLanguage).
- * Wave 5: extended to all 9 P2-01 types (was 6).
+ * Wave 5: extended to all 9 P2-01 types (was 6); B6-1: + SOURCE_MINIO → 11.
  */
 export function buildPaletteItems(
   styles: Record<string, string>,
@@ -78,6 +78,16 @@ export function buildPaletteItems(
       borderColor: styles.warningBorder,
       disabled: true,
       disabledTitleKey: 'dw.pipeline.node.cdcFlagshipOnly',
+    },
+    {
+      // B6-1：近源层（数据湖 MinIO）读取节点
+      type: 'SOURCE_MINIO',
+      labelKey: 'dw.pipeline.node.sourceMinio',
+      label: t('dw.pipeline.node.sourceMinio'),
+      icon: ({ size, className }) => <Database size={size} className={className} />,
+      color: styles.accentText,
+      bgColor: styles.accentBg,
+      borderColor: styles.accentBorder,
     },
     {
       type: 'TRANSFORM_SQL',
@@ -145,6 +155,7 @@ export const PALETTE_LABELS: Record<PipelineNodeType, string> = {
   SOURCE_CSV: 'Source CSV',
   SOURCE_REST: 'Source REST',
   SOURCE_CDC: 'Source CDC',
+  SOURCE_MINIO: 'Source MinIO',
   TRANSFORM_SQL: 'Transform SQL',
   TRANSFORM_UDF: 'Transform UDF',
   JOIN: 'Join',
@@ -159,6 +170,7 @@ export const PIPELINE_NODE_TYPES: PipelineNodeType[] = [
   'SOURCE_CSV',
   'SOURCE_REST',
   'SOURCE_CDC',
+  'SOURCE_MINIO',
   'TRANSFORM_SQL',
   'TRANSFORM_UDF',
   'JOIN',

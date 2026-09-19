@@ -10,10 +10,12 @@ import com.chinacreator.gzcm.engine.data.pipeline.PipelineService;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
+import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -32,7 +34,8 @@ import java.util.Map;
  *   <li>即时采集：创建/复用定义 → 提交 runtime-task(PIPELINE) 执行，返回 taskId。</li>
  *   <li>定时采集：策略写 {@code td_datasource.metadata_config.ingest}（JSON 段），
  *       由 {@link DataIngestScheduler} 扫描触发，执行链路与即时采集一致。</li>
- *   <li>默认目标 = 数据湖 MinIO（近源库），对象名 {@code datalake/{datasourceId}/{table}_{ts}.csv}。</li>
+ *   <li>默认目标 = 数据湖 MinIO（近源库），对象名按分层规范 §三 组装为
+ *       {@code raw/structured/{datasourceId}/{table}/{dw.lake.partition_by}=YYYY-MM-DD/{table}_{ts}.csv}。</li>
  * </ul>
  */
 @Service
@@ -50,12 +53,22 @@ public class DataIngestService {
     private final ITaskManagementService taskManagementService;
     private final DataSourceService dataSourceService;
 
+    /** 系统配置（读取 dw.lake.partition_by）；可选注入，无 bean 时回退默认 dt */
+    @Autowired(required = false)
+    private SysConfigService sysConfigService;
+
     public DataIngestService(PipelineService pipelineService,
                              ITaskManagementService taskManagementService,
                              DataSourceService dataSourceService) {
         this.pipelineService = pipelineService;
         this.taskManagementService = taskManagementService;
         this.dataSourceService = dataSourceService;
+    }
+
+    /** 数据湖分区字段名（dw.lake.partition_by，默认 dt；非法值由 LakeObjectKeys 回退并 warn）。 */
+    private String resolvePartitionField() {
+        return LakeObjectKeys.resolvePartitionField(
+                sysConfigService != null ? sysConfigService.getString(LakeObjectKeys.CFG_PARTITION_BY) : null);
     }
 
     /**
@@ -250,15 +263,13 @@ public class DataIngestService {
         PipelineSaveDTO.NodeSpec sink = new PipelineSaveDTO.NodeSpec();
         sink.setNodeId("sink_" + table);
         sink.setType("SINK_MINIO");
-        // 近源层对象 key：raw/structured/{source}/{table}/dt=YYYY-MM-DD/{table}_{ts}.csv
-        LocalDateTime now = LocalDateTime.now();
-        String dt = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        String ts = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        // 近源层对象 key 由 LakeObjectKeys 按分层规范 §三 组装：
+        // raw/structured/{source}/{table}/{dw.lake.partition_by}=YYYY-MM-DD/{table}_{ts}.csv
         Map<String, Object> sinkConfig = new LinkedHashMap<>();
         sinkConfig.put("table", table);
         sinkConfig.put("format", "csv");
-        sinkConfig.put("objectName", "raw/structured/" + datasourceId + "/" + table + "/dt=" + dt
-                + "/" + table + "_" + ts + ".csv");
+        sinkConfig.put("objectName", LakeObjectKeys.structuredObjectKey(
+                datasourceId, table, resolvePartitionField(), "csv", null));
         sink.setConfig(sinkConfig);
         sink.setPositionX(400);
         sink.setPositionY(100);

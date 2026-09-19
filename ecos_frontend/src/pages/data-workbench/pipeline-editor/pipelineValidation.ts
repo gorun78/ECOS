@@ -38,6 +38,9 @@ const REQUIRED_CONFIG_FIELDS: Record<PipelineNodeType, readonly string[]> = {
   SOURCE_CSV: ['filePath'],
   SOURCE_REST: ['url'],
   SOURCE_CDC: [],
+  // SOURCE_MINIO 必填字段随 zone 分支（STRUCTURED 需 table；UNSTRUCTURED 需 docId+originalFileName；
+  // 显式 objectName 时均免），由后端执行器强制校验，故此处不设静态必填项。
+  SOURCE_MINIO: [],
   TRANSFORM_SQL: ['transformSql'],
   TRANSFORM_UDF: ['udfId'],
   JOIN: ['joinType'],
@@ -46,7 +49,8 @@ const REQUIRED_CONFIG_FIELDS: Record<PipelineNodeType, readonly string[]> = {
   OUTPUT_OBJECT: ['targetTable'],
 };
 
-const SOURCE_TYPES = new Set<PipelineNodeType>(['SOURCE_JDBC', 'SOURCE_CSV', 'SOURCE_REST', 'SOURCE_CDC']);
+const SOURCE_TYPES = new Set<PipelineNodeType>(
+  ['SOURCE_JDBC', 'SOURCE_CSV', 'SOURCE_REST', 'SOURCE_CDC', 'SOURCE_MINIO']);
 const OUTPUT_TYPES = new Set<PipelineNodeType>(['OUTPUT_OBJECT', 'SINK', 'SINK_MINIO']);
 
 /** ReadNodeConfig helper — stable across node id changes. */

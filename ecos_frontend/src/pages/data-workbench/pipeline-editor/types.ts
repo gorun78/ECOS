@@ -11,6 +11,7 @@ export type PipelineNodeType =
   | 'SOURCE_CSV'
   | 'SOURCE_REST'
   | 'SOURCE_CDC'
+  | 'SOURCE_MINIO'
   | 'TRANSFORM_SQL'
   | 'TRANSFORM_UDF'
   | 'JOIN'
@@ -70,6 +71,17 @@ export interface NodeConfig {
     table?: string;
     format?: 'csv';
     columns?: string[];
+    // ── SOURCE_MINIO (数据湖近源层 → 管道，B6-1) ──
+    /** 近源区：STRUCTURED（默认）/ UNSTRUCTURED */
+    zone?: 'STRUCTURED' | 'UNSTRUCTURED';
+    /** 对象 key 的 {source} 段（可空，回退 DAG 内 SOURCE_JDBC 的 datasourceId） */
+    source?: string;
+    /** 非结构化文档 ID */
+    docId?: string;
+    /** 非结构化原始文件名 */
+    originalFileName?: string;
+    /** 指定分区日（YYYY-MM-DD，仅结构化） */
+    dt?: string;
     // ── OUTPUT_OBJECT ──
     mode?: 'append' | 'overwrite';
     batchSize?: number;

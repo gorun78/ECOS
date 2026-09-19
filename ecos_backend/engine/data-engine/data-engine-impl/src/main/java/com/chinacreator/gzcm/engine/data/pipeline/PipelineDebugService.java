@@ -78,6 +78,8 @@ public class PipelineDebugService {
     private final JdbcTemplate jdbc;
     private final DataSourceService dataSourceService;
     private final UdfService udfService;
+    /** 主执行器：SOURCE_MINIO / SINK_MINIO 节点复用其近源层读写逻辑（避免两处实现漂移） */
+    private final PipelineExecutionService pipelineExecutionService;
 
     /** 全部调试会话（内存态，惰性清理） */
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
@@ -95,12 +97,14 @@ public class PipelineDebugService {
                                 ConnectorFactory connectorFactory,
                                 JdbcTemplate jdbc,
                                 DataSourceService dataSourceService,
-                                UdfService udfService) {
+                                UdfService udfService,
+                                PipelineExecutionService pipelineExecutionService) {
         this.repository = repository;
         this.connectorFactory = connectorFactory;
         this.jdbc = jdbc;
         this.dataSourceService = dataSourceService;
         this.udfService = udfService;
+        this.pipelineExecutionService = pipelineExecutionService;
     }
 
     // ==================== 会话创建 ====================
@@ -367,16 +371,17 @@ public class PipelineDebugService {
     }
 
     /**
-     * 节点执行 — 与 PipelineExecutionService.executeNode 的语义一致（9 类型）。
+     * 节点执行 — 与 PipelineExecutionService.executeNode 的语义一致（11 类型）。
      * 保留 sample（前 SAMPLE_LIMIT 行）与列名以支撑数据预览 / 变量快照。
      */
     private NodeResult executeNode(Session s, PipelineNode node) throws Exception {
         Map<String, Object> config = parseConfig(node.getConfig());
         String type = node.getType();
         return switch (type) {
-            case "SOURCE_JDBC" -> execSourceJdbcCapture(s, config);
-            case "SOURCE_CSV" -> execSourceCsvCapture(s, config);
-            case "SOURCE_REST" -> execSourceRestCapture(s, config);
+            case "SOURCE_JDBC" -> execSourceJdbcCapture(s, node, config);
+            case "SOURCE_CSV" -> execSourceCsvCapture(s, node, config);
+            case "SOURCE_REST" -> execSourceRestCapture(s, node, config);
+            case "SOURCE_MINIO" -> execSourceMinioCapture(s, node, config);
             case "SOURCE_CDC" -> {
                 // D12：SOURCE_CDC 仅在节点枚举中登记，调试执行器未实现 —— 显式拒绝（与 PipelineExecutionService 同源）
                 log.warn("SOURCE_CDC 节点未实现，显式拒绝调试执行: nodeId={}", node.getNodeId());
@@ -387,12 +392,13 @@ public class PipelineDebugService {
             case "TRANSFORM_UDF" -> execUdfTransformCapture(s, node, config);
             case "JOIN" -> execJoinCapture(s, node, config);
             case "SINK" -> execSinkCapture(s, node, config);
+            case "SINK_MINIO" -> execSinkMinioCapture(s, node, config);
             case "OUTPUT_OBJECT" -> execOutputObjectCapture(s, config);
             default -> throw new ValidationException("type", "不支持的节点类型: " + type);
         };
     }
 
-    private NodeResult execSourceJdbcCapture(Session s, Map<String, Object> config) throws Exception {
+    private NodeResult execSourceJdbcCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
         String sql = (String) config.get("sql");
         if (sql == null || sql.isEmpty()) {
             throw new ValidationException("sql", "SOURCE_JDBC: sql 必填");
@@ -419,11 +425,13 @@ public class PipelineDebugService {
         log.info("DEBUG SOURCE_JDBC: datasourceId={}, fetchSize={}", datasourceId, fetchSize);
 
         List<Map<String, Object>> rows = jdbcConnector.executeSql(connectionConfig, sql, fetchSize);
+        // 下游 JOIN/SINK/SINK_MINIO 消费上游产出行（与主执行器 nodeResults 语义一致）
+        ensureNodeResults(s).put(node.getNodeId(), rows);
         long affected = extractAffectedRows(rows);
         return buildRowsResult(rows, affected);
     }
 
-    private NodeResult execSourceCsvCapture(Session s, Map<String, Object> config) throws Exception {
+    private NodeResult execSourceCsvCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
         String filePath = (String) config.get("filePath");
         if (filePath == null || filePath.isEmpty()) {
             throw new ValidationException("filePath", "SOURCE_CSV: filePath 必填");
@@ -436,10 +444,11 @@ public class PipelineDebugService {
         int fetchSize = toInt(config.get("fetchSize"), 0);
         log.info("DEBUG SOURCE_CSV: filePath={}", filePath);
         List<Map<String, Object>> rows = csvConnector.readRows(connectionConfig, fetchSize);
+        ensureNodeResults(s).put(node.getNodeId(), rows);
         return buildRowsResult(rows, rows.size());
     }
 
-    private NodeResult execSourceRestCapture(Session s, Map<String, Object> config) throws Exception {
+    private NodeResult execSourceRestCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
         String url = (String) config.get("url");
         if (url == null || url.isEmpty()) {
             throw new ValidationException("url", "SOURCE_REST: url 必填");
@@ -450,7 +459,26 @@ public class PipelineDebugService {
         }
         log.info("DEBUG SOURCE_REST: url={}, method={}", url, config.getOrDefault("method", "GET"));
         List<Map<String, Object>> rows = restConnector.fetchData(config);
+        ensureNodeResults(s).put(node.getNodeId(), rows);
         return buildRowsResult(rows, rows.size());
+    }
+
+    /**
+     * SOURCE_MINIO 调试执行 — 复用主执行器近源层读取逻辑（MinIO 对象读取 + 近源层 key 组装）。
+     */
+    private NodeResult execSourceMinioCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
+        long start = System.currentTimeMillis();
+        Map<String, List<Map<String, Object>>> results = ensureNodeResults(s);
+        long rows = pipelineExecutionService.executeSourceMinioPublic(node, config, results,
+                PipelineExecutionService.resolveLakeSourcePublic(s.nodes));
+        List<Map<String, Object>> produced = results.getOrDefault(node.getNodeId(), Collections.emptyList());
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("objectName", config.get("objectName"));
+        snapshot.put("zone", config.getOrDefault("zone", "STRUCTURED"));
+        snapshot.put("rowCount", rows);
+        List<String> cols = produced.isEmpty() ? Collections.emptyList() : new ArrayList<>(produced.get(0).keySet());
+        return new NodeResult(rows, cols, cols, snapshot, nowIso(), System.currentTimeMillis() - start,
+                copySample(produced));
     }
 
     private NodeResult execTransformSqlCapture(Session s, Map<String, Object> config) {
@@ -581,6 +609,24 @@ public class PipelineDebugService {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("table", configFirst(config, "table", "targetTable"));
         snapshot.put("mode", configFirst(config, "mode"));
+        snapshot.put("writtenRows", written);
+        snapshot.put("rowsProcessed", s.totalRows + written);
+        long nodeMs = System.currentTimeMillis() - start;
+        return new NodeResult(written, null, null, snapshot, nowIso(), nodeMs, null);
+    }
+
+    /**
+     * SINK_MINIO 调试执行 — 复用主执行器的近源层写入逻辑（对象 key 组装 + MinIO 上传 + 近源层登记）。
+     */
+    private NodeResult execSinkMinioCapture(Session s, PipelineNode node, Map<String, Object> config) throws Exception {
+        long start = System.currentTimeMillis();
+        Map<String, List<Map<String, Object>>> results = ensureNodeResults(s);
+        long written = pipelineExecutionService.executeSinkMinioPublic(node, config, results,
+                PipelineExecutionService.resolveLakeSourcePublic(s.nodes));
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("table", configFirst(config, "table", "objectPrefix"));
+        snapshot.put("objectName", config.get("objectName"));
+        snapshot.put("format", config.get("format"));
         snapshot.put("writtenRows", written);
         snapshot.put("rowsProcessed", s.totalRows + written);
         long nodeMs = System.currentTimeMillis() - start;

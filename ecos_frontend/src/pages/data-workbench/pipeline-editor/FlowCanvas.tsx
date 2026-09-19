@@ -421,6 +421,7 @@ export const miniMapNodeColor = (node: Node): string => {
     case 'SOURCE_CSV': return '#10b981';
     case 'SOURCE_REST': return '#0ea5e9';
     case 'SOURCE_CDC': return '#f97316';
+    case 'SOURCE_MINIO': return '#6366f1';
     case 'TRANSFORM_SQL': return '#14b8a6';
     case 'TRANSFORM_UDF': return '#06b6d4';
     case 'JOIN': return '#8b5cf6';
