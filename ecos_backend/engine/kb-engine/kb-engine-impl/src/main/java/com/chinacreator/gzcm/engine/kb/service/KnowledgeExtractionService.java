@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dto.ExtractCandidateVO;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractFileVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
@@ -27,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.util.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -468,6 +471,153 @@ public class KnowledgeExtractionService {
 
     public Map<String, Object> getTask(String id) {
         return jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", id);
+    }
+
+    // ── 待审核文件 / 候选清单（B5-2 / D6：前端 review Tab） ────────
+
+    /**
+     * 待审核抽取文件列表（真实表 {@code extraction_drafts}，分页 + 状态过滤）。
+     *
+     * @param status   抽取状态过滤（可空；如 PENDING_REVIEW / APPROVED / REJECTED）
+     * @param pageNum  页码（从 1 起，非法值按 1）
+     * @param pageSize 每页条数（默认 20，收敛 [1,100]）
+     * @return 文件条目（candidateCount = 实体数 + 关系数）
+     */
+    public List<ExtractFileVO> listExtractFiles(String status, int pageNum, int pageSize) {
+        int effectivePage = Math.max(pageNum, 1);
+        int effectiveSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (effectivePage - 1) * effectiveSize;
+
+        List<Map<String, Object>> rows;
+        if (status == null || status.isBlank()) {
+            rows = jdbc.queryForList(
+                "SELECT id, file_name, status, extracted_entities_json, extracted_links_json, error_msg, created_at " +
+                "FROM extraction_drafts ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                effectiveSize, offset);
+        } else {
+            rows = jdbc.queryForList(
+                "SELECT id, file_name, status, extracted_entities_json, extracted_links_json, error_msg, created_at " +
+                "FROM extraction_drafts WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                status.trim().toUpperCase(Locale.ROOT), effectiveSize, offset);
+        }
+
+        List<ExtractFileVO> files = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            ExtractFileVO vo = new ExtractFileVO();
+            vo.setFileId(str(row.get("id")));
+            vo.setFileName(str(row.get("file_name")));
+            vo.setStatus(str(row.get("status")));
+            vo.setCandidateCount(parseJsonList(row.get("extracted_entities_json")).size()
+                    + parseJsonList(row.get("extracted_links_json")).size());
+            vo.setCreatedAt(toIso(row.get("created_at")));
+            vo.setError(row.get("error_msg") == null ? null : String.valueOf(row.get("error_msg")));
+            files.add(vo);
+        }
+        log.info("待审核抽取文件列表: status={} pageNum={} pageSize={} returned={}",
+                status, effectivePage, effectiveSize, files.size());
+        return files;
+    }
+
+    /**
+     * 抽取候选清单（真实表 {@code extraction_drafts} 的三类抽取 JSON 展开）。
+     *
+     * @param fileId 文件 ID（= extraction_drafts.id）
+     * @return 候选条目；文件不存在或无候选时返回空列表
+     */
+    public List<ExtractCandidateVO> listCandidates(String fileId) {
+        if (fileId == null || fileId.isBlank()) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT extracted_entities_json, extracted_links_json, extracted_rules_json " +
+            "FROM extraction_drafts WHERE id = ?", fileId.trim());
+        if (rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<String, Object> row = rows.get(0);
+        List<ExtractCandidateVO> candidates = new ArrayList<>();
+
+        int index = 0;
+        for (Map<String, Object> entity : parseJsonList(row.get("extracted_entities_json"))) {
+            ExtractCandidateVO vo = new ExtractCandidateVO();
+            vo.setCandidateId("entity-" + index++);
+            vo.setKind("entity");
+            vo.setType(fieldOr(entity, "type", "UNKNOWN"));
+            vo.setDescription(fieldOr(entity, "name", ""));
+            vo.setConfidence(toDoubleOrNull(entity.get("confidence")));
+            candidates.add(vo);
+        }
+        index = 0;
+        for (Map<String, Object> link : parseJsonList(row.get("extracted_links_json"))) {
+            ExtractCandidateVO vo = new ExtractCandidateVO();
+            vo.setCandidateId("link-" + index++);
+            vo.setKind("link");
+            vo.setType(fieldOr(link, "type", "RELATED_TO"));
+            String from = fieldOr(link, "from_entity", fieldOr(link, "from", ""));
+            String to = fieldOr(link, "target_entity", fieldOr(link, "to", ""));
+            vo.setDescription(from + " → " + to);
+            vo.setConfidence(toDoubleOrNull(link.get("confidence")));
+            candidates.add(vo);
+        }
+        index = 0;
+        for (Map<String, Object> rule : parseJsonList(row.get("extracted_rules_json"))) {
+            ExtractCandidateVO vo = new ExtractCandidateVO();
+            vo.setCandidateId("rule-" + index++);
+            vo.setKind("rule");
+            vo.setType("RULE");
+            String name = fieldOr(rule, "name", "");
+            String description = fieldOr(rule, "description", "");
+            vo.setDescription(name.isBlank() ? description : name + " — " + description);
+            candidates.add(vo);
+        }
+        log.info("抽取候选列表: fileId={} candidates={}", fileId, candidates.size());
+        return candidates;
+    }
+
+    // ── 抽取 JSON / 字段解析辅助 ─────────────────────
+
+    /** 解析抽取 JSON 数组为 Map 列表；空值/非法 JSON 返回空列表（不抛出，避免拖垮列表接口）。 */
+    private List<Map<String, Object>> parseJsonList(Object json) {
+        if (json == null) {
+            return Collections.emptyList();
+        }
+        String text = String.valueOf(json).trim();
+        if (text.isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            return mapper.readValue(text, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            log.warn("抽取 JSON 解析失败（按空列表处理）: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** 取字符串字段，缺失/空白时回退默认值。 */
+    private String fieldOr(Map<String, Object> source, String key, String fallback) {
+        Object value = source.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? fallback : text;
+    }
+
+    /** 数值字段 → Double；非数值返回 null。 */
+    private Double toDoubleOrNull(Object value) {
+        return value instanceof Number number ? number.doubleValue() : null;
+    }
+
+    /** JDBC 时间戳 → ISO-8601 字符串（空值返回 null）。 */
+    private String toIso(Object value) {
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toInstant().toString();
+        }
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String str(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 
     /**

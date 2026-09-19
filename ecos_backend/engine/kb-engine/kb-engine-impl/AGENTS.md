@@ -54,6 +54,23 @@
     关键类：`service/KnowledgeDocIngestService`、`doc/mapper/{KbDocMapper,KbDocChunkMapper}`、
     `doc/model/{KbDoc,KbDocChunk}`；chunkSize 取值须 ∈ {256,512,1024,2048}（与前端 `CHUNK_SIZE_OPTIONS` 对齐），
     默认由 `ecos.kb.doc.chunk-size`(512)/`ecos.kb.doc.chunk-overlap`(64) 配置。
+  - B5-2（D6）补齐知识工作台 6 个前端 404 端点：
+    - `POST /api/v1/knowledge/eval/run` — 检索质量评估（`KnowledgeEvalController` + `KnowledgeEvalService`）：
+      入参 `EvalRunRequest{seedSetName,topK,maxQueries}`，出参 `KnowledgeEvalReportVO`
+      （recallAt5/mrrAt5/ndcgAt5/degraded/queryCount）。指标基于 `knowledge_embedding` + pgvector
+      真实向量做**自检索**计算（llm-gateway 嵌入 → `searchByVector`），无向量/嵌入不可用时
+      `degraded=true` 降级（禁硬编码假数据）。
+    - `GET /api/v1/knowledge/assets` + `GET /api/v1/knowledge/lifecycle/audit`
+      （`KnowledgeLifecycleController` + `KnowledgeLifecycleService`）：资产取 `knowledge_article`
+      （status → draft/active/deprecated/archived），审计取 `kg_sync_log` 真实台账投影；
+      均支持 `pageNum/pageSize`，资产支持 `status` 过滤。
+    - `GET /api/v1/knowledge/extract/files` + `GET /api/v1/knowledge/extract/candidates/{fileId}`
+      + `POST /api/v1/knowledge/extract/candidates/{fileId}/approve`（`ExtractionController`）：
+      数据源 `extraction_drafts`（真实表）；候选审核入图**委托**既有 `POST /extract/{id}/approve`
+      （写 `graph_node`/`graph_edge`），不重复实现写入逻辑。
+    - `POST /api/v1/knowledge/graph/build/preview?mode=` — dry-run 预览（`KnowledgeIngestController`）：
+      复用 `KbEntityInstanceExtractionService` 的 dry-run 分支，同步返回
+      `GraphBuildPreviewVO{create,update,skip,edgeCreate,entityCount,invalidMappings,issues}`，不落库。
 - 实例抽取（PMO-B3-2）：`KbEntityInstanceExtractionService` — 经 REST 只读消费本体映射契约
   （`GET /api/v1/ontology/entity-mappings?ontologyId=`）与 DW 层实例行
   （`GET /api/v1/engine/data/layers/CURATED/resources/{id}/rows?watermark=&limit=`），

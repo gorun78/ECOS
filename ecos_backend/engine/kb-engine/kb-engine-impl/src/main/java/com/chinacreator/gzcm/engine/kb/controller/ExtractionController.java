@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractCandidateVO;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractFileVO;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractionApproveResultVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeExtractionService;
@@ -72,6 +75,78 @@ public class ExtractionController {
             log.error("查询任务失败: id={}, {}", id, e.getMessage());
             return ApiResponse.notFound("任务不存在: " + id);
         }
+    }
+
+    /**
+     * 待审核抽取文件列表（B5-2 / D6，前端 review Tab）— 真实表 extraction_drafts，分页 + 状态过滤。
+     */
+    @GetMapping("/files")
+    public ApiResponse<List<ExtractFileVO>> listFiles(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "pageNum", defaultValue = "1") int pageNum,
+            @RequestParam(value = "pageSize", defaultValue = "20") int pageSize) {
+        try {
+            List<ExtractFileVO> files = extractionService.listExtractFiles(status, pageNum, pageSize);
+            return ApiResponse.success(files);
+        } catch (Exception e) {
+            log.error("查询待审核文件列表失败: {}", e.getMessage(), e);
+            return ApiResponse.badRequest("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 抽取候选清单（B5-2 / D6，前端 review Tab）— 展开 extraction_drafts 三类抽取 JSON。
+     */
+    @GetMapping("/candidates/{fileId}")
+    public ApiResponse<Map<String, List<ExtractCandidateVO>>> listCandidates(@PathVariable String fileId) {
+        try {
+            Map<String, List<ExtractCandidateVO>> payload = new java.util.LinkedHashMap<>();
+            payload.put("candidates", extractionService.listCandidates(fileId));
+            return ApiResponse.success(payload);
+        } catch (Exception e) {
+            log.error("查询抽取候选失败: fileId={}, {}", fileId, e.getMessage(), e);
+            return ApiResponse.badRequest("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 候选审核入图（方案 §5.3 新增端点）— 委托既有 {@code approve}，
+     * 审核通过后候选写入 graph_node/graph_edge（复用 build 台账，不重复实现写入逻辑）。
+     */
+    @PostMapping("/candidates/{fileId}/approve")
+    public ApiResponse<ExtractionApproveResultVO> approveCandidates(@PathVariable String fileId) {
+        try {
+            return ApiResponse.success(toApproveResult(extractionService.approve(fileId)));
+        } catch (IllegalStateException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        } catch (Exception e) {
+            log.error("候选审核入图失败: fileId={}, {}", fileId, e.getMessage(), e);
+            return ApiResponse.badRequest("审核失败: " + e.getMessage());
+        }
+    }
+
+    /** 既有 approve 匿名结果为强类型 VO（保持接口出入参强类型，铁律 §后端规范）。 */
+    private ExtractionApproveResultVO toApproveResult(Map<String, Object> raw) {
+        ExtractionApproveResultVO vo = new ExtractionApproveResultVO();
+        vo.setId(raw.get("id") == null ? null : String.valueOf(raw.get("id")));
+        vo.setStatus(raw.get("status") == null ? null : String.valueOf(raw.get("status")));
+        Object counts = raw.get("counts");
+        if (counts instanceof Map<?, ?> countMap) {
+            vo.setRules(intOf(countMap.get("rules")));
+            vo.setEntities(intOf(countMap.get("entities")));
+            vo.setLinks(intOf(countMap.get("links")));
+        }
+        Object rejected = raw.get("rejectedReasons");
+        if (rejected instanceof List<?> list) {
+            for (Object item : list) {
+                vo.getRejectedReasons().add(String.valueOf(item));
+            }
+        }
+        return vo;
+    }
+
+    private int intOf(Object value) {
+        return value instanceof Number number ? number.intValue() : 0;
     }
 
     /**

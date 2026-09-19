@@ -4,12 +4,15 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
+import com.chinacreator.gzcm.engine.kb.dto.GraphBuildPreviewVO;
 import com.chinacreator.gzcm.engine.kb.dto.GraphBuildRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeDocIngestResultVO;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeIngestRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeIngestResult;
+import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeDocIngestService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,6 +44,7 @@ import java.util.Map;
  * <ul>
  *   <li>POST /api/v1/knowledge/ingest      — 写入实体（upsert 到 graph_node，幂等）</li>
  *   <li>POST /api/v1/knowledge/graph/build — 触发 runtime-task 异步全量构建，返回 jobId</li>
+ *   <li>POST /api/v1/knowledge/graph/build/preview — dry-run 预览（B5-2 D6，同步只统计不落库）</li>
  * </ul>
  */
 @RestController
@@ -58,14 +62,19 @@ public class KnowledgeIngestController {
     /** 非结构化文档登记与解析编排（B5-1 / A3 过渡态）。 */
     private final KnowledgeDocIngestService docIngestService;
 
+    /** 契约驱动实例抽取服务（B3-2）— dry-run 预览复用其 dry-run 分支。 */
+    private final KbEntityInstanceExtractionService instanceExtractionService;
+
     public KnowledgeIngestController(KnowledgeNodeMapper nodeMapper,
                                      JdbcTemplate jdbcTemplate,
                                      KgSyncService kgSyncService,
-                                     KnowledgeDocIngestService docIngestService) {
+                                     KnowledgeDocIngestService docIngestService,
+                                     KbEntityInstanceExtractionService instanceExtractionService) {
         this.nodeMapper = nodeMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.kgSyncService = kgSyncService;
         this.docIngestService = docIngestService;
+        this.instanceExtractionService = instanceExtractionService;
     }
 
     // ── /docs/ingest ─────────────────────────────────────────────────
@@ -179,6 +188,52 @@ public class KnowledgeIngestController {
         } catch (Exception e) {
             log.error("Knowledge graph build failed: {}", e.getMessage(), e);
             return ApiResponse.internalError("图谱构建触发失败: " + e.getMessage());
+        }
+    }
+
+    // ── /graph/build/preview ─────────────────────────────────────────
+
+    /**
+     * POST /api/v1/knowledge/graph/build/preview — 图谱构建 dry-run 预览（方案 §5.3 + 附录 B graph_build Tab）。
+     *
+     * <p>复用 B3-2 契约驱动实例抽取的 dry-run 分支：真实读取本体映射契约与 DW 层实例行，
+     * 按 C1~C4 校验后<b>只统计不落库</b>，同步返回 create/update/skip/edgeCreate 与问题明细。
+     * 前端 GraphBuilderTab「dry-run」按钮消费此端点。</p>
+     *
+     * @param mode 抽取模式（可选，FULL 默认 / INCREMENTAL）
+     * @return dry-run 预览报告
+     */
+    @PostMapping("/graph/build/preview")
+    public ApiResponse<GraphBuildPreviewVO> previewBuild(
+            @RequestParam(value = "mode", required = false) String mode) {
+        String jobId = "preview-" + System.currentTimeMillis();
+        try {
+            boolean incremental = "INCREMENTAL".equalsIgnoreCase(mode == null ? "" : mode.trim());
+            EntityInstanceExtractionReportVO report =
+                    instanceExtractionService.extract("ALL", jobId, incremental, true);
+
+            GraphBuildPreviewVO preview = new GraphBuildPreviewVO();
+            preview.setCreate(report.getNodeCreated());
+            preview.setUpdate(report.getNodeUpdated());
+            preview.setSkip(report.getNodeSkipped());
+            preview.setEdgeCreate(report.getEdgeCreated());
+            preview.setEntityCount(report.getEntityCount());
+            preview.setInvalidMappings(report.getInvalidMappings());
+            preview.setOntologyId(report.getOntologyId());
+            preview.setOntologies(report.getOntologies());
+            preview.setDurationMs(report.getDurationMs());
+            preview.setIssues(report.getIssues());
+
+            log.info("图谱构建 dry-run 预览完成: jobId={}, mode={}, create={}, update={}, skip={}, edges={}",
+                    jobId, incremental ? "INCREMENTAL" : "FULL",
+                    preview.getCreate(), preview.getUpdate(), preview.getSkip(), preview.getEdgeCreate());
+            emitAudit("knowledge.graph.build.preview",
+                    "jobId=" + jobId + " create=" + preview.getCreate() + " update=" + preview.getUpdate()
+                            + " skip=" + preview.getSkip());
+            return ApiResponse.success(preview);
+        } catch (Exception e) {
+            log.error("图谱构建 dry-run 预览失败: jobId={}, {}", jobId, e.getMessage(), e);
+            return ApiResponse.internalError("预览失败: " + e.getMessage());
         }
     }
 
