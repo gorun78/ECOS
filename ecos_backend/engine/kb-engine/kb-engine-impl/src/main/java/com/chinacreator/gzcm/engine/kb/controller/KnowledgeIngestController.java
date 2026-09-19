@@ -115,19 +115,22 @@ public class KnowledgeIngestController {
     // ── /graph/build ─────────────────────────────────────────────────
 
     /**
-     * POST /api/v1/knowledge/graph/build — 触发 runtime-task 异步全量建图。
+     * POST /api/v1/knowledge/graph/build — 触发异步图谱构建（方案 §5.3 修正：支持 FULL/INCREMENTAL 与 dry-run）。
      *
-     * <p>复用 {@link KgSyncService#triggerFullSync(String)} 已有方法；
-     * jobId = {@code build-<timestamp>}（时间戳防并发碰撞）。异步执行，立即返回 jobId。</p>
+     * <p>jobId = {@code build-<timestamp>}（时间戳防并发碰撞）。异步执行，立即返回 jobId。
+     * {@code mode} 缺省 FULL；{@code dryRun=true} 时只统计不落库（预览报告回填 {@code kg_sync_log.report}）。
      */
     @PostMapping("/graph/build")
     public ApiResponse<GraphBuildResponse> build(@RequestBody(required = false) GraphBuildRequest req) {
         try {
             String jobId = "build-" + System.currentTimeMillis();
-            kgSyncService.triggerFullSync(jobId);
-            log.info("Knowledge graph build triggered: jobId={}", jobId);
-            emitAudit("knowledge.graph.build", "jobId=" + jobId);
-            return ApiResponse.success(new GraphBuildResponse(jobId, "accepted"));
+            String mode = (req == null || req.getMode() == null || req.getMode().isBlank())
+                    ? "FULL" : req.getMode().trim().toUpperCase(java.util.Locale.ROOT);
+            boolean dryRun = req != null && req.isDryRun();
+            kgSyncService.triggerBuildSync(jobId, mode, dryRun);
+            log.info("Knowledge graph build triggered: jobId={}, mode={}, dryRun={}", jobId, mode, dryRun);
+            emitAudit("knowledge.graph.build", "jobId=" + jobId + " mode=" + mode + " dryRun=" + dryRun);
+            return ApiResponse.success(new GraphBuildResponse(jobId, dryRun ? "previewing" : "accepted"));
         } catch (Exception e) {
             log.error("Knowledge graph build failed: {}", e.getMessage(), e);
             return ApiResponse.internalError("图谱构建触发失败: " + e.getMessage());

@@ -34,9 +34,20 @@
   - `/api/v1/kb/rules` + `/api/v1/kb/rules/versions` — 规则 CRUD + 版本（`ExpertRuleController`）。
   - `/api/v1/kb/articles` — 文章（`KnowledgeArticleController`）。
   - `/api/v1/kb/graph/sync` — KG 入湖（`GraphSyncController`）。
+  - `/api/v1/knowledge/sync/*` — 同步状态/日志/任务列表/预览/回滚（`GraphSyncController`，PMO-50 T2/T4）：
+    `GET /status`、`POST /trigger`、`POST /object/{objectType}`、`GET /logs`、`GET /jobs`、
+    `POST /jobs/{jobId}/preview`、`POST /jobs/{jobId}/rollback`、`GET /jobs/{jobId}/logs`。
+  - `POST /api/v1/knowledge/graph/build` — 图谱构建（`KnowledgeIngestController`，方案 §5.3 修正，PMO-B3-2 T4）：
+    入参 `GraphBuildRequest{mode=FULL|INCREMENTAL, dryRun=false|true}`，出参 `{jobId,status}`；
+    异步执行「骨架版本对齐（B1）→ 契约驱动 DW 层实例抽取（B3-2）」，结果回填 `kg_sync_log.nodes/edges/report`。
   - `/api/v1/knowledge/ecos-graph` — Ecos 通用兼容端点（`EcosKnowledgeGraphController`，2 method：
     `GET /` 取图快照 / `POST /sync` 同步到 Neo4j）。
     注意：gateway 侧同名 Controller 用 base `/api/v1/ecos/knowledge-graph`，本模块侧路径独立，勿混。
+- 实例抽取（PMO-B3-2）：`KbEntityInstanceExtractionService` — 经 REST 只读消费本体映射契约
+  （`GET /api/v1/ontology/entity-mappings?ontologyId=`）与 DW 层实例行
+  （`GET /api/v1/engine/data/layers/CURATED/resources/{id}/rows?watermark=&limit=`），
+  按 C1~C4 校验写入 `graph_node`/`graph_edge`；水位线持久化于 `kb_extract_watermark`（V136），
+  报告落 `kg_sync_log.report`（JSONB）。
 - 示例（GraphSyncController 片段）：
 ```java
 @RestController
