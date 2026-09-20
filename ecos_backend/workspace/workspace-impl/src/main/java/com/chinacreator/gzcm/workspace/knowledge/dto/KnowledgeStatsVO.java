@@ -65,6 +65,12 @@ public class KnowledgeStatsVO implements Serializable {
     /** 最近一次数据变更时间（9 张表 created_at/updated_at 的 MAX 聚合） */
     private String lastUpdatedAt;
 
+    /** 向量维数（knowledge_embedding.embedding_vec 列维数，pgvector 未启用时为 null） */
+    private Integer embeddingDim;
+
+    /** 向量库覆盖文档数（knowledge_embedding 去重 document_id / article_id） */
+    private Long docCount;
+
     public Long getGraphNodeCount() {
         return graphNodeCount;
     }
@@ -191,5 +197,21 @@ public class KnowledgeStatsVO implements Serializable {
 
     public void setLastUpdatedAt(String lastUpdatedAt) {
         this.lastUpdatedAt = lastUpdatedAt;
+    }
+
+    public Integer getEmbeddingDim() {
+        return embeddingDim;
+    }
+
+    public void setEmbeddingDim(Integer embeddingDim) {
+        this.embeddingDim = embeddingDim;
+    }
+
+    public Long getDocCount() {
+        return docCount;
+    }
+
+    public void setDocCount(Long docCount) {
+        this.docCount = docCount;
     }
 }

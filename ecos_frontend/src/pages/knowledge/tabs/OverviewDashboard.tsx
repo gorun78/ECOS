@@ -11,12 +11,12 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  LayoutDashboard, Binary, Layers, Database, ShieldCheck,
-  Activity, HeartPulse, Search, Clock,
+  LayoutDashboard, Binary, Layers, Database,
+  Activity, HeartPulse, Search, Clock, Network,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
-import { knowledgeApi } from '../services/knowledgeApi';
+import { knowledgeApi, type GraphStats } from '../services/knowledgeApi';
 
 const RAG_HISTORY_KEY = 'kb_rag_top_queries';
 
@@ -50,9 +50,9 @@ export default function OverviewDashboard() {
   const { t } = useLanguage();
   const { styles } = useTheme();
 
-  const [graphStats, setGraphStats] = useState<{
-    graphNodeCount: number; graphEdgeCount: number; embeddingCount: number; ruleCount: number; lastUpdatedAt?: string;
-  }>({ graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0, lastUpdatedAt: undefined });
+  const [graphStats, setGraphStats] = useState<GraphStats>(
+    { graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0, lastUpdatedAt: undefined }
+  );
   const [statsOff, setStatsOff] = useState(false);
   const [syncLogs, setSyncLogs] = useState<{ timestamp?: string; [key: string]: unknown }[]>([]);
   const [engineHealth, setEngineHealth] = useState<Record<string, { ok: boolean; latencyMs?: number; message?: string }>>({});
@@ -137,11 +137,49 @@ export default function OverviewDashboard() {
           <p className="text-[10px] font-mono opacity-70">/api/v1/knowledge/stats · {t('knowledge.overview.retry_hint')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard title={t('knowledge.dashboard.kpi.graph_nodes')} value={graphStats.graphNodeCount} icon={<Binary size={16} />} accent="bg-indigo-50 text-indigo-600" />
-          <KpiCard title={t('knowledge.dashboard.kpi.graph_edges')} value={graphStats.graphEdgeCount} icon={<Layers size={16} />} accent="bg-blue-50 text-blue-600" />
-          <KpiCard title={t('knowledge.dashboard.kpi.chunks')} value={graphStats.embeddingCount} icon={<Database size={16} />} accent="bg-emerald-50 text-emerald-600" />
-          <KpiCard title={t('knowledge.dashboard.kpi.active_rules')} value={graphStats.ruleCount} icon={<ShieldCheck size={16} />} accent="bg-violet-50 text-violet-600" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 图谱概要（存储能力上提：节点 / 边 / 最近同步；详情在知识查询 · 图谱探索） */}
+          <SummaryCard
+            title={t('knowledge.overview.graph_summary')}
+            icon={
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Binary size={13} />
+                  <span className="text-[10px] font-mono">{t('knowledge.dashboard.kpi.graph_nodes')}</span>
+                  <span className="text-lg font-black font-mono">{graphStats.graphNodeCount.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Layers size={13} />
+                  <span className="text-[10px] font-mono">{t('knowledge.dashboard.kpi.graph_edges')}</span>
+                  <span className="text-lg font-black font-mono">{graphStats.graphEdgeCount.toLocaleString()}</span>
+                </div>
+              </div>
+            }
+            hint={t('knowledge.overview.graph_summary_hint')}
+            lastSyncedAt={graphStats.lastUpdatedAt}
+          />
+          {/* 向量库概要（chunk 数 / 覆盖文档 / 维数；详情在知识查询 · RAG 实验台） */}
+          <SummaryCard
+            title={t('knowledge.overview.vector_summary')}
+            icon={
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Database size={13} />
+                  <span className="text-[10px] font-mono">{t('knowledge.dashboard.kpi.chunks')}</span>
+                  <span className="text-lg font-black font-mono">{graphStats.embeddingCount.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Search size={13} />
+                  <span className="text-[10px] font-mono">{t('knowledge.overview.doc_count')}</span>
+                  <span className="text-xs font-bold">{graphStats.docCount ? graphStats.docCount.toLocaleString() : '~'}</span>
+                  <span className="text-[10px] font-mono ml-2">{t('knowledge.overview.vector_dim')}</span>
+                  <span className="text-xs font-bold">{graphStats.embeddingDim ? `${graphStats.embeddingDim}` : '~'}</span>
+                </div>
+              </div>
+            }
+            hint={t('knowledge.overview.vector_summary_hint')}
+            lastSyncedAt={graphStats.lastUpdatedAt}
+          />
         </div>
       )}
 
@@ -177,7 +215,7 @@ export default function OverviewDashboard() {
           <div className={`flex items-center justify-between border-b pb-2 ${styles.divider}`}>
             <h3 className={`font-extrabold text-xs flex items-center gap-1.5 ${styles.cardText}`}>
               <HeartPulse size={13} className={styles.successText} />
-              {t('knowledge.dashboard.h.engine')}
+              {t('knowledge.overview.engine_status')}
             </h3>
             <span className="text-[9px] font-mono text-slate-400">/api/v1/knowledge/health</span>
           </div>
@@ -238,15 +276,27 @@ export default function OverviewDashboard() {
   );
 }
 
-function KpiCard({ title, value, icon, accent }: { title: string; value: number; icon: React.ReactNode; accent: string }) {
+function SummaryCard({ title, icon, hint, lastSyncedAt }: {
+  title: string;
+  icon: React.ReactNode;
+  hint: string;
+  lastSyncedAt?: string;
+}) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   return (
-    <div className={`border p-4 rounded-xl flex items-center justify-between shadow-xs hover:opacity-90 transition ${styles.cardBg} ${styles.cardBorder}`}>
-      <div>
-        <span className={`font-mono text-[9px] uppercase block ${styles.cardTextMuted}`}>{title}</span>
-        <span className={`text-2xl font-black font-mono ${styles.cardText}`}>{value.toLocaleString()}</span>
+    <div className={`border rounded-xl p-4 space-y-2.5 shadow-xs ${styles.cardBg} ${styles.cardBorder}`}>
+      <div className="flex items-center justify-between">
+        <h3 className={`font-extrabold text-xs flex items-center gap-1.5 ${styles.cardText}`}>
+          <Network size={13} className={styles.accentText} />
+          {title}
+        </h3>
+        <span className={`text-[10px] font-mono tracking-wider uppercase ${styles.accentText}`}>{hint}</span>
       </div>
-      <span className={`p-2 rounded-lg ${accent}`}>{icon}</span>
+      <div className={`text-xs ${styles.cardText}`}>{icon}</div>
+      <div className={`text-[10px] font-mono tracking-wider uppercase ${styles.cardTextMuted}`}>
+        {t('knowledge.overview.last_sync')}: <span className="font-bold">{lastSyncedAt ?? '—'}</span>
+      </div>
     </div>
   );
 }

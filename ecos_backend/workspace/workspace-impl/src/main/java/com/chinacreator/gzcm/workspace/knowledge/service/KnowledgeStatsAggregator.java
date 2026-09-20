@@ -74,7 +74,33 @@ public class KnowledgeStatsAggregator {
         vo.setLastOntologySnapshotAt(maxTimestamp("SELECT MAX(created_at) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setLastUpdatedAt(maxTimestamp(GREATEST_TS_SQL));
 
+        // Wave 0 向量库概要维数：embedding 维数 / 覆盖文档数（只加不改，失败静默占位 null/0）
+        vo.setEmbeddingDim(embeddingDim());
+        vo.setDocCount(docCount());
+
         return vo;
+    }
+
+    /**
+     * 向量维数 — SELECT vector_dims(MAX(embedding_vec))：
+     * pgvector 扩展未装或历史行为 NULL 时返回 null（前端展示 ~），不占位 0。
+     */
+    private Integer embeddingDim() {
+        try {
+            Integer val = jdbc.queryForObject(
+                    "SELECT vector_dims(MAX(embedding_vec)) FROM ecos_knowledge.knowledge_embedding", Integer.class);
+            return val;
+        } catch (Exception ex) {
+            log.warn("knowledge stats embedding_dim fallback null: {}", shortMsg(ex));
+            return null;
+        }
+    }
+
+    /** 向量库覆盖文档数 — embedding 去重（document_id / article_id 任一非空） */
+    private Long docCount() {
+        return count(
+                "SELECT COUNT(DISTINCT COALESCE(document_id, article_id)) "
+                        + "FROM ecos_knowledge.knowledge_embedding WHERE COALESCE(document_id, article_id) IS NOT NULL");
     }
 
     // ── 内部辅助（失败兜底 0/null, 不抛）────────────────

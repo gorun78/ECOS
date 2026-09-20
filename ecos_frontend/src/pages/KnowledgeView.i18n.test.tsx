@@ -44,21 +44,24 @@ describe('KnowledgeView 左侧菜单 i18n', () => {
   it('中文态渲染中文分组名与子项名', () => {
     const { container } = renderWithLocale('zh');
     const text = container.textContent ?? '';
-    expect(text).toContain('知识摄入'); // knowledge.group.ingest
-    expect(text).toContain('知识建模'); // knowledge.group.model
-    expect(text).toContain('图谱构建'); // knowledge.nav.graph_build
+    expect(text).toContain('知识管理'); // knowledge.group.manage
+    expect(text).toContain('知识查询'); // knowledge.group.retrieve
+    expect(text).toContain('数据同步'); // knowledge.nav.datasync
+    expect(text).toContain('知识萃取'); // knowledge.nav.streaming
     expect(text).toContain('引擎配置'); // knowledge.nav.engine_config
-    expect(text).not.toContain('Ingest');
-    expect(text).not.toContain('Graph Build');
+    expect(text).not.toContain('Knowledge Management');
+    expect(text).not.toContain('Data Sync');
   });
 
   it('英文态渲染英文分组名与子项名', () => {
     const { container } = renderWithLocale('en');
     const text = container.textContent ?? '';
-    expect(text).toContain('Ingest');
-    expect(text).toContain('Graph Build');
-    expect(text).toContain('Engine Config');
-    expect(text).not.toContain('知识摄入');
-    expect(text).not.toContain('图谱构建');
+    expect(text).toContain('Knowledge Management'); // knowledge.group.manage
+    expect(text).toContain('Knowledge Retrieval'); // knowledge.group.retrieve
+    expect(text).toContain('Data Sync'); // knowledge.nav.datasync
+    expect(text).toContain('Extraction'); // knowledge.nav.streaming
+    expect(text).toContain('Engine Config'); // knowledge.nav.engine_config
+    expect(text).not.toContain('知识管理');
+    expect(text).not.toContain('数据同步');
   });
 });

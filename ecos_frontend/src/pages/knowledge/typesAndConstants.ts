@@ -262,18 +262,17 @@ export const KB_EVAL_LEVELS = [1, 2, 3, 4, 5] as const;
 // ── Tab structure ─────────────────────────────────────────────────────────────
 
 /**
- * 7 组 Tab 严格按 §6 核心功能模块组织：
- *   overview → 总览（横切）
- *   extract  → K1 知识抽取
- *   fusion   → K2 知识融合
- *   store    → K3 知识存储
- *   update   → K4 知识更新
- *   retrieve → K5 知识查询
- *   govern   → K6 知识治理
- *   config   → 引擎配置（横切）
+ * 6 组 Tab（Wave 0 重构：知识抽取/融合/存储/更新收敛进「知识管理」，
+ * 存储能力上提总览概要卡，引擎配置置底）：
+ *   overview → 总览（横切：图谱概要 + 向量库概要 + 引擎状态）
+ *   manage   → 知识管理（数据同步 / 知识萃取 / 知识融合 / 分类体系 / 知识更新）
+ *   retrieve → 知识查询（K5）
+ *   govern   → 知识治理（K6）
+ *   config   → 引擎配置（横切，置底）
  *
- * 注：ontology_model 属本体工作台（金 I）职责，已从知识工作台 Tab 移除；
- *  映射契约的消费视图仅保留在 K1 extract 组内作只读入口。
+ * 注：import / upload / vector_index / graph_build 从导航撤下（路由组件保留不删），
+ * 其能力上提总览概要卡或删除入口由后续 Wave 承接；
+ * ontology_model 属本体工作台（金 I）职责，不在此处。
  */
 export const KNOWLEDGE_TAB_GROUPS = [
   {
@@ -283,30 +282,13 @@ export const KNOWLEDGE_TAB_GROUPS = [
     ],
   },
   {
-    id: 'extract',
+    id: 'manage',
     tabs: [
-      { id: 'import'   as const, icon: 'Download'   as const },
-      { id: 'upload'   as const, icon: 'FileText'   as const },
-    ],
-  },
-  {
-    id: 'fusion',
-    tabs: [
+      { id: 'datasync'       as const, icon: 'Database'   as const },
+      { id: 'streaming'      as const, icon: 'Workflow'   as const },
       { id: 'review'         as const, icon: 'ListChecks' as const },
       { id: 'classification' as const, icon: 'Tag'        as const },
-    ],
-  },
-  {
-    id: 'store',
-    tabs: [
-      { id: 'vector_index' as const, icon: 'Binary'   as const },
-      { id: 'graph_build'  as const, icon: 'Database' as const },
-    ],
-  },
-  {
-    id: 'update',
-    tabs: [
-      { id: 'sync' as const, icon: 'RefreshCw' as const },
+      { id: 'update'         as const, icon: 'RefreshCw'  as const },
     ],
   },
   {

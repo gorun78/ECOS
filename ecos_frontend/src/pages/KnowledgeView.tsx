@@ -1,5 +1,5 @@
 // @ts-nocheck
-// 知识工作台主导航（B8 / Q5：15 Tab / 7 组）
+// 知识工作台主导航（§6 严格对齐 K1~K6 六模块 + overview + config 横切）
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -13,6 +13,7 @@ import {
   GitBranch,
   LayoutDashboard,
   Network,
+  RefreshCw,
   Settings,
   Shield,
   ShieldCheck,
@@ -28,9 +29,9 @@ import OverviewDashboard from './knowledge/tabs/OverviewDashboard';
 import DataWorkbenchImportTab from './knowledge/tabs/DataWorkbenchImportTab';
 import DocumentUploadTab from './knowledge/tabs/DocumentUploadTab';
 import ExtractionReviewTab from './knowledge/tabs/ExtractionReviewTab';
-import OntologyModelTab from './knowledge/tabs/OntologyModelTab';
 import GraphBuilderTab from './knowledge/tabs/GraphBuilderTab';
 import VectorIndexTab from './knowledge/tabs/VectorIndexTab';
+import KnowledgeUpdateTab from './knowledge/tabs/KnowledgeUpdateTab';
 import ClassificationTab from './knowledge/tabs/ClassificationTab';
 import RagTab from './knowledge/tabs/RagTab';
 import GraphExplorerTab from './knowledge/tabs/GraphExplorerTab';
@@ -39,15 +40,17 @@ import KnowledgeEvalTab from './knowledge/tabs/KnowledgeEvalTab';
 import LifecycleManagerTab from './knowledge/tabs/LifecycleManagerTab';
 import ComplianceTab from './knowledge/tabs/KnowledgeComplianceCheckTab';
 import EngineConfigTab from './knowledge/tabs/EngineConfigTab';
+import DatasyncTab from './knowledge/tabs/DatasyncTab';
+import ExtractionStreamingTab from './knowledge/tabs/ExtractionStreamingTab';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
   Download,
   FileText,
   ListChecks,
-  Workflow,
   Database,
   Binary,
+  RefreshCw,
   Tag,
   Zap,
   Network,
@@ -56,24 +59,32 @@ const ICON_MAP: Record<string, LucideIcon> = {
   GitBranch,
   Shield,
   Settings,
+  Workflow,
 };
 
 const TAB_COMPONENTS: Record<KnowledgeTabId, React.ComponentType> = {
   overview: OverviewDashboard,
-  import: DataWorkbenchImportTab,
-  upload: DocumentUploadTab,
+  // manage：知识管理（Wave 0 收敛同步/萃取/融合/分类/更新）
+  datasync: DatasyncTab,
+  streaming: ExtractionStreamingTab,
   review: ExtractionReviewTab,
-  ontology_model: OntologyModelTab,
-  graph_build: GraphBuilderTab,
-  vector_index: VectorIndexTab,
   classification: ClassificationTab,
+  update: KnowledgeUpdateTab,
+  // retrieve：知识查询
   rag: RagTab,
   graph_explorer: GraphExplorerTab,
+  // govern：知识治理
   rules: KnowledgeRuleRepositoryTab,
   eval: KnowledgeEvalTab,
   lifecycle: LifecycleManagerTab,
   compliance: ComplianceTab,
+  // 横切：引擎配置（置底）
   engine_config: EngineConfigTab,
+  // 以下组件保留（路由可达 / 测试依赖），导航已撤下：import/upload/vector_index/graph_build
+  import: DataWorkbenchImportTab,
+  upload: DocumentUploadTab,
+  vector_index: VectorIndexTab,
+  graph_build: GraphBuilderTab,
 };
 
 interface KnowledgeViewProps {

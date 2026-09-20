@@ -366,13 +366,18 @@ export async function fetchRuleVersions(ruleId: string): Promise<RuleVersion[]> 
 
 // ── PMO-54 — Overview / Dashboard ─────────────────────────────────────────────
 
-export async function fetchGraphStats(): Promise<{
+// Wave 0 — 向量库概要新增可选字段（后端只加不改：embeddingDim = embedding_vec 维数，docCount = 覆盖文档数）
+export interface GraphStats {
   graphNodeCount: number;
   graphEdgeCount: number;
   embeddingCount: number;
   ruleCount: number;
   lastUpdatedAt?: string;
-}> {
+  embeddingDim?: number;
+  docCount?: number;
+}
+
+export async function fetchGraphStats(): Promise<GraphStats> {
   try {
     const data = await apiFetchData<any>('/api/v1/knowledge/stats');
     return {
@@ -381,9 +386,29 @@ export async function fetchGraphStats(): Promise<{
       embeddingCount: data?.embeddingCount ?? 0,
       ruleCount: data?.ruleCount ?? 0,
       lastUpdatedAt: data?.lastUpdatedAt,
+      embeddingDim: data?.embeddingDim,
+      docCount: data?.docCount,
     };
   } catch {
     return { graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 };
+  }
+}
+
+/** Wave 0 数据同步 — 读本体工作台「实体-数据映射契约」（ontology-engine 只读端点） */
+export interface EntityMappingItem {
+  entityCode?: string;
+  resourceName?: string;
+  datasetId?: string;
+  materialized?: boolean;
+  fieldMappings?: unknown[];
+}
+
+export async function fetchEntityMappings(): Promise<EntityMappingItem[]> {
+  try {
+    const data = await apiFetchData<any>('/api/v1/ontology/entity-mappings');
+    return Array.isArray(data) ? (data as EntityMappingItem[]) : [];
+  } catch {
+    return [];
   }
 }
 
@@ -818,6 +843,7 @@ export const knowledgeApi = {
   fetchRuleVersions,
   // PMO-54
   fetchGraphStats,
+  fetchEntityMappings,
   fetchEngineHealth,
   fetchGraphJobs,
   previewGraphBuild,
