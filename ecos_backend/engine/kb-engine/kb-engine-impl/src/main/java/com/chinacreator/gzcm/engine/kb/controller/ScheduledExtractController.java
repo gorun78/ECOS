@@ -179,7 +179,9 @@ public class ScheduledExtractController {
         List<Map<String, Object>> rows;
         try {
             rows = jdbc.queryForList(
-                    "SELECT id, schedule_id, name, ontology_ids, mode, period, cron_expression, "
+                    "SELECT id, schedule_id, name, "
+                            + "convert_from(ontology_ids::bytea,'UTF8') AS ontology_ids, "
+                            + "mode, period, cron_expression, "
                             + "next_run_at, enabled, last_run_at, last_status, created_at "
                             + "FROM " + TABLE + " WHERE is_deleted = 0 ORDER BY created_at DESC");
         } catch (DataAccessException e) {
@@ -210,7 +212,11 @@ public class ScheduledExtractController {
         Map<String, Object> current;
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT * FROM " + TABLE + " WHERE id = ? AND is_deleted = 0", id);
+                    "SELECT id, schedule_id, name, "
+                            + "convert_from(ontology_ids::bytea,'UTF8') AS ontology_ids, "
+                            + "mode, period, cron_expression, next_run_at, enabled, "
+                            + "last_run_at, last_status, created_at "
+                            + "FROM " + TABLE + " WHERE id = ? AND is_deleted = 0", id);
             if (rows.isEmpty()) {
                 return ApiResponse.notFound("未找到任务: id=" + id);
             }
