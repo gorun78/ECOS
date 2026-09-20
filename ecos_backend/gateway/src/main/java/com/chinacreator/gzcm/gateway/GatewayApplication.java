@@ -131,7 +131,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     // PMO-48-A: DqRuleMapper 在 data.quality.mapper，纳入扫描否则 bean 缺失（质量包下任意 mapper 包）
     "com.chinacreator.gzcm.engine.data.quality.**.mapper",
     "com.chinacreator.gzcm.engine.data.quality.mapper",
-    "com.chinacreator.gzcm.engine.kb.repository"
+    "com.chinacreator.gzcm.engine.kb.repository",
+    // 非结构化文档链路：kb.doc.mapper 下的 KbDocMapper/KbDocChunkMapper 不在 kb.repository 内，
+    // 不纳入扫描会导致 KnowledgeDocIngestService 注入失败（启动即失败），与 dccheng 侧口径保持一致
+    "com.chinacreator.gzcm.engine.kb.**.mapper"
 })
 public class GatewayApplication {
 
