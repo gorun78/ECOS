@@ -35,6 +35,45 @@ const RULES_BASE = '/api/v1/knowledge/compliance-rules';
 
 const KB_V1 = '/api/v1/knowledge';
 
+// ── Wave 3 C1 — T8 抽取 · 定时 · 日志 · 本体树 类型 ───────────────────────────
+
+/** 本体树节点（三级结构：domain → ontologies → entityCodes） */
+export interface OntologyTreeVo {
+  domain: string;
+  ontologies: Array<{ id: string; name: string; entityCodes: string[] }>;
+}
+
+/** 定时抽取任务定义 */
+export interface ScheduledExtractVo {
+  id: number;
+  scheduleId: string;
+  name: string;
+  ontologyIds: string[];
+  mode: string;
+  period: string;
+  timeOfDay?: string;
+  enabled: boolean;
+  lastRunAt?: string;
+  lastStatus?: string;
+  createdAt: string;
+}
+
+/** 定时抽取任务创建 / 修改入参 */
+export interface ScheduledExtractCreateReq {
+  name: string;
+  ontologyIds: string[];
+  mode: string;
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  timeOfDay: string;
+}
+
+/** 抽取日志条目 */
+export interface ExtractLogEntry {
+  ts: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+}
+
 /** SSE-capable RAG query — falls back to POST /rag when backend hasn't wired SSE */
 export async function runRAGQuerySSE(query: string, onToken: (token: string) => void): Promise<{ answerGenerated: boolean }> {
   // Try: GET /api/v1/knowledge/rag?query=...&stream=true
@@ -797,6 +836,223 @@ export async function fetchMetadataDrift(sample?: boolean): Promise<{
   }
 }
 
+// ── Wave 3 C1 — T8 本体树 / 定时抽取 / 日志 / 状态 ─────────────────────────────
+
+/** 拉取本体三级树（domain → ontology → entityCodes）；空树或失败时兜底返回 [] 不抛 */
+export async function fetchOntologyTree(): Promise<OntologyTreeVo[]> {
+  try {
+    const data = await apiFetchData<OntologyTreeVo[]>(`${KB_V1}/extract/ontology-tree`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 获取定时抽取任务列表 */
+export async function fetchScheduledExtracts(): Promise<ScheduledExtractVo[]> {
+  try {
+    const data = await apiFetchData<ScheduledExtractVo[]>(`${KB_V1}/extract/scheduled`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 创建定时抽取任务 */
+export async function createScheduledExtract(
+  req: ScheduledExtractCreateReq,
+): Promise<{ id: number; scheduleId: string; nextRunAt: string }> {
+  const data = await apiFetchData<{ id: number; scheduleId: string; nextRunAt: string }>(
+    `${KB_V1}/extract/scheduled`,
+    { method: 'POST', body: JSON.stringify(req) },
+  );
+  return data || { id: 0, scheduleId: '', nextRunAt: new Date().toISOString() };
+}
+
+/** 更新定时抽取任务 */
+export async function updateScheduledExtract(
+  id: number,
+  req: ScheduledExtractCreateReq,
+): Promise<void> {
+  await apiFetchData<unknown>(`${KB_V1}/extract/scheduled/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(req),
+  });
+}
+
+/** 删除定时抽取任务 */
+export async function deleteScheduledExtract(id: number): Promise<void> {
+  await apiFetchData<unknown>(`${KB_V1}/extract/scheduled/${id}`, { method: 'DELETE' });
+}
+
+/** 获取抽取作业日志（结构化抽取 → 按 jobId 反查日志） */
+export async function fetchExtractLogs(jobId: number): Promise<ExtractLogEntry[]> {
+  try {
+    const data = await apiFetchData<ExtractLogEntry[]>(`${KB_V1}/extract/structured/logs/${jobId}`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 获取抽取日志导出 Blob（POST body 触发下载，供 T10 组件 window.open / a.download 触发） */
+export async function fetchExportLogBody(jobId: number): Promise<Blob> {
+  const token = localStorage.getItem('token') || '';
+  const res = await fetch(`${KB_V1}/extract/structured/export-log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ jobId }),
+  });
+  if (!res.ok) throw new Error(`export-log HTTP ${res.status}`);
+  return res.blob();
+}
+
+/** 触发结构化抽取（dryRun=true 只统计不落库） */
+export async function triggerStructuredExtract(req: {
+  dryRun: boolean;
+  mode: string;
+}): Promise<{ taskId: string; jobId: number; status: string }> {
+  const data = await apiFetchData<{ taskId: string; jobId: number; status: string }>(
+    `${KB_V1}/extract/structured`,
+    { method: 'POST', body: JSON.stringify(req) },
+  );
+  return data || { taskId: '', jobId: 0, status: 'PENDING' };
+}
+
+/** 查询结构化抽取任务状态 */
+export async function fetchExtractStatus(taskId: string): Promise<{
+  taskId: string;
+  status: string;
+  progress: number;
+  statusMessage?: string;
+}> {
+  const data = await apiFetchData<{ taskId: string; status: string; progress: number; statusMessage?: string }>(
+    `${KB_V1}/extract/status/${encodeURIComponent(taskId)}`,
+  );
+  return data || { taskId, status: 'UNKNOWN', progress: 0 };
+}
+
+// ── Wave 3 C1（2 号）：本体树 + 定时抽取管理 + 日志流（snake_case 后端形态） ─────
+
+/** 同 OntologyTreeVo，语义命名对齐任务契约 */
+export type OntologyTreeNode = OntologyTreeVo;
+
+/** 结构化抽取作业信息（status/jobs 端点，兼容 taskId 关联） */
+export interface ExtractJobInfo {
+  jobId: string;
+  trigger: 'MANUAL' | 'SCHEDULED';
+  mode: 'FULL' | 'INCREMENTAL';
+  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  progress?: number;             // 0~100
+  statusMessage?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  rowsRead?: number;
+  rowsWritten?: number;
+  mismatches?: number;
+  error?: string;
+  advice?: string;
+  taskId?: string;
+}
+
+/** 拉取最近抽取作业列表（limit 上限 50） */
+export async function fetchExtractJobs(limit = 50): Promise<ExtractJobInfo[]> {
+  try {
+    const d = await apiFetchData<{ jobs?: ExtractJobInfo[] } & ExtractJobInfo>(
+      `${KB_V1}/extract/structured/jobs?limit=${limit}`,
+    );
+    if (!d) return [];
+    // 兼容两种返回形态：{jobs:[...]} 或直接数组形态
+    if (Array.isArray((d as { jobs?: unknown }).jobs)) return (d as { jobs?: ExtractJobInfo[] }).jobs || [];
+    if (d.jobId) return [d as ExtractJobInfo];
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/** 单个抽取作业状态（按 taskId 查询） */
+export async function fetchExtractJobStatus(taskId: string): Promise<ExtractJobInfo | null> {
+  try {
+    return await apiFetchData<ExtractJobInfo>(
+      `${KB_V1}/extract/structured/status/${encodeURIComponent(taskId)}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** 定时抽取任务行（后端 snake_case 形态） */
+export interface ScheduledExtractRow {
+  id: number;
+  scheduleId: string;
+  name: string;
+  ontologyIds: string[];
+  mode: 'FULL' | 'INCREMENTAL';
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  timeOfDay?: string;             // "HH:mm"
+  enabled: number;                // 0/1
+  created_at?: string;
+  next_run_at?: string;
+  last_run_at?: string;
+  last_status?: string;
+}
+
+/** 创建定时抽取任务（POST /extract/scheduled） */
+export async function createScheduledExtractRow(body: {
+  name: string;
+  ontologyIds: string[];
+  mode: 'FULL' | 'INCREMENTAL';
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  timeOfDay: string;
+}): Promise<{ id: number; scheduleId: string; nextRunAt: string }> {
+  return await apiFetchData<{ id: number; scheduleId: string; nextRunAt: string }>(
+    `${KB_V1}/extract/scheduled`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** 更新定时抽取任务（PUT /extract/scheduled/{id}） */
+export async function updateScheduledExtractRow(id: number, body: {
+  name: string;
+  ontologyIds: string[];
+  mode: 'FULL' | 'INCREMENTAL';
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  timeOfDay: string;
+  enabled?: boolean;
+}): Promise<{ id: number; scheduleId: string; nextRunAt: string }> {
+  return await apiFetchData<{ id: number; scheduleId: string; nextRunAt: string }>(
+    `${KB_V1}/extract/scheduled/${id}`,
+    { method: 'PUT', body: JSON.stringify(body) },
+  );
+}
+
+/** 导出抽取日志（POST /export-log → Blob，供 a.download 触发下载） */
+export async function exportExtractLog(jobId: string): Promise<Blob> {
+  const token = localStorage.getItem('token') || '';
+  const res = await fetch(`${KB_V1}/extract/structured/export-log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ jobId }),
+  });
+  if (!res.ok) throw new Error(`extract log export failed: ${res.status}`);
+  return await res.blob();
+}
+
+/** Wave 3 C1 api 导出（追加，不影响 knowledgeApi 对象内既有成员） */
+export const wave3c1C1Api = {
+  fetchOntologyTree,
+  fetchExtractJobs,
+  fetchExtractJobStatus,
+  fetchScheduledExtracts,
+  createScheduledExtractRow,
+  updateScheduledExtractRow,
+  deleteScheduledExtract,
+  fetchExtractLogs,
+  exportExtractLog,
+};
+
 // ── PMO-54 — Consolidated knowledgeApi export (extended with above) ──────────
 
 export const knowledgeApi = {
@@ -872,4 +1128,14 @@ export const knowledgeApi = {
   saveEngineConfig,
   fetchDataWorkbenchSources,
   fetchMetadataDrift,
+  // Wave 3 C1 — T8 本体树 / 定时抽取 / 日志 / 状态
+  fetchOntologyTree,
+  fetchScheduledExtracts,
+  createScheduledExtract,
+  updateScheduledExtract,
+  deleteScheduledExtract,
+  fetchExtractLogs,
+  fetchExportLogBody,
+  triggerStructuredExtract,
+  fetchExtractStatus,
 };
