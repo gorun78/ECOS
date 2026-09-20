@@ -2,330 +2,361 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * PMO-54 DataWorkbenchImportTab — 数据导入
+ * PMO K1 DataWorkbenchImportTab — 知识结构化抽取（原数据导入队列已下线）
  *
- * 左侧：数据源清单（/api/integration/metadata/sources 真实数据）
- * 右侧：选中 → 预览 pipeline 产物（/api/v1/integration/metadata/drift 返回 sample 表格 + 血缘）
- * 操作：入摄入队列 → knowledgeApi.addImportToQueue({dsId, pipelineId, options})；队列 table 状态 + 批量重试
+ * K1 结构化（映射驱动）实例抽取主力：
+ * 左侧：本体版本选择（/api/v1/ecos/versions）+ 抽取模式（FULL/INCREMENTAL）
+ * 右侧：Dry-run 预览报告 + 触发真实抽取 + 抽取作业列表（行展开看 detail）
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Download, RefreshCw, Loader2, Database, Plus, AlertCircle,
-  CheckCircle2, ListOrdered,
+  Download, RefreshCw, Loader2, ChevronDown, ChevronRight,
+  Eye, PlayCircle, ListOrdered,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
 import { apiFetchData } from '../../../api';
-import type { ImportQueueItem } from '../typesAndConstants';
+import type { StructuredExtractReport, StructuredExtractJob } from '../typesAndConstants';
 
 type TabProps = { showToast?: (type: 'success' | 'info' | 'error', msg: string) => void };
 
-const STATUS_STYLES: Record<ImportQueueItem['status'], { cls: string; labelKey: 'queued' | 'parsing' | 'vectorizing' | 'done' | 'failed' }> = {
-  queued:      { cls: 'bg-blue-50 text-blue-700 border-blue-200', labelKey: 'queued' },
-  parsing:     { cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', labelKey: 'parsing' },
-  vectorizing: { cls: 'bg-violet-50 text-violet-700 border-violet-200', labelKey: 'vectorizing' },
-  done:        { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', labelKey: 'done' },
-  failed:      { cls: 'bg-rose-50 text-rose-700 border-rose-200', labelKey: 'failed' },
+/** 本体版本下拉项（OntologyVersionVO 子集） */
+interface OntologyVersionOption {
+  id: string;
+  ontologyId: string;
+  versionNo: string;
+  status: string;
+}
+
+/** 抽取模式 */
+type ExtractMode = 'FULL' | 'INCREMENTAL';
+
+/** 作业状态 → 主题色徽章样式 */
+const JOB_STATUS_STYLES: Record<string, string> = {
+  SUCCESS: 'text-emerald-600',
+  PENDING: 'text-blue-600',
+  RUNNING: 'text-blue-600',
+  NOT_FOUND: 'text-slate-500',
+  FAILED: 'text-rose-600',
 };
 
 export default function DataWorkbenchImportTab({ showToast }: TabProps) {
-  const { t, locale } = useLanguage();
+  const { locale } = useLanguage();
   const { styles } = useTheme();
   const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
-  const toast = useCallback(
-    (type: 'success' | 'info' | 'error', msg: string) => (showToast ? showToast(type, msg) : console.info(msg)),
-    [showToast]
-  );
 
-  const [sources, setSources] = useState<any[]>([]);
-  const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [driftPreview, setDriftPreview] = useState<{ fields: any[]; rows: any[]; lineage: any } | null>(null);
-  const [queue, setQueue] = useState<ImportQueueItem[]>([]);
-  const [queueLoading, setQueueLoading] = useState(false);
+  const [versions, setVersions] = useState<OntologyVersionOption[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<string>('');
+  const [mode, setMode] = useState<ExtractMode>('INCREMENTAL');
 
-  const loadSources = useCallback(async () => {
-    setIsLoading(true);
+  const [preview, setPreview] = useState<StructuredExtractReport | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+
+  const [jobs, setJobs] = useState<StructuredExtractJob[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [expandedJob, setExpandedJob] = useState<{ rowKey: string; detail: string; status: string } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // ── 数据加载 ─────────────────────────────────────────────────────────────
+
+  const loadVersions = useCallback(async () => {
+    setVersionsLoading(true);
     try {
-      const data = await apiFetchData<any>('/api/integration/metadata');
-      const list = Array.isArray(data) ? data : (data?.data as any[]) || data?.sources || [];
-      const mapped = (list as any[]).map((s: any, i: number) => ({
-        id: String(s.id ?? s.dsId ?? `ds-${i}`),
-        name: String(s.name ?? s.tableName ?? s.id ?? `source-${i}`),
-        type: String(s.sourceType ?? s.type ?? 'integration'),
-        status: (s.status ?? (s.syncStatus === 'synced' ? 'connected' : 'disconnected')),
-        records: s.records ?? s.recordsOrFields ?? '—',
-      }));
-      setSources(mapped.filter(s => s.id));
+      const data = await apiFetchData<OntologyVersionOption[]>('/api/v1/ecos/versions');
+      const list = Array.isArray(data) ? data : [];
+      setVersions(list.map(v => ({
+        id: String(v.id ?? ''),
+        ontologyId: String(v.ontologyId ?? ''),
+        versionNo: String(v.versionNo ?? ''),
+        status: String(v.status ?? ''),
+      })).filter(v => v.id));
     } catch {
-      setSources([]);
+      setVersions([]);
     } finally {
-      setIsLoading(false);
+      setVersionsLoading(false);
     }
   }, []);
 
-  const loadDrift = useCallback(async (dsId: string) => {
-    setDriftPreview(null);
+  const loadJobs = useCallback(async () => {
+    setJobsLoading(true);
     try {
-      const data = await apiFetchData<any>('/api/integration/metadata/drift?sample=true&dsId=' + encodeURIComponent(dsId));
-      const raw = Array.isArray(data) ? { fields: data } : data;
-      setDriftPreview({
-        fields: raw?.fields ?? raw?.schemaDelta ?? raw?.columns ?? [],
-        rows: raw?.rows ?? raw?.samples ?? [],
-        lineage: raw?.lineage ?? null,
-      });
+      setJobs(await knowledgeApi.fetchStructuredJobs(1, 20));
     } catch {
-      setDriftPreview({ fields: [], rows: [], lineage: null });
-    }
-  }, []);
-
-  const loadQueue = useCallback(async () => {
-    setQueueLoading(true);
-    try {
-      const list = knowledgeApi.fetchImportQueue();
-      setQueue(list);
+      setJobs([]);
     } finally {
-      setQueueLoading(false);
+      setJobsLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadSources(); loadQueue(); }, [loadSources, loadQueue]);
+  useEffect(() => { loadVersions(); loadJobs(); }, [loadVersions, loadJobs]);
 
-  const handleEnqueue = () => {
-    if (!selectedSource) return;
-    const src = sources.find(s => s.id === selectedSource);
-    if (!src) return;
+  // ── Dry-run 预览 / 触发抽取 ───────────────────────────────────────────────
+
+  const handleDryRun = useCallback(async () => {
+    setPreviewLoading(true);
+    setPreview(null);
     try {
-      const entry = knowledgeApi.addImportToQueue({
-        dsId: src.id,
-        label: src.name,
-        pipelineId: src.id,
+      const report = await knowledgeApi.fetchTriggerStructuredExtract({
+        ontologyId: selectedVersion || undefined,
+        mode,
+        dryRun: true,
       });
-      toast('success', tl('已入摄入队列: ', 'Enqueued: ') + src.name);
-      loadQueue();
-    } catch (e: any) {
-      toast('error', tl('入队失败: ', 'Enqueue failed: ') + (e?.message || ''));
+      setPreview(report);
+    } catch (e) {
+      showToast?.('error', tl('Dry-run 预览失败: ', 'Dry-run failed: ') + (e as Error).message);
+    } finally {
+      setPreviewLoading(false);
     }
-  };
+  }, [selectedVersion, mode, tl, showToast]);
 
-  const handleRetry = (id: string) => {
+  const handleTrigger = useCallback(async () => {
+    setTriggering(true);
     try {
-      knowledgeApi.retryImport(id);
-      toast('success', tl('已重置为 queued: ' + id, 'Reset to queued: ' + id));
-      loadQueue();
-    } catch (e: any) {
-      toast('error', tl('重试失败: ', 'Retry failed: ') + (e?.message || ''));
+      await knowledgeApi.fetchTriggerStructuredExtract({
+        ontologyId: selectedVersion || undefined,
+        mode,
+        dryRun: false,
+      });
+      showToast?.('success', tl('抽取任务已提交', 'Extract job submitted'));
+      loadJobs();
+    } catch (e) {
+      showToast?.('error', tl('触发抽取失败: ', 'Trigger failed: ') + (e as Error).message);
+    } finally {
+      setTriggering(false);
     }
-  };
+  }, [selectedVersion, mode, tl, showToast, loadJobs]);
 
-  const failedCount = queue.filter(q => q.status === 'failed').length;
+  // ── 作业详情展开 ─────────────────────────────────────────────────────────
+
+  const handleRowClick = useCallback(async (job: StructuredExtractJob, rowKey: string) => {
+    if (!job.jobId) return;
+    if (expandedJob?.rowKey === rowKey && !detailLoading) {
+      setExpandedJob(null);
+      return;
+    }
+    setDetailLoading(true);
+    try {
+      const detail = await knowledgeApi.fetchStructuredJobDetail(job.jobId);
+      setExpandedJob({ rowKey, detail: detail.detail ?? '', status: detail.status ?? '' });
+    } catch (e) {
+      setExpandedJob({ rowKey, detail: (e as Error).message, status: 'ERROR' });
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [expandedJob, detailLoading]);
+
+  const versionLabel = (v: OntologyVersionOption) =>
+    `${v.ontologyId} @ ${v.versionNo} (${v.status || '—'})`;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 ${styles.cardBorder} pb-4 gap-3`}>
+    <div className="space-y-4">
+      {/* 头部 */}
+      <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-3`}>
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
-            <Download size={16} className="text-blue-600" />
-            {tl('数据导入（集成工作台 → 知识摄入队列）', 'Data Import (Integration → KB Queue)')}
+            <Download size={16} className="text-indigo-600" />
+            {tl('体数据来源与抽取任务', 'Ontology Source & Extract Jobs')}
           </h2>
-          <p className={`text-xs ${styles.cardTextMuted}`}>{tl('左侧选数据源，右侧预览 schema/样本/血缘，加入摄入队列', 'Left source, right preview, enqueue to vectorize')}</p>
+          <p className={`text-[10px] ${styles.cardTextMuted}`}>
+            {tl('选择本体版本 → Dry-run 预览 → 触发结构化抽取', 'Pick ontology version → dry-run preview → trigger structured extract')}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={loadSources} disabled={isLoading}
-            className={`px-3 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50`}>
-            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            {tl('刷新数据源', 'Refresh sources')}
-          </button>
-        </div>
+        <button
+          onClick={() => { loadVersions(); loadJobs(); }}
+          disabled={versionsLoading || jobsLoading}
+          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border cursor-pointer disabled:opacity-50 ${styles.cardBorder} ${styles.inputBg}`}
+        >
+          {(versionsLoading || jobsLoading) ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+          {tl('刷新', 'Refresh')}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* 左侧：数据源清单 */}
-        <div className={`${styles.cardBg} border border-slate-200 ${styles.cardBorder} rounded-xl overflow-hidden`}>
-          <div className={`px-4 py-3 border-b border-slate-100 ${styles.appBorder} flex items-center justify-between`}>
-            <span className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
-              <Database size={13} className="text-indigo-500" /> {tl('数据源', 'Data Sources')} ({sources.length})
-            </span>
-            <span className={`text-[9px] font-mono ${styles.muted}`}>/api/integration/metadata</span>
-          </div>
-          <div className={`divide-y divide-slate-100 ${styles.sidebarBorder} max-h-[460px] overflow-y-auto`}>
-            {isLoading ? (
-              <div className={`p-10 text-center ${styles.muted} text-xs`}>{tl('加载中...', 'Loading...')}</div>
-            ) : sources.length === 0 ? (
-              <div className={`p-10 text-center ${styles.muted} text-xs space-y-1`}>
-                <p>{tl('暂无数据源返回', 'No sources returned')}</p>
-                <p className={`text-[9px] font-mono ${styles.muted}`}>{tl('PMO-56 后端待补 /integration/metadata/sources', 'PMO-56: /integration/metadata/sources')}</p>
-              </div>
-            ) : sources.map(s => (
-              <button
-                key={s.id}
-                onClick={() => { setSelectedSource(s.id); loadDrift(s.id); }}
-                className={`w-full text-left px-4 py-3 transition ${
-                  selectedSource === s.id ? 'bg-indigo-50 border-l-2 border-indigo-500' : `${styles.sidebarHoverBg} border-l-2 border-transparent`
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`font-bold text-xs ${styles.cardText} truncate flex-1`}>{s.name}</span>
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
-                    s.status === 'connected' ? `${styles.successBg} ${styles.successText}` : `${styles.badgeBg} ${styles.cardTextMuted}`
-                  }`}>{s.status}</span>
-                </div>
-                <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{s.id}</div>
-                <div className={`text-[9px] ${styles.muted}`}>{s.type} · {s.records}</div>
-              </button>
-            ))}
-          </div>
-          <div className={`p-3 border-t border-slate-100 ${styles.appBorder}`}>
-            <button
-              onClick={handleEnqueue}
-              disabled={!selectedSource}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:cursor-not-allowed"
+      {/* 本体版本 + 模式 + 操作 */}
+      <div className={`border ${styles.cardBorder} rounded-xl p-4 space-y-4 ${styles.cardBg}`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 本体版本 */}
+          <div className="space-y-1">
+            <label className={`text-[10px] font-extrabold ${styles.muted} uppercase`}>
+              {tl('本体版本', 'Ontology Version')}
+            </label>
+            <select
+              value={selectedVersion}
+              onChange={e => setSelectedVersion(e.target.value)}
+              disabled={versionsLoading}
+              className={`w-full px-2.5 py-2 text-xs rounded-md border focus:outline-none ${styles.inputBg} ${styles.inputBorder}`}
             >
-              <Plus size={12} /> {tl('并入摄入队列', 'Enqueue to Import Queue')}
+              <option value="">{tl('全部本体（默认）', 'All ontologies (default)')}</option>
+              {versions.map(v => (
+                <option key={v.id} value={v.ontologyId}>{versionLabel(v)}</option>
+              ))}
+            </select>
+            {versionsLoading && (
+              <p className="text-[9px] font-mono opacity-50">{tl('加载版本中...', 'Loading versions...')}</p>
+            )}
+          </div>
+
+          {/* 抽取模式 */}
+          <div className="space-y-1">
+            <label className={`text-[10px] font-extrabold ${styles.muted} uppercase`}>
+              {tl('抽取模式', 'Extract Mode')}
+            </label>
+            <div className="flex rounded-md border overflow-hidden">
+              {(['INCREMENTAL', 'FULL'] as ExtractMode[]).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`flex-1 px-3 py-2 text-[11px] font-bold transition ${
+                    mode === m
+                      ? `${styles.accentBg} text-white`
+                      : `${styles.inputBg} ${styles.cardText} hover:opacity-80`
+                  }`}
+                >
+                  {m === 'FULL' ? tl('全量 (FULL)', 'Full') : tl('增量 (INCREMENTAL)', 'Incremental')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex flex-col justify-end gap-2">
+            <button
+              onClick={() => handleDryRun()}
+              disabled={previewLoading || triggering}
+              className={`w-full px-3 py-2 rounded-md text-xs font-bold border flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${styles.cardBorder} ${styles.inputBg}`}
+            >
+              {previewLoading ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+              {tl('Dry-run 预览', 'Dry-run Preview')}
+            </button>
+            <button
+              onClick={() => handleTrigger()}
+              disabled={previewLoading || triggering}
+              className={`w-full px-3 py-2 rounded-md text-xs font-bold text-white flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${styles.accentBg}`}
+            >
+              {triggering ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
+              {tl('触发抽取', 'Trigger Extract')}
             </button>
           </div>
         </div>
 
-        {/* 右侧：预览 */}
-        <div className={`lg:col-span-2 ${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-4 overflow-y-auto max-h-[560px]`}>
-          <div className={`flex items-center justify-between border-b ${styles.appBorder} pb-2`}>
-            <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
-              <Database size={13} className="text-blue-500" />
-              {tl('Pipeline 产物预览', 'Pipeline Output Preview')}
-            </h3>
-            <span className={`text-[9px] font-mono ${styles.muted}`}>/integration/metadata/drift · sample</span>
-          </div>
-          {!selectedSource ? (
-            <div className={`py-16 text-center ${styles.muted} space-y-2`}>
-              <Database size={24} className={`mx-auto ${styles.muted}`} />
-              <p className="text-xs">{tl('从左侧选中一个数据源查看 schema / 行样本 / 血缘', 'Select a data source to preview schema / sample rows / lineage')}</p>
+        {/* Dry-run 报告 */}
+        {preview && (
+          <div className={`border ${styles.cardBorder} rounded-lg p-3 space-y-2`}>
+            <div className={`text-[10px] font-extrabold ${styles.muted} uppercase`}>
+              {tl('Dry-run 预览报告', 'Dry-run Report')} (mode: {preview.mode}, {preview.durationMs}ms)
             </div>
-          ) : !driftPreview ? (
-            <div className={`py-12 text-center ${styles.muted} text-xs`}>{tl('加载预览...', 'Loading preview...')}</div>
-          ) : (
-            <>
-              {/* Schema */}
-              {driftPreview.fields.length > 0 && (
-                <div>
-                  <span className={`text-[10px] font-extrabold ${styles.muted} uppercase block mb-1.5`}>{tl('字段 Schema', 'Schema')} ({driftPreview.fields.length})</span>
-                  <div className={`overflow-x-auto border ${styles.cardBorder} rounded-lg`}>
-                    <table className="w-full text-[10px]">
-                      <thead>
-                        <tr className={`${styles.badgeBg} border-b ${styles.cardBorder}`}>
-                          <th className={`p-2 text-left font-bold ${styles.cardTextMuted}`}>column</th>
-                          <th className={`p-2 text-left font-bold ${styles.cardTextMuted}`}>type</th>
-                          <th className={`p-2 text-left font-bold ${styles.cardTextMuted}`}>nullable</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(driftPreview.fields as any[]).map((f: any, i: number) => (
-                          <tr key={i} className={`border-t ${styles.appBorder}`}>
-                            <td className={`p-2 font-mono ${styles.cardText}`}>{String(f.name ?? f.column ?? f.field ?? '')}</td>
-                            <td className={`p-2 ${styles.sidebarText}`}>{String(f.type ?? f.dataType ?? '—')}</td>
-                            <td className={`p-2 ${styles.cardTextMuted}`}>{String(f.nullable ?? '—')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {[
+                { label: tl('本体数', 'Ontologies'), value: preview.ontologyCount },
+                { label: tl('实体数', 'Entities'), value: preview.entityCount },
+                { label: tl('新建节点', 'Nodes Created'), value: preview.nodeCreated },
+                { label: tl('更新节点', 'Nodes Updated'), value: preview.nodeUpdated },
+                { label: tl('新建边', 'Edges Created'), value: preview.edgeCreated },
+                { label: tl('跳过', 'Skipped'), value: preview.nodeSkipped },
+                { label: tl('无效映射', 'Invalid Mappings'), value: preview.invalidMappings },
+                { label: tl('水位线', 'Watermark'), value: preview.nextWatermark ?? '—' },
+              ].map((item, i) => (
+                <div key={i} className={`p-2 rounded border ${styles.appBorder}`}>
+                  <div className={`text-[9px] ${styles.muted}`}>{item.label}</div>
+                  <div className={`text-sm font-bold ${styles.cardText} truncate`}>
+                    {typeof item.value === 'number' ? item.value.toFixed(0) : String(item.value)}
                   </div>
                 </div>
-              )}
-              {/* Sample rows */}
-              {driftPreview.rows && driftPreview.rows.length > 0 && (
-                <div>
-                  <span className={`text-[10px] font-extrabold ${styles.muted} uppercase block mb-1.5`}>{tl('行样本 (limit 5)', 'Sample Rows (limit 5)')}</span>
-                  <div className={`overflow-x-auto border ${styles.cardBorder} rounded-lg`}>
-                    <table className="w-full text-[10px]">
-                      <tbody>
-                        {(driftPreview.rows as any[]).slice(0, 5).map((r: any, i: number) => (
-                          <tr key={i} className={`border-t ${styles.appBorder} first:border-0`}>
-                            {Object.entries(r).slice(0, 6).map(([k, v], j) => (
-                              <td key={j} className={`p-2 font-mono ${styles.sidebarText}`}>
-                                <span className={`${styles.muted} mr-1`}>{k}:</span>
-                                {String(v).substring(0, 40)}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              {/* Lineage stub */}
+              ))}
+            </div>
+            {preview.issues.length > 0 && (
               <div>
-                <span className={`text-[10px] font-extrabold ${styles.muted} uppercase block mb-1.5`}>{tl('血缘 Lineage', 'Lineage')}</span>
-                <div className={`p-3 ${styles.badgeBg} border ${styles.cardBorder} rounded-lg text-[10px] ${styles.sidebarText} space-y-1`}>
-                  {driftPreview.lineage ? (
-                    <>
-                      <span className="font-mono">{JSON.stringify(driftPreview.lineage, null, 2).substring(0, 400)}</span>
-                    </>
-                  ) : (
-                    <p>{tl('后端 /integration/metadata/drift 未返回血缘字段（PMO-56 待补）', 'drift endpoint did not return lineage payload (PMO-56)')}</p>
-                  )}
-                </div>
+                <span className={`text-[9px] font-bold ${styles.muted} uppercase`}>
+                  {tl('问题明细', 'Issues')} ({preview.issues.length})
+                </span>
+                <ul className="space-y-0.5 max-h-24 overflow-y-auto">
+                  {preview.issues.map((iss, i) => (
+                    <li key={i} className="text-[10px] font-mono text-rose-500">
+                      [{iss.code}] {iss.message}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* 底部：摄入队列 */}
-      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden`}>
+      {/* 抽取作业列表 */}
+      <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.cardBg}`}>
         <div className={`px-4 py-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
           <span className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
-            <ListOrdered size={13} className="text-indigo-500" /> {tl('摄入队列', 'Import Queue')} ({queue.length})
+            <ListOrdered size={13} className="text-indigo-500" />
+            {tl('抽取作业', 'Extract Jobs')} ({jobs.length})
           </span>
-          {failedCount > 0 && (
-            <span className="text-[10px] font-bold text-rose-600">{failedCount} failed · {tl('批量重试', 'retry-all')}</span>
-          )}
+          <span className={`text-[9px] font-mono ${styles.muted}`}>/extract/structured/jobs</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] border-collapse">
             <thead>
-              <tr className={`${styles.badgeBg} ${styles.muted} border-b ${styles.cardBorder}`}>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">Label</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">dsId</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">pipelineId</th>
+              <tr className={`${styles.appBorder} border-b ${styles.cardBorder}`}>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider w-8"></th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">jobId</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('模式', 'Mode')}</th>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('状态', 'Status')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('入队时间', 'Enrolled')}</th>
-                <th className="p-3 text-right font-extrabold uppercase tracking-wider">{tl('操作', 'Action')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('开始时间', 'Started At')}</th>
+                <th className="p-3 text-right font-extrabold uppercase tracking-wider">{tl('耗时 (ms)', 'Duration')}</th>
               </tr>
             </thead>
             <tbody>
-              {queueLoading ? (
-                <tr><td colSpan={6} className={`p-8 text-center ${styles.muted}`}>{tl('加载中...', 'Loading...')}</td></tr>
-              ) : queue.length === 0 ? (
-                <tr><td colSpan={6} className={`p-10 text-center ${styles.muted} text-xs`}>
-                  {tl('队列空。在上方选中数据源后点击「并入摄入队列」', 'Queue empty. Select a source and click "Enqueue" above.')}
-                </td></tr>
-              ) : queue.map(item => (
-                <tr key={item.id} className={`border-b ${styles.appBorder} ${styles.sidebarHoverBg}`}>
-                  <td className={`p-3 font-bold ${styles.cardText}`}>{item.label}</td>
-                  <td className={`p-3 font-mono ${styles.cardTextMuted}`}>{item.dsId}</td>
-                  <td className={`p-3 font-mono ${styles.cardTextMuted}`}>{item.pipelineId || '—'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_STYLES[item.status].cls}`}>
-                      {tl(STATUS_STYLES[item.status].labelKey.toUpperCase(), STATUS_STYLES[item.status].labelKey.toUpperCase())}
-                    </span>
-                    {item.errorMsg && <p className="text-[9px] text-rose-600 mt-1 truncate max-w-[180px]">{item.errorMsg}</p>}
-                  </td>
-                  <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{item.enrollmentAt}</td>
-                  <td className="p-3 text-right">
-                    {item.status === 'failed' || item.status === 'queued' ? (
-                      <button onClick={() => handleRetry(item.id)}
-                        className={`px-2 py-1 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-md text-[10px] flex items-center gap-1 ml-auto`}>
-                        <RefreshCw size={10} /> {tl('重试', 'Retry')}
-                      </button>
-                    ) : (
-                      <span className={`${styles.muted} text-[10px] font-bold ml-auto`}>{tl('运行中...', 'running...')}</span>
-                    )}
+              {jobsLoading ? (
+                <tr><td colSpan={6} className="p-8 text-center opacity-50">{tl('加载中...', 'Loading...')}</td></tr>
+              ) : jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-10 text-center opacity-50 text-xs">
+                    {tl('暂无抽取作业。点击「Dry-run 预览」或「触发抽取」发起。', 'No extract jobs yet. Click Dry-run or Trigger to start.')}
                   </td>
                 </tr>
-              ))}
+              ) : jobs.map((job, idx) => {
+                const rowKey = job.jobId || `job-${idx}`;
+                const expanded = expandedJob?.rowKey === rowKey;
+                const statusCls = JOB_STATUS_STYLES[job.status] ?? 'text-slate-500';
+                return (
+                  <React.Fragment key={rowKey}>
+                    <tr
+                      onClick={() => job.jobId && handleRowClick(job, rowKey)}
+                      className={`border-b ${styles.appBorder} ${job.jobId ? 'cursor-pointer hover:opacity-60' : ''}`}
+                    >
+                      <td className="p-3">
+                        {job.jobId ? (
+                          expanded
+                            ? <ChevronDown size={12} className={styles.muted} />
+                            : <ChevronRight size={12} className={styles.muted} />
+                        ) : null}
+                      </td>
+                      <td className={`p-3 font-mono ${styles.cardTextMuted}`}>{job.jobId ?? '—'}</td>
+                      <td className={`p-3 ${styles.cardText}`}>{job.mode}</td>
+                      <td className="p-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${styles.cardBorder} ${statusCls}`}>
+                          {job.status}
+                        </span>
+                      </td>
+                      <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{job.startedAt ?? '—'}</td>
+                      <td className={`p-3 text-right font-mono ${styles.cardTextMuted} text-[10px]`}>{job.durationMs ?? '—'}</td>
+                    </tr>
+                    {expanded && (
+                      <tr className={`border-b ${styles.appBorder}`}>
+                        <td colSpan={6} className={`p-3 ${styles.appBorder} text-[10px] font-mono`}>
+                          <div className={`text-[9px] font-bold ${styles.muted} uppercase mb-1`}>
+                            {tl('作业详情', 'Job Detail')} ({expandedJob?.status})
+                          </div>
+                          {detailLoading && expandedJob?.rowKey === rowKey
+                            ? <span className="opacity-50">{tl('加载详情中...', 'Loading detail...')}</span>
+                            : String(expandedJob?.detail ?? '')}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

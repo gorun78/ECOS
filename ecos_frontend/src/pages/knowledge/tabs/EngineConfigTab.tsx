@@ -3,13 +3,13 @@
 // 统一走 /api/v1/knowledge/engine-config?scope=（fallback /api/v1/cognitive/config sys_config）
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Cpu, Database, FileJson, ListChecks, Loader2, RefreshCw, Save,
+  ArrowUpFromLine, Cpu, Database, FileJson, ListChecks, Loader2, RefreshCw, Save,
 } from "lucide-react";
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
 import { knowledgeApi } from "../services/knowledgeApi";
 
-type Scope = "pgvector" | "neo4j" | "llm" | "task";
+type Scope = "pgvector" | "neo4j" | "llm" | "task" | "extract";
 
 interface EngineConfigWrapper {
   config: Record<string, unknown>;
@@ -24,6 +24,7 @@ const SCOPES: { scope: Scope; Icon: typeof Database; i18nKey: string }[] = [
   { scope: "neo4j", Icon: FileJson, i18nKey: "knowledge.engine_config.scope.neo4j" },
   { scope: "llm", Icon: Cpu, i18nKey: "knowledge.engine_config.scope.llm" },
   { scope: "task", Icon: ListChecks, i18nKey: "knowledge.engine_config.scope.task" },
+  { scope: "extract", Icon: ArrowUpFromLine, i18nKey: "knowledge.engine_config.scope.extract" },
 ];
 
 // 各 scope 的默认 schema 字段（用于编辑 hint + 类型校验）
@@ -55,6 +56,13 @@ const CONFIG_FIELDS: Record<Scope, { key: string; i18nKey: string; type: "number
     { key: "retryCount", i18nKey: "knowledge.engine_config.field.retryCount", type: "number" },
     { key: "deadLetterRetentionDays", i18nKey: "knowledge.engine_config.field.deadLetterRetentionDays", type: "number" },
     { key: "heartbeatIntervalSeconds", i18nKey: "knowledge.engine_config.field.heartbeatIntervalSeconds", type: "number" },
+  ],
+  // K1 知识抽取 — key 与后端 extract 配置键名一致（snake_case）
+  extract: [
+    { key: "allow_direct_upload", i18nKey: "knowledge.engine_config.field.allowDirectUpload", type: "boolean" },
+    { key: "page_limit", i18nKey: "knowledge.engine_config.field.pageLimit", type: "number" },
+    { key: "max_pages", i18nKey: "knowledge.engine_config.field.maxPages", type: "number" },
+    { key: "periodic_enabled", i18nKey: "knowledge.engine_config.field.periodicEnabled", type: "boolean" },
   ],
 };
 
@@ -103,6 +111,13 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
     return String(v);
   };
 
+  /** 按字段类型把 input 原始值转回真实配置值（number → Number，boolean → 布尔，其余原样） */
+  const toConfigValue = (type: "number" | "string" | "boolean", raw: string): unknown => {
+    if (type === "number") return Number(raw);
+    if (type === "boolean") return raw === "true";
+    return raw;
+  };
+
   const changedValue = (k: string): string => {
     const c = changes.find(x => x.key === k);
     return c?.value ?? "";
@@ -123,15 +138,11 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
   const save = async () => {
     setSaving(true);
     try {
-      // 按字段类型反序列化（number 强制 number）
+      // 按字段类型反序列化（number 强制 number，boolean 转布尔）
       const newCfg: Record<string, unknown> = { ...cfg };
       for (const chg of changes) {
         const f = fields.find(fd => fd.key === chg.key);
-        if (f?.type === "number") {
-          newCfg[chg.key] = Number(chg.value);
-        } else {
-          newCfg[chg.key] = chg.value;
-        }
+        newCfg[chg.key] = toConfigValue(f?.type ?? "string", chg.value);
       }
       const updated: EngineConfigWrapper = await knowledgeApi.saveEngineConfig(scope, newCfg);
       setCfg((updated?.config as Record<string, unknown>) || {});
@@ -221,12 +232,32 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
                     <div className="text-[10px] font-mono opacity-50">{f.key}</div>
                   </div>
                   <div className="col-span-2 flex items-center gap-2">
-                    <input
-                      type={f.type === "number" ? "number" : "text"}
-                      value={isChanged ? changedValue(f.key) : displayFor(f.key, cfg[f.key])}
-                      onChange={e => updateField(f.key, e.target.value)}
-                      className={`w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none ${styles.inputBg} ${styles.inputBorder}`}
-                    />
+                    {f.type === "boolean" ? (
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={
+                            isChanged
+                              ? changedValue(f.key) === "true"
+                              : cfg[f.key] === true || cfg[f.key] === "true"
+                          }
+                          onChange={e => updateField(f.key, e.target.checked ? "true" : "false")}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-[11px] font-mono opacity-70">
+                          {isChanged
+                            ? changedValue(f.key)
+                            : String(cfg[f.key] ?? "")}
+                        </span>
+                      </label>
+                    ) : (
+                      <input
+                        type={f.type === "number" ? "number" : "text"}
+                        value={isChanged ? changedValue(f.key) : displayFor(f.key, cfg[f.key])}
+                        onChange={e => updateField(f.key, e.target.value)}
+                        className={`w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none ${styles.inputBg} ${styles.inputBorder}`}
+                      />
+                    )}
                     {isChanged && (
                       <button
                         onClick={() => resetField(f.key)}

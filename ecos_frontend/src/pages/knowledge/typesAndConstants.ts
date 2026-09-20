@@ -206,7 +206,39 @@ export interface LifecycleAuditEntry {
 
 // ── PMO-54 — engine config ─────────────────────────────────────────────────────
 
-export type EngineConfigScope = 'pgvector' | 'neo4j' | 'llm' | 'task';
+export type EngineConfigScope = 'pgvector' | 'neo4j' | 'llm' | 'task' | 'extract';
+
+/** K1 结构化抽取临时文件上传门禁（引擎配置 extract.allow_direct_upload 驱动） */
+export interface ExtractUploadGate {
+  allowed: boolean;
+  hint: string;
+}
+
+/** K1 结构化（映射驱动）实例抽取报告 — 与 kb EntityInstanceExtractionReportVO 对齐 */
+export interface StructuredExtractReport {
+  mode: string;
+  dryRun: boolean;
+  ontologyId: string;
+  ontologyCount: number;
+  entityCount: number;
+  nodeCreated: number;
+  nodeUpdated: number;
+  edgeCreated: number;
+  nodeSkipped: number;
+  invalidMappings: number;
+  nextWatermark: string | null;
+  durationMs: number;
+  issues: { code: string; message: string }[];
+}
+
+/** K1 结构化抽取作业（列表行；jobId 缺失时为 null） */
+export interface StructuredExtractJob {
+  jobId: string | null;
+  mode: string;
+  status: string;
+  startedAt: string | null;
+  durationMs: number | null;
+}
 
 export interface EngineConfig {
   [scope: string]: string;
@@ -229,7 +261,20 @@ export const KB_EVAL_LEVELS = [1, 2, 3, 4, 5] as const;
 
 // ── Tab structure ─────────────────────────────────────────────────────────────
 
-/** 菜单文案统一走 i18n：分组 t('knowledge.group.*') / 子项 t('knowledge.nav.*') */
+/**
+ * 7 组 Tab 严格按 §6 核心功能模块组织：
+ *   overview → 总览（横切）
+ *   extract  → K1 知识抽取
+ *   fusion   → K2 知识融合
+ *   store    → K3 知识存储
+ *   update   → K4 知识更新
+ *   retrieve → K5 知识查询
+ *   govern   → K6 知识治理
+ *   config   → 引擎配置（横切）
+ *
+ * 注：ontology_model 属本体工作台（金 I）职责，已从知识工作台 Tab 移除；
+ *  映射契约的消费视图仅保留在 K1 extract 组内作只读入口。
+ */
 export const KNOWLEDGE_TAB_GROUPS = [
   {
     id: 'overview',
@@ -238,41 +283,46 @@ export const KNOWLEDGE_TAB_GROUPS = [
     ],
   },
   {
-    id: 'ingest',
+    id: 'extract',
     tabs: [
-      { id: 'import' as const, icon: 'Download' as const },
-      { id: 'upload' as const, icon: 'FileText' as const },
-      { id: 'review' as const, icon: 'ListChecks' as const },
+      { id: 'import'   as const, icon: 'Download'   as const },
+      { id: 'upload'   as const, icon: 'FileText'   as const },
     ],
   },
   {
-    id: 'model',
+    id: 'fusion',
     tabs: [
-      { id: 'ontology_model' as const, icon: 'Workflow' as const },
-      { id: 'graph_build' as const, icon: 'Database' as const },
-      { id: 'classification' as const, icon: 'Tag' as const },
+      { id: 'review'         as const, icon: 'ListChecks' as const },
+      { id: 'classification' as const, icon: 'Tag'        as const },
     ],
   },
   {
     id: 'store',
     tabs: [
-      { id: 'vector_index' as const, icon: 'Binary' as const },
+      { id: 'vector_index' as const, icon: 'Binary'   as const },
+      { id: 'graph_build'  as const, icon: 'Database' as const },
     ],
   },
   {
-    id: 'retrieval',
+    id: 'update',
     tabs: [
-      { id: 'rag' as const, icon: 'Zap' as const },
+      { id: 'sync' as const, icon: 'RefreshCw' as const },
+    ],
+  },
+  {
+    id: 'retrieve',
+    tabs: [
+      { id: 'rag'            as const, icon: 'Zap'     as const },
       { id: 'graph_explorer' as const, icon: 'Network' as const },
     ],
   },
   {
     id: 'govern',
     tabs: [
-      { id: 'rules' as const, icon: 'ShieldCheck' as const },
-      { id: 'eval' as const, icon: 'Gauge' as const },
-      { id: 'lifecycle' as const, icon: 'GitBranch' as const },
-      { id: 'compliance' as const, icon: 'Shield' as const },
+      { id: 'rules'      as const, icon: 'ShieldCheck' as const },
+      { id: 'eval'       as const, icon: 'Gauge'       as const },
+      { id: 'lifecycle'  as const, icon: 'GitBranch'   as const },
+      { id: 'compliance' as const, icon: 'Shield'      as const },
     ],
   },
   {

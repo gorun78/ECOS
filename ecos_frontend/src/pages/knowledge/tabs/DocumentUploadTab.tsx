@@ -11,12 +11,13 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  FileText, Upload, Clock, RotateCw, Sparkles, Database, Trash2, History,
+  FileText, Upload, Clock, RotateCw, Sparkles, Database, Trash2, History, Lock,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { apiFetchData } from '../../../api';
 import { knowledgeApi } from '../services/knowledgeApi';
+import type { ExtractUploadGate } from '../typesAndConstants';
 import ExtractionReviewPanel from '../components/ExtractionReviewPanel';
 
 // ── 阶段状态机 ──────────────────────────────────────────────────────────────
@@ -69,15 +70,28 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [uploadGate, setUploadGate] = useState<ExtractUploadGate | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
+  // K1 临时上传门禁：引擎配置 extract.allow_direct_upload 关闭时整区禁用
+  useEffect(() => {
+    let cancelled = false;
+    knowledgeApi.fetchUploadEnabled()
+      .then(gate => { if (!cancelled) setUploadGate(gate); })
+      .catch(() => { if (!cancelled) setUploadGate({ allowed: false, hint: '' }); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const uploadAllowed = uploadGate?.allowed !== false;
+
   // ── Chunked upload ─────────────────────────────────────────────────────────
 
   const handleFile = useCallback(async (file: File) => {
+    if (!uploadAllowed) return;
     setFileName(file.name);
     setFileSize(file.size);
     setPhase('uploading');
@@ -94,7 +108,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
       setPhase('failed');
       toast('error', tl('上传失败: ', 'Upload failed: ') + (e?.message || e));
     }
-  }, []);
+  }, [uploadAllowed]);
 
   const startPolling = useCallback((id: string) => {
     let attempt = 0;
@@ -139,15 +153,17 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
   }, [phase]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
+    if (!uploadAllowed) return;
     e.preventDefault(); setDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file) handleFile(file);
-  }, [handleFile]);
+  }, [handleFile, uploadAllowed]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!uploadAllowed) return;
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-  }, [handleFile]);
+  }, [handleFile, uploadAllowed]);
 
   const handleReset = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -212,15 +228,15 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
 
       {/* Drop zone */}
       <div
-        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={e => { if (!uploadAllowed) return; e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
+        className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
           dragOver ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 bg-white'
-        }`}
+        } ${!uploadAllowed ? 'pointer-events-none opacity-60' : ''}`}
         onClick={() => document.getElementById('kb-doc-upload-file-input')?.click()}
       >
-        <input id="kb-doc-upload-file-input" type="file" accept={ACCEPT_TYPES} onChange={handleFileInput} className="hidden" />
+        <input id="kb-doc-upload-file-input" type="file" accept={ACCEPT_TYPES} disabled={!uploadAllowed} onChange={handleFileInput} className="hidden" />
         {phase === 'uploading' ? (
           <div className="space-y-3">
             <RotateCw size={32} className="animate-spin text-blue-500 mx-auto" />
@@ -241,6 +257,25 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
             <div className="flex items-center gap-1 justify-center text-[9px] text-indigo-600">
               <Sparkles size={10} /> {tl('上传后自动解析 → 抽取 → 人工审核', 'Auto parse → extract → review')}
             </div>
+          </div>
+        )}
+        {/* K1 临时上传门禁遮罩 */}
+        {!uploadAllowed && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-black/50 text-white">
+            <Lock size={20} />
+            <p className="text-[11px] font-bold">{tl('临时上传未开启', 'Direct upload disabled')}</p>
+            <p className="text-[10px] font-mono max-w-[80%] text-center opacity-80 break-words">
+              {uploadGate?.hint || 'backend unavailable / disabled'}
+            </p>
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                toast('info', tl('请切换到「引擎配置 → 知识抽取」开启 allow_direct_upload', 'Go to Engine Config → Extract and enable allow_direct_upload'));
+              }}
+              className="px-3 py-1.5 rounded-md text-[10px] font-bold border border-white/40 hover:bg-white/10 cursor-pointer"
+            >
+              {tl('去引擎配置开启', 'Open in Engine Config')}
+            </button>
           </div>
         )}
       </div>

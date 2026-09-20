@@ -19,6 +19,9 @@ import type {
   LifecycleState,
   EngineConfigScope,
   EngineConfig,
+  ExtractUploadGate,
+  StructuredExtractReport,
+  StructuredExtractJob,
 } from '../typesAndConstants';
 
 const KNOWLEDGE_BASE = '/api/knowledge';
@@ -527,6 +530,52 @@ export async function fetchExtractCandidates(fileId: string): Promise<{ candidat
   }
 }
 
+// ── K1 结构化（映射驱动）实例抽取 ─────────────────────────────────────────────
+
+/** 临时文件上传门禁（引擎配置 extract.allow_direct_upload） */
+export async function fetchUploadEnabled(): Promise<ExtractUploadGate> {
+  try {
+    return await apiFetchData<ExtractUploadGate>(`${KB_V1}/extract/upload-enabled`);
+  } catch {
+    // 后端不可用时按默认禁用，避免绕过门禁
+    return { allowed: false, hint: 'backend unavailable' };
+  }
+}
+
+/** 触发结构化抽取（dryRun=true 只统计不落库） */
+export async function fetchTriggerStructuredExtract(params: {
+  ontologyId?: string;
+  mode: 'FULL' | 'INCREMENTAL';
+  dryRun?: boolean;
+}): Promise<StructuredExtractReport> {
+  return await apiFetchData<StructuredExtractReport>(`${KB_V1}/extract/structured`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+/** 抽取作业列表（水位表倒序分页） */
+export async function fetchStructuredJobs(pageNum: number, pageSize: number): Promise<StructuredExtractJob[]> {
+  try {
+    const data = await apiFetchData<StructuredExtractJob[]>(`${KB_V1}/extract/structured/jobs?pageNum=${pageNum}&pageSize=${pageSize}`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 抽取作业详情（jobId KBK1S- 前缀反查 kg_sync_log） */
+export async function fetchStructuredJobDetail(jobId: string): Promise<{ jobId: string; status: string; detail: string }> {
+  return await apiFetchData<{ jobId: string; status: string; detail: string }>(
+    `${KB_V1}/extract/structured/jobs/${encodeURIComponent(jobId)}`
+  );
+}
+
+/** K1 抽取引擎配置（scope=extract，复用 fetchEngineConfig） */
+export async function fetchExtractEngineConfig(): Promise<{ config: Record<string, unknown>; version: number; updatedAt: string }> {
+  return fetchEngineConfig('extract');
+}
+
 // 待审核文件列表（PMO-56 待补）
 export async function fetchExtractCandidateFiles(): Promise<{
   fileId: string;
@@ -781,6 +830,11 @@ export const knowledgeApi = {
   retryImport,
   uploadDocumentChunked,
   fetchExtractCandidates,
+  fetchUploadEnabled,
+  fetchTriggerStructuredExtract,
+  fetchStructuredJobs,
+  fetchStructuredJobDetail,
+  fetchExtractEngineConfig,
   fetchExtractCandidateFiles,
   fetchEvalSeeds,
   uploadEvalSeed,
