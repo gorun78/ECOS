@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.kb.KnowledgeSettingsService;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractCandidateVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractFileVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionApproveResultVO;
@@ -27,17 +28,32 @@ import java.util.Map;
 public class ExtractionController {
 
     private static final Logger log = LoggerFactory.getLogger(ExtractionController.class);
+
+    /** 临时文件上传开关配置键（引擎配置 → 知识抽取）。 */
+    private static final String KEY_ALLOW_DIRECT_UPLOAD = "extract.allow_direct_upload";
+
     private final KnowledgeExtractionService extractionService;
 
-    public ExtractionController(KnowledgeExtractionService extractionService) {
+    private final KnowledgeSettingsService settingsService;
+
+    public ExtractionController(KnowledgeExtractionService extractionService,
+                                KnowledgeSettingsService settingsService) {
         this.extractionService = extractionService;
+        this.settingsService = settingsService;
     }
 
     /**
      * 上传文档，启动抽取管道。
+     *
+     * <p>K1 gate：开关 {@code extract.allow_direct_upload} 关闭时直接 400 拒绝，
+     * 非结构化快路径默认走 DW 层登记通道，不走临时文件直传。</p>
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
+        boolean allowed = "true".equalsIgnoreCase(settingsService.getSetting(KEY_ALLOW_DIRECT_UPLOAD));
+        if (!allowed) {
+            return ApiResponse.badRequest("临时文件上传未开启：请在引擎配置 → 知识抽取 中启用 allow_direct_upload");
+        }
         try {
             Map<String, Object> result = extractionService.upload(file);
             return ApiResponse.success(result);
