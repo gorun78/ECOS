@@ -63,6 +63,17 @@
 > **认知底座** `ecos_cognitive_model`（PMO-51，独立于三表；由场景 `mind.model_refs[]` 多选挂载）
 >
 > **决策层**（业务层，可选落盘）`DecisionService` 消费四件套输出 → `action_plan[]`
+>
+> **★ 策略（policy）不是三要素**：`/policy` 是四件套的**输出端点**，其产物（`action_plan[]`）属「决策回执」，**不进入** `ecos_scenario_mind`，也**不属于** `evidence/hypothesis/belief`。三要素具备「可被证据否定 / 可版本覆盖」的内禀属性；策略是「基于此刻三要素 + 三件套输出的应然判断」，证据一变即须重算，故只作为瞬态输出，采纳后才可选落 `ecos_decision_record`。
+>
+> **★ 认知心智层 vs 知识库（解耦）**：`ecos_cognitive_evidence` 的 `source_type` 是多态枚举，**KB 只是「来源之一」**，不直接成为心智要素：
+> | source_type | source_ref 指向 | 说明 |
+> |:--|---|---|
+> | `PROD_DATA` | `td_datasource.datasource_id` | 生产数据流实例化 |
+> | `KB_ARTICLE` | `knowledge_article.id` | 知识库条文被调阅后实例化为一条证据 |
+> | `AGENT_RESULT` | `agent 运行 run_id`（瞬态） | Agent 产出 |
+> | `USER_INPUT` / `REPORT` / `API` / `SENSOR` | 各自来源 | 其余来源 |
+> 规则：KB 条文**只被引用**（`source_ref`），内容不复制进 mind；运行时 cognitive 按需 `GET /api/v1/knowledge/articles/{id}` **只读**拉取；KB 修订 → 引用它的 evidence 标记「可能失效」。同一条 KB 可被多个场景的多条 evidence 引用，**KB 与心智松耦合**。
 
 ### 2.2 心智层数据模型（V130__ecos_scenario_mind.sql）
 
@@ -97,7 +108,51 @@ CREATE INDEX IF NOT EXISTS idx_mind_scenario ON ecos_scenario_mind (scenario_id)
 > - **4 个 JSONB 字段**承载引用（不建 6 张关联表，避免过度工程化；引用是**证据/假设/模型 任一**可挂载多个）
 > - `cognitive_endpoints` JSONB 内部四键 `diagnose/forecast/simulate/policy`，每键 `{enabled, weight, ...}`，P1 新增时仅改 JSON 内字段，**不动 DDL**
 
-### 2.3 升级 binding schema（V131）
+### 2.3 语义模型：场景是「窗」，心智是「房」，推演是「活动」，外部源是「光」
+
+> 回答「认知与场景的关系（Q3）」防反模式：**场景不生成认知**，认知生成于场景外（证据从 PD/KB/Agent 流入），场景只是**聚合 + 唱例 + 授权 + 审计挂钩**。
+
+| 层 | 关系 | 含义 |
+|:--|---|---|
+| **结构** | 场景 1:1 心智 | 创建场景自动生成 1 个 mind（`UNIQUE scenario_id`）；改场景名/优先级**不**必然改 mind |
+| **数据** | 场景 1:N binding（6 资源）；场景 1:1 mind | binding=资源清单，mind=认知清单，**二者并列独立** |
+| **运行时** | mind 是四件套端点的 `inline_context` 入口 | `POST /scenarios/{id}/cognitive/*` → workspace 读 mind 三要素 → 透传 cognitive:18089 → 瞬态返回 |
+| **授权** | 场景 security binding 限定四件套可读认知范围 | security-engine ABAC 评估 `scene_id + action=diagnose` 决定能否看哪些 evidence |
+
+> 「窗」的语义：场景不带认知时是**空窗**（mind 已建但 evidence/hypothesis_refs 空、belief 是 passive 先验概率）；证据流进来后心智才被「点亮」。
+
+#### Q4 企业决策场景实例（`proj_cz26_chem_invest`：5 亿化工新增投资决策）
+
+```
+【数据底座 · 外部】
+  PROD_DATA  ds_chem_group_monthly   化工月产值/库存周转
+  PROD_DATA  ds_hist_invest          3 个已投案例 ROI
+  KB_ARTICLE kb_caqc_capa_2024       《产能预警标准》
+  MODEL      mos_chemical_2026       景气度预测模型 (回测 MAE=0.12)
+
+【心智三要素 · 场景 sc_cz26_chem_invest 的 mind】
+  evidence: ev_001(产值环比18%) ev_002(KB产能过载) ev_003(历史ROI<8%)
+            ev_004(董事长意向) ev_005(原料价-5.1%)
+  hypothesis: hy_001「投5亿回报<8%」(支撑:ev_002,ev_003)
+             hy_002「不投→24m转型失败」(支撑:ev_004,ev_001)
+  belief: variable=invest_decision
+          states=[approved,rejected,deferred]  prob=[0.10,0.15,0.75]→[0.20,0.25,0.55]
+          version 1→2（forecast 后重估）
+
+【四件套端点 · 运行态触发（瞬态不落盘）】
+  /diagnose → 根因「行业产能过载」(hy_001, depth3, conf 0.72)
+  /forecast  → 12/24/36m 现金流 p10/50/90 + MAE 0.12
+  /simulate  → counterfactor{hy_001→rejected} → 24m 竞对占产能+12%, 集团ROI 9.5%→7.1%
+  /policy    → action_plan「投3亿 instead of 5亿」+ 合规passed + risk low
+
+【回执 · 可选落盘】
+  ecos_decision_record: action_plan JSONB + source_refs[](指 4 件套输出 hash)
+```
+
+> 决策路径四级（左→右），**策略是唯一「写得起约束」的一级**（落 `ecos_decision_record`），前三级始终瞬态：
+> `证据/假设/信念 (心智·落盘) → 诊断/预测/推演 (瞬态) → 策略 (瞬态→可选落决策回执)`
+
+### 2.4 升级 binding schema（V131）
 
 ```sql
 ALTER TABLE ecos_scenario_binding 
@@ -108,7 +163,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 
 兼容策略：旧 binding `target_ref` 保留只读；新 binding 优先填 `target_id + target_type`，`target_ref` 仍写在 ID 字符串（保持兼容，老客户端可读）。
 
-### 2.4 新建 2 张真资源表（P1 sysman，sys_man 库）
+### 2.5 新建 2 张真资源表（P1 sysman，sys_man 库）
 
 **`ecos_security_policy`**（V132）：
 | 列 | 类型 | 说明 |
@@ -133,7 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 
 > sysman 模块已有 `sysman-boot` Flyway 目录（V124/V126/V134...），**追加 V132/V133 不破坏既有 migration 序号**。
 
-### 2.5 流程设计（新 7 步 → 新 6 步，心智层并行）
+### 2.6 流程设计（新 7 步 → 新 6 步，心智层并行）
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -175,7 +230,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
   - **不通过项标记红字，允许保存为 DRAFT**（不阻塞创建，仅"READY"才允许 ACTIVE）
 - 第 6 步：保存（替换原第 7 步"安全阻断"——独立拆出来更安全治理）
 
-### 2.6 新增端点（workspace-scene :18090，P1）
+### 2.7 新增端点（workspace-scene :18090，P1）
 
 | 方法 | 路径 | 用途 |
 |---|---|---|
@@ -196,7 +251,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 
 > 端点铁律：路径用 `/api/v1/` 前缀 + `VersionPrefixRewriteFilter` 的 `V1_REWRITE_MAP` + `SecurityConfig.permitAll` + `ClearanceInterceptor` 豁免 三滤波器逐层加（架构铁律 §1.2）。
 
-### 2.7 前端文件改动清单（P2）
+### 2.8 前端文件改动清单（P2）
 
 | 文件 | 操作 |
 |---|---|
@@ -207,7 +262,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | `ecos_frontend/src/api.ts` | 新增 10 个 API 函数（6 个 available + POST/GET/DELETE mind + pre-validate） |
 | `ecos_frontend/src/locales/scenario/{zh-CN,en}.json` | 新增 namespace `scenario.mind.*`/`scenario.prv.*`/`scenario.avl.*`（**遵守前端铁律 §4.3**） |
 
-### 2.8 全链路串通（P2）
+### 2.9 全链路串通（P2）
 
 ```
 前端 ScenarioEditor
@@ -249,7 +304,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | **P3** | T20 | `ecos_frontend/src/pages/scenario/ScenarioE2E.test.tsx`（新建,vitest + jsdom） | 端到端：选 4 类资源 + 设心智档 + pre-validate 全 PASS → POST 场景 ACTIVE | 200；`ecos_business_scenario.status='ACTIVE'`；`ecos_scenario_mind` 1 条；cognitive 3 表各 +1 |
 | **P3** | T21 | 浏览器 E2E（浏览器工具） | 渲染 + console + network 截屏 | 三项无红 |
 | **P3b** | T25 | 4 个场景级 cognitive 端点（§2.6 表内 POST 行 4 行） | 扩展 workspace-impl，新增 `ScenarioCognitiveController` 中转 cognitive engine；读 `mind.cognitive_endpoints` 校验 `enabled` → 透传三要素 + 模型引用 → cognitive 端点 | 对启用端点 POST 引用数据 → 返回 root_causes/forecast/simulate/policy 各自结构体；`simulate` 未启用时返 `409 {code:409,msg}` |
-| **P3b** | T26 | 四件套返回前端渲染 + 决策回执 Preview | 运行态只读调 P3b T25 端点渲染、策略输出汇总到 `DecisionService`（可选落盘 `ecos_decision_record` V134） | 4 个端点输出卡片化展示；429 任一 enabled=false 时 UI 灰置；`ecos_decision_record`（若有）记录可回查 |
+| **P3b** | T26 | 四件套返回前端渲染 + 决策回执 Preview | 运行态只读调 P3b T25 端点渲染、策略输出汇总到 `DecisionService`（可选落盘 `ecos_decision_record` V134，字段含 `action_plan` JSONB + `source_refs[]`(指 diagnose/forecast/simulate 输出 hash)） | 4 个端点输出卡片化展示；任一 `enabled=false` 时 UI 灰置；`ecos_decision_record`（若有）可回查 source_refs 溯源 |
 | **P4** | T22 | `docs/ARCHITECTURE-RULES.md` §4.8 增补 | 加 "binding.target_ref 真 ID 化" 条款 | 文档同步 |
 | | T23 | `ecos_frontend/src/pages/scenario/README.md`（新建，仅本文档） | 创建流程说明 + 预校验 gate | 文档可读 |
 | | T24 | Reviewer 审查 + 全量回归 | Reviewer 6 专项（code-review/security/recommender/test/review）+ 6 模块 `mvn install -DskipTests` + `vitest` 全绿 | deliverable_allowed=true |
@@ -288,6 +343,7 @@ V4: 浏览器 E2E（P3 T21）：渲染 + console + network 截屏三项无红
 |:--:|:--:|---|---|
 | v1.0 | 2026-09-21 | 初版 P0.1 契约 + P0.2 心智模型冻结 | 规划启动 |
 | v1.1 | 2026-09-21 | 新增 **§2.1 认知心智层概念模型**（三要素 + 四件套端点 + 模型底座 + 决策层）；§2.2 `cognitive_endpoints` JSONB 显式四键 schema；§2.5 步骤 4 新增四件套开关预设为默认；§2.5 步骤 5 新增四件套可达性检查；§2.6 端点表新增 POST `/{id}/cognitive/{diagnose,forecast,simulate,policy}`；P3b T25/T26 新增 2 个 Task | **用户反馈**：场景不只是"绑资源"，还要在运行态能调用 cognitive 四件套端点（含原未提及的 `/simulate` 与 `/policy`）；端到端"创建心智 → 运行时推理/预测/推演/策略"需可同迭代内闭环 |
+| v1.2 | 2026-09-21 | §2.1 补「**策略非三要素**」+「**KB 与证据解耦**」两条脚注（Q1/Q2）；新增 **§2.3 语义模型**（四层「窗/房/活动/光」+ Q3 场景关系 + **Q4 企业投资决策全例**）；§2.4~2.9 重编号；P3b T26 的 `ecos_decision_record` 补 `source_refs[]` 溯源字段 | **用户四问对齐**：①证据与知识库关系 ②策略是否为要素 ③认知与场景关系 ④企业决策场景举例；四问答案落文档，供跨团队宣讲 |
 
 ## §依赖与协作
 
