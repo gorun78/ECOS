@@ -282,11 +282,18 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | 文件 | 操作 |
 |---|---|
 | `ecos_frontend/src/pages/scenario/ScenarioEditor.tsx` | 7 步→6 步向导；第 2 步新增 ontology 下拉；第 3 步改为"安全+接口"；**新增步骤 4 "心智灯·认知引擎"**；**新增步骤 5 "预校验"**；步骤 6 保存 |
-| `ecos_frontend/src/pages/scenario/MentalModelStep.tsx`（新建） | 心智档表单：假设/证据/不确定性判断/模型多选 |
+| `ecos_frontend/src/pages/scenario/MentalModelStep.tsx`（新建） | **单 base mind 表单**：假设/证据/不确定性判断/模型多选（变体 mind 创建留 P3b T27） |
 | `ecos_frontend/src/pages/scenario/PreValidateStep.tsx`（新建） | 预校验 UI：六类资源 resolve 结果（PASS/FAIL 红绿）+ AI 工具清单 + security 预演 + 心智档校验 |
 | `ecos_frontend/src/pages/scenario/ResourcePickerStep.tsx`（新建） | 步骤 2 四类资源（数据源/本体实体/知识资产/智能体）并列选择器，选项池从 `/available/*` 拉取（替换 `data.ts`） |
 | `ecos_frontend/src/api.ts` | 新增 10 个 API 函数（6 个 available + POST/GET/DELETE mind + pre-validate） |
-| `ecos_frontend/src/locales/scenario/{zh-CN,en}.json` | 新增 namespace `scenario.mind.*`/`scenario.prv.*`/`scenario.avl.*`（**遵守前端铁律 §4.3**） |
+| `ecos_frontend/src/locales/scenario/{zh-CN,en}.json` | 新增 namespace `scenario.avl.*`（可用资源）、`scenario.mind.*`（心智档）、`scenario.prv.*`（预校验）三个 namespace（**遵守前端铁律 §4.3**） |
+
+> **P3b 追加文件/命名空间（T27/T28）**：
+> | 文件 | 操作 |
+> |---|---|
+> | `ecos_frontend/src/pages/scenario/MindVariantStep.tsx`（P3b 新建，见 T27） | 多心智变体管理 Tab：列表 + 加变体 Modal + active 切换 |
+> | `ecos_frontend/src/pages/scenario/CognitionPanel.tsx`（改造，P3b 见 T28） | 新增「对比推演」区（A/B mind 双栏 diff） |
+> | `ecos_frontend/src/locales/scenario/{zh-CN,en}.json`（追加） | 新增 `scenario.variant.*`（变体管理）/ `scenario.diff.*`（对比推演）两个 namespace |
 
 ### 2.9 全链路串通（P2）
 
@@ -340,7 +347,7 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | | T12 | 三滤波器（架构铁律 §1.2） | `VersionPrefixRewriteFilter` + `ClearanceInterceptor` 豁免 + `SecurityConfig.permitAll` 各加 `/api/v1/workspace/scenarios/**`、`/api/v1/security/policies/**`、`/api/v1/interfaces/**` | curl 经 gateway 8080 不需 JWT 也能 200（demo 期；生产期由 OPA 承接） |
 | | T13 | `ecos_frontend/src/api.ts` | 新增 10 个 API 函数（§2.5） | tsc --noEmit EXIT=0 |
 | **P2** | T14 | `ecos_frontend/src/pages/scenario/ResourcePickerStep.tsx`（新建） | 替换 data.ts mock，拉 `/available/*`，4 栏并列 | 数据源下拉项 `/api/v1/datanet/datasource` 真 `datasourceId` |
-| | T15 | `ecos_frontend/src/pages/scenario/MentalModelStep.tsx`（新建） | 假设 3 条制 + 证据 + 不确定性判断 + 模型多选；**本地预校验 prob 和=1** | 概率和≠1 时红字 + POST 预检查 /mind-model |
+| | T15 | `ecos_frontend/src/pages/scenario/MentalModelStep.tsx`（新建） | **单 base mind 表单**：假设 3 条制 + 证据 + 不确定性判断（本地预校验 prob 和=1）+ 模型多选；四件套开关（diagnose/forecast/simulate/policy）默认开/关 + 权重滑块 | 概率和≠1 时红字 + POST 预检查 /mind-model；变体 mind 加减按钮**置灰**（P2 只 base，标注「P3b 开放」） |
 | | T16 | `ecos_frontend/src/pages/scenario/PreValidateStep.tsx`（新建） | 六类红绿徽标 + AI tool 匹配 + 心智档校验 + "拟 READY" 保存为 ACTIVE 按钮 | 保存时若全 PASS 自动状态 ACTIVE；不通过仅 DRAFT |
 | | T17 | `ecos_frontend/src/pages/scenario/ScenarioEditor.tsx` | 7 步→6 步；4/5 步插入；核对 `Locale = 'zh'|'en'` 无硬编码 | 前端五铁律 0 命中；切中/英 6 步步骤标签全切换 |
 | | T18 | `ecos_frontend/src/locales/scenario/{zh-CN,en}.json` | 新增 `scenario.avl.*`（可用资源）、`scenario.mind.*`（心智档）、`scenario.prv.*`（预校验）三个 namespace | 中英文 key 对称；100% 切换无 i18n fallback 字 |
@@ -350,6 +357,8 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | **P3b** | T24a | `workspace/.../workspace/controller/ScenarioMindController.java`（新建） |  minds 子资源 CRUD：`GET/POST /scenarios/{id}/minds`、`PATCH/DELETE /scenarios/{id}/minds/{mindId}`（§2.7 表 P3b 4 行）；activate 切换事务内 forte 归零其它变体 | curl：建 base→加 optimistic→PATCH optimistic.active=1 后 base.active=0；删 base 后 optimistic 自动补位 active=1 |
 | **P3b** | T25 | 4 个场景级 cognitive 端点（§2.7 表内 POST 行 4 行，含 `?mind={mindId?}`） | 扩展 workspace-impl，新增 `ScenarioCognitiveController` 中转 cognitive engine；读指定（或 active）mind 的 `cognitive_endpoints` 校验 `enabled` → 透传三要素 + 模型引用 → cognitive 端点 | 对启用端点 POST → 返回 root_causes/forecast/simulate/policy 各自结构体；`simulate` 未启用返 `409{code:409,msg}`；`?mindA&mindB` 对比推演双行返回 |
 | **P3b** | T26 | 四件套返回前端渲染 + 决策回执 Preview | 运行态只读调 P3b T25 端点渲染、策略输出汇总到 `DecisionService`（可选落盘 `ecos_decision_record` V134，字段含 `action_plan` JSONB + `source_refs[]`(指 diagnose/forecast/simulate 输出 hash)） | 4 个端点输出卡片化展示；任一 `enabled=false` 时 UI 灰置；`ecos_decision_record`（若有）可回查 source_refs 溯源 |
+| **P3b** | T27 | `ecos_frontend/src/pages/scenario/MindVariantStep.tsx`（新建，多心智变体管理） | 场景详情新增 Tab「心智变体」：列表（每 mind 一行：label/active/四件套摘要/三要素摘要）+「+ 加变体」→ 弹 Modal 填 mind_label / 继承 base 拷贝 → 独立编辑三要素 / 四件套权重 → active 切换 radio；删除 base 时自动补位确认 | 场景可挂 N 个 mind；任一 mind 可独立 CRUD；activate 切换瞬间其它 mind 归 0（对齐 T24a 后端契约）；删除 base 后 last-verified 场景让 optimistic 自动变 active |
+| **P3b** | T28 | 两 mind 对比推演 UI（P3b T25 的 `?mindA&mindB` 消费方）| 在 CognitionPanel 新增「对比推演」区：选 2 个 mind 作 A/B，`POST /scenarios/{id}/cognitive/simulate?mindA=...&mindB=...` 返回 → 左右双栏 diff 视图（同 3 要素下两档预测对比表）+ 归一化置信度对比条 | 双行结构体并列渲染；prob 差异列高亮；某一 mind 未启用 simulate 时返 409 且 A/B 栏置灰；i18n 中英文对称；对比推演**只读**不落盘 |
 | **P4** | T22 | `docs/ARCHITECTURE-RULES.md` §4.8 增补 | 加 "binding.target_ref 真 ID 化" 条款 | 文档同步 |
 | | T23 | `ecos_frontend/src/pages/scenario/README.md`（新建，仅本文档） | 创建流程说明 + 预校验 gate | 文档可读 |
 | | T24 | Reviewer 审查 + 全量回归 | Reviewer 6 专项（code-review/security/recommender/test/review）+ 6 模块 `mvn install -DskipTests` + `vitest` 全绿 | deliverable_allowed=true |
@@ -390,6 +399,7 @@ V4: 浏览器 E2E（P3 T21）：渲染 + console + network 截屏三项无红
 | v1.1 | 2026-09-21 | 新增 **§2.1 认知心智层概念模型**（三要素 + 四件套端点 + 模型底座 + 决策层）；§2.2 `cognitive_endpoints` JSONB 显式四键 schema；§2.5 步骤 4 新增四件套开关预设为默认；§2.5 步骤 5 新增四件套可达性检查；§2.6 端点表新增 POST `/{id}/cognitive/{diagnose,forecast,simulate,policy}`；P3b T25/T26 新增 2 个 Task | **用户反馈**：场景不只是"绑资源"，还要在运行态能调用 cognitive 四件套端点（含原未提及的 `/simulate` 与 `/policy`）；端到端"创建心智 → 运行时推理/预测/推演/策略"需可同迭代内闭环 |
 | v1.2 | 2026-09-21 | §2.1 补「**策略非三要素**」+「**KB 与证据解耦**」两条脚注（Q1/Q2）；新增 **§2.3 语义模型**（四层「窗/房/活动/光」+ Q3 场景关系 + **Q4 企业投资决策全例**）；§2.4~2.9 重编号；P3b T26 的 `ecos_decision_record` 补 `source_refs[]` 溯源字段 | **用户四问对齐**：①证据与知识库关系 ②策略是否为要素 ③认知与场景关系 ④企业决策场景举例；四问答案落文档，供跨团队宣讲 |
 | v1.3 | 2026-09-21 | **心智改 1:N 多变体**（`mind_label` + `active_mind` + partial unique index）+ **新增 §2.10 设计判断（ADR-PMO60-1：心智独立于场景定义，1:N+独立REST子资源，不建桥表）**；§2.3 关系表 1:1→1:N；§2.7 端点新增 `/minds` 子资源 4 个 CRUD + 4 个 cognitive 端点加 `?mind={mindId?}`；流程步骤 4/5 补变体与 active 唯一性；Task 新增 T24a（minds CRUD）+ T25 改造 | **用户拍板「多心智变体」+ 追问软件设计层面「心智是否独立于场景定义」**；架构判断采纳方案 B（1:N 独立子资源，不桥表化），同步落 DDL/REST/Task |
+| v1.4 | 2026-09-21 | P2 重新定位为「**单 base mind 向导**」（T15 表单 + 变体按钮置灰标注 P3b）；P3b 新增 T27（`MindVariantStep.tsx` 多心智变体管理 Tab）+ T28（CognitionPanel A/B 对比推演 `?mindA&mindB`）；§2.8 文件清单追加 P3b 2 文件 + `scenario.variant.*`/`scenario.diff.*` 两个 namespace | **用户确认「P2 向导内要多档对比 UI」**；把范围拆清楚：P2 = base 向导（不搞变体搞乱），P3b = 变体管理 + 对比推演独立 Task |
 
 ## §依赖与协作
 
