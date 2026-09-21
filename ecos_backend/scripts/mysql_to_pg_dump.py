@@ -124,8 +124,10 @@ def decode_mysql_string(raw: str) -> tuple[str, int]:
                 continue
             out.append(ch)
             i += 1
+        # 注意：循环内已按字符逐个消解 '' → '（见上方 `ch == "'"` 分支），
+        # 此处不得再对结果整体 replace("''", "'")——那会把相邻两个转义单引号
+        # （如 'a\'\'b' → a''b）错误压缩为一个。
         text = "".join(out)
-        text = text.replace("''", "'")
     if "\0" in text:
         nuls = text.count("\0")
         text = text.replace("\0", "")
