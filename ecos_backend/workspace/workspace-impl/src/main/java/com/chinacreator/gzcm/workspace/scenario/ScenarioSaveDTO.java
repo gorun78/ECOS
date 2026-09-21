@@ -36,8 +36,12 @@ public class ScenarioSaveDTO {
     public static class ScenarioBindingItem {
         /** 绑定类型（必填，枚举：DATASET/OBJECT_TYPE/KNOWLEDGE_BASE/AI_AGENT/SECURITY_POLICY/INTERFACE） */
         private String bindingType;
-        /** 目标资源标识（必填，≤255） */
+        /** 目标资源标识（必填，≤255，向下兼容；v2.0 建议用 targetId） */
         private String targetRef;
+        /** v2.0 真 PG 主键（替代 targetRef 字符串别名；targetRef 保留只读兼容） */
+        private String targetId;
+        /** v2.0 真资源类型：DATASOURCE|ONTOLOGY_ENTITY|KNOWLEDGE_ARTICLE|AGENT_PROFILE|SECURITY_POLICY|INTERFACE_REF */
+        private String targetType;
         /** 备注（可选） */
         private String remark;
 
@@ -45,6 +49,10 @@ public class ScenarioSaveDTO {
         public void setBindingType(String bindingType) { this.bindingType = bindingType; }
         public String getTargetRef() { return targetRef; }
         public void setTargetRef(String targetRef) { this.targetRef = targetRef; }
+        public String getTargetId() { return targetId; }
+        public void setTargetId(String targetId) { this.targetId = targetId; }
+        public String getTargetType() { return targetType; }
+        public void setTargetType(String targetType) { this.targetType = targetType; }
         public String getRemark() { return remark; }
         public void setRemark(String remark) { this.remark = remark; }
     }

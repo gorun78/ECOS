@@ -211,19 +211,22 @@ public class ScenarioService {
         log.info("逻辑删除业务场景 id={} by={}", id, operator);
     }
 
-    /** 场景绑定关系（六类分组，缺省空列表）。 */
+    /** 场景绑定关系（六类分组，缺省空列表；v2.0：target_id 非空优先，否则回退 target_ref）。 */
     public Map<String, List<String>> bindings(String id) {
         if (!exists(id)) {
             throw new NotFoundException("SCEN-404: 场景不存在: " + id);
         }
         Map<String, List<String>> grouped = ScenarioVO.emptyBindings();
         List<ScenarioBinding> rows = jdbc.query(
-            "SELECT id, scenario_id, binding_type, target_ref, remark, create_time " +
+            "SELECT id, scenario_id, binding_type, target_ref, target_id, target_type, remark, create_time " +
             "FROM ecos_scenario_binding WHERE scenario_id = ? AND is_deleted = 0 ORDER BY id", BINDING_MAPPER, id);
         for (ScenarioBinding b : rows) {
             String key = BINDING_ENDPOINTS.get(b.getBindingType());
             if (key != null) {
-                grouped.get(key).add(b.getTargetRef());
+                // v2.0: target_id 非空时返 target_id，否则回退 target_ref（向下兼容）
+                String effectiveId = (b.getTargetId() != null && !b.getTargetId().isBlank())
+                        ? b.getTargetId() : b.getTargetRef();
+                grouped.get(key).add(effectiveId);
             }
         }
         return grouped;
@@ -297,6 +300,8 @@ public class ScenarioService {
         b.setScenarioId(rs.getString("scenario_id"));
         b.setBindingType(rs.getString("binding_type"));
         b.setTargetRef(rs.getString("target_ref"));
+        b.setTargetId(rs.getString("target_id"));
+        b.setTargetType(rs.getString("target_type"));
         b.setRemark(rs.getString("remark"));
         b.setCreateTime(rs.getTimestamp("create_time") == null ? null : rs.getTimestamp("create_time").toLocalDateTime());
         return b;
@@ -337,10 +342,14 @@ public class ScenarioService {
                 throw new BusinessException(400, "SCEN-400: 绑定缺少 targetRef");
             }
             String bid = "sb_" + UUID.randomUUID().toString().substring(0, 12);
+            // v2.0: targetId 优先，targetRef 兜底；target_type 真资源类型
+            String targetRef = item.getTargetId() != null && !item.getTargetId().isBlank()
+                    ? item.getTargetId() : item.getTargetRef();
             jdbc.update(
-                "INSERT INTO ecos_scenario_binding (id, scenario_id, binding_type, target_ref, remark, create_by, update_by, is_deleted) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
-                bid, scenarioId, item.getBindingType().toUpperCase(), item.getTargetRef(),
+                "INSERT INTO ecos_scenario_binding (id, scenario_id, binding_type, target_ref, target_id, target_type, remark, create_by, update_by, is_deleted) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                bid, scenarioId, item.getBindingType().toUpperCase(), targetRef,
+                item.getTargetId(), item.getTargetType(),
                 item.getRemark() == null ? "" : item.getRemark(), operator, operator);
         }
     }

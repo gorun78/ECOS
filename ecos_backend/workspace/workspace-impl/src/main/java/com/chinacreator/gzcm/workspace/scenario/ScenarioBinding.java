@@ -16,6 +16,10 @@ public class ScenarioBinding {
     private String bindingType;
     /** 目标资源标识（数据集 id / 对象类型 code / 知识库 id 等） */
     private String targetRef;
+    /** v2.0 真 PG 主键（替代 targetRef 字符串别名） */
+    private String targetId;
+    /** v2.0 真资源类型：DATASOURCE|ONTOLOGY_ENTITY|KNOWLEDGE_ARTICLE|AGENT_PROFILE|SECURITY_POLICY|INTERFACE_REF */
+    private String targetType;
     /** 备注 */
     private String remark;
     /** 创建时间 */
@@ -29,6 +33,10 @@ public class ScenarioBinding {
     public void setBindingType(String bindingType) { this.bindingType = bindingType; }
     public String getTargetRef() { return targetRef; }
     public void setTargetRef(String targetRef) { this.targetRef = targetRef; }
+    public String getTargetId() { return targetId; }
+    public void setTargetId(String targetId) { this.targetId = targetId; }
+    public String getTargetType() { return targetType; }
+    public void setTargetType(String targetType) { this.targetType = targetType; }
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }
     public LocalDateTime getCreateTime() { return createTime; }

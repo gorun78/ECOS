@@ -177,6 +177,9 @@ public class SecurityConfig {
                     "/api/v1/workspace/**",
                     // ── Agent tools
                     "/api/agent/tools/**"
+                    // ── PMO-60 v2.0 P4 P0-2: 移除 /api/v1/interfaces/** permitAll ──
+                    // 原 T4b 误加 permitAll 致 InterfaceRefController 匿名可访问（违反 §2.4-6 默认 DENY）。
+                    // 现走 .anyRequest().authenticated()，需 Bearer Token。
                 ).permitAll()
                 .anyRequest().authenticated()
             )
