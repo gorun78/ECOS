@@ -28,12 +28,21 @@ public class TenantAwareJdbcTemplate extends JdbcTemplate {
 
     private static final Logger log = LoggerFactory.getLogger(TenantAwareJdbcTemplate.class);
 
-    /** 需要租户隔离的业务表（P1-1 已添加 tenant_id 列的 8 张表 + 2 张辅助表） */
+    /**
+     * 需要租户隔离的业务表（P1-1 已添加 tenant_id 列的 8 张表 + 2 张辅助表）
+     *
+     * <p>⚠️ {@code ecos_glossary_term} 已移出本名单（2026-09-21）：本类对 SQL 一律
+     * 追加 {@code WHERE tenant_id = ?}，而 INSERT 语句追加 WHERE 属语法非法
+     * （{@code INSERT ... VALUES (...) WHERE ...}），致该表经 JdbcTemplate 的
+     * 新增/导入操作全部失败。该表改按 PMO-30 P1-1 的「仓库内手工租户」约定处理
+     * （见 {@code GlossaryRepository}：SELECT 加 {@code tenant_id = ? OR tenant_id IS NULL}、
+     * INSERT 打标、UPDATE/DELETE 带租户条件），与 {@code ecos_domain} 同模式。
+     * 表本身仍具 tenant_id 列，隔离语义不降低。
+     */
     private static final Set<String> TENANT_TABLES = new HashSet<>(Arrays.asList(
         "ecos_objects", "ecos_object_relation",
         "ecos_dq_rule",
-        "ecos_workflow_instance",
-        "ecos_glossary_term"
+        "ecos_workflow_instance"
     ));
 
     /** 匹配 SQL 中涉及的表名：FROM/JOIN/UPDATE/INTO 后的 ecos_xxx */

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.sysman.service;
 
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -57,15 +58,32 @@ public class PortalSearchQueryService {
         }
     }
 
-    /** glossary 术语表只读检索 */
+    /**
+     * glossary 术语表只读检索。
+     *
+     * <p>PMO-30 P1-1 多租户：{@code ecos_glossary_term} 走「仓库内手工租户」约定
+     * （{@code TenantAwareJdbcTemplate} 对 INSERT 追加 WHERE 属语法非法，该表已移出
+     * 自动重写名单），故此处显式加租户条件：本租户行 + 共享行（{@code tenant_id IS NULL}）。
+     */
     public List<Map<String, Object>> searchGlossary(String keyword) {
+        String like = "%" + keyword + "%";
+        String tenantId = TenantContextHolder.getTenantId();
         try {
+            if (tenantId == null || tenantId.isBlank()) {
+                return jdbc.queryForList("""
+                        SELECT code AS id, name AS term, definition
+                        FROM ecos_glossary_term
+                        WHERE name LIKE ? OR definition LIKE ?
+                        LIMIT 20
+                        """, like, like);
+            }
             return jdbc.queryForList("""
                     SELECT code AS id, name AS term, definition
                     FROM ecos_glossary_term
-                    WHERE name LIKE ? OR definition LIKE ?
+                    WHERE (name LIKE ? OR definition LIKE ?)
+                      AND (tenant_id = ? OR tenant_id IS NULL)
                     LIMIT 20
-                    """, "%" + keyword + "%", "%" + keyword + "%");
+                    """, like, like, tenantId);
         } catch (Exception e) {
             return List.of();
         }
