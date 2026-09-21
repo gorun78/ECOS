@@ -75,18 +75,22 @@
 > | `USER_INPUT` / `REPORT` / `API` / `SENSOR` | 各自来源 | 其余来源 |
 > 规则：KB 条文**只被引用**（`source_ref`），内容不复制进 mind；运行时 cognitive 按需 `GET /api/v1/knowledge/articles/{id}` **只读**拉取；KB 修订 → 引用它的 evidence 标记「可能失效」。同一条 KB 可被多个场景的多条 evidence 引用，**KB 与心智松耦合**。
 
-### 2.2 心智层数据模型（V130__ecos_scenario_mind.sql）
+### 2.2 心智层数据模型（V130__ecos_scenario_mind.sql）— **多心智变体，独立于场景定义**
+
+> **架构决策 (ADR-PMO60-1)**：心智管理**独立于**场景定义 —— 心智是 cognitive 域自治资产，场景是「业务引用者」。通过 **1:N 物理表 + 独立 REST 子资源 + 激活哨兵** 实现，**不**额外建桥表（避免过度工程化，见 §2.10 设计判断）。
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_scenario_mind (
     id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    scenario_id           VARCHAR(64) NOT NULL UNIQUE,
+    scenario_id           VARCHAR(64) NOT NULL,                 -- ← 1:N（不再 UNIQUE）
+    mind_label            VARCHAR(64) NOT NULL DEFAULT 'base',  -- 变体标签：base / optimistic / conservative ...
+    active_mind           SMALLINT NOT NULL DEFAULT 0,          -- 激活哨兵（0/1），每 scenario 至多 1 行 =1
     initial_belief_jsonb  JSONB DEFAULT '{}'::jsonb,   -- 不确定性判断初始化（{variable, prob[]}）
     evidence_refs         JSONB DEFAULT '[]'::jsonb,   -- 引用 ecos_cognitive_evidence.id 数组
     hypothesis_refs       JSONB DEFAULT '[]'::jsonb,   -- 引用 ecos_cognitive_hypothesis.id 数组
     model_refs            JSONB DEFAULT '[]'::jsonb,   -- 引用 ecos_cognitive_model.id 数组（PMO-51 预测底座）
     cognitive_endpoints   JSONB DEFAULT '{}'::jsonb,   -- 四件套端点启停 + 权重
-    -- cognitive_endpoints 期望 schema：
+    -- cognitive_endpoints 期望 schema（每心智变体可独立配置权重）：
     -- {
     --   "diagnose":   { "enabled": true,  "weight": 1.0, "causal_depth": 3 },
     --   "forecast":   { "enabled": true,  "weight": 0.8, "model_id": "mos_xxx" },
@@ -100,13 +104,30 @@ CREATE TABLE IF NOT EXISTS ecos_scenario_mind (
     update_by             VARCHAR(64) DEFAULT 'system',
     is_deleted            SMALLINT NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_mind_scenario ON ecos_scenario_mind (scenario_id);
+-- 1:N 索引
+CREATE INDEX IF NOT EXISTS idx_mind_scenario ON ecos_scenario_mind (scenario_id, is_deleted);
+-- 同一 scenario 内 mind_label 唯一（区分变体）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_mind_scenario_label
+    ON ecos_scenario_mind (scenario_id, mind_label)
+    WHERE is_deleted = 0;
+-- 激活哨兵：每 scenario 最多 1 行 active_mind=1（partial index 兜底）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_mind_active
+    ON ecos_scenario_mind (scenario_id)
+    WHERE is_deleted = 0 AND active_mind = 1;
 ```
 
-> 设计要点：
-> - 1:1（`UNIQUE scenario_id`），`ecos_business_scenario.id` → `ecos_scenario_mind.scenario_id` 单向，cognitive 写入不动场景表
-> - **4 个 JSONB 字段**承载引用（不建 6 张关联表，避免过度工程化；引用是**证据/假设/模型 任一**可挂载多个）
-> - `cognitive_endpoints` JSONB 内部四键 `diagnose/forecast/simulate/policy`，每键 `{enabled, weight, ...}`，P1 新增时仅改 JSON 内字段，**不动 DDL**
+> **设计要点**：
+> - **1:N** 心智：同场景多 mind 并存（`base`/`optimistic`/`conservative`/…），**至少 1 行** `active_mind=1`
+> - **独立 REST 子资源**：`/scenarios/{sid}/minds`（复数）独立 CRUD，与场景 CRUD 解耦（场景重命名不改 mind；mind 可单删不动 scenario）
+> - **激活语义**：未指定 `mind_id` 的 cognitive 端点调用 → 走 `active_mind=1` 那道；调用方传 `?mind={mind_id}` 走指定变体
+> - **JSONB 四件套形态不变**：只是心智行从 1 行变 N 行，每个 mind 自带自己的 evidence_refs/hypothesis_refs/model_refs/belief
+> - **cognitive 引擎侧**完全无感：只认 `mind_id` 入参，不知道场景语义如何
+> - **弱点披露**：某 mind 被删但 evidence/hypothesis/belief 已被引用入 `ecos_decision_record.source_refs[]` 时，决策回查保留 hash，不依赖 mind_id 存在（**hash 留痕，不强 FK**）
+
+> **为什么不加桥表**（与否：选 B 不选 C）：
+> - Q4 场景需要的是「同一项目多档心智」——1:N 同一 scenario 多行即达成，不涉及「一 mind 跨多场景」反向多对多
+> - 反向多对多（同一套"化工景气心智"复用给 3 个场景）是**未来需求**，若真出现再上桥表 `ecos_mind_ref(scenario_id, mind_id)`，届时改 DDL 成本可控（本节设计不让这一需求**阻塞**当前落地）
+> - 应用层并发签「激活哨兵」靠 partial unique index 兜底，避免分布式锁
 
 ### 2.3 语义模型：场景是「窗」，心智是「房」，推演是「活动」，外部源是「光」
 
@@ -114,9 +135,9 @@ CREATE INDEX IF NOT EXISTS idx_mind_scenario ON ecos_scenario_mind (scenario_id)
 
 | 层 | 关系 | 含义 |
 |:--|---|---|
-| **结构** | 场景 1:1 心智 | 创建场景自动生成 1 个 mind（`UNIQUE scenario_id`）；改场景名/优先级**不**必然改 mind |
-| **数据** | 场景 1:N binding（6 资源）；场景 1:1 mind | binding=资源清单，mind=认知清单，**二者并列独立** |
-| **运行时** | mind 是四件套端点的 `inline_context` 入口 | `POST /scenarios/{id}/cognitive/*` → workspace 读 mind 三要素 → 透传 cognitive:18089 → 瞬态返回 |
+| **结构** | 场景 1:N 心智（至少 1 行 active） | 创建场景自动生成 1 个「base」mind；分析师可加 `optimistic`/`conservative` 等变体；激活哨兵保证 ≤1 行 active |
+| **数据** | 场景 1:N binding（6 资源）；场景 1:N mind | binding=资源清单，mind=认知清单（多档），**二者并列独立** |
+| **运行时** | mind 是四件套端点的 `inline_context` 入口 | `POST /scenarios/{id}/cognitive/*?mind={mind_id}`（缺省 active）→ workspace 读 mind 三要素 → 透传 cognitive:18089 → 瞬态返回 |
 | **授权** | 场景 security binding 限定四件套可读认知范围 | security-engine ABAC 评估 `scene_id + action=diagnose` 决定能否看哪些 evidence |
 
 > 「窗」的语义：场景不带认知时是**空窗**（mind 已建但 evidence/hypothesis_refs 空、belief 是 passive 先验概率）；证据流进来后心智才被「点亮」。
@@ -197,13 +218,14 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 │ 2. 数据·本体·知识·Agent （4 类并行·后端联查选项池）          │  ◄── 资源四联查
 ├──────────────┬───────────────────────────────────────────┤
 │ 3. 安全·接口  │ 4. **心智灯·认知引擎**（NEW：初始假设/证据/
-│ （P1 升真）   │   不确定性判断 + 关联认知模型）
+│ （P1 升真）   │   不确定性判断 + 关联认知模型 + 四件套开关 + 启 base mind；
+│               │   后续分析师可加 optimistic/conservative 变体）
 ├──────────────┴───────────────────────────────────────────┤
 │ 5. **预校验闸**（NEW：跨服务 resolve 真 ID 可达 + 重表校验 +
-│   security 审计 + AI 卡链路规约）
+│   security 审计 + AI 卡链路规约 + active_mind 唯一性校验）
 └────────────────────────────────────────────────────────────┘
         ↓ 通过
-   坐库 ecos_business_scenario + mind + binding
+   坐库 ecos_business_scenario + 至少 1 行 mind (base) + binding
 ```
 
 **关键变化**：
@@ -240,14 +262,18 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | GET | `/api/v1/workspace/scenarios/available/agents` | 调 aiming `:18084` |
 | GET | `/api/v1/workspace/scenarios/available/security` | 调 sysman `:18081`（P1 新表） |
 | GET | `/api/v1/workspace/scenarios/available/interfaces` | 调 sysman `:18081`（P1 新表） |
-| POST | `/api/v1/workspace/scenarios/{id}/mind-model` | 落 `ecos_scenario_mind` |
-| GET | `/api/v1/workspace/scenarios/{id}/mind-model` | 读回 |
-| DELETE | `/api/v1/workspace/scenarios/{id}/mind-model` | 删 |
-| POST | `/api/v1/workspace/scenarios/{id}/pre-validate` | 一键预校验（返回逐项 PASS/FAIL） |
-| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/diagnose` | **P2 新增**：场景级诊断（读心智三要素 → 因果推理 → 根因链） |
-| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/forecast` | **P2 新增**：场景级预测（指定 `model_id` → 时序 + 置信区间） |
-| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/simulate` | **P2 新增**：场景级推演（反事实·`counterfactors[]` → 连锁影响） |
-| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/policy` | **P2 新增**：场景级策略建议（四件套汇总 → `action_plan[]` + 风险） |
+| POST | `/api/v1/workspace/scenarios/{id}/mind-model` | 落 `ecos_scenario_mind`（**兼容保留**，实际建 base mind） |
+| GET | `/api/v1/workspace/scenarios/{id}/mind-model` | 读 base mind（**兼容保留**） |
+| DELETE | `/api/v1/workspace/scenarios/{id}/mind-model` | 删 base mind（**兼容保留**） |
+| **GET** | `/api/v1/workspace/scenarios/{id}/minds` | **P3b 新增**：列出场景全部心智变体（每行 mind_label/active/四件套状态） |
+| **POST** | `/api/v1/workspace/scenarios/{id}/minds` | **P3b 新增**：加一个变体 mind（label/三要素/四件套开关）；`label=base` 首条默认 active=1 |
+| **PATCH** | `/api/v1/workspace/scenarios/{id}/minds/{mindId}` | **P3b 新增**：改某 mind 的三要素/四件套；改 `active_mind` 时本 scenario 其它变体 active 强制归 0 |
+| **DELETE** | `/api/v1/workspace/scenarios/{id}/minds/{mindId}` | **P3b 新增**：删某变体；删 base 时其它变体自动补 active=1 |
+| POST | `/api/v1/workspace/scenarios/{id}/pre-validate` | 一键预校验（返回逐项 PASS/FAIL + **active_mind 唯一性**） |
+| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/diagnose?mind={mindId?}` | **P3b 新增**：场景级诊断（缺省走 active mind；显式 mindId 可指定变体） |
+| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/forecast?mind={mindId?}` | **P3b 新增**：场景级预测（某 mind 指定的 model_id 生效） |
+| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/simulate?mind={mindId?}` | **P3b 新增**：场景级推演（可传 `counterfactors[]`；支持「两 mind 间对比推演」`?mindA&mindB`） |
+| **POST** | `/api/v1/workspace/scenarios/{id}/cognitive/policy?mind={mindId?}` | **P3b 新增**：场景级策略建议（四件套汇总 → `action_plan[]` + 风险） |
 
 > 端点铁律：路径用 `/api/v1/` 前缀 + `VersionPrefixRewriteFilter` 的 `V1_REWRITE_MAP` + `SecurityConfig.permitAll` + `ClearanceInterceptor` 豁免 三滤波器逐层加（架构铁律 §1.2）。
 
@@ -266,16 +292,34 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 
 ```
 前端 ScenarioEditor
-  → POST /api/v1/workspace/scenarios/{id}/mind-model
-    → workspace-impl → PG ecos_scenario_mind（cognitive 表认知心智）
+  → POST /api/v1/workspace/scenarios/{id}/mind-model      （建 base mind；变体走 /minds POST）
+    → workspace-impl → PG ecos_scenario_mind（cognitive 表认知心智·1:N 行）
     → 同步 cognitive-engine REST
        → POST /api/v1/cognitive/evidence/hypotheses/beliefs （已实现 P2a）
   → POST /api/v1/workspace/scenarios/{id}/pre-validate
     → workspace-impl 并行调 4 service（datanet/buszhi/dccheng/aiming）
     → 联调 security-engine 预演
-    → 返回 {dataset PASS/FAIL, ... 共 6 项 + 心智档校验}
+    → 返回 {dataset PASS/FAIL, ... 共 6 项 + 心智档校验 + active_mind 唯一性}
      前端渲染红绿徽标；不阻塞 DRAFT，ACTIVE 需全 PASS
+  → 运行态（P3b）：POST /scenarios/{id}/cognitive/{diagnose|forecast|simulate|policy}?mind={mindId?}
+     → workspace 读指定 mind 三要素 → 透传 cognitive:18089 → 瞬态返回
+     → 策略输出可选落 ecos_decision_record（含 source_refs[] hash 溯源）
 ```
+
+### 2.10 设计判断：心智管理是否独立于场景定义（ADR-PMO60-1 依据）
+
+| 方案 | 形态 | 判定 |
+|:--:|---|:--|
+| A. 内嵌 1:1 | `UNIQUE scenario_id`，心智随场景生死 | ❌ 多心智变体诉求（Q4）无法表达；心智与场景生命周期耦合 |
+| **B. 1:N + 独立 REST 子资源** | `UNIQUE (scenario_id, mind_label)` + `active_mind` 哨兵 + `/minds` 独立 CRUD | ✅ **采纳**：心智 = cognitive 域自治资产，场景 = 业务引用者；单表多行满足"同场景多档心智" |
+| C. 拆独立心智主表 + 桥表 | `ecos_mind`（跨场景）+ `ecos_mind_ref(scenario_id, mind_id)` | ⏸ 过度：反向多对多（同心智跨多场景）是**未来需求**，今天 Q4 只需"同场景多档"，1:N 已达成，待真出现再补桥表 |
+
+**采纳 B 的 3 条理由**：
+1. **单一职责**：场景表职责是"业务对象聚合"（名/目的/binding/优先级）；认知过程归 cognitive 域。1:N + 独立 REST 让二者各自演进不互相拖
+2. **多心智变体零成本**：同 scenario 多 mind 行即"乐观/保守档"，`activate` 切换靠 partial unique index 兜底，无分布式锁
+3. **最小前沿**：不预埋反向多对多桥表，让"同心智跨多场景复用的未来需求"**不阻塞当前落地**；出现时补 `ecos_mind_ref` 成本可控（本节明确不阻塞）
+
+> **cognitive 引擎侧零感知**：只认 `mind_id` 入参。workspace 决定"哪档心智"（业务决策），cognitive 只负责"给这档心智算四件套"（认知能力）。职责边界清晰。
 
 ## §Task（按 P0.1 / P0.2 / P1 / P2 分阶段）
 
@@ -283,14 +327,14 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 |:--:|:--|---|---|---|
 | **P0.1** | T1 | 本报告 | 契约侦察交付 | ✔ 已完成（见 §P0.1） |
 | **P0.2** | T2 | 本报告 | 心智模型 + 流程终稿 | ✔ 本次交付 |
-| **P1** | T3 | `gateway/src/main/resources/db/migration/V130__ecos_scenario_mind.sql` | 新建 `ecos_scenario_mind` 表（§2.1） | 在 `sys_man` 建表成功；6 表（`ecos_business_scenario` + `ecos_scenario_binding` + `ecos_scenario_mind` + cognitive 3 表）联查 SELECT 成功 |
+| **P1** | T3 | `gateway/src/main/resources/db/migration/V130__ecos_scenario_mind.sql` | 新建 `ecos_scenario_mind` 表（§2.2，**1:N 多心智变体**：`mind_label` + `active_mind` + 3 个 partial/unique 索引） | 在 `sys_man` 建表成功；同一 scenario 插 2 行不同 mind_label OK、第 2 行 active=1 时触发 `uq_mind_active` 冲突拒绝 |
 | | T4 | `gateway/.../V131__ecos_scenario_binding_upgrade.sql` | `ALTER TABLE ... ADD COLUMN target_id/target_type` + 索引 | 老 binding 读不受影响；新 binding 写 target_id 不报 NOT NULL |
 | | T5a | `services/sysman/impl/sysman-boot/.../migration/V132__ecos_security_policy.sql` | 新建 `ecos_security_policy` 表 | 唯一约束 `name` 命中；`policy_expr` 字段返回 |
 | | T5b | `services/sysman/impl/sysman-boot/.../migration/V133__ecos_interface_ref.sql` | 新建 `ecos_interface_ref` 表 | 唯一约束、接口 `endpoint`/`method` 字段 |
 | | T6 | `services/sysman/impl/.../sysman/controller/SecurityPolicyController.java`（新建） | `@RequestMapping("/api/v1/security/policies")` CRUD 5 端点 | `GET /api/v1/security/policies` 返 JSON 列表；POST 创建走 security-engine 审计 Kafka |
 | | T7 | `services/sysman/impl/.../sysman/controller/InterfaceRefController.java`（新建） | `@RequestMapping("/api/v1/interfaces")` CRUD 5 端点 | 同 T6 |
 | | T8 | `workspace/.../workspace/controller/ScenarioOptionsController.java`（新建） | 6 个 `/scenarios/available/*` 联查端点（§2.5） | 任一端点 200 返数组（item id 为真 PG 主键）；断网时**默认 DENY**（§2.4）返回 503 |
-| | T9 | `workspace/.../workspace/scenario/ScenarioMindService.java`（新建） | 落 `ecos_scenario_mind` 写/读/删 + 同步 cognitive-engine REST（`/api/v1/cognitive/evidence|hypotheses|belief`） | 1 次 POST 在 cognitive 三表各看到 1 条新记录（按 `scenario_id` 关联） |
+| | T9 | `workspace/.../workspace/scenario/ScenarioMindService.java`（新建） | 落 `ecos_scenario_mind` **1:N** 写/读/删（minds CRUD：create base/variant、activate 切换、delete 补位）+ 同步 cognitive-engine REST（`/api/v1/cognitive/evidence\|hypotheses\|belief`）；应用层强校验 active_mind ≤1 | 建 base + 加 optimistic 变体后 2 行；对 optimistic 设 active=1 → base 自动 active=0（partial unique index 兼守护）；1 次 POST 在 cognitive 三表各看到 1 条新记录 |
 | | T10 | `workspace/.../workspace/scenario/ScenarioPreValidateService.java`（新建） | 一键预校验：4 类 resource resolve + 2 类 system resolve + AI tool 匹配 + 心智档校验；返回逐项 `PASS/FAIL` 列表 | 完整 PASS 全绿；某个 service 不可达 = 该 service 一类 **FAIL**（不假绿） |
 | | T11 | `workspace/.../workspace/scenario/ScenarioService.java` | 改 `saveBindings`：校验 `target_id + target_type` 一致性；6 类全部必填 `target_id`（安全/接口 P1 已完成）；调 `kafkaProducer.send(auditTopic)` 发审计 | 不通过校验时 `BAD_REQUEST`；审计 Kafka 在 `sysman` 侧可见 |
 | | T12 | 三滤波器（架构铁律 §1.2） | `VersionPrefixRewriteFilter` + `ClearanceInterceptor` 豁免 + `SecurityConfig.permitAll` 各加 `/api/v1/workspace/scenarios/**`、`/api/v1/security/policies/**`、`/api/v1/interfaces/**` | curl 经 gateway 8080 不需 JWT 也能 200（demo 期；生产期由 OPA 承接） |
@@ -303,7 +347,8 @@ CREATE INDEX IF NOT EXISTS idx_scenario_bind_tid ON ecos_scenario_binding (targe
 | | T19 | `ecos_frontend/src/locales/scenario/i18n.test.tsx`（新建，vitest） | 组件级对 6 步向导文案 zh/en 互切；断言 `knowledge.group` 类**不再走 `locale === 'zh-CN'`**（上一文件已修，本批次防回归） | 2 用例全 PASS；变异测试（删掉 `t()` 改回硬编码）必 FAIL |
 | **P3** | T20 | `ecos_frontend/src/pages/scenario/ScenarioE2E.test.tsx`（新建,vitest + jsdom） | 端到端：选 4 类资源 + 设心智档 + pre-validate 全 PASS → POST 场景 ACTIVE | 200；`ecos_business_scenario.status='ACTIVE'`；`ecos_scenario_mind` 1 条；cognitive 3 表各 +1 |
 | **P3** | T21 | 浏览器 E2E（浏览器工具） | 渲染 + console + network 截屏 | 三项无红 |
-| **P3b** | T25 | 4 个场景级 cognitive 端点（§2.6 表内 POST 行 4 行） | 扩展 workspace-impl，新增 `ScenarioCognitiveController` 中转 cognitive engine；读 `mind.cognitive_endpoints` 校验 `enabled` → 透传三要素 + 模型引用 → cognitive 端点 | 对启用端点 POST 引用数据 → 返回 root_causes/forecast/simulate/policy 各自结构体；`simulate` 未启用时返 `409 {code:409,msg}` |
+| **P3b** | T24a | `workspace/.../workspace/controller/ScenarioMindController.java`（新建） |  minds 子资源 CRUD：`GET/POST /scenarios/{id}/minds`、`PATCH/DELETE /scenarios/{id}/minds/{mindId}`（§2.7 表 P3b 4 行）；activate 切换事务内 forte 归零其它变体 | curl：建 base→加 optimistic→PATCH optimistic.active=1 后 base.active=0；删 base 后 optimistic 自动补位 active=1 |
+| **P3b** | T25 | 4 个场景级 cognitive 端点（§2.7 表内 POST 行 4 行，含 `?mind={mindId?}`） | 扩展 workspace-impl，新增 `ScenarioCognitiveController` 中转 cognitive engine；读指定（或 active）mind 的 `cognitive_endpoints` 校验 `enabled` → 透传三要素 + 模型引用 → cognitive 端点 | 对启用端点 POST → 返回 root_causes/forecast/simulate/policy 各自结构体；`simulate` 未启用返 `409{code:409,msg}`；`?mindA&mindB` 对比推演双行返回 |
 | **P3b** | T26 | 四件套返回前端渲染 + 决策回执 Preview | 运行态只读调 P3b T25 端点渲染、策略输出汇总到 `DecisionService`（可选落盘 `ecos_decision_record` V134，字段含 `action_plan` JSONB + `source_refs[]`(指 diagnose/forecast/simulate 输出 hash)） | 4 个端点输出卡片化展示；任一 `enabled=false` 时 UI 灰置；`ecos_decision_record`（若有）可回查 source_refs 溯源 |
 | **P4** | T22 | `docs/ARCHITECTURE-RULES.md` §4.8 增补 | 加 "binding.target_ref 真 ID 化" 条款 | 文档同步 |
 | | T23 | `ecos_frontend/src/pages/scenario/README.md`（新建，仅本文档） | 创建流程说明 + 预校验 gate | 文档可读 |
@@ -344,6 +389,7 @@ V4: 浏览器 E2E（P3 T21）：渲染 + console + network 截屏三项无红
 | v1.0 | 2026-09-21 | 初版 P0.1 契约 + P0.2 心智模型冻结 | 规划启动 |
 | v1.1 | 2026-09-21 | 新增 **§2.1 认知心智层概念模型**（三要素 + 四件套端点 + 模型底座 + 决策层）；§2.2 `cognitive_endpoints` JSONB 显式四键 schema；§2.5 步骤 4 新增四件套开关预设为默认；§2.5 步骤 5 新增四件套可达性检查；§2.6 端点表新增 POST `/{id}/cognitive/{diagnose,forecast,simulate,policy}`；P3b T25/T26 新增 2 个 Task | **用户反馈**：场景不只是"绑资源"，还要在运行态能调用 cognitive 四件套端点（含原未提及的 `/simulate` 与 `/policy`）；端到端"创建心智 → 运行时推理/预测/推演/策略"需可同迭代内闭环 |
 | v1.2 | 2026-09-21 | §2.1 补「**策略非三要素**」+「**KB 与证据解耦**」两条脚注（Q1/Q2）；新增 **§2.3 语义模型**（四层「窗/房/活动/光」+ Q3 场景关系 + **Q4 企业投资决策全例**）；§2.4~2.9 重编号；P3b T26 的 `ecos_decision_record` 补 `source_refs[]` 溯源字段 | **用户四问对齐**：①证据与知识库关系 ②策略是否为要素 ③认知与场景关系 ④企业决策场景举例；四问答案落文档，供跨团队宣讲 |
+| v1.3 | 2026-09-21 | **心智改 1:N 多变体**（`mind_label` + `active_mind` + partial unique index）+ **新增 §2.10 设计判断（ADR-PMO60-1：心智独立于场景定义，1:N+独立REST子资源，不建桥表）**；§2.3 关系表 1:1→1:N；§2.7 端点新增 `/minds` 子资源 4 个 CRUD + 4 个 cognitive 端点加 `?mind={mindId?}`；流程步骤 4/5 补变体与 active 唯一性；Task 新增 T24a（minds CRUD）+ T25 改造 | **用户拍板「多心智变体」+ 追问软件设计层面「心智是否独立于场景定义」**；架构判断采纳方案 B（1:N 独立子资源，不桥表化），同步落 DDL/REST/Task |
 
 ## §依赖与协作
 
