@@ -20,6 +20,7 @@ import MetadataTab from './object/MetadataTab';
 import MappingTab from './object/MappingTab';
 import LinksTab from './object/LinksTab';
 import ActionsTab from './object/ActionsTab';
+import GlossaryTab from './object/GlossaryTab';
 
 interface ObjectTypeViewProps {
   objectType: ObjectType;
@@ -56,7 +57,7 @@ export default function ObjectTypeView({
   onCreateProposal,
   onToast
 }: ObjectTypeViewProps) {
-  const [activeTab, setActiveTab] = useState<'metadata' | 'properties' | 'mapping' | 'links' | 'actions' | 'lineage'>('properties');
+  const [activeTab, setActiveTab] = useState<'metadata' | 'properties' | 'mapping' | 'links' | 'actions' | 'lineage' | 'glossary'>('properties');
   const [newPropName, setNewPropName] = useState('');
   const [newPropType, setNewPropType] = useState<'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint'>('string');
   const [mappingRecord, setMappingRecord] = useState<OntologyMappingRecord | null>(null);
@@ -341,10 +342,11 @@ export default function ObjectTypeView({
 
       {/* Detail Tabs */}
       <div className={`flex px-6 border-b ${styles.cardBorder} ${styles.cardBg}`}>
-        {(['properties', 'mapping', 'metadata', 'links', 'actions', 'lineage'] as const).map(tab => {
+        {(['properties', 'mapping', 'metadata', 'links', 'actions', 'lineage', 'glossary'] as const).map(tab => {
           const tabLabels: Record<string, string> = {
             properties: t('ow.tab.properties'), mapping: t('ow.tab.mapping'), metadata: t('ow.tab.metadata'),
-            links: t('ow.tab.links'), actions: t('ow.tab.actions'), lineage: t('ow.btn.viewLineage')
+            links: t('ow.tab.links'), actions: t('ow.tab.actions'), lineage: t('ow.btn.viewLineage'),
+            glossary: t('ow.tab.glossary')
           };
           return (
             <button key={tab} onClick={() => setActiveTab(tab)}
@@ -389,6 +391,9 @@ export default function ObjectTypeView({
         {activeTab === 'actions' && (
           <ActionsTab objectType={objectType} relatedActions={relatedActions}
             onNavigateToAction={onNavigateToAction} />
+        )}
+        {activeTab === 'glossary' && (
+          <GlossaryTab objectType={objectType} onToast={onToast} />
         )}
         {activeTab === 'lineage' && (
           <div className="space-y-4">

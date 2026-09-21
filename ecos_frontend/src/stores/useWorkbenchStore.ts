@@ -16,11 +16,8 @@ import type {
   Entity,
   Property,
   Relationship,
-  GlossaryTerm,
-  GlossaryFilter,
   BulkResource,
   DataResourceSummary,
-  EntityTermBinding,
   PropertyTermBinding,
   EntityTableMapping,
   FieldMapping,
@@ -139,12 +136,6 @@ export interface WorkbenchState {
   error: string | null;
 
   // ===== 术语库状态 (v1.1) =====
-  /** 术语库术语列表 */
-  glossaryTerms: GlossaryTerm[];
-  /** 术语加载中 */
-  glossaryTermsLoading: boolean;
-  /** 实体 → 术语关联 (entityId → termId[]) */
-  entityTermBindings: Record<string, string[]>;
   /** 属性 → 术语关联 (propertyId → termId) */
   propertyTermBindings: Record<string, string>;
 
@@ -222,12 +213,6 @@ export interface WorkbenchState {
   connectNodes: (source: string, target: string) => void;
 
   // ===== Actions: 术语库 (v1.1) =====
-  /** 获取术语库术语 */
-  fetchGlossaryTerms: (filters?: { domain?: string; status?: string }) => Promise<void>;
-  /** 绑定实体与术语 */
-  bindEntityToTerm: (entityId: string, termId: string) => void;
-  /** 解绑实体与术语 */
-  unbindEntityFromTerm: (entityId: string, termId: string) => void;
   /** 绑定属性与术语 */
   bindPropertyToTerm: (propertyId: string, termId: string) => void;
   /** 解绑属性与术语 */
@@ -274,9 +259,6 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       error: null as string | null,
 
       // v1.1
-      glossaryTerms: [] as GlossaryTerm[],
-      glossaryTermsLoading: false,
-      entityTermBindings: {},
       propertyTermBindings: {},
       dataResources: [] as BulkResource[],
       dataResourcesLoading: false,
@@ -699,57 +681,6 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       },
 
       // ── 术语库 (v1.1) ──
-
-      fetchGlossaryTerms: async (filters) => {
-        set({ glossaryTermsLoading: true, error: null });
-        try {
-          // 使用现有 glossary API 端点
-          const params = new URLSearchParams();
-          if (filters?.domain) params.set("domain", filters.domain);
-          if (filters?.status) params.set("status", filters.status);
-
-          const resp = await fetch(
-            `/api/v1/ontology/glossary/terms?${params.toString()}`
-          );
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
-          const terms: GlossaryTerm[] =
-            json.data || json.records || json || [];
-          set({
-            glossaryTerms: terms,
-            glossaryTermsLoading: false,
-          });
-        } catch (err: any) {
-          set({
-            glossaryTermsLoading: false,
-            error: err?.message || "获取术语列表失败",
-          });
-        }
-      },
-
-      bindEntityToTerm: (entityId: string, termId: string) => {
-        set((state) => {
-          const current = state.entityTermBindings[entityId] || [];
-          if (current.includes(termId)) return state;
-          return {
-            entityTermBindings: {
-              ...state.entityTermBindings,
-              [entityId]: [...current, termId],
-            },
-          };
-        });
-      },
-
-      unbindEntityFromTerm: (entityId: string, termId: string) => {
-        set((state) => ({
-          entityTermBindings: {
-            ...state.entityTermBindings,
-            [entityId]: (state.entityTermBindings[entityId] || []).filter(
-              (t) => t !== termId
-            ),
-          },
-        }));
-      },
 
       bindPropertyToTerm: (propertyId: string, termId: string) => {
         set((state) => ({

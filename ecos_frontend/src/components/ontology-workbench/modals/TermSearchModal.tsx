@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { X, Search, Filter, BookOpen, Loader2, Check } from "lucide-react";
-import { fetchTerms } from "../../../services/glossaryClient";
+import { fetchTerms } from "../../../services/glossary";
 import { useTheme } from "../../ThemeContext";
 import type { GlossaryTerm, GlossaryFilter } from "../../../types/workbench";
 
