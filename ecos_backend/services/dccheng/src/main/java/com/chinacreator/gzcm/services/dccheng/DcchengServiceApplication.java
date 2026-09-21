@@ -40,8 +40,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.services.dccheng",
         // 主封装引擎 — kb (水·K): KG 存储/检索/RAG/规则CRUD/知识抽取
         "com.chinacreator.gzcm.engine.kb",
-        // 封装引擎 — cognitive (木·C): 因果推理/情景推演/混合推理
-        "com.chinacreator.gzcm.engine.cognitive2",
         // 横切底座
         "com.chinacreator.gzcm.runtime",
         // peer 系统配置 (kb/cognitive 某 controller 有具体类 type IModel 引用)
@@ -52,9 +50,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.engine.kb.**.dao",
         "com.chinacreator.gzcm.engine.kb.**.repository",
         "com.chinacreator.gzcm.engine.kb.**.mapper",
-        // cognitive2 域 (推理暂无落库, 防御性保留)
-        "com.chinacreator.gzcm.engine.cognitive2.**.dao",
-        "com.chinacreator.gzcm.engine.cognitive2.**.mapper",
         // 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",

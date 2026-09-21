@@ -30,13 +30,6 @@
             <artifactId>kb-engine-impl</artifactId>
             <version>${databridge.version}</version>
         </dependency>
-        <!-- 封装引擎 — cognitive (木·C) -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>cognitive-engine-impl</artifactId>
-            <version>${databridge.version}</version>
-        </dependency>
-
         <!-- 共享契约 -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>

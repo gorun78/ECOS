@@ -62,6 +62,12 @@
             <artifactId>common-api</artifactId>
             <version>${databridge.version}</version>
         </dependency>
+        <!-- 木·C 认知引擎 并入 ai 服务层（PMO-60 v2.0 T0b / ADR-P0:18084 归属） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>cognitive-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
         <!-- sysman-impl: CognitiveConfigController (ai-engine) 注入
              sysman.config.service.impl.SysConfigService 具体类,
              独立 aiming 需 sysman-impl 在 classpath 才装配成功 -->

@@ -8,11 +8,11 @@ import com.chinacreator.gzcm.engine.cognitive2.model.DiagnosisRequest;
 import com.chinacreator.gzcm.engine.cognitive2.model.PrecedentRef;
 import com.chinacreator.gzcm.engine.cognitive2.model.ReasoningPath;
 import com.chinacreator.gzcm.engine.cognitive2.model.RuleRef;
+import com.chinacreator.gzcm.engine.kb.ComplianceRuleProvider;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
-import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,7 +36,8 @@ import java.util.*;
  *   <li>{@link RootCauseAnalyzer} — 根因定位 + 建议生成 + 规则引擎兜底</li>
  * </ul>
  *
- * <p>依赖：仅依赖 kb-engine-api 接口（KnowledgeGraphService），不直接 import kb-engine-impl。
+ * <p>依赖：仅依赖 kb-engine-api 接口（KnowledgeGraphService + ComplianceRuleProvider），
+ * 不直接 import kb-engine-impl（架构铁律 §2.1：跨引擎只调 api，不调 impl）。
  */
 @Service
 public class CausalReasonerServiceImpl implements CausalReasonerService {
@@ -54,7 +55,7 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
     /** Wave-3.2 增量：RuleRef 收口（从 KB 读取规则 + 去重） */
     private final RuleRefCollector ruleRefCollector;
     /** Wave-3.2 增量：KB 合规规则源（用于给 ruleRef 补充 version 信息） */
-    private final ComplianceRuleMapper ruleMapper;
+    private final ComplianceRuleProvider ruleMapper;
 
     /**
      * 构造器注入。
@@ -66,7 +67,7 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
      * @param reasoningPathFromCausalBuilder     因果链 → ReasoningPath 转换器
      * @param precedentRecaller                  先例召回器（PMO-32 复用）
      * @param ruleRefCollector                   RuleRef 收口器（KB 规则 → 去重索引）
-     * @param ruleMapper                         KB 合规规则源
+     * @param ruleMapper                         KB 合规规则源（kb-engine-api 接口）
      */
     public CausalReasonerServiceImpl(KnowledgeGraphService knowledgeGraphService,
                                       CausalDetector causalDetector,
@@ -75,7 +76,7 @@ public class CausalReasonerServiceImpl implements CausalReasonerService {
                                       ReasoningPathFromCausalBuilder reasoningPathFromCausalBuilder,
                                       PrecedentRecaller precedentRecaller,
                                       RuleRefCollector ruleRefCollector,
-                                      ComplianceRuleMapper ruleMapper) {
+                                      ComplianceRuleProvider ruleMapper) {
         this.knowledgeGraphService = knowledgeGraphService;
         this.causalDetector = causalDetector;
         this.suggestionBuilder = suggestionBuilder;

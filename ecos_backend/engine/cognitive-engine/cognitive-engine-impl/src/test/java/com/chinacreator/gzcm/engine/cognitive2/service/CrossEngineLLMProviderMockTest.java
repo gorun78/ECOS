@@ -6,11 +6,11 @@ import com.chinacreator.gzcm.engine.cognitive2.model.CausalEdge;
 import com.chinacreator.gzcm.engine.cognitive2.model.DiagnosisRequest;
 import com.chinacreator.gzcm.engine.cognitive2.model.ReasoningPath;
 import com.chinacreator.gzcm.engine.cognitive2.model.RuleRef;
+import com.chinacreator.gzcm.engine.kb.ComplianceRuleProvider;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
-import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ class CrossEngineLLMProviderMockTest {
     @Mock private ReasoningPathFromCausalBuilder rpBuilder;
     @Mock private PrecedentRecaller precedentRecaller;
     @Mock private RuleRefCollector ruleRefCollector;
-    @Mock private ComplianceRuleMapper ruleMapper;
+    @Mock private ComplianceRuleProvider ruleMapper;
     private CausalReasonerServiceImpl service;
 
     @BeforeEach

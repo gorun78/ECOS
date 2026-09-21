@@ -4,11 +4,11 @@ import com.chinacreator.gzcm.engine.cognitive2.model.ReasonerResult;
 import com.chinacreator.gzcm.engine.cognitive2.model.ReasoningStep;
 import com.chinacreator.gzcm.engine.cognitive2.model.SubQuery;
 import com.chinacreator.gzcm.engine.cognitive2.model.SubQuery.SubQueryType;
+import com.chinacreator.gzcm.engine.kb.ComplianceRuleProvider;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
-import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,9 +29,9 @@ import java.util.stream.Collectors;
  *   <li>{@link SubQueryType#HYBRID} — KG + 规则 + RAG 并行融合（超时保护 + 加权排序）</li>
  * </ul>
  *
- * <p>跨模块依赖：
+ * <p>跨模块依赖（架构铁律 §2.1：跨引擎只调 api，不调 impl）：
  * <ul>
- *   <li>{@link ComplianceRuleMapper} — kb-engine-impl，规则 KG 查询</li>
+ *   <li>{@link ComplianceRuleProvider} — kb-engine-api，规则 KG 查询</li>
  *   <li>{@link KnowledgeRetrievalService} — kb-engine-api，向量 RAG 检索</li>
  *   <li>{@link KnowledgeGraphService} — kb-engine-api，知识图谱 Cypher 查询</li>
  * </ul>
@@ -49,13 +49,13 @@ public class KnowledgeReasonerService {
     private static final double RULE_WEIGHT = 0.85;
     private static final double RAG_WEIGHT  = 0.60;
 
-    private final ComplianceRuleMapper ruleMapper;
+    private final ComplianceRuleProvider ruleMapper;
     private final KnowledgeRetrievalService retrievalService;
     private final KnowledgeGraphService graphService;
     private final SpelConditionEvaluator spelEvaluator;
     private final ReasoningPathBuilder reasoningPathBuilder;
 
-    public KnowledgeReasonerService(ComplianceRuleMapper ruleMapper,
+    public KnowledgeReasonerService(ComplianceRuleProvider ruleMapper,
                                     KnowledgeRetrievalService retrievalService,
                                     KnowledgeGraphService graphService,
                                     SpelConditionEvaluator spelEvaluator,
@@ -167,7 +167,7 @@ public class KnowledgeReasonerService {
         Map<String, Object> facts = sq.getFacts();
         log.info("RULE_CHECK: objectType={}, facts={}", objectType, facts);
 
-        // 1. KG 查询：通过 ComplianceRuleMapper 按 domain 匹配规则
+        // 1. KG 查询：通过 ComplianceRuleProvider 按 domain 匹配规则
         List<ComplianceRule> candidateRules;
         if (objectType != null && !objectType.isEmpty()) {
             candidateRules = ruleMapper.findByDomain(objectType);

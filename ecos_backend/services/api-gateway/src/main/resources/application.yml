@@ -41,7 +41,12 @@ spring:
           - id: ai-service
             uri: http://localhost:18088
             predicates:
-              - Path=/api/v1/aip/**, /api/v1/nlq/**, /api/v1/guardrails/**, /api/v1/prompt/**, /api/v1/diagnostic/**, /api/v1/engine/cognitive/**
+              - Path=/api/v1/aip/**, /api/v1/nlq/**, /api/v1/guardrails/**, /api/v1/prompt/**, /api/v1/diagnostic/**
+          # PMO-60 v2.0 P0: cognitive 迁移至 aiming:18084，从 ai-service 摘出 cognitive 前缀
+          - id: cognitive-service
+            uri: http://localhost:18084
+            predicates:
+              - Path=/api/v1/cognitive/**, /api/v1/engine/cognitive/**, /api/v1/world-model/**
 
   kafka:
     bootstrap-servers: localhost:9092

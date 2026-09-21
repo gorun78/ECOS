@@ -11,7 +11,11 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController;
 import com.chinacreator.gzcm.engine.ai.controller.CognitiveController;
+import com.chinacreator.gzcm.engine.ai.controller.CognitiveConfigController;
 import com.chinacreator.gzcm.engine.ai.service.CognitiveService;
+import com.chinacreator.gzcm.sysman.config.I18nConfig;
+import com.chinacreator.gzcm.sysman.config.SysManRuntimeConfig;
+import com.chinacreator.gzcm.sysman.controller.SysConfigController;
 
 /**
  * ECOS Aiming 微服务 — 智能服务（火·W 智慧）
@@ -48,6 +52,8 @@ import com.chinacreator.gzcm.engine.ai.service.CognitiveService;
         "com.chinacreator.gzcm.services.aiming",
         // 主封装引擎 — ai-engine (火·W): Agent/Loop/Memory/LLM/工具路由
         "com.chinacreator.gzcm.engine.ai",
+        // 木·C 认知引擎 并入本服务层 (PMO-60 v2.0 T0b / ADR-P0:18084 归属)
+        "com.chinacreator.gzcm.engine.cognitive2",
         // agent-service runtime (ToolRouter/Memory/Planner/Governance/Reflection/Telemetry)
         "com.chinacreator.gzcm.services.agent",
         // LLM 调用收敛 (铁律 §2.5)
@@ -75,6 +81,21 @@ import com.chinacreator.gzcm.engine.ai.service.CognitiveService;
                 DiagnosticAgentController.class,
                 CognitiveController.class,
                 CognitiveService.class
+        }),
+        // R2 (PMO-60 T0b): ai-engine 的 cognitive stub controller 与 cognitive2 真实现同频冲突 —
+        // 同前缀 /api/v1/cognitive/config: GET / 与 PUT / 双向撞车 (cognitive2 CognitiveConfigController 完整实现优先)
+        // 取舍与 gateway 对齐 (GatewayApplication 同条目, PMO-55 E-A)
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
+                classes = CognitiveConfigController.class),
+        // R3 (PMO-60 T0b): sysman.config 整包扫描引入的 sysman 域 side effect 排除 —
+        //  - SysConfigController 路由 /api/v1/system/config 与 sysman service :18081 撞车 (镜像 gateway 同条目)
+        //  - I18nConfig @Primary MessageSource + I18nMessageSource bean 会沉淀 I18nUtils 静态态,
+        //    aiming 不消费 sysman i18n 体系, 排除避免双 MessageSource beans 启动歧义
+        //  - SysManRuntimeConfig 的 ISystemDatabaseAccess 属 sysman 域概念, 本 service 不消费
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
+                SysConfigController.class,
+                I18nConfig.class,
+                SysManRuntimeConfig.class
         })
 })
 @MapperScan({
@@ -88,6 +109,9 @@ import com.chinacreator.gzcm.engine.ai.service.CognitiveService;
         "com.chinacreator.gzcm.services.agent.**.mapper",
         // llm-gateway 横切底座 (AgentCallLogRepository)
         "com.chinacreator.gzcm.runtime.llm.repository",
+        // 木·C 认知引擎 心智状态三表 DAO (V127~V129, PMO-60 T0b)
+        "com.chinacreator.gzcm.engine.cognitive2.**.dao",
+        "com.chinacreator.gzcm.engine.cognitive2.**.mapper",
         // runtime 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao"

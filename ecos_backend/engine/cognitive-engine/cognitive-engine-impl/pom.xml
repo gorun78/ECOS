@@ -41,11 +41,6 @@
             <artifactId>kb-engine-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>kb-engine-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
         <!-- PMO-59 P2a: 写操作审计/心智事件统一走 runtime-event 公共底座 (铁律 §2.5, 禁自建 KafkaTemplate)；
              P2b: 定时补算委托 runtime-task 全局调度 (铁律 §2.5.3), 告警走 runtime-monitor (IWarnLogService) -->
         <dependency>
