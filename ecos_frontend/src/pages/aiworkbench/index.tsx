@@ -20,14 +20,15 @@ import AgentStudioView from './AgentStudioView';
 import ModelCatalogView from './ModelCatalogView';
 import AgentPlayground from './AgentPlayground';
 import EvalsView from './EvalsView';
+import CognitionView from './CognitionView';
 import {
   LayoutDashboard, Network, FlaskConical, Cpu, BarChart3, Layers,
-  CloudOff, RefreshCw,
+  CloudOff, RefreshCw, BrainCircuit,
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
-type TabId = 'overview' | 'agent' | 'playground' | 'orchestration' | 'evals' | 'models';
+type TabId = 'overview' | 'agent' | 'playground' | 'orchestration' | 'evals' | 'models' | 'cognition';
 
 const NAV_TABS: Array<{
   id: TabId;
@@ -41,6 +42,7 @@ const NAV_TABS: Array<{
   { id: 'orchestration', icon: Cpu, labelKey: 'aiworkbench.tab.orchestration', descKey: 'aiworkbench.tabdesc.orchestration' },
   { id: 'evals', icon: BarChart3, labelKey: 'aiworkbench.tab.evals', descKey: 'aiworkbench.tabdesc.evals' },
   { id: 'models', icon: Layers, labelKey: 'aiworkbench.tab.models', descKey: 'aiworkbench.tabdesc.models' },
+  { id: 'cognition', icon: BrainCircuit, labelKey: 'aiworkbench.tab.cognition', descKey: 'aiworkbench.tabdesc.cognition' },
 ];
 
 const VIEW_TITLES: Record<TabId, string> = {
@@ -50,6 +52,7 @@ const VIEW_TITLES: Record<TabId, string> = {
   orchestration: 'aiworkbench.viewTitle.orchestration',
   evals: 'aiworkbench.viewTitle.evals',
   models: 'aiworkbench.viewTitle.models',
+  cognition: 'aiworkbench.viewTitle.cognition',
 };
 
 interface AIPWorkbenchProps {
@@ -271,6 +274,9 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
                           showToast={showToast}
                         />
                     )}
+
+          {/* cognition: 场景认知四件套执行入口（PMO-60 v2.0 P2b 搭壳；P3b 落地真实端点） */}
+          {currentTab === 'cognition' && <CognitionView />}
         </div>
       </div>
     </div>

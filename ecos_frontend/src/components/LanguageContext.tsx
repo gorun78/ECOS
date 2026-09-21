@@ -13,6 +13,7 @@ import commonZh from "../locales/common/zh-CN.json";
 import copilotZh from "../locales/copilot/zh-CN.json";
 import dashboardZh from "../locales/dashboard/zh-CN.json";
 import scenarioZh from "../locales/scenario/zh-CN.json";
+import cognitionZh from "../locales/cognition/zh-CN.json";
 import ontologyEn from "../locales/ontology/en.json";
 import aiworkbenchEn from "../locales/aiworkbench/en.json";
 import dwEn from "../locales/dw/en.json";
@@ -22,6 +23,7 @@ import commonEn from "../locales/common/en.json";
 import copilotEn from "../locales/copilot/en.json";
 import dashboardEn from "../locales/dashboard/en.json";
 import scenarioEn from "../locales/scenario/en.json";
+import cognitionEn from "../locales/cognition/en.json";
 
 export type Locale = "zh" | "en";
 
@@ -32,8 +34,8 @@ interface LanguageContextType {
 }
 
 const TRANSLATIONS: Record<Locale, Record<string, string>> = {
-  zh: { ...ontologyZh, ...aiworkbenchZh, ...dwZh, ...knowledgeZh, ...secZh, ...commonZh, ...copilotZh, ...dashboardZh, ...scenarioZh },
-  en: { ...ontologyEn, ...aiworkbenchEn, ...dwEn, ...knowledgeEn, ...secEn, ...commonEn, ...copilotEn, ...dashboardEn, ...scenarioEn },
+  zh: { ...ontologyZh, ...aiworkbenchZh, ...dwZh, ...knowledgeZh, ...secZh, ...commonZh, ...copilotZh, ...dashboardZh, ...scenarioZh, ...cognitionZh },
+  en: { ...ontologyEn, ...aiworkbenchEn, ...dwEn, ...knowledgeEn, ...secEn, ...commonEn, ...copilotEn, ...dashboardEn, ...scenarioEn, ...cognitionEn },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
