@@ -229,21 +229,33 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
         </div>
       </div>
 
-      {/* 主区：未触发时空态；触发后 KPI + 进度条 + 状态 badge */}
+      {/* 主区：未触发时空态（含灰态 KPI + 0% 进度条）；触发后 KPI + 进度条 + 状态 badge */}
       {active === null || active === undefined || !job ? (
         <div className="space-y-3">
-          <div className={`p-4 rounded-lg text-xs text-center ${styles.muted} ${styles.badgeBg}`}>
-            {t('knowledge.datasync.monitor.empty')}
+          <div className={`p-3 rounded-lg text-xs text-center ${styles.muted} ${styles.badgeBg}`}>
+            {t('knowledge.datasync.monitor.no_task')}
           </div>
-          {active !== null && active !== undefined && (
-            <div className="flex items-center gap-2 text-[10px] font-mono" style={{ color: styles.muted }}>
-              <Activity size={10} />
-              {t('knowledge.datasync.monitor.retention_logged')}
-              <span className={isDryRun ? `${styles.warningBg} ${styles.warningText} ${styles.warningBorder} px-1.5 py-0.5 rounded-md border` : ''}>
-                {isDryRun ? t('knowledge.datasync.monitor.dry_run_badge') : ''}
-              </span>
-            </div>
-          )}
+          {/* 灰态 KPI（值=0，提示面板结构） */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {kpiValues.map(k => (
+              <div key={k.label} className={`rounded-lg px-3 py-2 border ${styles.badgeBg} opacity-50`} style={{ borderColor: styles.cardBorder }}>
+                <p className="text-[10px] font-mono uppercase tracking-wider" style={{ color: styles.muted }}>{k.label}</p>
+                <p className="text-sm font-bold font-mono" style={{ color: styles.muted }}>{k.value}</p>
+              </div>
+            ))}
+          </div>
+          {/* 0% 进度条（灰态） */}
+          <div className={`h-2 rounded-md overflow-hidden ${styles.inputBg} border opacity-50`} style={{ borderColor: styles.cardBorder }}>
+            <div className={`h-full ${styles.accentBg}`} style={{ width: '0%' }} />
+          </div>
+          {/* 空日志占位 */}
+          <div className={`rounded-lg p-3 ${styles.badgeBg}`} style={{ borderColor: styles.cardBorder }}>
+            <p className="text-[10px] font-mono uppercase tracking-wider flex items-center gap-1.5" style={{ color: styles.muted }}>
+              <FileText size={10} />
+              {t('knowledge.datasync.monitor.select_text')}
+            </p>
+            <pre className="text-[10px] font-mono mt-1.5" style={{ color: styles.muted }}>{t('knowledge.datasync.monitor.no_logs')}</pre>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

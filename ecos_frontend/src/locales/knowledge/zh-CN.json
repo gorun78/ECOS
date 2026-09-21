@@ -941,6 +941,7 @@
   "knowledge.datasync.monitor.pick_exec": "真的立即执行",
   "knowledge.datasync.monitor.dry_run_badge": "dry-run",
   "knowledge.datasync.monitor.empty": "触发一次抽取后会在此显示实时进度、KPI、日志与任务历史。",
+  "knowledge.datasync.monitor.no_task": "暂无抽取任务 — 选择「立即抽取」或「定时抽取」触发后，此处将显示实时进度",
 
   "knowledge.datasync.sched.new_title": "新建定时任务",
   "knowledge.datasync.sched.edit_title": "定时任务·{name}",

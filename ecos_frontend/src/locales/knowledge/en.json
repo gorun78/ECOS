@@ -1075,6 +1075,7 @@
   "knowledge.datasync.monitor.pick_exec": "Actually Execute Now",
   "knowledge.datasync.monitor.dry_run_badge": "dry-run",
   "knowledge.datasync.monitor.empty": "After triggering an extraction, realtime progress, KPI, logs and job list will appear here.",
+  "knowledge.datasync.monitor.no_task": "No extraction jobs — trigger via \"Run Now\" or \"Scheduled\" to see realtime progress here",
 
   "knowledge.datasync.sched.new_title": "New Scheduled Run",
   "knowledge.datasync.sched.edit_title": "Scheduled Run · {name}",
