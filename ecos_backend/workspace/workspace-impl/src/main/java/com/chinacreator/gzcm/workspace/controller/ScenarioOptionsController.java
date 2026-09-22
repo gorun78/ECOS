@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 场景资源选项池 REST API — 6 类真 ID 跨服务联查（PMO-60 v2.0 P1）。
@@ -207,6 +208,12 @@ public class ScenarioOptionsController {
                 serviceName + " unreachable: " + (reason != null && reason.length() > 128 ? reason.substring(0, 128) : reason));
     }
 
+    /** 安全字段白名单——仅这些 key 允许透传到前端 extra（防 host/port/username/jdbcUrl/password 泄漏） */
+    private static final Set<String> EXTRA_WHITELIST = Set.of(
+            "code", "domain", "status", "type", "health", "labels",
+            "name", "description", "tags", "category", "priority", "enabled"
+    );
+
     @SuppressWarnings("unchecked")
     private static AvailableItemVO toItem(Map<?, ?> m, String idField, String nameField) {
         String id = asString(m.get(idField));
@@ -216,9 +223,10 @@ public class ScenarioOptionsController {
         }
         Map<String, Object> extra = new LinkedHashMap<>();
         for (Map.Entry<?, ?> e : m.entrySet()) {
-            if (!idField.equals(e.getKey()) && !nameField.equals(e.getKey())
-                    && !"label".equals(e.getKey()) && e.getValue() != null) {
-                extra.put(String.valueOf(e.getKey()), e.getValue());
+            String key = String.valueOf(e.getKey());
+            if (EXTRA_WHITELIST.contains(key.toLowerCase()) && e.getValue() != null
+                    && !key.equals(idField) && !key.equals(nameField) && !"label".equals(key)) {
+                extra.put(key, e.getValue());
             }
         }
         return new AvailableItemVO(id, name, extra);
