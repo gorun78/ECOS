@@ -23,6 +23,14 @@ import com.chinacreator.gzcm.runtime.core.task.parser.ITaskParser;
 import com.chinacreator.gzcm.runtime.core.task.persistence.ITaskPersistenceService;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 
+/**
+ * 任务管理服务 — PMO-72 W4：所有 submitTask / executeTask / 状态变更 全部落 PG
+ * (runtime.task.persistence 走 Spring JdbcTemplate, JdbcTaskPersistenceService 实现,
+ * 而非历史 DatabaseTaskPersistenceServiceImpl 的内存反射路径)。
+ *
+ * <p>双态：PG 不可达时 warn 不抛（Kafka 同思路），内存 ConcurrentMap 仍保留作热路径；
+ * 启动时 {@link #onStartup} 从 PG 拉一次 plan 缓存到内存（兼容性兜底）。</p>
+ */
 @Service
 public class TaskManagementServiceImpl implements ITaskManagementService {
 
@@ -226,10 +234,8 @@ public class TaskManagementServiceImpl implements ITaskManagementService {
         if (persistenceService != null) {
             try {
                 persistenceService.saveStatus(status);
-                // 记录执行记录（如果支持）
-                if (persistenceService instanceof com.chinacreator.gzcm.runtime.core.task.persistence.impl.DatabaseTaskPersistenceServiceImpl) {
-                    recordTaskExecution(taskId, status, result);
-                }
+                // PMO-72 W4: 任务完成时同步更新 td_runtime_task_plan.last_run_at + last_status
+                persistPlanLastRunOnFinish(taskId, status);
             } catch (Exception e) {
                 logger.warn("持久化任务状态失败: taskId={}", taskId, e);
             }
@@ -237,6 +243,28 @@ public class TaskManagementServiceImpl implements ITaskManagementService {
         
         logger.info("任务执行完成: taskId={}, status={}", taskId, status.getStatus());
         return result;
+    }
+
+    /**
+     * PMO-72 W4: executeTask 完成后落 plan.last_run_at + last_status.
+     * 失败容忍：PG 不可达时 warn 不抛（Kafka 同思路，不阻塞主流程）。
+     */
+    private void persistPlanLastRunOnFinish(String taskId, TaskStatus status) {
+        if (!(persistenceService instanceof com.chinacreator.gzcm.runtime.core.task.persistence.impl.JdbcTaskPersistenceService)) {
+            return;
+        }
+        try {
+            com.chinacreator.gzcm.runtime.core.task.persistence.impl.JdbcTaskPersistenceService jdbc =
+                    (com.chinacreator.gzcm.runtime.core.task.persistence.impl.JdbcTaskPersistenceService) persistenceService;
+            boolean ok = jdbc.markLastRun(taskId,
+                    status.getEndTime() != null ? status.getEndTime() : new Date(),
+                    status.getStatus() != null ? status.getStatus().name() : null);
+            if (!ok) {
+                logger.warn("persistPlanLastRunOnFinish: 落 PG plan.last_run_at 失败 taskId={}", taskId);
+            }
+        } catch (Exception e) {
+            logger.warn("persistPlanLastRunOnFinish: 异常 taskId={}", taskId, e);
+        }
     }
     
     /**
@@ -555,6 +583,52 @@ public class TaskManagementServiceImpl implements ITaskManagementService {
     @Autowired
     public void setPersistenceService(ITaskPersistenceService persistenceService) {
         this.persistenceService = persistenceService;
+    }
+
+    /**
+     * PMO-72 W4 — 启动时从 PG 恢复所有计划到内存（@PostConstruct）。
+     *
+     * <p>兼容重启：进程冷启动时, 业务进程重启前 submitTask 的任务已 sysman 落 PG,
+     * 这里把 td_runtime_task_plan.is_deleted=0 一次性拉回来填到 plans map, 使
+     * {@link #getTaskExecutionPlan(String)} / {@link #executeTask(String)} 立即命中
+     * 内存。</p>
+     *
+     * <p>失败容忍：PG 不可达时静默降级（warn 不抛），避免 PG 抖动阻止 gateway 启动。</p>
+     */
+    @jakarta.annotation.PostConstruct
+    public void onStartup() {
+        if (persistenceService == null) {
+            logger.warn("onStartup: persistenceService 未注入, 跳过 PG 计划恢复");
+            return;
+        }
+        try {
+            List<TaskDescription> persistedTasks = persistenceService.queryTasks(
+                    new HashMap<>(), 0, 1000);
+            if (persistedTasks != null) {
+                for (TaskDescription td : persistedTasks) {
+                    if (td == null || td.getTaskId() == null) {
+                        continue;
+                    }
+                    tasks.put(td.getTaskId(), td);
+                }
+            }
+            for (String taskId : tasks.keySet()) {
+                TaskExecutionPlan p;
+                try {
+                    p = persistenceService.getPlan(taskId);
+                } catch (Exception e) {
+                    logger.warn("onStartup: getPlan 失败 taskId={}", taskId, e);
+                    continue;
+                }
+                if (p != null) {
+                    plans.put(taskId, p);
+                }
+            }
+            logger.info("onStartup: PG 恢复 {} 个任务 + {} 个执行计划",
+                    tasks.size(), plans.size());
+        } catch (Exception e) {
+            logger.warn("onStartup: PG 计划恢复失败（双态降级, 不阻断启动）", e);
+        }
     }
 
     private void setStatus(String taskId, TaskStatus.Status s) {

@@ -25,5 +25,11 @@
             <artifactId>runtime-access</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+
+        <!-- PMO-72 W4: PG 持久化基石 — JdbcTemplate 直连 sys_man (走 HikariCP 默认连接池, IR01/EN01) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
     </dependencies>
 </project>
