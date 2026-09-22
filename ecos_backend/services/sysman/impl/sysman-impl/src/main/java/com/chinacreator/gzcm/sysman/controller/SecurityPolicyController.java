@@ -25,7 +25,7 @@ import java.util.*;
  * 写操作审计：通过 {@code EventBusService}（可选注入）发送事件到
  * {@code KafkaTopics.AUDIT}（{@code ecos.audit}）topic。不可用时仅 WARN 日志，不阻塞主流程。
  */
-@RestController
+@RestController("ecosSecurityPolicyController")
 @RequestMapping("/api/v1/security/policies")
 public class SecurityPolicyController {
 

@@ -26,6 +26,7 @@ import java.util.Map;
  * 统一走 runtime-task（PIPELINE 类型），满足"定时采集进异步任务中心"。
  */
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(com.chinacreator.gzcm.engine.data.pipeline.PipelineService.class)
 public class DataIngestScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DataIngestScheduler.class);

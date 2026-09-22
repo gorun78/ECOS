@@ -39,6 +39,7 @@ import java.util.Map;
  * </ul>
  */
 @Service
+@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(com.chinacreator.gzcm.engine.data.pipeline.PipelineService.class)
 public class DataIngestService {
 
     private static final Logger log = LoggerFactory.getLogger(DataIngestService.class);

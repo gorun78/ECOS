@@ -24,6 +24,7 @@ import java.util.Map;
  * 保持 Object 类型（Neo4j 节点属性随本体演进，动态 Map 集合）。
  */
 @RestController
+@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(com.chinacreator.gzcm.common.service.IGraphService.class)
 @RequestMapping("/api/v1/engine/ontology/graph")
 public class OntologyGraphController {
 
