@@ -53,7 +53,7 @@ public class OntologyMappingCreateDTO {
     /** 是否参与图谱实例化（Q2 裁决新增列，默认 true；false = 显式关闭） */
     private Boolean materialized;
 
-    /** 非结构化文档锚点 JSON 字符串（W2 新增，写入 {@code doc_anchor} 列；可选，{@code null} = 不动/无锚点） */
+    /** 非结构化文档锚点 JSON 字符串（W2 新增，写入 {@code doc_anchor_json} 列；可选，{@code null} = 不动/无锚点） */
     private String docAnchorJson;
 
     /** 锚点类型（W2 新增，写入 {@code doc_anchor_type} 列：TABLE / DOC_ONLY / MIXED） */

@@ -237,7 +237,7 @@ public class OntologyMappingController {
         }
         // W2 新增：非结构化文档锚点（仅"非 null"时覆盖，语义与 Q2 materialized 一致）
         if (dto.getDocAnchorJson() != null) {
-            sql.append(", doc_anchor=?::jsonb");
+            sql.append(", doc_anchor_json=?::jsonb");
             params.add(dto.getDocAnchorJson());
         }
         if (dto.getDocAnchorType() != null) {

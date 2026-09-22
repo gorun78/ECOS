@@ -53,15 +53,15 @@ public class OntologyMappingService {
     /** 问题码：指定的映射主键不存在。 */
     private static final String CODE_MAPPING_NOT_FOUND = "MAPPING_NOT_FOUND";
 
-    /** 映射表显式列清单（禁 {@code SELECT *}，架构铁律 §六 SQL 规范；含 Q2 新增列 materialized、W2 新增列 doc_anchor/doc_anchor_type）。 */
+    /** 映射表显式列清单（禁 {@code SELECT *}，架构铁律 §六 SQL 规范；含 Q2 新增列 materialized、W2 新增列 doc_anchor_json/doc_anchor_type）。 */
     private static final String MAPPING_COLUMNS =
             "id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, "
-                    + "field_mappings, materialized, doc_anchor, doc_anchor_type, created_at, updated_at";
+                    + "field_mappings, materialized, doc_anchor_json, doc_anchor_type, created_at, updated_at";
 
     /** 映射表显式列清单（带 {@code m.} 别名，联表查询用）。 */
     private static final String MAPPING_COLUMNS_ALIASED =
             "m.id, m.entity_code, m.entity_name, m.domain_code, m.datasource_id, m.resource_name, "
-                    + "m.table_schema, m.field_mappings, m.materialized, m.doc_anchor, m.doc_anchor_type, "
+                    + "m.table_schema, m.field_mappings, m.materialized, m.doc_anchor_json, m.doc_anchor_type, "
                     + "m.created_at, m.updated_at";
 
     private final JdbcTemplate jdbc;
@@ -129,7 +129,7 @@ public class OntologyMappingService {
     }
 
     /**
-     * 插入新映射记录（旧签名兼容重载，doc_anchor 走 {@code null} 默认路径）。
+     * 插入新映射记录（旧签名兼容重载，doc_anchor_json 走 {@code null} 默认路径）。
      */
     public void insertMapping(String id, String objectId, String sourceName,
                               String sourceType, String sourceUri, String fieldMappingsJson,
@@ -142,7 +142,7 @@ public class OntologyMappingService {
      * 插入新映射记录（W2 扩展：非结构化文档锚点）。
      *
      * @param materialized   是否参与图谱实例化（Q2 裁决）；{@code null} 时按默认 {@code true} 落库
-     * @param docAnchorJson  非结构化文档锚点 JSON（{@code doc_anchor} 列，W2 新增；
+     * @param docAnchorJson  非结构化文档锚点 JSON（{@code doc_anchor_json} 列，W2 新增；
      *                       {@code null} = 无锚点）
      * @param docAnchorType  锚点类型（{@code doc_anchor_type} 列，W2 新增；
      *                       TABLE/DOC_ONLY/MIXED，{@code null} = 未显式指定）
@@ -153,7 +153,7 @@ public class OntologyMappingService {
         String normalizedType = (docAnchorType == null || docAnchorType.isBlank())
                 ? null : docAnchorType.trim();
         jdbc.update(
-                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, materialized, doc_anchor, doc_anchor_type, created_at, updated_at) "
+                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, materialized, doc_anchor_json, doc_anchor_type, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?::jsonb, ?, NOW(), NOW())",
                 id, objectId, sourceName, sourceType, "",
                 sourceName, sourceUri, fieldMappingsJson,
@@ -589,15 +589,15 @@ public class OntologyMappingService {
         // Q2 裁决：materialized 为表列（非扩展属性），null 视为默认 true
         Object materialized = row.get("materialized");
         vo.setMaterialized(materialized == null ? Boolean.TRUE : Boolean.valueOf(String.valueOf(materialized)));
-        // W2 新增：非结构化文档锚点（列 doc_anchor JSONB / doc_anchor_type VARCHAR）
-        Object docAnchorObj = row.get("doc_anchor");
+        // W2 新增：非结构化文档锚点（列 doc_anchor_json JSONB / doc_anchor_type VARCHAR）
+        Object docAnchorObj = row.get("doc_anchor_json");
         if (docAnchorObj != null) {
             Map<String, Object> docAnchor = parseFieldMappings(docAnchorObj);
             vo.setDocAnchor(docAnchor);
             try {
                 vo.setDocAnchorJson(MAPPER.writeValueAsString(docAnchor));
             } catch (Exception e) {
-                log.warn("序列化 doc_anchor 失败 mappingId={}: {}", rowId, e.getMessage());
+                log.warn("序列化 doc_anchor_json 失败 mappingId={}: {}", rowId, e.getMessage());
             }
         }
         Object docAnchorTypeObj = row.get("doc_anchor_type");

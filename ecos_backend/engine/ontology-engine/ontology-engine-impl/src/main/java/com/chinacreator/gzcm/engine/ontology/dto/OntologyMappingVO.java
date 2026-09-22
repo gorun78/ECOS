@@ -67,7 +67,7 @@ public class OntologyMappingVO {
     /** 是否参与实例化（Q2 裁决新增列，默认 true；false = 显式关闭图谱实例化） */
     private Boolean materialized;
 
-    /** 非结构化文档锚点 JSON 字符串（W2 新增，列 {@code doc_anchor}；前端按需取解析态字段 {@link #docAnchor}） */
+    /** 非结构化文档锚点 JSON 字符串（W2 新增，列 {@code doc_anchor_json}；前端按需取解析态字段 {@link #docAnchor}） */
     private String docAnchorJson;
 
     /** 锚点类型（W2 新增，列 {@code doc_anchor_type}：TABLE / DOC_ONLY / MIXED） */
