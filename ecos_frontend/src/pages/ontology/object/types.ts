@@ -3,6 +3,7 @@
  * @license Apache-2.0
  */
 import type { ObjectType, PropertyType, Dataset, SharedProperty, InterfaceType, OntologyDomain } from '../../../types/ontology';
+import type { DocAnchor, DocAnchorType, MappingValidationReport } from '../../../types/ontology';
 
 export interface ObjectDetailTabProps {
   objectType: ObjectType;
@@ -48,6 +49,22 @@ export interface MappingTabProps extends ObjectDetailTabProps {
   handlePropMappingChange: (propId: string, colName: string) => void;
   mappingDirty: boolean;
   onSaveMapping: () => void;
+  /** W2 新增：当前非结构化文档锚点（TABLE 类型时为 undefined，Tab 内不显示输入区） */
+  docAnchor?: DocAnchor;
+  /** W2 新增：锚点类型（默认 TABLE） */
+  docAnchorType?: DocAnchorType;
+  /** W2 新增：修改锚点（任意字段变化均会置位 mappingDirty） */
+  handleDocAnchorChange?: (anchor: DocAnchor | null) => void;
+  /** W2 新增：修改锚点类型（切换类型时保留锚点输入值以便回填） */
+  handleDocAnchorTypeChange?: (type: DocAnchorType) => void;
+  /** W2 新增：「校验映射」按钮点击回调（触发 C4 校验，对象详情层负责消费报告） */
+  onValidateMappings?: () => void;
+  /** W2 新增：校验按钮执行中禁用 */
+  validating?: boolean;
+  /** W2 新增：校验报告（点击「校验映射」后由父层装载；undefined = 尚未校验） */
+  lastValidation?: MappingValidationReport;
+  /** W2 新增：关闭校验报告弹层（不传则不渲染 Modal） */
+  onDismissValidation?: () => void;
 }
 
 export interface LinksTabProps {

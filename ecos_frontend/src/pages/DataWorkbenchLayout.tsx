@@ -1,16 +1,18 @@
 /**
  * DataWorkbenchLayout — Shell component
- * Tab navigation + Copilot toggle + conditional rendering of 6 tab modules.
+ * Tab navigation + Copilot toggle + conditional rendering of tab modules.
  *
  * PMO-3I (2026-08-25): consolidated 9 tabs → 6 tabs.
  *   - removed: guide, syncs, pipelines (as separate tabs)
  *   - merged syncs + pipelines into pipeline-builder (list + editor dual-pane)
- *   - final tabs: connections / pipeline-builder / health / lineage / sql-query / engine-config
+ *   - final tabs: connections / pipeline-builder / health / lineage / engine-config
+ * 数据质量（health）内嵌为工作台内 Tab，保留工作台侧边菜单；
+ * 独立路由 #/dq_dashboard 保留给 Topbar 入口与深链（?tab=&table=）使用。
  * @license Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { showToastGlobal } from '../components/common/Toast';
@@ -23,16 +25,27 @@ import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
 import { AddConnectionModal, AddSyncModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
 import { useDataWorkbench } from './data-workbench/hooks/useDataWorkbench';
 
-type TabName = 'connections' | 'pipeline-builder' | 'lineage' | 'engine-config';
+/** 数据质量中心（独立路由页复用同一组件，此处内嵌展示） */
+const DataQualityDashboard = lazy(() => import('./DataQualityDashboard'));
 
-/** 侧边栏条目：navigateTo 存在时为跨路由导航项，否则为工作台内 tab 切换。 */
+/** 懒加载 Tab 的加载占位 */
+function TabLoading() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" />
+    </div>
+  );
+}
+
+type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'engine-config';
+
+/** 侧边栏条目：切换工作台内 tab。 */
 interface SideTabItem {
   id: string;
   icon: string;
   i18nKey: string;
-  /** 目标路由路径，仅跨路由导航项需要（如「数据质量」→ 数据质量中心）。 */
-  navigateTo?: string;
 }
+
 
 interface DataWorkbenchLayoutProps {
   objectTypes?: ObjectType[];
@@ -44,14 +57,14 @@ interface DataWorkbenchLayoutProps {
 }
 
 /**
- * 侧边栏主菜单（4 项，按用户指定顺序：数据源连接 → 数据管道 → 数据质量 → 数据血缘）。
- * 「数据质量」为跨路由导航项，点击直接进入数据质量中心（#/dq_dashboard），不再内嵌质量检测 tab。
+ * 侧边栏主菜单（4 项，按用户指定顺序：数据源同步 → 数据管道 → 数据质量 → 数据血缘）。
+ * 全部为工作台内 Tab 切换，切换后侧边菜单保持一致可见。
  * 引擎配置不在主菜单内，改为靠底展示（置于「物理数据监控仪表」之上），见下方 SIDE_BOTTOM_TABS。
  */
 const TAB_CONFIG: SideTabItem[] = [
   { id: 'connections', icon: 'Database', i18nKey: 'dw.tab.connections' },
   { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
-  { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health', navigateTo: '/dq_dashboard' },
+  { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
 ];
 
@@ -65,7 +78,6 @@ export default function DataWorkbenchLayout({
 }: DataWorkbenchLayoutProps = {}) {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
-  const navigate = useNavigate();
   const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
 
   const dw = useDataWorkbench(showToast, t);
@@ -94,12 +106,11 @@ export default function DataWorkbenchLayout({
   // ── UI toggles ──
   const [showExtIfaces, setShowExtIfaces] = useState(false);
 
-  /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。
-   *  带 navigateTo 的条目跳转目标路由（不参与 tab 选中态）。 */
+  /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。 */
   const renderSideTab = (tab: SideTabItem) => {
-    const active = !tab.navigateTo && activeTab === tab.id;
+    const active = activeTab === tab.id;
     return (
-      <button key={tab.id} onClick={() => tab.navigateTo ? navigate(tab.navigateTo) : setActiveTab(tab.id)}
+      <button key={tab.id} onClick={() => setActiveTab(tab.id)}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${active ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm` : `${styles.cardTextMuted} hover:opacity-80`}`}>
           <LucideIcon name={tab.icon} size={14} className={active ? styles.accentText : styles.cardTextMuted} />
           <span className="truncate">{t(tab.i18nKey)}</span>
@@ -135,6 +146,11 @@ export default function DataWorkbenchLayout({
         <div className="flex-1 flex overflow-hidden min-w-0">
           {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />}
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} triggerSync={dw.triggerSync} t={t} />}
+          {activeTab === 'health' && (
+            <Suspense fallback={<TabLoading />}>
+              <DataQualityDashboard />
+            </Suspense>
+          )}
           {activeTab === 'lineage' && <DataLineageTab initialTable={initialLineageTable} />}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>

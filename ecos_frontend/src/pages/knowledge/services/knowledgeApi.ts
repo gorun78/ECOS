@@ -37,10 +37,27 @@ const KB_V1 = '/api/v1/knowledge';
 
 // ── Wave 3 C1 — T8 抽取 · 定时 · 日志 · 本体树 类型 ───────────────────────────
 
-/** 本体树节点（三级结构：domain → ontologies → entityCodes） */
+/** 本体对象类型（实体）简表 */
+export interface EntityBrief {
+  code: string;
+  name: string;
+  entityType: string;
+  domainId?: string;
+  sortOrder?: number;
+}
+
+/** 本体树节点（域 → 本体 → 对象类型） */
 export interface OntologyTreeVo {
   domain: string;
-  ontologies: Array<{ id: string; name: string; entityCodes: string[] }>;
+  ontologies: Array<{
+    id: string;
+    name: string;
+    entityCodes: string[];
+    /** 对象类型列表（entityType 徽章渲染源） */
+    entities?: EntityBrief[];
+    /** 按业务域分组的对象类型（domainId → entities） */
+    domainBreakdown?: Record<string, EntityBrief[]>;
+  }>;
 }
 
 /** 定时抽取任务定义 */
@@ -411,9 +428,11 @@ export interface GraphStats {
   graphEdgeCount: number;
   embeddingCount: number;
   ruleCount: number;
+  articleCount?: number;
+  docCount?: number;
+  complianceRuleCount?: number;
   lastUpdatedAt?: string;
   embeddingDim?: number;
-  docCount?: number;
 }
 
 export async function fetchGraphStats(): Promise<GraphStats> {
@@ -423,10 +442,12 @@ export async function fetchGraphStats(): Promise<GraphStats> {
       graphNodeCount: data?.graphNodeCount ?? 0,
       graphEdgeCount: data?.graphEdgeCount ?? 0,
       embeddingCount: data?.embeddingCount ?? 0,
-      ruleCount: data?.ruleCount ?? 0,
+      ruleCount: data?.ruleCount ?? data?.complianceRuleCount ?? 0,
+      articleCount: data?.articleCount,
+      docCount: data?.docCount,
+      complianceRuleCount: data?.complianceRuleCount,
       lastUpdatedAt: data?.lastUpdatedAt,
       embeddingDim: data?.embeddingDim,
-      docCount: data?.docCount,
     };
   } catch {
     return { graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 };
@@ -907,12 +928,40 @@ export async function fetchExportLogBody(jobId: number): Promise<Blob> {
   return res.blob();
 }
 
-/** 触发结构化抽取（dryRun=true 只统计不落库） */
+/**
+ * 触发结构化抽取。
+ *
+ * 后端（StructuredExtractController POST /extract/structured）两种响应形态：
+ * - dryRun=true  —— 同步返回 EntityInstanceExtractionReportVO
+ *   （{ ontologyId, ontologyCount, entityCount, nodeCreated, nodeUpdated,
+ *     nodeSkipped, edgeCreated, durationMs, issues[], ... }，无可轮询 taskId）；
+ * - dryRun=false —— 异步返回 KbImportTriggerVO（{ taskId, jobId }）。
+ */
+export interface StructuredExtractDryRunReport {
+  ontologyId?: string;
+  durationMs?: number;
+  ontologyCount?: number;
+  entityCount?: number;
+  nodeCreated?: number;
+  nodeUpdated?: number;
+  nodeSkipped?: number;
+  edgeCreated?: number;
+  invalidMappings?: number;
+  mode?: string;
+  dryRun?: boolean;
+}
+
+export interface StructuredExtractTriggerResp extends StructuredExtractDryRunReport {
+  taskId?: string;
+  jobId?: number;
+  status?: string;
+}
+
 export async function triggerStructuredExtract(req: {
   dryRun: boolean;
   mode: string;
-}): Promise<{ taskId: string; jobId: number; status: string }> {
-  const data = await apiFetchData<{ taskId: string; jobId: number; status: string }>(
+}): Promise<StructuredExtractTriggerResp> {
+  const data = await apiFetchData<StructuredExtractTriggerResp>(
     `${KB_V1}/extract/structured`,
     { method: 'POST', body: JSON.stringify(req) },
   );

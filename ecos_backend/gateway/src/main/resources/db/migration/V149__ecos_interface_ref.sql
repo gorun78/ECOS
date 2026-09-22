@@ -5,7 +5,7 @@
 
 CREATE TABLE IF NOT EXISTS ecos_interface_ref (
     id             VARCHAR(64) PRIMARY KEY,          -- ifc_xxxxxxxx
-    name           VARCHAR(255) NOT NULL UNIQUE,
+    name           VARCHAR(255) NOT NULL,
     interface_type VARCHAR(32) NOT NULL,             -- HTTP|KAFKA|REST|MQ|AMQP
     endpoint       VARCHAR(512) NOT NULL,            -- host:port/path 或 topic
     method         VARCHAR(16),
@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS ecos_interface_ref (
     update_time    TIMESTAMP NOT NULL DEFAULT NOW(),
     create_by      VARCHAR(64) NOT NULL DEFAULT 'system',
     update_by      VARCHAR(64) NOT NULL DEFAULT 'system',
-    is_deleted     SMALLINT NOT NULL DEFAULT 0
+    is_deleted     SMALLINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_ifc_ref_type_name UNIQUE (interface_type, name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ifc_ref_type ON ecos_interface_ref (interface_type, is_deleted);

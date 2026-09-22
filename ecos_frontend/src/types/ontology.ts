@@ -320,6 +320,39 @@ export interface OntologyMappingRecord {
   status: string;
   createdAt: string;
   updatedAt: string;
+  /** 非结构化文档锚点 JSON 字符串（W2 新增，列 doc_anchor） */
+  docAnchorJson?: string;
+  /** 锚点类型：TABLE / DOC_ONLY / MIXED（W2 新增，列 doc_anchor_type） */
+  docAnchorType?: string;
+  /** 非结构化文档锚点解析态：{docId, source, docChunkCount}（W2 新增） */
+  docAnchor?: { docId: string; source: string; docChunkCount?: number };
+}
+
+/** 锚点类型 — 与后端 ecos_entity_table_mapping.doc_anchor_type 对齐（W2 新增） */
+export type DocAnchorType = "TABLE" | "DOC_ONLY" | "MIXED";
+
+/** 非结构化文档锚点载荷 — 序列化为 docAnchorJson 传给后端（W2 新增） */
+export interface DocAnchor {
+  docId: string;
+  source: string;
+  docChunkCount?: number;
+}
+
+/** 映射校验（C4）问题项 — 对齐后端 OntologyMappingIssueVO */
+export interface MappingValidationIssue {
+  entityCode?: string;
+  tableName?: string;
+  columnName?: string;
+  code: string;
+  message: string;
+}
+
+/** 映射校验（C4）报告 — 对齐后端 OntologyMappingValidationVO */
+export interface MappingValidationReport {
+  valid: boolean;
+  checkedCount: number;
+  rejectCode?: string;
+  issues: MappingValidationIssue[];
 }
 
 export interface CreateMappingDTO {
@@ -330,6 +363,10 @@ export interface CreateMappingDTO {
   sourceName?: string;
   sourceUri?: string;
   description?: string;
+  /** 非结构化文档锚点 JSON 字符串（W2 新增，可选） */
+  docAnchorJson?: string;
+  /** 锚点类型：TABLE / DOC_ONLY / MIXED（W2 新增，可选） */
+  docAnchorType?: string;
 }
 
 export interface UpdateMappingDTO {
@@ -341,6 +378,10 @@ export interface UpdateMappingDTO {
   propertyMappings?: Record<string, string>;
   description?: string;
   status?: string;
+  /** 非结构化文档锚点 JSON 字符串（W2 新增，可选；不传则后端不覆盖） */
+  docAnchorJson?: string;
+  /** 锚点类型（W2 新增，可选；不传则后端不覆盖） */
+  docAnchorType?: string;
 }
 
 // ================================================================

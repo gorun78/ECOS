@@ -73,6 +73,11 @@ ecos:
     embedding-dimension: ${ECOS_RAG_EMB_DIM:1536}
   # 本体版本发布消费者: 微服务内网直连 buszhi 18083 (ADR-7 内网可达)
   ontology-base: ${ECOS_ONTOLOGY_BASE:http://localhost:18083/api/v1/ecos}
+  # ⚠️ REST consumer of kb 的 OntologyTreeController / KbEntityInstanceExtractionService:
+  # 默认走 gateway 同进程路由（fat-JAR 加载 OntologyController 直读 sys_man.public.ecos_ontology），
+  # 避免 buszhi:18083 停服时本体树静默空（ADR-7 服务端口仅内网，buszhi 挂 = 403/连接拒绝 → 静默空树）。
+  # body: gateway 的 /api/v1/ecos/** 在 auth.whitelist（见 gateway application.yml:80），匿名可达。
+  ontology-api-base: ${ECOS_ONTOLOGY_API_BASE:http://localhost:8080/api/v1}
   # DCCheng 双跑期 (gateway 与 dccheng 共进程时) 自动识别:
   # 双跑时 event 走 Spring 同 JVM, REST 通过 X-ECOS- 头走 18083 也可
   dccheng:

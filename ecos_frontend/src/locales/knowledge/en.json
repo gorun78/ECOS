@@ -260,6 +260,13 @@
   "knowledge.overview.vector_dim": "Vector Dim",
   "knowledge.overview.doc_count": "Docs Covered",
   "knowledge.overview.last_sync": "Last Sync",
+  "knowledge.stats.title": "Graph & Vector Store (real KB counts)",
+  "knowledge.stats.hint": "source /api/v1/knowledge/stats · auto-refresh after extract",
+  "knowledge.stats.gloss.graph_node": "Graph Nodes",
+  "knowledge.stats.gloss.graph_edge": "Graph Edges",
+  "knowledge.stats.gloss.doc": "Docs Covered",
+  "knowledge.stats.gloss.embedding": "Embeddings",
+  "knowledge.stats.gloss.article": "Articles",
   "knowledge.overview.engine_status": "Engine Status",
 
   "knowledge.datasync.title": "Data Sync",
@@ -1071,6 +1078,11 @@
   "knowledge.datasync.kpi.progress": "Progress",
 
   "knowledge.datasync.extract.erase_hint": "Clears target memory area. dry-run only prints, no persistence.",
+  "knowledge.datasync.extract.submitted": "Extract submitted. Live results stream into the monitor panel below.",
+  "knowledge.datasync.extract.no_target": "No task returned (mappable entities: {count}, skipped: {skipped}) — first run with DW-layer data pending? Check ontology mapping + DW fetch; otherwise review monitor panel shortly",
+  "knowledge.datasync.extract.dryrun_result": "Dry-run done: {count} entities (nodes +{created} / updated {updated}), no persistence",
+  "knowledge.datasync.extract.submit_feedback": "After submit: toast + live monitoring below; dry-run only toasts, no persistence",
+  "knowledge.datasync.precondition.hint": "When no ontology is selected, all materialized=true entities in the mapping table run; valid ontology mapping + DW-layer fetch required.",
   "knowledge.datasync.monitor.pick_dry_run": "Select Dry-run (statistics only)",
   "knowledge.datasync.monitor.pick_exec": "Actually Execute Now",
   "knowledge.datasync.monitor.dry_run_badge": "dry-run",
@@ -1108,5 +1120,19 @@
   "knowledge.datasync.monitor.select_hint": "When no ontology is selected above, runs against all ontologies",
   "knowledge.datasync.export.log_suffix": "extract-log-{id}.log",
 
-  "knowledge.datasync.audit_hint": "Audit log is stored in kb_extract_audit and referenced by jobId; placeholder here, will be wired in a later batch."
+  "knowledge.datasync.audit_hint": "Audit log is stored in kb_extract_audit and referenced by jobId; placeholder here, will be wired in a later batch.",
+
+  "knowledge.datasync.picker.summary": "{domains} domains · {ontologies} ontologies · {objects} object types",
+  "knowledge.datasync.picker.empty_hint": "No object-type details; double-click a row to inspect entities (selection granularity remains ontology-level)",
+  "knowledge.datasync.ontology.domain.unassigned": "Unassigned",
+  "knowledge.datasync.ontology.domains.dom_org": "Organization",
+  "knowledge.datasync.ontology.domains.dom_hr": "Human Resources",
+  "knowledge.datasync.ontology.domains.dom_prod": "Product",
+  "knowledge.datasync.ontology.domains.dom_sales": "Sales",
+  "knowledge.datasync.ontology.domains.dom_proj": "Project",
+  "knowledge.datasync.ontology.domains.dom_proc": "Procurement",
+  "knowledge.datasync.ontology.domains.dom_asset": "Asset",
+  "knowledge.datasync.entityType.master": "Master",
+  "knowledge.datasync.entityType.transaction": "Transaction",
+  "knowledge.datasync.entityType.other": "Other"
 }

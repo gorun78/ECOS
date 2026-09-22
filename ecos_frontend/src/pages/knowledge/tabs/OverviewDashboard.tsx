@@ -9,10 +9,11 @@
  * - 底层：Top Queries 最近 10 条（本地 history）
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard, Binary, Layers, Database,
   Activity, HeartPulse, Search, Clock, Network,
+  FileText, BookMarked, Boxes, Gauge,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
@@ -59,16 +60,29 @@ export default function OverviewDashboard() {
   const [healthAvailable, setHealthAvailable] = useState<boolean | null>(null);
   const [topQueries, setTopQueries] = useState<TopQuery[]>([]);
 
+  /** W3：仅拉一次 /api/v1/knowledge/stats（与初次并发拉调用解耦，收到 kb:stats:refresh 重拉） */
+  const loadStats = useCallback(async () => {
+    try {
+      const stats = await knowledgeApi.fetchGraphStats();
+      setGraphStats(stats);
+      setStatsOff(false);
+    } catch {
+      setStatsOff(true);
+    }
+  }, []);
+
+  /** 萃取落地后 DatasyncTab 发 'kb:stats:refresh' 事件让总览重拉（同 tab 内 refresh 亦生效） */
+  const onStatsRefresh = useCallback(() => { void loadStats(); }, [loadStats]);
+
   useEffect(() => {
+    // C-1: 三路并发，每路独立 catch → 即使某路 500 也不代表整体失败
     (async (): Promise<void> => {
-      // C-1: 三路并发，每路独立 catch → 即使某路 500 也不代表整体失败
       const [stats, logs, health] = await Promise.all([
         knowledgeApi.fetchGraphStats().catch((): null => null),
         (async (): Promise<{ timestamp?: string; [key: string]: unknown }[]> => {
           try {
             const data = await knowledgeApi.fetchSyncLogs();
             if (!Array.isArray(data)) return [];
-            // SyncLog 类型缺 index signature — 走 unknown 中转展开，避免 union type 撞墙
             return data.map(l => ({ ...l, timestamp: (l as { timestamp?: string }).timestamp }));
           } catch {
             return [] as { timestamp?: string; [key: string]: unknown }[];
@@ -76,7 +90,6 @@ export default function OverviewDashboard() {
         })(),
         knowledgeApi.fetchEngineHealth().catch((): null => null),
       ]);
-      // stats 失败 → 整段 KPI 卡降级 empty，记录 "backend offline"；不直接 500 白屏
       if (!stats) {
         setStatsOff(true);
         setGraphStats({ graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 });
@@ -92,6 +105,14 @@ export default function OverviewDashboard() {
     })();
     setTopQueries(loadTopQueries());
   }, []);
+
+  // W3：监听萃取成功事件，重拉 stats（与 DatasyncTab notifyStatsRefresh 对应）
+  useEffect(() => {
+    window.addEventListener('kb:stats:refresh', onStatsRefresh);
+    return () => {
+      window.removeEventListener('kb:stats:refresh', onStatsRefresh);
+    };
+  }, [onStatsRefresh]);
 
   // 最近7天 daily 同步量（本地 group by 天）
   const dailyCounts = useMemo(() => {
@@ -180,6 +201,55 @@ export default function OverviewDashboard() {
             hint={t('knowledge.overview.vector_summary_hint')}
             lastSyncedAt={graphStats.lastUpdatedAt}
           />
+          {/* W3 — KB 5 真实计数（graphNode/edge/doc/embedding/article），0 值灰色 muted */}
+          <div className={`md:col-span-2 border rounded-xl p-4 ${styles.cardBg} ${styles.cardBorder}`}>
+            <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: styles.cardBorder }}>
+              <h3 className={`font-extrabold text-xs flex items-center gap-1.5 ${styles.cardText}`}>
+                <Gauge size={13} className={styles.accentText} />
+                {t('knowledge.stats.title')}
+              </h3>
+              <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+                {graphStats.lastUpdatedAt ?? t('knowledge.overview.stats_offline')}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+              <StatTile
+                icon={<Network size={13} />}
+                label={t('knowledge.stats.gloss.graph_node')}
+                value={graphStats.graphNodeCount}
+                muted={graphStats.graphNodeCount === 0}
+                styles={styles}
+              />
+              <StatTile
+                icon={<Boxes size={13} />}
+                label={t('knowledge.stats.gloss.graph_edge')}
+                value={graphStats.graphEdgeCount}
+                muted={graphStats.graphEdgeCount === 0}
+                styles={styles}
+              />
+              <StatTile
+                icon={<FileText size={13} />}
+                label={t('knowledge.stats.gloss.doc')}
+                value={graphStats.docCount}
+                muted={(graphStats.docCount ?? 0) === 0}
+                styles={styles}
+              />
+              <StatTile
+                icon={<Layers size={13} />}
+                label={t('knowledge.stats.gloss.embedding')}
+                value={graphStats.embeddingCount}
+                muted={graphStats.embeddingCount === 0}
+                styles={styles}
+              />
+              <StatTile
+                icon={<BookMarked size={13} />}
+                label={t('knowledge.stats.gloss.article')}
+                value={graphStats.articleCount}
+                muted={(graphStats.articleCount ?? 0) === 0}
+                styles={styles}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -297,6 +367,35 @@ function SummaryCard({ title, icon, hint, lastSyncedAt }: {
       <div className={`text-[10px] font-mono tracking-wider uppercase ${styles.cardTextMuted}`}>
         {t('knowledge.overview.last_sync')}: <span className="font-bold">{lastSyncedAt ?? '—'}</span>
       </div>
+    </div>
+  );
+}
+
+/** W3 — 总览 KB 统计 tile（值 0 时灰色 muted，避免误呈现为损坏） */
+function StatTile({ icon, label, value, muted, styles }: {
+  icon: React.ReactNode;
+  label: string;
+  value?: number;
+  muted: boolean;
+  styles: ReturnType<typeof useTheme>['styles'];
+}) {
+  const v = value ?? 0;
+  const valueColor = muted ? styles.muted : styles.cardText;
+  const captionColor = muted ? styles.muted : styles.cardTextMuted;
+  return (
+    <div
+      className={`rounded-lg px-3 py-2 border flex flex-col gap-1 ${styles.badgeBg}`}
+      style={{ borderColor: styles.cardBorder, opacity: muted ? 0.85 : 1 }}
+    >
+      <div className="flex items-center gap-1.5" style={{ color: captionColor }}>
+        <span style={{ color: styles.muted }}>
+          {icon}
+        </span>
+        <span className="text-[10px] font-mono uppercase tracking-wider">{label}</span>
+      </div>
+      <p className="text-sm font-black font-mono leading-none" style={{ color: valueColor }}>
+        {v.toLocaleString()}
+      </p>
     </div>
   );
 }

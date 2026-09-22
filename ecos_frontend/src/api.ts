@@ -130,8 +130,44 @@ function toAbortError(e: unknown): Error {
 
 // ── Internal fetch helpers ────────────────────────────────────
 
+/**
+ * Login grace period — lets authenticated session avoid hard logout from
+ * transient 401 during bootstrapped requests (e.g., Topbar fetches
+ * /api/v1/security-profiles/user/{id} right after Login.setToken and
+ * before topbar's useEffect flush clears); in that 10s window we only
+ * throw without clearing the user's token, so a flaky 401 doesn't
+ * silently kick the user back to /login.
+ */
+const AUTH_GRACE_KEY = "auth_refresh_grace_until";
+const AUTH_GRACE_MS = 30_000;
+
+/** 写入登录宽限期（login 成功后调用，让 UI 有 30s 缓冲消化 P3 端点的初次探测） */
+export function setAuthGracePeriod() {
+  try {
+    localStorage.setItem(AUTH_GRACE_KEY, String(Date.now() + AUTH_GRACE_MS));
+  } catch { /* non-critical */ }
+}
+
+/** 检查并消费宽限期 — 在宽限期内返回 true（**不清标记**，保证 10s 窗口内多次 401 都被吸收），过期返回 false */
+function consumeAuthGraceIfActive(): boolean {
+  if (typeof window === "undefined" || !window.localStorage) return false;
+  try {
+    const raw = localStorage.getItem(AUTH_GRACE_KEY);
+    if (!raw) return false;
+    const until = Number(raw);
+    if (Number.isFinite(until) && Date.now() < until) return true;
+    // 宽限期已过期 — 清理
+    if (Number.isFinite(until) && Date.now() >= until) localStorage.removeItem(AUTH_GRACE_KEY);
+  } catch { /* non-critical */ }
+  return false;
+}
+
 /** Global token expiration handler — clears auth and redirects to login */
 function handleAuthExpired(): never {
+  if (consumeAuthGraceIfActive()) {
+    // 宽限期内：只 throw，不清 token、不跳 #/login
+    throw new Error("Session refresh in progress. Please try again.");
+  }
   localStorage.removeItem('token');
   localStorage.removeItem('username');
   localStorage.removeItem('roles');

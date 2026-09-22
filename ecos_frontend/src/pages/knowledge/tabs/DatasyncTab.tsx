@@ -24,6 +24,7 @@ import {
   type ScheduledExtractVo,
   type EntityMappingItem,
 } from '../services/knowledgeApi';
+import { showToastGlobal } from '../../../components/common/Toast';
 import OntologyTreePicker from './components/OntologyTreePicker';
 import MonitorPanel from './components/MonitorPanel';
 
@@ -108,7 +109,17 @@ export default function DatasyncTab() {
 
   useEffect(() => { void loadSchedules(); }, [loadSchedules]);
 
-  /** 立即抽取（执行或 dry-run） */
+  /** 通知 Overview 总览重拉 KB 统计（萃取落地后图谱/向量计数变化） */
+  const notifyStatsRefresh = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('kb:stats:refresh'));
+  }, []);
+
+  /** 立即抽取（执行或 dry-run）
+   *  W3：消除「点了没反应」歧义 ——
+   *   1) dry-run（同步 report）回显实体映射数与节点创建/更新数（不再静默）
+   *   2) 真实执行后端未返回 taskId 时 warn 提示（如无映射可萃取）
+   *   3) 提交成功后发 kb:stats:refresh 让总览重拉
+   */
   const trigger = useCallback(async (runDryAndReturnOnly: boolean) => {
     setError(null);
     if (runDryAndReturnOnly) {
@@ -119,19 +130,37 @@ export default function DatasyncTab() {
     try {
       // 即使用户未选本体，也允许「全部本体」语义触发
       const resp = await triggerStructuredExtract({ dryRun: runDryAndReturnOnly, mode: syncMode });
-      // 仅真实执行（dryRun=false）进监控面板；dry-run 走统计报告不进轮询
-      if (!runDryAndReturnOnly && resp.taskId) {
+      if (runDryAndReturnOnly) {
+        // 同步路径回显 EntityInstanceExtractionReportVO 关键计数
+        showToastGlobal('info', t('knowledge.datasync.extract.dryrun_result', {
+          count: resp.entityCount ?? 0,
+          created: resp.nodeCreated ?? 0,
+          updated: resp.nodeUpdated ?? 0,
+        }));
+        return;
+      }
+      // 异步路径：taskId truthy → 进监控面板 + 通知总览重拉
+      if (resp.taskId) {
         setActive({ taskId: String(resp.taskId), dryRun: false });
         setActiveTrigger('MANUAL');
+        showToastGlobal('success', t('knowledge.datasync.extract.submitted'));
+        notifyStatsRefresh();
+        return;
       }
+      // 无 taskId（拒绝/无目标）→ warn 而非静默
+      showToastGlobal('info', t('knowledge.datasync.extract.no_target', {
+        count: resp.entityCount ?? 0,
+        skipped: resp.nodeSkipped ?? 0,
+      }));
     } catch (e) {
       console.warn('trigger structured extract failed', e);
       setError(String(e));
+      showToastGlobal('error', String(e));
     } finally {
       setRunning(false);
       setDryRunning(false);
     }
-  }, [syncMode]);
+  }, [syncMode, t, notifyStatsRefresh]);
 
   /** 定时任务 CRUD（callback 入参用 ScheduledExtractVo；mode/period string 形态 → 联合类型） */
   const onToggleEnabled = useCallback(async (row: ScheduledExtractVo) => {
@@ -369,6 +398,12 @@ function NowMode(props: {
   const busy = running || dryRunning;
   return (
     <div className="space-y-3">
+      {/* 未选本体时的前置提示（仅提示，不软性禁用） */}
+      {showAllHint && (
+        <p className="text-[11px] leading-normal" style={{ color: styles.muted }}>
+          {t('knowledge.datasync.precondition.hint')}
+        </p>
+      )}
       {/* mode 单选（全量覆盖 / 增量更新） */}
       <div className="flex items-center gap-2">
         <span className="text-[11px]" style={{ color: styles.muted }}>{t('knowledge.datasync.mode.label')}:</span>
@@ -414,6 +449,10 @@ function NowMode(props: {
           {t('knowledge.datasync.monitor.pick_exec')}
         </button>
       </div>
+      {/* 提交后 round-trip 说明（消除"点了没反应"歧义：执行走监控面板 / dry-run 回显 toast） */}
+      <p className="text-[10px] font-mono" style={{ color: styles.muted }}>
+        {t('knowledge.datasync.extract.submit_feedback')}
+      </p>
     </div>
   );
 }

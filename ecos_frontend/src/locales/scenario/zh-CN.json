@@ -284,5 +284,12 @@
   "scenario.sandbox.palette.sec": "安全",
   "scenario.sandbox.palette.iface": "接口",
   "scenario.sandbox.empty.title": "未选择场景",
-  "scenario.sandbox.empty.body": "请在场景库中选一个场景来打开沙盘"
+  "scenario.sandbox.empty.body": "请在场景库中选一个场景来打开沙盘",
+  "scenario.variant.title": "心智变体管理",
+  "scenario.variant.copy": "复制为变体",
+  "scenario.variant.delete": "删除变体",
+  "scenario.variant.delete.confirm": "确认删除此心智变体？",
+  "scenario.variant.empty": "暂无变体（base 心智已隐含存在）",
+  "scenario.variant.inherit": "继承 base 三要素",
+  "scenario.variant.name": "变体名称"
 }

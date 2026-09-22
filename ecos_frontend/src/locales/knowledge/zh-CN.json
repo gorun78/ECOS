@@ -196,6 +196,13 @@
   "knowledge.overview.vector_dim": "向量维数",
   "knowledge.overview.doc_count": "覆盖文档",
   "knowledge.overview.last_sync": "最近同步",
+  "knowledge.stats.title": "图谱与向量库概要（真实 KB 计数）",
+  "knowledge.stats.hint": "来源 /api/v1/knowledge/stats · 萃取后自动刷新",
+  "knowledge.stats.gloss.graph_node": "图谱节点",
+  "knowledge.stats.gloss.graph_edge": "图谱边",
+  "knowledge.stats.gloss.doc": "覆盖文档",
+  "knowledge.stats.gloss.embedding": "向量条目",
+  "knowledge.stats.gloss.article": "知识文章",
   "knowledge.overview.engine_status": "引擎状态",
 
   "knowledge.datasync.title": "数据同步",
@@ -937,6 +944,11 @@
   "knowledge.datasync.kpi.progress": "进度",
 
   "knowledge.datasync.extract.erase_hint": "将目标内存区清空，dry-run 仅打印不落库",
+  "knowledge.datasync.extract.submitted": "萃取已提交，结果在下方监控面板实时回流",
+  "knowledge.datasync.extract.no_target": "后端未返回任务（本批映射实体 {count} 条、跳过 {skipped} 条）—— 若为首次萃取且数据已采集到 DW 层，请稍后查看监控；否则请检查本体工作台映射与数据工作台采集",
+  "knowledge.datasync.extract.dryrun_result": "Dry-run 完成：实体 {count} 条（节点 +{created} / 更新 {updated}），不落库",
+  "knowledge.datasync.extract.submit_feedback": "执行后：右上反馈 + 下方监控面板实时回流；dry-run 仅弹 toast 不落库",
+  "knowledge.datasync.precondition.hint": "未选择具体本体时，将按映射表中所有 materialized=true 的实体执行；需本体工作台已配置有效映射并已采到 DW 层",
   "knowledge.datasync.monitor.pick_dry_run": "选择 Dry-run（统计 only）",
   "knowledge.datasync.monitor.pick_exec": "真的立即执行",
   "knowledge.datasync.monitor.dry_run_badge": "dry-run",
@@ -974,5 +986,19 @@
   "knowledge.datasync.monitor.select_hint": "上方未勾选本体时，按「全部本体」语义运行",
   "knowledge.datasync.export.log_suffix": "extract-log-{id}.log",
 
-  "knowledge.datasync.audit_hint": "审计日志由 kb_extract_audit 表承载，按 jobId 反查；此处为占位，后续批次接通"
+  "knowledge.datasync.audit_hint": "审计日志由 kb_extract_audit 表承载，按 jobId 反查；此处为占位，后续批次接通",
+
+  "knowledge.datasync.picker.summary": "共 {domains} 域 · {ontologies} 本体 · {objects} 对象类型",
+  "knowledge.datasync.picker.empty_hint": "暂无对象类型明细；双击行可查看实体详情（当前选择粒度为本体级）",
+  "knowledge.datasync.ontology.domain.unassigned": "未分组",
+  "knowledge.datasync.ontology.domains.dom_org": "组织域",
+  "knowledge.datasync.ontology.domains.dom_hr": "人力域",
+  "knowledge.datasync.ontology.domains.dom_prod": "产品域",
+  "knowledge.datasync.ontology.domains.dom_sales": "销售域",
+  "knowledge.datasync.ontology.domains.dom_proj": "项目域",
+  "knowledge.datasync.ontology.domains.dom_proc": "采购域",
+  "knowledge.datasync.ontology.domains.dom_asset": "资产域",
+  "knowledge.datasync.entityType.master": "主数据",
+  "knowledge.datasync.entityType.transaction": "业务单据",
+  "knowledge.datasync.entityType.other": "其它"
 }

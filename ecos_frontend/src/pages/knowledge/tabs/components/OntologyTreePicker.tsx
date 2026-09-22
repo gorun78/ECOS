@@ -2,22 +2,47 @@
  * Wave 3 C1 — OntologyTreePicker（本体树形选择器）
  *
  * 受控组件：父组件传入 selectedOntologyIds，勾选变化经 onChange 回调。
- * 三种视图：全部（选中即勾选树中全部本体）/ 按域（域头 checkbox 批量 + 叶子本体勾选）。
+ * 三种视图：全部（选中即勾选树中全部本体）/ 按域（域头批量 + 叶子本体勾选）。
+ * 层级结构：域（domainBreakdown 业务域）→ 本体（勾选粒度）→ 对象类型（只读明细，entityType 徽章）。
  * 记忆回显：localStorage `ecos_kb_ontology_picker` 保存 30 天，挂载时自动恢复。
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   TreePine, Folder, CheckSquare, Square, ChevronRight, ChevronDown, RefreshCw, Loader2,
+  Users, Building2, Globe, Database, FileText, Box,
 } from 'lucide-react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import { fetchOntologyTree } from '../../services/knowledgeApi';
-import type { OntologyTreeNode, OntologyTreeVo } from '../../services/knowledgeApi';
+import type { OntologyTreeNode, OntologyTreeVo, EntityBrief } from '../../services/knowledgeApi';
+import type { LucideIcon } from 'lucide-react';
 
 const STORAGE_KEY = 'ecos_kb_ontology_picker';
 const STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
 const MAX_VISIBLE_TAGS = 5;
+
+/** 未分组对象的虚拟域 key（domainBreakdown 无条目 / entity.domainId 为空时兜底） */
+const UNASSIGNED_KEY = '__unassigned__';
+
+/** 域图标按 domainId 匹配（无 i18n 名称时回退 domainId 文本，按字母序取第一个匹配） */
+const DOMAIN_ICONS: Array<{ prefix: string; icon: LucideIcon }> = [
+  { prefix: 'org', icon: Building2 },
+  { prefix: 'hr', icon: Users },
+];
+
+/** 对象类型 entityType 徽章（口径对齐本体工作台 mapEntityToObjectType：MASTER=indigo/Database，其余 teal/FileText，其它 slate/Box） */
+const ENTITY_TYPE_BADGE: Record<string, { icon: LucideIcon; cls: string; labelKey: string }> = {
+  MASTER: { icon: Database, cls: 'text-indigo-400 bg-indigo-500/15 border-indigo-500/25', labelKey: 'knowledge.datasync.entityType.master' },
+  TRANSACTION: { icon: FileText, cls: 'text-teal-400 bg-teal-500/15 border-teal-500/25', labelKey: 'knowledge.datasync.entityType.transaction' },
+};
+const ENTITY_TYPE_BADGE_DEFAULT: { icon: LucideIcon; cls: string; labelKey: string } = {
+  icon: Box, cls: 'text-slate-400 bg-slate-500/15 border-slate-500/25', labelKey: 'knowledge.datasync.entityType.other',
+};
+/** 未命中表值的 entityType 全部落 DEFAULT（"其它"） */
+function entityBadge(entityType: string) {
+  return ENTITY_TYPE_BADGE[entityType] || ENTITY_TYPE_BADGE_DEFAULT;
+}
 
 type PickerMode = 'all' | 'domain';
 
@@ -43,6 +68,35 @@ function loadStoredSelection(): StoredSelection | null {
   }
 }
 
+/** 域图标：按 domainId 匹配（org/hr 细分），其余统一 Globe */
+function domainIcon(domainId: string): LucideIcon {
+  const hit = DOMAIN_ICONS.find(d => domainId.includes(d.prefix));
+  return hit ? hit.icon : Globe;
+}
+
+/** 组装本体内各业务域的组条目（domainBreakdown 无覆盖的对象并入未分组） */
+function domainEntries(onto: OntologyTreeVo['ontologies'][number]): Array<{ key: string; entities: EntityBrief[] }> {
+  const sorted = [...(onto.entities || [])].sort(
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+  );
+  const breakdown = onto.domainBreakdown || {};
+  const entries: Array<{ key: string; entities: EntityBrief[] }> = Object.keys(breakdown)
+    .sort()
+    .map(key => ({
+      key,
+      entities: [...(breakdown[key] || [])].sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      ),
+    }));
+  const knownCodes = new Set(entries.flatMap(e => e.entities.map(x => x.code)));
+  const unassigned = sorted.filter(e => {
+    if (knownCodes.has(e.code)) return false;
+    return !e.domainId || !breakdown[e.domainId];
+  });
+  if (unassigned.length > 0) entries.push({ key: UNASSIGNED_KEY, entities: unassigned });
+  return entries;
+}
+
 /** 汇总树中全部本体 id */
 function allOntologyIds(tree: OntologyTreeVo[]): string[] {
   return tree.flatMap(node => node.ontologies.map(o => o.id));
@@ -62,6 +116,23 @@ export default function OntologyTreePicker({
   const allIds = useMemo(() => allOntologyIds(tree), [tree]);
   const isAllMode = mode === 'all';
   const activeIds = isAllMode ? allIds : selectedOntologyIds;
+
+  /** 汇总统计：业务域数（各本体 domainBreakdown key 并集，未分组不计）/ 本体数 / 对象类型数 */
+  const { domainCounts, totalEntityCount } = useMemo(() => {
+    const domainSet = new Set<string>();
+    let objects = 0;
+    tree.forEach(node => node.ontologies.forEach(onto => {
+      Object.keys(onto.domainBreakdown || {}).forEach(k => domainSet.add(k));
+      objects += (onto.entities || []).length;
+    }));
+    return { domainCounts: Array.from(domainSet), totalEntityCount: objects };
+  }, [tree]);
+
+  /** i18n 未命中（回显原 key）时落回原文本 */
+  const domainLabel = (domainId: string) => {
+    const key = `knowledge.datasync.ontology.domains.${domainId}`;
+    return t(key) === key ? domainId : t(key);
+  };
 
   const loadTree = useCallback(async () => {
     setLoading(true);
@@ -111,16 +182,6 @@ export default function OntologyTreePicker({
     setSelection('domain', next);
   };
 
-  const toggleDomain = (domain: OntologyTreeVo) => {
-    if (isAllMode) return;
-    const idsInDomain = domain.ontologies.map(o => o.id);
-    const fullySelected = idsInDomain.length > 0 && idsInDomain.every(id => activeIds.includes(id));
-    const next = fullySelected
-      ? activeIds.filter(x => !idsInDomain.includes(x))
-      : Array.from(new Set([...activeIds, ...idsInDomain]));
-    setSelection('domain', next);
-  };
-
   const switchMode = (nextMode: PickerMode) => {
     if (nextMode === mode) return;
     if (nextMode === 'all') {
@@ -146,11 +207,6 @@ export default function OntologyTreePicker({
 
   const selectedCountIn = (domain: OntologyTreeVo) =>
     domain.ontologies.filter(o => activeIds.includes(o.id)).length;
-
-  const isDomainSelected = (domain: OntologyTreeVo) =>
-    domain.ontologies.length > 0 && selectedCountIn(domain) === domain.ontologies.length;
-  const isDomainPartial = (domain: OntologyTreeVo) =>
-    !isDomainSelected(domain) && selectedCountIn(domain) > 0;
 
   /** 行背景：选中 > 半选 > 默认 hover */
   const rowCls = (checked: boolean, partial: boolean) =>
@@ -228,6 +284,14 @@ export default function OntologyTreePicker({
         <p className={`text-xs ${styles.muted} text-center py-6`}>{t('knowledge.tree_picker.empty')}</p>
       ) : (
         <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
+          {/* 顶部汇总：域数 · 本体数 · 对象类型数 */}
+          <div className={`text-[10px] font-mono flex items-center gap-1 px-1 pb-0.5 ${styles.muted}`}>
+            {t('knowledge.datasync.picker.summary', {
+              domains: domainCounts.length,
+              ontologies: allIds.length,
+              objects: totalEntityCount,
+            })}
+          </div>
           {isAllMode ? (
             // 全部模式：单行高亮（选中即全选）
             <button
@@ -240,47 +304,116 @@ export default function OntologyTreePicker({
               <span className={`ml-auto text-[10px] font-mono ${styles.muted}`}>{allIds.length}</span>
             </button>
           ) : (
-            tree.map(node => {
-              const isCollapsed = !!collapsed[node.domain];
+            // 第一层 = 真实 domainId（后端 domainBreakdown keys），聚合跨本体
+            // 第二层 = 该 domain 下的本体（勾粒度仍"本体 id"级）
+            // 第三层 = 对象类型行（icon + name + code + entityType 徽章，只读）
+            (() => {
+              // 聚合：dom → { ontologies: [...], briefs: [...] }
+              const byDom = new Map<string, { ontologies: OntologyTreeVo['ontologies'][number][]; briefs: EntityBrief[] }>();
+              tree.forEach(node => node.ontologies.forEach(onto => {
+                const br = onto.domainBreakdown || {};
+                Object.entries(br).forEach(([domKey, briefs]) => {
+                  const rec = byDom.get(domKey) || { ontologies: [], briefs: [] };
+                  if (!rec.ontologies.some(o => o.id === onto.id)) rec.ontologies.push(onto);
+                  rec.briefs.push(...briefs);
+                  byDom.set(domKey, rec);
+                });
+                // 兜底：若本体的 domainBreakdown 为空但 entities 有值，归入 "未分组"
+                if (Object.keys(br).length === 0 && (onto.entities || []).length > 0) {
+                  const rec = byDom.get(UNASSIGNED_KEY) || { ontologies: [], briefs: [] };
+                  if (!rec.ontologies.some(o => o.id === onto.id)) rec.ontologies.push(onto);
+                  rec.briefs.push(...(onto.entities || []));
+                  byDom.set(UNASSIGNED_KEY, rec);
+                }
+              }));
+              const domEntries = Array.from(byDom.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+              if (domEntries.length === 0) {
+                return <p className={`text-[10px] ${styles.muted} text-center py-3`}>{t('knowledge.datasync.picker.empty_hint')}</p>;
+              }
               return (
-                <div key={node.domain}>
-                  {/* 域头：展开箭头 + 批量勾选 */}
-                  <div className={`flex items-center gap-1 p-1.5 rounded-lg ${styles.sidebarHoverBg}`}>
-                    <button
-                      type="button"
-                      onClick={() => toggleCollapsed(node.domain)}
-                      className={`p-0.5 rounded cursor-pointer ${styles.muted}`}
-                      title={isCollapsed ? t('knowledge.tree_picker.expand') : t('knowledge.tree_picker.collapse')}
-                    >
-                      {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleDomain(node)}
-                      className={`flex-1 flex items-center gap-2 rounded-md px-1.5 py-1 cursor-pointer text-left ${rowCls(isDomainSelected(node), isDomainPartial(node))}`}
-                    >
-                      <Folder size={12} />
-                      <span className="text-xs font-bold truncate">{node.domain}</span>
-                      <span className={`ml-auto text-[10px] font-mono ${styles.muted}`}>
-                        {selectedCountIn(node)}/{node.ontologies.length}
-                      </span>
-                    </button>
-                  </div>
-                  {/* 叶子：本体个体勾选 */}
-                  {!isCollapsed && node.ontologies.map(onto => (
-                    <button
-                      key={onto.id}
-                      type="button"
-                      onClick={() => toggleOntology(onto.id)}
-                      className={`w-full flex items-center gap-2 pl-7 pr-2 py-1.5 rounded-lg mt-0.5 cursor-pointer text-left ${rowCls(activeIds.includes(onto.id), false)}`}
-                    >
-                      {activeIds.includes(onto.id) ? <CheckSquare size={12} /> : <Square size={12} />}
-                      <span className="text-[11px] font-semibold truncate">{onto.name || onto.id}</span>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  {domEntries.map(([domKey, rec]) => {
+                    const isCollapsed = !!collapsed[domKey];
+                    const ontoCount = rec.ontologies.length;
+                    const selectedInDom = rec.ontologies.filter(o => activeIds.includes(o.id)).length;
+                    return (
+                      <div key={`${domKey}`}>
+                        {/* 第一层：域头（折叠 + 域图标 + 对象类型数统计） */}
+                        <div className={`flex items-center gap-1 p-1.5 rounded-lg ${styles.sidebarHoverBg}`}>
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapsed(domKey)}
+                            className={`p-0.5 rounded cursor-pointer ${styles.muted}`}
+                            title={isCollapsed ? t('knowledge.tree_picker.expand') : t('knowledge.tree_picker.collapse')}
+                          >
+                            {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapsed(domKey)}
+                            className={`flex-1 flex items-center gap-2 rounded-md px-1.5 py-1 cursor-pointer text-left ${styles.badgeBg} ${styles.sidebarText}`}
+                          >
+                            <span className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${styles.inputBg} ${styles.muted}`}>
+                              {(() => { const DIcon = domainIcon(domKey); return <DIcon size={11} />; })()}
+                            </span>
+                            <span className="text-xs font-bold truncate">
+                              {domainLabel(domKey)}
+                            </span>
+                            <span className={`ml-auto text-[10px] font-mono ${styles.muted}`}>
+                              {selectedInDom}/{ontoCount}
+                            </span>
+                          </button>
+                        </div>
+                        {/* 第二层：该域下的本体行（可勾选） + 第三层：本域下的对象类型（只读） */}
+                        {!isCollapsed && (
+                          <>
+                            {rec.ontologies.map(onto => (
+                              <button
+                                key={`${domKey}-onto-${onto.id}`}
+                                type="button"
+                                onClick={() => toggleOntology(onto.id)}
+                                className={`w-full flex items-center gap-2 pl-7 pr-2 py-1 rounded-md mt-0.5 cursor-pointer text-left ${rowCls(activeIds.includes(onto.id), false)}`}
+                              >
+                                {activeIds.includes(onto.id) ? <CheckSquare size={12} /> : <Square size={12} />}
+                                <Folder size={11} className={`${styles.muted} shrink-0`} />
+                                <span className="text-[11px] font-semibold truncate">{onto.name || onto.id}</span>
+                              </button>
+                            ))}
+                            {rec.briefs.map(ent => {
+                              const badge = entityBadge(ent.entityType);
+                              const BIcon = badge.icon;
+                              return (
+                                <div
+                                  key={`${domKey}-${ent.code}`}
+                                  className={`w-full flex items-center gap-2 pl-11 pr-2 py-1 text-left`}
+                                >
+                                  <span className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border ${styles.inputBg} ${styles.muted}`}>
+                                    <BIcon size={11} />
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className={`text-[11px] font-medium truncate ${styles.cardText}`}>
+                                      {ent.name || ent.code}
+                                    </div>
+                                    <div className={`text-[9px] ${styles.muted} font-mono truncate`}>
+                                      {ent.code}
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={`text-[8px] px-1 py-0.5 rounded border font-medium shrink-0 ${badge.cls} ${styles.sidebarText}`}
+                                  >
+                                    {t(badge.labelKey)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
               );
-            })
+            })()
           )}
         </div>
       )}

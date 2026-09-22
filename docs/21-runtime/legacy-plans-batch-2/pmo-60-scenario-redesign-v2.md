@@ -158,8 +158,8 @@ v1.x §2.2 `ecos_scenario_mind`（1:N + `active_mind` + 3 个 partial/unique 索
 |:--|---|---|:--|
 | （v1.x T3·心智） | gateway | `ecos_scenario_mind` | **V146** |
 | （v1.x T4·binding） | gateway | `ecos_scenario_binding` 升级（target_id/type） | **V147** |
-| （v1.x T5a·安全） | sysman-boot | `ecos_security_policy` | **V148** |
-| （v1.x T5b·接口） | sysman-boot | `ecos_interface_ref` | **V149** |
+| （v1.x T5a·安全） | gateway | `ecos_security_policy` | **V148** |
+| （v1.x T5b·接口） | gateway | `ecos_interface_ref` | **V149** |
 | **★ v2.0 沙盘布局** | gateway | `ecos_scenario_sandbox_layout` | **V150** |
 | （v1.x P3b 决策回执） | gateway | `ecos_decision_record`（可选） | **V151** |
 
@@ -306,8 +306,8 @@ v1.x §2.2 `ecos_scenario_mind`（1:N + `active_mind` + 3 个 partial/unique 索
 | **P1** | T1 | `docs/plans/api-contract.md` 相关段 + 本报告 | 契约冻结（§4） | 冻结 |
 | **P1** | T2 | `gateway/src/main/resources/db/migration/V146__ecos_scenario_mind.sql` | 继承 v1.x（1:N + active_mind + 3 索引） | `uq_mind_active` 唯一性验证 |
 | | T3 | `gateway/.../V147__ecos_scenario_binding_upgrade.sql` | 继承 v1.x（target_id/type） | 读取 backward compat |
-| | T4a | `sysman-boot/.../V148__ecos_security_policy.sql` | 继承 v1.x | curl GET 列表 |
-| | T4b | `sysman-boot/.../V149__ecos_interface_ref.sql` | 继承 v1.x | curl GET 列表 |
+| | T4a | `gateway/.../V148__ecos_security_policy.sql`（⚠️ 实际落 gateway 非 sysman-boot） | 继承 v1.x | curl GET 列表 |
+| | T4b | `gateway/.../V149__ecos_interface_ref.sql`（⚠️ 实际落 gateway 非 sysman-boot） | 继承 v1.x | curl GET 列表 |
 | | **★ T4c** | `gateway/.../V150__ecos_scenario_sandbox_layout.sql` | 新建 `ecos_scenario_sandbox_layout`（§2.1） | 1:1 UNIQUE 验证；默认布局可查可写 |
 | | T5 | workspace `ScenarioOptionsController` | 6 联查（继承 v1.x T8） | 每类返真 ID 数组 |
 | | T6 | workspace `ScenarioMindService` | 1:N CRUD（继承 v1.x T9） | 激活哨兵行为 |

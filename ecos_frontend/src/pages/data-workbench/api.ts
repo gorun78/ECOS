@@ -1443,3 +1443,178 @@ export async function initDatalake(): Promise<{ bucket?: string; status?: string
     return null;
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// 非结构化近源层上传（数据侧前端打通 step ②③）
+// POST /api/v1/datanet/datalake/unstructured/upload
+// multipart/form-data: file + JSON metadata
+// 对象 key = raw/unstructured/{source}/{docId}/{originalFileName}
+// 后端复用 DataLakeResourceService.registerUnstructured 登记 RAW/UNSTRUCTURED/LAKE_OBJECT
+// ────────────────────────────────────────────────────────────
+
+/** 上传元数据（source/docId 必填；originalFileName 可选，缺省取 file.name） */
+export interface UnstructuredUploadOptions {
+  source: string;
+  docId: string;
+  originalFileName?: string;
+  resourceName?: string;
+  datasourceId?: string;
+}
+
+export interface UnstructuredUploadResult {
+  code: number;
+  message?: string;
+  data?: {
+    resourceId?: string;
+    resourceName?: string;
+    resourceType?: string;
+    datasourceId?: string;
+    sourcePath?: string;
+    status?: string;
+    layer?: string;
+    zone?: string;
+    created?: boolean;
+  };
+}
+
+/** 上传非结构化文件到 MinIO 近源层并登记。multipart 不带 Content-Type（浏览器自动加 boundary） */
+export async function uploadUnstructured(
+  file: File,
+  meta: UnstructuredUploadOptions
+): Promise<UnstructuredUploadResult | { ok: false; error: string }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append(
+    'req',
+    new Blob(
+      [
+        JSON.stringify({
+          source: meta.source,
+          docId: meta.docId,
+          originalFileName: meta.originalFileName ?? undefined,
+          resourceName: meta.resourceName ?? undefined,
+          datasourceId: meta.datasourceId ?? undefined,
+        }),
+      ],
+      { type: 'application/json' }
+    )
+  );
+  fd.set('req', fd.get('req') as Blob, 'req.json');
+  try {
+    const res = await fetch('/api/v1/datanet/datalake/unstructured/upload', {
+      method: 'POST',
+      headers: { ...authHeaders() },
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({ code: res.status, message: `HTTP ${res.status}` }));
+    if (!res.ok) {
+      return { ok: false as const, error: json?.message || `HTTP ${res.status}` };
+    }
+    return {
+      code: Number(json?.code ?? -1),
+      message: json?.message,
+      data: json?.data,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'network error';
+    console.warn('[data-workbench] uploadUnstructured failed:', e);
+    return { ok: false as const, error: msg };
+  }
+}
+
+/** 列举数据湖对象（近源层 + 其他 zone） */
+export async function listDatalakeObjects(prefix = ''): Promise<{
+  bucket?: string;
+  prefix?: string;
+  items: { name: string; size?: number; lastModified?: string; isDir?: boolean }[];
+  total?: number;
+} | null> {
+  try {
+    const url = `/api/v1/datanet/datalake/objects?prefix=${encodeURIComponent(prefix || '')}&_=${Date.now()}`;
+    const raw = await get<Record<string, unknown>>(url);
+    if (!raw) return null;
+    const items = Array.isArray(raw.items)
+      ? (raw.items as Record<string, unknown>[]).map((i) => ({
+          name: String(i.name || ''),
+          size: typeof i.size === 'number' ? (i.size as number) : undefined,
+          lastModified: (i.lastModified as string) || undefined,
+          isDir: Boolean(i.isDir),
+        }))
+      : [];
+    return {
+      bucket: (raw.bucket as string) || undefined,
+      prefix: (raw.prefix as string) || undefined,
+      items,
+      total: typeof raw.total === 'number' ? (raw.total as number) : items.length,
+    };
+  } catch (e) {
+    console.warn('[data-workbench] listDatalakeObjects failed:', e);
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// 非结构化近源层 —— 文件夹数据源模式（不传二进制，服务端读取）
+// GET  /api/v1/datanet/datalake/unstructured/folder/files?datasourceId=&docId=
+// POST /api/v1/datanet/datalake/unstructured/collect
+// 对象 key = raw/unstructured/{datasourceId}/{docId}/{fileName}
+// ────────────────────────────────────────────────────────────
+
+/** 文件夹数据源文件列表项（不暴露服务端绝对路径） */
+export interface FolderFileVo {
+  name: string;
+  size?: number;
+  lastModified?: string;
+}
+
+/** 文件夹采集入参：datasourceId 指向 FILESYSTEM 数据源（路径由其 connectionConfig 持有） */
+export interface FolderCollectReq {
+  datasourceId: string;
+  docId: string;
+  fileNames: string[];
+}
+
+/** 文件夹采集结果：逐文件明细 + 成功/失败计数 */
+export interface FolderCollectResult {
+  collected: number;
+  failed: number;
+  items: { name: string; status: string; error?: string }[];
+}
+
+/** 列出 FILESYSTEM 数据源根目录下的可采集文件（扩展名白名单过滤，docId 可选前缀过滤） */
+export async function listFolderFiles(datasourceId: string, docId?: string): Promise<FolderFileVo[]> {
+  try {
+    const url = `/api/v1/datanet/datalake/unstructured/folder/files?datasourceId=${encodeURIComponent(datasourceId)}${docId ? `&docId=${encodeURIComponent(docId)}` : ''}`;
+    const raw = await get<unknown[]>(url);
+    if (!Array.isArray(raw)) return [];
+    return (raw as Record<string, unknown>[])
+      .map((f) => ({
+        name: String(f.name || ''),
+        size: typeof f.size === 'number' ? (f.size as number) : undefined,
+        lastModified: (f.lastModified as string) || undefined,
+      }))
+      .filter((f) => f.name);
+  } catch (e) {
+    console.warn('[data-workbench] listFolderFiles failed:', e);
+    throw e;
+  }
+}
+
+/** 将 FILESYSTEM 数据源目录中的文件采集到近源层并登记（后端逐文件处理） */
+export async function collectFolderFiles(req: FolderCollectReq): Promise<FolderCollectResult> {
+  const raw = await post<Record<string, unknown> | null>('/api/v1/datanet/datalake/unstructured/collect', req);
+  if (!raw) {
+    return { collected: 0, failed: req.fileNames.length, items: [] };
+  }
+  return {
+    collected: Number(raw.collected) || 0,
+    failed: Number(raw.failed) || 0,
+    items: Array.isArray(raw.items)
+      ? (raw.items as Record<string, unknown>[]).map((i) => ({
+          name: String(i.name || ''),
+          status: String(i.status || ''),
+          error: i.error ? String(i.error) : undefined,
+        }))
+      : [],
+  };
+}

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { authLogin } from "../api";
+import { authLogin, setAuthGracePeriod } from "../api";
 
 export default function Login() {
   const { t } = useLanguage();
@@ -60,6 +60,11 @@ export default function Login() {
         localStorage.setItem("username", data.username);
       if (data.roles)
         localStorage.setItem("roles", JSON.stringify(data.roles));
+
+      // 开 30s 宽限期：消化 Topbar/RequireAuth/several-mount 时对 P3 端点的初次探测
+      // （例如 /api/v1/security-profiles/user/{id}），避免在本次 mount 高峰期里任意一个偶发 401
+      // 触发 handleAuthExpired 把刚登录的 token 清掉并跳回 #/login。
+      setAuthGracePeriod();
 
       // Fetch and persist userId for security profile API
       try {

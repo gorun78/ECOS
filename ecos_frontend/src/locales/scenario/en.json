@@ -284,5 +284,12 @@
   "scenario.sandbox.palette.sec": "Security",
   "scenario.sandbox.palette.iface": "Interface",
   "scenario.sandbox.empty.title": "No scenario",
-  "scenario.sandbox.empty.body": "Pick a scenario in library to open sandbox"
+  "scenario.sandbox.empty.body": "Pick a scenario in library to open sandbox",
+  "scenario.variant.title": "Mind Variant Management",
+  "scenario.variant.copy": "Copy as Variant",
+  "scenario.variant.delete": "Delete Variant",
+  "scenario.variant.delete.confirm": "Confirm delete this mind variant?",
+  "scenario.variant.empty": "No variants (base mind is implicit)",
+  "scenario.variant.inherit": "Inherit base factors",
+  "scenario.variant.name": "Variant name"
 }

@@ -101,7 +101,7 @@ public class KbEntityInstanceExtractionService {
             JdbcTemplate jdbc,
             RestTemplate restTemplate,
             @Value("${ecos.datanet.base-url:http://localhost:18082}") String datanetBaseUrl,
-            @Value("${ecos.ontology-api-base:http://localhost:18083/api/v1}") String ontologyApiBase) {
+            @Value("${ecos.ontology-api-base:http://localhost:8080/api/v1}") String ontologyApiBase) {
         this.jdbc = jdbc;
         this.restTemplate = restTemplate;
         this.datanetBaseUrl = datanetBaseUrl;

@@ -138,23 +138,26 @@ function buildNodeTypeRegistry(
 
 // ── SdBEdge kind → 颜色 token 映射（参考 WorkflowDesigner 颜色策略）──
 
+// ── SdBEdge kind → CSS var() token（B8: 无硬编码 hex，4 主题在 index.css 定义）──
+// 需确保 index.css 4 主题(palette/deep/cyber/royal)下定义了 --ecos-edge-bind/inherit/feed/insight
+
 function sdEdgeStyle(kind: SdBEdge["kind"]): React.CSSProperties {
   switch (kind) {
     case "bind":
-      return { stroke: "#64748B", strokeWidth: 1.5 };
+      return { stroke: "var(--ecos-edge-bind, #64748B)", strokeWidth: 1.5 };
     case "inherit":
-      return { stroke: "#A855F7", strokeWidth: 1.5, strokeDasharray: "4 3" };
+      return { stroke: "var(--ecos-edge-inherit, #A855F7)", strokeWidth: 1.5, strokeDasharray: "4 3" };
     case "feed":
-      return { stroke: "#10B981", strokeWidth: 1.5 };
+      return { stroke: "var(--ecos-edge-feed, #10B981)", strokeWidth: 1.5 };
     case "insight":
-      return { stroke: "#F59E0B", strokeWidth: 1.5, strokeDasharray: "6 3" };
+      return { stroke: "var(--ecos-edge-insight, #F59E0B)", strokeWidth: 1.5, strokeDasharray: "6 3" };
     default:
-      return { stroke: "#64748B", strokeWidth: 1 };
+      return { stroke: "var(--ecos-edge-bind, #64748B)", strokeWidth: 1 };
   }
 }
 
 function sdEdgeLabelStyle(): React.CSSProperties {
-  return { fontSize: 10, fill: "#CBD5E1", background: "rgba(15, 23, 42, 0.92)" };
+  return { fontSize: 10, fill: "var(--ecos-text-muted, #CBD5E1)", background: "var(--ecos-surface, rgba(15, 23, 42, 0.92))" };
 }
 
 // ── Palette state / Drawer state ───────────────────────────
@@ -591,11 +594,11 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
               maskColor="rgba(0,0,0,0.3)"
               nodeColor={(nd: { type?: string }) => {
                 const tt = nd.type;
-                if (tt === "hub") return "#6366F1";
-                if (tt === "resource") return "#0EA5E9";
-                if (tt === "mind") return "#F59E0B";
-                if (tt === "insight") return "#10B981";
-                return "#94A3B8";
+                if (tt === "hub") return "var(--ecos-node-hub, #6366F1)";
+                if (tt === "resource") return "var(--ecos-node-resource, #0EA5E9)";
+                if (tt === "mind") return "var(--ecos-node-mind, #F59E0B)";
+                if (tt === "insight") return "var(--ecos-node-insight, #10B981)";
+                return "var(--ecos-node-default, #94A3B8)";
               }}
             />
           </ReactFlow>

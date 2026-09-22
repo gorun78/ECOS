@@ -54,7 +54,27 @@ public class SecurityPolicyController {
         row.put("id", rs.getString("id"));
         row.put("name", rs.getString("name"));
         row.put("domain", rs.getString("domain"));
-        row.put("policyExpr", rs.getString("policy_expr"));
+        String expr = rs.getString("policy_expr");
+        // B12: 列表/详情默认返摘要（前50字符），防 ABAC 策略原文泄露
+        row.put("policyExprSummary", expr != null && expr.length() > 50 ? expr.substring(0, 50) + "..." : expr);
+        row.put("priority", rs.getInt("priority"));
+        Timestamp ct = rs.getTimestamp("create_time");
+        row.put("createTime", ct != null ? ct.getTime() : null);
+        Timestamp ut = rs.getTimestamp("update_time");
+        row.put("updateTime", ut != null ? ut.getTime() : null);
+        row.put("createBy", rs.getString("create_by"));
+        return row;
+    };
+
+    /** 详情端点专用：含完整 policy_expr（受 security-engine ABAC 评估保护）。 */
+    private final RowMapper<Map<String, Object>> ROW_MAPPER_FULL = (rs, rowNum) -> {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", rs.getString("id"));
+        row.put("name", rs.getString("name"));
+        row.put("domain", rs.getString("domain"));
+        String expr = rs.getString("policy_expr");
+        row.put("policyExpr", expr);
+        row.put("policyExprSummary", expr != null && expr.length() > 50 ? expr.substring(0, 50) + "..." : expr);
         row.put("priority", rs.getInt("priority"));
         Timestamp ct = rs.getTimestamp("create_time");
         row.put("createTime", ct != null ? ct.getTime() : null);
@@ -106,6 +126,29 @@ public class SecurityPolicyController {
             return ApiResponse.success(rows.get(0));
         } catch (Exception e) {
             log.error("查询安全策略详情失败: id={}", id, e);
+            return ApiResponse.internalError("查询失败: " + e.getMessage());
+        }
+    }
+
+    /** B12: 需 admin 角色（HeaderAuthInterceptor 的 X-ECOS-ROLE 判定）才可查完整 ABAC 表达式原文。 */
+    @GetMapping("/{id}/expr")
+    public ApiResponse<Map<String, Object>> getFullExpr(
+            @PathVariable String id,
+            @RequestHeader(value = "X-ECOS-ROLE", required = false) String role) {
+        if (!"ADMIN".equalsIgnoreCase(role) && !"SECURITY_AUDITOR".equalsIgnoreCase(role)) {
+            return ApiResponse.forbidden("需要 admin 或 security_auditor 角色才能查看策略表达式原文");
+        }
+        try {
+            String sql = "SELECT id, name, domain, policy_expr, priority, "
+                    + "create_time, update_time, create_by "
+                    + "FROM " + TABLE + " WHERE id = ? AND is_deleted = 0";
+            List<Map<String, Object>> rows = jdbc.query(sql, ROW_MAPPER_FULL, id);
+            if (rows.isEmpty()) {
+                return ApiResponse.notFound("安全策略不存在: " + id);
+            }
+            return ApiResponse.success(rows.get(0));
+        } catch (Exception e) {
+            log.error("查询策略表达式失败: id={}", id, e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
         }
     }

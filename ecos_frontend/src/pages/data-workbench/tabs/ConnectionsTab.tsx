@@ -11,6 +11,7 @@ import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMe
 import HistoryVersionCompareModal from '../HistoryVersionCompareModal';
 import CollectProgressPanel from '../CollectProgressPanel';
 import IngestSubPanel from './IngestSubPanel';
+import DatalakeUploadPanel from './DatalakeUploadPanel';
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
   { value: 'MANUAL', key: 'dw.strategy.manual' },
@@ -515,6 +516,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 
                     {/* 数据采集（采集型管道 → 数据湖 MinIO 近源库）—— 与元数据采集同面板 */}
                     <IngestSubPanel conn={conn} showToast={showToast} />
+
+                    {/* 文档近源层（非结构化 · 文件夹数据源模式）—— 服务端读取 FILESYSTEM 目录 → MinIO 采集登记 */}
+                    <DatalakeUploadPanel showToast={showToast} dsId={conn.id} />
 
                     {/* 活跃采集任务状态指示器 — 对接异步任务中心 */}
                     {activeTasks.length > 0 && (

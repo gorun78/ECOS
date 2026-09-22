@@ -278,7 +278,7 @@ flowchart TB
 | Q2 | 图谱是否对所有本体实体做实例化？ | **按需**：以 `ecos_entity_table_mapping` 存在性为准；映射表新增 `materialized` 布尔列（默认 `true`）用于显式关闭 | 无映射实体（接口/动作等）无 DW 实例来源，强行实例化只产空节点并放大存储（R4） |
 | Q3 | DW 层变更如何通知知识工作台？ | **先轮询水位线**，不预先实现 Kafka 事件。触发条件：当「DW 表变更 → 知识可见」时延要求 < 5 分钟时再补事件 | 避免过度工程；轮询满足当前批次需求 |
 | Q4 | 图谱骨架是否需「类型节点」？ | **不建独立类型节点**。类型作为节点属性 + 类型索引；本体骨架视图从 `kb_ontology_snapshot` 单独渲染，与实例图谱分层展示 | 类型节点使节点数翻倍且与实例语义混淆；schema 已由本体权威承载，图内再存一份违反低冗余红线 |
-| Q5 | Tab 分组是否重排？ | **重排**，但**排期在 B5 功能修复之后**。最终 7 组：`overview` / `ingest`(import,upload,review) / `model`(ontology_model,graph_build,classification) / `store`(vector_index) / `retrieval`(rag,graph_explorer) / `govern`(rules,eval,lifecycle,compliance) / `config`(engine_config) | 分组与 §6 的 K1~K6 模块一一映射；需同步补 `knowledge.group.{store,govern}` i18n 词条 |
+| Q5 | Tab 分组是否重排？ | **重排**（已两阶段执行）。**第一阶段（B8，原案）**：15 Tab 按页面结构重排为 7 组（`overview/ingest/model/store/retrieval/govern/config`）。**第二阶段（2026-09-20，用户裁决"严格对齐 K1~K6"）**：发现 B8 落地后 Tab 分组名与 §6 的 K1~K6 生命周期职能不匹配，重新组织为 7 组 **`overview / extract(K1) / fusion(K2) / store(K3) / update(K4) / retrieve(K5) / govern(K6) / config`**；**新增 `sync` Tab 承载 K4 触发源监控**；**`ontology_model` 彻底移出**（属本体工作台金 I 职责，知识工作台不再承担本体建模职能）；i18n 同步更新 `knowledge.group.{extract,fusion,update,retrieve}` 与 `knowledge.kupdate.*` 词条 | 分组与 §6 的 K1~K6 模块严格一一映射（含命名）；`ontology_model` 按 §1 五条边界铁律 3「语义不上移」与 §0.5 职责表移出知识工作台 |
 | Q6 | 是否同步更新分层规范 §七？ | **更新**，三处：①「前端无分层视图消费方」改为已有消费方；② P4 非结构化缺口按 §3/§4 重述为 A3→A1 路线；③ §1 五条边界铁律并入架构铁律文档 | 规范是「唯一规则出口」，不得与代码事实冲突。✅ **已于 2026-09-19 授权后完成**（见下） |
 
 **Q6 落地记录（2026-09-19）**：
@@ -327,24 +327,38 @@ flowchart TB
 
 ---
 
-## 附录 B. 15 Tab 重构映射
+## 附录 B. 15 Tab 重构映射（最终版，2026-09-20 严格对齐 §6 K1~K6）
 
 | Tab | 归属模块 | 处置 |
 |:--|:--|:--|
 | overview | — | 保留（workspace 聚合层） |
 | import | K1 | 重构：去 localStorage 队列，改读 data-engine 元数据 + DW 资源列表 |
-| upload | F1/F2 | 重构：补齐非结构化资源登记 + 分片字段后端接收 |
-| review | K1/K2 | 修复：补 `/extract/files`、`/extract/candidates` 端点（D6） |
-| ontology_model | — | 保留；补 C4 校验入口 |
-| graph_build | K4 | 增强：补 `/graph/build/preview`（dry-run + C1~C4 报告） |
+| upload | K1（F1/F2） | 重构：补齐非结构化资源登记 + 分片字段后端接收 |
+| review | K2 | 修复：补 `/extract/files`、`/extract/candidates` 端点（D6）；属 K2 融合（候选审核） |
+| ~~ontology_model~~ | **移出** | **2026-09-20 彻底移除**：本体建模属本体工作台（金 I）职责，按 §1 五条边界铁律 3「语义不上移」与 §0.5 职责表移出知识工作台 |
+| classification | K2 | 重构：去掉 `DEMO_CLASSIFICATIONS`；属 K2 融合（实体消歧/分类） |
 | vector_index | K3 | 修复：解 D3/D4 后转真实向量索引管理 |
-| classification | K2 | 重构：去掉 `DEMO_CLASSIFICATIONS` |
+| graph_build | K3 | 任务操作入口（构建/预览/回滚）；与 K4 监控 Tab 分工 |
+| **sync**（新增） | K4 | **新增 2026-09-20**：触发源状态监控 + 版本对齐 + 审计事件流；与 `graph_build`（K3 任务操作）分工 |
 | rag | K5 | 修复：解 D3 后转真向量检索 |
 | graph_explorer | K5 | 保留 |
 | rules | K6 | 重构：去掉 `DEMO_RULES` 回退 |
 | eval | K6 | 修复：补 `/knowledge/eval/run`（D6） |
 | lifecycle | K6 | 修复：补 `/knowledge/assets`、`/knowledge/lifecycle/audit`（D6） |
 | compliance | K6 | 保留（OPA 合规检查） |
-| engine_config | — | 保留 |
+| engine_config | — | 保留（横切引擎配置） |
 
-**Tab 分组（Q5 已裁决：重排，排在 B5 之后执行）**：由现 6 组调整为 7 组——`overview` / `ingest`(import,upload,review) / `model`(ontology_model,graph_build,classification) / `store`(vector_index) / `retrieval`(rag,graph_explorer) / `govern`(rules,eval,lifecycle,compliance) / `config`(engine_config)。实施时须同步补 `knowledge.group.{store,govern}` 的 zh-CN/en 词条。
+**Tab 分组（Q5 第二阶段，2026-09-20，严格对齐 §6 K1~K6）**：
+
+| 分组 id | i18n 中文名 | 覆盖 K 模块 | 归入 Tab |
+|:--|:--|:--|:--|
+| overview | 总览 | —（横切） | overview |
+| extract | 知识抽取 | **K1** | import, upload |
+| fusion | 知识融合 | **K2** | review, classification |
+| store | 知识存储 | **K3** | vector_index, graph_build |
+| update | 知识更新 | **K4** | sync |
+| retrieve | 知识查询 | **K5** | rag, graph_explorer |
+| govern | 知识治理 | **K6** | rules, eval, lifecycle, compliance |
+| config | 引擎配置 | —（横切） | engine_config |
+
+总 Tab 数：15（移除 ontology_model −1、新增 sync +1）。前端单源事实见 `ecos_frontend/src/pages/knowledge/typesAndConstants.ts` 的 `KNOWLEDGE_TAB_GROUPS`。

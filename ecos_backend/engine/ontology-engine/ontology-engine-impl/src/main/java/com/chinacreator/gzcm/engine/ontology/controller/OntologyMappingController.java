@@ -166,13 +166,21 @@ public class OntologyMappingController {
             return ApiResponse.badRequest("ONT-MAP-003: Failed to serialize field mappings: " + e.getMessage());
         }
 
-        // Q2 裁决：materialized 未传时由 Service 按默认 true 落库
+        // Q2 裁决：materialized 未传时由 Service 按默认 true 落库；W2：透传非结构化文档锚点（可空）
         mappingService.insertMapping(id, objectId, sourceName, sourceType, sourceUri,
-                fieldMappingsJson, dto.getMaterialized());
+                fieldMappingsJson, dto.getMaterialized(),
+                dto.getDocAnchorJson(), dto.getDocAnchorType());
 
         // 同步到 OntologyMappingStore 供 OntologyService.entityToMap() 读取
         Map<String, Object> apiMap = buildApiMap(id, objectId, sourceType, sourceName, sourceUri,
                 extendedAttrs, description, status);
+        // W2 新增：锚点字段同步放入 In-mem Store Map，保持与 DB 列一致（读路径兼容旧消费方）
+        if (dto.getDocAnchorJson() != null && !dto.getDocAnchorJson().isBlank()) {
+            apiMap.put("docAnchorJson", dto.getDocAnchorJson());
+        }
+        if (dto.getDocAnchorType() != null && !dto.getDocAnchorType().isBlank()) {
+            apiMap.put("docAnchorType", dto.getDocAnchorType());
+        }
         mappingStoreRef.store.put(id, apiMap);
         mappingStoreRef.store.put(objectId, apiMap);
 
@@ -226,6 +234,15 @@ public class OntologyMappingController {
         if (dto.getMaterialized() != null) {
             sql.append(", materialized=?");
             params.add(dto.getMaterialized());
+        }
+        // W2 新增：非结构化文档锚点（仅"非 null"时覆盖，语义与 Q2 materialized 一致）
+        if (dto.getDocAnchorJson() != null) {
+            sql.append(", doc_anchor=?::jsonb");
+            params.add(dto.getDocAnchorJson());
+        }
+        if (dto.getDocAnchorType() != null) {
+            sql.append(", doc_anchor_type=?");
+            params.add(dto.getDocAnchorType().isBlank() ? null : dto.getDocAnchorType().trim());
         }
 
         try {

@@ -39,6 +39,9 @@ import type {
   OntologyMappingRecord,
   CreateMappingDTO,
   UpdateMappingDTO,
+  MappingValidationReport,
+  DocAnchor,
+  DocAnchorType,
   ExportTaskSummary,
   ExportTask,
   CreateExportDTO,
@@ -591,6 +594,50 @@ export async function fetchMappableObjects() {
   return apiFetchData(`${MAPPING_BASE}/objects`);
 }
 
+/**
+ * 校验当前对象类型的映射一致性（C4 映射有效性，W2 前端入口）。
+ *
+ * POST /api/v1/ontology/mappings/validate
+ * 入参 entityCode = 当前对象类型 id（与 ecos_entity_table_mapping.entity_code 对齐，
+ * 见 OntologyMappingValidateDTO）；按该对象类型的全部已存映射批量校验。
+ * 失败不抛错（后端始终返回 200 + valid=true/false），由调用方消费 report 渲染。
+ */
+export async function validateEntityMappings(objectTypeId: string): Promise<MappingValidationReport> {
+  return apiFetchData<MappingValidationReport>(`${MAPPING_BASE}/validate`, {
+    method: "POST",
+    body: JSON.stringify({ entityCode: objectTypeId }),
+  });
+}
+
+/**
+ * 序列化非结构化文档锚点（W2 新增）。
+ *
+ * 规则：
+ * - anchor 为 null / 空对象 / 全字段空 → 返回 null（不落库锚点）
+ * - type 缺省 TABLE；type = TABLE 时不允许写锚点 JSON
+ * - DOC_ONLY / MIXED 时 docId 必填（本函数只做形式序列化，业务校验由调用方负责）
+ */
+export function buildDocAnchorPayload(
+  type: DocAnchorType | undefined,
+  anchor: DocAnchor | null
+): { type?: DocAnchorType; json?: string } {
+  if (!type || type === "TABLE" || !anchor) {
+    // 默认 / 结构化表 / 无锚点：不写锚点列
+    return { type: type || undefined, json: undefined };
+  }
+  const docId = String(anchor.docId || "").trim();
+  const source = String(anchor.source || "").trim();
+  if (!docId) {
+    // docId 缺失视为无锚点（与"请填入 docId"校验语义对齐）
+    return { type, json: undefined };
+  }
+  const payload: DocAnchor = { docId, source: source || "kb" };
+  if (typeof anchor.docChunkCount === "number" && anchor.docChunkCount >= 0) {
+    payload.docChunkCount = anchor.docChunkCount;
+  }
+  return { type, json: JSON.stringify(payload) };
+}
+
 // ================================================================
 // DW 层数据对象（数据映射取数来源）
 //
@@ -1056,6 +1103,8 @@ export const ontologyApi = {
   updateMapping,
   deleteMapping,
   fetchMappableObjects,
+  validateEntityMappings,
+  buildDocAnchorPayload,
   fetchExportTasks,
   fetchExportTask,
   createExportTask,

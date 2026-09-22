@@ -12,9 +12,10 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { Compass, Trash2, AlertTriangle, GitPullRequest } from 'lucide-react';
 import DynamicIcon from '../../components/ontology/DynamicIcon';
-import { fetchMappings, createMapping, updateMapping, fetchLineageImpact, updateEntity, reassignObjectDomain, fetchDwDatasetColumns } from '../../services/ontologyApi';
+import { fetchMappings, createMapping, updateMapping, fetchLineageImpact, updateEntity, reassignObjectDomain, fetchDwDatasetColumns, validateEntityMappings, buildDocAnchorPayload } from '../../services/ontologyApi';
 
 import type { ObjectType, PropertyType, Dataset, DatasetColumn, LinkType, ActionType, SharedProperty, InterfaceType, OntologyDomain, OntologyMappingRecord, LineageImpactResult } from '../../types/ontology';
+import type { DocAnchor, DocAnchorType, MappingValidationReport } from '../../types/ontology';
 import PropertiesTab from './object/PropertiesTab';
 import MetadataTab from './object/MetadataTab';
 import MappingTab from './object/MappingTab';
@@ -62,6 +63,12 @@ export default function ObjectTypeView({
   const [newPropType, setNewPropType] = useState<'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint'>('string');
   const [mappingRecord, setMappingRecord] = useState<OntologyMappingRecord | null>(null);
   const [mappingDirty, setMappingDirty] = useState(false);
+  /** W2 新增：非结构化文档锚点（与后端 doc_anchor / doc_anchor_type 对齐） */
+  const [docAnchor, setDocAnchor] = useState<DocAnchor>({ docId: '', source: '', docChunkCount: undefined });
+  const [docAnchorType, setDocAnchorType] = useState<DocAnchorType>('TABLE');
+  /** W2 新增：校验报告（点击「校验映射」后装载；undefined = 弹层未打开） */
+  const [validating, setValidating] = useState(false);
+  const [lastValidation, setLastValidation] = useState<MappingValidationReport | null>(null);
   /** 基础信息 Tab 未保存标记（改动后启用保存按钮） */
   const [metaDirty, setMetaDirty] = useState(false);
   const [metaSaving, setMetaSaving] = useState(false);
@@ -86,6 +93,10 @@ export default function ObjectTypeView({
     // 切换对象：重置基础信息编辑态，并以当前域归属作为保存基线
     setMetaDirty(false);
     setMetaBaseline({ domainId: objectType.domainId });
+    // W2 新增：切换对象时重置非结构化锚点编辑态
+    setDocAnchor({ docId: '', source: '', docChunkCount: undefined });
+    setDocAnchorType('TABLE');
+    setLastValidation(null);
     fetchMappings({ objectId: objectType.id })
       .then(records => {
         if (cancelled) return;
@@ -93,6 +104,20 @@ export default function ObjectTypeView({
           const rec = records[0];
           setMappingRecord(rec);
           setMappingDirty(false);
+          // W2 新增：回填 doc_anchor 解析态（后端 docAnchor 字段缺失时按 TABLE 初始化）
+          if (rec.docAnchorType) {
+            setDocAnchorType(rec.docAnchorType as DocAnchorType);
+          }
+          if (rec.docAnchor && rec.docAnchor.docId) {
+            setDocAnchor({
+              docId: String(rec.docAnchor.docId || ''),
+              source: String(rec.docAnchor.source || 'kb'),
+              docChunkCount:
+                typeof rec.docAnchor.docChunkCount === 'number'
+                  ? rec.docAnchor.docChunkCount
+                  : undefined,
+            });
+          }
           onUpdate({
             ...objectType,
             mapping: { datasetId: rec.datasetId, propertyMappings: rec.propertyMappings }
@@ -127,26 +152,73 @@ export default function ObjectTypeView({
     try {
       const propMappings = mapping.propertyMappings;
       const fieldMappings = Object.entries(propMappings).map(([source, target]) => ({ source, target }));
+      // W2 新增：按当前锚点类型序列化载荷（TABLE 类型时 json 为 undefined 不落库）
+      const anchorPayload = buildDocAnchorPayload(docAnchorType, docAnchor);
+      // 校验：DOC_ONLY / MIXED 类型下 docId 必填（前端拦截，提示语由 i18n 提供）
+      if ((docAnchorType === 'DOC_ONLY' || docAnchorType === 'MIXED') && !String(docAnchor?.docId || '').trim()) {
+        onToast?.('error', t('mapping.anchor.required'));
+        return;
+      }
+      const anchorFields = {
+        docAnchorJson: anchorPayload.json,
+        docAnchorType: anchorPayload.type,
+      };
       if (mappingRecord) {
         const updated = await updateMapping(mappingRecord.id, {
           fieldMappings,
           propertyMappings: propMappings,
           description: mappingRecord.description,
+          ...anchorFields,
         });
         setMappingRecord(updated);
       } else {
         const created = await createMapping({
           objectTypeId: objectType.id,
           datasetId: mapping.datasetId,
-          propertyMappings: propMappings
+          propertyMappings: propMappings,
+          ...anchorFields,
         });
         setMappingRecord(created);
       }
       setMappingDirty(false);
+      onToast?.('success', t('ow.msg.mappingSaved'));
     } catch (err: any) {
-      alert(err?.message || t('ow.label.mappingSaveError'));
+      onToast?.('error', t('ow.msg.mappingSaveFailed').replace('{error}', String(err?.message || err)));
     }
   };
+
+  /** W2 新增：触发当前对象类型的 C4 映射一致性校验，装载报告弹层 */
+  const handleValidateMappings = async () => {
+    setValidating(true);
+    try {
+      const report = await validateEntityMappings(objectType.id);
+      setLastValidation(report);
+    } catch (err: any) {
+      // 校验端点失败（网络 / 租户 401）显式 toast，不静默吞错
+      onToast?.('error', t('ow.msg.mappingSaveFailed').replace('{error}', String(err?.message || err)));
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  /** W2 新增：锚点字段变更（置位 mappingDirty 以便启用保存按钮） */
+  const handleDocAnchorChange = (next: DocAnchor | null) => {
+    setDocAnchor(next || { docId: '', source: '', docChunkCount: undefined });
+    setMappingDirty(true);
+  };
+
+  /** W2 新增：锚点类型切换（清空 docId/source；TABLE 类型下旧锚点作废） */
+  const handleDocAnchorTypeChange = (type: DocAnchorType) => {
+    setDocAnchorType(type);
+    // 切回 TABLE 时清空锚点输入值（保留 source 方便下次切换时再回填，可选）
+    if (type === 'TABLE') {
+      setDocAnchor({ docId: '', source: '', docChunkCount: undefined });
+    }
+    setMappingDirty(true);
+  };
+
+  /** W2 新增：关闭校验报告弹层（仅清空报告引用，不重置其他编辑态） */
+  const handleDismissValidation = () => setLastValidation(null);
 
   const handleImpactAnalysis = async () => {
     setImpactLoading(true);
@@ -382,7 +454,14 @@ export default function ObjectTypeView({
             datasets={datasets} selectedDataset={selectedDataset}
             handleDatasetChange={handleDatasetChange} handleAutoMap={handleAutoMap}
             handlePropMappingChange={handlePropMappingChange}
-            mappingDirty={mappingDirty} onSaveMapping={handleSaveMapping} />
+            mappingDirty={mappingDirty} onSaveMapping={handleSaveMapping}
+            docAnchor={docAnchor} docAnchorType={docAnchorType}
+            handleDocAnchorChange={handleDocAnchorChange}
+            handleDocAnchorTypeChange={handleDocAnchorTypeChange}
+            onValidateMappings={handleValidateMappings}
+            validating={validating}
+            lastValidation={lastValidation || undefined}
+            onDismissValidation={handleDismissValidation} />
         )}
         {activeTab === 'links' && (
           <LinksTab objectType={objectType} relatedLinks={relatedLinks}
