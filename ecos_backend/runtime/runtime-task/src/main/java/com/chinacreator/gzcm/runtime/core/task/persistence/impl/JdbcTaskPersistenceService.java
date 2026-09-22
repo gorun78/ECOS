@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +36,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author PMO Worker (W4)
  */
 @Service
-@ConditionalOnProperty(name = "runtime.task.persistence.enabled", havingValue = "true", matchIfMissing = true)
+@Primary
+@ConditionalOnProperty(name = "runtime.task.persistence.enabled", havingValue = "true", matchIfMissing = false)
 public class JdbcTaskPersistenceService implements ITaskPersistenceService {
 
     private static final Logger logger = LoggerFactory.getLogger(JdbcTaskPersistenceService.class);

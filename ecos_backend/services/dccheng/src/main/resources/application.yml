@@ -66,10 +66,15 @@ ecos:
     enabled: ${ECOS_NEO4J_ENABLED:false}
   # PMO-50 T1/T4: RAG 向量检索 + 本体事件消费者
   # RAG embedding 调用地址: 微服务走 ileng-service,.dccheng 同 JVM 自调 18086
+  runtime-task:
+    persistence:
+      # PMO-72 W4: runtime-task PG 持久化开关 (架构铁律 §1.6 定时任务走 td_runtime_task_plan);
+      # 启用后 JdbcTaskPersistenceService (@Primary) 替代 in-memory TaskPersistenceServiceImpl
+      enabled: true
   rag:
-    embedding-model: ${ECOS_RAG_EMB_MODEL:text-embedding-3-small}
-    llm-gateway-base: ${ECOS_RAG_LLM_BASE:}   # 空串=内部走 LLMGatewayService
     # B4: 须与 V137 的 embedding_vec 列维度一致，不一致时写入侧跳过并 log.warn
+    embedding-model: ${ECOS_RAG_EMB_MODEL:text-embedding-3-small}
+    llm-gateway-base: ${ECOS_RAG_LLM_BASE:}
     embedding-dimension: ${ECOS_RAG_EMB_DIM:1536}
   # 本体版本发布消费者: 微服务内网直连 buszhi 18083 (ADR-7 内网可达)
   ontology-base: ${ECOS_ONTOLOGY_BASE:http://localhost:18083/api/v1/ecos}
