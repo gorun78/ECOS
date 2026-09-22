@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.workspace.scenario;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 场景心智变体视图 VO — 列表/详情出参（PMO-60 v2.0 P1）。
@@ -57,4 +59,21 @@ public class ScenarioMindVO {
     public void setCreateTime(String createTime) { this.createTime = createTime; }
     public String getUpdateTime() { return updateTime; }
     public void setUpdateTime(String updateTime) { this.updateTime = updateTime; }
+
+    /**
+     * 组装认知四件套的 inline_context（用于 REST 透传到 cognitive-engine）。
+     * <p>含三要素 id refs + 四件套开关 + model refs。</p>
+     */
+    public Map<String, Object> toInlineContext() {
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        ctx.put("mindId", id);
+        ctx.put("mindLabel", mindLabel);
+        ctx.put("evidence_refs", evidenceRefs);
+        ctx.put("hypothesis_refs", hypothesisRefs);
+        ctx.put("model_refs", modelRefs);
+        ctx.put("belief", initialBelief);
+        ctx.put("cognitive_endpoints", cognitiveEndpoints);
+        ctx.put("confidence", initialConfidence);
+        return ctx;
+    }
 }

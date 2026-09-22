@@ -244,6 +244,27 @@ public class ScenarioMindService {
     }
 
     /**
+     * 获取场景当前激活心智（active_mind=1 的行）。
+     *
+     * @param scenarioId 场景 id
+     * @return 激活的 mind VO；若不存在则返回 null
+     */
+    public ScenarioMindVO getActiveMind(String scenarioId) {
+        if (scenarioId == null || scenarioId.isBlank()) {
+            throw new BusinessException(400, "MIND-400: scenarioId 必填");
+        }
+        List<ScenarioMindRaw> rows = jdbc.query(
+            "SELECT id, scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
+            "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, " +
+            "create_time, update_time " +
+            "FROM ecos_scenario_mind WHERE scenario_id=? AND active_mind=1 AND is_deleted=0", MIND_MAPPER, scenarioId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        return toVO(rows.get(0));
+    }
+
+    /**
      * 获取 base mind（兼容 v1.x /mind-model 端点）。
      *
      * @param scenarioId 场景 id
