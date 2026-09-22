@@ -3,6 +3,7 @@
  * - 任务列表 / 状态实时 / 操作（执行/取消/暂停/恢复/归档）
  * - 每 5s 轮询任务状态，新任务自动出现
  * - 主题感知 (useTheme), 国际化 (useLanguage, taskPanel.* 或 dw.taskCenter.*)
+ * - PMO-72 W4: 数据源 = td_runtime_task* 5 表 (PG sys_man.public) + runtime-task JdbcTaskPersistenceService 持久化 + PG 重启恢复
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useTheme } from "../components/ThemeContext";

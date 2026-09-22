@@ -1,6 +1,8 @@
 /**
  * Task Center API — 与 TaskController 真实后端端点对齐
  * 后端: /api/v1/task/*
+ * PMO-72 W4: 数据源 = td_runtime_task* 5 表 (PG sys_man.public) +
+ *           runtime-task JdbcTaskPersistenceService 持久化 (cron/next_run_at/last_run_at/last_status)
  */
 
 const BASE = "/api/v1/task";

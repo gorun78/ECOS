@@ -60,15 +60,26 @@ export interface OntologyTreeVo {
   }>;
 }
 
-/** 定时抽取任务定义 */
+/**
+ * 定时抽取任务定义（TB-1 批次 / PMO-73 W3 后）
+ *
+ * 字段语义（铁律 §1.6-2：调度单事实源 = td_runtime_task_plan）：
+ * - `id`         — 旧 fallback 镜像行 id（ecos_knowledge.kb_scheduled_extract.id）；主流程不消费
+ * - `scheduleId` — 真实调度 ID == td_runtime_task_plan.task_id（前端只读显示，不区分旧/新来源）
+ * - `mode/period/timeOfDay/ontologyIds` — 业务语义字段（同名旧 V141 + TB-1 路径一致）
+ * - `enabled`    — 取自 td_runtime_task_plan.task_status ∈ {RUNNING, PAUSED}
+ * - `lastRunAt/lastStatus/createdAt` — 来自 td_runtime_task_plan 计划元信息
+ */
 export interface ScheduledExtractVo {
   id: number;
+  /** 真实调度 ID == td_runtime_task_plan.task_id（前端只读显示，不区分旧/新来源） */
   scheduleId: string;
   name: string;
   ontologyIds: string[];
   mode: string;
   period: string;
   timeOfDay?: string;
+  /** task_status 不在 PAUSED 即 enabled=true */
   enabled: boolean;
   lastRunAt?: string;
   lastStatus?: string;
@@ -869,7 +880,13 @@ export async function fetchOntologyTree(): Promise<OntologyTreeVo[]> {
   }
 }
 
-/** 获取定时抽取任务列表 */
+/**
+ * 获取定时抽取任务列表
+ *
+ * 后端 (ScheduledExtractController GET /extract/scheduled) 主源 =
+ * td_runtime_task_plan（task_type='KB_IMPORT_SCHEDULED'，V152 W4 持久化），
+ * fallback 旧表 kb_scheduled_extract 旧行合并；id 为主源 mirror 行 id（前端不消费，仅回退 UI 显示）。
+ */
 export async function fetchScheduledExtracts(): Promise<ScheduledExtractVo[]> {
   try {
     const data = await apiFetchData<ScheduledExtractVo[]>(`${KB_V1}/extract/scheduled`);
@@ -1032,9 +1049,10 @@ export async function fetchExtractJobStatus(taskId: string): Promise<ExtractJobI
   }
 }
 
-/** 定时抽取任务行（后端 snake_case 形态） */
+/** 定时抽取任务行（后端 snake_case 形态；TB-1 后 scheduleId = td_runtime_task_plan.task_id） */
 export interface ScheduledExtractRow {
   id: number;
+  /** 真实调度 ID == td_runtime_task_plan.task_id（前端不区分旧/新来源，仅显示） */
   scheduleId: string;
   name: string;
   ontologyIds: string[];
