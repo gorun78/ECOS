@@ -244,8 +244,7 @@ export default function DatasyncTab() {
   const onPickDryRun = useCallback(() => { void trigger(true); }, [trigger]);
 
   return (
-    <div className="h-full overflow-y-auto p-6 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
 
         {/* §1 标题 + hero */}
         <div className="space-y-1">
@@ -253,15 +252,11 @@ export default function DatasyncTab() {
             <Database className="w-5 h-5" style={{ color: styles.accentText }} />
             {t('knowledge.datasync.title')}
           </h2>
-          <p className="text-xs" style={{ color: styles.cardTextMuted }}>{t('knowledge.datasync.subtitle')}</p>
-          <p className="text-xs leading-normal mt-2 pl-3 border-l-2" style={{ color: styles.cardText, borderColor: styles.accentBg }}>
-            {t('knowledge.datasync.hero')}
-          </p>
         </div>
 
-        {/* §1b tier banner（T12） */}
+        {/* §1b tier banner（T12 · full width） */}
         <div
-          className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${styles.warningBg}`}
+          className={`w-full flex items-center justify-between gap-4 px-4 py-2.5 rounded-xl border ${styles.warningBg}`}
           style={{ borderColor: styles.warningBorder }}
         >
           <span className="text-xs font-mono tracking-wide" style={{ color: styles.warningText }}>
@@ -295,7 +290,7 @@ export default function DatasyncTab() {
         </div>
 
         {/* §2b 映射契约摘要（Wave 0 保留 · 本体工作台契约只读） */}
-        <div className={`flex items-center justify-between border rounded-xl px-4 py-2 ${styles.inputBg}`} style={{ borderColor: styles.cardBorder }}>
+        <div className={`w-full flex items-center justify-between border rounded-xl px-4 py-2 ${styles.inputBg}`} style={{ borderColor: styles.cardBorder }}>
           <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: styles.muted }}>
             {t('knowledge.datasync.mappings_title')}
           </span>
@@ -306,13 +301,10 @@ export default function DatasyncTab() {
 
         {/* §3 抽取方式（T5 + T8） */}
         <div className={`border rounded-xl p-4 space-y-4 ${styles.cardBg} ${styles.cardBorder}`}>
-          <div className="space-y-0.5">
+          <div>
             <h3 className="font-semibold text-sm" style={{ color: styles.cardText }}>
               {t('knowledge.datasync.section.extract_mode')}
             </h3>
-            <p className="text-[11px]" style={{ color: styles.cardTextMuted }}>
-              {t('knowledge.datasync.section.extract_mode_desc')}
-            </p>
           </div>
 
           {/* 单选 pill：立即 / 定时 */}
@@ -370,16 +362,6 @@ export default function DatasyncTab() {
           active={active}
           trigger={activeTrigger}
         />
-
-        {/* §5 落库审计占位（K1 已落；此处只给 hint） */}
-        <div className={`flex items-start gap-2 border rounded-xl p-3 ${styles.badgeBg}`} style={{ borderColor: styles.cardBorder }}>
-          <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: styles.muted }} />
-          <p className="text-[11px] leading-normal" style={{ color: styles.muted }}>
-            <span className="font-bold">{t('knowledge.datasync.section.audit')}:</span>{' '}
-            {t('knowledge.datasync.audit_hint')}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -398,12 +380,6 @@ function NowMode(props: {
   const busy = running || dryRunning;
   return (
     <div className="space-y-3">
-      {/* 未选本体时的前置提示（仅提示，不软性禁用） */}
-      {showAllHint && (
-        <p className="text-[11px] leading-normal" style={{ color: styles.muted }}>
-          {t('knowledge.datasync.precondition.hint')}
-        </p>
-      )}
       {/* mode 单选（全量覆盖 / 增量更新） */}
       <div className="flex items-center gap-2">
         <span className="text-[11px]" style={{ color: styles.muted }}>{t('knowledge.datasync.mode.label')}:</span>
@@ -420,11 +396,6 @@ function NowMode(props: {
           label={t('knowledge.sync_mode.incremental')}
         />
       </div>
-      {showAllHint && (
-        <p className="text-[10px] font-mono" style={{ color: styles.muted }}>
-          {t('knowledge.datasync.monitor.select_hint')}
-        </p>
-      )}
       {/* 按钮链：dry-run（统计 only）+ 真的立即执行 */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
@@ -449,10 +420,6 @@ function NowMode(props: {
           {t('knowledge.datasync.monitor.pick_exec')}
         </button>
       </div>
-      {/* 提交后 round-trip 说明（消除"点了没反应"歧义：执行走监控面板 / dry-run 回显 toast） */}
-      <p className="text-[10px] font-mono" style={{ color: styles.muted }}>
-        {t('knowledge.datasync.extract.submit_feedback')}
-      </p>
     </div>
   );
 }

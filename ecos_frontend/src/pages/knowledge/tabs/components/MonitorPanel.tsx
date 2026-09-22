@@ -101,15 +101,14 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
     } catch {
       // 静默
     }
-    // 日志（task 启动后才会有，容错空）：触发即用 active.taskId 的 jobId（后端 jobId is Number 字符串），拿到 Number 后再拉
-    try {
-      const n = Number(active.taskId);
-      if (Number.isFinite(n) && n > 0) {
-        const entries = await fetchExtractLogs(n);
+    // 日志（task 启动后才会有，容错空）：jobId 是后端 String（"KBK1S-<ts>" 前缀），直接透传
+    if (active && active.taskId) {
+      try {
+        const entries = await fetchExtractLogs(String(active.taskId));
         if (Array.isArray(entries) && entries.length > 0) setLogs(entries);
+      } catch {
+        // 静默
       }
-    } catch {
-      // 静默
     }
   }, [active]);
 
@@ -143,13 +142,13 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
   useEffect(() => {
     if (job && TERMINAL_STATES.has(job.status) && intervalIdRef.current !== null) {
       stopPolling();
-      // 终态后还要拉一次日志收尾
-      void (async () => {
-        const jid = (job.jobId as string) || '';
-        const n = Number(jid);
-        if (!n || Number.isNaN(n) || n <= 0) return;
-        try { const entries = await fetchExtractLogs(n); setLogs(entries); } catch { /* 静默 */ }
-      })();
+      // 终态后还要拉一次日志收尾（job.jobId 已是 string）
+      const jid = String(job.jobId ?? '');
+      if (jid) {
+        void (async () => {
+          try { const entries = await fetchExtractLogs(jid); setLogs(entries); } catch { /* 静默 */ }
+        })();
+      }
     }
   }, [job, stopPolling]);
 
@@ -161,12 +160,12 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
   /** 导出 Blob → a.download 触发，revoke 在 setTimeout 30s 后（避免立刻 revoke） */
   const exportLog = useCallback(async () => {
     if (!job) return;
-    const jid = Number(job.jobId);
-    if (!jid || Number.isNaN(jid)) return;
+    const jid = String(job.jobId ?? '');
+    if (!jid) return;
     setExporting(true);
     setExportFailed(false);
     try {
-      const blob = await exportExtractLog(String(jid));
+      const blob = await exportExtractLog(jid);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -345,8 +344,8 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
         {recentJobs.length === 0 ? (
           <p className="text-xs py-3 text-center" style={{ color: styles.muted }}>{t('knowledge.datasync.monitor.empty')}</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-[11px] whitespace-nowrap">
               <thead>
                 <tr className="text-left font-mono text-[9px] uppercase tracking-wider" style={{ color: styles.muted }}>
                   <th className="py-1 pr-2">jobId</th>

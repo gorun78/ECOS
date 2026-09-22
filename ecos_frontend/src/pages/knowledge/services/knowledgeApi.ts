@@ -24,10 +24,10 @@ import type {
   StructuredExtractJob,
 } from '../typesAndConstants';
 
-const KNOWLEDGE_BASE = '/api/knowledge';
-const GRAPH_BASE = '/api/knowledge';
+const KNOWLEDGE_BASE = '/api/v1/knowledge';
+const GRAPH_BASE = '/api/v1/knowledge';
 const GLOSSARY_BASE = '/api/v1/ontology/glossary';
-const CATALOG_BASE = '/api/catalog';
+const CATALOG_BASE = '/api/v1/catalog';
 const COGNITIVE_BASE = '/api/v1/cognitive';
 const RULES_BASE = '/api/v1/knowledge/compliance-rules';
 
@@ -824,7 +824,7 @@ export interface DataWorkbenchSource {
 
 export async function fetchDataWorkbenchSources(): Promise<DataWorkbenchSource[]> {
   try {
-    const data = await apiFetchData<any>('/api/integration/metadata');
+    const data = await apiFetchData<any>('/api/v1/integration/metadata');
     const items = Array.isArray(data) ? data : (data?.data as any[]) || data?.sources || [];
     return (items as any[]).map((s: any) => ({
       dsId: String(s.id ?? s.dsId ?? s.name ?? ''),
@@ -907,9 +907,9 @@ export async function deleteScheduledExtract(id: number): Promise<void> {
 }
 
 /** 获取抽取作业日志（结构化抽取 → 按 jobId 反查日志） */
-export async function fetchExtractLogs(jobId: number): Promise<ExtractLogEntry[]> {
+export async function fetchExtractLogs(jobId: string): Promise<ExtractLogEntry[]> {
   try {
-    const data = await apiFetchData<ExtractLogEntry[]>(`${KB_V1}/extract/structured/logs/${jobId}`);
+    const data = await apiFetchData<ExtractLogEntry[]>(`${KB_V1}/extract/structured/logs/${encodeURIComponent(jobId)}`);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -917,7 +917,7 @@ export async function fetchExtractLogs(jobId: number): Promise<ExtractLogEntry[]
 }
 
 /** 获取抽取日志导出 Blob（POST body 触发下载，供 T10 组件 window.open / a.download 触发） */
-export async function fetchExportLogBody(jobId: number): Promise<Blob> {
+export async function fetchExportLogBody(jobId: string): Promise<Blob> {
   const token = localStorage.getItem('token') || '';
   const res = await fetch(`${KB_V1}/extract/structured/export-log`, {
     method: 'POST',
@@ -953,7 +953,7 @@ export interface StructuredExtractDryRunReport {
 
 export interface StructuredExtractTriggerResp extends StructuredExtractDryRunReport {
   taskId?: string;
-  jobId?: number;
+  jobId?: string;
   status?: string;
 }
 
@@ -965,7 +965,7 @@ export async function triggerStructuredExtract(req: {
     `${KB_V1}/extract/structured`,
     { method: 'POST', body: JSON.stringify(req) },
   );
-  return data || { taskId: '', jobId: 0, status: 'PENDING' };
+  return data || { taskId: '', jobId: '', status: 'PENDING' };
 }
 
 /** 查询结构化抽取任务状态 */

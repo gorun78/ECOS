@@ -206,8 +206,6 @@
   "knowledge.overview.engine_status": "引擎状态",
 
   "knowledge.datasync.title": "数据同步",
-  "knowledge.datasync.subtitle": "依据本体模型与数据映射，从数据工作台抽取 → 形成知识图谱与向量库",
-  "knowledge.datasync.hero": "依据本体工作台的本体模型与实体-数据映射契约，从数据工作台抽取数据形成知识图谱；依据本体与文档锚点映射，形成向量库。",
   "knowledge.datasync.mappings_title": "当前生效的本体映射来源",
   "knowledge.datasync.mappings_hint": "读自 /api/v1/ontology/entity-mappings（本体工作台契约）",
   "knowledge.datasync.mappings_empty": "暂无映射契约（实体-数据映射未配置或后端不可用）",
@@ -932,7 +930,6 @@
   "knowledge.datasync.section.ontology_title": "本体选取",
   "knowledge.datasync.section.ontology_desc": "数据来源 = 本体工作台「实体-数据映射契约」；勾选下列本体后，抽取将仅作用于所选本体的实体集合。",
   "knowledge.datasync.section.extract_mode": "抽取方式",
-  "knowledge.datasync.section.extract_mode_desc": "单选：立即触发或登记定时任务；mode 与下方监控面板联动。",
   "knowledge.datasync.section.monitor": "抽取监控",
   "knowledge.datasync.section.audit": "落库审计",
 
@@ -947,13 +944,10 @@
   "knowledge.datasync.extract.submitted": "萃取已提交，结果在下方监控面板实时回流",
   "knowledge.datasync.extract.no_target": "后端未返回任务（本批映射实体 {count} 条、跳过 {skipped} 条）—— 若为首次萃取且数据已采集到 DW 层，请稍后查看监控；否则请检查本体工作台映射与数据工作台采集",
   "knowledge.datasync.extract.dryrun_result": "Dry-run 完成：实体 {count} 条（节点 +{created} / 更新 {updated}），不落库",
-  "knowledge.datasync.extract.submit_feedback": "执行后：右上反馈 + 下方监控面板实时回流；dry-run 仅弹 toast 不落库",
-  "knowledge.datasync.precondition.hint": "未选择具体本体时，将按映射表中所有 materialized=true 的实体执行；需本体工作台已配置有效映射并已采到 DW 层",
   "knowledge.datasync.monitor.pick_dry_run": "选择 Dry-run（统计 only）",
   "knowledge.datasync.monitor.pick_exec": "真的立即执行",
   "knowledge.datasync.monitor.dry_run_badge": "dry-run",
   "knowledge.datasync.monitor.empty": "触发一次抽取后会在此显示实时进度、KPI、日志与任务历史。",
-  "knowledge.datasync.monitor.no_task": "暂无抽取任务 — 选择「立即抽取」或「定时抽取」触发后，此处将显示实时进度",
 
   "knowledge.datasync.sched.new_title": "新建定时任务",
   "knowledge.datasync.sched.edit_title": "定时任务·{name}",
@@ -983,7 +977,6 @@
   "knowledge.datasync.monitor.retention_logged": "信号已送 · 轮询中（每 2s）",
   "knowledge.datasync.monitor.dry_run_log_note": "dry-run 不落库，仅回传单例统计",
   "knowledge.datasync.monitor.stats_only_note": "统计 only（不落库）",
-  "knowledge.datasync.monitor.select_hint": "上方未勾选本体时，按「全部本体」语义运行",
   "knowledge.datasync.export.log_suffix": "extract-log-{id}.log",
 
   "knowledge.datasync.audit_hint": "审计日志由 kb_extract_audit 表承载，按 jobId 反查；此处为占位，后续批次接通",

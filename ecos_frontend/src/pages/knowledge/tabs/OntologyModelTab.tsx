@@ -109,7 +109,7 @@ export default function OntologyModelTab() {
 
   return (
     <div className="space-y-6">
-      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-4 gap-4`}>
+        <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-4 gap-4 flex-wrap`}>
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}><Workflow size={16} className="text-blue-600 animate-pulse" />{t("knowledge.ontologytab.语义本体与物理宽表对齐管理器")}</h2>
           <p className={`text-xs ${styles.cardTextMuted} font-sans`}>{t("knowledge.ontologytab.建立强类型对齐契约_将逻辑本体字段与物理大宽表列名进行多对多")}</p>
@@ -128,7 +128,7 @@ export default function OntologyModelTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
         {[
           { label: 'Active Ontologies', value: `${ontologyMappings.length} Entities`, icon: <Cpu size={14} />, bg: 'bg-blue-50 text-blue-600' },
           { label: 'Physical Targets', value: `${availableTables.length} OLAP Tables`, icon: <Database size={14} />, bg: 'bg-emerald-50 text-emerald-600' },
@@ -189,8 +189,11 @@ export default function OntologyModelTab() {
                   <button onClick={handleAddMapping} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={11} />{t("knowledge.ontologytab.添加映射")}</button>
                 </div>
                 <div className={`border ${styles.appBorder} rounded-xl overflow-hidden`}>
-                  <table className="w-full text-left border-collapse">
-                    <thead><tr className={`${styles.badgeBg} border-b ${styles.appBorder} text-[10px] font-extrabold ${styles.cardTextMuted} font-sans select-none`}><th className="p-3">{t("knowledge.ontologytab.逻辑属性")}</th><th className="p-3">{t("knowledge.synctab.类型")}</th><th className="p-3">{t("knowledge.ontologytab.物理表")}</th><th className="p-3">{t("knowledge.ontologytab.物理列")}</th><th className="p-3">{t("knowledge.ontologytab.说明")}</th><th className="p-3 text-center">{t("knowledge.ontologytab.操作")}</th></tr></thead>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className={`${styles.badgeBg} border-b ${styles.appBorder} text-[10px] font-extrabold ${styles.cardTextMuted} font-sans select-none`}><th className="p-3">{t("knowledge.ontologytab.逻辑属性")}</th><th className="p-3">{t("knowledge.synctab.类型")}</th><th className="p-3">{t("knowledge.ontologytab.物理表")}</th><th className="p-3">{t("knowledge.ontologytab.物理列")}</th><th className="p-3">{t("knowledge.ontologytab.说明")}</th><th className="p-3 text-center">{t("knowledge.ontologytab.操作")}</th></tr>
+                      </thead>
                     <tbody className={`divide-y ${styles.sidebarBorder} text-[11px]`}>
                       {(!editingOntology.mappings || editingOntology.mappings.length === 0) ? (
                         <tr><td colSpan={6} className={`p-8 text-center ${styles.muted} font-sans`}>{t("knowledge.ontologytab.尚未配置映射")}</td></tr>
@@ -211,8 +214,9 @@ export default function OntologyModelTab() {
                     </tbody>
                   </table>
                 </div>
+                </div>
               </div>
-              <div className={`flex items-center justify-between pt-4 border-t ${styles.appBorder}`}>
+              <div className={`flex flex-wrap items-center justify-between pt-4 border-t ${styles.appBorder}`}>
                 <div className={`text-[10px] ${styles.muted}`}>* {t("knowledge.ontologytab.保存后实时更新_rag_上下文数据库")}</div>
                 <button onClick={() => handleSaveMappings(ontologyMappings)} className={`px-5 py-2 ${styles.accentBg} text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-colors`}><Save size={12} /><span>{t("knowledge.ontologytab.保存对齐契约")}</span></button>
               </div>
@@ -225,7 +229,7 @@ export default function OntologyModelTab() {
 
       {showExportModal && (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${styles.overlayBg} backdrop-blur-xs animate-fade-in`}>
-          <div className={`${styles.cardBg} rounded-2xl max-w-2xl w-full border ${styles.cardBorder} shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
+          <div className={`${styles.cardBg} rounded-2xl w-[92vw] max-w-2xl border ${styles.cardBorder} shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
             <div className="bg-slate-950 text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2"><Download size={15} className="text-blue-400" /><span className="font-black text-xs">{t("knowledge.ontologytab.rag_先验知识元数据包")}</span></div>
               <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white font-bold cursor-pointer"><X size={16} /></button>

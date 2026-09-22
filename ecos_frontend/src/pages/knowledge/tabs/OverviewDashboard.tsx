@@ -158,7 +158,7 @@ export default function OverviewDashboard() {
           <p className="text-[10px] font-mono opacity-70">/api/v1/knowledge/stats · {t('knowledge.overview.retry_hint')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {/* 图谱概要（存储能力上提：节点 / 边 / 最近同步；详情在知识查询 · 图谱探索） */}
           <SummaryCard
             title={t('knowledge.overview.graph_summary')}
@@ -253,7 +253,7 @@ export default function OverviewDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* 近7天折线（模拟 mini 折线） */}
         <div className={`lg:col-span-2 ${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
           <div className={`flex items-center justify-between border-b pb-2 ${styles.divider}`}>

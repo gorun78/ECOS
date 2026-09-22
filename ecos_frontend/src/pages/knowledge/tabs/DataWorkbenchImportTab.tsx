@@ -159,7 +159,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <Download size={16} className="text-indigo-600" />
-            {tl('体数据来源与抽取任务', 'Ontology Source & Extract Jobs')}
+            {tl('本体数据来源与抽取任务', 'Ontology Source & Extract Jobs')}
           </h2>
           <p className={`text-[10px] ${styles.cardTextMuted}`}>
             {tl('选择本体版本 → Dry-run 预览 → 触发结构化抽取', 'Pick ontology version → dry-run preview → trigger structured extract')}
@@ -294,8 +294,8 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
           </span>
           <span className={`text-[9px] font-mono ${styles.muted}`}>/extract/structured/jobs</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[11px] border-collapse">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-[11px] border-collapse whitespace-nowrap">
             <thead>
               <tr className={`${styles.appBorder} border-b ${styles.cardBorder}`}>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider w-8"></th>
