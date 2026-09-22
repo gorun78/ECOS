@@ -61,6 +61,14 @@ const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx
 const EngineMonitor = lazy(() => import('./pages/EngineMonitor.tsx'));
 const CognitiveEngineView = lazy(() => import('./pages/CognitiveEngineView.tsx'));
 const AsyncTaskCenterView = lazy(() => import('./pages/AsyncTaskCenterView'));
+const SandboxCanvas = lazy(() => import('./pages/scenario-sandbox/SandboxCanvas.tsx'));
+
+// Bridge for <Route element={...}>'s props with useParams (scenario-sandbox/:scenarioId)
+import { useParams } from 'react-router-dom';
+function SandboxRouteWrapper() {
+  const { scenarioId } = useParams<{ scenarioId: string }>();
+  return <SandboxCanvas scenarioId={scenarioId ?? ''} />;
+}
 
 // Suspense fallback — spinner shown while any lazy chunk is downloading
 function RouteFallback() {
@@ -146,6 +154,11 @@ createRoot(document.getElementById('root')!).render(
                 {/* K · 知识层 */}
                 <Route path="workflow_designer" element={<WorkshopView />} />
                 <Route path="project_workbench" element={<ScenarioManagementView />} />
+                <Route path="scenario-sandbox/:scenarioId" element={
+                    <Suspense fallback={<RouteFallback />}>
+                        <SandboxRouteWrapper />
+                    </Suspense>
+                } />
                 <Route path="world_model" element={<WorldModelViewer />} />
                 <Route path="knowledge_view" element={<KnowledgeView />} />
                 {/* W · 智能层 */}

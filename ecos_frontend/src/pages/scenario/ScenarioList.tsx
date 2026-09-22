@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import LucideIcon from '../../components/LucideIcon';
 import type { ThemeStyles } from '../../components/ThemeContext';
 import type { BusinessScenario } from '../project-workbench/types';
@@ -140,6 +141,16 @@ export default function ScenarioList({
                   />
                   {scen.status}
                 </span>
+                <Link
+                  to={`/scenario-sandbox/${scen.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded border transition-all opacity-60 hover:opacity-100"
+                  style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+                  title={tl('进沙盘', 'Enter Sandbox')}
+                >
+                  <LucideIcon name="Layers" size={10} />
+                  {tl('沙盘', 'Sandbox')}
+                </Link>
               </div>
             </div>
           );
