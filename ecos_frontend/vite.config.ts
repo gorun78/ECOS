@@ -31,7 +31,9 @@ export default defineConfig(() => {
         '/api/v1/policy-engine': { target: 'http://localhost:18081', changeOrigin: true },
         '/api/v1/engine/data':   { target: 'http://localhost:18082', changeOrigin: true },
         '/api/v1/ecos':          { target: 'http://localhost:18083', changeOrigin: true },
-        '/api/v1/cognitive':     { target: 'http://localhost:18089', changeOrigin: true },
+        // PMO-60: workspace routing + cognitive merged into aiming
+        '/api/v1/workspace':     { target: 'http://localhost:18090', changeOrigin: true },
+        '/api/v1/cognitive':     { target: 'http://localhost:18084', changeOrigin: true },
         '/api/v1/world-model':   { target: 'http://localhost:18089', changeOrigin: true },
         '/api/v1/rules':         { target: 'http://localhost:18086', changeOrigin: true },
         '/api/v1/kb':            { target: 'http://localhost:18086', changeOrigin: true },
