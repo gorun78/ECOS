@@ -96,6 +96,62 @@ app.use("/api/dq", datanetProxy);
 app.use("/api/v1/ecos/git", datanetProxy);
 app.use("/api/datalake", datanetProxy);
 
+// ── PMO-60: workspace + cognitive routes (workspace.controller 被 gateway 排除, 需独立转发) ──
+const WORKSPACE = process.env.WORKSPACE_URL || "http://localhost:18090";
+const workspaceProxy = async (req: express.Request, res: express.Response) => {
+  const targetUrl = `${WORKSPACE}${req.originalUrl}`;
+  const method = req.method;
+  console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl} (workspace)`);
+  try {
+    const withBody = method !== "GET" && method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
+    const fetchOptions: RequestInit = { method, headers: upstreamHeaders };
+    if (withBody) fetchOptions.body = JSON.stringify(req.body);
+    const upstream = await fetch(targetUrl, fetchOptions);
+    const contentType = upstream.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await upstream.json();
+      res.status(upstream.status).json(data);
+    } else {
+      const text = await upstream.text();
+      res.status(upstream.status).set("Content-Type", contentType).send(text);
+    }
+  } catch (err: any) {
+    console.error(`[BFF] Workspace proxy error for ${req.originalUrl}:`, err.message);
+    res.status(502).json({ success: false, message: `Workspace unavailable: ${err.message}` });
+  }
+};
+app.use("/api/v1/workspace", workspaceProxy);
+// cognitive migrated to aiming:18084 (PMO-60 P0)
+const AIMING = process.env.AIMING_URL || "http://localhost:18084";
+app.use("/api/v1/cognitive", async (req: express.Request, res: express.Response) => {
+  const targetUrl = `${AIMING}${req.originalUrl}`;
+  console.log(`[BFF] ${req.method} ${req.originalUrl} -> ${targetUrl} (aiming-cognitive)`);
+  try {
+    const withBody = req.method !== "GET" && req.method !== "HEAD" && req.body;
+    const upstreamHeaders: Record<string, string> = {
+      ...(withBody ? { "Content-Type": "application/json" } : {}),
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+    };
+    const fetchOptions: RequestInit = { method: req.method, headers: upstreamHeaders };
+    if (withBody) fetchOptions.body = JSON.stringify(req.body);
+    const upstream = await fetch(targetUrl, fetchOptions);
+    const contentType = upstream.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await upstream.json();
+      res.status(upstream.status).json(data);
+    } else {
+      const text = await upstream.text();
+      res.status(upstream.status).set("Content-Type", contentType).send(text);
+    }
+  } catch (err: any) {
+    res.status(502).json({ success: false, message: `Aiming/cognitive unavailable: ${err.message}` });
+  }
+});
+
 // ── Special endpoints (backend doesn't have these) ─────────
 
 // GET /api/audit-logs — aggregates agent execution records as audit events
