@@ -143,24 +143,26 @@ public class StructuredExtractController {
             return ApiResponse.success(report);
         }
 
-        // ── 异步路径：dryRun=false，走 runtime-task ────────────────────────────────────
+        // ── 异步路径：dryRun=false，走 runtime-task（立即提交，executeTask 持久化到 dispatch queue，
+        //    工作线程异步跑；与数据工作台 DataIngestService.runOnce 同形态：
+        //    desc.setAsync(false) + executeTask 同步派发，**不另起线程**（架构铁律 §1.6-1））
         TaskDescription desc = new TaskDescription();
         desc.setTaskName("结构化映射实例抽取: " + jobId);
         desc.setTaskType(KB_IMPORT_TASK_TYPE);
-        desc.setDescription("异步执行结构化映射驱动实例抽取 jobId=" + jobId);
+        desc.setDescription("结构化映射驱动实例抽取 jobId=" + jobId);
         Map<String, Object> params = new HashMap<>();
         params.put("ontologyId", req.getOntologyId());
         params.put("mode", mode);
         params.put("dryRun", false);
         params.put("jobId", jobId);
+        params.put("biz_kind", "KB_EXTRACT");
         desc.setParameters(params);
-        desc.setAsync(true);
+        desc.setAsync(false);   // 即时任务同步派发（不进入调度循环，立即 executeTask）
 
         String taskId;
         try {
             taskId = taskManagementService.submitTask(desc);
-            // parseTask 同步完成（纯注册执行计划，无 IO）
-            taskManagementService.parseTask(taskId);
+            taskManagementService.executeTask(taskId);   // 同步派发：dispatch queue 入队 + 工作线程异步跑
         } catch (ValidationException e) {
             log.warn("E3 异步提交失败 jobId={}: {}", jobId, e.getMessage());
             return ApiResponse.badRequest(e.getMessage());
@@ -169,21 +171,11 @@ public class StructuredExtractController {
             return ApiResponse.badRequest("异步任务提交失败: " + e.getMessage());
         }
 
-        // 启动后台执行（executeTask 在线程池异步跑）
-        final String tid = taskId;
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                taskManagementService.executeTask(tid);
-            } catch (Exception e) {
-                log.error("KB_IMPORT 后台执行失败 taskId={} jobId={}: {}", tid, jobId, e.getMessage(), e);
-            }
-        });
-
         log.info("E3 异步任务已提交: taskId={} jobId={} mode={} ontologyId={}",
-                tid, jobId, mode, req.getOntologyId());
+                taskId, jobId, mode, req.getOntologyId());
         KbImportTriggerVO vo = new KbImportTriggerVO();
-        vo.setTaskId(tid);
-        vo.setJobId(jobId);
+        vo.setTaskId(taskId);
+        vo.setJobId(taskId);    // 铁律 §1.6-1：jobId = taskId，统一标识
         return ApiResponse.success(vo);
     }
 

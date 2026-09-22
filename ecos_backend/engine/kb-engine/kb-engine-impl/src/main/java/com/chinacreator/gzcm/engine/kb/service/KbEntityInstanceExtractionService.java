@@ -289,7 +289,7 @@ public class KbEntityInstanceExtractionService {
                     report.setNodeSkipped(report.getNodeSkipped() + 1);
                     continue;
                 }
-                String nodeId = buildNodeId(nodeType, pkValue);
+                String nodeId = buildNodeId(snap.ontologyId(), nodeType, pkValue);
                 if (dryRun) {
                     // dry-run：只统计不落库（预览）
                     report.setNodeCreated(report.getNodeCreated() + 1);
@@ -358,7 +358,7 @@ public class KbEntityInstanceExtractionService {
                 report.setNodeSkipped(report.getNodeSkipped() + 1);
                 continue;
             }
-            String targetNodeId = buildNodeId(matched.targetCode(), fkValue);
+            String targetNodeId = buildNodeId(snap.ontologyId(), matched.targetCode(), fkValue);
             String edgeId = buildEdgeId(snap.ontologyId(), sourceType, relCode, pkValue, fkValue);
             pendingEdges.add(new EdgeCandidate(edgeId, sourceNodeId, targetNodeId, relCode,
                     snap, resourceId, pkValue));
@@ -779,24 +779,21 @@ public class KbEntityInstanceExtractionService {
         }
     }
 
-    /** 节点 id：{@code nodeType:pk}；超 64 列宽时走 SHA-256 前缀（确定性 + 幂等）。 */
-    private String buildNodeId(String nodeType, String pkValue) {
-        String raw = nodeType + ":" + pkValue;
-        if (raw.length() <= SHORT_COLUMN_MAX) {
-            return raw;
-        }
-        String prefix = nodeType.length() > 20 ? nodeType.substring(0, 20) : nodeType;
-        return prefix + "-" + sha256Hex(raw).substring(0, ID_HASH_LEN);
+    /** 节点 id：{@code sha256(ontologyId::nodeType::pkValue)} 全量 32 hex 字符。
+     *     含 ontologyId 限定，杜绝跨本体 / 跨实体（含同 20 字符前缀）撞车（架构铁律 §6 擦子红线）。
+     */
+    private String buildNodeId(String snapshotOntologyId, String nodeType, String pkValue) {
+        String raw = snapshotOntologyId + "::" + nodeType + "::" + pkValue;
+        return sha256Hex(raw).substring(0, 32);
     }
 
-    /** 边 id：{@code kgrel:ontology:source:relation:pk:fk}；超 64 列宽时走 SHA-256 前缀。 */
-    private String buildEdgeId(String ontologyId, String sourceType, String relation,
+    /** 边 id：{@code sha256(ontologyId:sourceType:relation:sourcePk:fkValue)} 前 32 hex 字符。
+     *     不再是 {@code kgrel:} 前缀 + 字符串拼接，同节点 id 同思路（防截断撞车）。
+     */
+    private String buildEdgeId(String snapshotOntologyId, String sourceType, String relation,
                                String sourcePk, String fkValue) {
-        String raw = "kgrel:" + ontologyId + ":" + sourceType + ":" + relation + ":" + sourcePk + ":" + fkValue;
-        if (raw.length() <= SHORT_COLUMN_MAX) {
-            return raw;
-        }
-        return "kgrel-" + sha256Hex(raw).substring(0, SHORT_COLUMN_MAX - 6);
+        String raw = snapshotOntologyId + ":" + sourceType + ":" + relation + ":" + sourcePk + ":" + fkValue;
+        return "kgrel:" + sha256Hex(raw).substring(0, 32);
     }
 
     /** SHA-256 十六进制摘要（id 收敛用，不用于安全用途）。 */
