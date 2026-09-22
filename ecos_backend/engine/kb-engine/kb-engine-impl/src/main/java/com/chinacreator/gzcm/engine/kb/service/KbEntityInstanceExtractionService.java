@@ -278,10 +278,26 @@ public class KbEntityInstanceExtractionService {
         // 4. 分页拉取 DW 实例行（水位线增量）
         String watermark = incremental ? readWatermark(snap.ontologyId(), entityCode, resourceId) : null;
         String lastWatermark = watermark;
+        int rowsRead = 0;
+        int rowsCapped = 0;
+        boolean truncated = false;
         for (int page = 0; page < MAX_PAGES; page++) {
             RowsPage rowsPage = readRows(resourceId, watermark, report);
             if (rowsPage == null) {
                 break;
+            }
+            // dry-run：预查存在性（命中→updated / 未命中→created），不写任何行
+            // 业务铁律 §5.1-11：dry-run 计数与真执行口径一致（避免 nodeCreated 虚高误导）
+            Set<String> existingForDryRun = null;
+            if (dryRun) {
+                existingForDryRun = new LinkedHashSet<>();
+                for (Map<String, Object> row : rowsPage.rows()) {
+                    String pv = text(row.get(pkColumn));
+                    if (!pv.isEmpty()) {
+                        existingForDryRun.add(buildNodeId(snap.ontologyId(), nodeType, pv));
+                    }
+                }
+                existingForDryRun = queryExistingNodeIds(existingForDryRun);
             }
             for (Map<String, Object> row : rowsPage.rows()) {
                 String pkValue = text(row.get(pkColumn));
@@ -289,10 +305,15 @@ public class KbEntityInstanceExtractionService {
                     report.setNodeSkipped(report.getNodeSkipped() + 1);
                     continue;
                 }
+                rowsRead++;
                 String nodeId = buildNodeId(snap.ontologyId(), nodeType, pkValue);
                 if (dryRun) {
-                    // dry-run：只统计不落库（预览）
-                    report.setNodeCreated(report.getNodeCreated() + 1);
+                    // dry-run：用预查存在性集合判 created/updated（与真执行同口径）
+                    if (existingForDryRun.contains(nodeId)) {
+                        report.setNodeUpdated(report.getNodeUpdated() + 1);
+                    } else {
+                        report.setNodeCreated(report.getNodeCreated() + 1);
+                    }
                 } else if (upsertNode(nodeId, pkValue, nodeType, description, domain, row, fieldRefs, snap, resourceId)) {
                     report.setNodeCreated(report.getNodeCreated() + 1);
                 } else {
@@ -306,7 +327,18 @@ public class KbEntityInstanceExtractionService {
             if (!rowsPage.hasMore() || watermark == null || watermark.isBlank()) {
                 break;
             }
+            // 页上限命中（MAX_PAGES × PAGE_LIMIT = 100k 已读完判空白，前端要看到"依旧只 10%"）
+            if (page == MAX_PAGES - 1 && rowsPage.hasMore()) {
+                truncated = true;
+                rowsCapped = rowsRead;
+                report.addIssue(entityCode, "ROWS_TRUNCATED",
+                        String.format("页上限 %d × %d = %d 行命中，剩余行未处理（表 %s）",
+                                MAX_PAGES, PAGE_LIMIT, MAX_PAGES * PAGE_LIMIT, resourceId));
+            }
         }
+        report.setRowsRead(rowsRead);
+        report.setRowsCapped(rowsCapped);
+        report.setTruncated(truncated);
         // 水位线持久化（尽力而为，失败不影响抽取结果；dry-run 不落水位）
         if (!dryRun && lastWatermark != null && !lastWatermark.isBlank()) {
             writeWatermark(snap.ontologyId(), entityCode, resourceId, lastWatermark);

@@ -1,7 +1,8 @@
 package com.chinacreator.gzcm.engine.kb.task;
 
-import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
+import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
+import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
 import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
@@ -9,6 +10,7 @@ import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -24,9 +26,12 @@ import java.util.Date;
  *   <li>从 TaskExecutionPlan 第一步 config 取 {@code ontologyId}/{@code mode}/{@code dryRun}/{@code jobId}；</li>
  *   <li>通过 ITaskStatusCallback 回报进度（0% → 100%）；</li>
  *   <li>调用 {@code KbEntityInstanceExtractionService.extract(...)})；</li>
- *   <li>成功：callback.onTaskComplete(success=true, result=report JSON)；</li>
- *   <li>失败：callback.onTaskComplete(success=false) + 将错误写入 kb_extract_audit（try/catch，失败仅 log.warn）；</li>
+ *   <li>成功：callback.onTaskComplete(success=true, result=report JSON) + audit 双走（JDBC + Kafka）；</li>
+ *   <li>失败：callback.onTaskComplete(success=false) + audit 双走。</li>
  * </ol>
+ *
+ * <p>审计策略（架构铁律 §2.4-5）：JDBC {@code kb_extract_audit} 落本地 + Kafka {@code ecoss.audit}
+ * 双走（Kafka 反射注入双态，缺失时 fallback 仅 JDBC）。</p>
  *
  * @author ECOS KB Team
  */
@@ -44,8 +49,14 @@ public class KbImportTaskExecutor implements ITaskExecutor {
     @Value("${ecos.architecture.tier:standard}")
     private String tier;
 
+    /** 可选 — 容器中存在 KafkaTemplate Bean 时注入（反射访问容忍 classpath 差异，对齐 SecurityEngineClient 双态）。
+     *     架构铁律 §2.4-5：写操作必发 Kafka ecos.audit；缺失时 fallback 仅 log + JDBC，不阻断业务。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
+
     public KbImportTaskExecutor(KbEntityInstanceExtractionService extractionService,
-                                 JdbcTemplate jdbc) {
+                                JdbcTemplate jdbc) {
         this.extractionService = extractionService;
         this.jdbc = jdbc;
     }
@@ -93,9 +104,9 @@ public class KbImportTaskExecutor implements ITaskExecutor {
                 jobId = String.valueOf(plan.getContext().get("jobId"));
             }
         }
-        // jobId 为空时兜底生成
+        // jobId 为空时兜底生成（铁律 §1.6-1：jobId = taskId，统一标识；plan 自挂时也会前置对齐）
         if (jobId == null || jobId.isBlank()) {
-            jobId = "KBK1S-" + System.currentTimeMillis();
+            jobId = taskId != null && !taskId.isBlank() ? taskId : "KBK1S-" + System.currentTimeMillis();
         }
         boolean incremental = "INCREMENTAL".equalsIgnoreCase(mode);
 
@@ -108,19 +119,21 @@ public class KbImportTaskExecutor implements ITaskExecutor {
         }
 
         try {
-            // 回报进度 10%
             if (callback != null) {
                 callback.onProgressUpdate(taskId, 10, "加载抽取快照与元数据");
             }
             EntityInstanceExtractionReportVO report = extractionService.extract(
                     ontologyId, jobId, incremental, dryRun);
             long durationMs = report.getDurationMs();
+            long rowsTotal = (long) report.getNodeCreated() + report.getNodeUpdated();
+            long rowsOk = rowsTotal;
+            long rowsFailed = (long) report.getNodeSkipped() + report.getInvalidMappings();
+
             log.info("KbImportTaskExecutor.done: taskId={} jobId={} nodeCreated={} nodeUpdated={} "
                             + "edges={} failed={} durationMs={}",
                     taskId, jobId, report.getNodeCreated(), report.getNodeUpdated(),
                     report.getEdgeCreated(), report.getInvalidMappings(), durationMs);
 
-            // 回报完成
             if (callback != null) {
                 callback.onProgressUpdate(taskId, 90, "完成抽取，正在落审计");
                 String resultJson;
@@ -133,14 +146,11 @@ public class KbImportTaskExecutor implements ITaskExecutor {
                 callback.onTaskComplete(taskId, true, resultJson, null);
             }
 
-            // 落 audit（T4）
+            // 落 audit（铁律 §2.4-5）：JDBC 本地 + Kafka 双走
             writeAudit(jobId, taskId, mode, "SUCCEEDED", durationMs,
-                    report.getNodeCreated() + report.getNodeUpdated(),
-                    report.getNodeSkipped() + report.getInvalidMappings(),
-                    report.getNodeCreated() + report.getNodeUpdated(),
+                    rowsTotal, rowsOk, rowsFailed,
                     0L, null);
 
-            // result 返回报告 JSON
             try {
                 return MAPPER.writeValueAsString(report);
             } catch (Exception e) {
@@ -154,8 +164,8 @@ public class KbImportTaskExecutor implements ITaskExecutor {
                 callback.onTaskComplete(taskId, false, null, e.getMessage());
                 callback.onError(taskId, e.getMessage(), getStackTrace(e));
             }
-            // 失败也落 audit（标记 FAILED）
-            writeAudit(jobId, taskId, mode, "FAILED", durationMs, 0L, 0L, 0L, 0L, e.getMessage());
+            writeAudit(jobId, taskId, mode, "FAILED", durationMs,
+                    0L, 0L, 0L, 0L, e.getMessage());
             throw new TaskExecutionException("KB_IMPORT 抽取失败: " + e.getMessage(), e);
         }
     }
@@ -180,7 +190,6 @@ public class KbImportTaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskStatus getStatus(String taskId) throws TaskExecutionException {
-        // 状态由 runtime-task 管理，此处返回 RUNNING 占位
         TaskStatus status = new TaskStatus();
         status.setTaskId(taskId);
         status.setStatus(TaskStatus.Status.RUNNING);
@@ -188,18 +197,11 @@ public class KbImportTaskExecutor implements ITaskExecutor {
     }
 
     /**
-     * 写入 kb_extract_audit 行（尽力而为：失败仅 log.warn，不阻断业务）。
-     *
-     * @param jobId       抽取 jobId
-     * @param taskId      runtime-task 任务 ID
-     * @param mode        抽取模式
-     * @param status      SUCCEEDED / FAILED
-     * @param durationMs  耗时（ms）
-     * @param rowsTotal   本批复处理行数（nodeCreated+nodeUpdated）
-     * @param rowsOk      正常落库行数（nodeCreated+nodeUpdated）
-     * @param rowsFailed  失败行（nodeSkipped+invalidMappings）
-     * @param mismatched  对照失败（本批次固定 0）
-     * @param errorMessage 失败原因（成功时为 null）
+     * 写入 kb_extract_audit 行 + Kafka ecos.audit（铁律 §2.4-5）：
+     * <ul>
+     *   <li>JDBC：本地台账（删 audit 不阻断业务）</li>
+     *   <li>Kafka：平台统一审计流；缺失降级仅 JDBC + log，**不抛**</li>
+     * </ul>
      */
     private void writeAudit(String jobId, String taskId, String mode, String status,
                             long durationMs, long rowsTotal, long rowsOk,
@@ -211,9 +213,38 @@ public class KbImportTaskExecutor implements ITaskExecutor {
                             + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     jobId, taskId, tier, mode, status,
                     durationMs, rowsTotal, rowsOk, rowsFailed, mismatched, errorMessage);
-            log.info("KB_IMPORT audit 写入成功: jobId={} task={} status={}", jobId, taskId, status);
+            log.info("KB_IMPORT audit JDBC 写入: jobId={} task={} status={}", jobId, taskId, status);
         } catch (Exception e) {
-            log.warn("KB_IMPORT audit 写入失败（不阻断业务）: jobId={} task={} err={}", jobId, taskId, e.getMessage());
+            log.warn("KB_IMPORT audit JDBC 写入失败（不阻断业务）: jobId={} task={} err={}", jobId, taskId, e.getMessage());
+        }
+        // Kafka 双走（铁律 §2.4-5）
+        publishAuditEvent(jobId, taskId, status, mode, durationMs, rowsTotal, rowsOk, rowsFailed, errorMessage);
+    }
+
+    /**
+     * Kafka 审计事件发送（铁律 §2.4-5）：
+     * 通过反射调用 {@code KafkaTemplate.send(String, Object)} 容忍 classpath 缺失（与
+     * {@code SecurityEngineClient.audit} 同波形）；Kafka 缺失时 warn 不抛。
+     */
+    private void publishAuditEvent(String jobId, String taskId, String status, String mode,
+                                   long durationMs, long rowsTotal, long rowsOk,
+                                   long rowsFailed, String errorMessage) {
+        String payload = String.format(
+                "{\"action\":\"kg_instance_extract\",\"jobId\":\"%s\",\"taskId\":\"%s\",\"tier\":\"%s\","
+                        + "\"mode\":\"%s\",\"status\":\"%s\",\"durationMs\":%d,\"rowsTotal\":%d,"
+                        + "\"rowsOk\":%d,\"rowsFailed\":%d,\"kt\":\"knowledge\",\"ts\":%d}",
+                jobId, taskId, tier, mode, status, durationMs, rowsTotal, rowsOk, rowsFailed,
+                System.currentTimeMillis());
+        if (kafkaTemplate == null) {
+            log.warn("KbImportTaskExecutor.audit: KafkaTemplate 不可用，审计事件仅记 JDBC: jobId={} status={}",
+                    jobId, status);
+            return;
+        }
+        try {
+            kafkaTemplate.send(KafkaTopics.AUDIT, payload);
+            log.info("KB_IMPORT audit Kafka 已发: topic={} jobId={}", KafkaTopics.AUDIT, jobId);
+        } catch (Exception e) {
+            log.warn("KB_IMPORT audit Kafka 发送失败（不阻断业务）: jobId={} err={}", jobId, e.getMessage());
         }
     }
 

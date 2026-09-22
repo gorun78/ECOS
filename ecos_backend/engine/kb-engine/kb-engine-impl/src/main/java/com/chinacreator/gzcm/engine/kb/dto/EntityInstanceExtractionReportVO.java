@@ -60,6 +60,15 @@ public class EntityInstanceExtractionReportVO {
     /** C4 映射有效性失败被拒绝实例化的实体数（INVALID_MAPPING） */
     private int invalidMappings;
 
+    /** 本次实抽行数（不含 nodeSkipped）。{@code <rowsCapped} 表示已被截断。 */
+    private int rowsRead;
+
+    /** 因页上限（{@code MAX_PAGES × PAGE_LIMIT}）截断时已读行数；未截断为 0。 */
+    private int rowsCapped;
+
+    /** 是否到达页上限仍有余数据（true 表示还有数据未抽，前端给提示）。 */
+    private boolean truncated;
+
     /** 本次抽取收敛后的最后水位（无更多数据时为 null） */
     private String nextWatermark;
 
