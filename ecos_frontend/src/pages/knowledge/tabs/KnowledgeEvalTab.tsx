@@ -195,9 +195,9 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* 左侧：seed 集合 */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 min-w-0">
           <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
@@ -238,7 +238,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
         </div>
 
         {/* 右侧：运行 + 报告 */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <button
             onClick={handleRun}
             disabled={isRunning || seeds.length === 0}
@@ -263,7 +263,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
                   {tl('后端 /eval/run 不可用 → 降级到本地召回评测', 'Backend /eval/run unavailable → degraded to local recall eval')}
                 </p>
               )}
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
                 <MetricBar label={tl('Recall@5', 'Recall@5')} value={activeReport.recallAt5} />
                 <MetricBar label="MRR@5" value={activeReport.mrrAt5} />
                 <MetricBar label="NDCG@5" value={activeReport.ndcgAt5} />

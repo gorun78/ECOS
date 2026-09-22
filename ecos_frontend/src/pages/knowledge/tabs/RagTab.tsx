@@ -108,9 +108,9 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
         <p className={`text-xs ${styles.muted}`}>{t("knowledge.ragtab.模拟_aip_copilot_多轮检索问答_来源标注_置信度")}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left — Query + History */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 min-w-0">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-4`}>
             <div className={`border-b ${styles.cardBorder} pb-2 flex items-center gap-2`}>
               <span className="p-1.5 rounded bg-blue-50 text-blue-600"><Keyboard size={13} /></span>
@@ -150,7 +150,7 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
                   </div>
                 ))}
               </div>
-              <div className="flex gap-1.5 pt-2 border-t border-slate-150">
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-150">
                 <input type="text" value={followUpInput} onChange={e => setFollowUpInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleFollowUp()}
                   placeholder={t("knowledge.ragtab.追问")}

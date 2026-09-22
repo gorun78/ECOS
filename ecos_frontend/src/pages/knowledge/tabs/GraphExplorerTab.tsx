@@ -256,9 +256,9 @@ export default function GraphExplorerTab() {
   const detailDisplayNode = nodeDetail || (selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null) || null;
 
   return (
-    <div className={`flex h-full ${styles.appBg} rounded-xl border ${styles.cardBorder} overflow-hidden`}>
+    <div className={`flex flex-1 min-h-0 ${styles.appBg} rounded-xl border ${styles.cardBorder} overflow-hidden`}>
       {/* Left Toolbar */}
-      <div className={`w-56 border-r ${styles.cardBorder} flex flex-col shrink-0 p-3 space-y-3 ${styles.appBg}`}>
+      <div className={`w-56 border-r ${styles.cardBorder} flex flex-col shrink-0 p-3 space-y-3 ${styles.appBg} z-10 relative`}>
         {/* Search — full-text graph search */}
         <div className="space-y-1.5 relative">
           <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.fullTextSearch')}</label>
@@ -300,7 +300,7 @@ export default function GraphExplorerTab() {
         {/* Path finder — inline inputs */}
         <div className="space-y-1.5">
           <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.pathFinder')}</label>
-          <div className="flex gap-1 items-center">
+          <div className="flex flex-wrap gap-1 items-center">
             <input
               type="text"
               value={pathSource}
@@ -388,7 +388,7 @@ export default function GraphExplorerTab() {
       </div>
 
       {/* Middle Graph Canvas */}
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-0 relative">
         {isLoading && (
           <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 ${styles.sidebarBg} border ${styles.cardBorder} rounded-lg text-[11px] ${styles.cardText} flex items-center gap-2 shadow-lg`}>
             <Loader2 size={12} className="animate-spin" />

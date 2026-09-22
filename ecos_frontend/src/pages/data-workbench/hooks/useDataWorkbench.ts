@@ -104,9 +104,10 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
 
   // ── Handlers ──
   const testConnection = useCallback(async (connId: string) => {
-    setTestingConnId(connId); setTestingLogs([]);
+    // 先解析连接：列表里查不到（如新建后本回调仍持有旧列表）直接返回，避免 testingConnId 永不复位
     const conn = connections.find(c => c.id === connId);
     if (!conn) return;
+    setTestingConnId(connId); setTestingLogs([]);
     const addLog = (msg: string) => setTestingLogs(p => [...p, msg]);
     addLog(`${t('databench.layout.testLog.initDriver')}[${conn.type.toUpperCase()}]`);
     addLog(t('databench.layout.testLog.connecting'));

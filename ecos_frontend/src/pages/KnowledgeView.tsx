@@ -203,7 +203,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-6">
           <ActiveTabComponent showToast={showToast} />
         </div>
       </main>

@@ -290,7 +290,7 @@ export function AddConnectionModal({
               <select value={newConnType} onChange={e => { setNewConnType(e.target.value as string); setPreviewVisible(false); setPreviewResult(null); }}
                 className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.cardBg} font-mono`}>
                 {CONNECTION_TYPES.map(type => {
-                  // PMO-48-T5: 标准版禁用 gaussdb/minio/fs
+                  // PMO-48-T5: 标准版禁用 gaussdb/minio（fs 全版本可用）
                   const disabled = isStandard && STANDARD_DISABLED_TYPES.includes(type.value);
                   return (
                     <option key={type.value} value={type.value} disabled={disabled}>

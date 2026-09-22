@@ -167,8 +167,8 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
           </span>
           <span className="text-[9px] font-mono text-slate-400">{assets.length === 0 ? tl('/assets 待 PMO-56 后端提供', '/assets endpoint awaiting PMO-56') : tl('加载自 /api/v1/knowledge/assets', 'loaded from /api/v1/knowledge/assets')}</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[11px] border-collapse">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-[11px] border-collapse whitespace-nowrap">
             <thead>
               <tr className="bg-slate-50 text-slate-400 border-b border-slate-200">
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">ID</th>

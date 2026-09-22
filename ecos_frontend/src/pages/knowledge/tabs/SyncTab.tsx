@@ -120,8 +120,8 @@ export default function SyncTab() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 space-y-4 min-w-0">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-4`}>
             <div className="flex items-center justify-between border-b border-slate-150 pb-2">
               <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5 text-rose-600`}>
@@ -171,8 +171,8 @@ export default function SyncTab() {
             {t("knowledge.synctab.三大工作台元数据同步列表")} ({assets.length})
           </h3>
 
-          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs`}>
-            <table className="w-full text-left border-collapse">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs overflow-x-auto`}>
+            <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className={`bg-slate-50 ${styles.muted} text-[10px] font-extrabold uppercase tracking-wider border-b ${styles.cardBorder}`}>
                   <th className="p-3">{t("knowledge.synctab.资产名称")}</th>

@@ -212,7 +212,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
       {previewJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0" style={{ background: 'rgba(15,23,42,0.5)' }} onClick={() => setPreviewJob(null)} />
-          <div className={`relative w-full max-w-2xl ${styles.cardBg} border ${styles.cardBorder} rounded-2xl shadow-2xl overflow-hidden`}>
+          <div className={`relative w-[92vw] max-w-2xl ${styles.cardBg} border ${styles.cardBorder} rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col`}>
             <div className={`flex items-center justify-between px-5 py-3 border-b ${styles.cardBorder}`}>
               <h3 className={`text-sm font-extrabold ${styles.cardText} flex items-center gap-2`}>
                 <Eye size={14} className="text-blue-600" />
@@ -279,7 +279,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
       {logsJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0" style={{ background: 'rgba(15,23,42,0.5)' }} onClick={() => setLogsJob(null)} />
-          <div className={`relative w-full max-w-3xl ${styles.cardBg} border ${styles.cardBorder} rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[75vh]`}>
+          <div className={`relative w-[92vw] max-w-3xl ${styles.cardBg} border ${styles.cardBorder} rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[75vh]`}>
             <div className={`flex items-center justify-between px-5 py-3 border-b ${styles.cardBorder}`}>
               <h3 className={`text-sm font-extrabold ${styles.cardText} flex items-center gap-2`}>
                 <Terminal size={14} className="text-indigo-600" />

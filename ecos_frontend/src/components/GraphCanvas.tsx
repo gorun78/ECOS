@@ -384,11 +384,12 @@ export default function GraphCanvas({
 
       {/* SVG Graph */}
       <svg
-        className="w-full h-full cursor-grab active:cursor-grabbing"
+        className="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing"
         style={{
           transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
           transformOrigin: "0 0",
           transition: draggedNodeId ? "none" : "transform 0.15s ease-out",
+          display: "block",
         }}
       >
         <defs>

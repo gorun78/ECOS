@@ -78,8 +78,8 @@ export default function ExtractionReviewTab() {
   );
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="max-w-7xl mx-auto space-y-4">
+    <div className="h-full overflow-y-auto">
+      <div className="space-y-4">
         {/* 标题 */}
         <div>
           <h2 className={`text-xl font-bold ${styles.cardText}`}>{t("knowledge.review.title")}</h2>

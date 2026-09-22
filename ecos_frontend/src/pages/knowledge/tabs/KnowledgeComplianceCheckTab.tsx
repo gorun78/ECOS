@@ -191,7 +191,7 @@ export default function KnowledgeComplianceCheckTab() {
   const zh = locale === 'zh';
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       {/* 标题 */}
       <div className={`border-b ${styles.cardBorder} pb-3 space-y-1`}>
         <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
@@ -203,9 +203,9 @@ export default function KnowledgeComplianceCheckTab() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ── 左侧：输入区 ───────────────────────────────── */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 min-w-0">
           {/* 业务对象选择 */}
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
             <div className={`flex items-center gap-2 border-b ${styles.divider} pb-2`}>
@@ -345,7 +345,7 @@ export default function KnowledgeComplianceCheckTab() {
         </div>
 
         {/* ── 右侧：结果区 ───────────────────────────────── */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 min-w-0">
           {/* 结果占位 */}
           {!results && !isChecking && (
             <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-8 shadow-xs text-center space-y-2`}>
@@ -387,7 +387,7 @@ export default function KnowledgeComplianceCheckTab() {
                   </button>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
                   <div className={`flex-1 ${styles.appBg} rounded-lg p-3 text-center`}>
                     <div className={`text-lg font-black ${styles.cardText}`}>{results.summary.total}</div>
                     <div className={`text-[9px] ${styles.muted} font-bold uppercase`}>{t("knowledge.knowledgecompli.235")}</div>

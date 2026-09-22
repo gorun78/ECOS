@@ -23,7 +23,7 @@ export default function ExtractionStreamingTab() {
 
   return (
     <div className="h-full overflow-y-auto p-6 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
         {/* 标题 */}
         <div className="space-y-1">
           <h2 className="font-bold text-xl tracking-tight flex items-center gap-2" style={{ color: styles.cardText }}>

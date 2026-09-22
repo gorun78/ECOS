@@ -208,8 +208,8 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
   return (
     <div className="space-y-4">
       {/* 头部 */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="space-y-1">
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3">
+        <div className="space-y-1 min-w-0">
           <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
             <FileText size={16} className="text-indigo-600" />
             {tl('知识抽取引擎（分片上传）', 'Knowledge Extraction (Chunked Upload)')}
@@ -282,10 +282,10 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
 
       {/* 阶段状态机 */}
       {(phase !== 'idle' && phase !== 'reviewing' && phase !== 'done') ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <FileText size={14} className="text-indigo-500" />
-            <span className="font-bold text-xs text-slate-800 truncate">{fileName || tl('处理中', 'Processing')}</span>
+        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 overflow-hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <FileText size={14} className="text-indigo-500 shrink-0" />
+            <span className="font-bold text-xs text-slate-800 truncate min-w-0 flex-1">{fileName || tl('处理中', 'Processing')}</span>
             <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${phase === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-indigo-50 text-indigo-700'}`}>
               {tl(PHASE_LABELS[phase].zh, PHASE_LABELS[phase].en)}
             </span>
@@ -293,14 +293,14 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
           </div>
 
           {/* 阶段指示器 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-stretch gap-1 sm:gap-2 overflow-x-auto">
             {PHASE_ORDER.slice(1, 6).map((step, idx) => {
               const activeIdx = PHASE_ORDER.indexOf(phase);
               const isDone = idx < activeIdx;
               const color = phase === 'failed' ? 'bg-rose-200 text-rose-600' :
                 isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400';
               return (
-                <div key={step} className="flex-1 flex flex-col items-center gap-1">
+                <div key={step} className="flex-1 min-w-[60px] flex flex-col items-center gap-1">
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${color}`}>
                     {idx + 1}
                   </span>

@@ -163,8 +163,8 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
   };
 
   return (
-    <div className={`h-full overflow-y-auto p-6 ${styles.cardText}`}>
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto">
+      <div className="space-y-6 p-6">
         {/* 头部 */}
         <div>
           <h2 className={`text-xl font-bold ${styles.cardText}`}>{t("knowledge.engine_config.title")}</h2>
@@ -226,7 +226,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
             {fields.map(f => {
               const isChanged = changes.some(c => c.key === f.key);
               return (
-                <div key={f.key} className="grid grid-cols-3 gap-3 items-center px-4 py-2.5">
+                  <div key={f.key} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center px-4 py-2.5">
                   <div className="text-xs">
                     <div>{t(f.i18nKey)}</div>
                     <div className="text-[10px] font-mono opacity-50">{f.key}</div>
@@ -276,7 +276,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
         </div>
 
         {/* 操作栏 */}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {dirty && !saving && (
             <span className="text-[11px] font-mono opacity-70">
               {t("knowledge.engine_config.dirty_hint")} ({changes.length})

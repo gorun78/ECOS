@@ -103,7 +103,7 @@ export default function KnowledgeUpdateTab({ showToast }: TabProps) {
       </div>
 
       {/* K4 4 触发源 · 卡片组 */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
         <div className={cardCls}>
           <p className={cardTitleCls}><FileClock className={iconCn} /> {t('knowledge.kupdate.source_ontology_event')}</p>
           <p className="text-xs text-blue-600 font-bold flex items-center gap-1.5">
@@ -139,19 +139,19 @@ export default function KnowledgeUpdateTab({ showToast }: TabProps) {
       </div>
 
       {/* 同步状态 + 日志 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* 同步状态表 */}
-        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden lg:col-span-2`}>
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden lg:col-span-2 min-w-0`}>
           <div className={`px-4 py-2.5 border-b ${styles.cardBorder} flex items-center justify-between`}>
             <span className={`text-[11px] font-extrabold uppercase tracking-wider ${styles.muted}`}>
               {t('knowledge.kupdate.sync_status_title')} ({syncStatuses.length})
             </span>
           </div>
-          <div className="max-h-72 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto overflow-x-auto">
             {syncStatuses.length === 0 ? (
               <p className={`p-8 text-center text-xs ${styles.muted}`}>{t('knowledge.kupdate.no_sync_status')}</p>
             ) : (
-              <table className="w-full text-left text-[11px] border-collapse">
+              <table className="w-full text-left text-[11px] border-collapse whitespace-nowrap">
                 <thead>
                   <tr className={`${styles.badgeBg} ${styles.muted} border-b ${styles.cardBorder}`}>
                     <th className="p-3 font-extrabold uppercase tracking-wider">{t('knowledge.kupdate.col.object_type')}</th>

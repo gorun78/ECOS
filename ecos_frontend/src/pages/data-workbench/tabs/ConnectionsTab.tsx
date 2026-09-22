@@ -7,11 +7,18 @@ import type { DataConnection, TableInfo } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
 
-import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, triggerCollectSync, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff, fetchFields, type DataFieldMeta } from '../api';
+import { deleteDataSource, updateDataSource, fetchDataSourceResources, triggerMetadataCollect, triggerCollectSync, fetchCollectStatus, saveMetadataStrategy, fetchActiveCollectTasks, fetchCollectDiff, fetchFields, listFolderFiles, collectFolderFiles, type DataFieldMeta, type FolderFileVo } from '../api';
 import HistoryVersionCompareModal from '../HistoryVersionCompareModal';
 import CollectProgressPanel from '../CollectProgressPanel';
 import IngestSubPanel from './IngestSubPanel';
-import DatalakeUploadPanel from './DatalakeUploadPanel';
+
+/** 字节数格式化（文件夹数据源文件列表用） */
+const fmtBytes = (n?: number): string => {
+  if (!n) return '-';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+};
 
 const STRATEGY_OPTIONS: { value: string; key: string }[] = [
   { value: 'MANUAL', key: 'dw.strategy.manual' },
@@ -62,6 +69,9 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   const [loadingTables, setLoadingTables] = useState(false);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize] = useState(10); // 数据表目录默认每页显示 10 条
+  // 文件夹数据源（fs）目录文件列表（非结构化近源层采集源）
+  const [folderFiles, setFolderFiles] = useState<FolderFileVo[]>([]);
+  const [folderFilesLoading, setFolderFilesLoading] = useState(false);
   // PMO-37 元数据获取策略
   const [collecting, setCollecting] = useState(false);
   const [lastCollectInfo, setLastCollectInfo] = useState<{ time?: string; countMethod?: string } | null>(null);
@@ -153,12 +163,30 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     return () => { cancelled = true; };
   }, [selectedConnId]);
 
-  // 选中连接时获取数据表目录
+  /** 文件夹数据源（fs）：列出目录内可采集文件（非结构化近源层的采集来源） */
+  const refreshFolderFiles = useCallback(async (dsId: string) => {
+    setFolderFilesLoading(true);
+    try {
+      setFolderFiles(await listFolderFiles(dsId));
+    } catch (e) {
+      setFolderFiles([]);
+      showToast('error', tt('dw.folder.listFailed').replace('{err}', e instanceof Error ? e.message : 'HTTP'));
+    } finally {
+      setFolderFilesLoading(false);
+    }
+  }, [showToast, tt]);
+
+  // 选中连接时获取目录：数据库源拉表目录，文件夹源列目录文件
   useEffect(() => {
     setTablePage(1);
     if (!selectedConnId) return;
     const conn = connections.find(c => c.id === selectedConnId);
-    if (!conn || conn.tablesAvailable.length > 0) return;
+    if (!conn) return;
+    if (conn.type === 'fs') {
+      refreshFolderFiles(conn.id);
+      return;
+    }
+    if (conn.tablesAvailable.length > 0) return;
     setLoadingTables(true);
     fetchDataSourceResources(selectedConnId).then(tables => {
       if (tables.length > 0) {
@@ -277,6 +305,8 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   {(() => {
     const conn = connections.find(c => c.id === selectedConnId);
     if (!conn) return <div className={`flex-1 p-6 ${styles.cardTextMuted}`}>{t("dw.txt.282170")}</div>;
+    /** 文件夹数据源（fs）：以目录文件列表替代数据库表目录 */
+    const isFsConn = conn.type === 'fs';
     return (
       <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
         {/* Detail banner */}
@@ -487,6 +517,31 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                         onClick={async () => {
                           setCollecting(true);
                           try {
+                            if (conn.type === 'fs') {
+                              // 文件夹数据源：整体采集目录内全部可采集文件到近源层（非结构化）
+                              const files = folderFiles.length > 0 ? folderFiles : await listFolderFiles(conn.id);
+                              if (files.length === 0) {
+                                showToast('info', t('dw.folder.collectNoFiles'));
+                                return;
+                              }
+                              const docId = `doc_${conn.id.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`;
+                              const res = await collectFolderFiles({
+                                datasourceId: conn.id,
+                                docId,
+                                fileNames: files.map(f => f.name),
+                              });
+                              if (res.failed > 0) {
+                                const firstErr = res.items?.find(i => i.status !== 'SUCCESS')?.error;
+                                showToast('error', t('dw.folder.collectPartial')
+                                  .replace('{ok}', String(res.collected)).replace('{fail}', String(res.failed))
+                                  + (firstErr ? `（${firstErr}）` : ''));
+                              } else {
+                                showToast('success', t('dw.folder.collectSuccess')
+                                  .replace('{count}', String(res.collected)));
+                              }
+                              await refreshFolderFiles(conn.id);
+                              return;
+                            }
                             // 同步立即采集：走 triggerCollectSync（后端任务引擎异步执行 + 前端 2s 轮询进度）
                             const r = await triggerCollectSync(conn.id);
                             if (r?.taskId) {
@@ -516,9 +571,6 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 
                     {/* 数据采集（采集型管道 → 数据湖 MinIO 近源库）—— 与元数据采集同面板 */}
                     <IngestSubPanel conn={conn} showToast={showToast} />
-
-                    {/* 文档近源层（非结构化 · 文件夹数据源模式）—— 服务端读取 FILESYSTEM 目录 → MinIO 采集登记 */}
-                    <DatalakeUploadPanel showToast={showToast} dsId={conn.id} />
 
                     {/* 活跃采集任务状态指示器 — 对接异步任务中心 */}
                     {activeTasks.length > 0 && (
@@ -559,7 +611,13 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
                 <span>{t("dw.txt.42bc1b")}</span>
                 <div className="flex items-center gap-3">
-                  <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}> {t("dw.ontologyReadonly")} ({conn.tablesAvailable.length} {t("dw.tablesUnit")})</span>
+                  <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
+                    {' '}
+                    {isFsConn
+                      ? `(${folderFiles.length} ${t("dw.folder.fileCountUnit")})`
+                      : `${t("dw.ontologyReadonly")} (${conn.tablesAvailable.length} ${t("dw.tablesUnit")})`}
+                  </span>
+                  {!isFsConn && (
                   <button
                     onClick={() => setShowVersionCompare(true)}
                     disabled={loadingTables}
@@ -569,8 +627,13 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     <GitCompare size={12} />
                     <span>{t("dw.histCompare.button")}</span>
                   </button>
+                  )}
                   <button
                     onClick={async () => {
+                      if (isFsConn) {
+                        await refreshFolderFiles(conn.id);
+                        return;
+                      }
                       setLoadingTables(true);
                       const r = await triggerMetadataCollect(conn.id);
                       if (r?.taskId) {
@@ -672,7 +735,43 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 </div>
               )}
 
-              {loadingTables ? (
+              {isFsConn ? (
+                folderFilesLoading ? (
+                  <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
+                    <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
+                    {t('dw.loading') || 'Loading...'}
+                  </div>
+                ) : folderFiles.length === 0 ? (
+                  <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
+                    <LucideIcon name="FolderOpen" size={24} className={`${styles.warningText}`} />
+                    <span>{t('dw.folder.empty')}</span>
+                    <span>{t('dw.folder.emptyHint')}</span>
+                  </div>
+                ) : (
+                  <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden`}>
+                    <table className="w-full text-left text-[11px]">
+                      <thead className={`${styles.sidebarBg} ${styles.cardTextMuted}`}>
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">{t('dw.folder.colName')}</th>
+                          <th className="px-3 py-2 font-semibold w-24">{t('dw.folder.colSize')}</th>
+                          <th className="px-3 py-2 font-semibold w-44">{t('dw.folder.colModified')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {folderFiles.map(f => (
+                          <tr key={f.name} className={`border-t ${styles.cardBorder}`}>
+                            <td className={`px-3 py-1.5 font-mono truncate max-w-0 ${styles.cardText}`} title={f.name}>{f.name}</td>
+                            <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>{fmtBytes(f.size)}</td>
+                            <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>
+                              {f.lastModified ? new Date(f.lastModified).toLocaleString() : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : loadingTables ? (
                  <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
                    <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
                    {t('dw.loading') || 'Loading...'}

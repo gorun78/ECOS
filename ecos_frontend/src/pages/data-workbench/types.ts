@@ -133,8 +133,8 @@ export const CONNECTION_TYPES: { value: ConnType; i18nKey: string; tier: 'relati
   { value: 'rest_api', i18nKey: 'dw.connType.restApi', tier: 'api' },
 ];
 
-/** PMO-48-T5: 标准版禁用的类型(旗舰/企业专属) */
-export const STANDARD_DISABLED_TYPES: ConnType[] = ['gaussdb', 'minio', 'fs'];
+/** PMO-48-T5: 标准版禁用的类型(旗舰/企业专属)。fs(本地文件/文件夹数据源) 全版本可用，不在此列。 */
+export const STANDARD_DISABLED_TYPES: ConnType[] = ['gaussdb', 'minio'];
 
 /** PMO-48-T5: 标签 i18n key 前缀 */
 export const CONN_TYPE_LABEL_PREFIX = 'dw.connType.';

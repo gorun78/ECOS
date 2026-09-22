@@ -25,6 +25,14 @@ async function get<T>(url: string): Promise<T> {
   return (json.data ?? json) as T;
 }
 
+/** 前端连接类型 → 后端规范类型名（本地文件的规范名为 FILESYSTEM，后端无 FS 类型） */
+const API_TYPE_ALIASES: Record<string, string> = { fs: 'FILESYSTEM' };
+
+/** 归一化连接类型为后端可识别的大写类型名 */
+function toApiType(type: string): string {
+  return API_TYPE_ALIASES[type.toLowerCase()] ?? type.toUpperCase();
+}
+
 // ─── 字段映射适配器 ────────────────────────────────────────
 
 /** DataSourceEntity → DataConnection */
@@ -700,7 +708,7 @@ export async function createDataSource(payload: {
   try {
     const dto = {
       datasourceName: payload.name,
-      datasourceType: payload.type.toUpperCase(),
+      datasourceType: toApiType(payload.type),
       connectionConfig: buildConnectionConfig(payload),
       description: payload.description || '',
       tags: payload.tags || '',
@@ -735,7 +743,7 @@ export async function updateDataSource(id: string, payload: {
   try {
     const dto = {
       datasourceName: payload.name,
-      datasourceType: payload.type.toUpperCase(),
+      datasourceType: toApiType(payload.type),
       connectionConfig: buildConnectionConfig(payload),
       description: payload.description || '',
       tags: payload.tags || '',
@@ -1079,7 +1087,7 @@ export async function testDataSourceRaw(payload: {
   try {
     const dto = {
       datasourceName: payload.name,
-      datasourceType: payload.type.toUpperCase(),
+      datasourceType: toApiType(payload.type),
       connectionConfig: buildConnectionConfig(payload),
     };
     const result = await post<{ success: boolean; message?: string }>(`${DATANET_DS}/test`, dto);
@@ -1197,7 +1205,7 @@ export function buildPreviewSchemaPayload(payload: {
 }): Record<string, unknown> {
   const extra = payload.extra ?? {};
   const body: Record<string, unknown> = {
-    type: payload.type.toUpperCase(),
+    type: toApiType(payload.type),
     host: payload.host || 'localhost',
     port: payload.port || 0,
     username: payload.username || '',
@@ -1519,37 +1527,6 @@ export async function uploadUnstructured(
     const msg = e instanceof Error ? e.message : 'network error';
     console.warn('[data-workbench] uploadUnstructured failed:', e);
     return { ok: false as const, error: msg };
-  }
-}
-
-/** 列举数据湖对象（近源层 + 其他 zone） */
-export async function listDatalakeObjects(prefix = ''): Promise<{
-  bucket?: string;
-  prefix?: string;
-  items: { name: string; size?: number; lastModified?: string; isDir?: boolean }[];
-  total?: number;
-} | null> {
-  try {
-    const url = `/api/v1/datanet/datalake/objects?prefix=${encodeURIComponent(prefix || '')}&_=${Date.now()}`;
-    const raw = await get<Record<string, unknown>>(url);
-    if (!raw) return null;
-    const items = Array.isArray(raw.items)
-      ? (raw.items as Record<string, unknown>[]).map((i) => ({
-          name: String(i.name || ''),
-          size: typeof i.size === 'number' ? (i.size as number) : undefined,
-          lastModified: (i.lastModified as string) || undefined,
-          isDir: Boolean(i.isDir),
-        }))
-      : [];
-    return {
-      bucket: (raw.bucket as string) || undefined,
-      prefix: (raw.prefix as string) || undefined,
-      items,
-      total: typeof raw.total === 'number' ? (raw.total as number) : items.length,
-    };
-  } catch (e) {
-    console.warn('[data-workbench] listDatalakeObjects failed:', e);
-    return null;
   }
 }
 

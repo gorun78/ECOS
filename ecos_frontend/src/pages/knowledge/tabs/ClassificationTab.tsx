@@ -72,8 +72,8 @@ export default function ClassificationTab() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 space-y-3 min-w-0">
           {rootNodes.map(root => (
             <div key={root.id} className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-xs overflow-hidden`}>
               <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
@@ -107,7 +107,7 @@ export default function ClassificationTab() {
           ))}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
             <h3 className={`font-bold text-xs ${styles.cardText} flex items-center gap-1.5`}>
               <Sparkles size={13} className="text-purple-600" />
