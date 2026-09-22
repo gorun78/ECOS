@@ -2,7 +2,8 @@
 
 > Java 17 + Spring Boot 3.2.2 + MyBatis + PostgreSQL | Maven multi-module | **微服务 v2 (7 独立 JAR)**
 > 代码路径 (Windows): `D:\workspace\javaprojects\ECOS\ecos_backend\` (2026-09-09 起)
-> 架构宪法: `.trae/rules/架构铁律.md` v1.1 (2026-09-11) + `docs/plans/current-plan.md` v1.4 + 附录 A 目标结构
+> 架构宪法: `.trae/rules/架构铁律.md` v1.3 (2026-09-11) + `docs/21-runtime/legacy-plans/current-plan.md` v1.4 + 附录 A 目标结构
+> 数据库规范: `.trae/rules/数据库访问规范.md` v1.0 (2026-09-22, IR/DR/EN/ST 共 23 条红线)
 
 ## 产品定位
 

@@ -7,7 +7,7 @@
 
 | Directory | Stack | Entry | Notes |
 |-----------|-------|-------|-------|
-| `ecos_backend/` | Java 17 / Spring Boot 3.2.2 / MyBatis / PG | `gateway/GatewayApplication.java` | Single fat-JAR, not microservices. See `ecos_backend/AGENTS.md` |
+| `ecos_backend/` | Java 17 / Spring Boot 3.2.2 / MyBatis / PG | `gateway/GatewayApplication.java` | Microservice v2 (7 JARs). See `ecos_backend/AGENTS.md` |
 | `ecos_frontend/` | React 19 / Vite 6 / Tailwind 4 / TypeScript | `src/main.tsx` → `App.tsx` | Express server (`server.ts`) for SSR. Proxies `/api` → `localhost:8080` |
 | `ecos-docker/` | Docker Compose | `docker-compose.yml` | PG 16, Neo4j 5, MinIO, OPA |
 | `ecos-kb/` | Python scripts + JSON | `scripts/scan_all.py` | Auto-generated API index & schema. See `ecos-kb/AGENTS.md` |
@@ -18,7 +18,7 @@
 启动命令（PowerShell 一行式，**不创建临时脚本**）：
 
 ```powershell
-# 后端（enterprise profile, fat-JAR, 端口 8080）
+# 后端（enterprise profile, gateway :8080 微服务 v2）
 powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\start-gateway.ps1
 
 # 前端
@@ -120,7 +120,7 @@ compose 文件：`ecos-docker/docker-compose.yml`（PG 16:5432, Neo4j 5:7474+768
 
 # 项目概述
 
-ECOS（Enterprise Cognitive Operating System）企业认知操作系统。核心链路：数据治理 → 知识图谱 → LLM Agent 部署。单体 fat-JAR 架构（gateway 唯一入口，非微服务）：引擎层五对象（土D/金I/水K/木C/火W）+ 服务层四转化（格致诚明）+ 横切层（security 护 / runtime 器）。PostgreSQL 16 为主存储，Neo4j 5（enterprise 档）+ Doris（ultimate 档）按档位叠加。
+ECOS（Enterprise Cognitive Operating System）企业认知操作系统。核心链路：数据治理 → 知识图谱 → LLM Agent 部署。微服务 v2 架构（7 独立 JAR：gateway:8080 + 5 service:sysman/datanet/buszhi/dccheng/aiming + workspace:18090）：引擎层五对象（土D/金I/水K/木C/火W）+ 服务层四转化（格致诚明）+ 横切层（security 护 / runtime 器）。PostgreSQL 16 为主存储，Neo4j 5（enterprise 档）+ Doris（ultimate 档）按档位叠加。
 
 # 工程环境
 
@@ -133,15 +133,20 @@ ECOS（Enterprise Cognitive Operating System）企业认知操作系统。核心
 
 # 项目规范
 
-- 架构铁律：.trae/rules/架构铁律.md
+- 架构铁律：.trae/rules/架构铁律.md (v1.3, 宪法)
 - 后端开发规范：.trae/rules/后端开发规范.md
 - 前端开发规范：.trae/rules/前端开发规范.md
 - Git提交规范：.trae/rules/Git提交规范.md
+- 数据库访问规范：.trae/rules/数据库访问规范.md (v1.0, IR/DR/EN/ST 共 23 条红线)
+- 数据湖存储分层规范：.trae/rules/数据湖存储分层规范.md (v1.2, 五层 + zone)
+- 文档编写规范：.trae/rules/文档编写规范.md (v1.0, R1-R13)
+- 文档目录规范：.trae/rules/文档目录规范.md (v2.0, 14 一级目录)
+- 开发环境登录凭据：.trae/rules/开发环境登录凭据.md (v1.0, admin/admin123)
 
 # 工程结构
 
 ECOS/（Windows D:\workspace\javaprojects\ECOS）
-├─ ecos_backend/  Java 17 / SB 3.2.2 单 fat-JAR，入口 gateway/GatewayApplication.java
+├─ ecos_backend/  Java 17 / SB 3.2.2 微服务 v2 (7 JAR)，入口 gateway/GatewayApplication.java
 │  ├─ gateway/       唯一 Spring Boot 启动器（端口 8080，聚合全部模块）
 │  ├─ common/        common-api（PipelineEvent/ICopilotService 等共享契约）+ common-impl
 │  ├─ engine/        五对象引擎（api/impl/boot 三模块制）：
