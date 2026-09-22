@@ -303,15 +303,24 @@ public class DataSourceServiceImpl implements DataSourceService {
         Timestamp now = new Timestamp(System.currentTimeMillis());
         boolean ok = false;
         String message;
-        try {
-            // 真实连通性测试：走 runtime-access Connector（POSTGRESQL 等别名内部归一化为 JDBC）
-            com.chinacreator.gzcm.runtime.access.connector.Connector connector =
-                    connectorFactory.getConnector(ds.getDatasourceType());
-            ok = connector.testConnection(cfg);
-            message = ok ? "连接成功" : "连接失败: 数据源不可达或认证被拒绝";
-        } catch (Exception e) {
-            message = "连接失败: " + e.getMessage();
-            log.warn("testConnection failed datasource={}: {}", datasourceId, e.getMessage());
+        String type = ds.getDatasourceType() != null ? ds.getDatasourceType().toUpperCase() : "";
+        if (MINIO_TYPE.equals(type) || "FILESYSTEM".equals(type)) {
+            // MINIO / FILESYSTEM 无 Connector bean，走各自真实校验（对象存储连通 / 文件夹存在性与权限）
+            Map<String, Object> detail = MINIO_TYPE.equals(type) ? testMinio(cfg) : testFilesystem(cfg);
+            ok = Boolean.TRUE.equals(detail.get("success"));
+            Object msg = detail.get("message");
+            message = msg != null ? msg.toString() : (ok ? "连接成功" : "连接失败");
+        } else {
+            try {
+                // 真实连通性测试：走 runtime-access Connector（POSTGRESQL 等别名内部归一化为 JDBC）
+                com.chinacreator.gzcm.runtime.access.connector.Connector connector =
+                        connectorFactory.getConnector(ds.getDatasourceType());
+                ok = connector.testConnection(cfg);
+                message = ok ? "连接成功" : "连接失败: 数据源不可达或认证被拒绝";
+            } catch (Exception e) {
+                message = "连接失败: " + e.getMessage();
+                log.warn("testConnection failed datasource={}: {}", datasourceId, e.getMessage());
+            }
         }
         String finalMessage = message;
         jdbc.update(
@@ -611,7 +620,7 @@ public class DataSourceServiceImpl implements DataSourceService {
      * 真实 MinIO 连通测试（仅企业/ultimate 生效 — 标准版在 register 已拦下 MINIO）。
      * 通过 listBuckets 校验 endpoint/凭证可达；不可达时返回可读 error。
      */
-    private Map<String, Object> testMinio(String connectionConfig) {
+    Map<String, Object> testMinio(String connectionConfig) {
         if (isStandardProfile()) {
             String err = "MINIO 仅在企业版/旗舰版可用（当前运行 standard profile）";
             return Map.of("success", false, "error", err, "message", err, "type", MINIO_TYPE);
@@ -652,14 +661,16 @@ public class DataSourceServiceImpl implements DataSourceService {
     }
 
     /**
-     * 真实 FILESYSTEM 检查：basePath 存在 + 读写权限。
+     * 真实 FILESYSTEM 检查：文件夹路径存在 + 读写权限。
+     * <p>路径键按前端保存口径优先取 {@code rootPath}（见 FsConfigForm / buildConnectionConfig），
+     * 兼容 {@code basePath} / {@code path} / {@code root} 历史写法。
      */
-    private Map<String, Object> testFilesystem(String connectionConfig) {
+    Map<String, Object> testFilesystem(String connectionConfig) {
         try {
             Map<String, String> cfg = parseCfg(connectionConfig);
-            String basePath = firstNonBlank(cfg.get("basePath"), cfg.get("path"), cfg.get("root"));
+            String basePath = firstNonBlank(cfg.get("rootPath"), cfg.get("basePath"), cfg.get("path"), cfg.get("root"));
             if (basePath == null || basePath.isBlank()) {
-                String err = "FILESYSTEM 配置缺少 basePath";
+                String err = "FILESYSTEM 配置缺少文件夹地址(rootPath)";
                 return Map.of("success", false, "error", err, "message", err, "type", "FILESYSTEM");
             }
             java.nio.file.Path p = java.nio.file.Path.of(basePath);

@@ -3,7 +3,6 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
-import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -18,7 +17,7 @@ public class DataSourceRegistryService {
 
     private static final String CACHE_KEY = "ALL";
 
-    private final DataSourceService dataSourceService;
+    private final DataSourceServiceImpl dataSourceService;
     private final ConnectorFactory connectorFactory;
 
     private final Cache<String, List<DataSourceEntity>> dsListCache = Caffeine.newBuilder()
@@ -26,7 +25,7 @@ public class DataSourceRegistryService {
             .maximumSize(2)
             .build();
 
-    public DataSourceRegistryService(DataSourceService dataSourceService,
+    public DataSourceRegistryService(DataSourceServiceImpl dataSourceService,
                                       ConnectorFactory connectorFactory) {
         this.dataSourceService = dataSourceService;
         this.connectorFactory = connectorFactory;
@@ -62,6 +61,14 @@ public class DataSourceRegistryService {
         }
         if (dto.getConnectionConfig() == null || dto.getConnectionConfig().isBlank()) {
             throw new IllegalArgumentException("连接配置不能为空");
+        }
+        String type = dto.getDatasourceType().toUpperCase();
+        // MINIO / FILESYSTEM 无 Connector bean，复用 DataSourceServiceImpl 的真实校验分支
+        if (DataSourceServiceImpl.MINIO_TYPE.equals(type)) {
+            return dataSourceService.testMinio(dto.getConnectionConfig());
+        }
+        if ("FILESYSTEM".equals(type)) {
+            return dataSourceService.testFilesystem(dto.getConnectionConfig());
         }
         try {
             Connector connector = connectorFactory.getConnector(dto.getDatasourceType());

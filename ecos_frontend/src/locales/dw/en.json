@@ -1219,7 +1219,7 @@
   "dw.connType.minio": "MinIO",
   "dw.connType.csv": "CSV File",
   "dw.connType.sftp": "SFTP",
-  "dw.connType.fs": "Local File",
+  "dw.connType.fs": "Folder Data Source",
   "dw.connType.kafka": "Apache Kafka",
   "dw.connType.mongodb": "MongoDB",
   "dw.connType.sap": "SAP ERP",

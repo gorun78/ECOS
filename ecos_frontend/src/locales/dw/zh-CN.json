@@ -1224,7 +1224,7 @@
   "dw.connType.minio": "MinIO",
   "dw.connType.csv": "CSV 文件",
   "dw.connType.sftp": "SFTP",
-  "dw.connType.fs": "本地文件",
+  "dw.connType.fs": "文件夹数据源",
   "dw.connType.kafka": "Apache Kafka",
   "dw.connType.mongodb": "MongoDB",
   "dw.connType.sap": "SAP ERP",

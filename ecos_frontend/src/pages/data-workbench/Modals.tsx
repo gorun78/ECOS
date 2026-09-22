@@ -300,7 +300,7 @@ export function AddConnectionModal({
                 })}
               </select>
             </div>
-            {(isJdbc || isMongo || isMinio || isFs) && (
+            {(isJdbc || isMongo || isMinio) && (
               <div className="space-y-1">
                 <label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.ct.port')}</label>
                 <input type="number" value={newConnPort}
