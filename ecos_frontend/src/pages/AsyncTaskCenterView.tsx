@@ -8,6 +8,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useTheme } from "../components/ThemeContext";
 import { useLanguage } from "../components/LanguageContext";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import {
   fetchTaskList, fetchTaskStatus, fetchTaskStats,
   executeTask, cancelTask, pauseTask, resumeTask, archiveTask, batchTask,
@@ -138,6 +139,7 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
   }, [rows, statusFilter, categoryFilter, search]);
 
   const active = activeTaskId ? rows.find(r => r.taskId === activeTaskId) : null;
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const allFilteredSelected = filtered.length > 0 && filtered.every(r => selectedIds.has(r.taskId));
 
   // ── 渲染 ──────────────────────────────────────────
@@ -258,8 +260,98 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
 
       {/* 主体: 表格 + 详情侧栏（移动端纵向堆叠，md 起双栏并列） */}
       <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0">
-        {/* 表格 — 移动端横滚 / 桌面占满剩余空间 */}
+        {/* 表格 / 移动端折叠卡片 — md 起切回原生 table */}
         <div className="flex-1 min-w-0 overflow-x-auto md:overflow-visible">
+        {isMobile ? (
+          <div className="flex flex-col gap-2">
+            {loading && filtered.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs" style={{ color: styles.cardTextMuted }}>{t("taskPanel.loading") || "加载中..."}</div>
+            ) : filtered.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs" style={{ color: styles.cardTextMuted }}>{t("taskPanel.empty") || "暂无任务"}</div>
+            ) : filtered.map(r => {
+              const st = (r._status?.status ?? r.status) as string;
+              const rowActive = r.taskId === activeTaskId;
+              const disabled = st === "SUCCEEDED" || st === "FAILED" || st === "CANCELLED" || st === "TIMEOUT";
+              const counts = parseProgressCounts(r.statusMessage);
+              return (
+                <div
+                  key={r.taskId}
+                  onClick={() => setActiveTaskId(r.taskId)}
+                  className="rounded-md border cursor-pointer transition-colors"
+                  style={{
+                    borderColor: styles.cardBorder,
+                    background: rowActive ? (styles.accentBg as string) + "0d" : styles.cardBg,
+                    color: styles.cardText,
+                  }}
+                >
+                  {/* 卡片头：checkbox + 任务名 + 状态 + 分类 */}
+                  <div className="flex items-center gap-2 px-2.5 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(r.taskId)}
+                      onClick={e => e.stopPropagation()}
+                      onChange={() => {
+                        setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(r.taskId)) next.delete(r.taskId); else next.add(r.taskId);
+                          return next;
+                        });
+                      }}
+                      className="cursor-pointer shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-semibold text-xs truncate" title={r.taskName}>{r.taskName}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-mono" style={{ color: statusColor(st) }}>
+                          {st === "RUNNING" && <span className="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle" style={{ background: styles.accentText }} />}
+                          {t(`taskPanel.status.${st.toLowerCase()}`) || st}
+                        </span>
+                        <span className="text-[9px]" style={{ color: styles.cardTextMuted }}>
+                          {r.taskId.slice(0, 8)}…
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] shrink-0 px-1.5 py-0.5 border rounded" style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}>
+                      {categoryLabel(r.category)}
+                    </span>
+                  </div>
+                  {/* 进度条（头部下方常驻，不折叠） */}
+                  <div className="px-2.5 pt-1 flex items-center gap-2">
+                    <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: styles.cardBorder }}>
+                      <div
+                        className="h-full transition-all duration-500"
+                        style={{ width: `${r.progress ?? 0}%`, background: st === "FAILED" || st === "CANCELLED" ? styles.dangerText : st === "SUCCEEDED" ? styles.successText : styles.accentText }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono" style={{ color: styles.cardTextMuted }}>{r.progress ?? 0}%
+                      {counts ? ` · ${counts.done}/${counts.total}` : ""}
+                    </span>
+                  </div>
+                  {/* 状态消息（有则显示，截断） */}
+                  {r.statusMessage && (
+                    <div className="px-2.5 pt-1 text-[10px] truncate" style={{ color: styles.cardTextMuted }} title={r.statusMessage}>
+                      {r.statusMessage}
+                    </div>
+                  )}
+                  {/* 操作按钮组（卡片底部，复用全局 op / ActionBtn，不重写查询逻辑） */}
+                  <div className="px-2.5 py-1.5 flex items-center justify-end gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
+                    {!disabled && st !== "RUNNING" && (
+                      <ActionBtn label="▶" title={t("taskPanel.action.execute") || "执行"} tone="accent" onClick={() => op(r.taskId, "execute")} />
+                    )}
+                    {st === "RUNNING" && <ActionBtn label="⏸" title={t("taskPanel.action.pause") || "暂停"} tone="warn" onClick={() => op(r.taskId, "pause")} />}
+                    {st === "PAUSED" && <ActionBtn label="▶" title={t("taskPanel.action.resume") || "恢复"} tone="accent" onClick={() => op(r.taskId, "resume")} />}
+                    {(st === "RUNNING" || st === "PAUSED" || st === "PENDING" || st === "PARSING" || st === "PARSED") && (
+                      <ActionBtn label="⏹" title={t("taskPanel.action.cancel") || "中止"} tone="danger" onClick={() => op(r.taskId, "cancel")} />
+                    )}
+                    <ActionBtn label="🗑" title={t("taskPanel.action.archive") || "归档"} tone="muted" onClick={() => op(r.taskId, "archive")} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
         <table className="w-full text-xs border-collapse" style={{ background: styles.cardBg }}>
           <thead>
             <tr className={`border-b ${styles.cardBorder} ${styles.sidebarBg}/60`}>
@@ -374,6 +466,7 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
             })}
           </tbody>
         </table>
+        )}
         </div>
 
         {/* 详情抽屉 (右侧) — 移动端全宽，桌面固定 400px */}
