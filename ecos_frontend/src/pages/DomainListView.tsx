@@ -181,9 +181,9 @@ export default function DomainListView() {
   }
 
   return (
-    <div className={`flex-1 flex h-full overflow-hidden ${styles.appBg} font-sans`}>
+    <div className={`flex-1 flex flex-col lg:flex-row h-full overflow-hidden ${styles.appBg} font-sans`}>
       {/* ═══════ 左侧：域列表 (280px) ═══════ */}
-      <div className={`w-[280px] min-w-[240px] border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0`}>
+      <div className={`w-full lg:w-[280px] lg:min-w-[240px] border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col lg:shrink-0`}>
         {/* 标题 */}
         <div className={`px-4 py-3.5 border-b ${styles.cardBorder}`}>
           <div className="flex items-center gap-2 mb-3">
@@ -471,7 +471,7 @@ export default function DomainListView() {
       </div>
 
       {/* ═══════ 右侧：快速操作面板 (280px) ═══════ */}
-      <div className={`w-[280px] min-w-[220px] border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-y-auto`}>
+      <div className={`w-full lg:w-[280px] lg:min-w-[220px] border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col lg:shrink-0 overflow-y-auto`}>
         <div className={`px-4 py-3.5 border-b ${styles.cardBorder}`}>
           <h3 className={`text-xs font-semibold ${styles.sidebarText} flex items-center gap-1.5`}>
             <Eye size={12} className="text-indigo-400" />
