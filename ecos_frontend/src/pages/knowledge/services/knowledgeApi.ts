@@ -276,6 +276,21 @@ export async function runKnowledgeQuery(query: string) {
   }
 }
 
+/** PMO-B T3 — 按业务域过滤的资产列表（走分类 TaxonService 路由） */
+export async function fetchNavProductsByCategory(categoryIds: string[], pageNum = 1, pageSize = 20) {
+  try {
+    const params = new URLSearchParams();
+    categoryIds.forEach(cid => params.append('categoryIds', cid));
+    params.set('pageNum', String(pageNum));
+    params.set('pageSize', String(pageSize));
+    return await apiFetchData<{ list: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/knowledge/nav/products?${params.toString()}`,
+    );
+  } catch {
+    return { list: [], total: 0 };
+  }
+}
+
 export async function getSettings(): Promise<KnowledgeSettings> {
   try {
     const data = await apiFetchData<KnowledgeSettings>(`${KNOWLEDGE_BASE}/settings`);
@@ -1145,6 +1160,7 @@ export const knowledgeApi = {
   runRAGQuery,
   runRAGQuerySSE,
   runKnowledgeQuery,
+  fetchNavProductsByCategory,
   getSettings,
   updateSettings,
   fetchGlossaryTerms,

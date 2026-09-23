@@ -3,7 +3,7 @@
  * 来源标注 · 多轮追问 · 置信度badge · 总置信度展示
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Keyboard, Flame, Layers, RefreshCw, Bot,
   FileText, Table2, BarChart3, AlertTriangle,
@@ -12,6 +12,7 @@ import {
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
+import { fetchNavCategories, type NavCategoryVO } from '../../../services/knowledgeNavApi';
 
 interface RagSource {
   title: string; type?: string; snippet: string; score: number; page?: number;
@@ -50,11 +51,30 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
   const [overallConfidence, setOverallConfidence] = useState<number | null>(null);
   const [qaHistory, setQaHistory] = useState<QARound[]>([]);
 
+  // PMO-B T3 — 按业务域过滤（默认空 = 全量，回归保证）
+  const [navCategories, setNavCategories] = useState<NavCategoryVO[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const loadNavCategories = useCallback(async (): Promise<void> => {
+    try {
+      const data = await fetchNavCategories('default');
+      setNavCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setNavCategories([]);
+    }
+  }, []);
+  useEffect(() => { void loadNavCategories(); }, [loadNavCategories]);
+  const toggleCategoryId = (id: string): void => {
+    setSelectedCategoryIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+
   const runQuery = async (q: string) => {
     setIsRetrieving(true);
     setLlmOutput(''); setSources([]); setOverallConfidence(null); setAnswerGenerated(null);
     try {
-      const result = await knowledgeApi.runRAGQuery({ query: q, topK: 5 });
+      const result = await knowledgeApi.runRAGQuery({
+        query: q, topK: 5,
+        categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+      });
       const srcs: RagSource[] = (result.sources || []).map((s: any) => ({
         title: s.title || 'Unknown', type: s.type || 'document',
         snippet: s.snippet || '', score: s.score ?? 0, page: s.page,
@@ -118,6 +138,40 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
             </div>
             <textarea value={queryInput} onChange={e => setQueryInput(e.target.value)} rows={3}
               className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg text-xs ${styles.inputText} focus:outline-hidden focus:border-blue-500`} />
+
+            {/* PMO-B T3 — 按业务域过滤 Select */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
+                  {t('knowledge.nav.nav_filter')}
+                </span>
+                <span className={`text-[9px] ${styles.muted}`}>
+                  {selectedCategoryIds.length > 0 ? `(${selectedCategoryIds.length})` : ''}
+                </span>
+              </div>
+              {navCategories.length === 0 ? (
+                <p className={`text-[10px] ${styles.muted}`}>{t('knowledge.nav.tree_empty')}</p>
+              ) : (
+                <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
+                  {navCategories.slice(0, 20).map(cat => (
+                    <label
+                      key={cat.id}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded bg-slate-50 hover:bg-blue-50 cursor-pointer text-[10px] ${styles.muted} transition`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCategoryIds.includes(cat.id)}
+                        onChange={() => toggleCategoryId(cat.id)}
+                        className="h-3 w-3 cursor-pointer"
+                      />
+                      <span className="truncate flex-1">{cat.name}</span>
+                      <span className={`text-[8px] ${styles.muted} shrink-0`}>({cat.articleCount})</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
               <span className={`text-[9px] ${styles.muted} font-extrabold uppercase block`}>{t("knowledge.ragtab.推荐问题")}</span>
               {[defaultQ,

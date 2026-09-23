@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -34,6 +35,8 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     private final QueryEmbeddingHelper queryEmbeddingHelper;
     // B4: pgvector 可用性单点判定（与向量写入共用）
     private final PgVectorSupport pgVectorSupport;
+    /** PMO-B T1: 知识导航目录树过滤（可选） */
+    private final JdbcTemplate jdbcTemplate;
     private final String embeddingModel;
     private final String llmGatewayBase;
 
@@ -45,6 +48,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                                          KnowledgeEdgeMapper edgeMapper,
                                          @Lazy QueryEmbeddingHelper queryEmbeddingHelper,
                                          PgVectorSupport pgVectorSupport,
+                                         JdbcTemplate jdbcTemplate,
                                          @Value("${ecos.rag.embedding-model:text-embedding-3-small}")
                                          String embeddingModel,
                                          @Value("${ecos.rag.llm-gateway-base:}")
@@ -55,6 +59,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         this.edgeMapper = edgeMapper;
         this.queryEmbeddingHelper = queryEmbeddingHelper;
         this.pgVectorSupport = pgVectorSupport;
+        this.jdbcTemplate = jdbcTemplate;
         this.embeddingModel = embeddingModel;
         this.llmGatewayBase = llmGatewayBase;
     }
@@ -100,16 +105,28 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
     @Override
     public Map<String, Object> ragQuery(String queryText, int topK, double threshold) {
+        // PMO-B T1: 兼容旧 3 参契约（不传 navigation 过滤 → 全量检索）
+        return ragQuery(queryText, topK, threshold, null, null);
+    }
+
+    @Override
+    public Map<String, Object> ragQuery(String queryText, int topK, double threshold,
+                                        List<String> categoryIds, List<String> tags) {
         long startTime = System.currentTimeMillis();
         // B4: topK 收敛到 [1, MAX_TOP_K]，防慢 SQL
         int effectiveTopK = Math.min(Math.max(topK, 1), MAX_TOP_K);
-        log.info("RAG query: query='{}', topK={}, threshold={}, pgvector={}",
-                queryText, effectiveTopK, threshold, pgVectorAvailable);
+        // PMO-B T1: 解析 categoryIds → 子树 path LIKE 集合（空 = 无导航过滤，全量）
+        List<String> subtreePaths = resolveCategorySubtree(categoryIds);
+        boolean navFilter = !subtreePaths.isEmpty();
+        log.info("RAG query: query='{}', topK={}, threshold={}, pgvector={}, navFilter={}",
+                queryText, effectiveTopK, threshold, pgVectorAvailable, navFilter);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("query", queryText);
         result.put("topK", effectiveTopK);
         result.put("threshold", threshold);
+        result.put("categoryIds", categoryIds == null ? List.of() : categoryIds);
+        result.put("tags", tags == null ? List.of() : tags);
 
         List<Map<String, Object>> sources = new ArrayList<>();
 
@@ -124,33 +141,55 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                             embeddingModel, llmGatewayBase, queryText);
                 } else {
                     try {
-                        List<Map<String, Object>> vectorResults = embeddingMapper.searchByVector(queryVector, effectiveTopK);
+                        // PMO-B T1: navFilter 时多取 5x 余量再按 navigation 收窄（避免误截断）
+                        int probeK = navFilter ? Math.min(effectiveTopK * 5, MAX_TOP_K * 5) : effectiveTopK;
+                        List<Map<String, Object>> vectorResults = embeddingMapper.searchByVector(queryVector, probeK);
                         if (vectorResults != null && !vectorResults.isEmpty()) {
                             for (Map<String, Object> row : vectorResults) {
+                                if (sources.size() >= effectiveTopK) {
+                                    break;
+                                }
+                                // PMO-B T1: 导航过滤通过路径子树 EXISTS 命中（兼容旧 key 全部小写形式）
+                                Object articleIdRaw = row.get("articleid");
+                                if (articleIdRaw == null) {
+                                    articleIdRaw = row.get("articleId");
+                                }
+                                String articleId = articleIdRaw == null ? "" : String.valueOf(articleIdRaw);
+                                Object contentRaw = row.get("chunktext");
+                                if (contentRaw == null) {
+                                    contentRaw = row.get("chunkText");
+                                }
+                                Object scoreRaw = row.get("score");
+                                if (scoreRaw == null) {
+                                    scoreRaw = 0.0;
+                                }
+                                if (navFilter && !matchesNavFilter(articleId, subtreePaths)) {
+                                    continue;
+                                }
                                 Map<String, Object> source = new LinkedHashMap<>();
                                 source.put("chunkId", row.getOrDefault("id", ""));
-                                source.put("content", row.getOrDefault("chunktext", ""));
-                                source.put("score", row.getOrDefault("score", 0.0));
-                                source.put("source", row.getOrDefault("articleid", ""));
+                                source.put("content", contentRaw == null ? "" : String.valueOf(contentRaw));
+                                source.put("score", scoreRaw);
+                                source.put("source", articleId);
                                 sources.add(source);
                             }
                             vectorSuccess = !sources.isEmpty();
-                            log.debug("Vector search (embedding_vec + HNSW) returned {} results", sources.size());
+                            log.debug("Vector search (embedding_vec + HNSW) returned {} results (navFilter={})",
+                                    sources.size(), navFilter);
                         }
                     } catch (Exception e) {
                         log.warn("RAG 降级关键词检索：向量检索异常（query='{}'）: {}", queryText, e.getMessage(), e);
                     }
                     if (!vectorSuccess) {
-                        log.warn("RAG 降级关键词检索：向量检索无命中（embedding_vec 可能为 NULL 或维度不符，query='{}'）",
-                                queryText);
+                        log.warn("RAG 降级关键词检索：向量检索无命中（query='{}'）", queryText);
                     }
                 }
                 if (!vectorSuccess) {
-                    sources = fallbackKeywordSearch(queryText, effectiveTopK);
+                    sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths);
                 }
             } else {
                 log.warn("RAG 降级关键词检索：pgvector 扩展不可用（镜像需内置 pgvector，query='{}'）", queryText);
-                sources = fallbackKeywordSearch(queryText, effectiveTopK);
+                sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths);
             }
         }
 
@@ -183,6 +222,91 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     }
 
     /**
+     * PMO-B T1: 把 categoryIds 列表展开为子树 path 前缀列表（包含自身 + 子孙节点）。
+     *
+     * <p>实现：取每张 {@code kb_nav_category.path}，加 '%' 后缀作为 LIKE prefix。
+     * 任一 id 不存在（软删 / 跨域）时只跳过那一条，不阻塞其他 id。
+     * 不可用时返回空 List → 调用方降级为全量检索（回归保证）。</p>
+     */
+    private List<String> resolveCategorySubtree(List<String> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> cleaned = new ArrayList<>();
+        for (String cid : categoryIds) {
+            if (cid != null && !cid.isBlank()) {
+                cleaned.add(cid.trim());
+            }
+        }
+        if (cleaned.isEmpty()) {
+            return List.of();
+        }
+        // 参数化占位（IR05 红线：禁字符串拼接业务 id）
+        List<Object> args = new ArrayList<>(cleaned.size());
+        StringBuilder inClause = new StringBuilder("(");
+        for (int i = 0; i < cleaned.size(); i++) {
+            if (i > 0) {
+                inClause.append(" OR ");
+            }
+            inClause.append("id = ?");
+            args.add(cleaned.get(i));
+        }
+        inClause.append(")");
+        String sql = "SELECT id, path FROM ecos_knowledge.kb_nav_category "
+                + "WHERE is_deleted = 0 AND (" + inClause + ")";
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
+            List<String> out = new ArrayList<>(rows.size());
+            for (Map<String, Object> row : rows) {
+                Object p = row.get("path");
+                if (p == null) {
+                    continue;
+                }
+                String path = String.valueOf(p);
+                if (path == null || path.isBlank()) {
+                    continue;
+                }
+                out.add(path.endsWith("%") ? path : path + "%");
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("resolveCategorySubtree 失败，降级为全量检索: {}", e.getMessage(), e);
+            return List.of();
+        }
+    }
+
+    /**
+     * PMO-B T1 辅助：判断 articleId 是否命中给定子树 path 任一前缀（复用 kb_nav_article_rel + kb_nav_category）。
+     * 文章没有任何导航标签（即零标记）时一律返回 false（要求"命中其中一项 OR 全部 nil"，对应 KISS 语义）。
+     */
+    private boolean matchesNavFilter(String articleId, List<String> subtreePaths) {
+        if (articleId == null || articleId.isBlank()) {
+            return false;
+        }
+        for (String p : subtreePaths) {
+            if (p == null || p.isBlank()) {
+                continue;
+            }
+            try {
+                Integer n = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ecos_knowledge.kb_nav_article_rel r "
+                                + "JOIN ecos_knowledge.kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 "
+                                + "WHERE r.is_deleted = 0 AND r.scope = 'category' AND r.article_id = ? "
+                                + "AND c.path LIKE ?",
+                        Integer.class, articleId, p);
+                if (n != null && n > 0) {
+                    return true;
+                }
+            } catch (Exception e) {
+                log.debug("matchesNavFilter queryForObject 失败（articleId={}, path={}）: {}",
+                        articleId, p, e.getMessage());
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Neo4j图数据库健康检查。
      */
     public Map<String, Object> graphHealth() {
@@ -203,13 +327,30 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     }
 
     /**
-     * 关键词回退检索 — ILIKE 匹配。
+     * 关键词回退检索 — ILIKE 匹配（PMO-B T1: 兼容无导航过滤场景）。
      */
     private List<Map<String, Object>> fallbackKeywordSearch(String queryText, int topK) {
+        return fallbackKeywordSearch(queryText, topK, null);
+    }
+
+    /**
+     * 关键词回退检索 — ILIKE 匹配；{@code subtreePaths} 为空 / null 时全量返回（兼容旧调用）。
+     */
+    private List<Map<String, Object>> fallbackKeywordSearch(String queryText, int topK, List<String> subtreePaths) {
         List<Map<String, Object>> sources = new ArrayList<>();
         try {
-            List<KnowledgeEmbedding> embeddings = embeddingMapper.searchByKeyword(queryText.trim(), topK);
+            // PMO-B T1: 有导航过滤时多取 5x，防 LIKE 子树截断全量
+            int probeK = (subtreePaths != null && !subtreePaths.isEmpty())
+                    ? Math.min(topK * 5, MAX_TOP_K * 5) : topK;
+            List<KnowledgeEmbedding> embeddings = embeddingMapper.searchByKeyword(queryText.trim(), probeK);
+            boolean navFilter = subtreePaths != null && !subtreePaths.isEmpty();
             for (KnowledgeEmbedding emb : embeddings) {
+                if (sources.size() >= topK) {
+                    break;
+                }
+                if (navFilter && !matchesNavFilter(emb.getArticleId(), subtreePaths)) {
+                    continue;
+                }
                 Map<String, Object> source = new LinkedHashMap<>();
                 source.put("chunkId", emb.getId());
                 source.put("content", emb.getChunkText());
