@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
 
@@ -52,6 +53,7 @@ class RAGSearchServiceTest {
     private KnowledgeEmbeddingMapper embeddingMapper;
     private PgVectorSupport pgVectorSupport;
     private QueryEmbeddingHelper queryEmbeddingHelper;
+    private JdbcTemplate jdbcTemplate;
     private KnowledgeRetrievalServiceImpl service;
 
     @BeforeEach
@@ -62,11 +64,12 @@ class RAGSearchServiceTest {
         embeddingMapper = mock(KnowledgeEmbeddingMapper.class);
         pgVectorSupport = mock(PgVectorSupport.class);
         queryEmbeddingHelper = mock(QueryEmbeddingHelper.class);
+        jdbcTemplate = mock(JdbcTemplate.class);
         // PMO-50 T1: QueryEmbeddingHelper 默认返回 null → service 走 keyword fallback；
         // 测试 mock searchByVector 仍然验证 mapper 调用链
         service = new KnowledgeRetrievalServiceImpl(
                 articleMapper, embeddingMapper, nodeMapper, edgeMapper,
-                queryEmbeddingHelper, pgVectorSupport, "text-embedding-3-small", "");
+                queryEmbeddingHelper, pgVectorSupport, jdbcTemplate, "text-embedding-3-small", "");
     }
 
     /** 在 stub checkPgVector 前手动设 flag (反射), 避免触发真实 JDBC。 */
