@@ -22,7 +22,7 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTheme } from "../ThemeContext";
-import DataTable, {ColumnConfig} from "./DataTable";
+import DataTable, {ColumnConfig, DataTableProps} from "./DataTable";
 import EmptyState from "./EmptyState";
 import LoadingSkeleton from "./LoadingSkeleton";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
@@ -290,6 +290,9 @@ export default function MobileDataTable<T extends Record<string, any>>({
   className = "",
   mobileConfig,
   mobileQuery,
+  columns,
+  data,
+  rowKey,
   ...rest
 }: MobileDataTableProps<T>): React.ReactElement {
   // 默认移动端查询；最终选择时的优先级：mobileQuery > 系统默认 "(max-width: 767px)"
@@ -301,6 +304,9 @@ export default function MobileDataTable<T extends Record<string, any>>({
     // 桌面态：完整交给 DataTable（不重写桌面表现）
     return (
       <DataTable<T>
+        columns={columns}
+        data={data}
+        rowKey={rowKey}
         {...rest}
         className={`${className} flex flex-col md:min-w-0`}
       />
@@ -311,6 +317,9 @@ export default function MobileDataTable<T extends Record<string, any>>({
   return (
     <div className={className}>
       <MobileCardRows<T>
+        columns={columns}
+        data={data}
+        rowKey={rowKey}
         {...rest}
         mobileConfig={mobileConfig}
         styles={styles}
