@@ -5,10 +5,11 @@
  */
 
 import React from "react";
-import { Edit3, Trash2, LogOut, AlertTriangle } from "lucide-react";
+import { Edit3, Trash2, LogOut, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { useLanguage } from "../../components/LanguageContext";
 import { useTheme } from "../../components/ThemeContext";
 import { fetchUserRoles } from "../../api";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { IamUser, IamRole } from "../../api";
 
 interface UserListProps {
@@ -101,6 +102,7 @@ export default function UserList({
 }: UserListProps) {
   const { locale, t } = useLanguage();
   const { styles } = useTheme();
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const isZh = locale === "zh";
 
   // ── Batch selection state ──────────────────────────────
@@ -186,6 +188,89 @@ export default function UserList({
   // Empty state
   if (users.length === 0) {
     return null; // Parent handles empty state
+  }
+
+  // 移动端：折叠卡片态（每卡头有 username+status，详情区折叠 email/org/roles，底部操作组 + 批量 checkbox）
+  // 桌面态保留原生 <table> 不变
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const toggleExpand = (id: string) => setExpandedId(prev => (prev === id ? null : id));
+  if (isMobile) {
+    return (
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+        {users.map(u => {
+          const expanded = expandedId === u.userId;
+          return (
+            <div key={u.userId} className="rounded-md bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10">
+              {/* 卡片头：checkbox + 用户名 + 状态徽章 + 展开钮 */}
+              <div className="flex items-center gap-2 px-2.5 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(u.userId)}
+                  onChange={() => toggleSelect(u.userId)}
+                  className="w-3.5 h-3.5 rounded accent-indigo-500 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-semibold truncate">{u.username}</span>
+                    <button onClick={() => onToggleStatus(u.userId, u.status)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer border transition-colors shrink-0 ${
+                        u.status === "ACTIVE"
+                          ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+                          : "bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 border-red-200 dark:border-red-800"
+                      }`}>
+                      ● {u.status === "ACTIVE" ? (isZh ? "活跃" : "Active") : (isZh ? "禁用" : "Disabled")}
+                    </button>
+                  </div>
+                  <div className="text-[10px] opacity-50 truncate">{u.realName || "—"}</div>
+                </div>
+                <button type="button" aria-label={expanded ? "收起详情" : "展开详情"}
+                  onClick={() => toggleExpand(u.userId)}
+                  className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0">
+                  {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+              </div>
+              {/* 详情区（折叠）：邮箱 / 组织 / 角色 */}
+              {expanded && (
+                <div className="border-t border-black/10 dark:border-white/10 px-2.5 py-2.5 flex flex-col gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{isZh ? "邮箱" : "Email"}</span>
+                    <span className="text-xs">{u.email || "—"}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{isZh ? "组织" : "Org"}</span>
+                    <span className="text-xs">{orgMap[u.orgId || ""] || (u as any).orgName || u.orgId || "—"}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{isZh ? "角色" : "Roles"}</span>
+                    <RoleTags userId={u.userId} roles={roles} />
+                  </div>
+                </div>
+              )}
+              {/* 操作行：编辑 / 强制下线 / 删除（卡片底部按钮组） */}
+              <div className="border-t border-black/10 dark:border-white/10 px-2.5 py-1.5 flex items-center justify-end gap-1.5">
+                <button onClick={() => onRowClick(u)}
+                  className="px-2 py-1 rounded text-[11px] bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 border border-black/5 dark:border-white/5">
+                  {isZh ? "详情" : "Detail"}
+                </button>
+                <button onClick={() => onEdit(u)}
+                  className="px-2 py-1 rounded text-[11px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
+                  {isZh ? "编辑" : "Edit"}
+                </button>
+                <button onClick={() => onForceLogout(u)}
+                  className="px-2 py-1 rounded text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30">
+                  {isZh ? "下线" : "Logout"}
+                </button>
+                <button onClick={() => onDelete(u)}
+                  className="px-2 py-1 rounded text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30">
+                  {isZh ? "删除" : "Delete"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 
   return (
