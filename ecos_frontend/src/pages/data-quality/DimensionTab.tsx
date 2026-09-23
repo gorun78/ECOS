@@ -317,9 +317,9 @@ export default function DimensionTab() {
           {error ? <span className="mt-1 text-xs text-danger-500">{error}</span> : null}
         </div>
       ) : (
-        <div className="grid grid-cols-12 gap-4">
-          {/* 雷达图卡片 (col-span-8) */}
-          <div className={`col-span-8 border ${styles.cardBorder} rounded-xl ${styles.cardBg} p-4`}>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* 雷达图卡片 (mobile: 整行 / md+: col-span-8) */}
+          <div className={`md:col-span-8 border ${styles.cardBorder} rounded-xl ${styles.cardBg} p-4`}>
             <div className="flex flex-col items-center justify-center">
               <div className={`text-[10px] font-mono uppercase tracking-wider ${styles.cardTextMuted} mb-2`}>
                 {t("dw.dqRule.radarTitle")}
@@ -347,8 +347,8 @@ export default function DimensionTab() {
             </div>
           </div>
 
-          {/* 6 张维度卡片 (col-span-4, 1×6 竖向 / 2×3 网格) */}
-          <div className="col-span-4 grid grid-cols-1 gap-3 content-start">
+          {/* 6 张维度卡片 (mobile: 整行 / md+: col-span-4, 1×6 竖向 / 2×3 网格) */}
+          <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-1 gap-3 content-start">
             {orderedDims.map((d) => {
               const code = d.dimension ?? "";
               const score = assetScore?.dimensionScores?.[code];

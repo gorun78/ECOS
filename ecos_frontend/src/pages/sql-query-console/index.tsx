@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../../components/ThemeContext';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import * as Icons from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 type AnyMonacoCodeEditor = any;
@@ -43,6 +44,8 @@ interface SQLQueryConsoleProps {
 
 export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
   const { styles } = useTheme();
+  // 移动端断言: 视口 ≤ 767px 时, Monaco 单行/复杂手势过于较重, 降级为只读 textarea 仅用于查看
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   // ── 数据源 ──
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
@@ -312,8 +315,17 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
 
         {/* 中间区域: 编辑器 + 结果 */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* SQL 编辑器 */}
-          <div className={`h-2/5 min-h-[120px] border-b ${styles.divider}`}>
+          {/* SQL 编辑器 (mobile: 降级只读 textarea 仅用于查看; 桌面: Monaco) */}
+          <div className={`h-2/5 min-h-[120px] border-b ${styles.divider} overflow-y-auto`}>
+            {isMobile ? (
+              <textarea
+                readOnly
+                spellCheck={false}
+                value={sql}
+                placeholder="移动端只读查看"
+                className={`w-full h-full min-h-[240px] p-2 font-mono text-xs bg-black/5 dark:bg-white/5 rounded resize-none outline-none ${styles.appText}`}
+              />
+            ) : (
             <Editor
               height="100%"
               defaultLanguage="sql"
@@ -328,6 +340,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 </div>
               }
             />
+            )}
           </div>
 
           {/* 查询结果 + 历史面板 */}

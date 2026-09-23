@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
 import { useTheme } from '../../../components/ThemeContext';
+import { useMediaQuery } from '../../../hooks/useMediaQuery';
 
 // ─── Props ────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ type UdfLanguage = 'python' | 'sql' | 'java';
 
 const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => {
   const { styles } = useTheme();
+  // 移动端断言: 视口 ≤ 767px 时, 双 Monaco 占用触控面积过大, 降级为原生 textarea
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const [language, setLanguage] = useState<UdfLanguage>('python');
   const [inputCode, setInputCode] = useState('');
   const [outputCode, setOutputCode] = useState('');
@@ -153,10 +156,10 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
         </div>
       </div>
 
-      {/* Main content: Left (Input) + Right (Preview) */}
-      <div className="flex-1 flex min-h-0">
+      {/* Main content: mobile 单列 / 桌面 左(输入) + 右(预览) */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Left: Input */}
-        <div className={`flex-1 flex flex-col border-r ${styles.cardBorder} min-w-0`}>
+        <div className={`flex-1 flex flex-col border-b md:border-b-0 md:border-r ${styles.cardBorder} min-w-0 min-h-0`}>
           <div className={`flex items-center justify-between px-3 py-1.5 ${styles.cardBg} border-b ${styles.cardBorder} shrink-0`}>
             <span className={`text-[10px] font-semibold ${styles.muted} uppercase tracking-wider`}>
               输入 ({language === 'sql' ? 'SQL' : 'Code'})
@@ -170,7 +173,16 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
               转换
             </button>
           </div>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {isMobile ? (
+              <textarea
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+                spellCheck={false}
+                placeholder={`输入 ${language === 'sql' ? 'SQL' : '代码'}`}
+                className={`w-full h-full min-h-[240px] p-2 font-mono text-xs bg-black/5 dark:bg-white/5 rounded resize-none outline-none ${styles.cardText}`}
+              />
+            ) : (
             <Editor
               height="100%"
               language={language === 'sql' ? 'sql' : language === 'java' ? 'java' : 'python'}
@@ -185,11 +197,12 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
                 scrollBeyondLastLine: false,
               }}
             />
+            )}
           </div>
         </div>
 
         {/* Right: UDF Preview */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className={`flex items-center justify-between px-3 py-1.5 ${styles.cardBg} border-b ${styles.cardBorder} shrink-0`}>
             <span className={`text-[10px] font-semibold ${styles.muted} uppercase tracking-wider`}>
               UDF 代码预览
@@ -220,7 +233,16 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
               </button>
             </div>
           </div>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {isMobile ? (
+              <textarea
+                value={outputCode}
+                onChange={(e) => setOutputCode(e.target.value)}
+                spellCheck={false}
+                placeholder="UDF 代码预览（移动端可编辑）"
+                className={`w-full h-full min-h-[240px] p-2 font-mono text-xs bg-black/5 dark:bg-white/5 rounded resize-none outline-none ${styles.cardText}`}
+              />
+            ) : (
             <Editor
               height="100%"
               language="python"
@@ -236,6 +258,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
                 readOnly: false,
               }}
             />
+            )}
           </div>
         </div>
       </div>

@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Zap, Clock, AlertCircle, XCircle, Loader2,
 } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import type { ParetoOptimizeResult, ParetoProblem, ParetoSolution } from "../../../api";
+import { useMediaQuery } from "../../../hooks/useMediaQuery";
 
 export interface ParetoTabProps {
   locale: string;
@@ -36,10 +37,19 @@ export default function ParetoTab({
   paretoLoading, paretoError, setParetoError,
   runParetoOptimize, loadParetoResult,
 }: ParetoTabProps) {
+  // 移动端断言: 视口 ≤ 767px 时, 左侧历史侧栏从 fixed 224px 折叠, 图表宽耦合变化,
+  // 需重新调 resize 以重新布局 canvas
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  useEffect(() => {
+    // 状态变化后触发下一次 resize, 避免侧栏折叠后图表被截
+    if (typeof window === "undefined") return;
+    const id = window.setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
+    return () => window.clearTimeout(id);
+  }, [isMobile]);
   return (
-    <div className="flex-1 flex gap-4 min-h-0">
-      {/* Left: History sidebar */}
-      <div className={`w-56 shrink-0 border rounded-lg p-3 flex flex-col min-h-0 overflow-hidden ${styles.cardBorder} ${styles.cardBg}`}>
+    <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
+      {/* Left: History sidebar (mobile: 折单列, 桌面: fixed 224px sidebar) */}
+      <div className={`w-full md:w-56 shrink-0 border rounded-lg p-3 flex flex-col min-h-0 overflow-hidden ${styles.cardBorder} ${styles.cardBg}`}>
         <div className="flex items-center gap-2 mb-3 shrink-0">
           <Clock className="w-3.5 h-3.5 opacity-50" />
           <span className="text-xs font-semibold opacity-70">

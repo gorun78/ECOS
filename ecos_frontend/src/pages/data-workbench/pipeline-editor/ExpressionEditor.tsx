@@ -8,6 +8,7 @@ import Editor, { type OnMount, type BeforeMount } from '@monaco-editor/react';
 import { PB_FUNCTIONS, type PBFunctionDef, CATEGORY_LABELS } from './pbFunctions';
 import { FunctionSquare } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
+import { useMediaQuery } from '../../../hooks/useMediaQuery';
 
 // Monaco 类型通过 @monaco-editor/react 内部暴露；这里不再手动 declare module 'monaco-editor'
 // （官方 types 自带 editor namespace，declare 会冲突 TS2451）
@@ -125,6 +126,8 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 }) => {
   const { styles } = useTheme();
   const editorRef = useRef<any>(null);
+  // 移动端断言: 视口 ≤ 767px 时, 单行 Monaco 手势较多, 降级为原生 input 仅用于输入表达式
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   // Store available columns globally for completion provider
   useEffect(() => {
@@ -282,6 +285,18 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
         } ${showOperatorButton ? 'pl-7' : ''}`}
         style={{ height: 32 }}
       >
+        {isMobile ? (
+          // 移动端降级: 单行 input, 跟随 32px 父容器, 不加载 Monaco 减少包体积/触摸开销
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            disabled={disabled}
+            spellCheck={false}
+            className={`w-full h-full bg-transparent outline-none px-2 font-mono text-[12px] ${styles.cardText}`}
+          />
+        ) : (
         <Editor
           height="32px"
           language="pb-expression"
@@ -331,6 +346,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
             </div>
           }
         />
+        )}
       </div>
     </div>
   );
