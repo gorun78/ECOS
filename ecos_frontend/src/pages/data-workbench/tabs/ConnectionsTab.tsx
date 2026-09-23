@@ -72,6 +72,10 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   // 文件夹数据源（fs）目录文件列表（非结构化近源层采集源）
   const [folderFiles, setFolderFiles] = useState<FolderFileVo[]>([]);
   const [folderFilesLoading, setFolderFilesLoading] = useState(false);
+  // 目录列表复选框选中集合（fs 为文件名，结构源为表名）—— 共享给「采集到近源层」banner
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  // 采集方案 Tab：'metadata' | 'ingest'，默认元数据采集（用户主档口先看采集，再切入数据湖写入）
+  const [planTab, setPlanTab] = useState<'metadata' | 'ingest'>('metadata');
   // PMO-37 元数据获取策略
   const [collecting, setCollecting] = useState(false);
   const [lastCollectInfo, setLastCollectInfo] = useState<{ time?: string; countMethod?: string } | null>(null);
@@ -179,6 +183,10 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
   // 选中连接时获取目录：数据库源拉表目录，文件夹源列目录文件
   useEffect(() => {
     setTablePage(1);
+    setSelectedNames(new Set());
+    // fs 文件即元数据（无元数据采集任务），默认切入数据采集 Tab
+    const initialConn = selectedConnId ? connections.find(c => c.id === selectedConnId) : null;
+    setPlanTab(initialConn?.type === 'fs' ? 'ingest' : 'metadata');
     if (!selectedConnId) return;
     const conn = connections.find(c => c.id === selectedConnId);
     if (!conn) return;
@@ -339,285 +347,64 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Technical specifications */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className={`col-span-1 ${styles.appBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
-              <h4 className={`text-xs font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-1.5 flex items-center gap-1.5`}>
+          {/* ① 连接参数（横向扁平卡，紧凑） */}
+          <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-4`}>
+            <div className="flex flex-wrap items-end gap-6">
+              <div className="flex items-center gap-2 mr-6">
                 <LucideIcon name="Settings" size={12} className={`${styles.cardTextMuted}`} />
-                {t("dw.connConfigParams")}
-              </h4>
-
-              <div className="text-xs space-y-2.5">
-                {conn.config.host && (
-                  <div>
-                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.16e578")}</span>
-                    <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.host}</span>
-                  </div>
-                )}
-                {conn.config.port && (
-                  <div>
-                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.4016cf")}</span>
-                    <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.port}</span>
-                  </div>
-                )}
-                {conn.config.username && (
-                  <div>
-                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.1169ed")}</span>
-                    <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.username}</span>
-                  </div>
-                )}
-                {conn.config.bucket && (
-                  <div>
-                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.eb9003")}</span>
-                    <span className={`font-mono font-medium ${styles.cardText} truncate block`}>{conn.config.bucket}</span>
-                  </div>
-                )}
-                {conn.config.endpointUrl && (
-                  <div>
-                    <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.3cd968")}</span>
-                    <span className={`font-mono font-medium ${styles.cardText} truncate block`}>{conn.config.endpointUrl}</span>
-                  </div>
-                )}
-                <hr className={`${styles.cardBorder}`} />
-                <div>
-                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.165c7b")}</span>
-                   <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || t("dw.neverTested")}</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>{t("dw.connConfigParams")}</span>
+              </div>
+              {conn.config.host && (
+                <div className="text-xs">
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.16e578")}</span>
+                  <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.host}</span>
                 </div>
-
-                {/* PMO-37 元数据获取策略 */}
-                <hr className={`${styles.cardBorder}`} />
-                <div>
-                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono mb-2`}>{t("dw.strategy.section")}</span>
-                  <div className="space-y-2">
-                    <div>
-                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.trigger")}</label>
-                      <select
-                        value={conn.strategy?.trigger || 'MANUAL'}
-                        onChange={async e => {
-                          const newTrigger = e.target.value;
-                          const newCount = conn.strategy?.countMethod || 'OFF';
-                          const newCron = conn.strategy?.scheduleCron;
-                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: newTrigger as any } } : c));
-                          await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
-                          // PMO-37 增强：ON_SAVE 自动模式 → 提交完整元数据采集任务
-                          // 选择 ON_SAVE 即"保存数据源时自动"，需立即触发一次采集以同步最新元数据，
-                          // 否则列表目录停留在陈旧状态，UI 上难以感知"自动采集"已生效。
-                          if (newTrigger === 'ON_SAVE' && collectTaskId === null) {
-                            setCollecting(true);
-                            try {
-                              const r = await triggerCollectSync(conn.id);
-                              if (r?.taskId) {
-                                setCollectTaskId(r.taskId);
-                                setCollectStatus(null);
-                                showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
-                              } else {
-                                showToast('warning', t('dw.strategy.autoCollectFallback') || '自动采集任务提交失败，已回退轻量拉取');
-                                const fresh = await fetchDataSourceResources(conn.id);
-                                const tables = Array.isArray(fresh) ? fresh : [];
-                                setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
-                              }
-                            } finally {
-                              setCollecting(false);
-                            }
-                          }
-                        }}
-                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
-                      >
-                        {STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
-                      </select>
-                    </div>
-                    {/* 定时采集策略 — 选择 ON_SCHEDULE 时显示 cron 配置 */}
-                    {conn.strategy?.trigger === 'ON_SCHEDULE' && (
-                    <div className={`space-y-1.5 p-2 rounded-lg border border-dashed ${styles.cardBorder}`}>
-                      <label className={`text-[10px] ${styles.cardTextMuted} block`}>{t("dw.strategy.cronLabel")}</label>
-                      <select
-                        value={conn.strategy?.scheduleCron || '0 0 * * *'}
-                        onChange={async e => {
-                          const newCron = e.target.value;
-                          const newTrigger = conn.strategy?.trigger || 'ON_SCHEDULE';
-                          const newCount = conn.strategy?.countMethod || 'OFF';
-                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, scheduleCron: newCron } } : c));
-                          await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
-                          showToast('success', t('dw.strategy.updateSuccess') || '策略已保存');
-                        }}
-                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText} font-mono`}
-                      >
-                        <option value="0 0 * * *">{t('dw.strategy.cron.daily')}</option>
-                        <option value="0 */6 * * *">{t('dw.strategy.cron.sixHourly')}</option>
-                        <option value="0 0 */2 * *">{t('dw.strategy.cron.twoDays')}</option>
-                        <option value="0 0 * * 1">{t('dw.strategy.cron.weekly')}</option>
-                      </select>
-                      <p className={`text-[10px] ${styles.cardTextMuted} font-mono`}>cron: {t('dw.strategy.cron.format')}</p>
-                    </div>
-                    )}
-                    <div>
-                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.count")}</label>
-                      <select
-                        value={conn.strategy?.countMethod || 'OFF'}
-                        onChange={async e => {
-                          const newCount = e.target.value;
-                          const newTrigger = conn.strategy?.trigger || 'MANUAL';
-                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, countMethod: newCount as any } } : c));
-                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
-                        }}
-                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
-                      >
-                        {COUNT_METHOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
-                      </select>
-                    </div>
-                    <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("dw.strategy.hint")}</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {/* 保存参数：仅保存策略配置并同步一次资源，不触发采集任务 */}
-                      <button
-                        disabled={collecting || collectTaskId !== null}
-                        onClick={async () => {
-                          try {
-                            const ok = await saveMetadataStrategy(conn.id,
-                              conn.strategy?.trigger || 'MANUAL',
-                              conn.strategy?.countMethod || 'OFF',
-                              conn.strategy?.scheduleCron);
-                            // PMO-37 增强：ON_SAVE 自动模式的"保存参数" → 提交完整采集任务
-                            // 用户单独点"保存参数"且当前为 ON_SAVE 时，按"保存数据源时自动"语义，
-                            // 完整触发一次采集任务（走 CollectProgressPanel 实时进度），而非轻量拉取。
-                            if (ok && conn.strategy?.trigger === 'ON_SAVE' && collectTaskId === null) {
-                              setCollecting(true);
-                              try {
-                                const r = await triggerCollectSync(conn.id);
-                                if (r?.taskId) {
-                                  setCollectTaskId(r.taskId);
-                                  setCollectStatus(null);
-                                  showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
-                                } else {
-                                  // 任务提交失败 → 回退轻量拉取，至少保证目录刷新
-                                  const fresh = await fetchDataSourceResources(conn.id);
-                                  const tables = Array.isArray(fresh) ? fresh : [];
-                                  setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
-                                  showToast('warning', t('dw.strategy.autoCollectFallback') || '参数已保存，自动采集任务提交失败已回退轻量拉取');
-                                }
-                              } finally {
-                                setCollecting(false);
-                              }
-                            } else if (ok) {
-                              showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
-                            } else {
-                              showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
-                            }
-                          } catch (e) {
-                            console.warn('[data-workbench] save params failed:', e);
-                            showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
-                          }
-                        }}
-                        className={`px-2 py-1 text-[11px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1`}
-                      >
-                        <LucideIcon name="Save" size={11} />
-                        {t('dw.strategy.saveParams') || '保存参数'}
-                      </button>
-                      <button
-                        disabled={collecting || collectTaskId !== null}
-                        onClick={async () => {
-                          setCollecting(true);
-                          try {
-                            if (conn.type === 'fs') {
-                              // 文件夹数据源：整体采集目录内全部可采集文件到近源层（非结构化）
-                              const files = folderFiles.length > 0 ? folderFiles : await listFolderFiles(conn.id);
-                              if (files.length === 0) {
-                                showToast('info', t('dw.folder.collectNoFiles'));
-                                return;
-                              }
-                              const docId = `doc_${conn.id.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`;
-                              const res = await collectFolderFiles({
-                                datasourceId: conn.id,
-                                docId,
-                                fileNames: files.map(f => f.name),
-                              });
-                              if (res.failed > 0) {
-                                const firstErr = res.items?.find(i => i.status !== 'SUCCESS')?.error;
-                                showToast('error', t('dw.folder.collectPartial')
-                                  .replace('{ok}', String(res.collected)).replace('{fail}', String(res.failed))
-                                  + (firstErr ? `（${firstErr}）` : ''));
-                              } else {
-                                showToast('success', t('dw.folder.collectSuccess')
-                                  .replace('{count}', String(res.collected)));
-                              }
-                              await refreshFolderFiles(conn.id);
-                              return;
-                            }
-                            // 同步立即采集：走 triggerCollectSync（后端任务引擎异步执行 + 前端 2s 轮询进度）
-                            const r = await triggerCollectSync(conn.id);
-                            if (r?.taskId) {
-                              setCollectTaskId(r.taskId);
-                              setCollectStatus(null);
-                              showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
-                            } else {
-                              showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
-                            }
-                          } finally {
-                            setCollecting(false);
-                          }
-                        }}
-                        className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
-                      >
-                        <LucideIcon name="RefreshCw" size={11} className={(collecting || collectTaskId !== null) ? 'animate-spin' : ''} />
-                        {(collecting || collectTaskId !== null) ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
-                      </button>
-                    </div>
-                    {/* 同步采集进度面板（CollectProgressPanel）在底部 console 区呈现（见主返回体末端） */}
-                    <div className={`text-[10px] ${styles.cardTextMuted}`}>
-                      {t("dw.strategy.lastCollect")}:{' '}
-                      {conn.metadataConfig?.lastCollectTime
-                        ? new Date(String(conn.metadataConfig.lastCollectTime)).toLocaleString()
-                        : t('dw.strategy.neverCollected')}
-                    </div>
-
-                    {/* 数据采集（采集型管道 → 数据湖 MinIO 近源库）—— 与元数据采集同面板 */}
-                    <IngestSubPanel conn={conn} showToast={showToast} />
-
-                    {/* 活跃采集任务状态指示器 — 对接异步任务中心 */}
-                    {activeTasks.length > 0 && (
-                      <div className={`space-y-1.5 p-2 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>
-                        <div className={`flex items-center gap-2 text-[11px]`}>
-                          <LucideIcon name="Loader2" size={13} className={`animate-spin ${styles.accentText}`} />
-                          <span className={`font-semibold ${styles.cardText}`}>
-                            {t('dw.strategy.taskRunning') || '任务执行中'}
-                          </span>
-                        </div>
-                        {activeTasks.map((task, i) => (
-                          <div key={task.taskId} className={`text-[10px] font-mono ${styles.cardTextMuted} flex items-center gap-2`}>
-                            <span className={`${task.status === 'RUNNING' ? styles.successText : styles.warningText} font-bold`}>
-                              {task.status}
-                            </span>
-                            <span>{task.taskId.slice(0, 8)}...{task.progress}%</span>
-                            {task.startTime && (
-                              <span className="opacity-70">{new Date(task.startTime).toLocaleTimeString()}</span>
-                            )}
-                          </div>
-                        ))}
-                        <button
-                          onClick={() => window.open('#/task-center', '_blank')}
-                          className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer flex items-center gap-1`}
-                        >
-                          <LucideIcon name="ExternalLink" size={10} />
-                          {t('dw.strategy.viewInTaskCenter') || '在任务中心查看'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+              )}
+              {conn.config.port && (
+                <div className="text-xs">
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.4016cf")}</span>
+                  <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.port}</span>
                 </div>
+              )}
+              {conn.config.username && (
+                <div className="text-xs">
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.1169ed")}</span>
+                  <span className={`font-mono font-medium ${styles.cardText}`}>{conn.config.username}</span>
+                </div>
+              )}
+              {conn.config.bucket && (
+                <div className="text-xs">
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.eb9003")}</span>
+                  <span className={`font-mono font-medium ${styles.cardText} truncate block`}>{conn.config.bucket}</span>
+                </div>
+              )}
+              {conn.config.endpointUrl && (
+                <div className="text-xs">
+                  <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.3cd968")}</span>
+                  <span className={`font-mono font-medium ${styles.cardText} truncate block`}>{conn.config.endpointUrl}</span>
+                </div>
+              )}
+              <div className="text-xs">
+                <span className={`text-[10px] ${styles.cardTextMuted} uppercase block font-mono`}>{t("dw.txt.165c7b")}</span>
+                <span className={`${styles.cardTextMuted} text-[11px] font-medium`}>{conn.config.lastTested || t("dw.neverTested")}</span>
               </div>
             </div>
+          </div>
 
-            {/* Database physical table browser */}
-            <div className="col-span-2 space-y-4">
-              <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
+          {/* ② 目录列表（heading 跟随下面 fs / 结构 分支渲染） */}
+          <div className="space-y-3">
+            <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
+              <span className="flex items-center gap-1.5">
+                <LucideIcon name="FolderTree" size={13} className={styles.accentText} />
                 <span>{t("dw.txt.42bc1b")}</span>
-                <div className="flex items-center gap-3">
-                  <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
-                    {' '}
-                    {isFsConn
-                      ? `(${folderFiles.length} ${t("dw.folder.fileCountUnit")})`
-                      : `${t("dw.ontologyReadonly")} (${conn.tablesAvailable.length} ${t("dw.tablesUnit")})`}
-                  </span>
-                  {!isFsConn && (
+              </span>
+              <div className="flex items-center gap-3">
+                <span className={`text-[10px] ${styles.cardTextMuted} font-normal`}>
+                  {isFsConn
+                    ? `(${folderFiles.length} ${t("dw.folder.fileCountUnit")})`
+                    : `${t("dw.ontologyReadonly")} (${conn.tablesAvailable.length} ${t("dw.tablesUnit")})`}
+                </span>
+                {!isFsConn && (
                   <button
                     onClick={() => setShowVersionCompare(true)}
                     disabled={loadingTables}
@@ -627,169 +414,155 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     <GitCompare size={12} />
                     <span>{t("dw.histCompare.button")}</span>
                   </button>
-                  )}
+                )}
+                {isFsConn && (
                   <button
-                    onClick={async () => {
-                      if (isFsConn) {
-                        await refreshFolderFiles(conn.id);
-                        return;
-                      }
-                      setLoadingTables(true);
-                      const r = await triggerMetadataCollect(conn.id);
-                      if (r?.taskId) {
-                        let done = false;
-                        for (let i = 0; i < 60 && !done; i++) {
-                          await new Promise(res => setTimeout(res, 1000));
-                          const st = await fetchCollectStatus(r.taskId);
-                          if (st?.status === 'SUCCEEDED' || st?.status === 'FAILED' || st?.status === 'error') {
-                            done = true;
-                            if (st.status === 'SUCCEEDED') {
-                              const fresh = await fetchDataSourceResources(conn.id);
-                              setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
-                              // 采集成功后刷新差异记录列表
-                              fetchCollectDiff(conn.id, 5).then(diffs => setDiffRecords(diffs || [])).catch(() => {});
-                              // 根据采集结果给用户准确反馈
-                              if (st.totalTables === 0 && fresh.length === 0) {
-                                showToast('warning', `${t('dw.conn.refreshTables')} → ${t('dw.conn.noTablesFound') || '采集完成但未发现可用数据表，请检查数据源连接配置'}`);
-                              } else {
-                                showToast('success', `${t('dw.conn.refreshTables')} → ${fresh.length} ${t('dw.tablesUnit') || '张表'}`);
-                              }
-                            } else if (st.status === 'FAILED') {
-                              showToast('error', `${t('dw.conn.refreshTables')} → ${st.errorMessage || t('dw.conn.collectFailed') || '采集任务执行失败'}`);
-                              // 任务失败也尝试重拉目录（可能之前已有数据）
-                              const fresh = await fetchDataSourceResources(conn.id);
-                              setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
-                            }
-                            break;
-                          }
-                        }
-                        // 轮询超时
-                        if (!done) {
-                          const fresh = await fetchDataSourceResources(conn.id);
-                          setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
-                          showToast('info', t('dw.conn.collectTimeout') || '采集任务超时，已拉取当前可用目录');
-                        }
-                      } else {
-                        const fresh = await fetchDataSourceResources(conn.id);
-                        setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: fresh } : c));
-                        if (!r) {
-                          showToast('error', t('dw.conn.collectSubmitFailed') || '采集任务提交失败');
-                        }
-                      }
-                      setLoadingTables(false);
-                    }}
-                    disabled={loadingTables}
+                    onClick={() => refreshFolderFiles(conn.id)}
+                    disabled={folderFilesLoading}
                     className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}
                     title={t("dw.conn.refreshTables")}
                   >
-                    <LucideIcon name="RefreshCw" size={12} className={loadingTables ? 'animate-spin' : ''} />
+                    <LucideIcon name="RefreshCw" size={12} className={folderFilesLoading ? 'animate-spin' : ''} />
                     <span>{t("dw.conn.refreshTables")}</span>
                   </button>
-                </div>
-              </h4>
+                )}
+              </div>
+            </h4>
 
-              {/* 采集差异记录 — Task2 版本差异可视化 */}
-              {diffRecords.length > 0 && (
-                <div className={`mb-4 border ${styles.cardBorder} rounded-lg overflow-hidden ${styles.appBg}`}>
-                  <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.sidebarBg}/60 flex items-center justify-between`}>
-                    <span className={`text-[10px] font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-                      <LucideIcon name="GitCommit" size={12} className={styles.accentText} />
-                      {t('dw.strategy.diffTitle') || '采集差异记录'}
-                    </span>
-                    {loadingDiff && <LucideIcon name="Loader2" size={11} className="animate-spin" />}
-                  </div>
-                  <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
-                    {diffRecords.map((rec, idx) => (
-                      <div key={idx} className={`group`}>
-                        {showDiffDetail === idx ? (
-                          <button
-                            onClick={() => setShowDiffDetail(null)}
-                            className="w-full text-left px-3 py-2 text-[10px] font-mono whitespace-pre-wrap break-words cursor-pointer hover:bg-opacity-50 transition-colors"
-                            style={{ background: styles.cardBg }}
-                          >
-                            {rec.diffMarkdown || '(空)'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setShowDiffDetail(idx)}
-                            className="w-full text-left px-3 py-2 transition-colors hover:bg-opacity-50 cursor-pointer"
-                            style={{ background: styles.cardBg }}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
-                                {rec.collectedAt && new Date(rec.collectedAt).toLocaleString()}
-                              </span>
-                              <span className={`text-[10px] font-mono ${styles.cardText}`}>{rec.diffSummary || ''}</span>
+            {/* 采集差异记录 — 仅结构源有差异记录（fs 文件无需版本对比） */}
+            {!isFsConn && diffRecords.length > 0 && (
+              <div className={`border ${styles.cardBorder} rounded-lg overflow-hidden ${styles.appBg}`}>
+                <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.sidebarBg}/60 flex items-center justify-between`}>
+                  <span className={`text-[10px] font-semibold ${styles.cardText} flex items-center gap-1.5`}>
+                    <LucideIcon name="GitCommit" size={12} className={styles.accentText} />
+                    {t('dw.strategy.diffTitle') || '采集差异记录'}
+                  </span>
+                  {loadingDiff && <LucideIcon name="Loader2" size={11} className="animate-spin" />}
+                </div>
+                <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
+                  {diffRecords.map((rec, idx) => (
+                    <div key={idx} className={`group`}>
+                      {showDiffDetail === idx ? (
+                        <button
+                          onClick={() => setShowDiffDetail(null)}
+                          className="w-full text-left px-3 py-2 text-[10px] font-mono whitespace-pre-wrap break-words cursor-pointer hover:bg-opacity-50 transition-colors"
+                          style={{ background: styles.cardBg }}
+                        >
+                          {rec.diffMarkdown || '(空)'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowDiffDetail(idx)}
+                          className="w-full text-left px-3 py-2 transition-colors hover:bg-opacity-50 cursor-pointer"
+                          style={{ background: styles.cardBg }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+                              {rec.collectedAt && new Date(rec.collectedAt).toLocaleString()}
+                            </span>
+                            <span className={`text-[10px] font-mono ${styles.cardText}`}>{rec.diffSummary || ''}</span>
+                          </div>
+                          {rec.gitCommit && (
+                            <div className={`text-[9px] font-mono ${styles.cardTextMuted} mt-1 flex items-center gap-1`}>
+                              <LucideIcon name="GitBranch" size={9} />
+                              {rec.gitCommit}
                             </div>
-                            {rec.gitCommit && (
-                              <div className={`text-[9px] font-mono ${styles.cardTextMuted} mt-1 flex items-center gap-1`}>
-                                <LucideIcon name="GitBranch" size={9} />
-                                {rec.gitCommit}
-                              </div>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {isFsConn ? (
-                folderFilesLoading ? (
-                  <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
-                    <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
-                    {t('dw.loading') || 'Loading...'}
-                  </div>
-                ) : folderFiles.length === 0 ? (
-                  <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
-                    <LucideIcon name="FolderOpen" size={24} className={`${styles.warningText}`} />
-                    <span>{t('dw.folder.empty')}</span>
-                    <span>{t('dw.folder.emptyHint')}</span>
-                  </div>
-                ) : (
-                  <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden`}>
-                    <table className="w-full text-left text-[11px]">
-                      <thead className={`${styles.sidebarBg} ${styles.cardTextMuted}`}>
-                        <tr>
-                          <th className="px-3 py-2 font-semibold">{t('dw.folder.colName')}</th>
-                          <th className="px-3 py-2 font-semibold w-24">{t('dw.folder.colSize')}</th>
-                          <th className="px-3 py-2 font-semibold w-44">{t('dw.folder.colModified')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {folderFiles.map(f => (
-                          <tr key={f.name} className={`border-t ${styles.cardBorder}`}>
-                            <td className={`px-3 py-1.5 font-mono truncate max-w-0 ${styles.cardText}`} title={f.name}>{f.name}</td>
-                            <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>{fmtBytes(f.size)}</td>
-                            <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>
-                              {f.lastModified ? new Date(f.lastModified).toLocaleString() : '-'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              ) : loadingTables ? (
-                 <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
-                   <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
-                   {t('dw.loading') || 'Loading...'}
-                 </div>
-              ) : conn.tablesAvailable.length === 0 ? (
-                 <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
-                  <LucideIcon name="AlertTriangle" size={24} className={`${styles.warningText}`} />
-                  <span>{t("dw.txt.2ce9e0")}</span>
-                  <span>{t("dw.txt.44e8b3")}</span>
+            {/* fs 文件列表 / 结构表列表 */}
+            {isFsConn ? (
+              folderFilesLoading ? (
+                <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
+                  <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
+                  {t('dw.loading') || 'Loading...'}
+                </div>
+              ) : folderFiles.length === 0 ? (
+                <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
+                  <LucideIcon name="FolderOpen" size={24} className={`${styles.warningText}`} />
+                  <span>{t('dw.folder.empty')}</span>
+                  <span>{t('dw.folder.emptyHint')}</span>
                 </div>
               ) : (
-                <>
+                <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden`}>
+                  <table className="w-full text-left text-[11px]">
+                    <thead className={`${styles.sidebarBg} ${styles.cardTextMuted}`}>
+                      <tr>
+                        <th className="px-3 py-2 font-semibold w-8">
+                          <input
+                            type="checkbox"
+                            className="accent-indigo-500"
+                            checked={folderFiles.length > 0 && folderFiles.every(f => selectedNames.has(f.name))}
+                            onChange={e => {
+                              const target = new Set<string>();
+                              if (e.target.checked) folderFiles.forEach(f => target.add(f.name));
+                              setSelectedNames(target);
+                            }}
+                            title={t('dw.ingest.selectAll') || '全选'}
+                          />
+                        </th>
+                        <th className="px-3 py-2 font-semibold">{t('dw.folder.colName')}</th>
+                        <th className="px-3 py-2 font-semibold w-24">{t('dw.folder.colSize')}</th>
+                        <th className="px-3 py-2 font-semibold w-44">{t('dw.folder.colModified')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {folderFiles.map(f => (
+                        <tr key={f.name} className={`border-t ${styles.cardBorder}`}>
+                          <td className={`px-2 py-1.5 ${styles.cardText}`}>
+                            <input
+                              type="checkbox"
+                              className="accent-indigo-500"
+                              checked={selectedNames.has(f.name)}
+                              onChange={e => {
+                                const next = new Set(selectedNames);
+                                if (e.target.checked) next.add(f.name); else next.delete(f.name);
+                                setSelectedNames(next);
+                              }}
+                            />
+                          </td>
+                          <td className={`px-3 py-1.5 font-mono truncate max-w-0 ${styles.cardText}`} title={f.name}>{f.name}</td>
+                          <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>{fmtBytes(f.size)}</td>
+                          <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>
+                            {f.lastModified ? new Date(f.lastModified).toLocaleString() : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : loadingTables ? (
+              <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
+                <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
+                {t('dw.loading') || 'Loading...'}
+              </div>
+            ) : conn.tablesAvailable.length === 0 ? (
+              <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
+                <LucideIcon name="AlertTriangle" size={24} className={`${styles.warningText}`} />
+                <span>{t("dw.txt.2ce9e0")}</span>
+                <span>{t("dw.txt.44e8b3")}</span>
+              </div>
+            ) : (
+              <>
                 <div className="space-y-4">
                   {conn.tablesAvailable.slice((tablePage - 1) * tablePageSize, tablePage * tablePageSize).map(tbl => (
                     <TableExpandRow
                       key={tbl.name}
                       connId={conn.id}
                       table={tbl}
+                      selected={selectedNames.has(tbl.name)}
+                      onToggle={() => {
+                        const next = new Set(selectedNames);
+                        if (next.has(tbl.name)) next.delete(tbl.name); else next.add(tbl.name);
+                        setSelectedNames(next);
+                      }}
                     />
                   ))}
                 </div>
@@ -816,7 +589,257 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                     </button>
                   </div>
                 )}
+              </>
+            )}
+          </div>
+
+          {/* ③ 采集方案（Tab：元数据采集 | 数据采集，紧贴目录列表下方） */}
+          <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}`}>
+            {/* Tab 条 */}
+            <div className={`flex border-b ${styles.cardBorder} ${styles.sidebarBg}/60`}>
+              {(['metadata', 'ingest'] as const).map(tabKey => {
+                const active = planTab === tabKey;
+                const label = tabKey === 'metadata' ? t("dw.strategy.section") : t("dw.ingest.title");
+                return (
+                  <button
+                    key={tabKey}
+                    onClick={() => setPlanTab(tabKey)}
+                    className={`px-4 py-2.5 text-xs transition-colors cursor-pointer font-medium border-b-2 ${
+                      active
+                        ? `border-current ${styles.accentText} ${styles.cardText}`
+                        : `border-transparent ${styles.cardTextMuted} hover:${styles.accentText}`
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab 内容 */}
+            <div className="p-4 space-y-3">
+              {planTab === 'metadata' && (
+                <>
+                  <div className="space-y-2">
+                    <div>
+                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.trigger")}</label>
+                      <select
+                        value={conn.strategy?.trigger || 'MANUAL'}
+                        onChange={async e => {
+                          const newTrigger = e.target.value;
+                          const newCount = conn.strategy?.countMethod || 'OFF';
+                          const newCron = conn.strategy?.scheduleCron;
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, trigger: newTrigger as any } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
+                          // PMO-37 增强：ON_SAVE 自动模式 → 提交完整元数据采集任务
+                          if (newTrigger === 'ON_SAVE' && collectTaskId === null) {
+                            setCollecting(true);
+                            try {
+                              const r = await triggerCollectSync(conn.id);
+                              if (r?.taskId) {
+                                setCollectTaskId(r.taskId);
+                                setCollectStatus(null);
+                                showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
+                              } else {
+                                showToast('warning', t('dw.strategy.autoCollectFallback') || '自动采集任务提交失败，已回退轻量拉取');
+                                const fresh = await fetchDataSourceResources(conn.id);
+                                const tables = Array.isArray(fresh) ? fresh : [];
+                                setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
+                              }
+                            } finally {
+                              setCollecting(false);
+                            }
+                          }
+                        }}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+                      >
+                        {STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
+                      </select>
+                    </div>
+                    {/* 定时采集策略 — 选择 ON_SCHEDULE 时显示 cron 配置 */}
+                    {conn.strategy?.trigger === 'ON_SCHEDULE' && (
+                      <div className={`space-y-1.5 p-2 rounded-lg border border-dashed ${styles.cardBorder}`}>
+                        <label className={`text-[10px] ${styles.cardTextMuted} block`}>{t("dw.strategy.cronLabel")}</label>
+                        <select
+                          value={conn.strategy?.scheduleCron || '0 0 * * *'}
+                          onChange={async e => {
+                            const newCron = e.target.value;
+                            const newTrigger = conn.strategy?.trigger || 'ON_SCHEDULE';
+                            const newCount = conn.strategy?.countMethod || 'OFF';
+                            setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, scheduleCron: newCron } } : c));
+                            await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
+                            showToast('success', t('dw.strategy.updateSuccess') || '策略已保存');
+                          }}
+                          className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText} font-mono`}
+                        >
+                          <option value="0 0 * * *">{t('dw.strategy.cron.daily')}</option>
+                          <option value="0 */6 * * *">{t('dw.strategy.cron.sixHourly')}</option>
+                          <option value="0 0 */2 * *">{t('dw.strategy.cron.twoDays')}</option>
+                          <option value="0 0 * * 1">{t('dw.strategy.cron.weekly')}</option>
+                        </select>
+                        <p className={`text-[10px] ${styles.cardTextMuted} font-mono`}>cron: {t('dw.strategy.cron.format')}</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t("dw.strategy.count")}</label>
+                      <select
+                        value={conn.strategy?.countMethod || 'OFF'}
+                        onChange={async e => {
+                          const newCount = e.target.value;
+                          const newTrigger = conn.strategy?.trigger || 'MANUAL';
+                          setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, countMethod: newCount as any } } : c));
+                          await saveMetadataStrategy(conn.id, newTrigger, newCount);
+                        }}
+                        className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+                      >
+                        {COUNT_METHOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.key)}</option>)}
+                      </select>
+                    </div>
+                    <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("dw.strategy.hint")}</p>
+                  </div>
+
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {/* 保存参数：仅保存策略配置并同步一次资源，不触发采集任务 */}
+                    <button
+                      disabled={collecting || collectTaskId !== null}
+                      onClick={async () => {
+                        try {
+                          const ok = await saveMetadataStrategy(conn.id,
+                            conn.strategy?.trigger || 'MANUAL',
+                            conn.strategy?.countMethod || 'OFF',
+                            conn.strategy?.scheduleCron);
+                          // PMO-37 增强：ON_SAVE 自动模式的"保存参数" → 提交完整采集任务
+                          if (ok && conn.strategy?.trigger === 'ON_SAVE' && collectTaskId === null) {
+                            setCollecting(true);
+                            try {
+                              const r = await triggerCollectSync(conn.id);
+                              if (r?.taskId) {
+                                setCollectTaskId(r.taskId);
+                                setCollectStatus(null);
+                                showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
+                              } else {
+                                const fresh = await fetchDataSourceResources(conn.id);
+                                const tables = Array.isArray(fresh) ? fresh : [];
+                                setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
+                                showToast('warning', t('dw.strategy.autoCollectFallback') || '参数已保存，自动采集任务提交失败已回退轻量拉取');
+                              }
+                            } finally {
+                              setCollecting(false);
+                            }
+                          } else if (ok) {
+                            showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
+                          } else {
+                            showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
+                          }
+                        } catch (e) {
+                          console.warn('[data-workbench] save params failed:', e);
+                          showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
+                        }
+                      }}
+                      className={`px-2 py-1 text-[11px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1`}
+                    >
+                      <LucideIcon name="Save" size={11} />
+                      {t('dw.strategy.saveParams') || '保存参数'}
+                    </button>
+
+                    {/* 立即采集（结构源主档口，走 triggerCollectSync 异步任务；fs 走 collectFolderFiles 全量采集） */}
+                    <button
+                      disabled={collecting || collectTaskId !== null}
+                      onClick={async () => {
+                        setCollecting(true);
+                        try {
+                          if (conn.type === 'fs') {
+                            const files = folderFiles.length > 0 ? folderFiles : await listFolderFiles(conn.id);
+                            if (files.length === 0) {
+                              showToast('info', t('dw.folder.collectNoFiles'));
+                              return;
+                            }
+                            const docId = `doc_${conn.id.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`;
+                            const res = await collectFolderFiles({
+                              datasourceId: conn.id,
+                              docId,
+                              fileNames: files.map(f => f.name),
+                            });
+                            if (res.failed > 0) {
+                              const firstErr = res.items?.find(i => i.status !== 'SUCCESS')?.error;
+                              showToast('error', t('dw.folder.collectPartial')
+                                .replace('{ok}', String(res.collected)).replace('{fail}', String(res.failed))
+                                + (firstErr ? `（${firstErr}）` : ''));
+                            } else {
+                              showToast('success', t('dw.folder.collectSuccess')
+                                .replace('{count}', String(res.collected)));
+                            }
+                            await refreshFolderFiles(conn.id);
+                            return;
+                          }
+                          // 同步立即采集：走 triggerCollectSync（后端任务引擎异步执行 + 前端 2s 轮询进度）
+                          const r = await triggerCollectSync(conn.id);
+                          if (r?.taskId) {
+                            setCollectTaskId(r.taskId);
+                            setCollectStatus(null);
+                            showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
+                          } else {
+                            showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
+                          }
+                        } finally {
+                          setCollecting(false);
+                        }
+                      }}
+                      className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
+                    >
+                      <LucideIcon name="RefreshCw" size={11} className={(collecting || collectTaskId !== null) ? 'animate-spin' : ''} />
+                      {(collecting || collectTaskId !== null) ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
+                    </button>
+
+                    {/* 上次采集时间展示 */}
+                    <span className={`text-[10px] ${styles.cardTextMuted}`}>
+                      {t("dw.strategy.lastCollect")}:{' '}
+                      {conn.metadataConfig?.lastCollectTime
+                        ? new Date(String(conn.metadataConfig.lastCollectTime)).toLocaleString()
+                        : t('dw.strategy.neverCollected')}
+                    </span>
+                  </div>
+
+                  {/* 活跃采集任务状态指示器 — 对接异步任务中心 */}
+                  {activeTasks.length > 0 && (
+                    <div className={`space-y-1.5 p-2 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>
+                      <div className={`flex items-center gap-2 text-[11px]`}>
+                        <LucideIcon name="Loader2" size={13} className={`animate-spin ${styles.accentText}`} />
+                        <span className={`font-semibold ${styles.cardText}`}>
+                          {t('dw.strategy.taskRunning') || '任务执行中'}
+                        </span>
+                      </div>
+                      {activeTasks.map((task, i) => (
+                        <div key={task.taskId} className={`text-[10px] font-mono ${styles.cardTextMuted} flex items-center gap-2`}>
+                          <span className={`${task.status === 'RUNNING' ? styles.successText : styles.warningText} font-bold`}>
+                            {task.status}
+                          </span>
+                          <span>{task.taskId.slice(0, 8)}...{task.progress}%</span>
+                          {task.startTime && (
+                            <span className="opacity-70">{new Date(task.startTime).toLocaleTimeString()}</span>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => window.open('#/task-center', '_blank')}
+                        className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer flex items-center gap-1`}
+                      >
+                        <LucideIcon name="ExternalLink" size={10} />
+                        {t('dw.strategy.viewInTaskCenter') || '在任务中心查看'}
+                      </button>
+                    </div>
+                  )}
                 </>
+              )}
+
+              {planTab === 'ingest' && (
+                <IngestSubPanel
+                  conn={conn}
+                  selectedNames={selectedNames}
+                  setSelectedNames={setSelectedNames}
+                  isFs={isFsConn}
+                  showToast={showToast}
+                />
               )}
             </div>
           </div>
@@ -891,7 +914,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
 //   面积以 max-height + opacity 过渡实现（340ms cubic-bezier）。
 //   再次点击 ChevecDown 图标（轴线反转为 ChevronUp）→ 收起隐藏。
 // 主题感知 (useTheme)，i18n (useLanguage)，禁 hardcoded 中文/颜色。
-function TableExpandRow({ connId, table }: { connId: string; table: TableInfo }) {
+function TableExpandRow({ connId, table, selected, onToggle }: { connId: string; table: TableInfo; selected?: boolean; onToggle?: () => void }) {
   const { styles } = useTheme();
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
@@ -949,6 +972,15 @@ function TableExpandRow({ connId, table }: { connId: string; table: TableInfo })
         className={`${styles.sidebarBg}/70 px-4 py-2 flex items-center justify-between gap-2 border-b ${styles.cardBorder}`}
       >
         <div className="flex items-center gap-2 text-xs flex-1 min-w-0">
+          {onToggle && (
+            <input
+              type="checkbox"
+              className="accent-indigo-500 shrink-0"
+              checked={Boolean(selected)}
+              onChange={onToggle}
+              title={t('dw.ingest.selectTables') || '选择采集'}
+            />
+          )}
           <LucideIcon name="Table" size={13} className={styles.accentText} />
           <span className={`font-bold font-mono ${styles.cardText} truncate`}>{table.name}</span>
           {table.resourceId && (

@@ -19,10 +19,15 @@ import {
   fetchDatalakeStatus, initDatalake,
   runDataIngest, fetchIngestStatus,
   saveIngestSchedule, fetchIngestSchedule,
+  collectFolderFiles,
 } from '../api';
 
 interface Props {
   conn: DataConnection;
+  selectedNames: Set<string>;
+  setSelectedNames: (v: Set<string>) => void;
+  /** 文件夹数据源（fs）：采集调用 collectFolderFiles 而非 runDataIngest */
+  isFs?: boolean;
   showToast: (type: string, message: string) => void;
 }
 
@@ -41,7 +46,7 @@ const CRON_OPTIONS: { value: string; labelKey: string }[] = [
   { value: '0 0 * * 1', labelKey: 'dw.strategy.cron.weekly' },
 ];
 
-const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
+const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames, isFs, showToast }) => {
   const { styles } = useTheme();
   const { t } = useLanguage();
 
@@ -49,9 +54,8 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
   const [datalake, setDatalake] = useState<{ endpoint?: string; bucket?: string; status?: string; initialized?: boolean } | null>(null);
   const [initLoading, setInitLoading] = useState(false);
 
-  // ── 表选择 ──
+  // ── 表选择（由父组件 ConnectionsTab 持有，与目录列表复选框共享） ──
   const tables = useMemo(() => conn.tablesAvailable ?? [], [conn.tablesAvailable]);
-  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
 
   // ── 即时采集 ──
   const [running, setRunning] = useState(false);
@@ -71,8 +75,10 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
       if (cancelled || !s) return;
       setScheduleEnabled(Boolean(s.enabled));
       if (s.cron) setCron(s.cron);
-      if (Array.isArray(s.tables) && s.tables.length > 0) {
-        setSelectedTables(new Set(s.tables));
+      // 父组件持有 selectedNames；仅在历史侧有表且父侧未选过时载入
+      const current = selectedNames;
+      if (Array.isArray(s.tables) && s.tables.length > 0 && current.size === 0) {
+        setSelectedNames(new Set(s.tables));
       }
     });
     return () => { cancelled = true; };
@@ -82,15 +88,16 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
   useEffect(() => () => { if (pollTimer.current) clearInterval(pollTimer.current); }, []);
 
   const toggleTable = (name: string) => {
-    setSelectedTables(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      return next;
-    });
+    const next = new Set(selectedNames);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setSelectedNames(next);
   };
 
   const toggleAll = () => {
-    setSelectedTables(prev => (prev.size === tables.length ? new Set() : new Set(tables.map(tb => (typeof tb === 'string' ? tb : (tb.name ?? ''))))));
+    const allNames = tables.length > 0
+      ? tables.map(tb => (typeof tb === 'string' ? tb : (tb.name ?? '')))
+      : Array.from(selectedNames);
+    setSelectedNames(selectedNames.size === allNames.length ? new Set() : new Set(allNames));
   };
 
   const pollTask = (taskId: string, table: string) => {
@@ -109,7 +116,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
   };
 
   const handleRun = async () => {
-    const list = Array.from(selectedTables);
+    const list = Array.from(selectedNames);
     if (list.length === 0) {
       showToast('warning', t('dw.ingest.noTableSelected') || '请先勾选要采集的表');
       return;
@@ -117,6 +124,26 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
     setRunning(true);
     setTasks([]);
     try {
+      if (isFs) {
+        // 文件夹数据源：逐文件清单采集到近源层（非结构化）
+        const docId = `ingest_${conn.id.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`;
+        const res = await collectFolderFiles({
+          datasourceId: conn.id,
+          docId,
+          fileNames: list,
+        });
+        setTasks(list.map(f => ({ table: f, taskId: docId, status: res.failed > 0 && res.collected === 0 ? 'FAILED' : 'SUCCEEDED' })));
+        if (res.failed > 0) {
+          const firstErr = res.items?.find(i => i.status !== 'SUCCESS')?.error;
+          showToast('error', (t('dw.folder.collectPartial') || '采集完成：{ok} 成功 / {fail} 失败')
+            .replace('{ok}', String(res.collected)).replace('{fail}', String(res.failed))
+            + (firstErr ? `（${firstErr}）` : ''));
+        } else {
+          showToast('success', (t('dw.folder.collectSuccess') || '已采集 {count} 个文件到近源层').replace('{count}', String(res.collected)));
+        }
+        return;
+      }
+      // 结构数据源：POST /api/v1/datanet/ingest/run 走采集型管道到近源层
       const r = await runDataIngest(conn.id, list);
       if (!r || !r.submitted) {
         showToast('error', t('dw.ingest.runFailed') || '采集任务提交失败');
@@ -150,7 +177,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
   };
 
   const handleSaveSchedule = async () => {
-    const list = Array.from(selectedTables);
+    const list = Array.from(selectedNames);
     if (list.length === 0) {
       showToast('warning', t('dw.ingest.noTableSelected') || '请先勾选要采集的表');
       return;
@@ -202,42 +229,24 @@ const IngestSubPanel: React.FC<Props> = ({ conn, showToast }) => {
         {t('dw.ingest.targetHint') || '默认写入数据湖 MinIO 近源库（datalake/数据源/表_时间戳.csv），目标可通过管道编辑器自定义。'}
       </p>
 
-      {/* 表多选 */}
-      <div className={`space-y-1`}>
-        <div className={`flex items-center justify-between`}>
-          <span className={`text-[10px] ${styles.cardText}`}>
-            {t('dw.ingest.selectTables') || '选择采集表'} ({selectedTables.size}/{tables.length})
-          </span>
-          <button onClick={toggleAll} className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer`}>
-            {selectedTables.size === tables.length && tables.length > 0
-              ? (t('dw.ingest.clearAll') || '清空')
-              : (t('dw.ingest.selectAll') || '全选')}
-          </button>
-        </div>
-        {tables.length === 0 ? (
-          <div className={`text-[10px] ${styles.cardTextMuted} p-2 rounded border border-dashed ${styles.cardBorder}`}>
-            {t('dw.ingest.noTablesHint') || '暂无表目录：请先执行上方「元数据采集」，或点击「立即采集」拉取后选择。'}
-          </div>
-        ) : (
-          <div className={`max-h-32 overflow-y-auto space-y-0.5 p-1 rounded border ${styles.cardBorder}`}>
-            {tables.slice(0, 50).map((tb, i) => {
-              const name = typeof tb === 'string' ? tb : ((tb as { name?: string }).name ?? `table_${i}`);
-              return (
-                <label key={name} className={`flex items-center gap-1.5 text-[10px] cursor-pointer hover:${styles.appBg} rounded px-1 py-0.5`}>
-                  <input type="checkbox" checked={selectedTables.has(name)} onChange={() => toggleTable(name)} className="accent-indigo-500" />
-                  <span className="font-mono truncate">{name}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
+      {/* 选中数量提示（实际复选框在目录列表区渲染） */}
+      <div className={`flex items-center gap-2`}>
+        <span className={`text-[10px] ${styles.cardText}`}>
+          {t('dw.ingest.selectTables') || '选择采集表'}
+          <span className={`ml-1 ${styles.cardTextMuted} font-mono`}>({selectedNames.size}/{tables.length || selectedNames.size})</span>
+        </span>
+        <button onClick={toggleAll} className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer`}>
+          {selectedNames.size > 0 && selectedNames.size >= tables.length && tables.length > 0
+            ? (t('dw.ingest.clearAll') || '清空')
+            : (t('dw.ingest.selectAll') || '全选')}
+        </button>
       </div>
 
       {/* 操作按钮 */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={handleRun}
-          disabled={running || selectedTables.size === 0}
+          disabled={running || selectedNames.size === 0}
           className={`px-2 py-1 text-[10px] font-semibold rounded transition flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
         >
           <LucideIcon name="Play" size={11} className={running ? 'animate-pulse' : ''} />
