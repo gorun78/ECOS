@@ -121,11 +121,97 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
   };
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: styles.appBg, color: styles.cardText }}>
-      {/* 左侧导航 */}
-      <nav className="w-64 flex-shrink-0 border-r flex flex-col" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        {/* Header */}
-        <div className="h-14 flex items-center gap-2 px-4 border-b" style={{ borderColor: styles.cardBorder }}>
+    <div className="flex-1 min-h-0 flex flex-col" style={{ background: styles.appBg, color: styles.cardText }}>
+      {/* Desktop: left sidebar (md+) */}
+      <div className="hidden md:flex flex-1 min-h-0">
+        <aside className="w-64 flex-shrink-0 border-r flex flex-col" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+          {/* Header */}
+          <div className="h-14 flex items-center gap-2 px-4 border-b" style={{ borderColor: styles.cardBorder }}>
+            <button
+              onClick={onBack}
+              className="p-1 rounded hover:opacity-70"
+              style={{ color: styles.cardTextMuted }}
+              aria-label={t('knowledge.back')}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <div className="font-semibold text-sm leading-tight">
+                <span className="tracking-[0.25em] uppercase">{t('knowledge.navigation.title')}</span>
+              </div>
+              <div className="text-[10px] font-mono tracking-wider uppercase opacity-60">{t('knowledge.navigation.subtitle')}</div>
+            </div>
+          </div>
+
+          {/* Tab 列表 */}
+          <div className="flex-1 overflow-y-auto py-3">
+            {groups.map(group => {
+              const groupTabs = group.tabs as readonly (typeof group.tabs)[number][];
+              return (
+                <div key={group.id} className="mb-3">
+                  <div className="px-4 pb-1.5 text-[10px] font-mono tracking-wider uppercase opacity-50">
+                    {t(`knowledge.group.${group.id}`)}
+                  </div>
+                  {groupTabs.map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabSwitch(tab.id)}
+                        className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors border-l-2 ${
+                          isActive ? `${styles.accentBg} ${styles.accentBorder} font-semibold` : `border-transparent hover:opacity-70`
+                        }`}
+                        style={isActive ? { color: '#fff' } : { color: styles.cardText }}
+                      >
+                        <Star className="w-3.5 h-3.5 opacity-50" style={isActive ? { color: '#fff' } : {}} />
+                        <span className="truncate">
+                          {t(`knowledge.nav.${tab.id}`)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 底部状态 */}
+          <div className="px-4 py-3 border-t text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ borderColor: styles.cardBorder }}>
+            <div className="flex items-center gap-1.5">
+              <span className={styles.successText}>●</span>
+              <span>{t('knowledge.engine')}</span>
+            </div>
+            <div className="mt-0.5 opacity-70">KB · Cogn · Sec · Data</div>
+          </div>
+        </aside>
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {/* Top bar */}
+          <div
+            className="h-14 flex-shrink-0 flex items-center justify-between px-6 border-b"
+            style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <TabIcon className="w-4 h-4" />
+              <span className="font-medium">{activeGroup ? t(`knowledge.group.${activeGroup.id}`) : ''}</span>
+              <span className="text-xs opacity-50">/</span>
+              <span className="font-semibold">{t(`knowledge.nav.${activeTab}`)}</span>
+            </div>
+            <div className="text-[10px] font-mono tracking-wider uppercase opacity-60">
+              {t('knowledge.nav.updated_tag')}
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-6">
+            <ActiveTabComponent showToast={showToast} />
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile: horizontal scroll tab bar (below md) */}
+      <div className="md:hidden flex flex-col h-full min-h-0">
+        {/* Mobile Header */}
+        <div className="h-14 flex-shrink-0 flex items-center gap-2 px-4 border-b" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
           <button
             onClick={onBack}
             className="p-1 rounded hover:opacity-70"
@@ -138,75 +224,42 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
             <div className="font-semibold text-sm leading-tight">
               <span className="tracking-[0.25em] uppercase">{t('knowledge.navigation.title')}</span>
             </div>
-            <div className="text-[10px] font-mono tracking-wider uppercase opacity-60">{t('knowledge.navigation.subtitle')}</div>
           </div>
         </div>
 
-        {/* Tab 列表 */}
-        <div className="flex-1 overflow-y-auto py-3">
-          {groups.map(group => {
-            const groupTabs = group.tabs as readonly (typeof group.tabs)[number][];
-            return (
-              <div key={group.id} className="mb-3">
-                <div className="px-4 pb-1.5 text-[10px] font-mono tracking-wider uppercase opacity-50">
-                  {t(`knowledge.group.${group.id}`)}
-                </div>
-                {groupTabs.map(tab => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleTabSwitch(tab.id)}
-                      className={`w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors border-l-2 ${
-                        isActive ? `${styles.accentBg} ${styles.accentBorder} font-semibold` : `border-transparent hover:opacity-70`
-                      }`}
-                      style={isActive ? { color: '#fff' } : { color: styles.cardText }}
-                    >
-                      <Star className="w-3.5 h-3.5 opacity-50" style={isActive ? { color: '#fff' } : {}} />
-                      <span className="truncate">
-                        {t(`knowledge.nav.${tab.id}`)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 底部状态 */}
-        <div className="px-4 py-3 border-t text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ borderColor: styles.cardBorder }}>
-          <div className="flex items-center gap-1.5">
-            <span className={styles.successText}>●</span>
-            <span>{t('knowledge.engine')}</span>
-          </div>
-          <div className="mt-0.5 opacity-70">KB · Cogn · Sec · Data</div>
-        </div>
-      </nav>
-
-      {/* 右侧内容 */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div
-          className="h-14 flex-shrink-0 flex items-center justify-between px-6 border-b"
-          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
-        >
-          <div className="flex items-center gap-2 text-sm">
-            <TabIcon className="w-4 h-4" />
-            <span className="font-medium">{activeGroup ? t(`knowledge.group.${activeGroup.id}`) : ''}</span>
-            <span className="text-xs opacity-50">/</span>
-            <span className="font-semibold">{t(`knowledge.nav.${activeTab}`)}</span>
-          </div>
-          <div className="text-[10px] font-mono tracking-wider uppercase opacity-60">
-            {t('knowledge.nav.updated_tag')}
+        {/* Horizontal scroll tab bar — flat, all 14 tabs in a single horizontal row */}
+        <div className="flex-shrink-0 border-b overflow-x-auto whitespace-nowrap -mx-1 px-1" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+          <div className="flex flex-nowrap gap-0.5 items-end pt-3 pb-0">
+            {groups.flatMap(group =>
+              (group.tabs as readonly (typeof group.tabs)[number][]).map(tab => {
+                const isActive = activeTab === tab.id;
+                const TabIconComponent = ICON_MAP[tab.icon] || LayoutDashboard;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabSwitch(tab.id)}
+                    className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${
+                      isActive
+                        ? `bg-transparent border-transparent ${styles.cardText} font-bold ${styles.accentBorder} border-t-indigo-500 dark:border-t-emerald-500 dark:text-emerald-400`
+                        : `border-transparent opacity-70 hover:opacity-100 ${styles.cardTextMuted}`
+                    }`}
+                  >
+                    <TabIconComponent className="w-3.5 h-3.5 shrink-0" />
+                    {t(`knowledge.nav.${tab.id}`)}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-6">
-          <ActiveTabComponent showToast={showToast} />
-        </div>
-      </main>
+        {/* Content area */}
+        <main className="flex-1 flex flex-col overflow-hidden w-full min-w-0">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4">
+            <ActiveTabComponent showToast={showToast} />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

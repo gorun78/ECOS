@@ -110,7 +110,7 @@ export default function DataQualityDashboard() {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap cursor-pointer transition ${
+                className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${
                   isActive
                     ? `bg-transparent border-transparent ${styles.cardText} font-bold ${styles.accentBorder} border-t-indigo-500 dark:border-t-emerald-500 dark:text-emerald-400`
                     : "border-transparent opacity-70 hover:opacity-100"
@@ -125,7 +125,7 @@ export default function DataQualityDashboard() {
       </div>
 
       {/* 当前 Tab 渲染 */}
-      <div className="flex-1 min-h-0 overflow-hidden px-6 py-4">
+      <div className="flex-1 min-h-0 overflow-hidden px-6 py-4 w-full min-w-0">
         <div className="max-w-7xl mx-auto h-full flex flex-col">
           <Suspense fallback={<TabFallback />}>
             {activeTab === "rules" && <RuleCenterTab initialTableFilter={tableFilter} />}

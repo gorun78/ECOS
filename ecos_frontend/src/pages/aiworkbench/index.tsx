@@ -113,9 +113,9 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
   };
 
   return (
-    <div className={`h-full w-full flex flex-row overflow-hidden ${styles.appBg} ${styles.appText} font-sans`}>
-      {/* 1. AIP Left Sidebar — theme tokens only, no hardcoded colors */}
-      <aside className={`w-64 border-r ${styles.sidebarBorder} flex flex-col h-full select-none shrink-0 text-xs ${styles.sidebarBg} ${styles.sidebarText}`}>
+    <div className={`h-full w-full flex overflow-hidden ${styles.appBg} ${styles.appText} font-sans`}>
+      {/* Desktop: left sidebar (md+) */}
+      <div className="hidden md:flex w-64 flex-shrink-0 border-r flex-col h-full select-none shrink-0 text-xs" style={{ borderColor: styles.sidebarBorder, background: styles.sidebarBg, color: styles.sidebarText }}>
         {/* Title / Branding */}
         <div className={`p-3 border-b ${styles.sidebarBorder}`}>
           <div className={`py-2 px-3 ${styles.cardBg} ${styles.sidebarText} rounded-lg flex items-center justify-between shadow-xs`}>
@@ -192,10 +192,103 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
             </p>
           </div>
         </div>
-      </aside>
+      </div>
 
-      {/* 2. Active View Panel Render */}
-      <div className={`flex-1 overflow-hidden relative flex flex-col ${styles.appBg}`}>
+      {/* Mobile: horizontal scroll tab bar (below md) */}
+      <div className="md:hidden w-full h-full flex flex-col overflow-hidden">
+        {/* Mobile brand header */}
+        <div className={`flex items-center gap-2 px-3 pt-2 pb-1 shrink-0 ${styles.cardBg}`}>
+          <span className={`p-1 rounded ${styles.accentBg} ${styles.accentText} flex items-center justify-center`}>
+            <LayoutDashboard size={13} className="animate-pulse" />
+          </span>
+          <span className={`font-extrabold text-[11px] leading-tight tracking-wide ${styles.cardText}`}>
+            {t('aiworkbench.brand')}
+          </span>
+          <span className={`text-[9px] px-1 py-0.5 rounded font-mono select-none shrink-0 ${styles.badgeBg} ${styles.muted}`}>
+            v2.4
+          </span>
+        </div>
+
+        {/* Horizontal scroll tab bar — flat, all 7 tabs in a single row */}
+        <div className={`flex-shrink-0 border-b overflow-x-auto whitespace-nowrap -mx-1 px-1 ${styles.cardBg}`} style={{ borderColor: styles.cardBorder }}>
+          <div className="flex flex-nowrap gap-0.5 items-end pt-2">
+            {NAV_TABS.map((tab) => {
+              const isActive = currentTab === tab.id;
+              const IconComp = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setCurrentTab(tab.id)}
+                  className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${
+                    isActive
+                      ? `bg-transparent border-transparent ${styles.cardText} font-bold ${styles.accentBorder} border-t-indigo-500 dark:border-t-emerald-500 dark:text-emerald-400`
+                      : `border-transparent opacity-70 hover:opacity-100 ${styles.cardTextMuted}`
+                  }`}
+                >
+                  <IconComp size={13} className="shrink-0" />
+                  {t(tab.labelKey)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content area */}
+        <div className={`flex-1 overflow-hidden relative flex flex-col w-full min-w-0 ${styles.appBg}`}>
+          <div className="flex-1 overflow-hidden relative">
+            {currentTab === 'overview' && (
+              <DashboardView
+                pipelines={pipelines}
+                agents={agents}
+                models={models}
+                auditLogs={auditLogs}
+                onNavigateToView={() => {}}
+              />
+            )}
+            {currentTab === 'agent' && (loadErrors.agents
+              ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
+              : <AgentStudioView
+                  agents={agents}
+                  models={models}
+                  guardrails={guardrails}
+                  onUpdateAgents={setAgents}
+                  onAddAuditLog={handleAddAuditLog}
+                  showToast={showToast}
+                />
+            )}
+            {currentTab === 'playground' && (
+              <AgentPlayground agents={agents} models={models} showToast={showToast} />
+            )}
+            {currentTab === 'orchestration' && (loadErrors.pipelines
+              ? <ErrorState message={loadErrors.pipelines} onRetry={loadPipelines} />
+              : <LogicView
+                  pipelines={pipelines}
+                  models={models}
+                  onUpdatePipelines={setPipelines}
+                  showToast={showToast}
+                />
+            )}
+            {currentTab === 'evals' && (
+              <EvalsView agents={agents} models={models} />
+            )}
+            {currentTab === 'models' && (loadErrors.models
+              ? <ErrorState message={loadErrors.models} onRetry={loadModels} />
+              : <ModelCatalogView
+                  models={models}
+                  agents={agents}
+                  guardrails={guardrails}
+                  onUpdateModels={setModels}
+                  showToast={showToast}
+                />
+            )}
+            {currentTab === 'cognition' && <CognitionView />}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: content area (md+) */}
+      <div className={`hidden md:flex flex-1 overflow-hidden relative flex-col w-full min-w-0 ${styles.appBg}`}>
         {/* Right Stage Sub-Header for View Title */}
         <div className={`h-10 ${styles.cardBg} border-b ${styles.cardBorder} px-6 flex items-center justify-between shrink-0 select-none`}>
           <div className="flex items-center gap-2">
@@ -215,7 +308,6 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          {/* overview: DashboardView (全量仪表盘，无 ErrorState — dashboard 自带子 Tab) */}
           {currentTab === 'overview' && (
             <DashboardView
               pipelines={pipelines}
@@ -225,8 +317,6 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
               onNavigateToView={() => {}}
             />
           )}
-
-          {/* agent: AgentStudioView */}
           {currentTab === 'agent' && (loadErrors.agents
             ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
             : <AgentStudioView
@@ -238,13 +328,9 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
                 showToast={showToast}
               />
           )}
-
-          {/* playground: Agent 多轮调试台（消费 index 已加载的 agents/models，失败时独立重试） */}
           {currentTab === 'playground' && (
             <AgentPlayground agents={agents} models={models} showToast={showToast} />
           )}
-
-          {/* orchestration: Logic 工作流画布 */}
           {currentTab === 'orchestration' && (loadErrors.pipelines
             ? <ErrorState message={loadErrors.pipelines} onRetry={loadPipelines} />
             : <LogicView
@@ -254,28 +340,19 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
                 showToast={showToast}
               />
           )}
-
-          {/* evals: 独立渲染 radar + 趋势 */}
           {currentTab === 'evals' && (
-            <EvalsView
-              agents={agents}
-              models={models}
-            />
+            <EvalsView agents={agents} models={models} />
           )}
-
-          {/* models: ModelCatalogView (内含 sub-tab: catalog / compare / guardrails) */}
-                    {currentTab === 'models' && (loadErrors.models
-                      ? <ErrorState message={loadErrors.models} onRetry={loadModels} />
-                      : <ModelCatalogView
-                          models={models}
-                          agents={agents}
-                          guardrails={guardrails}
-                          onUpdateModels={setModels}
-                          showToast={showToast}
-                        />
-                    )}
-
-          {/* cognition: 场景认知四件套执行入口（PMO-60 v2.0 P2b 搭壳；P3b 落地真实端点） */}
+          {currentTab === 'models' && (loadErrors.models
+            ? <ErrorState message={loadErrors.models} onRetry={loadModels} />
+            : <ModelCatalogView
+                models={models}
+                agents={agents}
+                guardrails={guardrails}
+                onUpdateModels={setModels}
+                showToast={showToast}
+              />
+          )}
           {currentTab === 'cognition' && <CognitionView />}
         </div>
       </div>
