@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import {
   apiFetchData,
   fetchTenants,
@@ -518,6 +519,7 @@ function EditQuotaModal({ quota, onSave, onClose }: EditQuotaModalProps) {
 type TabId = "management" | "quota" | "usage" | "invoice";
 
 export default function TenantManager() {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
@@ -822,7 +824,7 @@ export default function TenantManager() {
               </select>
             </div>
 
-            {/* Table */}
+            {/* Table / 移动端卡片态 */}
             {loadingTenants ? (
               <div className="flex items-center gap-2 p-4">
                 <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
@@ -832,6 +834,70 @@ export default function TenantManager() {
               <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
                 <Building className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
                 <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "暂无租户数据" : "No tenants found"}</p>
+              </div>
+            ) : isMobile ? (
+              <div className="space-y-2">
+                {tenants.map((tn) => (
+                  <div key={tn.id} className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Shield className="w-3.5 h-3.5 shrink-0 opacity-50" />
+                        <span className={`text-xs font-semibold truncate ${styles.cardText}`} title={tn.tenantName}>{tn.tenantName}</span>
+                      </div>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium border shrink-0 ${STATUS_COLORS[tn.status] ?? "bg-slate-500/10 text-slate-400 border-slate-500/30"}`}>
+                        {tn.status}
+                      </span>
+                    </div>
+                    <div className="px-3 pb-2">
+                      <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{tn.tenantCode} · ID {tn.id}</span>
+                    </div>
+                    <div className="px-3 py-2 border-t grid grid-cols-2 gap-2" style={{ borderColor: styles.cardBorder }}>
+                      <div>
+                        <div className="text-[10px] opacity-40 uppercase tracking-wider">{locale === "zh" ? "用户上限" : "Max Users"}</div>
+                        <div className={`text-xs font-mono ${styles.cardText}`}>{formatNumber(tn.maxUsers)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] opacity-40 uppercase tracking-wider">{locale === "zh" ? "存储 MB" : "Storage MB"}</div>
+                        <div className={`text-xs font-mono ${styles.cardText}`}>{formatNumber(tn.maxStorageMb)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] opacity-40 uppercase tracking-wider">{locale === "zh" ? "API/天" : "API/Day"}</div>
+                        <div className={`text-xs font-mono ${styles.cardText}`}>{formatNumber(tn.maxApiPerDay)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] opacity-40 uppercase tracking-wider">{locale === "zh" ? "隔离模式" : "Isolation"}</div>
+                        <div className={`text-xs font-mono ${styles.cardText}`}>{tn.isolationMode}</div>
+                      </div>
+                    </div>
+                    <div className="px-3 py-2 border-t flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: styles.cardBorder }}>
+                      <span className={`text-[11px] ${styles.cardTextMuted}`}>{formatDate(tn.createdAt)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => { setEditTenant(tn); setFormMode("edit"); }}
+                          className="px-2.5 py-1 rounded text-[11px] font-medium text-white shrink-0 bg-indigo-500 hover:bg-indigo-600">
+                          {locale === "zh" ? "编辑" : "Edit"}
+                        </button>
+                        <button onClick={() => setDeleteTarget({ id: tn.id, name: tn.tenantName })}
+                          className="px-2.5 py-1 rounded text-[11px] font-medium text-white shrink-0 bg-red-500 hover:bg-red-600">
+                          {locale === "zh" ? "删除" : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {tenantTotal > 20 && (
+                  <div className="flex items-center justify-center gap-2 py-2">
+                    <button disabled={tenantPage <= 1}
+                      onClick={() => { const p = tenantPage - 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
+                      className={`px-3 py-1 rounded text-[11px] border ${styles.cardBorder} disabled:opacity-30`}>
+                      {locale === "zh" ? "上一页" : "Prev"}
+                    </button>
+                    <span className={`text-[11px] ${styles.cardTextMuted}`}>{tenantPage} / {Math.max(1, Math.ceil(tenantTotal / 20))}</span>
+                    <button onClick={() => { const p = tenantPage + 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
+                      className={`px-3 py-1 rounded text-[11px] border ${styles.cardBorder}`}>
+                      {locale === "zh" ? "下一页" : "Next"}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
