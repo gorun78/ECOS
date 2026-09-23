@@ -220,8 +220,8 @@ export default function ScheduleTab() {
         </button>
       </div>
 
-      {/* 调度列表 */}
-      <div className={`flex-1 min-h-0 overflow-y-auto rounded-md border ${styles.cardBorder} ${styles.cardBg}`}>
+      {/* 调度列表 — 移动端横滚 / 桌面双轴自然滚动 */}
+      <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-auto md:overflow-visible rounded-md border ${styles.cardBorder} ${styles.cardBg}`}>
         {loading && schedules.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin opacity-50" />

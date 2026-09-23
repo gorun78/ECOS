@@ -121,9 +121,9 @@ export default function DataWorkbenchLayout({
   // ── Render ──
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${styles.appBg} relative overflow-hidden font-sans`}>
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className={`w-52 ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col justify-between shrink-0 select-none`}>
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Sidebar — 桌面双栏；移动端落到顶部，md 起恢复为左侧固定 208px 宽度 */}
+        <div className={`w-full md:w-52 md:h-full ${styles.sidebarBg} border-r ${styles.sidebarBorder} flex flex-col justify-between md:shrink-0 select-none`}>
           <div className="py-3 px-3 space-y-1 overflow-y-auto">
             <div className={`text-xs font-bold ${styles.cardText} px-2.5 mb-3`}>{t('databench.layout.sidebarTitle')}</div>
             {TAB_CONFIG.map(renderSideTab)}
@@ -142,8 +142,8 @@ export default function DataWorkbenchLayout({
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 flex overflow-hidden min-w-0">
+        {/* Body — 桌面双栏内容区；移动端落到下方，min-w-0 防表格内容溢出 */}
+        <div className="w-full flex-1 min-w-0 flex overflow-hidden">
           {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />}
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} triggerSync={dw.triggerSync} t={t} />}
           {activeTab === 'health' && (

@@ -278,7 +278,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
             <span className="mt-3 text-sm font-semibold">{t("dw.dqRule.empty")}</span>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto overflow-x-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-auto md:overflow-visible">
             <table className="w-full text-xs align-middle">
               <thead className="sticky top-0 z-10">
                 <tr className={`${styles.appBg} border-b ${styles.cardBorder}`}>

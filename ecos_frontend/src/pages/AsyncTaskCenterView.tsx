@@ -256,9 +256,10 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
         </div>
       )}
 
-      {/* 主体: 表格 + 详情侧栏 */}
-      <div className="flex-1 flex gap-3 min-h-0">
-        {/* 表格 */}
+      {/* 主体: 表格 + 详情侧栏（移动端纵向堆叠，md 起双栏并列） */}
+      <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0">
+        {/* 表格 — 移动端横滚 / 桌面占满剩余空间 */}
+        <div className="flex-1 min-w-0 overflow-x-auto md:overflow-visible">
         <table className="w-full text-xs border-collapse" style={{ background: styles.cardBg }}>
           <thead>
             <tr className={`border-b ${styles.cardBorder} ${styles.sidebarBg}/60`}>
@@ -373,10 +374,11 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
             })}
           </tbody>
         </table>
+        </div>
 
-        {/* 详情抽屉 (右侧) */}
+        {/* 详情抽屉 (右侧) — 移动端全宽，桌面固定 400px */}
         {active && (
-          <div className="w-[400px] shrink-0 border rounded-lg overflow-hidden" style={{ background: styles.cardBg, borderColor: styles.cardBorder, color: styles.cardText }}>
+          <div className="w-full md:w-[400px] shrink-0 border rounded-lg overflow-hidden" style={{ background: styles.cardBg, borderColor: styles.cardBorder, color: styles.cardText }}>
             <div className={`px-3 py-2 border-b ${styles.cardBorder} flex items-center justify-between`} style={{ background: (styles.sidebarBg as string) + "80" }}>
               <span className="text-xs font-semibold">{t("taskPanel.detail.title") || "任务详情"}</span>
               <button onClick={() => setActiveTaskId(null)} className="cursor-pointer text-xs hover:opacity-70" style={{ color: styles.cardTextMuted }}>✕</button>

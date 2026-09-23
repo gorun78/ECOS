@@ -867,7 +867,7 @@ export default function ObjectExplorerView({
                         {t('ow.empty.noInstanceData')}
                       </div>
                     ) : (
-                    <div className="flex-1 overflow-auto">
+                    <div className="flex-1 overflow-auto overflow-x-auto md:overflow-visible">
                       <table className="w-full text-left border-collapse text-xs select-none">
                         <thead>
                           <tr className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>

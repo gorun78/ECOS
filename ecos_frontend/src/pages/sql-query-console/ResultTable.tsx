@@ -58,8 +58,8 @@ export default function ResultTable({ result, loading, error }: ResultTableProps
         </button>
       </div>
 
-      {/* 表格 */}
-      <div className="flex-1 overflow-auto">
+      {/* 表格 — 移动端横滚 / 桌面双轴自然滚动（sticky thead 不受影响） */}
+      <div className="flex-1 overflow-auto overflow-x-auto md:overflow-visible">
         <table className="w-full text-[11px] border-collapse">
           <thead className="sticky top-0 z-10">
             <tr className={styles.cardBg}>

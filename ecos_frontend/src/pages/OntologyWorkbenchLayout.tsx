@@ -396,34 +396,36 @@ export default function OntologyWorkbenchLayout() {
 
   // ── Render ──
   return (
-    <div className={`flex h-full ${styles.appBg} ${styles.appText} overflow-hidden text-xs font-sans`}>
-      {/* Left Sidebar */}
-      <Sidebar
-        objectTypes={filteredObjects}
-        allObjectTypes={objectTypes}
-        linkTypes={filteredLinks}
-        actionTypes={actionTypes}
-        interfaces={interfaces}
-        sharedProperties={sharedProperties}
-        datasets={datasets}
-        functionTypes={functionTypes}
-        domains={domains}
-        selectedDomainId={selectedDomainId}
-        onSelectDomainId={setSelectedDomainId}
-        onUpdateDomains={updateDomains}
-        onUpdateObjectTypes={updateObjectTypes}
-        onToast={showToast}
-        selectedCategory={selectedCategory}
-        selectedId={selectedId}
-        onSelectCategory={(category: ViewCategory, id: string | null) => {
-          setSelectedCategory(category);
-          setSelectedId(id);
-        }}
-        onCreateNew={handleCreateNewElement}
-      />
+    <div className={`flex h-full flex-col md:flex-row ${styles.appBg} ${styles.appText} overflow-hidden text-xs font-sans`}>
+      {/* Left Sidebar — 桌面双栏左侧固定宽度；移动端顶部 */}
+      <div className="w-full md:w-60 md:h-full md:shrink-0 overflow-y-auto" style={{ borderColor: 'var(--border, rgba(0,0,0,0.08))' }}>
+        <Sidebar
+          objectTypes={filteredObjects}
+          allObjectTypes={objectTypes}
+          linkTypes={filteredLinks}
+          actionTypes={actionTypes}
+          interfaces={interfaces}
+          sharedProperties={sharedProperties}
+          datasets={datasets}
+          functionTypes={functionTypes}
+          domains={domains}
+          selectedDomainId={selectedDomainId}
+          onSelectDomainId={setSelectedDomainId}
+          onUpdateDomains={updateDomains}
+          onUpdateObjectTypes={updateObjectTypes}
+          onToast={showToast}
+          selectedCategory={selectedCategory}
+          selectedId={selectedId}
+          onSelectCategory={(category: ViewCategory, id: string | null) => {
+            setSelectedCategory(category);
+            setSelectedId(id);
+          }}
+          onCreateNew={handleCreateNewElement}
+        />
+      </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden relative flex flex-col">
+      {/* Main Content Area — 桌面双栏右侧；移动端落到下方 */}
+      <main className="w-full flex-1 min-w-0 overflow-hidden relative flex flex-col">
         {/* Top toolbar */}
         <div className={`flex items-center justify-between px-3 py-1.5 border-b ${styles.cardBorder} ${styles.cardBg}`}>
           <span className={`text-[10px] font-semibold uppercase tracking-wider ${styles.muted}`}>

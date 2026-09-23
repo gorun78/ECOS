@@ -835,7 +835,7 @@ export default function TenantManager() {
               </div>
             ) : (
               <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto md:overflow-visible">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className={`border-b ${styles.cardBorder} opacity-60`}>
@@ -960,7 +960,7 @@ export default function TenantManager() {
                 <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "该租户暂无配额数据" : "No quota data"}</p>
               </div>
             ) : (
-              <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
+              <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder} overflow-x-auto md:overflow-visible`}>
                 <table className="w-full text-xs">
                   <thead>
                     <tr className={`border-b ${styles.cardBorder} opacity-60`}>
@@ -1136,7 +1136,7 @@ export default function TenantManager() {
               </div>
             ) : (
               <>
-                <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
+                <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder} overflow-x-auto md:overflow-visible`}>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className={`border-b ${styles.cardBorder} opacity-60`}>

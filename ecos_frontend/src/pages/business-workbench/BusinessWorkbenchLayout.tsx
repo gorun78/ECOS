@@ -362,10 +362,10 @@ export default function BusinessWorkbenchLayout({
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Content — 桌面 flex-row；移动端 flex-col（Sidebar 落顶部，内容落下方） */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {viewMode === 'explorer' ? (
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 w-full min-w-0 flex overflow-hidden">
             <BusinessObjectExplorer
               objectTypes={objectTypes}
               linkTypes={linkTypes}
@@ -379,9 +379,10 @@ export default function BusinessWorkbenchLayout({
           </div>
         ) : (
           <>
-            {/* Sidebar */}
-            <Sidebar
-              objectTypes={filteredObjects}
+            {/* Sidebar — 桌面双栏左侧；移动端顶部 */}
+            <div className="w-full md:w-56 md:h-full md:shrink-0 border-b md:border-b-0 md:border-r border-t-0 md:border-t-0" style={{ borderColor: 'var(--border, rgba(0,0,0,0.08))' }}>
+              <Sidebar
+                objectTypes={filteredObjects}
               allObjectTypes={objectTypes}
               linkTypes={filteredLinks}
               actionTypes={filteredActions}
@@ -401,10 +402,11 @@ export default function BusinessWorkbenchLayout({
                 setSelectedId(id);
               }}
               onCreateNew={handleCreateNewElement}
-            />
+              />
+            </div>
 
-            {/* Central Editor */}
-            <main className="flex-1 overflow-hidden relative">
+            {/* Central Editor — 移动端下方；桌面侧占满剩余宽度 */}
+            <main className="w-full flex-1 min-w-0 overflow-hidden relative">
               {selectedCategory === 'overview' && (
                 <OverviewView
                   objectTypes={objectTypes}

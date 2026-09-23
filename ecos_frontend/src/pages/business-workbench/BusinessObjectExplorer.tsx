@@ -1002,8 +1002,8 @@ export default function BusinessObjectExplorer({
                       </div>
                     </div>
 
-                    {/* Table stage */}
-                    <div className="flex-1 overflow-auto">
+                    {/* Table stage — 移动端横滚 / 桌面占满剩余高度 */}
+                    <div className="flex-1 overflow-auto overflow-x-auto md:overflow-visible">
                       <table className="w-full text-left border-collapse text-xs select-none">
                         <thead>
                           <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>
