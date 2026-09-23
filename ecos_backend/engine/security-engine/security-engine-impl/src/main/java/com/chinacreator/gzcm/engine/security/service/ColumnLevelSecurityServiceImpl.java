@@ -25,12 +25,17 @@ public class ColumnLevelSecurityServiceImpl {
     /**
      * 根据 tableName + userId 查询列级安全策略，
      * 返回可见列列表和阻止列列表。
+     *
+     * <p>PMO-data10：V154 已 ADD {@code resource_id}（IR03 只加不删），运行期
+     * 双轨路由 {@code (table_name = ? OR resource_id = ?)} — 老行
+     * {@code resource_id} 为空走 {@code table_name} 兜底，新行优先按
+     * {@code resource_id} 命中（数据资产驱动，参见 {@code DataSecurityLevelEventListener}）。
      */
     public Map<String, Object> getColumns(String tableName, String userId, List<String> allColumns) {
         String sql = """
             SELECT visible_cols, blocked_cols, priority, policy_name
             FROM ecos_cls_policy
-            WHERE table_name = ? AND enabled = true
+            WHERE (table_name = ? OR resource_id = ?) AND enabled = true
               AND (user_id = ? OR user_id IS NULL)
               AND (role_id IS NULL OR role_id IN (
                   SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?
@@ -40,7 +45,7 @@ public class ColumnLevelSecurityServiceImpl {
 
         List<Map<String, Object>> policies;
         try {
-            policies = jdbcTemplate.queryForList(sql, tableName, userId, userId);
+            policies = jdbcTemplate.queryForList(sql, tableName, tableName, userId, userId);
         } catch (Exception e) {
             log.error("查询CLS策略失败: table={}, userId={}", tableName, userId, e);
             policies = Collections.emptyList();

@@ -22,12 +22,20 @@ public class RowLevelSecurityServiceImpl {
     /**
      * 根据 tableName + userId 查询所有匹配的行级安全策略，
      * 按 priority 升序排序，用 AND 合并所有 filter_expr。
+     *
+     * <p>PMO-data10：V154 已 ADD {@code resource_id}（IR03 只加不删），运行期
+     * 双轨路由 {@code (table_name = ? OR resource_id = ?)} — 老行
+     * {@code resource_id} 为空走 {@code table_name} 兜底，新行优先按
+     * {@code resource_id} 命中。新增 L4 资产准入约束 {@code clearance_level >= 4}
+     * 由 {@code DataSecurityLevelEventListener} 写 policy（{@code filter_expr = clearance_level
+     * >= 4}），本方法合并在 WHERE 子句，调用方需把 {@code clearance_level} 作为 WHERE
+     * 绑定变量传入（参见 {@code data-engine} 查询调用方）。
      */
     public Map<String, Object> apply(String tableName, String userId) {
         String sql = """
             SELECT filter_expr, priority, policy_name
             FROM ecos_rls_policy
-            WHERE table_name = ? AND enabled = true
+            WHERE (table_name = ? OR resource_id = ?) AND enabled = true
               AND (user_id = ? OR user_id IS NULL)
               AND (role_id IS NULL OR role_id IN (
                   SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?
@@ -37,7 +45,7 @@ public class RowLevelSecurityServiceImpl {
 
         List<Map<String, Object>> policies;
         try {
-            policies = jdbcTemplate.queryForList(sql, tableName, userId, userId);
+            policies = jdbcTemplate.queryForList(sql, tableName, tableName, userId, userId);
         } catch (Exception e) {
             log.error("查询RLS策略失败: table={}, userId={}", tableName, userId, e);
             policies = Collections.emptyList();

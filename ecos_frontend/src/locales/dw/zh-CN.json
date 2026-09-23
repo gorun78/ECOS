@@ -762,6 +762,7 @@
   "dw.tab.code_workbooks": "交互式工作簿",
   "dw.tab.connections": "数据源同步",
   "dw.tab.contour": "Contour 分析",
+  "dw.tab.data_assets": "数据资产",
   "dw.tab.engine_config": "引擎配置",
   "dw.tab.guide": "顶层策划：四工具融入五环节",
   "dw.tab.health": "数据质量",

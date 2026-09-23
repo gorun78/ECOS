@@ -25,6 +25,8 @@ public class DataLineageService {
     /** 血缘拓扑重建互斥锁（防止并发重建） */
     private final Object rebuildLock = new Object();
 
+    private final com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+
     public DataLineageService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -344,16 +346,23 @@ public class DataLineageService {
     // ── 拓扑全量重建（P1）──
 
     /**
-     * 全量重建血缘：扫描所有 pipeline_task 的 yaml_content，调用 JSqlParser 解析 SQL，
-     * 将表级/字段级 nodes+edges 持久化到 ecos_data.ecos_data_lineage_node/edge。
+     * 全量重建血缘：扫描 ecs_pipeline_definition（definition JSONB 里每个节点的 config.sql）
+     * 与 ecos_pipeline_task（yaml_content）中的 SQL，调用 JSqlParser 解析为表级/字段级 nodes+edges，
+     * 持久化到 ecos_data.ecos_data_lineage_node/edge。
      * 重建前清空旧数据，重建后返回聚合拓扑，供前端一次渲染全景图。
+     * <p>
+     * ⚠️ 历史缺口（PMO-W3）：原实现仅扫 ecs_pipeline_task.yaml_content，但 PipelineBuilder 创建的
+     * pipeline 真正落到 ecs_pipeline_definition.definition / ecos_pipeline_node.config 里，
+     * 导致"重新生成"返回 tasks_scanned=0 + emptyHint 误导用户。本次补齐 definition 扫描，
+     * 节点级 SQL（SELECT/INSERT/UPDATE）逐条喂给 JSqlParser。
      *
-     * @param limit 限制处理的 pipeline_task 数量（用于大规模场景的性能保护，0 = 不限制）
+     * @param limit 限制处理的 pipeline 数量（用于大规模场景的性能保护，0 = 不限制）
      * @return 聚合后的 nodes/edges 拓扑
      */
     public Map<String, Object> rebuildAndPersist(int limit) {
         synchronized (rebuildLock) {
             int taskLimit = limit > 0 ? limit : 0;
+            // 1. 旧表：ecs_pipeline_task（YAML 风格） — 保留兼容
             List<Map<String, Object>> tasks;
             try {
                 if (taskLimit > 0) {
@@ -365,9 +374,13 @@ public class DataLineageService {
                 }
             } catch (Exception e) {
                 log.warn("rebuildAndPersist 查询 tasks 失败: {}", e.getMessage());
-                return emptyLineageResult();
+                tasks = List.of();
             }
 
+            // 2. 主表：ecs_pipeline_definition.definition (JSONB) — 节点级 SQL 全量来源
+            int scannedDefinitions = 0;
+            List<Map<String, Object>> nodes = new ArrayList<>();
+            List<Map<String, Object>> edges = new ArrayList<>();
             Set<String> nodeIds = new LinkedHashSet<>();
             Set<String> edgeKeys = new HashSet<>();
             Map<String, Map<String, Object>> nodeMap = new LinkedHashMap<>();
@@ -375,6 +388,63 @@ public class DataLineageService {
             int parsedTasks = 0;
             int skippedSql = 0;
 
+            for (Map<String, Object> def : scanDefinitions()) {
+                String defId = (String) def.get("id");
+                String defName = (String) def.get("name");
+                String defJsonRaw = (String) def.get("definition");
+                if (defJsonRaw == null || defJsonRaw.isBlank() || "{}".equals(defJsonRaw)) continue;
+                boolean parsedAny = false;
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> defRoot = om.readValue(defJsonRaw, Map.class);
+                    Object nodesArr = defRoot.get("nodes");
+                    if (nodesArr instanceof List<?> arr && !arr.isEmpty()) {
+                        for (Object nraw : arr) {
+                            String sql = extractSqlFromNode(nraw);
+                            if (sql == null || sql.isBlank()) continue;
+                            try {
+                                Map<String, Object> parsed = parser.parse(sql);
+                                @SuppressWarnings("unchecked")
+                                List<Map<String, String>> pNodes = (List<Map<String, String>>) parsed.getOrDefault("nodes", List.of());
+                                @SuppressWarnings("unchecked")
+                                List<Map<String, String>> pEdges = (List<Map<String, String>>) parsed.getOrDefault("edges", List.of());
+                                if (pNodes.isEmpty() && pEdges.isEmpty()) {
+                                    skippedSql++;
+                                    continue;
+                                }
+                                parsedAny = true;
+                                persistParsed(defId, defName, pNodes, pEdges, nodeIds, edgeKeys, nodeMap, edgeList);
+                            } catch (Exception e) {
+                                log.debug("rebuildAndPersist definition node SQL 解析跳过 (def={}): {}", defId, e.getMessage());
+                            }
+                        }
+                    } else if (defNodeHasSql(defJsonRaw)) {
+                        // 兜底：definitions 内嵌 config.sql（V25+ pipeline-node 表丢弃旧数据时的兼容）
+                        List<String> sqls = extractSqlFromDefinitionsJson(defJsonRaw);
+                        for (String sql : sqls) {
+                            try {
+                                Map<String, Object> parsed = parser.parse(sql);
+                                @SuppressWarnings("unchecked")
+                                List<Map<String, String>> pNodes = (List<Map<String, String>>) parsed.getOrDefault("nodes", List.of());
+                                @SuppressWarnings("unchecked")
+                                List<Map<String, String>> pEdges = (List<Map<String, String>>) parsed.getOrDefault("edges", List.of());
+                                if (pNodes.isEmpty() && pEdges.isEmpty()) continue;
+                                parsedAny = true;
+                                persistParsed(defId, defName, pNodes, pEdges, nodeIds, edgeKeys, nodeMap, edgeList);
+                            } catch (Exception e) {
+                                log.debug("rebuildAndPersist definition 兜底解析跳过 (def={}): {}", defId, e.getMessage());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("rebuildAndPersist 查询 definitions 的 definition JSON 解析失败 (id={}): {}", defId, e.getMessage());
+                    continue;
+                }
+                if (parsedAny) parsedTasks++;
+                scannedDefinitions++;
+            }
+
+            // 3. 补充 ecs_pipeline_task (YAML)
             for (Map<String, Object> task : tasks) {
                 String taskId = (String) task.get("id");
                 String taskName = (String) task.get("name");
@@ -409,12 +479,57 @@ public class DataLineageService {
             result.put("total_nodes", nodeMap.size());
             result.put("total_edges", edgeList.size());
             result.put("tasks_scanned", tasks.size());
+            result.put("definitions_scanned", scannedDefinitions);
             result.put("tasks_parsed", parsedTasks);
             result.put("sql_failed", skippedSql);
-            log.info("rebuildAndPersist 完成: tasks={} parsed={} nodes={} edges={} sql_failed={}",
-                    tasks.size(), parsedTasks, nodeMap.size(), edgeList.size(), skippedSql);
+            log.info("rebuildAndPersist 完成: defs={} tasks={} parsed={} nodes={} edges={} sql_failed={}",
+                    scannedDefinitions, tasks.size(), parsedTasks, nodeMap.size(), edgeList.size(), skippedSql);
             return result;
         }
+    }
+
+    /** 扫描 ecs_pipeline_definition（ACTIVE + DRAFT，排除 ARCHIVED）。 */
+    private List<Map<String, Object>> scanDefinitions() {
+        try {
+            return jdbc.queryForList(
+                "SELECT id, name, definition::text AS definition FROM ecs_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY updated_at DESC");
+        } catch (Exception e) {
+            log.warn("rebuildAndPersist 查询 definitions 失败（表可能不同步）: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 从单个 pipeline 节点 JSON 对象里提取 SQL（兼容 config.sql / config.query / sql 字段）。 */
+    @SuppressWarnings("unchecked")
+    private String extractSqlFromNode(Object nraw) {
+        if (!(nraw instanceof Map)) return null;
+        Map<String, Object> n = (Map<String, Object>) nraw;
+        Object cfg = n.get("config");
+        if (cfg instanceof Map<?, ?> cm) {
+            Object sql = cm.get("sql");
+            if (sql == null) sql = cm.get("query");
+            if (sql == null) sql = cm.get("expression");
+            if (sql instanceof String s && !s.isBlank()) return s;
+        }
+        Object topSql = n.get("sql");
+        if (topSql instanceof String s && !s.isBlank()) return s;
+        return null;
+    }
+
+    /** 兜底：扫整个 definitions JSON 字符串里的 SQL 片段（YAML 提取器复用，task 风格兼容）。 */
+    private List<String> extractSqlFromDefinitionsJson(String json) {
+        List<String> out = new ArrayList<>();
+        Matcher m = Pattern.compile("(?i)\"(?:sql|query|expression)\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)+)\"").matcher(json);
+        while (m.find()) {
+            String s = m.group(1).replaceAll("\\\\\"", "").replaceAll("\\\\n", "\n").trim();
+            if (s.length() > 10) out.add(s);
+        }
+        return out;
+    }
+
+    /** 节点 JSON 是否含任意 SQL 字段（兜底扫描用）。 */
+    private boolean defNodeHasSql(String json) {
+        return json.contains("\"sql\"") || json.contains("\"query\"") || json.contains("\"expression\"");
     }
 
     /** 将已解析的 nodes/edges 写入持久化表，并从内存聚合 Map 中累加。 */

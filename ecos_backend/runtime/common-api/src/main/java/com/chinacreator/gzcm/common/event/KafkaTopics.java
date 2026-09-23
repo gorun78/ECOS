@@ -5,6 +5,10 @@ public final class KafkaTopics {
 
     public static final String IDENTITY = "ecos.identity";
     public static final String CATALOG = "ecos.catalog";
+    /** PMO-data10: 数据资产/字段级敏感度打标事件 — data-engine → security-engine 消费后
+     *  生成 ecos_cls_policy（字段级脱敏）+ ecos_rls_policy（L4 clearance 准入），
+     *  消费侧 groupId=dccheng-security-consumer。 */
+    public static final String DATA_SECURITY_TAGGED = "ecos.data.security-tagged";
     public static final String ONTOLOGY = "ecos.ontology";
     /** PMO-50 T4: 本体版本发布专用 topic — buszhi → dBpe 跨 JVM 事件 (兼容 @EventListener Spring 内存路径)。
      *  与 {@link #ONTOLOGY} 通用主题区分, 消费侧 groupId=dccheng-ontology-consumer, 避免多业务共用。 */

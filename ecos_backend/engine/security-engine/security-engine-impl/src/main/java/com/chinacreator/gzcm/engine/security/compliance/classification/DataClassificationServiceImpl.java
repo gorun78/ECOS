@@ -17,7 +17,16 @@ import com.chinacreator.gzcm.sysman.compliance.classification.DataClassification
 /**
  * 数据分级分类服务实现
  * 提供数据分级分类功能，包括自动分级分类、查询和统计
+ *
+ * @deprecated 自 v2.1 起废弃（PMO-data10 ADR-DATA10-02）。
+ *   本类是内存 Map 半成品 + 硬编码 4 级字典（PUBLIC/INTERNAL/SECRET/CONFIDENTIAL），
+ *   其分级单一权威来源已迁移到 data-engine 的
+ *   {@code ecos_data.ecos_data_level_def}（V154），请使用
+ *   <a href="...engine/data/dto/DataAssetVO.html">Data Asset CRUD REST</a> +
+ *   <a href="...engine/security/event/DataSecurityLevelEventListener.html">DataSecurityLevelEventListener</a>
+ *   链路。本类保留仅为向后兼容（read-only / 迁移过渡），不再被新调用方依赖。
  */
+@Deprecated
 @Service
 public class DataClassificationServiceImpl implements DataClassificationService {
     

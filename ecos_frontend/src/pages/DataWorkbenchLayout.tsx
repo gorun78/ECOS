@@ -27,6 +27,11 @@ import { useDataWorkbench } from './data-workbench/hooks/useDataWorkbench';
 
 /** 数据质量中心（独立路由页复用同一组件，此处内嵌展示） */
 const DataQualityDashboard = lazy(() => import('./DataQualityDashboard'));
+/**
+ * 数据资产中心（PMO-data10 新增 Tab）。
+ * 消费 datanet 资产 CRUD + 分级分类 REST，展示资产列表与字段级敏感度。
+ */
+const DataAssetsDashboard = lazy(() => import('./DataAssetsDashboard'));
 
 /** 懒加载 Tab 的加载占位 */
 function TabLoading() {
@@ -37,7 +42,7 @@ function TabLoading() {
   );
 }
 
-type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'engine-config';
+type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'data-assets' | 'engine-config';
 
 /** 侧边栏条目：切换工作台内 tab。 */
 interface SideTabItem {
@@ -66,6 +71,7 @@ const TAB_CONFIG: SideTabItem[] = [
   { id: 'pipeline-builder', icon: 'Workflow', i18nKey: 'dw.tab.pipeline_builder' },
   { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
+  { id: 'data-assets', icon: 'Package', i18nKey: 'dw.tab.data_assets' },
 ];
 
 /** 侧边栏底部入口（与主菜单同一样式与选中态）。 */
@@ -152,6 +158,11 @@ export default function DataWorkbenchLayout({
             </Suspense>
           )}
           {activeTab === 'lineage' && <DataLineageTab initialTable={initialLineageTable} />}
+          {activeTab === 'data-assets' && (
+            <Suspense fallback={<TabLoading />}>
+              <DataAssetsDashboard showToast={showToast} t={t} locale={locale} />
+            </Suspense>
+          )}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
         </div>
       </div>

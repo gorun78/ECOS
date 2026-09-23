@@ -144,8 +144,8 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
       if (stats.total_nodes === 0 && stats.tasks_parsed === 0) {
         setEmptyHint(
           locale === "zh"
-            ? `扫描 ${stats.tasks_scanned} 个管道任务后仍是空血缘。请先创建包含 SQL 的管道任务，再重新生成。`
-            : `Scanned ${stats.tasks_scanned} pipeline tasks but no SQL found. Create a pipeline with SQL first.`
+            ? `扫描了 ${stats.definitions_scanned ?? 0} 个管道定义与 ${stats.tasks_scanned} 个旧管道任务，但没有发现任何 SQL 节点。请在「管道 Builder」中创建至少一个 TRANSFORM_SQL 或 SOURCE_JDBC 节点（config.sql 含 SELECT/INSERT/...），再重新生成血缘。`
+            : `Scanned ${stats.definitions_scanned ?? 0} pipeline definitions + ${stats.tasks_scanned} legacy tasks but found no SQL nodes. Add at least one TRANSFORM_SQL / SOURCE_JDBC node (config.sql) in Pipeline Builder, then Rebuild.`
         );
       }
       await loadTopology();
@@ -435,7 +435,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
 
         {/* Property Panel */}
         {selectedNode && (
-          <div className={`w-[320px] ${styles.cardBg} border-l ${styles.cardBorder} p-4 overflow-y-auto shrink-0 shadow-lg`}>
+          <div className={`w-full lg:w-[320px] ${styles.cardBg} border-l ${styles.cardBorder} p-4 overflow-y-auto shrink-0 shadow-lg`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-sm font-bold ${styles.cardText}`}>
                 {locale === "zh" ? "节点详情" : "Node Detail"}

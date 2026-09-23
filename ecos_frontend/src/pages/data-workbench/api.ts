@@ -467,6 +467,7 @@ export async function fetchLineageImpact(
 export async function rebuildLineage(limit = 0): Promise<{
   total_nodes: number; total_edges: number;
   tasks_scanned: number; tasks_parsed: number; sql_failed: number;
+  definitions_scanned?: number;
 }> {
   try {
     const res = await fetch(`${LINEAGE_TOPOL}/rebuild?limit=${limit}`, {
@@ -481,6 +482,9 @@ export async function rebuildLineage(limit = 0): Promise<{
       tasks_scanned: Number(data?.tasks_scanned) || 0,
       tasks_parsed: Number(data?.tasks_parsed) || 0,
       sql_failed: Number(data?.sql_failed) || 0,
+      ...(data?.definitions_scanned != null
+        ? { definitions_scanned: Number(data.definitions_scanned) }
+        : {}),
     };
   } catch (e) {
     console.warn('[data-workbench] rebuildLineage failed:', e);
