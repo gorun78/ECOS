@@ -5,7 +5,7 @@
  * @license Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText, Search, RefreshCw, AlertCircle, Loader2,
   DollarSign, Calendar, User, Building2, CheckCircle,
@@ -15,6 +15,7 @@ import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import { apiFetchData } from "../api";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
+import MobileDataTable, { MobileCardConfig } from "../components/common/MobileDataTable";
 
 // ── Types ──────────────────────────────────────────────
 interface Contract {
@@ -170,6 +171,17 @@ export default function ContractManager() {
     },
   ];
 
+  // ── Mobile card config（移动端卡片态：合同列表）─────────
+  // 卡片头：合同编号（主键语义）+ 金额（业务关键）
+  // 详情折叠区：合同名称 / 甲方 / 签署日期 / 状态
+  const mobileConfig: MobileCardConfig<Contract> = useMemo(
+    () => ({
+      headerKeys: ["code", "amount"],
+      detailKeys: ["name", "partyA", "signDate", "status"],
+    }),
+    [],
+  );
+
   // ── Loading State ────────────────────────────────────
   if (loading && !contracts.length) {
     return (
@@ -292,7 +304,8 @@ export default function ContractManager() {
 
       {/* DataTable */}
       <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} overflow-hidden`}>
-        <DataTable<Contract>
+        <MobileDataTable<Contract>
+          mobileConfig={mobileConfig}
           columns={columns}
           data={contracts}
           rowKey="id"

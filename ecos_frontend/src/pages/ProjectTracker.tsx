@@ -5,7 +5,7 @@
  * @license Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Briefcase, Search, RefreshCw, AlertCircle, Loader2,
   ChevronDown, ChevronRight, Calendar, User, DollarSign,
@@ -15,6 +15,7 @@ import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import { apiFetchData } from "../api";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
+import MobileDataTable, { MobileCardConfig } from "../components/common/MobileDataTable";
 
 // ── Types ──────────────────────────────────────────────
 interface Project {
@@ -176,6 +177,17 @@ export default function ProjectTracker() {
     },
   ];
 
+  // ── Mobile card config（移动端卡片态：项目跟踪列表）─────────
+  // 卡片头：项目名称（主键语义）+ 状态（最高业务优先级）
+  // 详情折叠区：进度 / 负责人 / 金额 / 起止日期
+  const mobileConfig: MobileCardConfig<Project> = useMemo(
+    () => ({
+      headerKeys: ["name", "status"],
+      detailKeys: ["progress", "manager", "amount", "startDate"],
+    }),
+    [],
+  );
+
   // ── Loading State ────────────────────────────────────
   if (loading && !projects.length) {
     return (
@@ -276,7 +288,8 @@ export default function ProjectTracker() {
 
       {/* DataTable */}
       <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} overflow-hidden`}>
-        <DataTable<Project>
+        <MobileDataTable<Project>
+          mobileConfig={mobileConfig}
           columns={columns}
           data={projects}
           rowKey="id"

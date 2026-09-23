@@ -25,6 +25,7 @@ import {
 } from "../api";
 // T2: fetchEntityList/EntityListItem 由 api.ts 收敛到 services/ontologyApi.ts
 import { fetchEntityList, EntityListItem } from "../services/ontologyApi";
+import MobileDataTable, { MobileCardConfig } from "../components/common/MobileDataTable";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
 import { FALLBACK_ENTITIES, EVENT_LABELS, STATUS_COLORS, PAGE_SIZE, type Relation } from "./ObjectExplorer/helpers";
 
@@ -341,6 +342,18 @@ export default function ObjectExplorer() {
     return cols;
   }, [schema, styles]);
 
+  // ---- Mobile card config（移动端卡片态：ObjectExplorer 表格页）----
+  // 卡片头：主键 id + 1 个最高优先级字段（status，呈现 Dup/Active 状态颜色）
+  // 详情折叠区：schema 动态列（名称/编码等）
+  // 操作列：保留在卡片底部 DT 内（onRowClick 触发 detail 打开）
+  const mobileConfig: MobileCardConfig<ObjectData> = useMemo(() => {
+    const detail = tableColumns.map((c) => c.key).filter((k) => k !== "id" && k !== "status");
+    return {
+      headerKeys: ["id", "status"],
+      detailKeys: detail,
+    };
+  }, [tableColumns]);
+
   return (
     <div className={`flex flex-col h-full ${styles.appBg} font-sans ${styles.cardText}`}>
       {/* Error toast */}
@@ -413,7 +426,8 @@ export default function ObjectExplorer() {
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
         {/* Left: Data Table */}
         <div className={`flex-1 min-w-0 flex flex-col border-r ${styles.cardBorder} ${styles.cardBg}`}>
-          <DataTable<ObjectData>
+          <MobileDataTable<ObjectData>
+            mobileConfig={mobileConfig}
             columns={tableColumns}
             data={objects}
             rowKey="id"
