@@ -56,7 +56,7 @@ const SdResourcePickerModal: React.FC<SdResourcePickerModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`w-[520px] max-h-[640px] rounded-xl border shadow-2xl ${styles.cardBg} ${styles.cardBorder} flex flex-col`}
+        className={`w-[520px] max-w-[92vw] max-h-[640px] rounded-xl border shadow-2xl ${styles.cardBg} ${styles.cardBorder} flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         <div

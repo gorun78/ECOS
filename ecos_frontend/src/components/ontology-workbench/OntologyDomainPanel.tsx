@@ -314,7 +314,7 @@ export default function OntologyDomainPanel({
       {/* ── 创建/编辑弹窗 ── */}
       {(showCreate || editingId) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setShowCreate(false); setEditingId(null); }}>
-          <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-[380px] shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-full sm:w-[380px] mx-4 sm:mx-auto shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-white mb-4">
               {editingId ? '编辑本体' : '创建本体'}
             </h3>
@@ -347,7 +347,7 @@ export default function OntologyDomainPanel({
       {/* ── 删除确认 ── */}
       {deletingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingId(null)}>
-          <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-[360px] shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-full sm:w-[360px] mx-4 sm:mx-auto shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-white mb-2">删除本体</h3>
             <p className={`text-xs ${styles.cardTextMuted} mb-4`}>
               确定要删除「{ontologies.find(o => o.id === deletingId)?.name || deletingId}」吗？删除后其下实体将无法访问。

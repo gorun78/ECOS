@@ -342,7 +342,7 @@ export default function SystemConfigManager() {
         {/* Audit modal */}
         {auditOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setAuditOpen(false)}>
-            <div className={`${styles.cardBg} border ${styles.sidebarBorder} rounded-xl w-[700px] max-h-[80vh] flex flex-col shadow-2xl`} onClick={e => e.stopPropagation()}>
+            <div className={`${styles.cardBg} border ${styles.sidebarBorder} rounded-xl w-[700px] max-w-[92vw] max-h-[80vh] flex flex-col shadow-2xl`} onClick={e => e.stopPropagation()}>
               <div className={`flex items-center justify-between p-4 border-b ${styles.sidebarBorder}`}>
                 <div className="flex items-center gap-2">
                   <Shield size={18} className="text-indigo-400" />

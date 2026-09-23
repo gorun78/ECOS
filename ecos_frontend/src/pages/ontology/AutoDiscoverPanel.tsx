@@ -144,7 +144,7 @@ export default function AutoDiscoverPanel({ domainCode, onClose, onEnterDesigner
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className={`w-[640px] max-h-[90vh] rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl flex flex-col overflow-hidden`}>
+      <div className={`w-[640px] max-w-[92vw] max-h-[90vh] rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl flex flex-col overflow-hidden`}>
 
         {/* 标题栏 */}
         <div className={`flex items-center justify-between px-5 py-3.5 border-b ${styles.cardBorder} shrink-0`}>

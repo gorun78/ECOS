@@ -46,7 +46,7 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
   const { styles } = useTheme();
 
   return (
-    <div className={`w-[340px] min-w-[280px] border-r ${styles.appBorder} ${styles.cardBg} flex flex-col shrink-0`}>
+    <div className={`w-full lg:w-[340px] min-w-[280px] border-r ${styles.appBorder} ${styles.cardBg} flex flex-col shrink-0`}>
       <div className={`p-4 border-b ${styles.appBorder}`}>
         <div className={`flex mb-3 rounded-lg ${styles.appBg} p-0.5`}>
           <button

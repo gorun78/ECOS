@@ -161,7 +161,7 @@ export default function DomainDesignerView() {
       </div>
 
       {!rightPanelCollapsed && (
-        <div className={`w-[320px] min-w-[260px] border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-y-auto`}>
+        <div className={`w-full lg:w-[320px] min-w-[260px] border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-y-auto`}>
           <PropertyEditor entity={selectedEntity || null} relationships={entityRelationships}
             allEntities={entities} onCreateRelation={handleOpenCreateRelation} saving={savingEntity} />
         </div>

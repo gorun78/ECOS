@@ -1444,7 +1444,7 @@ export default function BusinessObjectExplorer({
       {/* MODAL 2: Execute Action Parameters Form */}
       {selectedAction && (
         <div className={`fixed inset-0 ${styles.overlayBg} backdrop-blur-3xs flex items-center justify-center z-50`}>
-          <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl shadow-2xl p-5 w-[420px] space-y-4`}>
+          <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl shadow-2xl p-5 w-full sm:w-[420px] mx-4 sm:mx-auto space-y-4`}>
             <div className={`flex justify-between items-center pb-2.5 border-b ${styles.divider}`}>
               <div className="flex items-center gap-1.5">
                 <LucideIcon name="Zap" size={14} className="text-amber-500 fill-amber-500/10" />

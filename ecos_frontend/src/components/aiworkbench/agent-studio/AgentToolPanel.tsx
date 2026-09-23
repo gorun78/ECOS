@@ -81,7 +81,7 @@ export default function AgentToolPanel({
 }: AgentToolPanelProps) {
   const { t } = useLanguage();
   return (
-    <div className={`w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
+    <div className={`w-full max-w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
       
       {/* Header with Tab Selectors */}
       <div className={`p-2 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between shrink-0`}>

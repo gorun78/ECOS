@@ -428,7 +428,7 @@ export default function KnowledgeGraphPage() {
 
         {/* Property Panel */}
         {selectedNode && (
-          <div className={`w-[300px] ${styles.cardBg} border-l ${styles.cardBorder} p-5 overflow-y-auto shrink-0 shadow-lg`}>
+          <div className={`w-full lg:w-[300px] ${styles.cardBg} border-l ${styles.cardBorder} p-5 overflow-y-auto shrink-0 shadow-lg`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
                 {TypeIcon && <TypeIcon className={`w-4 h-4 ${typeCfg?.text || "text-slate-600"}`} />}

@@ -264,7 +264,7 @@ export default function GlossaryManager() {
       )}
 
       {/* ═══════════ 左栏：词条列表 ═══════════ */}
-      <div className={`w-[320px] min-w-[280px] border-r flex flex-col shrink-0
+      <div className={`w-full lg:w-[320px] min-w-[280px] border-r flex flex-col shrink-0
         ${styles.cardBorder} ${styles.sidebarBg}`}>
         <div className={`p-4 border-b ${styles.cardBorder}`}>
           <div className={`text-base font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>

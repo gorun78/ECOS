@@ -723,7 +723,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
 
       {/* ── 详情抽屉 ────────────────────────────── */}
       <div
-        className={`absolute top-0 right-0 h-full w-[360px] ${styles.cardBg} shadow-2xl border-l ${styles.cardBorder} overflow-auto transition-transform duration-300 ${
+        className={`absolute top-0 right-0 h-full w-[360px] max-w-full ${styles.cardBg} shadow-2xl border-l ${styles.cardBorder} overflow-auto transition-transform duration-300 ${
           detailTask ? "translate-x-0" : "translate-x-full"
         }`}
       >

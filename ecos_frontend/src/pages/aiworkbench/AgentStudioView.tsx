@@ -601,7 +601,7 @@ export default function AgentStudioView({
           </div>
 
           {/* 3. Right: Live Sandbox Playground */}
-          <div className={`w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
+          <div className={`w-full max-w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
             
             {/* 右侧沙箱 header + simulation 子组件 (chat mode 由主组件渲染) */}
             <SimulationModal

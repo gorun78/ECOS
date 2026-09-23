@@ -72,7 +72,7 @@ export default function EntityTreePanel({
   if (leftPanelCollapsed) return null;
 
   return (
-    <div className={`w-[280px] min-w-[240px] border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0`}>
+    <div className={`w-full lg:w-[280px] min-w-[240px] border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0`}>
       {/* 域标题 */}
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
         <button

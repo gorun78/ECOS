@@ -256,7 +256,7 @@ export class ${className} {
               type="text"
               value={func.description}
               onChange={e => handleFieldChange('description', e.target.value)}
-              className={`text-xs ${styles.cardTextMuted} mt-1 border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-[500px]`}
+              className={`text-xs ${styles.cardTextMuted} mt-1 border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full max-w-[500px]`}
               placeholder="添加函数的功能与作用描述"
             />
           </div>
