@@ -65,6 +65,10 @@ export interface RagRequest {
   topK?: number;
   enableHyde?: boolean;
   rerankModel?: string;
+  /** PMO-B T3 — 知识导航目录过滤（null/empty = 全量，回归保证） */
+  categoryIds?: string[];
+  /** PMO-B T3 — 知识导航标签过滤（占位，本期不做下行 WHERE） */
+  tags?: string[];
 }
 
 export interface RagResult {

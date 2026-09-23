@@ -7,7 +7,7 @@
  * 复用 GraphCanvas 组件做图谱可视化渲染
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Search, Share2, Network, Plus, ArrowRight, Loader2,
   X, ExternalLink, GitBranch, Info, Hash, Tag,
@@ -16,6 +16,7 @@ import {
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
+import { fetchNavCategories, type NavCategoryVO } from '../../../services/knowledgeNavApi';
 import GraphCanvas from '../../../components/GraphCanvas';
 
 // ── Graph Node / Edge types (compatible with GraphCanvas) ──
@@ -74,6 +75,22 @@ export default function GraphExplorerTab() {
   const [toast, setToast] = useState<{ type: string; msg: string } | null>(null);
   const showToast = (type: string, msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 3000); };
 
+  // PMO-B T3 — 按业务域过滤（默认空 = 全量，回归保证）
+  const [navCategories, setNavCategories] = useState<NavCategoryVO[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const loadNavCategories = useCallback(async (): Promise<void> => {
+    try {
+      const data = await fetchNavCategories('default');
+      setNavCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setNavCategories([]);
+    }
+  }, []);
+  useEffect(() => { void loadNavCategories(); }, [loadNavCategories]);
+  const toggleCategoryId = (id: string): void => {
+    setSelectedCategoryIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+
   // ── Expand/collapse tracking ──
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
   const expansionChildrenRef = useRef<Map<string, Set<string>>>(new Map());
@@ -81,9 +98,25 @@ export default function GraphExplorerTab() {
   const loadGraph = useCallback(async (domain?: string) => {
     setIsLoading(true);
     try {
+      // PMO-B T3 — 如果 selectedCategoryIds 非空，前端侧按 categoryId 过滤（后端暂未支持，前端二次过滤 nodes 的 domain/cid 字段）
       const data = await knowledgeApi.fetchGraph(domain) as any;
-      setNodes(data?.nodes || []);
-      setEdges(data?.edges || data?.links || []);
+      const rawNodes: GraphNode[] = data?.nodes || [];
+      const rawEdges: GraphEdge[] = data?.edges || data?.links || [];
+      if (selectedCategoryIds.length > 0) {
+        const idSet = new Set(selectedCategoryIds);
+        const filteredNodes = rawNodes.filter(n => {
+          const props = (n.properties ?? {}) as Record<string, unknown>;
+          const cid = String(props.categoryId ?? props.navCategoryId ?? n.type ?? '');
+          return idSet.has(cid) || n.id === 'kg-root';
+        });
+        const nodeIdSet = new Set(filteredNodes.map(n => n.id));
+        const filteredEdges = rawEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
+        setNodes(filteredNodes);
+        setEdges(filteredEdges);
+      } else {
+        setNodes(rawNodes);
+        setEdges(rawEdges);
+      }
       setPathNodes(new Set());
       setPathEdges(new Set());
     } catch (e: any) {
@@ -91,7 +124,7 @@ export default function GraphExplorerTab() {
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
+  }, [t, selectedCategoryIds]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -338,6 +371,41 @@ export default function GraphExplorerTab() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+        </div>
+
+        {/* PMO-B T3 — 按业务域过滤（多 checkbox 单选可叠加） */}
+        <div className="space-y-1.5">
+          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
+            {t('knowledge.nav.nav_filter_pair')}
+            <span className="ml-1 normal-case font-mono text-emerald-600">
+              {selectedCategoryIds.length > 0 ? `(${selectedCategoryIds.length})` : ''}
+            </span>
+          </label>
+          {navCategories.length === 0 ? (
+            <p className={`text-[9px] ${styles.muted}`}>{t('knowledge.nav.tree_empty')}</p>
+          ) : (
+            <div className={`max-h-32 overflow-y-auto space-y-1 pr-1 border rounded-lg p-1.5 ${styles.sidebarBg}`}>
+              {navCategories.slice(0, 15).map(cat => (
+                <label
+                  key={cat.id}
+                  className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-blue-50 cursor-pointer text-[10px] ${styles.muted} transition`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCategoryIds.includes(cat.id)}
+                    onChange={() => {
+                      toggleCategoryId(cat.id);
+                      // 选择变更立即重载（保持 domainFilter 联动）
+                      loadGraph(domainFilter || undefined);
+                    }}
+                    className="h-3 w-3 cursor-pointer"
+                  />
+                  <span className="truncate flex-1">{cat.name}</span>
+                  <span className={`text-[8px] ${styles.muted} shrink-0`}>({cat.articleCount})</span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Load Full Graph */}
