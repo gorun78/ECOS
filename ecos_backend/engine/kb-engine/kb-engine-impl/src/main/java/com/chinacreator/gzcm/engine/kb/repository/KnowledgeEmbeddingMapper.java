@@ -84,4 +84,17 @@ public interface KnowledgeEmbeddingMapper {
             "ORDER BY created_at DESC " +
             "LIMIT #{limit}")
     List<KnowledgeEmbedding> searchByKeyword(@Param("keyword") String keyword, @Param("limit") int limit);
+
+    /**
+     * F10: 批量查 knowledge_embedding 存在性（参数化 IN，返回命中的 document_id 列表）。
+     *
+     * <p>is_deleted 字段由表结构决定；当前表无 is_deleted 列，故仅按 document_id IN 查询，
+     * 有记录即视为向量已入（pgvector 可用性由调用侧 PgVectorSupport 前置判定）。
+     *
+     * @param ids 知识资产 ID 集合（≤ 100）
+     * @return 命中的 document_id 列表
+     */
+    @Select("<script>SELECT DISTINCT document_id FROM ecos_knowledge.knowledge_embedding WHERE document_id IN " +
+            "<foreach item='item' index='index' collection='ids' open='(' separator=',' close=')'>#{item}</foreach></script>")
+    List<String> batchExists(@Param("ids") List<String> ids);
 }

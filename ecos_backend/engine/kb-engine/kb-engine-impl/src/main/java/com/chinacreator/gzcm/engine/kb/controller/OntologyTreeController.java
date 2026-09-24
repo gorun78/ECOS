@@ -39,6 +39,8 @@ import java.util.Map;
  * <p>不直接查 {@code td_data_*}（铁律 §0.5-1）；不 {@code new RestTemplate}
  * （复用 {@code KbEngineRestConfig} 的 Bean）；本体 engine 不可达时返回空列表
  * 不抛 500（前端渲染空树）。</p>
+ *
+ * @group ASSETS
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/extract")

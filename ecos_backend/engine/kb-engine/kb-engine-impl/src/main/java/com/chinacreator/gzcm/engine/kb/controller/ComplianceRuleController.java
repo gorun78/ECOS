@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * 合规规则 CRUD Controller（{@code /api/v1/knowledge/compliance-rules/*}）。
+ *
+ * @group GOVERN
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge/compliance-rules")
 public class ComplianceRuleController {

@@ -20,6 +20,8 @@ import java.util.List;
  *
  * <p>数据全部来自真实表（knowledge_article / kg_sync_log），无 DEMO 假数据；
  * 支持 {@code pageNum}/{@code pageSize} 分页，资产支持 {@code status} 过滤。</p>
+ *
+ * @group GOVERN
  */
 @RestController
 @RequestMapping("/api/v1/knowledge")

@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 知识规则 CRUD + 版本管理 Controller（{@code /api/v1/knowledge/rules/*}）。
+ *
+ * @group GOVERN
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge/rules")
 public class ExpertRuleController {

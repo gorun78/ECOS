@@ -4,10 +4,15 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.kb.KbEngineModuleRegistry;
+import com.chinacreator.gzcm.engine.kb.KbEngineModuleRegistry.Module;
+import com.chinacreator.gzcm.engine.kb.KbEngineModuleRegistry.ModuleEntry;
 import com.chinacreator.gzcm.engine.kb.nav.INavService;
+import com.chinacreator.gzcm.engine.kb.nav.model.ModuleInfoVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavCategorySaveDTO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavCategoryVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavFolderQuery;
+import com.chinacreator.gzcm.engine.kb.nav.model.NavModulesVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavNodeStatsVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavProductItemVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavRecommendVO;
@@ -24,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +52,8 @@ import java.util.Map;
  *
  * <p>Controller 仅做入参校验 + 调用 INavService + 异常 → ApiResponse 映射；
  * 业务规则与 ABAC/审计由 Service 层处理（铁律 §1.1）。</p>
+ *
+ * @group ASSETS
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/nav")
@@ -432,6 +440,30 @@ public class NavTaxonController {
             log.error("nav domains 列表失败: {}", e.getMessage(), e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
         }
+    }
+
+    // ═══════════════ 模块列表 ═══════════════
+
+    /**
+     * PMO-D F10: 列出 7 个前端页面模块及其归属 Controller 列表。
+     *
+     * <p>数据源：{@link KbEngineModuleRegistry} 常量表，纯内存读（≤ 5ms），
+     * 不走 DB / Neo4j / pgvector。
+     *
+     * @return 强类型 {@link NavModulesVO}（非 Map）
+     */
+    @GetMapping("/modules")
+    public ApiResponse<NavModulesVO> modulesList() {
+        List<ModuleInfoVO> list = new ArrayList<>();
+        for (ModuleEntry entry : KbEngineModuleRegistry.MODULES) {
+            ModuleInfoVO info = new ModuleInfoVO();
+            info.setModuleName(entry.module().name().toLowerCase());
+            info.setControllers(entry.controllers());
+            list.add(info);
+        }
+        NavModulesVO vo = new NavModulesVO();
+        vo.setModules(list);
+        return ApiResponse.success(vo);
     }
 
     /**

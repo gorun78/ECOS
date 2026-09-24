@@ -19,6 +19,9 @@ import java.util.*;
  *   <li>回退：环境配置 KB_BASES_JSON（静态 JSON 数组）</li>
  *   <li>兜底：空列表 + success 200</li>
  * </ol>
+ *
+ * @group OVERVIEW
+ * @group WIKI
  */
 @RestController
 @RequestMapping("/api/v1/knowledge-bases")

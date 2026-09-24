@@ -13,6 +13,7 @@ import java.util.Map;
  *
  * @author ECOS KB Engine Team
  * @since 2026-08-08
+ * @group CENTER_P3
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/rag")

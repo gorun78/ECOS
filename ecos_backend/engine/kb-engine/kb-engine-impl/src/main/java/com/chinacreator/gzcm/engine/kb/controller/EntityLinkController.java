@@ -13,6 +13,7 @@ import java.util.Map;
  *
  * @author ECOS KB Engine Team
  * @since 2026-08-08
+ * @group WIKI
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/entity-link")

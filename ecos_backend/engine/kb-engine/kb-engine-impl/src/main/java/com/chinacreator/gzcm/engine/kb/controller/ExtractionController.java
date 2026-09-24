@@ -22,6 +22,7 @@ import java.util.Map;
  *
  * @author ECOS KB Engine Team
  * @since 2026-08-08, 2026-09-02 (Wave-2C)
+ * @group EXTRACT
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/extract")

@@ -38,6 +38,8 @@ import java.util.Objects;
  *   <li>POST /api/v1/knowledge/graph/search — 按 keyword + nodeType 双过滤（top N）</li>
  *   <li>POST /api/v1/knowledge/graph/path    — 双端点 BFS 短时路径（不存在 → 空 list）</li>
  * </ul>
+ *
+ * @group GRAPH
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/graph")

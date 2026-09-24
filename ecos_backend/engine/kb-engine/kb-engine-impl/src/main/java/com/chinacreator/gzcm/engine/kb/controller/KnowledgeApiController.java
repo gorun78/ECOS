@@ -14,6 +14,8 @@ import java.util.*;
  * 知识 RAG + 综合查询 Controller（PMO-B T1 增补：检索侧打通 categoryIds 过滤）。
  *
  * <p>回归保证：未带 {@code categoryIds} 字段的旧客户端 → 行为与历史版本一致（全量检索）。</p>
+ *
+ * @group OVERVIEW
  */
 @RestController
 @RequestMapping("/api/v1/knowledge")

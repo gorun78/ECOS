@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>指标由 {@link KnowledgeEvalService} 基于真实向量检索链路计算，不返回硬编码数据；
  * 数据不足时以 {@code degraded=true} 如实降级（前端据此回落本地评测）。</p>
+ *
+ * @group GOVERN
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/eval")

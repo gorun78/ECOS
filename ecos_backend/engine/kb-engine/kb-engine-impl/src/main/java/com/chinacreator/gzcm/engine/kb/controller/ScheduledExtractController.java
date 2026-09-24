@@ -40,6 +40,8 @@ import java.util.List;
  *
  * <p>铁律 §1.6-2：弃自建 {@code kb_scheduled_extract} 表自造定时器，统一迁至 runtime-task
  * {@code td_runtime_task_plan} 单事实源。</p>
+ *
+ * @group EXTRACT
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/extract/scheduled")

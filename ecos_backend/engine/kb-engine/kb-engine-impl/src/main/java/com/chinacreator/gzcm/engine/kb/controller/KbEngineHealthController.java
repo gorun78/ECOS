@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * KB 引擎健康检查 + 配置 + 启停端点（{@code /api/v1/engine/knowledge/*}）。
+ *
+ * @group OVERVIEW
+ */
 @RestController
 @RequestMapping("/api/v1/engine/knowledge")
 public class KbEngineHealthController {

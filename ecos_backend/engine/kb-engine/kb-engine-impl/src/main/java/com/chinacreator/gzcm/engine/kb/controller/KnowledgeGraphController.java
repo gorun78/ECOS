@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * 知识图谱查询 + 节点/关系 CRUD Controller（{@code /api/v1/knowledge/*g*}）。
+ *
+ * @group GRAPH
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge")
 public class KnowledgeGraphController {

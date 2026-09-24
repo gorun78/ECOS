@@ -46,6 +46,8 @@ import java.util.Map;
  *   <li>POST /api/v1/knowledge/graph/build — 触发 runtime-task 异步全量构建，返回 jobId</li>
  *   <li>POST /api/v1/knowledge/graph/build/preview — dry-run 预览（B5-2 D6，同步只统计不落库）</li>
  * </ul>
+ *
+ * @group EXTRACT
  */
 @RestController
 @RequestMapping("/api/v1/knowledge")

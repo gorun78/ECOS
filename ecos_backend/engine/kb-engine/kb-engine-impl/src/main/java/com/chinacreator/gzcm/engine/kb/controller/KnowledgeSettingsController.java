@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * 知识引擎配置管理 Controller（{@code /api/v1/knowledge/settings/*}）。
+ *
+ * @group OVERVIEW
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge/settings")
 public class KnowledgeSettingsController {

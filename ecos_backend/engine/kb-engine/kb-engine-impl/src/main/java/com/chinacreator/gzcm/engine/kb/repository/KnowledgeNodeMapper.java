@@ -31,4 +31,14 @@ public interface KnowledgeNodeMapper {
 
     @Select("SELECT COUNT(*) FROM ecos_knowledge.graph_node")
     long count();
+
+    /**
+     * F10: 批量查 graph_node 存在性（参数化 IN，返回命中的 id 列表）。
+     *
+     * @param ids 知识资产 ID 集合（≤ 100）
+     * @return 命中的 graph_node.id 列表
+     */
+    @Select("<script>SELECT id FROM ecos_knowledge.graph_node WHERE id IN " +
+            "<foreach item='item' index='index' collection='ids' open='(' separator=',' close=')'>#{item}</foreach></script>")
+    List<String> batchExists(@Param("ids") List<String> ids);
 }

@@ -25,6 +25,8 @@ import java.util.*;
  * </ul>
  * 所有写操作发 Kafka {@code ecos.audit}（{@code KafkaTopics.AUDIT}），
  * Kafka broker 不可用时 log 兜底（铁律 §2.4 #5）。
+ *
+ * @group GRAPH
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/sync")

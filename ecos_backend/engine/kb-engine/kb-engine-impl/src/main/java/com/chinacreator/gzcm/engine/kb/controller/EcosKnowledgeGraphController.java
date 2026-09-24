@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Ecos 知识图谱通用兼容端点（{@code /api/v1/knowledge/ecos-graph/*}）。
+ *
+ * @group GRAPH
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge/ecos-graph")
 public class EcosKnowledgeGraphController {

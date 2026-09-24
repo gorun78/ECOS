@@ -69,6 +69,8 @@ import java.util.Map;
  *
  * <p>不实现周期调度（{@code extract.periodic_enabled} 仅置配置开关，运行时调度留给 K4 批次，
  * 铁律 §2.5-3 禁止自建 {@code ScheduledExecutorService}）。</p>
+ *
+ * @group EXTRACT
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/extract/structured")
