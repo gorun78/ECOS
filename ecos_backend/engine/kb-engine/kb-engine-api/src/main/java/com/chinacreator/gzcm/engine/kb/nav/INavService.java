@@ -94,4 +94,12 @@ public interface INavService {
      * reason="llm-gateway 不可用 或 LLM 解析失败"}，<b>不抛</b>。</p>
      */
     NavRecommendVO recommend(String articleId);
+
+    /**
+     * PMO-C T2: 列出当前 nav 体系下所有 distinct domain（目录 ∪ 标签，已去 duplicate）。
+     *
+     * <p>供前端多 domain 切换下拉使用；返回升序排列、含 current and 历史 domain。
+     * 无数据时返回空 List（前端按 default 兜底，不抛）。</p>
+     */
+    List<String> listDomains();
 }

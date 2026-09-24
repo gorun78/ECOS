@@ -21,9 +21,12 @@ public class KnowledgeGraphController {
     private KnowledgeGraphService kgService;
 
     @GetMapping("/graph")
-    public ApiResponse<Map<String, Object>> getGraph(@RequestParam(required = false) String domain) {
+    public ApiResponse<Map<String, Object>> getGraph(
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) List<String> categoryIds) {
         try {
-            Map<String, Object> graph = kgService.getGraph(domain);
+            // PMO-C T3: categoryIds 为空 = 全量（与既有行为一致）；非空 = 按分类白名单过滤
+            Map<String, Object> graph = kgService.getGraph(domain, categoryIds);
             return ApiResponse.success(graph);
         } catch (Exception e) {
             log.error("Failed to fetch knowledge graph: {}", e.getMessage(), e);

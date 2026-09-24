@@ -422,6 +422,19 @@ public class NavTaxonController {
     // ═══════════════ LLM 候选 ═══════════════
 
     /**
+     * PMO-C T2: 列出当前 nav 体系下所有 distinct domain（供前端多 domain 切换下拉）。
+     */
+    @GetMapping("/domains")
+    public ApiResponse<List<String>> listDomains() {
+        try {
+            return ApiResponse.success(navService.listDomains());
+        } catch (Exception e) {
+            log.error("nav domains 列表失败: {}", e.getMessage(), e);
+            return ApiResponse.internalError("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * LLM 归类候选（仅建议，不落库）。
      */
     @GetMapping("/recommend/{articleId}")

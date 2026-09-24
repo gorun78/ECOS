@@ -671,6 +671,29 @@ public class NavTaxonServiceImpl implements INavService {
         return llmRecommendService.recommend(articleId, title, content, domain);
     }
 
+    @Override
+    public List<String> listDomains() {
+        // PMO-C T2: distinct domain from category UNION distinct domain from tag（去 duplicate，升序）
+        String sql = "SELECT DISTINCT domain FROM ecos_knowledge.kb_nav_category WHERE is_deleted = 0 "
+                + "UNION "
+                + "SELECT DISTINCT domain FROM ecos_knowledge.kb_nav_tag WHERE is_deleted = 0 "
+                + "ORDER BY 1 ASC";
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(sql);
+            List<String> out = new ArrayList<>(rows.size());
+            for (Map<String, Object> row : rows) {
+                String d = str(row.get("domain"));
+                if (d != null && !d.isBlank()) {
+                    out.add(d);
+                }
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("nav listDomains 失败，回退为 default 单域: {}", e.getMessage(), e);
+            return new ArrayList<>(List.of("default"));
+        }
+    }
+
     // ═══════════════════════ 私有 helpers ═══════════════════════
 
     private static Map<String, Object> abac(Object... kv) {
