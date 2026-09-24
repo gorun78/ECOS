@@ -23,7 +23,7 @@
 ECOS 的病灶不是"三层并存"，是**分层没对齐**：
 
 - **dccheng 为什么乱**：它把"引擎层的对象管理"（ontology 的 19 个 Controller + knowledge 的 4 个）和"服务层的转化职责"（`cheng` 这个名字本该是 K→C 转化）**混在一个模块里**。名字是转化的名字，干的是对象管理的活。
-- **services 层为什么薄壳**：它还没按"格致诚明"四转化收敛，散成 12 个服务。应收敛为 4 个转化服务：ge-service（D→I）、zhi-service（I→K）、cheng-service（K→C）、ming-service（K→W）。
+- **services 层为什么薄壳**：它还没按"格致诚明"四转化收敛，散成 12 个服务。应收敛为 4 个转化服务：ge-service（D→I）、zhi-service（I→K）、cheng-service（K→C）、ming-service（**C→W**，v1.4 修订）。
 - **修复方向**：不是"删 dccheng"，是"拆解 dccheng"——对象代码归还引擎层（五行），`cheng` 名归还服务层（格致诚明）。
 
 ---
@@ -31,7 +31,7 @@ ECOS 的病灶不是"三层并存"，是**分层没对齐**：
 ## 一、修复总原则
 
 1. **引擎层（五对象·五行）是对象管理的唯一权威**。data/ontology/kb/cognitive/ai 五引擎各管其对象生命周期，security-engine 是横切的"护"。
-2. **服务层（四转化·格致诚明）只做对象间转化**。ge（D→I）、zhi（I→K）、cheng（K→C）、ming（K→W）。
+2. **服务层（四转化·格致诚明）只做对象间转化**。ge（D→I）、zhi（I→K）、cheng（K→C）、ming（**C→W**）（v1.4 修订：原 K→W 降级为"Knowledge-driven Action"特殊通道）。
 3. **拆解 dccheng，不修它**。24 个 Controller 全部在引擎层有对应，对象代码归还引擎，`cheng` 名归还服务层。
 4. **services 层本次只修冲突，不废弃**。它是未来四转化服务的雏形，先消除路径冲突，收敛留后续。
 5. **不破坏三版本架构**。缓存选型分版本：standard=Caffeine 本地，enterprise/ultimate 加 Redis。
@@ -127,7 +127,7 @@ runtime 现状 515 文件（7 子模块），是历史大本营。按「器」�
 | D1 | ArchUnit 扩展到 engine/sysman/gateway 模块（已有 5 测试基础，增量补断言） | 断言：engine 不依赖 dccheng、Controller 跨模块不重复、API 路径不重复 |
 | D2 | ~~ComponentFactory 迪米特法则~~ **作废**（死代码已删） | — |
 | D3 | ~~previewRestfulData 12 参数~~ **作废**（已删） | — |
-| D4 | **services 层收敛为四转化服务**：ge-service（D→I）、zhi-service（I→K）、cheng-service（K→C）、ming-service（K→W），替换散乱的 10 个子服务 | 每转化服务有独立 Controller + curl 验收 |
+| D4 | **services 层收敛为四转化服务**：ge-service（D→I）、zhi-service（I→K）、cheng-service（K→C）、ming-service（**C→W**），替换散乱的 10 个子服务 | 每转化服务有独立 Controller + curl 验收 |
 
 ---
 

@@ -1,13 +1,15 @@
 # ECOS 架构铁律 — 所有PMO指令强制执行
 
-> 版本: 1.1 | 2026-09-16 | 基于 Phase 1-2 实战教训 + 后端AGENTS.md + 前端GEMINI.md + 六引擎契约
+> 版本: 1.4 | 2026-09-24 | 基于 v1.3 + DIKCW 核心关系升级（架构铁律 v1.4，PMO-XX 指令批准）
 > 此文件是ECOS开发的**宪法**。每条PMO指令必须在开头引用，违反任一铁律=验收不通过。
+>
+> **2026-09-24 v1.4 变更**（DIKCW 核心关系模型升级 · 架构哲学演进）: 五对象 (D/I/K/C/W) 对象定义升级；主认知链从「单向流水线」升级为 **Enterprise Cognitive Loop**（`D→I→K→C→W` 主链 + `W→D` 现实反馈链）；四转化「明」由 `K→W` **重新定义为 `C→W`**（`K→W` 仅作确定性知识驱动自动化特殊通道保留）；**C = f(D,I,K,Context,Evidence,Hypothesis,Belief,Cognitive Model)** 不是 K 的简单下游；**W ≠ AI/LLM/Agent**，W = Decision/Strategy/Policy/Action/Execution；cognitive↔ai 边界明文（LLM 不替代因果推理）；数据/数据库边界不变（认知层四表不变，禁止新增 cognitive_* 表）。
 >
 > **2026-09-16 v1.1 变更**（§1.2 三滤波器「豁免写法」判据修正 · 用户批准）: 实证**路径重写先于鉴权**（`VersionPrefixRewriteFilter` `@Order(MIN+10)` 早于 Spring Security `-100`，鉴权层只见裸路径），废止「双路径各写一遍」的机械表述，改为三步判据（是否应匿名 → 是否在 `V1_REWRITE_MAP` 内 → 匿名回归）。触发事故：误补 `/api/integration/**` permitAll 致未认证可读数据源 `host/port/username/jdbcUrl`（同 T3-006，违反 §2.4-6），已撤销。
 >
 > **2026-09-19 变更**（新增 §0.5 三工作台职责边界铁律 · 用户批准）: 数据工作台（土 D）/ 本体工作台（金 I）/ 知识工作台（水 K + 木 C）职责边界与五条边界铁律，依据 `docs/plans/knowledge-workbench-replan-v1.md`（v2.1）§1。
 >
-> ⚠ 本文件的架构描述仍为 v1.0 单体态（微服务 v2 尚未同步）；工厂副本 `.trae/rules/架构铁律.md` 已至 v1.3，冲突时以工厂副本为准（见文末同步说明）。
+> ⚠ 本文件的结构描述仍为 v1.0 单体态；工厂副本 `.trae/rules/架构铁律.md` 与 v1.4 同步（DIKCW 核心哲学已对齐），冲突时以工厂副本 §0.2.1 + 本文件 §0.2 修订为准。
 
 ---
 
@@ -38,7 +40,7 @@ ECOS 反应中国古代智慧，全系统分两层核心：
 | ge（格） | D→I | 格物 |
 | zhi（致） | I→K | 致知 |
 | cheng（诚） | K→C | 诚意 |
-| ming（明） | K→W | 明明德 |
+| ming（明） | **C→W** | 明德 |
 
 **系统分层（自上而下）**：
 
@@ -86,7 +88,7 @@ ultimate    → PG + Neo4j + Doris (单表>100万行启用列存)
 
 ### 0.5 三工作台职责边界铁律（🔴 2026-09-19 新增）
 
-三个工作台是**用户视角的职能划分**，映射到引擎：数据工作台 = `data-engine`（土 D）、本体工作台 = `ontology-engine`（金 I）、知识工作台 = `kb-engine`（水 K）+ `cognitive-engine`（木 C）。三者构成**单向流水线**：
+三个工作台是**用户视角的职能划分**，映射到引擎：数据工作台 = `data-engine`（土 D）、本体工作台 = `ontology-engine`（金 I）、知识工作台 = `kb-engine`（水 K）+ `cognitive-engine`（木 C）。三者构成**单向认知链路**（v1.4 起，是 Enterprise Cognitive Loop 的 D→I→K 前段；完整的 W→D 反馈链由 action/agent 与运营闭环产生）：
 
 ```
 数据工作台（存储与加工） → 本体工作台（模型与映射契约） → 知识工作台（语义实例化）

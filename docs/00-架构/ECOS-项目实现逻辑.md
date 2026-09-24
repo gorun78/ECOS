@@ -45,8 +45,8 @@
 |:--|:--|:--|
 | ge（格物） | D→I 数据→信息 | 代码寄居 `data-engine-impl/transform` 包（:18082），无独立 service |
 | zhi（致知） | I→K 信息→知识 | `ontology-engine` → `kb-engine` `KgSyncService.sync`（REST :18086） |
-| cheng（诚） | K→C 知识→认知 | 待独立 service（阶段 D4） |
-| ming（明） | K→W 知识→智慧 | 待独立 service（阶段 D4） |
+| cheng（诚） | K→C 知识→认知 | `cognitive-engine`（:18084） responsible for 情境→认知推理 |
+| ming（明） | **C→W 认知→决策与行动**（v1.4 修订，原 `K→W` 降级为"确定性知识驱动自动化"特殊通道） | `ai-engine` 行动编排（Agent/Tool Calling/Action Orchestration） |
 
 ### 1.3 依赖方向铁律
 

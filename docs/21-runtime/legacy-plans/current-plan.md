@@ -56,7 +56,7 @@
 | b) 数据服务 | `services/datanet` | data-engine + ge 转化 | 18082 | `data-engine-impl` | 数据源/管道/血缘/DQ + D→I 转化（ge） |
 | c) 本体服务 | `services/buszhi` | ontology-engine + zhi（KG 同步/抽取经 REST→dccheng） | 18083 | `ontology-engine-impl` | 本体建模/对象/关系/版本 + 工作流引擎 |
 | d) 知识服务 | `services/dccheng` | kb-engine + cognitive-engine | 18086 | `kb-engine-impl` + `cognitive-engine-impl` | KG/RAG/规则 + 因果推理/情景模拟 + I→K（zhi）+ K→C（cheng）转化 |
-| e) 智能服务 | `services/aiming` | ai-engine | 18084 | `ai-engine-impl` + `llm-gateway` | Agent/Loop/LLM 调用/Memory + K→W（ming）转化 |
+| e) 智能服务 | `services/aiming` | ai-engine | 18084 | `ai-engine-impl` + `llm-gateway` | Agent/Loop/LLM 调用/Memory + C→W（ming）转化（v1.4 修订，原 K→W） |
 | — | `gateway`（顶层，与 engine 平级） | —（纯网关） | 8080 | `common-api` + security-engine-api（认证验证） | 统一入口/路由/认证前置/限流/监控聚合 |
 
 **引擎独立性**:

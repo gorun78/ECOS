@@ -36,7 +36,7 @@
 | `20-services/datanet/` | `services/datanet`（封装 data-engine + ge 转化） | :18082 | 数据服务业务封装、ge（D→I）转化逻辑、数据湖生产管道 | `ge-transform-design.md` / `data-pipeline-orch.md` |
 | `20-services/buszhi/` | `services/buszhi`（封装 ontology-engine + 工作流） | :18083 | 工作流状态机/审批、zhi（I→K）KG 同步、DSL 编译部署 | `workflow-state-machine.md` / `zhi-kg-sync.md` |
 | `20-services/dccheng/` | `services/dccheng`（封装 kb + cognitive 双引擎） | :18086 | 知识服务封装、cheng（K→C）推理编排、知识库工作流 | `cheng-reasoning-orch.md` / `kb-workflow.md` |
-| `20-services/aiming/` | `services/aiming`（封装 ai-engine + llm-gateway） | :18084 | Agent 服务封装、ming（K→W）转化、LLM 调用统一入口 | `ming-agent-design.md` / `llm-gateway-usage.md` |
+| `20-services/aiming/` | `services/aiming`（封装 ai-engine + llm-gateway） | :18084 | Agent 服务封装、ming（**C→W** 认知→决策与行动）转化、LLM 调用统一入口（v1.4 修订：原 K→W 降级为"确定性知识驱动自动化"） | `ming-agent-design.md` / `llm-gateway-usage.md` |
 
 ### 0.3 跨域/横切目录（按方法论 + 基础设施划分）
 
