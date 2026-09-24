@@ -180,11 +180,14 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         if (cronExpression == null || cronExpression.trim().isEmpty()) {
             return "0 0 * * * *";
         }
-        String[] parts = cronExpression.trim().split("\\s+");
+        // 兼容 Quartz cron（'?' 是 Day-OfMonth/Day-of-Week 占位）→ Spring CronExpression 只认 '*':
+        // Spring CronExpression.parse 不支持 '?'，直接会漏 narrow down，最底层是 IAE 被 catch 而静默返 scheduleId
+        String normalized = cronExpression.trim().replace('?', '*');
+        String[] parts = normalized.split("\\s+");
         if (parts.length == 5) {
-            return "0 " + cronExpression.trim();
+            return "0 " + normalized;
         }
-        return cronExpression.trim();
+        return normalized;
     }
     
     @Override
