@@ -1,9 +1,19 @@
 # 知识导航设计文档（PMO-B T4）
 
 > 来源: PMO-B 任务规格 | 日期: 2026-09-24 | 责任人: FullStack 实现工程师
-> 版本: v1.0（任务批次 1：在 PMO-A 之上做检索下沉 + 前端替换）
+> 版本: v1.1（批次 2：§7 未做项 3 项下沉重）
 > 追溯: PMO-A 已交付 kb_nav_category / kb_nav_tag / kb_nav_article_rel 3 张 DDL（V155/156/157）
 > 上游: .trae/rules/铁律 §2.4（安全）/ §4.1（主题）/ §4.3（i18n）
+
+## 批次 2 变更表
+
+| # | 项 | 动作 | commit |
+|:--:|:--|:--|:--|
+| 1 | §7 未做项 #1：`POST /rag` 的 `tags` 字段增下行 WHERE | `KnowledgeRetrievalServiceImpl` 新增 `matchesTagFilter(articleId, tags)` 对称 `matchesNavFilter`；向量 + 关键词回退两路 OR 命中（navFilter/tagFilter 二选一） | 见 backend commit hash |
+| 2 | §7 未做项 #2：`GET /graph` 增加 `categoryIds` 参数 | `KnowledgeGraphService` 加 `getGraph(domain, List<String> categoryIds)` overload；`KnowledgeGraphController` L23 加 `@RequestParam(required=false) List<String> categoryIds`；impl 走策略 B（PG `kb_nav_article_rel` 白名单 + 内存过滤 nodes/edges，`kg-root` 锚点保留） | 见 backend commit hash |
+| 3 | §7 未做项 #3：多 domain 切换 | `INavService.listDomains()` + `NavTaxonController` `GET /api/v1/knowledge/nav/domains`（UNION category ∪ tag distinct domain）；前端 `knowledgeNavApi.ts` 加 `fetchNavDomains()`，`ClassificationTab` / `GraphExplorerTab` domain 下拉改用真实列表 | 见 frontend commit hash |
+
+> 保留未做项（§7 #4/#5，P3 后置）：`kb_nav_category` level 4+ 拆表 / `matchesNavFilter` 批量 IN 优化（candidateIds 展开）。
 
 ## 一、定位边界
 
@@ -162,11 +172,11 @@
 
 ## 七、未做项（P3 / 后续批次）
 
-- POST /rag 的 tags 字段增下行 WHERE（仅占位）；
-- 图谱 GET /graph 增加 categoryIds 参数（当前前端二次过滤，后续后端下沉）；
-- 多 domain 切换（当前前端硬编码 default）；
-- kb_nav_category 拆表（如 level 3 以上 3 级深度演进）；
-- 批量 IN 优化 matchesNavFilter 查询次数。
+- ~~`POST /rag` 的 `tags` 字段增下行 WHERE（仅占位）~~ ✅ 2026-09-24 PMO-C（`matchesTagFilter` 对称 `matchesNavFilter`，向量 + 关键词回退 OR 命中，见批次 2 变更表 #1）；
+- ~~图谱 `GET /graph` 增加 `categoryIds` 参数（当前前端二次过滤，后续后端下沉）~~ ✅ 2026-09-24 PMO-C（`getGraph(domain, categoryIds)` overload + PG `kb_nav_article_rel` 白名单 + 内存过滤，见批次 2 变更表 #2）；
+- ~~多 domain 切换（当前前端硬编码 default）~~ ✅ 2026-09-24 PMO-C（`INavService.listDomains()` + `GET /nav/domains` + 前端 domain 下拉，见批次 2 变更表 #3）；
+- `kb_nav_category` 拆表（如 level 3 以上 3 级深度演进）——P3；
+- 批量 IN 优化 `matchesNavFilter` 查询次数（candidateIds 展开）——P3 性能专项。
 
 ---
-> 本设计文档 v1.0 制定于 2026-09-24，由 PMO-B 任务批次 1 提交，后续批次（PMO-C 性能 / P3 接 Copilot）需同步更新。
+> 本设计文档 v1.0 制定于 2026-09-24，由 PMO-B 任务批次 1 提交，v1.1 于 2026-09-24 由 PMO-C 批次 2 落地 §7 未做项 #1~#3。后续批次（PMO-C 性能 / P3 接 Copilot）需同步更新。
