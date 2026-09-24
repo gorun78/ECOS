@@ -113,6 +113,14 @@ export async function fetchNavCategories(
   return apiFetchData<NavCategoryVO[]>(`${NAV_BASE}/categories?${params.toString()}`);
 }
 
+/**
+ * PMO-C T2: 列出当前 nav 体系下所有 distinct domain（目录 ∪ 标签，升序）。
+ * 供多 domain 切换下拉使用；后端无数据时回退为 ['default']。
+ */
+export async function fetchNavDomains(): Promise<string[]> {
+  return apiFetchData<string[]>(`${NAV_BASE}/domains`);
+}
+
 /** 创建目录（一级 parentId=null，二级/三级指定 parentId） */
 export async function createNavCategory(dto: NavCategorySaveDTO): Promise<NavCategoryVO> {
   return apiFetchData<NavCategoryVO>(`${NAV_BASE}/categories`, {

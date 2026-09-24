@@ -136,8 +136,17 @@ export async function runRAGQuerySSE(query: string, onToken: (token: string) => 
   }
 }
 
-export async function fetchGraph(domain?: string) {
-  const q = domain ? `?domain=${encodeURIComponent(domain)}` : '';
+/**
+ * 拉取知识图谱。
+ * PMO-C T3: 追加可选 categoryIds → 后端按分类白名单过滤（null/[] = 全量，回归保证）。
+ */
+export async function fetchGraph(domain?: string, categoryIds?: string[]) {
+  const params = new URLSearchParams();
+  if (domain) params.set('domain', domain);
+  if (categoryIds && categoryIds.length > 0) {
+    categoryIds.forEach(cid => params.append('categoryIds', cid));
+  }
+  const q = params.toString() ? `?${params.toString()}` : '';
   return apiFetchData<{ nodes: unknown[]; edges: unknown[] }>(`${GRAPH_BASE}/graph${q}`);
 }
 

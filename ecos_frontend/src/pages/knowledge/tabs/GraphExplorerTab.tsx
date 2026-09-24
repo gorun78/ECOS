@@ -16,7 +16,7 @@ import {
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
-import { fetchNavCategories, type NavCategoryVO } from '../../../services/knowledgeNavApi';
+import { fetchNavCategories, fetchNavDomains, type NavCategoryVO } from '../../../services/knowledgeNavApi';
 import GraphCanvas from '../../../components/GraphCanvas';
 
 // ── Graph Node / Edge types (compatible with GraphCanvas) ──
@@ -76,17 +76,30 @@ export default function GraphExplorerTab() {
   const showToast = (type: string, msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 3000); };
 
   // PMO-B T3 — 按业务域过滤（默认空 = 全量，回归保证）
+  // PMO-C T2 — nav domain 切换（kb_nav_category.domain，与上方 graph domainFilter 区分）
+  const [navDomain, setNavDomain] = useState<string>('default');
+  const [navDomains, setNavDomains] = useState<string[]>(['default']);
   const [navCategories, setNavCategories] = useState<NavCategoryVO[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
-  const loadNavCategories = useCallback(async (): Promise<void> => {
+  const loadNavDomains = useCallback(async (): Promise<void> => {
     try {
-      const data = await fetchNavCategories('default');
+      const list = await fetchNavDomains();
+      setNavDomains(Array.isArray(list) && list.length > 0 ? list : ['default']);
+    } catch {
+      setNavDomains(['default']);
+    }
+  }, []);
+  const loadNavCategories = useCallback(async (d: string): Promise<void> => {
+    try {
+      const data = await fetchNavCategories(d);
       setNavCategories(Array.isArray(data) ? data : []);
     } catch {
       setNavCategories([]);
     }
   }, []);
-  useEffect(() => { void loadNavCategories(); }, [loadNavCategories]);
+  useEffect(() => { void loadNavDomains(); }, [loadNavDomains]);
+  // domain 变化时重拉目录树（categories 依赖 activeDomain）
+  useEffect(() => { void loadNavCategories(navDomain); }, [navDomain, loadNavCategories]);
   const toggleCategoryId = (id: string): void => {
     setSelectedCategoryIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   };
@@ -98,10 +111,11 @@ export default function GraphExplorerTab() {
   const loadGraph = useCallback(async (domain?: string) => {
     setIsLoading(true);
     try {
-      // PMO-B T3 — 如果 selectedCategoryIds 非空，前端侧按 categoryId 过滤（后端暂未支持，前端二次过滤 nodes 的 domain/cid 字段）
-      const data = await knowledgeApi.fetchGraph(domain) as any;
+      // PMO-C T3 — 后端下沉：categoryIds 非空时透传，后端按 kb_nav_article_rel 白名单过滤
+      const data = await knowledgeApi.fetchGraph(domain, selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined) as any;
       const rawNodes: GraphNode[] = data?.nodes || [];
       const rawEdges: GraphEdge[] = data?.edges || data?.links || [];
+      // P3 优化点：后端已按 nav 白名单过滤 nodes/edges；前端保留二次兜底（兼容旧后端无 categoryIds 参数）
       if (selectedCategoryIds.length > 0) {
         const idSet = new Set(selectedCategoryIds);
         const filteredNodes = rawNodes.filter(n => {
@@ -369,6 +383,25 @@ export default function GraphExplorerTab() {
           >
             {DOMAIN_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* PMO-C T2 — nav domain 切换（kb_nav_category.domain，区别于上方 graph domainFilter） */}
+        <div className="space-y-1.5">
+          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
+            {t('knowledge.nav.domain_filter_label')}
+          </label>
+          <select
+            value={navDomain}
+            onChange={(e) => setNavDomain(e.target.value)}
+            className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-blue-500 cursor-pointer`}
+          >
+            {!navDomains.includes('default') && (
+              <option value="default">{t('knowledge.nav.domain_default')}</option>
+            )}
+            {navDomains.map(d => (
+              <option key={d} value={d}>{d === 'default' ? t('knowledge.nav.domain_default') : d}</option>
             ))}
           </select>
         </div>

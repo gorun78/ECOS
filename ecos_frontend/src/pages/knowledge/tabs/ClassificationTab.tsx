@@ -34,6 +34,7 @@ import {
   setArticleCategories,
   undoArticle,
   recommendArticle,
+  fetchNavDomains,
   type NavCategorySaveDTO,
   type NavCategoryVO,
   type NavTagVO,
@@ -67,8 +68,20 @@ export default function ClassificationTab() {
   const { t } = useLanguage();
   const { styles } = useTheme();
 
-  // ── 全局 domain（当前硬编码 default，留接口以便未来扩展） ──
+  // ── 全局 domain（PMO-C T2: 多 domain 切换，拉取 nav domains 下拉；default 兜底） ──
   const [domain, setDomain] = useState<string>(DEFAULT_DOMAIN);
+  const [domains, setDomains] = useState<string[]>([DEFAULT_DOMAIN]);
+
+  // PMO-C T2: 加载可用 domain 列表（失败时保留 default 单选项，不阻塞）
+  const loadDomains = useCallback(async (): Promise<void> => {
+    try {
+      const list = await fetchNavDomains();
+      setDomains(Array.isArray(list) && list.length > 0 ? list : [DEFAULT_DOMAIN]);
+    } catch {
+      setDomains([DEFAULT_DOMAIN]);
+    }
+  }, []);
+  useEffect(() => { void loadDomains(); }, [loadDomains]);
 
   // ── 目录树 ──
   const [categories, setCategories] = useState<NavCategoryVO[]>([]);
@@ -397,7 +410,13 @@ export default function ClassificationTab() {
             aria-label={t('knowledge.nav.domain_filter_label')}
             className={`px-3 py-1.5 text-xs ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-blue-500 cursor-pointer`}
           >
-            <option value={DEFAULT_DOMAIN}>{t('knowledge.nav.domain_default')}</option>
+            {/* 兜底项：保证 default 始终可选（后端 domains 不含 default 时防孤儿态） */}
+            {!domains.includes(DEFAULT_DOMAIN) && (
+              <option value={DEFAULT_DOMAIN}>{t('knowledge.nav.domain_default')}</option>
+            )}
+            {domains.map(d => (
+              <option key={d} value={d}>{d === DEFAULT_DOMAIN ? t('knowledge.nav.domain_default') : d}</option>
+            ))}
           </select>
           <button
             onClick={() => { void (async () => { await Promise.all([loadCategories(), loadTags()]); }); }}
