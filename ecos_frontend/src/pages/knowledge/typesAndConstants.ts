@@ -1,4 +1,13 @@
 import type { KGNode, KGEdge, GlossaryTerm, GlossaryFilter, Domain } from '../../types/workbench';
+import type { LucideIcon } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Database,
+  ArrowDownUp,
+  Network,
+  BookOpen,
+  ShieldCheck,
+} from 'lucide-react';
 
 export type { KGNode, KGEdge, GlossaryTerm, GlossaryFilter, Domain };
 
@@ -321,6 +330,59 @@ export const KNOWLEDGE_TAB_GROUPS = [
 
 /** PMO-54 — Discriminated union of all tab ids — type-safe */
 export type KnowledgeTabId = (typeof KNOWLEDGE_TAB_GROUPS)[number]['tabs'][number]['id'];
+
+/** PMO-D Batch 1 — 撤下 8 Tab id（路由保留，侧栏不挂）。
+ * 这 8 个 id 是 KNOWN 的「撤下」集合，与 KnowledgeTabId 取并集供 KnowledgeView 路由/deep-link 消费。 */
+export const DEPRECATED_TAB_IDS = [
+  'rag',
+  'engine_config',
+  'ontology_model',
+  'graph_builder',
+  'glossary',
+  'sync',
+  'data_import',
+  'vector_index',
+] as const;
+
+export type DeprecatedTabId = (typeof DEPRECATED_TAB_IDS)[number];
+
+/** PMO-D Batch 1 — 全量路由可达 Tab id 集（含撤下 8） */
+export type AnyKnowledgeTabId = KnowledgeTabId | DeprecatedTabId;
+
+// ── PMO-D Batch 1 — 6 平铺页面侧栏数据源 ─────────────────────────────────────
+
+/** PMO-D Batch 1 — 6 平铺页面（F1）侧栏数据源 */
+export const ACTIVE_PAGES = ['overview', 'assets', 'extract', 'graph', 'wiki', 'govern'] as const;
+export type ActivePage = (typeof ACTIVE_PAGES)[number];
+
+/** PMO-D Batch 1 — i18n 前缀（zh-CN: knowledge.nav.page_overview 等） */
+export const ACTIVE_PAGE_I18N_KEYS: Record<ActivePage, string> = {
+  overview: 'knowledge.nav.page_overview',
+  assets: 'knowledge.nav.page_assets',
+  extract: 'knowledge.nav.page_extract',
+  graph: 'knowledge.nav.page_graph',
+  wiki: 'knowledge.nav.page_wiki',
+  govern: 'knowledge.nav.page_govern',
+};
+
+/**
+ * PMO-D Batch 1 — 6 页面 Lucide icon 映射。
+ * 铁律 §4.2 lucide-only：LayoutDashboard/Database/ArrowDownUp/Network/BookOpen/ShieldCheck。
+ */
+export const ACTIVE_PAGE_ICONS: Record<ActivePage, LucideIcon> = {
+  overview: LayoutDashboard,
+  assets: Database,
+  extract: ArrowDownUp,
+  graph: Network,
+  wiki: BookOpen,
+  govern: ShieldCheck,
+};
+
+/**
+ * PMO-D Batch 1 — 撤下 8 Tab（路由保留，侧栏不挂，deep-link + warn banner 由 F8 实现）。
+ * 默认导出供 KnowledgeView 内部 read-only 消费；不进 KnowledgeTabId union。
+ */
+export const DEPRECATED_TABS: Readonly<DeprecatedTabId[]> = DEPRECATED_TAB_IDS;
 
 export const DEFAULT_SETTINGS: KnowledgeSettings = {
   defaultVectorModel: 'text-embedding-004',

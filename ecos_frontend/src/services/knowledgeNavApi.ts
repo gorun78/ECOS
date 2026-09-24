@@ -252,6 +252,45 @@ export async function addArticleTags(
   );
 }
 
+/**
+ * PMO-D Batch 1（F10）— 知识资产批量状态接口。
+ *
+ * 后端契约（KnowledgeArticleController GET /api/v1/knowledge/assets/status?ids=）：
+ * - 入参：`ids` — 逗号分隔的文章 ID，单次 ≤ 100
+ * - 返回：`{ items: AssetStatusItem[] }`（强类型 VO 非 Map，铁律 §2.1）
+ * - 双引擎并行批查（graph 状态 = Neo4j 存在性；vector 状态 = pgvector 状态）
+ *
+ * 前端 Policy：超过 100 ids 时由调用方（AssetListPage）chunk = 100 并发请求，
+ * 此函数单次 ids ≤ 100，否则报错（避免静默截断）。
+ */
+export interface AssetStatusItem {
+  articleId: string;
+  /** 是否已入图谱（Neo4j / graph_node） */
+  graph: boolean;
+  /** 是否已入向量索引（pgvector 且 is_deleted=0） */
+  vector: boolean;
+}
+
+/**
+ * 批量查询知识资产的图谱 / 向量双写状态。
+ *
+ * @param ids 资产 ID 列表（单次 ≤ 100，超过 400 由调用方分片；本函数做最后的安全检查直接拒绝）
+ * @returns `AssetStatusItem[]`；后端无命中时返回 items=[] 或空数组
+ */
+export async function fetchAssetStatuses(ids: string[]): Promise<AssetStatusItem[]> {
+  if (!ids || ids.length === 0) return [];
+  if (ids.length > 100) {
+    throw new Error('fetchAssetStatuses: ids must be ≤ 100 per batch (caller must chunk)');
+  }
+  const qs = `?ids=${encodeURIComponent(ids.join(','))}`;
+  const data = await apiFetchData<{ items?: AssetStatusItem[] } | AssetStatusItem[]>(
+    `/api/v1/knowledge/assets/status${qs}`,
+  );
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
+}
+
 /** Undo — 删除文章在某 scope（category / tag）下的全部 rel 行 */
 export async function undoArticle(articleId: string, scope: 'category' | 'tag'): Promise<Record<string, string>> {
   return apiFetchData<Record<string, string>>(
