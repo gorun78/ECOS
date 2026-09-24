@@ -119,6 +119,18 @@ public class KbRestClientConfig {
                 }
             }
 
+            /**
+             * 4 参 getGraph REST 代理 — PMO-C T3 接口扩展兼容（categoryIds 暂不参与 REST 过滤，
+             * 降级到 1 参全量 + catalog 端点未覆盖时无差别）。
+             */
+            @Override
+            @SuppressWarnings("unchecked")
+            public Map<String, Object> getGraph(String domain, List<String> categoryIds) {
+                log.debug("KB REST getGraph 4-param 调用，降级到 1-param REST 代理: cats={}",
+                        categoryIds == null ? 0 : categoryIds.size());
+                return getGraph(domain);
+            }
+
             @Override
             public Map<String, Object> getNodeDetail(String nodeId) {
                 try {
@@ -266,6 +278,19 @@ public class KbRestClientConfig {
                     log.warn("KB REST ragQuery 失败: query={}, error={}", queryText, e.getMessage());
                     return Collections.emptyMap();
                 }
+            }
+
+            /**
+             * 5 参 ragQuery REST 代理 — PMO-B T1 接口扩展兼容（categoryIds/tags 暂不参与 REST 收窄，
+             * 退化为 4 参全量检索；catalog 端点未覆盖时无差别降级）。
+             */
+            @Override
+            public Map<String, Object> ragQuery(String queryText, int topK, double threshold,
+                                                List<String> categoryIds, List<String> tags) {
+                log.debug("KB REST ragQuery 5-param 调用，降级到 4 参 REST 代理: cats={}, tags={}",
+                        categoryIds == null ? 0 : categoryIds.size(),
+                        tags == null ? 0 : tags.size());
+                return ragQuery(queryText, topK, threshold);
             }
 
             @Override
