@@ -77,15 +77,25 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             return scheduleId;
         }
 
-        // 持久化调度元信息到 td_runtime_task_plan（PMO-72 W4）
-        // 失败容忍：PG 不可达时 warn 不抛，调度继续（双态）
-        Date nextRun = toDate(cron.next(Instant.now()));
-        persistPlanCron(scheduleId, taskDescription, normalized, nextRun);
+        // 周期调度装配需 cron.next() 推下次触发 —— day-of-week 等字段在 Spring 6.1 下推演可能抛
+        // UnsupportedTemporalTypeException (DayOfWeek) 等运行时异常，这里统一容忍:
+        // 任何 init 期失败都降级为 "无周期不重排"，不拖垮 Spring context 与 @PostConstruct。
+        // (容忍口径与 persistPlanCron 一致: 失败容 warn，不影响其它业务 bean。)
+        try {
+            // 持久化调度元信息到 td_runtime_task_plan（PMO-72 W4）
+            // 失败容忍：PG 不可达时 warn 不抛，调度继续（双态）
+            Date nextRun = toDate(cron.next(Instant.now()));
+            persistPlanCron(scheduleId, taskDescription, normalized, nextRun);
 
-        // 真实 cron 周期调度：计算当前时刻的下次触发时间，触发后按 next() 重排下一次
-        rescheduleCron(scheduleId, taskDescription, cron);
-        log.info("定时任务已注册 scheduleId={} cron={} taskId={}",
-                scheduleId, normalized, taskDescription.getTaskId());
+            // 真实 cron 周期调度：计算当前时刻的下次触发时间，触发后按 next() 重排下一次
+            rescheduleCron(scheduleId, taskDescription, cron);
+            log.info("定时任务已注册 scheduleId={} cron={} taskId={}",
+                    scheduleId, normalized, taskDescription.getTaskId());
+        } catch (Exception e) {
+            // 周期注册降级：任务仍写 taskDescriptions 可用 submit 手动触发，但不绑 cron 回环。
+            log.warn("cron 周期注册降级 (无法计算下次触发, 任务仍可手动执行) scheduleId={} task={} cron={}: {}",
+                    scheduleId, taskDescription.getTaskId(), normalized, e.getMessage());
+        }
         return scheduleId;
     }
 
