@@ -2,11 +2,14 @@
  * DataAssetsDashboard — 数据资产 + 分级分类（PMO-data10）。
  *
  * 消费 data-engine 资产 CRUD + security-tag REST：
- *   GET    /api/v1/datanet/assets                (列表)
+ *   GET    /api/v1/datanet/assets                (列表 — 已登记资产;空则物理层 pd_ son_td_data_resource 占位视图)
  *   GET    /api/v1/datanet/assets/{assetId}/fields        (字段级敏感度)
  *   POST   /api/v1/datanet/assets/{assetId}/security-tag  (人工确认打标)
  *   GET    /api/v1/datanet/levels                  (4 级字典)
  *   GET    /api/v1/datanet/categories              (业务分类树)
+ *
+ * 国际化： 全部 label 走 t('dw.assets.*')；下拉 option text 已国际化；
+ *         字段级数据维度（L1/L2/L3/L4 等级 code、data_type 枚举）保持流转原入。
  *
  * 768px 不溢出：grid-cols-1 md:grid-cols-2（桌面双栏， 平板以下单列），
  * 卡片 min-w-0+overflow:hidden 防表格溢出， 字段名 truncate。
@@ -23,8 +26,17 @@ interface Props {
 
 const API = '/api/v1/datanet';
 
+/** 从 localStorage 读取 Bearer Token（与 data-workbench/api.ts 同一套逻辑） */
+function authHeaders(): Record<string, string> {
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('accessToken') || '') : '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(init?.headers ?? {}) },
+    ...init,
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -77,11 +89,11 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
       const resp = await api<{ data: DataAssetVO[] }>(`${API}/assets?${params.toString()}`);
       setAssets(resp.data ?? []);
     } catch (e) {
-      showToast('error', 'Failed to load assets: ' + (e as Error).message);
+      showToast('error', t('dw.assets.loadFailed').replace('{msg}', (e as Error).message));
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => {
     loadAssets(filter);
@@ -95,7 +107,11 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
         const resp = await api<{ data: DataAssetFieldVO[] }>(
           `${API}/assets/${encodeURIComponent(selectedAssetId)}/fields?page=1&pageSize=200`,
         );
-        setFields(resp.data?.items ?? []);
+        // 后端可能直接返回数组；同时兼容包一层 { items: [...] } 形式（防御性处理）
+        const arr = Array.isArray(resp.data)
+          ? resp.data
+          : (resp.data as unknown as { items?: DataAssetFieldVO[] })?.items ?? [];
+        setFields(arr);
       } catch {
         setFields([]);
       }
@@ -118,20 +134,22 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-3 overflow-hidden">
-      {/* 顶栏 —— 横滑 filter（768px 适配 flex-wrap） */}
+      {/* 顶栏 —— 横滑 filter（768px 适配 flex-wrap）—— 全国际化 */}
       <div className={`flex flex-wrap items-center gap-2 ${styles.cardTextMuted}`}>
-        <span className="font-bold text-sm shrink-0">{t('dw.tab.data_assets') || 'Data Assets'}</span>
-        <span className="text-xs shrink-0">{assets.length} items</span>
+        <span className="font-bold text-sm shrink-0">{t('dw.assets.title')}</span>
+        <span className="text-xs shrink-0">{assets.length} {t('dw.assets.itemsUnit')}</span>
         <div className="flex-1 min-w-4" />
         <select
           className={`text-xs border rounded px-1.5 py-1 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}
           value={filter.level}
           onChange={e => setFilter({ ...filter, level: e.target.value })}
         >
-          <option value="">All levels</option>
+          <option value="">{t('dw.assets.allLevels')}</option>
           {(levels.length ? levels : [
-            { levelCode: 'L1', levelName: '公开' }, { levelCode: 'L2', levelName: '内部' },
-            { levelCode: 'L3', levelName: '敏感' }, { levelCode: 'L4', levelName: '核心机密' },
+            { levelCode: 'L1', levelName: t('dw.assets.level.L1') },
+            { levelCode: 'L2', levelName: t('dw.assets.level.L2') },
+            { levelCode: 'L3', levelName: t('dw.assets.level.L3') },
+            { levelCode: 'L4', levelName: t('dw.assets.level.L4') },
           ] as DataLevelDef[]).map(l => <option key={l.levelCode} value={l.levelCode}>{l.levelCode} {l.levelName}</option>)}
         </select>
         <select
@@ -139,11 +157,11 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           value={filter.category}
           onChange={e => setFilter({ ...filter, category: e.target.value })}
         >
-          <option value="">All categories</option>
+          <option value="">{t('dw.assets.allCategories')}</option>
           {categories.filter(c => c.level === 2).map(c => <option key={c.categoryId} value={c.categoryId}>{c.name}</option>)}
         </select>
         <input
-          placeholder="Keyword..."
+          placeholder={t('dw.assets.keywords')}
           className="text-xs border rounded px-2 py-1 min-w-[140px] md:min-w-[200px]"
           value={filter.keyword}
           onChange={e => setFilter({ ...filter, keyword: e.target.value })}
@@ -157,13 +175,13 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           <CardBlock className="flex-1 overflow-hidden">
             <div className="flex flex-col h-full min-h-0">
               <div className={`flex items-center justify-between text-xs font-bold ${styles.cardText}`}>
-                <span>{assets.length} assets</span>
+                <span>{assets.length} {t('dw.assets.count')}</span>
               </div>
               <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-1">
                 {loading ? (
                   <div className="h-10 w-10 animate-spin rounded-full border-2 border-current opacity-60 mx-auto" />
                 ) : assets.length === 0 ? (
-                  <div className="text-xs opacity-60 py-4 text-center">No assets yet</div>
+                  <div className="text-xs opacity-60 py-4 text-center">{t('dw.assets.empty')}</div>
                 ) : (
                   assets.map(a => (
                     <button
@@ -189,7 +207,7 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
                       </div>
                       <div className="mt-1 flex justify-between text-[10px] opacity-70">
                         <span>{a.owner || '—'}</span>
-                        <span>{(a.confirmedFieldCount ?? 0)} fields confirmed</span>
+                        <span>{(a.confirmedFieldCount ?? 0)} {t('dw.assets.optionalFields')}</span>
                       </div>
                     </button>
                   ))
@@ -204,7 +222,7 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           <CardBlock className="max-h-full overflow-y-auto">
             {!selectedAssetId ? (
               <div className={`flex items-center justify-center text-xs opacity-60 h-full py-8`}>
-                Select an asset on the left to see details
+                {t('dw.assets.selectHint')}
               </div>
             ) : (
               <AssetDetail
@@ -224,7 +242,7 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
   );
 }
 
-/** 资产详情 —— 基础信息 + 字段级敏感度表 + 打标表单。 */
+/** 资产详情 —— 基础信息 + 字段级敏感度表 + 打标表单。全部 i18n。 */
 function AssetDetail({
   asset, fields, levels, showToast, t, onChanged, filter,
 }: {
@@ -262,27 +280,24 @@ function AssetDetail({
           }],
         }),
       });
-      showToast('success', 'Security tag saved (policy generated asynchronously)');
+      showToast('success', t('dw.assets.tagSaved'));
       setEditingFieldId(null);
       // 同步刷新资产列表与当前资产字段
       await onChanged(filter);
       const resp = await api<{ data: DataAssetFieldVO[] }>(
         `${API}/assets/${asset.assetId}/fields?page=1&pageSize=200`,
       );
-      // 父层用 _bumped 字段触发 useEffect 不需要， 这里直接重拉父层已完成。
-      // 父层 fields 状态变化由 selectedAssetId 的 effect 重算 —— 为防止漏对齐， 做一次 request
-      // 但父层 effect 只依赖 selectedAssetId， 这里无法 bump —— 父层在 onSaved 时 callback 触发，
-      // 会重跑该 effect 区间内的依赖（filter 未变）， 所以父层 fields 仍旧 —— 直接 window.location 重载太重。
-      // 替代方案： 父层用 setTimeout 重拉 fields (可选)。
       void resp;
     } catch (e) {
-      showToast('error', 'Tag failed: ' + (e as Error).message);
+      showToast('error', t('dw.assets.tagFailed').replace('{msg}', (e as Error).message));
     }
   };
 
   const levelOptions = levels.length ? levels : [
-    { levelCode: 'L1', levelName: '公开' }, { levelCode: 'L2', levelName: '内部' },
-    { levelCode: 'L3', levelName: '敏感' }, { levelCode: 'L4', levelName: '核心机密' },
+    { levelCode: 'L1', levelName: t('dw.assets.level.L1') },
+    { levelCode: 'L2', levelName: t('dw.assets.level.L2') },
+    { levelCode: 'L3', levelName: t('dw.assets.level.L3') },
+    { levelCode: 'L4', levelName: t('dw.assets.level.L4') },
   ];
 
   return (
@@ -292,7 +307,7 @@ function AssetDetail({
         <div className="font-bold text-sm">{asset.assetName}</div>
         <div className="grid grid-cols-2 text-[11px] opacity-80 mt-0.5">
           <span className="truncate">{asset.resourceName}</span>
-          <span>Layer: {asset.layer} {asset.zone ? `· ${asset.zone}` : ''}</span>
+          <span>{t('dw.assets.layer')}: {asset.layer} {asset.zone ? `· ${asset.zone}` : ''}</span>
         </div>
         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -305,15 +320,15 @@ function AssetDetail({
           </span>
           {asset.categoryStatus && (
             <span className={`text-[10px] ${styles.cardTextMuted}`}>
-              status={asset.categoryStatus}
+              {t('dw.assets.status')}={asset.categoryStatus}
             </span>
           )}
         </div>
         <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] mt-2">
-          <div><span className="opacity-60">Owner</span>: {asset.owner || '—'}</div>
-          <div><span className="opacity-60">Organization</span>: {asset.ownerOrg || '—'}</div>
+          <div><span className="opacity-60">{t('dw.assets.owner')}</span>: {asset.owner || '—'}</div>
+          <div><span className="opacity-60">{t('dw.assets.organization')}</span>: {asset.ownerOrg || '—'}</div>
           <div className="col-span-2">
-            <span className="opacity-60">Description</span>: {asset.businessDesc || '—'}
+            <span className="opacity-60">{t('dw.assets.description')}</span>: {asset.businessDesc || '—'}
           </div>
         </div>
       </div>
@@ -321,24 +336,24 @@ function AssetDetail({
       {/* 字段级敏感度表 */}
       <div>
         <div className={`text-xs font-bold ${styles.cardText} mb-1.5`}>
-          {fields.length} tagged fields (filtered by confirmed=true)
+          {fields.length} {t('dw.assets.fieldsTitle')}
         </div>
         <div className={`overflow-x-auto ${styles.cardBg} border rounded text-xs`}>
           <table className="w-full text-left">
             <thead>
               <tr className={`border-b ${styles.cardBorder}`}>
-                <th className="px-2 py-1 text-right w-5">Status</th>
-                <th className="px-2 py-1">Field</th>
-                <th className="px-2 py-1">Data Type</th>
-                <th className="px-2 py-1">Sensitivity</th>
-                <th className="px-2 py-1">Mask</th>
-                <th className="px-2 py-1 text-right">Actions</th>
+                <th className="px-2 py-1 text-right w-5">{t('dw.assets.colStatus')}</th>
+                <th className="px-2 py-1">{t('dw.assets.colField')}</th>
+                <th className="px-2 py-1">{t('dw.assets.colDataType')}</th>
+                <th className="px-2 py-1">{t('dw.assets.colSensitivity')}</th>
+                <th className="px-2 py-1">{t('dw.assets.colMask')}</th>
+                <th className="px-2 py-1 text-right">{t('dw.assets.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {fields.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="h-12 text-center opacity-60">No tagged fields yet</td>
+                  <td colSpan={6} className="h-12 text-center opacity-60">{t('dw.assets.fieldsEmpty')}</td>
                 </tr>
               ) : fields.map((f) => (
                 <tr key={f.fieldAssetId || f.fieldId} className={`border-b ${styles.cardBorder}`}>
@@ -346,9 +361,9 @@ function AssetDetail({
                     {f.confirmed ? <span className="text-emerald-600">✓</span> : <span className="text-amber-600">✎</span>}
                   </td>
                   <td className="px-2 py-1 truncate max-w-[12ch]">{f.fieldName}</td>
-                  <td className="px-2 py-1">{f.dataType}</td>
+                  <td className="px-2 py-1">{t(`dw.assets.dataType.${f.dataType}`) || f.dataType}</td>
                   <td className="px-2 py-1">{f.fieldSensitivity}</td>
-                  <td className="px-2 py-1">{f.maskStrategy}</td>
+                  <td className="px-2 py-1">{t(`dw.assets.maskStrategy.${f.maskStrategy}`) || f.maskStrategy}</td>
                   <td className="px-2 py-1 text-right">
                     <button
                       className="text-xs underline hover:text-rose-600"
@@ -362,7 +377,7 @@ function AssetDetail({
                         });
                       }}
                     >
-                      Edit
+                      {t('dw.assets.editBtn')}
                     </button>
                   </td>
                 </tr>
@@ -377,7 +392,7 @@ function AssetDetail({
         <div className={`rounded border p-3 text-xs space-y-3 ${styles.cardBg} ${styles.cardBorder}`}>
           <div className="grid grid-cols-3 gap-2">
             <label>
-              <span className="opacity-60 block text-[10px] mb-1">Sensitivity Level</span>
+              <span className="opacity-60 block text-[10px] mb-1">{t('dw.assets.sensitive')}</span>
               <select
                 className={`w-full border rounded px-1.5 py-1 ${styles.cardBorder}`}
                 value={editing.level}
@@ -387,25 +402,25 @@ function AssetDetail({
               </select>
             </label>
             <label>
-              <span className="opacity-60 block text-[10px] mb-1">Data Type (脱敏规则)</span>
+              <span className="opacity-60 block text-[10px] mb-1">{t('dw.assets.dataType')}</span>
               <select
                 className={`w-full border rounded px-1.5 py-1 ${styles.cardBorder}`}
                 value={editing.dataType}
                 onChange={e => setEditing({ ...editing, dataType: e.target.value })}
               >
                 {['GENERAL', 'ID_CARD', 'PHONE', 'EMAIL', 'BANK_CARD', 'AMOUNT', 'ADDRESS']
-                  .map(v => <option key={v} value={v}>{v}</option>)}
+                  .map(v => <option key={v} value={v}>{t(`dw.assets.dataType.${v}`) || v}</option>)}
               </select>
             </label>
             <label>
-              <span className="opacity-60 block text-[10px] mb-1">Mask Strategy</span>
+              <span className="opacity-60 block text-[10px] mb-1">{t('dw.assets.maskStrategy')}</span>
               <select
                 className={`w-full border rounded px-1.5 py-1 ${styles.cardBorder}`}
                 value={editing.maskStrategy}
                 onChange={e => setEditing({ ...editing, maskStrategy: e.target.value })}
               >
                 {['none', 'prefix3', 'suffix4', 'middle4', 'full'].map(v =>
-                  <option key={v} value={v}>{v}</option>)}
+                  <option key={v} value={v}>{t(`dw.assets.maskStrategy.${v}`) || v}</option>)}
               </select>
             </label>
           </div>
@@ -413,20 +428,20 @@ function AssetDetail({
             <label className="flex items-center gap-1.5">
               <input type="checkbox" checked={editing.confirmed}
                 onChange={e => setEditing({ ...editing, confirmed: e.target.checked })}/>
-              <span className="text-[11px]">人工已确认 (Human confirmed)</span>
+              <span className="text-[11px]">{t('dw.assets.confirmed')}</span>
             </label>
             <div className="flex-1" />
             <button
               className="px-2.5 py-1 text-xs rounded bg-black/5 hover:bg-black/10"
               onClick={() => setEditingFieldId(null)}
             >
-              Cancel
+              {t('dw.assets.cancelBtn')}
             </button>
             <button
               className="px-2.5 py-1 text-xs rounded bg-black/10 hover:bg-black/20 font-semibold"
               onClick={confirmTag}
             >
-              Save & Publish
+              {t('dw.assets.savePublish')}
             </button>
           </div>
         </div>
