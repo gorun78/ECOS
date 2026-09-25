@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_category_tree (
 COMMENT ON TABLE ecos_data.ecos_data_category_tree IS '业务分类树（最多 3 级，资产/目录主用）';
 CREATE INDEX IF NOT EXISTS idx_category_tree_parent ON ecos_data.ecos_data_category_tree(parent_id);
 CREATE INDEX IF NOT EXISTS idx_category_tree_level  ON ecos_data.ecos_data_category_tree(level);
+-- PMO-data10 V154.3 补丁: seed INSERT 用到 sort_order, 但表定义初版漏写, R9 只加不删
+ALTER TABLE ecos_data.ecos_data_category_tree ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
 -- ── 3. 资产业务视图（ADR：td_data_resource 物理层 + 本表业务层）──
 CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_asset (

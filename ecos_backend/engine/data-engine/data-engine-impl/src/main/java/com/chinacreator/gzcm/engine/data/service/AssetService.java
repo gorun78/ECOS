@@ -276,8 +276,33 @@ public class AssetService {
 
     // ── 分页列表 ─────────────────────────────────────────────
 
-    /** 资产分页列表（按数据湖存储分层规范 §五 合法性矩阵过滤）。 */
+    /** 资产分页列表（按数据湖存储分层规范 §五 合法性矩阵过滤）。
+     *  <p>真业务资产查未登记时 fallback 物理层 td_data_resource 作「占位资产」只读视图
+     *  （0 登记 = 让 UI 显示 DW 层 393 张表，等待用户从"数据资产" Tab 逐个登记 + 打标），
+     *  占位模式 hasAsset=true 代表已登记；前端可据此分支渲染"登记资产" / "登记数据加载"。
+     *  物理层视图 T: 资产条 = td_data_resource 行，asset_id = resource_id (key 稳定)，
+     *  asset_name = resource_name，layer / zone / description / datasource_id 直接透传
+     *  （符合数据湖存储分层规范 §四 工作台读写边界：本体/知识 DW 层只读，此处 data-engine 持有）。
+     */
     public List<DataAssetVO> listAssets(DataAssetQueryDTO q) {
+        // 0) 登记资产数：为 0 + 未指定 keyword/sensitivity/category 时， 直接切到占位视图
+        Integer registered;
+        try {
+            registered = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ecos_data.ecos_data_asset WHERE is_deleted = 0", Integer.class);
+        } catch (Exception e) {
+            log.warn("ecos_data 表未建（V154 未 apply），fallback 走物理层占位视图: {}", e.getMessage());
+            return listPhysicalFallback(q);
+        }
+        if (registered != null && registered == 0
+            && (q.getKeyword() == null || q.getKeyword().isBlank())
+            && (q.getSensitivityLevel() == null || q.getSensitivityLevel().isBlank())
+            && (q.getCategoryId() == null || q.getCategoryId().isBlank())
+            && (q.getCategoryStatus() == null || q.getCategoryStatus().isBlank())
+            && (q.getOwner() == null || q.getOwner().isBlank())) {
+            return listPhysicalFallback(q);
+        }
+
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(
             "a.asset_id, a.resource_id, r.resource_name, r.resource_type, r.datasource_id, " +
@@ -344,6 +369,51 @@ public class AssetService {
         params.add(pageSize);
         params.add((page - 1) * pageSize);
         return jdbc.query(sql.toString(), assetRowMapper(), params.toArray());
+    }
+
+    /**
+     * 物理层占用视图 fallback（V154 登记资产为 0 时展示 td_data_resource 只读）。
+     *
+     * <p>每行 td_data_resource → DataAssetVO：
+     *  asset_id = resource_id（稳定 key，方便再次点击时用还是同一引用）
+     *  asset_name = resource_name；sensitivity_level = "L2"（内部默认）
+     *  confirmed_field_count = 0；category_status = "PENDING"（提示未登记）
+     */
+    private List<DataAssetVO> listPhysicalFallback(DataAssetQueryDTO q) {
+        StringBuilder sql = new StringBuilder(
+            "SELECT r.resource_id AS asset_id, r.resource_id, r.resource_name AS asset_name, " +
+            "  r.resource_name, r.resource_type, r.datasource_id, NULL::text AS business_desc, " +
+            "  NULL::text AS owner, NULL::text AS owner_org, 'SOURCE'::text AS data_grain, " +
+            "  NULL::text AS category_id, NULL::text AS category_name, 'L2'::text AS sensitivity_level, " +
+            "  '内部'::text AS level_name, 'PENDING'::text AS category_status, " +
+            "  NULL::text AS last_tagged_by, NULL::timestamp AS last_tagged_at, " +
+            "  'default'::text AS domain, r.description, " +
+            "  COALESCE(r.field_count, 0) AS field_count, COALESCE(r.record_count, -1) AS record_count, " +
+            "  COALESCE(NULLIF(r.layer, ''), 'CURATED')::text AS layer, r.zone, r.last_sync_time, 0 AS confirmed_field_count " +
+            "FROM td_data_resource r WHERE TRUE");
+        // 分层/分区限定（仅在物理占位视图下生效；layer 列不存在物理层， zone 可过滤）
+        List<Object> params = new ArrayList<>();
+        if (q.getZone() != null && !q.getZone().isBlank())   { sql.append(" AND r.zone = ?");  params.add(q.getZone()); }
+        if (q.getDatasourceId() != null && !q.getDatasourceId().isBlank()) { sql.append(" AND r.datasource_id = ?"); params.add(q.getDatasourceId()); }
+        if (q.getResourceType() != null && !q.getResourceType().isBlank()) { sql.append(" AND r.resource_type = ?"); params.add(q.getResourceType()); }
+        // 关键字 → resource_name / description
+        if (q.getKeyword() != null && !q.getKeyword().isBlank()) {
+            sql.append(" AND (r.resource_name ILIKE ? OR r.description ILIKE ?)");
+            String kw = "%" + q.getKeyword() + "%"; params.add(kw); params.add(kw);
+        }
+        // sensitivityLevel/domain/owner/category*/categoryStatus 在物理层无实际意义（未经打标）， 直接忽略
+        sql.append(" ORDER BY r.last_sync_time DESC NULLS LAST");
+        int page = (q.getPage() == null || q.getPage() < 1) ? 1 : q.getPage();
+        int pageSize = (q.getPageSize() == null || q.getPageSize() < 1) ? 50 : q.getPageSize();
+        sql.append(" LIMIT ? OFFSET ?");
+        params.add(pageSize);
+        params.add((page - 1) * pageSize);
+        try {
+            return jdbc.query(sql.toString(), assetRowMapper(), params.toArray());
+        } catch (Exception e) {
+            log.warn("listPhysicalFallback 失败， fallback 到空列表", e);
+            return new ArrayList<>();
+        }
     }
 
     // ── 字段列表 / 打标 ─────────────────────────────────────
