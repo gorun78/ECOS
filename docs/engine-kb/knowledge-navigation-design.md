@@ -1,19 +1,37 @@
 # 知识导航设计文档（PMO-B T4）
 
 > 来源: PMO-B 任务规格 | 日期: 2026-09-24 | 责任人: FullStack 实现工程师
-> 版本: v1.1（批次 2：§7 未做项 3 项下沉重）
+> 版本: v2.0（批次 3：6 页面结构定稿 + §7 未做项 #1-#3 已落 commit `12a20d6` + §9 铁律 §5.3 批次表/§4.6 800 行上限）
 > 追溯: PMO-A 已交付 kb_nav_category / kb_nav_tag / kb_nav_article_rel 3 张 DDL（V155/156/157）
-> 上游: .trae/rules/铁律 §2.4（安全）/ §4.1（主题）/ §4.3（i18n）
+> 上游: .trae/rules/架构铁律.md §2.4（安全）/ §4.1（主题）/ §4.3（i18n）/ §5.3（单指令 ≤ 5 Task）/ §4.6（组件 ≤ 800 行）
 
-## 批次 2 变更表
+## 批次 3 变更表（v2.0）
+
+> 本表对应 PRD `knowledge-workbench-refactor-prd-v1.1-draft.md` §4.4.A 的 **Batch 1/2/3 收口**（3 个 commit hash 已落，本批不 merge release，待 Reviewer 第三门险）。
+
+| # | 功能点 | 动作 | commit hash |
+|:--:|:--|:--|:--|
+| 1 | F10 后端 — Controller 分组 + `KbEngineModuleRegistry` + 2 强类型 VO endpoint（`GET /api/v1/knowledge/nav/modules` + `GET /api/v1/knowledge/assets/status`） | `kb-engine-impl` 新增 `KbEngineModuleRegistry.java` / 21 Controller 全打标 `@group` Javadoc / `NavModulesVO` + `ModuleInfoVO` + `AssetStatusVO` + `AssetStatusItemVO` 4 VO 落 `kb-engine-api` / `NavTaxonController.modulesList` + `KnowledgeArticleController.assetStatus` 2 强类型 endpoint / 单测 `NavModulesTest`(5 case) + `AssetStatusControllerTest`(3 case) 8/8 PASS | `73e68fd` |
+| 2 | F1 + F3 前端骨架 — 6 平铺侧栏 Page + `KnowledgeView` 重构 + `AssetListPage`（8 列资产表 + 批量 `/assets/status` 状态列 + domain 切换 reset） | `src/pages/knowledge/typesAndConstants.ts` 新增 `ACTIVE_PAGES` 6 项 + `DEPRECATED_TAB_IDS` 8 项 + `ACTIVE_PAGE_ICONS` / `ACTIVE_PAGE_I18N_KEYS` 映射 / `src/pages/KnowledgeView.tsx` 重写（F1 侧栏 + F8 deep-link + warn banner）/ `pages/knowledge/pages/AssetListPage.tsx` 完整 / `services/knowledgeNavApi.ts` 加 `fetchAssetStatuses`（强类型 `AssetStatusItem`）/ 单测 `AssetListPage.test.tsx` 6 case | `693617d` |
+| 3 | Batch 2 5 Page 实体 — `OverviewPage` / `ExtractionPage` / `GraphPage` / `WikiPage` / `GovernPage` + 4 子组件（`AuditFeedCard` / `QualityMetricsTable` / `RuleRepoTable` / `EvalRunPanel`） | 6 Page 文件（i18n `knowledge.overview.*` / `knowledge.extract.*` / `knowledge.graph.*` / `knowledge.wiki.*` / `knowledge.govern.*`）/ `GovernPage` 主文件 ~300 行 + 4 子组件各 ≤ 300 行（铁律 §4.6 ≤ 800 行）/ 0 硬编码色值 + 0 硬编码中文 | `69d3095` |
+| 4 | F9 i18n `_depr` 元 key 标注（本批 Batch 3 新增） | `src/locales/knowledge/zh-CN.json` + `en.json` 各新增 265 个 `_depr.knowledge.{ragtab,graphexplorert,glossarytab,synctab,vector_index,graph_builder,engine_config,ontology_model,closedlooptab,indextab,lineagetab,cognitiveconfigtab,graphsynctab}.*: true` 元 key（对应 8 撤下 Tab 实际消费的 13 个前缀 === 265 key）/ zh-CN 补 7 个 en 既有但 zh 缺失的 `knowledge.datasync.*` 对偶 key（平行度 0 差集）/ 新建 `ecos_frontend/scripts/check-i18n-parity.mjs`（CI 可选门禁，本批不强制启用） | 本 commit |
+| 5 | F11 设计文档 v1.1 → v2.0（本批） | §七 未做项 #1-#3 已 ✅ 2026-09-24 PMO-C（commit `12a20d6`）/ **新增 §八 6 页面结构定稿**（核心交付）/ §2.3 子树补 F6 说明（走 `POST /api/v1/knowledge/docs/ingest` + `Content-Type: text/markdown`，不新增 endpoint）/ §九 铁律引用补 §5.3 批次表 + §4.6 800 行上限 | 本 commit |
+| 6 | F12 回归 & 质量门（5 用例 + build-approval） | 后端 `mvn install -Penterprise -pl kb-engine-api,kb-engine-impl -am -DskipTests` 成功 + `mvn test -Penterprise -pl kb-engine-impl -Dtest='NavModulesTest,AssetStatusControllerTest'` 8/8 PASS / 前端 `npx tsc --noEmit` 0 error + `npx vitest run` 全 PASS / 5 用例 C1-C5 全 PASS（静态审查 + 运行态）/ 铁律 grep 5 项 0 命中 / `docs/30-cross-cutting-docs/reviews/kb-workbench-refactor/BUILD-APPROVAL-2026-09-24.json`（7 门禁全真，`deliverable_allowed: true`） | 本 commit |
+
+> 保留未做项（P3 后置）：
+> - `kb_nav_category` level 4+ 拆表 / `matchesNavFilter` 批量 IN 优化（candidateIds 展开）。
+> - 知识中心 / RAG 问答（P3，撤导航，路由保留）。
+> - 在线 Wiki 编辑器（用户裁决 md 导入，非编辑器）。
+
+### 批次 2（v1.1）变更表（历史溯源，commit `12a20d6` 已落）
+
+> 批次 2（v1.1）已交付：§7 未做项 #1（`matchesTagFilter` 对称）/#2（`graph?categoryIds=` 后端下沉）/#3（多 domain 切换 + `GET /nav/domains`）。本表保留作历史溯源。
 
 | # | 项 | 动作 | commit |
 |:--:|:--|:--|:--|
-| 1 | §7 未做项 #1：`POST /rag` 的 `tags` 字段增下行 WHERE | `KnowledgeRetrievalServiceImpl` 新增 `matchesTagFilter(articleId, tags)` 对称 `matchesNavFilter`；向量 + 关键词回退两路 OR 命中（navFilter/tagFilter 二选一） | 见 backend commit hash |
-| 2 | §7 未做项 #2：`GET /graph` 增加 `categoryIds` 参数 | `KnowledgeGraphService` 加 `getGraph(domain, List<String> categoryIds)` overload；`KnowledgeGraphController` L23 加 `@RequestParam(required=false) List<String> categoryIds`；impl 走策略 B（PG `kb_nav_article_rel` 白名单 + 内存过滤 nodes/edges，`kg-root` 锚点保留） | 见 backend commit hash |
-| 3 | §7 未做项 #3：多 domain 切换 | `INavService.listDomains()` + `NavTaxonController` `GET /api/v1/knowledge/nav/domains`（UNION category ∪ tag distinct domain）；前端 `knowledgeNavApi.ts` 加 `fetchNavDomains()`，`ClassificationTab` / `GraphExplorerTab` domain 下拉改用真实列表 | 见 frontend commit hash |
-
-> 保留未做项（§7 #4/#5，P3 后置）：`kb_nav_category` level 4+ 拆表 / `matchesNavFilter` 批量 IN 优化（candidateIds 展开）。
+| 1 | §7 未做项 #1：`POST /rag` 的 `tags` 字段增下行 WHERE | `KnowledgeRetrievalServiceImpl` 新增 `matchesTagFilter(articleId, tags)` 对称 `matchesNavFilter`；向量 + 关键词回退两路 OR 命中（navFilter/tagFilter 二选一） | `12a20d6` |
+| 2 | §7 未做项 #2：`GET /graph` 增加 `categoryIds` 参数 | `KnowledgeGraphService` 加 `getGraph(domain, List<String> categoryIds)` overload；`KnowledgeGraphController` 加 `@RequestParam(required=false) List<String> categoryIds`；impl 走策略 B（PG `kb_nav_article_rel` 白名单 + 内存过滤 nodes/edges，`kg-root` 锚点保留） | `12a20d6` |
+| 3 | §7 未做项 #3：多 domain 切换 | `INavService.listDomains()` + `NavTaxonController` `GET /api/v1/knowledge/nav/domains`（UNION category ∪ tag distinct domain）；前端 `knowledgeNavApi.ts` 加 `fetchNavDomains()`，`ClassificationTab` / `GraphExplorerTab` domain 下拉改用真实列表 | `12a20d6` |
 
 ## 一、定位边界
 
@@ -53,6 +71,8 @@
 - scope = 'category' | 'tag'；
 - 对 category：ref_id = kb_nav_category.id；对 tag：ref_id = tag_name；
 - UNIQUE (article_id, scope, ref_id, domain)。
+
+> **批次 3 补充（F6）**：`_depr` 元 key + 6 Page `knowledge.wiki.*` 文案消费方是 WikiPage。其「md 导入」能力复用既有 `POST /api/v1/knowledge/docs/ingest`，通过 `Content-Type: text/markdown` 与普通 text 分支区分（同一 endpoint，**不新增**任何 ingest 子路径），无需在本节新增 DDL 行（`kb_nav_article_rel` 当初即以 scope='category' 表示文档↔目录关系，md 导入后落 `kb_document` 时按既有 `NavCategoryAssigner` 钩子入这张关联表）。
 
 ## 三、后端接口契约
 
@@ -178,5 +198,34 @@
 - `kb_nav_category` 拆表（如 level 3 以上 3 级深度演进）——P3；
 - 批量 IN 优化 `matchesNavFilter` 查询次数（candidateIds 展开）——P3 性能专项。
 
+## 八、6 页面结构定稿（v2.0 核心交付）
+
+> 6 平铺侧栏 Page 取代原 v1.x 9 Tab 体系（8 撤下 Tab deep-link 由 `KnowledgeView` warn banner 兜底）。文件路径均相对 `ecos_frontend/src/`，单文件 ≤ 800 行（铁律 §4.6），i18n 0 中文硬编码（铁律 §4.3）。
+
+| Page 名 | 文件路径 | 数据源 API | i18n 前缀 |
+|:--|:--|:--|:--|
+| 知识总览 | `pages/knowledge/pages/OverviewPage.tsx` | `GET /api/v1/engine/kb/index-status` · `GET /api/v1/knowledge/extract/candidates` · `GET /api/v1/knowledge/extract/jobs` · `GET /api/v1/knowledge/nav/products`（资产表 5 行） | `knowledge.overview.*` |
+| 知识资产 | `pages/knowledge/pages/AssetListPage.tsx` | `GET /api/v1/knowledge/nav/products` · `GET /api/v1/knowledge/assets/status`（批量 status 列，>100 reject）· `GET /api/v1/knowledge/nav/domains` | `knowledge.asset.*` |
+| 知识抽取 | `pages/knowledge/pages/ExtractionPage.tsx` | `GET /api/v1/knowledge/structured/mappings` · `POST /api/v1/knowledge/structured/extract/submit` · `GET /api/v1/knowledge/docs/ingest` | `knowledge.extract.*` |
+| 知识图谱 | `pages/knowledge/pages/GraphPage.tsx` | `GET /api/v1/knowledge/graph?domain=&categoryIds=` · `GET /api/v1/knowledge/nav/domains` | `knowledge.graph.*` |
+| 企业知识 | `pages/knowledge/pages/WikiPage.tsx` | `POST /api/v1/knowledge/docs/ingest`（`Content-Type: text/markdown` 分支）· `GET /api/v1/knowledge/nav/categories?domain=&parentId=` | `knowledge.wiki.*` |
+| 知识治理 | `pages/knowledge/pages/GovernPage.tsx` + `pages/knowledge/components/govern/{AuditFeedCard,QualityMetricsTable,RuleRepoTable,EvalRunPanel}` | `GET /api/v1/knowledge/extract/candidates` · `GET /api/v1/knowledge/rules` · `POST /api/v1/knowledge/eval/run` | `knowledge.govern.*` |
+
+**说明**：
+
+- `GovernPage` 主文件 ~300 行，4 子组件各 ≤ 300 行 — 符合 §4.6 800 行上限。
+- 6 Page 文件路径内的 13 个撤下 Tab 旧 i18n 前缀已在 `zh-CN.json` / `en.json` 中加 `_depr.{key}: true` 元 key（合计 265 个），由 `scripts/check-i18n-parity.mjs` 在 CI 可选门禁中校验平行度。
+- `GraphPage.tsx` line 中 `categoryIds` 调用策略见 PRD §F12 C4（checkbox 不勾时传 undefined，不传字段）；后端接 `categoryIds` 入参行为见 C1-C3（同 PRD §F12）。
+
+## 九、铁律引用
+
+> 本批次（PMO-C v2.1-alpha Batch 1/2/3）全程遵循 `.trae/rules/架构铁律.md`（v1.4）以下条目：
+>
+> - **§5.3 单指令 ≤ 5 Task** — 本批次 4 Task（T1 F9 i18n / T2 F11 文档 / T3 F12 回归 / T4 终审），合于 ≤5；Batch 1/2 各批亦 ≤5 Task，均在 `PRD §4.4.A` 批次表对应 §5.3 边界内。
+> - **§4.6 文件 ≤ 800 行** — 6 Page 文件均 ≤ 800 行：`KnowledgeView.tsx` 398 / `GraphPage.tsx` 687 / `OverviewPage.tsx` 514 / `AssetListPage.tsx` ~250 / `ExtractionPage.tsx` ~280 / `WikiPage.tsx` ~300 / `GovernPage.tsx` ~300 + 4 子组件各 ≤ 300；`LanguageContext.tsx` 81 行。
+> - **§3.1 只加不删** — 撤下 8 Tab 用 `_depr` 元 key 标记而非物理删除，旧 key 值保留原文。
+> - **§4.3 i18n 0 硬编码中文** — 6 Page 0 中文硬编码（详见 F12 铁律 grep 5 项报告）；`check-i18n-parity.mjs` 平行度门禁 zh/en 各 1268 有效 key，0 差集。
+> - **§5.3 批次表**（`PRD §4.4.A` 配套）— Batch 1 (commit `693617d`)：F1+F10+F3；Batch 2 (commit `69d3095`)：F2+F4+F5+F6+F7；Batch 3 (本 commit)：F8+F9+F11+F12。
+
 ---
-> 本设计文档 v1.0 制定于 2026-09-24，由 PMO-B 任务批次 1 提交，v1.1 于 2026-09-24 由 PMO-C 批次 2 落地 §7 未做项 #1~#3。后续批次（PMO-C 性能 / P3 接 Copilot）需同步更新。
+> 本设计文档 v1.0 制定于 2026-09-24（PMO-B 批次 1），v1.1 于 2026-09-24 由 PMO-C 批次 2 落地 §7 未做项 #1~#3（commit `12a20d6`），v2.0 于 2026-09-25 由 PMO-C 批次 3 收口（新增 §八 6 页面结构定稿 + §九 铁律引用 + §2.3 F6 补充 + 头部批次 3 变更表）。后续 PMO / P3 批次需同步更新。

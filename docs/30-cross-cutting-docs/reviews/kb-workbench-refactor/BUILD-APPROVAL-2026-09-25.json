@@ -1,0 +1,113 @@
+{
+  "approve_at": "2026-09-25",
+  "scope": "ECOS kb-workbench-refactor Batch 3 (F8 F9 F11 F12)",
+  "branch": "release/v2.1-alpha",
+  "head": "69d3095",
+  "batch_commits": {
+    "F10-backend": "73e68fd",
+    "F1-F3-frontend-bone": "693617d",
+    "Batch2-5-page-entity": "69d3095"
+  },
+  "gate1_backend_build": {
+    "command": "mvn install -Penterprise -pl kb-engine-api,kb-engine-impl -am -DskipTests",
+    "exit_code": 0,
+    "verdict": "PASS"
+  },
+  "gate2_backend_unit": {
+    "command": "mvn test -Penterprise -pl kb-engine-impl -Dtest='NavModulesTest,AssetStatusControllerTest'",
+    "tests_run": 8,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "verdict": "PASS"
+  },
+  "gate3_frontend_ts": {
+    "command": "npx tsc --noEmit",
+    "errors": 0,
+    "verdict": "PASS"
+  },
+  "gate4_frontend_unit": {
+    "command": "npx vitest run",
+    "files_passed": 14,
+    "tests_passed": 93,
+    "tests_failed": 0,
+    "verdict": "PASS"
+  },
+  "gate5_case_5": {
+    "C1_no_category_ids": {
+      "path": "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/service/KnowledgeRetrievalServiceImpl.java",
+      "evidence": "resolveCategorySubtree 第 250 行: if (categoryIds == null || categoryIds.isEmpty()) return List.of(); 第 120 行 navFilter=!subtreePaths.isEmpty()=false, 第 171-186 行 if/elif 分支全部跳过 → 全量检索",
+      "verdict": "PASS (static)"
+    },
+    "C2_with_category_ids": {
+      "path": "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/service/KnowledgeRetrievalServiceImpl.java",
+      "evidence": "resolveCategorySubtree 把 id 展开为 path 前缀 (line 253-288，加 % 后缀 LIKE 锚点)。matchesNavFilter (line 323起) 用 EXISTS (kb_nav_article_rel r JOIN kb_nav_category c ON r.ref_id = c.id WHERE r.article_id = ? AND r.scope='category' AND c.path LIKE ?) 行级过滤，向量 + 关键词回退两路对称",
+      "verdict": "PASS (static)"
+    },
+    "C3_empty_array": {
+      "path": "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/service/KnowledgeRetrievalServiceImpl.java",
+      "evidence": "resolveCategorySubtree 第 250 行判定 isEmpty() 返 List.of() — 空数组与 null null 等价，全量检索",
+      "verdict": "PASS (static)"
+    },
+    "C4_no_check_no_categoryIds": {
+      "path": "ecos_frontend/src/pages/knowledge/pages/GraphPage.tsx",
+      "evidence": "loadGraph 第 112 行: fetchGraph(domain, categoryIds && categoryIds.length > 0 ? categoryIds : undefined)。第 171 行调用: loadGraph(undefined, selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined)。第 439 行 checkbox change 同策略。不勾选 checkbox 时不传参数 → 请求 URL 无 categoryIds 字段，后端走全量",
+      "verdict": "PASS (static)"
+    },
+    "C5_deprecated_8_tab": {
+      "path": "ecos_frontend/src/pages/KnowledgeView.tsx",
+      "evidence": "DEPRECATED_TAB_COMPONENTS (line 112-121) 8 项全集映射: rag / engine_config / ontology_model / graph_builder / glossary / sync / data_import / vector_index。isDeprecatedTabId (line 138) 控制 ?tab=xxx deep-link。warn banner (line 308-323, 380-386) 命中 8 项即显示，「knowledge.tab.deprecated_banner」+「knowledge.tab.deprecated_banner_back」按 删 8 项全 文案接通",
+      "verdict": "PASS (static)"
+    }
+  },
+  "gate6_铁律5项": {
+    "铁律1_select_star": {
+      "scope": "kb-engine-impl 本批新增 / 修改文件 (NavTaxonController / KnowledgeArticleController / KbEngineModuleRegistry / KnowledgeRetrievalServiceImpl / 4 VO / 2 单测)",
+      "matches": 0,
+      "verdict": "PASS"
+    },
+    "铁律2_map_string_object": {
+      "scope": "本批 2 强类型 endpoint (GET /nav/modules + GET /assets/status) 入参/出参",
+      "matches": 0,
+      "evidence": "NavTaxonController.modulesList() 返 ApiResponse<NavModulesVO>。KnowledgeArticleController.assetStatus() 返 ApiResponse<AssetStatusVO>，2 子 VO (ModuleInfoVO / AssetStatusItemVO) 强类型无 Map<String, Object>",
+      "verdict": "PASS"
+    },
+    "铁律3_硬编码中文": {
+      "scope": "6 Page 文件 JSX 文本节点",
+      "matches_non_comment": 0,
+      "evidence": "grep '[\\u4e00-\\u9fa5]{2,}' 命中均为注释行 (// 或 /* */ 内，如 AssetListPage.tsx line 2-20，typesAndConstants.ts 多处注释)；JSX 元素 text 节点 0 中文 — t('knowledge.*') 全贯穿",
+      "verdict": "PASS"
+    },
+    "铁律4_var": {
+      "scope": "ecos_frontend/src/pages/knowledge/pages/*.tsx",
+      "matches": 0,
+      "verdict": "PASS"
+    },
+    "铁律5_style_color": {
+      "scope": "ecos_frontend/src/pages/knowledge/pages/*.tsx",
+      "match_pattern": "style={{ color:(?!(\\s*styles\\.))",
+      "matches": 0,
+      "evidence": "全部 color 值为 styles.* (useTheme()).style 访问；唯一字面字符串 '#fff' (AssetListPage.tsx line 278) 是按钮快捷色，由主题触控点统一，归例外，未新增 (本批未修改该文件)",
+      "verdict": "PASS"
+    }
+  },
+  "i18n_parity": {
+    "command": "node ecos_frontend/scripts/check-i18n-parity.mjs",
+    "zh_active_keys": 1268,
+    "en_active_keys": 1268,
+    "depr_meta_keys_zh": 265,
+    "depr_meta_keys_en": 265,
+    "zh_datasync_added": 7,
+    "diff": 0,
+    "exit_code": 0,
+    "verdict": "PASS"
+  },
+  "deliverable_allowed": true,
+  "verdict": "APPROVED",
+  "reviewer": "PMO-C (Batch 3 final)",
+  "notes": [
+    "Batch 1 commit 73e68fd / 693617d / 69d3095 不动 (append-only, 已 commit)",
+    "本批 commit 仅 git add 本批 12 功能点相关文件: src/locales/knowledge/zh-CN.json + en.json (各 265 _depr 元 key [string 'true'] + zh 7 个 datasync 对偶) / ecos_frontend/scripts/check-i18n-parity.mjs (新建) / docs/engine-kb/knowledge-navigation-design.md (v1.1 → v2.0) / 本 JSON (新建)",
+    "不动 working tree 上其他批次 (PMO-71/73/74 等) dirty 残留文件 — 精确 git add"
+  ]
+}
