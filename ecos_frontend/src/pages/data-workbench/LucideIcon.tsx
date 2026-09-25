@@ -12,6 +12,7 @@ import {
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
   GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Table, Wifi, Terminal,
+  Package,
   type LucideIcon as LucideIconType,
 } from 'lucide-react';
 
@@ -21,6 +22,8 @@ const iconMap: Record<string, LucideIconType> = {
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
   GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Table, Wifi, Terminal,
+  // PMO-data10: 'data-assets' tab
+  Package,
 };
 
 interface Props {

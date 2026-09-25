@@ -166,6 +166,23 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           value={filter.keyword}
           onChange={e => setFilter({ ...filter, keyword: e.target.value })}
         />
+        {/* 核心 "分级分类" 操作按钮：点击后聚焦到详情面板的字段表 */}
+        <button
+          type="button"
+          disabled={!selectedAssetId}
+          title={!selectedAssetId ? t('dw.assets.selectHint') : undefined}
+          className={`text-xs px-3 py-1 rounded font-semibold transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed
+            ${selectedAssetId ? 'bg-black/10 hover:bg-black/20' : ''} ${styles.cardBorder} border`}
+          onClick={() => {
+            if (!selectedAssetId) return;
+            // 触发字段表滚动到视口（详情面板）
+            requestAnimationFrame(() => {
+              document.querySelectorAll('[data-asset-detail]').forEach(el => (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            });
+          }}
+        >
+          {t('dw.assets.classifyBtn')}
+        </button>
       </div>
 
       {/* 主体 —— 桌面 2 栏（列表 | 详情）， 平板以下上下堆叠 */}
@@ -218,8 +235,8 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
         </div>
 
         {/* 详情 + 字段级敏感度 */}
-        <div className="min-h-0">
-          <CardBlock className="max-h-full overflow-y-auto">
+        <div className="min-h-0" data-asset-detail>
+          <CardBlock className="max-h-full overflow-y-auto bg-black/[0.02]">
             {!selectedAssetId ? (
               <div className={`flex items-center justify-center text-xs opacity-60 h-full py-8`}>
                 {t('dw.assets.selectHint')}
