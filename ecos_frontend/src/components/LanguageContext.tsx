@@ -30,7 +30,11 @@ export type Locale = "zh" | "en";
 interface LanguageContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
+  /** Translate a key; optionally interpolate params, or supply an inline fallback string. */
+  t: {
+    (key: string, params?: Record<string, string | number>): string;
+    (key: string, fallback: string): string;
+  };
 }
 
 const TRANSLATIONS: Record<Locale, Record<string, string>> = {
@@ -57,14 +61,14 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem("ecos_locale", newLocale);
   };
 
-  const t = (key: string, params?: Record<string, string | number>): string => {
+  const t = (key: string, paramsOrFallback?: Record<string, string | number> | string): string => {
     let translation = TRANSLATIONS[locale][key];
     if (translation === undefined) {
-      // Fallback to English if missing, then to key itself
-      translation = TRANSLATIONS["en"][key] ?? key;
+      // Fallback to English if missing, then to an inline fallback string, then to the key itself
+      translation = TRANSLATIONS["en"][key] ?? (typeof paramsOrFallback === "string" ? paramsOrFallback : key);
     }
-    if (params) {
-      for (const [k, v] of Object.entries(params)) {
+    if (paramsOrFallback && typeof paramsOrFallback === "object") {
+      for (const [k, v] of Object.entries(paramsOrFallback)) {
         translation = translation.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
       }
     }
