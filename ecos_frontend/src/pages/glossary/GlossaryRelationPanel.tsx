@@ -1,5 +1,5 @@
 /**
- * GlossaryRelationPanel — Wiki 词条关系维护（关系 Tab）。
+ * GlossaryRelationPanel — 术语词条关系维护（关系 Tab）。
  *
  * 职责：新增词条关系边（起点 / 边类型 / 终点 / 权重 / 说明）与关系列表增删；
  * 增删成功后强制重拉列表（架构铁律 §4.8-3 写后刷新）。

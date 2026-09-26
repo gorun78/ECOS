@@ -1,5 +1,5 @@
 /**
- * GlossaryGraphPanel — Wiki 词条关系图谱（图谱 Tab）。
+ * GlossaryGraphPanel — 术语词条关系图谱（图谱 Tab）。
  *
  * 职责：以 cytoscape 渲染词条关系图谱，支持深度切换（1/2/3）、刷新、重新布局，
  * 点击节点回传词条 id 给父级（父级切到「详情」Tab）。

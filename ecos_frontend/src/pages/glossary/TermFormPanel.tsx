@@ -1,5 +1,5 @@
 /**
- * TermFormPanel — Wiki 词条详情表单（详情 Tab）。
+ * TermFormPanel — 术语词条详情表单（详情 Tab）。
  *
  * 职责：渲染词条全部语义字段（含 7 个新增字段）、基础校验、保存（新增/编辑）与状态流转。
  * 数据/接口：services/glossary 的 createGlossaryTerm / updateGlossaryTerm。

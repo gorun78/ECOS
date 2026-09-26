@@ -632,7 +632,7 @@ export default function OntologyWorkbenchLayout() {
           );
         })()}
 
-        {/* Wiki */}
+        {/* 术语（Glossary） */}
         {selectedCategory === 'glossary' && (
           // h-full + min-h-0：GlossaryManager 是 h-full flex 布局，父级不给确定高度会塌成 0
           <div className="p-4 h-full min-h-0">

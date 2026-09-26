@@ -1,5 +1,5 @@
 /**
- * GlossaryManager — Wiki（词条）管理容器。
+ * GlossaryManager — 术语（Glossary）管理容器。
  *
  * 布局：左栏 = 词条列表（搜索 / 状态筛选 / 新建 / 编辑 / 删除）；右栏 = 3 个 Tab
  * （详情 = 词条表单 / 关系 = 关系维护 / 图谱 = 关系图谱）。

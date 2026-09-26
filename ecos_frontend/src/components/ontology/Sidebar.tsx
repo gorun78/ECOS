@@ -1004,7 +1004,7 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* 📖 Wiki 快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
+      {/* 📖 术语（Glossary）快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
       <div className={`border-t ${styles.appBorder} px-3 py-3`}>
         <button
           onClick={() => onSelectCategory('glossary', null)}

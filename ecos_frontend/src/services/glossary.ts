@@ -1,5 +1,5 @@
 /**
- * Glossary (Wiki) API 服务层 — 本体工作台词条（Wiki）唯一服务出口。
+ * Glossary API 服务层 — 本体工作台术语（Glossary）唯一服务出口。
  *
  * 封装词条 CRUD、词条关系边与词条关系图谱三组接口。
  * 后端统一返回 ApiResponse<T>：{ code: 0 (成功), message, data, timestamp }；
@@ -27,7 +27,7 @@ export type GlossaryRelationType =
   | "CAUSAL"
   | "RELATED";
 
-/** 词条（Wiki 词条）— 完整语义字段 */
+/** 词条（术语词条）— 完整语义字段 */
 export interface GlossaryTerm {
   id: number;
   code: string | null;

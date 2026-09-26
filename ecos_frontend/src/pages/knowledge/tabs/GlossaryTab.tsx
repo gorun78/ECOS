@@ -1,4 +1,4 @@
-// Wiki Tab —— 本体工作台的 Wiki（术语/词条）管理入口。
+// 术语 Tab —— 本体工作台的术语（Glossary，术语/词条）管理入口。
 //
 // 数据来源：GlossaryController（/api/v1/ontology/glossary/**，术语状态机
 // DRAFT → REVIEW → PUBLISHED → DEPRECATED），由 buszhi 服务层（ontology-engine 聚合）提供，
