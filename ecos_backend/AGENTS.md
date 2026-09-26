@@ -38,7 +38,7 @@ services/sysman:18081  services/datanet:18082
     │
     └─→ services/buszhi:18083 (本体/工作流)
         services/dccheng:18086 (KB/知识图谱/RAG/规则)
-        services/aiming:18084 (Agent/Loop/LLM)
+        services/aiming:18084 (Agent/Loop/LLM + 认知木C)
         workspace:18090 (场景层, 调全部 5 service)
 ```
 
@@ -63,8 +63,8 @@ ecos_backend/
 │   ├── datanet/                封装 data-engine
 │   ├── buszhi/                 封装 ontology-engine (金·I)
 │   │   └── impl/              ★ P8-B 内阁目录, 原顶层 buszhi/buszhi-impl (23 工作流类 library)
-│   ├── dccheng/                封装 kb-engine + cognitive-engine
-│   ├── aiming/                 封装 ai-engine + llm-gateway
+│   ├── dccheng/                封装 kb-engine (水·K)
+│   ├── aiming/                 封装 ai-engine + cognitive-engine + llm-gateway (火·W + 木·C)
 │   └── agent-service/          ★ 保留 (Aiming 双容器演化保留, 见 AGENTS.md)
 ├── workspace/                 (附录 A 目标: 保留顶层独立)
 │   ├── workspace-impl/
@@ -97,7 +97,7 @@ workspace → (REST) → services/* → (Maven dep) → engine-impl → engine-a
 | 引擎·土 D | data-engine | `services/datanet` 封装 |
 | 引擎·金 I | ontology-engine | `services/buszhi` 封装 |
 | 引擎·水 K | kb-engine | `services/dccheng` 封装 |
-| 引擎·木 C | cognitive-engine | `services/dccheng` 封装 |
+| 引擎·木 C | cognitive-engine | `services/aiming` 封装 |
 | 引擎·火 W | ai-engine | `services/aiming` 封装 |
 | 横切·护 | security-engine | `services/sysman` 封装 |
 | 服务·四转化 | ge/zhi/cheng/ming | 寄居 engine-impl 对应子包 |

@@ -16,11 +16,13 @@ v1.x 契约基于"7+1 按引擎拆分"旧方案，v1.2 改为"5 业务服务按�
 | data-service (18082) | **datanet** | 数据源/管道/血缘/DQ |
 | ontology-service (18083) | **buszhi** | 本体/对象/关系/版本/工作流（**不含**对象运行时，归 workspace） |
 | kb-service (18086) | **dccheng** | KG/RAG/规则/抽取（注意：真实前缀 `/api/v1/knowledge/*`） |
-| cognitive-service (18089) | **dccheng** | 因果推理/情景推演（合并入 dccheng，**18089 端口废弃**） |
+| cognitive-service (18089) | **dccheng** → **aiming**（PMO-60 更正） | 因果推理/情景推演（v2.0 曾合并入 dccheng，**PMO-60 起归 aiming :18084**；18089 端口废弃，见下注） |
 | ai-service (18084) | **aiming** | Agent/Loop/Mesh/Delegation/LLM |
 | **（无）workspace (18090)** | **workspace** | **顶层独立场景应用层**（v1.4 新增）：对象运行时/ObjectQL/Scenario/Workbook，跨调用全部 service；旧 core-service 的 18090 端口重分配给它 |
 
 > v1.x 中与上述清单不符的端点（`/api/v1/core/*`、`ecos.core.events`、独立 18089 端口、旧 core-service 18090）在本版**全部作废**；18090 重分配给顶层 workspace 模块。**路径消歧**：workspace 的 `/api/v1/ecos/objects/*` 与 buszhi 的 `/api/v1/ecos/object/*` 为精确前缀兄弟，网关按最长前缀优先路由。
+>
+> **更正（架构铁律 v1.5 §0.3.1 / PMO-60）**：上表 cognitive 的 v2.0 归属已由 `dccheng` 更正为 **`aiming`（:18084）**——PMO-60 将 `cognitive-engine-impl` 从 dccheng 服务移入 aiming 服务（aiming 封装 `ai-engine-impl` + `cognitive-engine-impl` + `llm-gateway`）；`dccheng`（:18086）现**仅封装 `kb-engine-impl`**。故 `/api/v1/cognitive/*` 路由归属 aiming，kb 路径（`/api/v1/knowledge/*` 等）仍归属 dccheng；18089（旧 cognitive-boot）端口**仍废弃**。
 
 ---
 
@@ -33,8 +35,8 @@ v1.x 契约基于"7+1 按引擎拆分"旧方案，v1.2 改为"5 业务服务按�
 | sysman | 18081 | `/api/v1/security/*`、`/api/v1/audit/**`、`/api/v1/abac/*`、`/api/v1/data-masking/*`、`/api/v1/data-permission/*`、`/api/v1/policy-engine/*`、`/api/v1/auth/*`、`/api/v1/core/*`、`/sys-man/api/*` |
 | datanet | 18082 | `/api/v1/engine/data/*`、`/api/v1/pipeline/**` |
 | buszhi | 18083 | `/api/v1/ecos/object/*`、`/api/v1/ecos/workflow/*` |
-| dccheng | 18086 | `/api/v1/knowledge/*`（含 `reason`/`rag`/`sync`/`extract`/`compliance-rules`）、`/api/v1/cognitive/*`、`/api/v1/rules/*`、`/api/v1/world-model/*` |
-| aiming | 18084 | `/api/v1/agent/*`、`/api/v1/agent-loop/*`、`/api/v1/agent-mesh/*`、`/api/v1/agent-call/*`、`/api/v1/knowledge/*`（**除 `reason`**） |
+| dccheng | 18086 | `/api/v1/knowledge/*`（含 `reason`/`rag`/`sync`/`extract`/`compliance-rules`）、`/api/v1/rules/*`、`/api/v1/world-model/*` |
+| aiming | 18084 | `/api/v1/agent/*`、`/api/v1/agent-loop/*`、`/api/v1/agent-mesh/*`、`/api/v1/agent-call/*`、`/api/v1/knowledge/*`（**除 `reason`**）、`/api/v1/cognitive/*` |
 
 **路由例外（🔴 显式声明）**:
 - `POST /api/v1/knowledge/reason` → **dccheng**（cognitive 实现，见 [CognitivePipelineController](file:///d:/workspace/javaprojects/ECOS/ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2)）。aiming 不实现此路径，网关不做跨服务转发（避免二跳）。
@@ -42,7 +44,7 @@ v1.x 契约基于"7+1 按引擎拆分"旧方案，v1.2 改为"5 业务服务按�
 
 ### 1.2 端口互斥（开发约束）
 
-service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 service 会端口冲突**，调试以 `--server.port` 覆盖。18089（cognitive-boot）与 18086 不同，但 dccheng(18086) 的生产入口仅 18086。
+service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 service 会端口冲突**，调试以 `--server.port` 覆盖。18089（旧 cognitive-boot）**自 v2.0 起废弃**（PMO-60 更正：cognitive-engine 现随 `aiming` :18084 部署），`dccheng`（:18086）的生产入口仅承载 kb。
 
 ---
 
@@ -392,7 +394,9 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 - 2026-09-13：本体工作台 Wave D T19 修订（最终闸门 P1-2）— 按代码重扫重数 §3.3.1：**32 Controller / 204 端点方法**（旧写 30/117 系初版提名，与重扫不符）；T12 安全切点按 `Ontology*Controller` 类名**字面前缀命中 23/32**（旧写 24/30）；4 处端点数纠错 OntologyDomainApi 12→**13**、OntologyDomain 8→**9**、OntologyRule 6→**8**（补 POST `/rules/{ruleId}/test` 与 POST `/rules/evaluate` 两行子表登记）、OntologyVersion 7→**8**（主表数字订正，子表 8 行明细原已齐全）；子表 1/2/3 保留原结构只增订正行、不删原有说明。与 Reviewer 实测 ~173 的差：本表按代码真源全量累加方法级 `@*Mapping` 注解（含 alias 兼容 Controller 全端点），口径见总表头注。
 - 2026-09-12：本体工作台 Wave D T19 — 新增 §3.3.1 节完整登记 ontology-engine-impl 全部 30 Controller / 117 端点方法（代码为唯一真源、已逐一核验 `@RequestMapping`）；§3.3 原有 5 行表保留不动（服务间契约摘要）；T12 安全切点覆盖 24/30 由前缀 `Ontology*` 切点决定，其余 8 类不在切点。
 
-### 3.4 dccheng（KB + Cognitive 合并，端口 18086）
+### 3.4 dccheng（KB，端口 18086）
+
+> **更正（架构铁律 v1.5 §0.3.1 / PMO-60）**：cognitive-engine 已从 dccheng 移入 **aiming（:18084）**，故本节表格中 `/api/v1/cognitive/*` 端点现由 **aiming** 进程承载（原记录保留为历史实现留痕，PMO-59 相关端点读作 aiming）；kb 端点（`/api/v1/knowledge/*` 等）仍属 dccheng，aiming→dccheng 转为跨服务 REST。
 
 | Method | Path | 调用方 | 用途 | 说明 |
 |:-----:|:--|:--|:--|:--|
@@ -438,7 +442,7 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 > - **事件（已实现，P2b 实证）**：`ecos.cognitive` topic（KafkaTopics.COGNITIVE，gateway `ecos.event.kafka.enabled=true` + `spring.kafka` 仅增配置）——强类型 Payload 三类：`COGNITIVE_EVIDENCE_REGISTERED` / `COGNITIVE_HYPOTHESIS_INVALIDATED`（含 autoDetected 标志）/ `COGNITIVE_BELIEF_UPDATED`；统一携带 `faultContext`（phase/hypothesisId|evidenceId/autoDetected/reviewTag=`P2b-mental-layer-review`，周一故障复盘预留）。冲击链=证据登记即时检测（refuting 命中/高可信冲突/数值漂移三规则）+ `runtime-task` `COGNITIVE_MENTAL_SCAN` 定时补算（默认 10min，`ecos.cognitive.scan-interval` 可调），不做流式
 > - **审计**：全部写操作（evidence.create / hypothesis.create / hypothesis.invalidate / belief 注册/更新/覆写）发 Kafka `ecos.audit`（铁律 §2.4 #5，P2b 实读 7 条全核）
 
-> 注：dccheng 内 kb 与 cognitive 为**同 JVM 进程内调用**（不再跨服务 REST）；aiming 调 dccheng 为跨服务 REST。
+> 注（PMO-60 更正）：cognitive 已从 dccheng 移入 **aiming（:18084）**，kb 留在 dccheng——原"dccheng 内 kb 与 cognitive 同 JVM 进程内调用"表述随 PMO-60 失效；aiming 调 dccheng（kb）仍为跨服务 REST。
 
 ### 3.5 aiming
 
@@ -516,7 +520,7 @@ service 沿用其主引擎端口。本机**同时运行引擎 boot 与对应 ser
 | `ecos.workflow`（WORKFLOW） | buszhi | datanet/aiming | 工作流/审批/任务变更 |
 | `ecos.agent`（AGENT） | aiming | 各 service | agent/execution/tool 变更 |
 | `ecos.knowledge`（KNOWLEDGE） | dccheng | aiming | KG/RAG/抽取变更 |
-| `ecos.cognitive`（COGNITIVE，PMO-59 P0 新增） | dccheng（cognitive） | Phase 2+ 订阅方 | 认知心智状态变更：新证据冲击/假设失效/不确定性判断更新（ADR-9；本 Phase 仅登记常量，无生产/消费代码） |
+| `ecos.cognitive`（COGNITIVE，PMO-59 P0 新增） | dccheng（cognitive）→ aiming（PMO-60 更正） | Phase 2+ 订阅方 | 认知心智状态变更：新证据冲击/假设失效/不确定性判断更新（ADR-9；本 Phase 仅登记常量，无生产/消费代码） |
 | `ecos.security`（**新增**） | sysman | datanet/buszhi/dccheng/aiming | 权限/密钥失效广播（§3.1 缓存失效） |
 
 > ⚠️ **现状**：`PipelineEvent` production 引用仅 1 处、Kafka listener 尚缺（common-api AGENTS.md 记 P2-4 缺口）——本表为**目标态**，属新建实现。旧契约的 `ecos.*.events` topic 名**全部作废**（实际常量无 `events` 后缀），`ecos.core.events` 随 core-service 删除作废。
