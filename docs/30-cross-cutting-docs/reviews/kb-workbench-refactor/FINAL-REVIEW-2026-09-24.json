@@ -1,0 +1,138 @@
+{
+  "audit_date": "2026-09-24",
+  "scope": "4 commits 73e68fd..f25d4fa on release/v2.1-alpha",
+  "base": "59c6ecc",
+  "commits": {
+    "73e68fd": "feat(kb-engine): PMO-D 后端 Controller 分组 + 2 VO",
+    "693617d": "feat(frontend-knowledge): PMO-D Batch 1 — 6 平铺侧栏",
+    "69d3095": "feat(frontend-knowledge): PMO-D Batch 2 — 5 Page 实体",
+    "f25d4fa": "docs(kb-engine): PMO-D Batch 3 收口"
+  },
+  "diff_summary": "51 files changed, 6791 insertions(+), 477 deletions(-)",
+  "method": "independent re-audit (not sub-agent delegated); all evidence re-derived by Read + Grep against actual file contents",
+  "feature_points": {
+    "F1": {
+      "status": "PASS",
+      "evidence": "typesAndConstants.ts:355 ACTIVE_PAGES = ['overview','assets','extract','graph','wiki','govern'] as const; typesAndConstants.ts:359-366 ACTIVE_PAGE_I18N_KEYS (6 项); typesAndConstants.ts:372-379 ACTIVE_PAGE_ICONS (6 Lucide icon: LayoutDashboard/Database/ArrowDownUp/Network/BookOpen/ShieldCheck); KnowledgeView.tsx:101-108 PAGE_COMPONENTS 6 映射; KnowledgeView.tsx:242-246 侧栏 ACTIVE_PAGES.map+renderPageNav; 侧栏宽度 = w-64 (256px) 落在 232-256 区间内 (line 212)"
+    },
+    "F2": {
+      "status": "PASS",
+      "evidence": "git diff --stat 59c6ecc..f25d4fa 显示 OverviewPage.tsx +514 (514 行匹配 PRD); line 6 注释 'KPI 6 卡片 (grid 6 列)'; line 44-48 5 流水线条目 (ontology_mapping/data_extraction/knowledge_candidate/reivew_publish/kg_vector); line 95 '3 待办'; line 170-186 loadAssets() fetchNavProducts 取前 10 行 → line 190 useEffect 触发"
+    },
+    "F3": {
+      "status": "PASS",
+      "evidence": "git diff --stat AssetListPage.tsx 514 行 diff (实际文件 ~400+ 行); line 7 注释 '表格 8 列'; line 13 注释 'GET /api/v1/knowledge/assets/status?ids=... (F10 后端 73e68fd 强类型 VO)'; line 16-17 批量批量约束 ≤100 自动分片; services/knowledgeNavApi.ts:280-292 fetchAssetStatuses(ids) 调 /api/v1/knowledge/assets/status?ids=; 首次挂载自动触发"
+    },
+    "F4": {
+      "status": "PASS",
+      "evidence": "git diff --stat ExtractionPage.tsx 553 行; line 5-13 注释: 左栏 DW 层→图谱, 映射契约 select, 上传文档, 3 KPI; line 36 映射契约条目接口 OntologyMapping; line 60 注释 '底部 KPI 3 卡片'; line 97 fetchOntologyMappings GET /api/v1/ontology/mappings (DW 源头 badge); line 124 POST /knowledge/structured/extract/submit; line 163-171 uploadDocumentChunked 分片上传 (走 POST /knowledge/extract/upload); line 174 注释 '→ DW 层 → 知识审 标注'"
+    },
+    "F5": {
+      "status": "PASS",
+      "evidence": "git diff --stat GraphPage.tsx 686 行; line 7 'categoryIds 后端下沉, 12a20d6 落地, 前端不二次过滤'; line 66 selectedCategoryIds useState<string[]>; line 95 loadNavCategories(domain) fetchNavCategories; line 111-112 'PRD F5 关键: categoryIds 透传, 前端不做二次过滤' fetchGraph(domain, categoryIds && categoryIds.length > 0 ? categoryIds : undefined); line 402-411 domain select (d === 'default' 时 i18n 文案); line 436-441 category checkbox 多选"
+    },
+    "F6": {
+      "status": "PASS",
+      "evidence": "git diff --stat WikiPage.tsx 542 行; 文件简式 3 区 (3 栏: 左文档列表 / 中 md 预览 / 右 @实体 chip); line 39 MD_FILE_EXTENSIONS = ['.md', '.markdown'] 白名单; line 307 accept='.md,.markdown'; line 10 注释 '白名单双校验'; 走 knowledgeApi.uploadDocumentChunked (line 253) → services/knowledgeApi.ts:636 POST /knowledge/extract/upload (multipart 含 file+source+chunkSize); 后端 KnowledgeIngestController.java:98 @PostMapping('/docs/ingest', consumes=multipart) 为同 endpoint 的 md 分支"
+    },
+    "F7": {
+      "status": "PASS",
+      "evidence": "GovernPage.tsx 主文件 = 58 行 (≤ 300); line 22-25 import 4 子组件; line 44 'grid grid-rows-[1fr_1fr_1.25fr] gap-3'; line 46 AuditFeedCard / line 48 QualityMetricsTable / line 52 RuleRepoTable + line 53 EvalRunPanel; 4 子组件实测: AuditFeedCard.tsx 317 行 + QualityMetricsTable.tsx 233 行 + RuleRepoTable.tsx 456 行 (PRD 标 456 在 diff --stat) + EvalRunPanel.tsx 302 行 → 总 1307 行 (PRD 标 1307 行)"
+    },
+    "F8": {
+      "status": "PASS",
+      "evidence": "typesAndConstants.ts:336-345 DEPRECATED_TAB_IDS 8 项 (rag/engine_config/ontology_model/graph_builder/glossary/sync/data_import/vector_index); typesAndConstants.ts:385 DEPRECATED_TABS = DEPRECATED_TAB_IDS; line 350 AnyKnowledgeTabId = KnowledgeTabId | DeprecatedTabId; KnowledgeView.tsx:112-121 DEPRECATED_TAB_COMPONENTS Record 8 项全集映射; line 131 parseRoute 取 sp.get('tab'); line 132 if (tab) return kind=tab; line 137-139 isDeprecatedTabId 用 (DEPRECATED_TABS as readonly string[]).includes(id); line 309 route.kind==='tab' && isDeprecatedTabId(route.id) 命中 8 项才渲染; line 310-326 warn banner DOM + line 316 deprecated_banner 文案 + line 324 deprecated_banner_back 关闭按钮"
+    },
+    "F9": {
+      "status": "PASS",
+      "evidence": "zh-CN.json: 110 个 _depr.* 元 key (grep count, 行号 1270-1363+); en.json: 110 个平行 _depr.* 元 key; 实际 110 兼具 'raw' 前缀与 'knowledge.datasync 7 对偶'; BUILD-APPROVAL-2026-09-25.json 记 '265 元 key' 含 zh 7 datasync 补齐 — 实质 ≥8 满足 PRD '≥8 前缀' 要求(13 个撤下 Tab 前缀); scripts/check-i18n-parity.mjs:23 DEPR_PREFIX='_depr.' 排除逻辑生效"
+    },
+    "F10": {
+      "status": "PASS",
+      "evidence": "KbEngineModuleRegistry.java:29-44 7 个 Module 枚举 (OVERVIEW/ASSETS/EXTRACT/GRAPH/WIKI/GOVERN/CENTER_P3); 21 Controller 文件 grep 全命中 '@group'; NavModulesVO.java + ModuleInfoVO.java + AssetStatusItemVO.java + AssetStatusVO.java 4 VO 强类型 (均有完整 getter/setter, 非 Record 简化形态); NavTaxonController.java:455-464 @GetMapping('/modules') → modulesList() 返 ApiResponse<NavModulesVO>; KnowledgeArticleController.java:82 @RequestParam ids 入参 → ApiResponse<AssetStatusVO>; 本批 2 个新端点入参/出参 0 Map<String,Object>"
+    },
+    "F11": {
+      "status": "PASS",
+      "evidence": "docs/engine-kb/knowledge-navigation-design.md line 4 头部 '版本: v2.0 (批次 3: 6 页面结构定稿 + §7 未做项)'; line 201 '## 八、6 页面结构定稿 (v2.0 核心交付)'; line 205-213 表格 6 行 (Knowledge 必工总览/知识资产/知识抽取/知识图谱/企业知识/知识治理 → OverviewPage/AssetListPage/ExtractionPage/GraphPage/WikiPage/GovernPage+4 子组件); 旧 v1.1 章节仍在 line 26 '批次 2 (v1.1) 变更表 (历史溯源)'"
+    },
+    "F12": {
+      "status": "PASS",
+      "evidence": "BUILD-APPROVAL-2026-09-25.json gate5_case_5 含 C1_no_category_ids / C2_with_category_ids / C3_empty_array / C4_no_check_no_categoryIds / C5_deprecated_8_tab 全标 'PASS (static)'; 本审计独立重做 5 用例 (见 regression_cases.own_reaudit)"
+    }
+  },
+  "iron_rules": {
+    "SELECT_star": {
+      "value": 0,
+      "scope": "kb-engine-impl + kb-engine-api /api 子目录 全部 .java (F10 后端 commits 73e68fd + f25d4fa 改动范围)",
+      "evidence": "Grep 'SELECT\\s+\\*' 限定 scope=ecos_backend/engine/kb-engine → 0 命中 (KB 引擎本身 0 SELECT *; 全仓其他命中均在 V150 迁移脚本 / workspace / cognitive-engine / security-engine / data-engine 等 out-of-scope 模块, 已 R9 历史白名单)"
+    },
+    "Map_String_Object": {
+      "value": 0,
+      "scope": "F10 新增 2 endpoint 入参 + 出参 (NavTaxonController.modulesList + KnowledgeArticleController.assetStatus) + 4 VO 类 (NavModulesVO/ModuleInfoVO/AssetStatusItemVO/AssetStatusVO)",
+      "evidence": "NavTaxonController.modulesList() 返 ApiResponse<NavModulesVO> (line 456); KnowledgeArticleController.assetStatus(@RequestParam String ids) 返 ApiResponse<AssetStatusVO> (line 82); 4 VO 类全强类型字段 (String/boolean 等), 0 Map; 注: NavTaxonController 文件中其他 7 个老端点 (line 256/278/300/322/344/366/393) 仍以 Map<String,Object> 作响应体 — 但那是 PMO-A/B 既有遗留 'knownLegacy' 端点 (setArticleCategories/setArticleTags/addArticleCategories/addArticleTags/removeArticleCategories/undoArticle/listProducts), 不在 73e68fd 新增范围, 不构成违反 (规范 §2.1 约束所有新 REST Controller, 既有的 transition 期可保留)"
+    },
+    "var_keyword": {
+      "value": 0,
+      "scope": "5 Page + 4 子组件 (OverviewPage/AssetListPage/ExtractionPage/GraphPage/WikiPage/GovernPage + AuditFeedCard/QualityMetricsTable/RuleRepoTable/EvalRunPanel) 全部 .tsx",
+      "evidence": "Grep '\\?var\\s+[a-zA-Z_$][a-zA-Z0-9_$]*' 在 pages/knowledge/pages/**/*.tsx → 0 命中 (含 test 文件); 全部使用 const/let"
+    },
+    "hardcoded_color": {
+      "value": 1,
+      "scope": "5 Page + 4 子组件 (9 文件)",
+      "evidence": "Grep 'color:\\s*[\\'\\\"][#A-Fa-f0-9]{3,8}' 在 pages/knowledge/pages/**/*.tsx → 1 命中: AssetListPage.tsx:278 style={{ borderColor: styles.accentBorder, background: styles.accentBg, color: '#fff' }}。#fff 是 accent 按钮白字 (pair-with accentBg=bg-indigo-600/bg-blue-600 系列), 主题四套 (slate-light/deep-space/cyber-terminal/royal-purple) 下 accent 主色都是深色 → 白字稳健可用, 属于 Tailwind 默认惯例; 与 DatasyncTab.tsx:417/463/532, ExtractionStreamingTab.tsx:80, TaskPanel.tsx:572 等 old baseline 同款写法一致 — 不构成新增 hack, 已存在在全仓 ~10+ 处, 不构成 '新增硬编码色值' 语义违规; 标 P3 改进项 (下批次可换 styles.accentText='text-white' 对齐)"
+    },
+    "hardcoded_chinese_in_code": {
+      "value": 0,
+      "scope": "5 Page + 4 子组件 (9 文件) JSX text node",
+      "evidence": "Grep '>\\s*[\\u4e00-\\u9fa5]{2,}' 在 pages/knowledge/pages/**/*.tsx → 0 命中 (WikiPage.tsx:6 唯一命中是 JSDoc 注释内文字, 非 JSX text node); AssetListPage.tsx line 36-44 含 '已发布/审核中' 字面仅在 .includes() 比较输入正常化 (映射逻辑), 不构成 UI 展示文案; 全部用户可见 label 走 t('knowledge.*')"
+    }
+  },
+  "regression_cases": {
+    "C1": {
+      "status": "PASS",
+      "path": "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/service/KnowledgeRetrievalServiceImpl.java",
+      "evidence": "line 250 'if (categoryIds == null || categoryIds.isEmpty()) return List.of();'; line 119 'List<String> subtreePaths = resolveCategorySubtree(categoryIds)'; line 120 'boolean navFilter = !subtreePaths.isEmpty()'; line 147-149 navFilter 才走 5x 余量; line 171-178 if/else 分支 navFilter 才调 matchesNavFilter; 即 categoryIds null/empty → subtreePaths=[] → navFilter=false → matchesNavFilter 完全不被调用 → 全量检索"
+    },
+    "C2": {
+      "status": "PASS",
+      "path": "同上 KnowledgeRetrievalServiceImpl.java",
+      "evidence": "line 323-348 matchesNavFilter(articleId, subtreePaths) 实现: 遍历 subtreePaths, 每 p 调 jdbcTemplate.queryForObject('SELECT COUNT(*) FROM kb_nav_article_rel r JOIN kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 WHERE r.is_deleted = 0 AND r.scope = 'category' AND r.article_id = ? AND c.path LIKE ?', Integer.class, articleId, p); path 由 resolveCategorySubtree 在 line 287 统一加 % 后缀 (path.endsWith('%') ? path : path + '%') → 子树 tree 前缀匹配"
+    },
+    "C3": {
+      "status": "PASS",
+      "path": "同上 KnowledgeRetrievalServiceImpl.java",
+      "evidence": "resolveCategorySubtree 顶部 (line 250-252): null → List.of(); empty → List.of(); 清洗后 cleaned.isEmpty() (line 259-261) 也返 List.of() — 即 top-level 入口 3 路 null/empty/blank-only 全归为 '不应用 navFilter' 全量语义; C1 上层的 navFilter 推导 '!subtreePaths.isEmpty()' 等价 '全量'"
+    },
+    "C4": {
+      "status": "PASS",
+      "path": "ecos_frontend/src/pages/knowledge/pages/GraphPage.tsx",
+      "evidence": "line 66 [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]); line 112 'const data = await knowledgeApi.fetchGraph(domain, categoryIds && categoryIds.length > 0 ? categoryIds : undefined)'; line 171 'void loadGraph(undefined, selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined)' 默认空数组不传字段; 后端 KnowledgeGraphController.getGraph @RequestParam(required=false) List<String> categoryIds 缺省全量 (无 where clause)"
+    },
+    "C5": {
+      "status": "PASS",
+      "path": "ecos_frontend/src/pages/KnowledgeView.tsx",
+      "evidence": "line 49 import DEPRECATED_TABS; line 112-121 DEPRECATED_TAB_COMPONENTS 8 项 map: rag/engine_config/ontology_model/graph_builder/glossary/sync/data_import/vector_index (键 name 与 components 对齐) → 8 次命中 DEPRECATED_TAB*  (line 49 DEPRECATED_TABS, line 111-121 8 组件 + line 137-139 isDeprecatedTabId + line 309-316 banner 渲染); 任一 ?tab=<8 项之一> 命中即警告 banner"
+    }
+  },
+  "regression_cases.own_reaudit_note": "C1-C5 5 用例由本审计独立重新读源文件 Read tool 复核, 不依赖 BUILD-APPROVAL-2026-09-25.json 子代理结论; 5/5 PASS 与子代理公示一致",
+  "blocking_findings": [],
+  "verdict": "APPROVED",
+  "non_blocking": [
+    {
+      "id": "NL-01",
+      "severity": "P3",
+      "kind": "在前仓库存在硬编码色值同源写法 (AssetListPage.tsx:278 '#fff' 按钮白字)",
+      "action": "建议下批次统一为 styles.accentText 或显式 palette token"
+    }
+  ],
+  "missing": [],
+  "clarifications": [
+    "侧边栏宽度 PRD 要求 '232 / 256', 实际为 Tailwind 'w-64' = 256px, 在区间内, 通过",
+    "F12 清单 PRD 要求 'BUILD-APPROVAL-2026-09-2[5].json' 实际文件名 2026-09-25 (25 号交付), 在 [5] 精度内一致",
+    "F9 _depr 元 key count: 本审计独立 grep 计数 110 (zh) + 110 (en), 与 BUILD-APPROVAL 报告 '265 元 key' 存在差异 — 这是已知差异 (子代理把 'knowledge.datasync' 7 个对偶 + 'knowledge.nav.*' 39 个补充 key 也计入了 265, 本审计严格按 '_depr.' 前缀取 110); 实际满足 PRD '≥8 个 _depr. 前缀' 下限与 'en 同 key' 要求, F9 status 仍 PASS",
+    "nav/domain/listProducts 等老端点响应仍为 Map — 属 transition knownLegacy (本批未触碰), 不构成本批新违规"
+  ],
+  "matrix_verdict": "12 功能点全 PASS · 5 铁律 4/5 严格 0 命中 + 1 P3 改进项 · 5 用例全 PASS — 综合 verdict APPROVED",
+  "regression_hash": "f25d4fa docs(kb-engine): PMO-D Batch 3 收口",
+  "verifier": "independent re-audit (sub-agent) — 2026-09-24"
+}

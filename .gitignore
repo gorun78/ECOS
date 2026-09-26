@@ -27,3 +27,10 @@ ecos_backend/services/dccheng/dccheng-run.log
 ecos_backend/services/dccheng/dccheng-run.log.err
 ecos_backend/services/dccheng/dccheng-run.log.*.old
 
+# 开发期工具缓存 (2026-09-24)
+.trae/plan-sessions/
+.trae/skills/ecos-fullstack-step/
+.vscode/
+ecos_frontend/tsc-data10.log
+node_modules/
+
