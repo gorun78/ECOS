@@ -20,7 +20,7 @@ import AgentStudioView from './AgentStudioView';
 import ModelCatalogView from './ModelCatalogView';
 import AgentPlayground from './AgentPlayground';
 import EvalsView from './EvalsView';
-import CognitionView from './CognitionView';
+import CognitionWorkbench from './cognition/CognitionWorkbench';
 import {
   LayoutDashboard, Network, FlaskConical, Cpu, BarChart3, Layers,
   CloudOff, RefreshCw, BrainCircuit,
@@ -282,7 +282,7 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
                   showToast={showToast}
                 />
             )}
-            {currentTab === 'cognition' && <CognitionView />}
+            {currentTab === 'cognition' && <CognitionWorkbench />}
           </div>
         </div>
       </div>
@@ -353,7 +353,7 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
                 showToast={showToast}
               />
           )}
-          {currentTab === 'cognition' && <CognitionView />}
+          {currentTab === 'cognition' && <CognitionWorkbench />}
         </div>
       </div>
     </div>
