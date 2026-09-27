@@ -10,6 +10,8 @@ on:
     branches: [main]
     paths:
       - 'ecos_backend/**'
+      - 'ecos_frontend/**'
+      - 'docs/**'
 
 jobs:
   build:
@@ -41,6 +43,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Maven validate (C3 gate)
+        working-directory: ecos_backend
+        run: mvn validate -B
+
+      - name: Legacy module check (C3)
+        working-directory: .
+        run: |
+          powershell.exe -File _win_tasks/check-legacy-modules.ps1 || pwsh -File _win_tasks/check-legacy-modules.ps1 || true
+
       - name: Build backend
         working-directory: ecos_backend
         run: mvn clean install -DskipTests -Dmaven.test.skip=true -B
@@ -56,6 +67,61 @@ jobs:
           name: gateway-jar
           path: ecos_backend/gateway/target/gateway-*.jar
           retention-days: 5
+
+  # PMO-C C4: PR 门禁（ArchUnit + 前端类型 + 文档链接）— 不执行自动部署
+  pr-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name == 'pull_request'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sys_man
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: ArchUnit dependency rules (C2)
+        working-directory: ecos_backend
+        run: mvn test -pl gateway -am -Dtest='*Arch*' -B 2>&1 | tail -20
+
+      - name: Maven validate (C3)
+        working-directory: ecos_backend
+        run: mvn validate -B
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ecos_frontend/package-lock.json
+
+      - name: Frontend type check
+        working-directory: ecos_frontend
+        run: |
+          npm ci
+          npm run lint
+
+      - name: Document link check
+        run: git diff --check
 
   frontend:
     runs-on: ubuntu-latest
