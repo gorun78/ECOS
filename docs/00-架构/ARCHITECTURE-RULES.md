@@ -1,74 +1,95 @@
 # ECOS 架构铁律 — 所有PMO指令强制执行
 
-> 版本: 1.6 | 2026-09-26 | 微服务 v2 权威副本（与工厂副本 `.trae/rules/架构铁律.md` v1.6 同源对齐）
-> 此文件是 ECOS 开发的**宪法**。每条 PMO 指令必须在开头引用，违反任一铁律=验收不通过。
+> 版本: 1.6 | 2026-09-26 | 基于 v1.5 + 场景工作台职责边界（§0.6，用户批准）
+> 此文件是ECOS开发的**宪法**。每条PMO指令必须在开头引用，违反任一铁律=验收不通过。
 >
-> **2026-09-26 v1.6 变更**（新增 §0.6 场景工作台职责边界铁律 · 用户批准）: 明确场景工作台（`workspace` :18090）为 DIKCW 的 **W（决策/行动）侧落地与收口**；主实体「场景」非「项目」、**不引入 `ecos_project`**；组成模型 = **🔴 子图 + 横切 + 出口**；演练沙盘三铁律。认知（木 C）前端归属维持 v1.5（AI 工作台）。
-> **2026-09-24 v1.5 变更**（认知 C 前端归属 · 用户批准）: 认知（木 C）的前端工作台**归属 AI 工作台**（火 W + 木 C 共享 :18084 aiming），引擎层归属与 C↔AI 边界不变。
-> **2026-09-24 v1.4 变更**（DIKCW 核心关系升级）: 主认知链 `D→I→K→C→W` + 现实反馈链 `W→D` = **Enterprise Cognitive Loop**；四转化「诚 = K→C」「明 = **C→W**」（原 K→W 降级为「确定性知识驱动自动化」特殊通道）；**C = f(D,I,K,Context,Evidence,Hypothesis,Belief,Cognitive Model)** 非 K 的简单下游；**W ≠ AI/LLM/Agent**，W = Decision/Strategy/Policy/Action/Execution；认知四表不变。
-> **2026-09-19 v1.3 变更**（新增 §0.5 三工作台职责边界铁律 · 用户批准）: 数据工作台（土 D）/ 本体工作台（金 I）/ 知识工作台（水 K + 木 C）职责边界与五条边界铁律，依据 `docs/21-runtime/legacy-plans/knowledge-workbench-replan-v1.md`（v2.1）§1。
-> **2026-09-16 v1.1 变更**（§1.2 三滤波器「豁免写法」判据修正 · 用户批准）: 路径重写先于鉴权（`VersionPrefixRewriteFilter` `@Order(MIN+10)` 早于 Spring Security `-100`，鉴权层只见裸路径），三步判据（是否应匿名 → 是否在 `V1_REWRITE_MAP` 内 → 匿名回归）。
+> **2026-09-26 v1.6 变更**（新增 §0.6 场景工作台职责边界铁律 · 用户批准）:
+> - 新增 **§0.6**：明确场景工作台的**定位**（顶层场景应用层 = DIKCW 的 W 侧落地收口）、**主实体「场景」定义**（非「项目」，**不引入 `ecos_project`**）、**组成模型**（🔴 **子图 + 横切 + 出口**，非平铺清单）、**使用对象与排他性**、**演练沙盘三铁律**
+> - 关键口径：六类绑定分三层（链路节点 `DATASET`/`OBJECT_TYPE`/`KNOWLEDGE_BASE`/`AI_AGENT` ／ 横切约束 `SECURITY_POLICY` ／ 出口 `INTERFACE`）；**禁止孤岛绑定**；跨工作台关系**一律引用既有契约**（继承 §0.5 契约先行，如 D→I 边引用 `ecos_entity_table_mapping`）；场景完整度按**真实连边覆盖率**计，**禁止按绑定数量算分**
+> - **只增不改**：§0.1~§0.5 既有铁律零改动；认知（木 C）前端归属维持 v1.5 不变（本条未涉）
+> - DDL 方向：新增边表 `ecos_scenario_binding_link` 承载关系矩阵（DDL 细节见执行指令，铁律不承载 DDL）
 >
-> **单体→微服务 v2 迁移注记**：本文件 §0.2~§0.4 早期由单体（单体 gateway + Maven import）描述；v1.6 起工程落地为**微服务 v2**——见 §0.1（微服务 v2 权威描述）。旧「单体」表述在 §0.1 末尾作迁移注记，不再作为现行架构。
+> **2026-09-24 v1.5 变更**（认知 C 前端归属调整 · 用户批准）:
+> - **用户视角归属变更**：认知（木 C）的前端工作台归属由「知识工作台（水 K + 木 C）」调整为挂入 **AI 工作台（火 W + 木 C）**
+> - **依据**：AI 引擎与认知引擎对应人脑「系统 1（快·直觉，ai-engine）／系统 2（慢·审慎，cognitive-engine）」的一体两面，同属"系统思考"面
+> - **🔴 只改前端归属，不改三样东西**（① 引擎层：`cognitive-engine` 仍为独立引擎（木 C），仍由 `services/aiming`（:18084）聚合加载；② 数据边界：C 的读取仍为 D/I/K 只读，§0.5 五条边界铁律不变；③ **C↔AI 职责边界**（§0.2.1）**维持不变**——本次调整**不构成** C 与 AI 技术手段的职责合并，禁止 LLM 直接承担 Cognitive Engine 职责的禁令继续有效）
+> - **§0.5 同步**：知识工作台 = 水 K（移除「+ 木 C」）；新增 AI 智能工作台 = 火 W + 木 C 归属说明
+> - 下游制品：`docs/engine-cognitive/cognition-v2-impl-prd.md`、认知工作台原型 V2.0（`README.md` §1/§2）
+>
+> **2026-09-24 v1.4 变更**（DIKCW 核心关系模型升级 · 架构哲学演进）:
+> - 五对象 (D/I/K/C/W) 对象定义明文升级为「事实/语义/知识/认知/行动」五种状态，**对象集合不变**（不新增、不删除、不合并）
+> - 主认知链从「单向流水线」升级为 **Enterprise Cognitive Loop**：
+>   `D → I → K → C → W` 是主链（从事实到行动的认知形成过程）
+>   `W → D` 是现实反馈链（行动产生新事实回流）
+>   两链共同构成企业认知闭环 `D → I → K → C → W → D`
+> - 四转化「诚(诚意)」由 `K→C` 保持不变；「明(明德)」由 `K→W` **重新定义为 `C→W`**（认知驱动决策与行动）
+>   —— `K→W` 仍可存在但仅作「确定性知识驱动自动化」特殊通道，**不再作为架构主导地位**
+> - **C 定义重点升级**：`C = f(D, I, K, Context, Evidence, Hypothesis, Belief, Cognitive Model)` —— C **不是** K 的简单下游加工结果；禁止把「C = f(K)」作为架构理解
+> - **W 定义重点调整**：W **不是** AI/LLM/Agent 本身；W 核心 `Decision / Strategy / Policy / Action / Execution`；AI 是实现 W 能力的技术手段，不等同于 W
+> - **Cognitive ↔ AI 边界明文**：禁止 LLM 直接承担 Cognitive Engine 职责；禁止 ai-engine 直接替代 cognitive-engine 进行企业因果判断；LLM 调用继续走 llm-gateway
+> - 数据/数据库边界不变：K 层、认知层仍用 `ecos_cognitive_model` / `ecos_cognitive_evidence` / `ecos_cognitive_hypothesis` / `ecos_cognitive_belief` 四表，禁止新增 `cognitive_*` 表；不因本次升级破坏 D/I/K/C 边界
+>
+> **2026-09-19 v1.3 变更**（新增 §0.5 三工作台职责边界铁律 · 用户批准）:
+> - 新增 §0.5：数据工作台（土 D）/ 本体工作台（金 I）/ 知识工作台（水 K + 木 C）职责边界与五条边界铁律
+> - 依据：`docs/plans/knowledge-workbench-replan-v1.md`（v2.1）§1
+>
+> **2026-09-16 v1.2 变更**（§1.2 三滤波器「豁免写法」判据修正 · 用户批准）:
+> - 实证 **路径重写先于鉴权**（`VersionPrefixRewriteFilter` 为 `@Order(MIN+10)`，早于 Spring Security `FilterChainProxy` `-100`）→ **鉴权层只见裸路径**
+> - 废止「双路径 `/api/v1/` 与 `/api/` 各写一遍」的机械表述，改为三步判据：① 该端点是否应匿名（业务数据端点默认 DENY）② 该前缀是否在 `V1_REWRITE_MAP` 内（在内 → 只写最终路径）③ 收尾强制匿名回归（无 token 403 / 带 token 200）
+> - 触发事故：数据工作台血缘恢复批次按旧表述误补 `/api/integration/**` permitAll，致**未认证可读数据源 `host/port/username/jdbcUrl`**（同 M0 改造 T3-006，违反 §2.4-6）；已撤销并复验
+>
+> **2026-09-11 v1.1 变更**（PMO-49 微服务 v2）:
+> - 旧单体 fat-JAR 已全量改造为微服务态（7 个独立 JAR）
+> - 部署单元：`api-gateway :8080` + `services/{sysman,datanet,buszhi,dccheng,aiming} :18081/2/3/4/6`（端口隔离 ADR-7）+ `workspace :18090`
+> - 参考 `docs/plans/current-plan.md` v1.4 + 附录 A 目标模块结构
+> - **P8-A 已完成**：`common/common-api` 迁入 `runtime/common-api`（顶层 `common/` 聚合废弃；Java 包名 `com.chinacreator.gzcm.common.*` 不变，20 处依赖零改动）
+> - **P8-B 已完成**：顶层 `buszhi/` 迁入 `services/buszhi/impl/`（buszhi-impl library artifact 保持稳定，5 个依赖方零改）
+> - **P8-C 已完成**：顶层 `sysman/` 迁入 `services/sysman/impl/`（`sysman-api`/`sysman-impl`(263 java)/`sysman-boot` 三个子模块整目录，**Java 包名 `com.chinacreator.gzcm.sysman.*` 不变**，gateway 内 7 处 import 零改；与 P8-A/B 同策略"保 artifact 稳定 · 仅动物理目录"）
+> - 说明：P8-A/B/C 全部采用 **"保 artifact 稳定 · 仅动物理目录"** 策略（与附录 A "导入侧仅改 groupId/artifactId 说明" 同原则，实现零依赖方 import 改动
 
 ---
 
 ## 〇、总则
 
-### 0.1 微服务 v2（权威口径，v1.6 起）
+### 0.1 微服务架构（v2）
 
-ECOS 自 v1.6 起为**微服务 v2 架构**，不再是单体。部署拓扑：
+ECOS是**微服务架构**：`api-gateway`（顶层 `gateway/` 模块）唯一对外入口 `:8080`，业务拆为 5 个 service 聚合模块（sysman/datanet/buszhi/dccheng/aiming，分别封装 security/data/ontology/kb/ai+cognitive 引擎）+ 1 个顶层 `workspace` 场景应用层 `:18090`（调用全部业务 service）= 7 个独立可部署 JAR。六引擎（`api`/`impl`/`boot`）保持三模块结构不变，engine impl 作为 library 被所属 service 聚合模块依赖；引擎 `boot` 仅限独立调试（非生产入口）。详见 `docs/plans/current-plan.md` v1.4
 
-```
-前端 (ecos_frontend :3000, BFF)
-        │  ── 所有 /api/* 经 BFF → gateway ──
-        ▼
-gateway (api-gateway :8080)  ← 唯一外部入口（组织/认证/限流 facade）
-        │  ── REST 跨服务路由（端口隔离 ADR-7）──
-        ├── services/sysman   :18081  安全/IAM/审计
-        ├── services/datanet  :18082  数据源/管道/DQ/数据湖
-        ├── services/buszhi   :18083  本体/对象/工作流
-        ├── services/aiming   :18084  智能体/LLM/认知(C↔W，认知前端归属此工作台)
-        ├── services/dccheng  :18086  知识图谱/RAG/规则
-        └── workspace         :18090  顶层场景应用层（W 侧编排收口，只调 service）
-                │
-                ▼  （各 service 内嵌对应 engine-impl，引擎不独立对外）
-        6 engine：security(护) / data(土D) / ontology(金I) / kb(水K) / cognitive(木C, run in aiming:18084) / ai(火W)
-        + 横切 runtime（runtime-access / runtime-task / runtime-monitor / llm-gateway）
-```
-
-| 维度 | 设定 |
-|:--|:--|
-| 可部署 JAR | **7 个**：gateway + 5 service（sysman/datanet/buszhi/aiming/dccheng）+ workspace |
-| 端口隔离 | sysman:18081 / datanet:18082 / buszhi:18083 / aiming:18084 / dccheng:18086 / workspace:18090（ADR-7，各 service 独占端口） |
-| 外部入口 | **gateway :8080 唯一**；`workspace → services/*`（REST），`services/* → engine-impl`（Maven dep），`engine-impl → engine-api → common-api` |
-| 认知归属 | cognitive-engine（木 C）实际部署 **run in aiming :18084**（PMO-60，前端归入 AI 工作台） |
-| 铁律 | 禁新增 Maven 模块 / 禁新增 Docker 容器（白名单基线，每 service 独立 Dockerfile） |
-
-> **单体→微服务迁移注记（历史）**：早期 v1.0~v1.2 本文件以「单体应用」描写——"`gateway` 是唯一 Spring Boot 入口、通过 Maven 依赖导入所有业务模块"。该**单体态废弃**；v1.6 微服务 v2 为准，此节仅作历史溯源。
+> ⚠️ 历史说明（2026-09-10 起）：本文档在 2026-08 前记录单体 fat-JAR 形态，已改造废弃。改造注意：
+> - service 间 REST 同步调用 + Kafka 异步事件
+> - 端口隔离：各 service 独占端口（sysman:18081/datanet:18082/buszhi:18083/aiming:18084/dccheng:18086/workspace:18090/gateway:8080）
+> - service 端口仅内网可达，nginx/gateway 不透传（防伪造，见 plan ADR-7）
+> - 数据隔离：standard 档 Schema，enterprise/ultimate 档独立 Database（方案 ADR-3）
 
 ### 0.2 五对象·五行（引擎层）＋ 四转化·格致诚明（服务层）
 
 ECOS 反应中国古代智慧，全系统分两层核心：
 
-**引擎层 = 五抽象对象**（管"是什么"及其生命周期），以五行代号：
+**引擎层 = 五核心对象**（管"是什么"及其生命周期），以五行代号：
 
-| 对象 | 引擎 | 五行代号 | 意象 |
-|------|------|:--:|------|
-| D 数据 | data-engine | 土 | 承载万物 |
-| I 信息·语义本体 | ontology-engine | 金 | 从矿中提炼 |
-| K 知识 | kb-engine | 水 | 流动汇聚 |
-| C 认知 | cognitive-engine | 木 | 生长向上 |
-| W 智慧 | ai-engine | 火 | 光明照亮 |
+| 对象 | 引擎 | 五行代号 | 意象 | 核心问题 |
+|------|------|:--:|:--|:--|
+| D 数据 / 事实 | data-engine | 土 | 承载万物 | 发生了什么？ |
+| I 信息 / 语义本体 | ontology-engine | 金 | 从矿中提炼 | 它是什么？ |
+| K 知识 | kb-engine | 水 | 流动汇聚 | 我们知道什么？ |
+| C 认知 | cognitive-engine | 木 | 生长向上 | 当前情况下我们认为是什么？ |
+| W 智慧 / 决策与行动 | ai-engine | 火 | 光明照亮 | 我们应该做什么？ |
+
+> **v1.4 五对象定位**（PMO-XX 核心哲学）：
+> - D = 事实世界；I = 语义世界；K = 知识世界；C = 认知世界；W = 行动世界
+> - **五者不是五个简单的数据存储层**，而是企业智能系统的五种核心对象/状态
 
 **服务层 = 四转化过程**（管"怎么变"），以《大学》格致诚明命名：
 
-| 转化 | 过程 | 出处 |
-|------|------|------|
-| ge（格） | D→I | 格物 |
-| zhi（致） | I→K | 致知 |
-| cheng（诚） | K→C | 诚意 |
-| ming（明） | **C→W** | 明德 |
+| 转化 | 过程 | 出处 | 含义 |
+|------|------|------|------|
+| ge（格） | D→I | 格物 | 从事实中建立业务语义 |
+| zhi（致） | I→K | 致知 | 从语义模型中组织、沉淀知识 |
+| cheng（诚） | K→C | 诚意 | 在当前情境中基于知识形成认知 |
+| ming（明） | **C→W** | 明德 | 将认知转化为决策、策略与行动 |
+
+> **🔴 v1.4 关键修订**：「明」由 `K→W` **重新定义为 `C→W`**，与 `K→C`（诚意）共同构成默认智能决策路径 `K → C → W`。
+> 旧「Ming = K→W」只能作为「**Knowledge-driven Action**（确定性知识驱动自动化）」特殊通道存在，例：合同到期前提醒任务等无需复杂推理的固定规则场景。**不再作为架构主导地位**。
 
 **系统分层（自上而下）**：
 
@@ -89,6 +110,102 @@ ECOS 反应中国古代智慧，全系统分两层核心：
 
 **基础设施访问铁律**：PG/Neo4j/MinIO/Doris/Git 的 Driver/Client 封装统一收敛到 `runtime-access`，引擎层/服务层**禁止各自 new Driver 或重复封装**。引擎只通过 runtime-access 访问基础设施。
 
+#### 0.2.1 DIKCW 主认知链 + 现实反馈链（Enterprise Cognitive Loop）— **v1.4 核心**
+
+> ECOS 的 DIKCW 不是「单向数据流水线」，而是**企业认知闭环**：「事实 → 语义 → 知识 → 认知 → 行动 → 新事实」的循环。
+
+```
+              ┌──────────────┐
+              │      D       │
+              │  Data/事实    │
+              └──────┬───────┘
+                     │ 格 (ge)
+                     ↓
+              ┌──────────────┐
+              │      I       │
+              │ Info/Ontology│
+              └──────┬───────┘
+                     │ 致 (zhi)
+                     ↓
+              ┌──────────────┐
+              │      K       │
+              │  Knowledge   │
+              └──┬───────┬───┘
+                 │       │
+        诚(cheng)│       │ Knowledge-driven Action（特殊通道，
+                 │       │  确定性知识 → 自动化动作，无需 C）
+                 ↓       ↓
+              ┌──────────────┐
+              │      C       │
+              │  Cognition   │◄──── K ─────────┘
+              └──────┬───────┘
+                     │ 明 (ming)
+                     ↓
+              ┌──────────────┐
+              │      W       │
+              │ Wisdom/Action│
+              └──────┬───────┘
+                     │  行动结果（事件/指标/新事实）
+                     ↓
+                     D
+```
+
+**两条独立的链，不得混为一谈**：
+
+| 链 | 形态 | 含义 |
+|:--|:--|:--|
+| **主认知链 (Cognitive Chain)** | `D → I → K → C → W` | 从事实到行动的认知形成过程 |
+| **现实反馈链 (Reality Feedback)** | `W → D` | 行动执行后产生新的现实事实，重新进入 D 层 |
+
+两链共同构成 **Enterprise Cognitive Loop：`D → I → K → C → W → D`**，是企业认知闭环的完整形态。
+
+**C 的定义（🔴 必须严格遵守）**：
+
+```
+C = f(D, I, K, Context, Evidence, Hypothesis, Belief, Cognitive Model)
+```
+
+- D：事实数据
+- I：语义与本体
+- K：知识
+- Context：当前业务情境（运行时上下文，**不新增独立表**）
+- Evidence：证据
+- Hypothesis：假设
+- Belief：当前认知信念/状态
+- Cognitive Model：认知模型
+
+> **C 是对企业当前情境进行解释、推理、判断和预测的动态认知状态，而不是知识层的另一个存储层。**
+> 禁止出现「C = f(K)」的架构理解。
+
+**Cognitive Engine 职责保持并强化**：
+
+- **持续负责**：因果推理 / 情景推演 / 混合推理
+- **核心推理链**：`Evidence → Knowledge Context → Cognitive Model → Reasoning → Hypothesis → Belief → Cognition`
+- **可读**：D 层事实、I 层语义/本体、K 层知识、当前业务 Context
+
+**W 的定义（🔴 禁止 AI = W / LLM = W / Agent = W）**：
+
+```
+W = Decision / Strategy / Policy / Action / Execution
+```
+
+> **W 是基于认知形成的决策、策略、政策、行动与执行能力。**
+> AI 是实现智慧能力的重要技术手段，但 **AI 本身不等于 W**。
+
+**ai-engine ↔ cognitive-engine 边界（铁律）**：
+
+| 引擎 | 负责 | 禁止 |
+|:--|:--|:--|
+| cognitive-engine | 推理 / 因果 / 情景 / 假设 / 信念 / 认知判断 | LLM 直接替代 causal reasoning |
+| ai-engine | Agent / Loop / Memory / LLM 调用 / Tool Calling / Decision Action Orchestration | 直接替代 cognitive-engine 进行企业因果判断 |
+
+允许路径（且继续走 llm-gateway）：
+
+```
+cognitive-engine → llm-gateway → LLM → cognitive-engine 正式判断
+ai-engine → cognitive-engine 的认知结果 → W (决策/行动落地)
+```
+
 ### 0.3 六引擎体系（五对象 + 一护）
 
 | 引擎 | 五行/角色 | 端口 | 职责 | 禁止 |
@@ -96,13 +213,31 @@ ECOS 反应中国古代智慧，全系统分两层核心：
 | **security-engine** | 护（横切，不入五行） | 18081 | 认证/授权/审计/脱敏/ABAC | 不执行业务规则判定 |
 | **data-engine** | 土（D 数据） | 18082 | 数据源/管道/血缘/DQ/查询 | 管道不执行>30min任务；血缘不追踪Neo4j |
 | **ontology-engine** | 金（I 信息·本体） | 18083 | 本体建模/实体/关系/版本 | — |
-| **cognitive-engine** | 木（C 认知） | run in aiming（:18084，PMO-60） | 因果推理/情景推演/混合推理 | 不新增DB表(推理实时计算)；不引入规则引擎(SpEL即可) |
+| **cognitive-engine** | 木（C 认知） | 18084（PMO-60 后 run in aiming） | 因果推理/情景推演/混合推理；C = f(D,I,K,Context,Evidence,Hypothesis,Belief,Cognitive Model) —— C **不是** K 的简单下游加工结果，而是企业对当前情境的动态认知状态 | 落盘三档口径（ADR-9）：推理**结果**不落盘(实时计算)；模型**资产**落 `ecos_cognitive_model`(ADR-8)；认知**心智状态**三表 `ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`(V127~129) 落盘，不新增其他表（Context 继续作运行时上下文，**不建 cognitive_context 表**）；不引入规则引擎(SpEL即可)；**禁止 LLM 直接承担推理职责** |
 | **kb-engine** | 水（K 知识） | 18086 | KG存储/检索/RAG/规则CRUD/知识抽取 | **不执行规则判定**(那是cognitive的)；不直接调LLM(那是ai的) |
-| **ai-engine** | 火（W 智慧） | 18084 | Agent/Loop/Memory/LLM调用 | — |
+| **ai-engine** | 火（W 智慧 / 决策与行动） | 18084 | Agent/Loop/Memory/LLM调用/Tool Calling/行动编排；W ≠ AI/LLM/Agent 本身，W = Decision/Strategy/Policy/Action/Execution | **不替代 cognitive-engine** 进行企业因果判断；W 的决策/行动落地执行结果回流 D 层（现实反馈链） |
 
-**引擎=api/impl/boot三模块**。boot独立启动仅开发用，生产走gateway。
+> **v1.5 前端归属**：认知（木 C）的前端工作台归属为 **AI 工作台（火 W + 木 C）**；引擎层归属、落盘口径与 C↔AI 职责边界均不变（见 §0.2.1 / §0.5）。
+
+**引擎=api/impl/boot三模块**（微服务改造后）：`boot` 保留用于独立启动调试（**非生产入口**）；生产由所属 service 聚合模块（`*-engine-impl` 作为 library 被 `services/{name}` 依赖）启动。service 沿用其主引擎端口（sysman:18081/datanet:18082/buszhi:18083/aiming:18084/dccheng:18086），本机同时运行引擎 boot 与对应 service 会端口互斥，调试以 `--server.port` 错开。
 
 **引擎层（五对象·五行）管理对象及其生命周期，服务层（四转化·格致诚明）负责对象间的转化过程。对象代码不得混入转化逻辑，转化服务不得内嵌对象管理。**
+
+#### 0.3.1 业务服务层（v2 拆分，PMO-49）
+
+| service | 职责 | 端口 | 封装引擎 |
+|---|---|:--:|---|
+| `services/sysman` | 系统管理 / 护横切 | 18081 | `security-engine-impl` |
+| `services/datanet` | 数据服务 / 土 D | 18082 | `data-engine-impl` |
+| `services/buszhi` | 本体 / 金 I | 18083 | `ontology-engine-impl` + 工作流 |
+| `services/aiming` | 智能 / 火 W + 木 C | 18084 | `ai-engine-impl` + `cognitive-engine-impl` + `llm-gateway`（PMO-60 P0 认知从 dccheng 迁入） |
+| `services/dccheng` | 知识库 / 水 K | 18086 | `kb-engine-impl`（PMO-60 P0 后 cognitive 已迁出至 aiming:18084） |
+| `workspace` (顶层) | 场景应用层（调全部 5 service） | 18090 | 无（只依赖 API 契约，REST 跨服务） |
+| `gateway` (顶层) | 组织/认证/限流 facade | 8080 | 无（纯组织层） |
+
+**依赖方向铁律**：`workspace → services/*` (REST)，**禁止** workspace 直接依赖 engine-impl；`services/* → engine-impl` (Maven dep)；`engine-impl → engine-api → common-api`。所有**横向/反向依赖**拒绝。
+
+**服务层端口仅内网可达**（ADR-7）：网关 :8080 或 nginx 是唯一对外入口；直连 18081/2/3/4/6/18090 会默认 DENY。
 
 ### 0.4 一套代码三套发布
 
@@ -116,17 +251,19 @@ ultimate    → PG + Neo4j + Doris (单表>100万行启用列存)
 
 ### 0.5 三工作台职责边界铁律（🔴 2026-09-19 新增）
 
-三个工作台是**用户视角的职能划分**，映射到引擎：数据工作台 = `data-engine`（土 D）、本体工作台 = `ontology-engine`（金 I）、知识工作台 = `kb-engine`（水 K）+ `cognitive-engine`（木 C）。三者构成**单向认知链路**（v1.4 起，是 Enterprise Cognitive Loop 的 D→I→K 前段；完整的 W→D 反馈链由 action/agent 与运营闭环产生）：
+三个工作台是**用户视角的职能划分**，映射到引擎：数据工作台 = `data-engine`（土 D）、本体工作台 = `ontology-engine`（金 I）、知识工作台 = `kb-engine`（水 K）。三者构成**单向认知链路**（v1.4 起，此链路是 Enterprise Cognitive Loop 的 D→I→K 前段；完整的 W→D 反馈链由 action/agent 服务与运营闭环产生，见 §0.2.1）：
 
 ```
 数据工作台（存储与加工） → 本体工作台（模型与映射契约） → 知识工作台（语义实例化）
 ```
 
+> **v1.5 调整**：认知（木 C）的**前端归属**已从本表移出，挂入 **AI 工作台（火 W + 木 C）**——依据「系统 1 快·直觉（ai-engine）／系统 2 慢·审慎（cognitive-engine）」一体两面。**引擎层与数据边界不变**：`cognitive-engine` 仍为独立引擎、仍由 `services/aiming`（:18084）聚合；C 的读取边界为 **D / I / K 只读**（比知识工作台多读 D 层，见 §0.2.1 `C = f(D,I,K,...)`）；**C↔AI 职责边界维持 §0.2.1 不变**——本次调整不构成 C 与 AI 技术手段的职责合并。
+
 | 工作台 | 一句话职责 | 核心产出 | 允许读 |
 |:--|:--|:--|:--|
 | 数据工作台（土 D） | 数据的**存储与管理** | 近源层对象、DW 层表、管道、血缘、DQ | 外部源系统、近源层、DW 层 |
 | 本体工作台（金 I） | 业务模型的**定义与关联** | 本体 schema、**实体→DW 表映射契约**（`ecos_entity_table_mapping`）、版本快照 | **仅 DW 层（只读）** |
-| 知识工作台（水 K + 木 C） | 依据本体模型**抽取数据形成知识图谱** | 知识图谱实例、向量索引、抽取候选、知识规则 | **仅 DW 层 + 语义层（只读）** |
+| 知识工作台（水 K） | 依据本体模型**抽取数据形成知识图谱** | 知识图谱实例、向量索引、抽取候选、知识规则 | **仅 DW 层 + 语义层（只读）** |
 
 **五条边界铁律（违反=验收失败）**：
 
@@ -137,6 +274,78 @@ ultimate    → PG + Neo4j + Doris (单表>100万行启用列存)
 5. **映射必校验**：本体工作台保存映射时**必须**校验 DW 表/列存在性与类型兼容。
 
 > 完整设计（对接机制、非结构化策略、接口规范、核心模块）与落地批次 B1~B8 见 `docs/plans/knowledge-workbench-replan-v1.md`。
+
+### 0.6 场景工作台职责边界铁律（🔴 2026-09-26 新增）
+
+> **背景**：数据 / 本体 / 知识 / AI（含认知）四个工作台已就绪，顶层场景工作台（`workspace` :18090）承担 DIKCW 闭环的 **W（决策/行动）** 侧落地与收口。本节明确其主实体「场景」的**定义、组成模型、使用对象与演练沙盘**。
+
+**定位**：场景工作台是**顶层场景应用层**（`workspace` :18090），调全部 5 个业务 service，是 Enterprise Cognitive Loop 中 **W（火·决策/行动）** 的执行与收口层。它**不生产**能力，只**编排**能力：把完成某类业务决策所需的 D/I/K/C 能力装配成一个可执行、可演练、可闭环的「场景」。
+
+#### 0.6.1 场景定义
+
+> **场景（Business Scenario）** = 一个**可执行、可编排、可模拟、可回放**的业务情形容器；它把完成某类业务决策所需的资源绑定在一起，用认知引擎驱动，产出「决策 → 行动 → 事实回灌」的闭环。
+
+**主实体铁律**：
+
+1. **主实体是「场景」不是「项目」**：工作台正式名 = **场景工作台**，禁止再称「项目工作台」；**不引入 `ecos_project` 聚合层**。
+2. **场景四态生命周期**：`DRAFT → ACTIVE → COMPLETED`（可 `SUSPENDED` 挂起后回 `ACTIVE`），沿用 `ecos_business_scenario.status`。
+3. **场景 ≠ 资源**：数据集 / 本体实体 / 知识库等单件资源不是场景，是被场景绑定的资源；运行记录 / 沙盘布局 / 决策回执是场景的产物，也不是场景。
+4. **可重复演练**：同一场景可多次 run（每次产出一条 `ecos_scenario_run`）。
+
+#### 0.6.2 场景组成模型（🔴 子图 + 横切 + 出口，非平铺清单）
+
+场景 = **元属性 + DIKCW 子图（节点 + 有向边）+ 横切约束 + 出口 + 运行产物**。
+
+六类绑定**不是六个并列的多选项**，而是分属三个语义层：
+
+| 层 | 成员（`ecos_scenario_binding.binding_type`） | 形态 | 在链上的位置 |
+|:--|:--|:--|:--|
+| **链路节点** | `DATASET` / `OBJECT_TYPE` / `KNOWLEDGE_BASE` / `AI_AGENT` | 有序、有向 | ✅ 主链（土 D → 金 I → 水 K → 火 W/木 C） |
+| **横切约束** | `SECURITY_POLICY` | 覆盖全链的约束 | ❌ 正交，非链上一环 |
+| **出口** | `INTERFACE` | 链末端对外暴露面 | ❌ 链外出口 |
+
+**六类之间的关系矩阵（边类型）**：
+
+| 关系 | 源 → 目标 | 转化 | 唯一事实源（契约） |
+|:--|:--|:--|:--|
+| **映射** | `DATASET` → `OBJECT_TYPE` | 格 ge | `ecos_entity_table_mapping` |
+| **抽取** | `OBJECT_TYPE` → `KNOWLEDGE_BASE` | 致 zhi | kb 抽取 |
+| **认知** | `KNOWLEDGE_BASE` → `AI_AGENT` | 诚 cheng | cognitive |
+| **行动** | `AI_AGENT` →（行动结果） | 明 ming | ai-engine / W→D |
+| **约束** | `SECURITY_POLICY` → 任意节点 / 边 | — | security-engine |
+| **暴露** | `INTERFACE` → `AI_AGENT`（或组合视图） | — | — |
+
+**三条铁律（违反 = 验收失败）**：
+
+1. **禁止孤岛绑定**：场景绑定必须**保连边**——链路节点之间必须形成连通路径，禁止绑出「数据集与本体实体无映射」「Agent 不消费任何已绑知识」这类断链场景。
+2. **契约先行（继承 §0.5）**：跨工作台关系**一律引用既有契约**——D→I 边必须引用 `ecos_entity_table_mapping`，场景层**不得自造映射语义**（不得自行推断「哪个表对应哪个本体实体」）。
+3. **完整度按真实连边计**：场景完整度 / 融合度指标必须按**真实连边覆盖率**计算，**禁止按绑定数量算分**。
+
+**DDL 方向**：新增边表 `ecos_scenario_binding_link` 承载上述关系矩阵；`ecos_scenario_binding` 保留为节点表（细节见执行指令）。
+
+#### 0.6.3 场景的使用对象与排他性
+
+| 角色 | 在场景里做什么 |
+|:--|:--|
+| 业务决策者 | 看 KPI、审批提案、触发 run 出决策结论 |
+| 场景编排者 | 建场景、配六类绑定与连边、维护沙盘布局与版本 |
+| 分析师 | 调认知四件套（诊断 / 预测 / 仿真 / 反事实）做态势分析 |
+| 外部受控方 | 受限访问（由 `SECURITY_POLICY` 绑定与 `department` 界定） |
+
+**两条排他铁律（违反 = 验收失败）**：
+
+1. **使用对象由场景界定**：`department` + `SECURITY_POLICY` 绑定共同界定「谁有权在本场景里做什么」。
+2. **名词排他**：场景工作台的「场景」≠ AI 智能体域的「项目跟踪」（`pages/ProjectTracker.tsx`，调 buszhi `objects/Project`）；二者**不得混用名词**。
+
+#### 0.6.4 演练沙盘（Sandbox）
+
+> **沙盘** = 场景的**可演练、可回放、乐观锁保护的画布视图**（1 场景 : 1 布局，`ecos_scenario_sandbox_layout.scenario_id UNIQUE`），把场景已绑定的资源与连边摊开，供人拖拽编排 + 触发认知演练。
+
+**三条铁律（违反 = 验收失败）**：
+
+1. **画布不产生资源**：沙盘只编排场景**已绑定的**资源，不在沙盘内新增 D/I/K/C 数据。
+2. **乐观锁强约束**：布局保存必走 `layout_version`，并发冲突返 409 + 提示刷新；禁止无条件覆盖。
+3. **演练必真接引擎**：沙盘内触发认知演练（诊断 / 预测 / 仿真 / 反事实）**必须**经 `services/*` REST **真调用**认知引擎，**禁止 stub/mock 哈希当结论落 UI**。
 
 ---
 
@@ -165,13 +374,14 @@ public class XxxController {
 
 ### 1.2 新增Controller的三滤波器（🔴最高频踩坑）
 
-**缺任何一层→403或404**。每新增Controller必须逐项验证：
+**缺任何一层→403或404**。每新增Controller必须逐项验证（微服务改造后校验点重分布）：
 
 | 层 | 文件 | 操作 |
 |:--|------|------|
 | 1 | `gateway/.../VersionPrefixRewriteFilter.java` | 确认V1_REWRITE_MAP中路径映射正确。Controller用`/api/v1/XXX`→REMOVE对应重写规则；用`/api/XXX`→KEEP |
-| 2 | `sysman/.../security/SecurityConfig.java` | **先判该端点是否应匿名**：业务数据端点一律**不写** permitAll（默认 DENY，§2.4-6）。确需匿名时按下方「豁免写法判据」② 决定写哪些形式 |
-| 3 | `sysman/.../security/ClearanceInterceptor.java` | 豁免列表 —— **HandlerInterceptor 层，路径重写已生效 → 只写最终路径形态**，判据同 ② |
+| 2 | `sysman/service/.../security/SecurityConfig.java` | **先判该端点是否应匿名**：业务数据端点一律**不写** permitAll（默认 DENY，§2.4-6）。确需匿名时按下方「豁免写法判据」② 决定写哪些形式（sysman service 内生效；其他 service 由各自 `HeaderAuthInterceptor` 委托 gateway 前置校验结果，见 ADR-7） |
+| 3 | `sysman/service/.../security/ClearanceInterceptor.java` | 豁免列表 —— **HandlerInterceptor 层，路径重写已生效 → 只写最终路径形态**，判据同 ②（同上，检查点适配 sysman service） |
+| 4（新增） | 各 service `HeaderAuthInterceptor.java` | 从 gateway strip/re-inject 的 `X-ECOS-*` 头还原用户上下文；非法请求（非 gateway 来源 / 头缺失）默认 DENY |
 
 **Ant路径陷阱**：`/api/v1/agent/**` 不一定匹配 `/api/v1/agent-loop/chat`（含连字符的路径）。必须显式写出完整前缀，不依赖父级`/**`通配。
 
@@ -187,6 +397,8 @@ public class XxxController {
 | ① | 该端点是否应匿名？ | **否 → permitAll 一律不写**（业务数据端点默认 DENY，§2.4-6） |
 | ② | 该前缀是否在 `V1_REWRITE_MAP` 内？ | **是 → 鉴权/豁免层只写最终路径（裸路径）**；写 v1 形式属死条目<br>**否 → `/api/v1/XXX/**` 与 `/api/XXX/**` 两形式各写一遍** |
 | ③ | 收尾强制 | **匿名回归**：无 token 期望 403、带 token 期望 200（禁止只验带 token 的 200） |
+
+> **路由前缀兄弟消歧（🔴 含近似前缀）**：当两个 service 控制器前缀互为 prefix（如 buszhi `/api/v1/ecos/object/*` 与 workspace `/api/v1/ecos/objects/*`，仅差末位 s），gateway 必须按**精确前缀优先**/最长前缀匹配路由。新增前缀时需核对与既有前缀的包含/兄弟关系（如 `container-services-rules 路由（含连字符/近似前缀需显式写出完整前缀`提醒，专项 E2E 验证）
 
 ### 1.3 依赖注入铁律
 
@@ -240,7 +452,23 @@ DataBridgeException(RuntimeException)
 
 - 统一路径：`/api/v1/engine/{type}/...`
 - 新增端点后追加到对应引擎的`AGENTS.md`端点清单
-- 如涉及定时/周期执行→委托`runtime-task`全局调度，不自建`ScheduledExecutorService`
+- 如涉及定时/周期执行→**调 §1.6 双入口范式**（不在此节展开）
+
+### 1.6 即时/定时任务统一接入入口（🔴 2026-09-22 新增，对齐数据工作台 `runOnce` 形态）
+
+> 数据工作台 `DataIngestService.runOnce(datasourceId, tableNames)` 是全仓门面：
+> `submitTask(desc) → executeTask(taskId)` 同步等待 → 返回 `{datasourceId, submitted, tasks:[{table, definitionId, taskId, status=SUBMITTED}]}`。
+> 所有需要"立即执行 + 异步任务中心跟踪"的端点**必须**复刻这一形态；**禁止自建任务表/任务名/调度器**。
+
+**铁律 4 条（违反 = 验收失败）**：
+
+1. **即时任务**：业务 Controller 提交**实时**走 `ITaskManagementService.submitTask(desc) + executeTask(taskId)`（**同步阻塞**等 runtime-task 派发返回，**不另起线程**）；响应回 **真实 `taskId`** + `status: "SUBMITTED"`，**不得回 `jobId` 这种业务自造标识作运行中任务 ID**。前端 `MonitorPanel` 改以 `taskId` 反查 `td_runtime_task_status` 拉 progress/log/导出。
+2. **定时任务**：**禁止**业务侧另起一套 `*_scheduled_*` 表（如 `kb_scheduled_extract`）记录 cron / next_run_at / last_status。一律走 `td_runtime_task_plan`（`taskType` 区分业务，`biz_kind` 列填 `KB_EXTRACT`/`PIPELINE` 等）+ `td_runtime_task` 落 execution 行；业务 Controller 同时通过 **`taskManagementService.scheduleTask(desc, cron)`** 注册 + 持有 `scheduleId` 字段。定时行与即时同源于 runtime-task 5 表，**单一事实源**。
+3. **监控面板**：业务级监控走**「异步任务中心 Agent」**整体视图（`AsyncTaskCenterView`）+ 业务 Tab 内嵌的行级监控（progress 0-100 / log tail / 导出）；**TopBar 右侧**统一入口进异步任务中心，**拒绝**业务 Tab 自行渲染平行任务列表。
+4. **审计不重复**：抽取动作的业务审计走 `*_extract_audit`（kb_extract_audit 等）**事件**层（谁/何时/啥结果），**不承载任务级 status/progress**；任务级的 runtime 状态（pending/running/succeeded/cancelled/failed）**只在** `td_runtime_task_status` 一份。两层防重复：审计表 ↔ runtime 5 表 **职责正交**，**不互相备份字段**。
+
+> **v2.1 引用区**：W2/W3 task card（`docs/30-cross-cutting-docs/reviews/knowledge-workbench/w2w3-taskcard-2026-09-22.md`）按本铁律把 WR-1（抽取路径不落库）升级为 `TA-1`（即时抽取 submit+execute）；新增 `TB-1`（定时抽取迁 `td_runtime_task_plan`），废弃 `kb_scheduled_extract`（V141 标 deprecate，不立即 drop）。
+
 
 ### 2.4 安全接入铁律（🔴强制，所有引擎数据访问必须过 security-engine 裁决）
 
@@ -250,9 +478,10 @@ security-engine 是「护」，所有引擎的数据访问与操作必须经它�
 2. **列级过滤**：查询结果返回前调 `POST /api/security/cls/columns` 过滤敏感列，不得裸返全列
 3. **脱敏**：敏感字段（手机/邮箱/身份证/金额/密码）返回前调 `POST /api/security/mask` 脱敏
 4. **操作授权**：Agent 工具调用 / Function 执行等操作前调 `POST /api/v1/security/policy-engine/evaluate`（OPA）做 ABAC 裁决
-5. **审计**：所有写操作异步调 `POST /api/v1/security/audit/log` 写审计，不阻塞主流程
+5. **审计**：所有写操作**发 Kafka `ecos.audit`**（common-api `KafkaTopics.AUDIT` 常量；sysman 消费落库，替换原 REST 端点；事件消息见 `docs/plans/api-contract.md` §5.2），不阻塞主流程。原 `POST /api/v1/security/audit/log` REST 端点保留一个过渡期（Phase 6 验证后下线），新代码一律走 Kafka
 6. **默认 DENY**：security-engine 不可用时默认拒绝（宁可误拒不可误放），不得降级为放行
 7. **禁止重复实现**：各引擎禁止在自身代码实现权限/脱敏/审计逻辑，统一走 security-engine REST
+8. **安全集成强制卡（🔴 task card 硬项）**：凡 Task 涉及敏感数据/密钥/密码（数据源连接配置、Token、第三方凭据等），task card 必须**显式列出** security-engine 集成项（落库前加密、读取时解密、响应体脱敏三类至少覆盖其一）；verifier 对相关模块执行 `grep -E "encrypt|decrypt|SecretService|IDataEncryptionService|securityEngine"` 计数，**命中 0 直接判 FAIL**（等同密码明文落盘，安全审计可升级为 P0），不得以"功能可用"豁免
 
 > 完整调用格式、请求/响应示例见 `docs/7-integration/02-security/05-安全能力操作手册.md`
 
@@ -289,7 +518,7 @@ runtime 是「器」（横切底座），提供全局基础设施能力，各引
 ### 3.3 跨引擎数据访问
 
 - data-engine不操作其他引擎的表
-- cognitive-engine不新增DB表（推理实时计算）
+- cognitive-engine 落盘三档口径（ADR-9，PMO-59 Phase 2）：推理**结果**不落盘(实时计算)；模型**资产**落 `ecos_cognitive_model`（ADR-8）；认知**心智状态**（`ecos_cognitive_evidence`/`ecos_cognitive_hypothesis`/`ecos_cognitive_belief`，DDL V127~V129）落盘；两档之外不新增 DB 表 — 三表为 cognitive 自有表，跨引擎只读不互写（原"不新增DB表"条款由本条取代，详见 `docs/plans/current-plan.md` ADR-9）
 - kb-engine的compliance_rules表被cognitive复用（只读）
 
 ---
@@ -366,6 +595,13 @@ const { t, locale } = useLanguage();
 - API函数统一放`src/api.ts`或模块内`services/*Api.ts`
 - SSE流式用`EventSource`或fetch readable stream
 
+### 4.8 前后端契约铁律（🔴 2026-09-08 pipeline 功能测试实证补充）
+
+1. **列表/详情配对**：列表 API 只返回摘要时，编辑器/详情页选中条目**必须调详情接口**（如 `GET /api/v1/pipeline/definitions/{id}`）拉全量（含 nodes/edges），禁止直接消费列表摘要渲染编辑画布——否则画布为空、编辑即丢数据
+2. **枚举边界一致**：节点类型等枚举（`SOURCE_JDBC/SOURCE_CSV/SOURCE_REST/TRANSFORM_SQL/OUTPUT_OBJECT`）前后端必须同源一致；前端节点面板、后端执行器 switch、测试数据三方对齐，禁止各自发明（如裸 `SOURCE`/`SINK` 会被执行器拒绝）
+3. **写后刷新**：创建/更新/删除成功后必须重拉列表（或等价刷新机制），禁止只改本地 state 导致列表与库不一致
+4. **逻辑删除语义**：DELETE 端点为逻辑删除（status→ARCHIVED，列表过滤、详情仍可查）；测试断言与前端展示必须按此语义，不得假设物理删除后 404
+
 ---
 
 ## 五、PMO执行铁律
@@ -383,7 +619,11 @@ const { t, locale } = useLanguage();
 | 7 | **硬编码Tailwind颜色(`bg-white`等)** | 主题切换失效 |
 | 8 | **硬编码中文字符串** | i18n切换失效 |
 | 9 | **自定义SVG图标** | 一致性断裂 |
-| 10 | **新建Maven模块或Docker容器** | 架构基线破坏 |
+| 10 | **新建Maven模块或Docker容器**（⚠️ 2026-09-10 改造豁免：允许按 `docs/plans/current-plan.md` v1.4 新增 5 个 service 聚合模块 + 1 个顶层 workspace 场景层模块、改造 gateway 为纯组织/认证 facade；Docker 容器枚仍按基线白名单，每 service 独立 Dockerfile） | 架构基线破坏 |
+| 11 | **未过编译门的前端变更留在working tree**（`npm run lint`/tsc未跑即交付） | 页面白屏（实证：JSX缺闭合`}`、`??`与`\|\|`混用无括号→esbuild transform失败，整个数据工作台不可用） |
+| 12 | **前端直接消费列表摘要渲染编辑态**（不调详情接口拉全量） | 画布为空/编辑丢数据（实证：pipeline编辑器节点数恒0） |
+| 13 | **be_win.bat 方式启 Gateway**（延迟展开 + for/f 读 JWT 解析冲突致进程静默退出） | java 不启动，Hikari 连接池卡死（实证：2026-09-09 两次失败，改用 start-gateway.ps1 一次成功） |
+| 14 | **智能体运行中创建临时脚本**（探测/诊断/构建类）。探测用 `RunCommand` 内联命令，调试用 `logger.debug()`，构建用现有脚本。仅当功能在现有脚本（`_win_tasks/` 4 核心 / `ecos_backend/scripts/`）中完全缺失时才可创建新脚本，且必须归入对应目录 | 冗余 72% 碎片化脚本散落（实证：3 周期 24→17 文件） |
 
 ### 5.2 原子任务格式
 
@@ -403,11 +643,18 @@ const { t, locale } = useLanguage();
 ```
 V1: 文件生存检查 (find -newer)
 V2: 集成点grep (注入/注册/调用链)
-V3: 编译 (mvn install -DskipTests)
-V4: Gateway启动+curl验收
+V3: 编译 (后端 mvn install -DskipTests；前端 npm run lint)
+V4: Gateway启动+curl验收（涉及前端页面时追加浏览器E2E：渲染+console+network抓包）
 ```
 
 不要跳过V2直接编译——集成点grep比编译更快发现逻辑遗漏。
+V3前端编译门不可省：esbuild/vite transform错误只在浏览器运行时暴露（白屏），tsc/lint是唯一前置拦截。
+V4浏览器E2E必查三项：页面渲染无ErrorBoundary、console无error、network无意外4xx/5xx（favicon 404可忽略）。
+
+**curl验收陷阱**：
+- Windows PowerShell下`-d`内联JSON易被转义破坏（400 请求体非法）→ 用`--data-binary @file`传body文件
+- body文件含中文必须UTF-8编码（ASCII编码会把中文变`?`，属测试脚本问题非API缺陷）
+- 统一返回体`ApiResponse`：业务错误码在`code`字段（如404），HTTP状态码可能仍为200，断言须看`code`+`success`
 
 ---
 
@@ -445,3 +692,7 @@ V4: Gateway启动+curl验收
 | Task | 文件 | 操作 | 验收 |
 |:--|------|------|------|
 ```
+
+---
+
+> 注：本文件是 docs/ARCHITECTURE-RULES.md（架构宪法）的工厂规范副本，供 AI-Native 软件工厂数字员工加载。与其他规范冲突时以本文件铁律为准（违反任一铁律=验收不通过）。源文件更新后需同步本副本。
