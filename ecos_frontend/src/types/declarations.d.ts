@@ -295,11 +295,11 @@ declare module '@xyflow/react' {
   export function useReactFlow(): ReactFlowInstance;
   export function useReactFlowStore(): Record<string, unknown> & { getSnapshot(): Record<string, unknown> };
 
-  export function ReactFlow(
+  export function ReactFlow<D = unknown, E = unknown>(
     props: React.Attributes & {
       children?: React.ReactNode;
-      nodes?: Node[];
-      edges?: Edge[];
+      nodes?: Node<D>[];
+      edges?: Edge<E>[];
       nodeTypes?: Record<string, unknown>;
       edgeTypes?: Record<string, unknown>;
       onNodesChange?: OnChange;
@@ -384,6 +384,12 @@ declare module '@xyflow/react' {
   export function MiniMap(props?: Record<string, unknown>): React.ReactElement;
   export function Controls(props?: Record<string, unknown>): React.ReactElement;
   export function Background(props?: Record<string, unknown>): React.ReactElement;
+
+  /**
+   * @xyflow/react 12 包装器组件 (proOptions / children 透传，与 reactflow 11 的
+   * <ReactFlowProvider> 保持同义签名，供 LogicView 等 canvas 容器使用)。
+   */
+  export function ReactFlowProvider(props: { children?: React.ReactNode; [key: string]: unknown }): React.ReactPortal | null;
 
   export const BackgroundVariant: Record<string, unknown>;
   export type NodeTypes = Record<string, unknown>;

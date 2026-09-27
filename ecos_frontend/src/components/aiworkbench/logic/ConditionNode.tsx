@@ -3,12 +3,12 @@
  * @license Apache-2.0
  */
 import React, { memo } from 'react';
-import { Handle, Position, type NodeProps } from 'reactflow';
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { GitBranch } from 'lucide-react';
 import { useTheme } from '../../ThemeContext';
 import type { LogicNodeData, LogicConditionConfig } from '../../../types/aiworkbench';
 
-function ConditionNode({ data, selected }: NodeProps<LogicNodeData>) {
+function ConditionNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const config = data.config as LogicConditionConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -30,7 +30,7 @@ function ConditionNode({ data, selected }: NodeProps<LogicNodeData>) {
 }
 
 // Re-export with proper diamond style
-function ConditionNodeDiamond({ data, selected }: NodeProps<LogicNodeData>) {
+function ConditionNodeDiamond({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const { styles } = useTheme();
   const config = data.config as LogicConditionConfig;
   const statusColor = {

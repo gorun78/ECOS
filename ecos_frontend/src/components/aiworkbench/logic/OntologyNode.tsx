@@ -3,12 +3,12 @@
  * @license Apache-2.0
  */
 import React, { memo } from 'react';
-import { Handle, Position, type NodeProps } from 'reactflow';
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { Database } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import type { LogicNodeData, LogicOntologyConfig } from '../../../types/aiworkbench';
 
-function OntologyNode({ data, selected }: NodeProps<LogicNodeData>) {
+function OntologyNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const config = data.config as LogicOntologyConfig;
   const { styles } = useTheme();
   const statusColor = {

@@ -3,12 +3,12 @@
  * @license Apache-2.0
  */
 import React, { memo } from 'react';
-import { Handle, Position, type NodeProps } from 'reactflow';
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { Clock } from 'lucide-react';
 import { useTheme } from '../../ThemeContext';
 import type { LogicNodeData, LogicTriggerConfig } from '../../../types/aiworkbench';
 
-function TriggerNode({ data, selected }: NodeProps<LogicNodeData>) {
+function TriggerNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const { styles } = useTheme();
   const config = data.config as LogicTriggerConfig;
   const statusColor = {

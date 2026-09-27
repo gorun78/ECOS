@@ -3,7 +3,8 @@
  * @license Apache-2.0
  */
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   Controls,
   MiniMap,
   Background,
@@ -17,11 +18,22 @@ import ReactFlow, {
   type Edge,
   type Connection,
   type NodeTypes,
-  type OnNodesChange,
-  type OnEdgesChange,
-  type OnConnect,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+  type NodeChange,
+  type EdgeChange,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+/**
+ * v11→v12 类型适配层（@xyflow/react 12 不再导出 v11 的三个 callback 类型）:
+ * - OnNodesChange = (changes: NodeChange[]) => void
+ * - OnEdgesChange = (changes: EdgeChange[]) => void
+ * - OnConnect     = (connection: Connection) => void
+ * 只为 LogicView 本文件兼容——上一行 import type 已与 v12 真实包签名同步,
+ * in-file alias 不引入新模块依赖，不改变对外 props/序列化行为。
+ */
+type OnNodesChange = (changes: NodeChange[]) => void;
+type OnEdgesChange = (changes: EdgeChange[]) => void;
+type OnConnect = (connection: Connection) => void;
 import * as Icons from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
@@ -234,8 +246,8 @@ export default function LogicView({
 
   // ── Flow state ──
   const initialGraph = useMemo(() => pipelineToGraph(selectedPipeline), []);
-  const [nodes, setNodes, onNodesChange] = useNodesState<LogicNodeData>(initialGraph.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<LogicEdgeData>(initialGraph.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<LogicNodeData>>(initialGraph.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<LogicEdgeData>>(initialGraph.edges);
 
   // Rebuild graph when pipeline changes
   useEffect(() => {
@@ -325,7 +337,7 @@ export default function LogicView({
   const [traceOpen, setTraceOpen] = useState(false);
 
   const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setSelectedNode(node as Node<LogicNodeData>);
+    setSelectedNode(node as unknown as Node<LogicNodeData>);
     setTraceOpen(false);
   }, []);
 
@@ -657,7 +669,7 @@ export default function LogicView({
                 <Controls className={`!${styles.cardBg} !border !${styles.appBorder} !rounded-lg !shadow-sm`} />
                 <MiniMap
                   className={`!rounded-lg !shadow-sm !border !${styles.appBorder}`}
-                  nodeColor={(n) => {
+                  nodeColor={(n: Node<LogicNodeData>) => {
                     const c: Record<LogicNodeType, string> = {
                       llm: '#a855f7', tool: '#f59e0b', ontology: '#06b6d4',
                       approval: '#f43f5e', condition: '#6366f1', trigger: '#14b8a6',
