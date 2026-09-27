@@ -41,7 +41,7 @@ const TAB_ZH_TO_KEY: Record<string, string> = {
   "数据字典": "topbar.tab.dict",
   "系统配置": "topbar.tab.system_config",
   "租户管理": "topbar.tab.system_config",
-  "项目工作台": "topbar.tab.project_workbench",
+  "场景工作台": "topbar.tab.project_workbench",
   "AI工作台": "topbar.tab.ai_workbench",
   "Agent 网格": "topbar.tab.agent_mesh",
   "Agent网格": "topbar.tab.agent_mesh",

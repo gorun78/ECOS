@@ -189,28 +189,67 @@ export function deleteScenarioMindBase(
   );
 }
 
-// ── 认知四件套（占位 / P3b T25 后端）─────────────────────
+// ── 认知四件套（P3b T25 后端已落地，PMO-66 B4 前端去 stub 切真实 /runs） ────────
 
 /**
- * 占位端点 — 触发沙盘的 diagnose / forecast / simulate / policy 之一
- * P3b T25 后端落地后改为真实调用：
- *   POST /api/v1/workspace/scenarios/{id}/cognitive/{ep}?mind=<mindId>
+ * 触发场景认知演练 — 经 workspace :18090 的 `/runs` 端点真调>DcchengClient>
+ * cognitive :18084 四件套（DIAGNOSE/FORECAST/SIMULATE/SAFEGUARD）。
  *
- * TODO(P3b T25): 此 stub 暂返回占位 hash，P3b 接真端点前请保留。
- * 当前实现：返回 stub 结果，不触网，UI 可走 outline 分支。
+ * <p>§0.6.4.3：沙盘内认知演练必真接引擎，禁止 stub/hash 当结论落 UI。
+ * 引擎不可达 → 后端按 §0.6.4.3 graceful 降级返回 `degraded:true` + error payload
+ * （不静默回 stub-hash），由 UI 层按 IsInfoCard 的 outline 分支呈现。</p>
+ *
+ * @returns `ok` 标志：true = 后端实际调用并写库成功；false = 后端不可达返回降级
  */
 export async function runInsight(
   scenarioId: string,
   ep: CognitiveEp,
   mindId?: string
-): Promise<{ summary: string; payloadHash: string; ok: boolean }> {
-  // P3b 落地前，前端不触网，仅生成 placeholder hash 让 UI 可消费
-  void scenarioId;
-  void mindId;
-  const hash = `stub-${ep}-${Date.now().toString(36)}`;
-  return {
-    summary: "",
-    payloadHash: hash,
-    ok: false,
+): Promise<{ summary: string; payloadHash: string; ok: boolean; degraded?: boolean; runId?: string }> {
+  // runTypes 映射：沙盘「四件套」按钮 → run 的 runTypes 枚举
+  const runTypesMap: Record<CognitiveEp, string[]> = {
+    diagnose: ["DIAGNOSE"],
+    forecast: ["FORECAST"],
+    simulate: ["SIMULATE"],
+    policy: ["STRATEGY"],
   };
+  try {
+    const res = await apiFetch<{ onResponse: unknown } & { degraded?: boolean; runId?: string; status?: string }>(
+      `/v1/workspace/scenarios/${encodeURIComponent(scenarioId)}/runs`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          runTypes: runTypesMap[ep] ?? ["DIAGNOSE"],
+          metric: "安全指标",
+          ...(mindId ? { mindId } : {}),
+        }),
+      }
+    );
+    const data = (res as unknown) as {
+      runId?: string;
+      status?: string;
+      degraded?: boolean;
+      diagnosis?: { rootCause?: string; suggestions?: string[]; confidence?: number };
+    };
+    const summary = data?.diagnosis?.rootCause
+      ?? (data?.diagnosis?.confidence !== undefined ? `confidence=${data.diagnosis.confidence}` : "")
+      ?? "";
+    return {
+      summary,
+      // 真实 runId 取代 stub hash
+      payloadHash: data?.runId ?? `run-unknown-${Date.now().toString(36)}`,
+      ok: true,
+      degraded: Boolean(data?.degraded),
+      runId: data?.runId,
+    };
+  } catch (e) {
+    // 引擎 / 后端不可达：返回 fallback，UI 走 outline 分支（§0.6.4.3 不静默回 stub-hash）
+    void mindId;
+    return {
+      summary: "",
+      payloadHash: `err-${ep}-${(e as Error).message ?? "netfail"}`,
+      ok: false,
+      degraded: true,
+    };
+  }
 }

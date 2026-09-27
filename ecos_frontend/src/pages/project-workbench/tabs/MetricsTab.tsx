@@ -1,5 +1,5 @@
 /**
- * ECOS 项目工作台 — metrics Tab
+ * ECOS 场景工作台 — metrics Tab
  * 从 ScenarioManagementView.tsx L1507-1594 拆分。
  * 引用的父级状态: ['efficiencyData', 'threatRadarData']
  */

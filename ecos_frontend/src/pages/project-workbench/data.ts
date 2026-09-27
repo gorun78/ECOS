@@ -1,5 +1,5 @@
 /**
- * ECOS 项目工作台 — 种子数据与选项池。
+ * ECOS 场景工作台 — 种子数据与选项池。
  * 从 ScenarioManagementView.tsx 拆分（Lines 63-145, 150-198, 822-837）。
  */
 

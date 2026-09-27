@@ -215,7 +215,11 @@ export async function fetchMentalReviews(params?: { tag?: string; since?: string
 
 // ── Pipeline ─────────────────────────────────────────────
 
-export async function createPipeline(body: { name: string; config: Record<string, unknown> }) {
+export async function createPipeline(body: {
+  name: string;
+  description?: string;
+  nodes: { nodeId: string; nodeType: string; config: Record<string, unknown>; dependsOn?: string[] }[];
+}) {
   return apiFetchData(`${COGNITIVE_BASE}/pipeline`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -224,6 +228,10 @@ export async function createPipeline(body: { name: string; config: Record<string
 
 export async function fetchPipelines() {
   return apiFetchData(`${COGNITIVE_BASE}/pipeline`);
+}
+
+export async function fetchPipelineDetail(id: string) {
+  return apiFetchData(`${COGNITIVE_BASE}/pipeline/${encodeURIComponent(id)}`);
 }
 
 export async function executePipeline(id: string) {
@@ -240,8 +248,7 @@ export async function deletePipeline(id: string) {
 
 export async function fetchPipelineExecution(pipelineId: string, execId: string) {
   return apiFetchData(
-    `${COGNITIVE_BASE}/pipeline/${encodeURIComponent(pipelineId)}/executions/${encodeURIComponent(execId)}`
-  );
+    `${COGNITIVE_BASE}/pipeline/${encodeURIComponent(pipelineId)}/execution/${encodeURIComponent(execId)}`);
 }
 
 // ── Planner ──────────────────────────────────────────────

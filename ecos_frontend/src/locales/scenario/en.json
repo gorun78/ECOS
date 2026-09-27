@@ -1,6 +1,6 @@
 {
-  "scenario.page.title": "Scenario & Project Command Center",
-  "scenario.page.subtitle": "From an executive perspective, fuse isolated physical data, semantic ontology, knowledge RAG, AI agents and security guardrails into concrete high-value business scenarios.",
+  "scenario.page.title": "Scenario Workbench",
+  "scenario.page.subtitle": "Fuse data, ontology, knowledge, AI agents and security policies into orchestrable, drillable, closed-loop business scenarios.",
   "scenario.kpi.total": "Total Active Scenarios",
   "scenario.kpi.unit": "pcs",
   "scenario.kpi.activeExtra": "Active: {n}",

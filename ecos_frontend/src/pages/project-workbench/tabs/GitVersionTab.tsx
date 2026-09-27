@@ -1,5 +1,5 @@
 /**
- * ECOS 项目工作台 — Git 配置版本中心 Tab
+ * ECOS 场景工作台 — Git 配置版本中心 Tab
  * 场景配置的 Git 版本管理界面（本地模拟）。
  * 
  * 父级状态引用: gitCommits, gitBranches, selectedScenarioId,

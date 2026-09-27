@@ -18,7 +18,7 @@ import java.util.*;
 /**
  * 认知管线编排 REST API — 前缀 /api/v1/cognitive/pipeline
  *
- * <p>四端点：创建 / 列表 / 执行 / 查询执行状态</p>
+ * <p>六端点：创建 / 列表 / 详情 / 删除 / 执行 / 查询执行状态</p>
  *
  * <p>管线定义已持久化到 PostgreSQL（kb_cognitive_pipeline 表），
  * 由 {@link CognitivePipelineRepository} 管理 CRUD。
@@ -111,6 +111,30 @@ public class CognitivePipelineController {
             result.add(m);
         }
         return ApiResponse.success(result);
+    }
+
+    /** GET /{id} — 查询管线详情（从 PostgreSQL 查询） */
+    @GetMapping("/{id}")
+    public ApiResponse<Map<String, Object>> get(@PathVariable String id) {
+        try {
+            CognitivePipeline pipeline = pipelineRepository.findById(id).orElse(null);
+            if (pipeline == null) {
+                return ApiResponse.notFound("Pipeline not found: " + id);
+            }
+
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", pipeline.getId());
+            map.put("name", pipeline.getName());
+            map.put("description", pipeline.getDescription());
+            map.put("status", pipeline.getStatus());
+            map.put("createdBy", pipeline.getCreatedBy());
+            map.put("nodes", pipeline.getNodes());
+            map.put("createdAt", pipeline.getCreatedAt());
+            return ApiResponse.success(map);
+        } catch (Exception e) {
+            log.error("Failed to get pipeline: {}", id, e);
+            return ApiResponse.internalError("Failed to get pipeline: " + e.getMessage());
+        }
     }
 
     /** POST /{id}/execute — 执行管线（从 PostgreSQL 加载管线定义） */

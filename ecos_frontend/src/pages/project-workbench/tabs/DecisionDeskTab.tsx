@@ -1,5 +1,5 @@
 /**
- * ECOS 项目工作台 — decision Tab
+ * ECOS 场景工作台 — decision Tab
  * 从 ScenarioManagementView.tsx L1265-1504 拆分。
  * 引用的父级状态: ['activeScenario', 'fetchProposalsList', 'handleApproveProposal', 'handleRejectProposal', 'handleRunSandbox', 'isLoadingProposals', 'isSimulating', 'proposals', 'resolvingProposalId', 'setSimQuery', 'setSimRole', 'simQuery', 'simResult', 'simRole']
  */

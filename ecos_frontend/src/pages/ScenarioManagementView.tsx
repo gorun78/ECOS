@@ -581,7 +581,7 @@ export default function ScenarioManagementView({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] bg-emerald-950 border border-emerald-900 px-2 py-0.5 rounded text-emerald-400 font-mono font-bold">
-                      ACTIVE PROJECT
+                      ACTIVE SCENARIO
                     </span>
                     <span className={`text-xs font-semibold ${styles.cardTextMuted} font-mono`}>ID: {activeScenario.id}</span>
                   </div>
