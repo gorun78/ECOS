@@ -1,8 +1,10 @@
 # ECOS 项目实现逻辑文档
 
-> 来源: PMO 历史任务汇总 | 日期: 2026-09-22 | 责任人: AI Agent
-> 版本: v1.0
-> 追溯: ARCHITECTURE-RULES v1.1 / 架构铁律 v1.3 / 数据湖存储分层规范 v1.2 / 数据库访问规范 v1.0 / 技术债修复计划 / 六引擎 AGENTS.md + docs/ 全量扫描
+> 来源: PMO 历史任务汇总 | 日期: 2026-09-26 | 责任人: AI Agent
+> 版本: v1.1
+> 追溯: ARCHITECTURE-RULES v1.6 / 架构铁律 v1.6 / 数据湖存储分层规范 v1.2 / 数据库访问规范 v1.0 / 技术债修复计划 / 六引擎 AGENTS.md + docs/ 全量扫描
+>
+> **v1.1 更新（2026-09-26）**：追溯版本升至架构铁律 **v1.6**；补入 v1.5「认知 C 前端归属 AI 工作台（aiming :18084）」、v1.6「**场景工作台为 W 侧编排收口**（workspace :18090，子图+横切+出口）」与 **W→D 现实反馈链**（见 §1.5）。
 
 ---
 
@@ -11,8 +13,8 @@
 本文档汇总 ECOS 工程历史任务执行过程中产生的**定义、决策和判断**，以六引擎为分类角度，**最近优先**排列。每项决策标注来源文件，供后续开发参考。
 
 **覆盖范围**：
-- `docs/00-架构/ARCHITECTURE-RULES.md`（v1.1）
-- `.trae/rules/架构铁律.md`（v1.3）
+- `docs/00-架构/ARCHITECTURE-RULES.md`（v1.6）
+- `.trae/rules/架构铁律.md`（v1.6）
 - `.trae/rules/数据湖存储分层规范.md`（v1.2）
 - `.trae/rules/数据库访问规范.md`（v1.0）
 - `docs/30-cross-cutting-docs/pmo/ECOS-技术债修复计划.md`
@@ -80,6 +82,20 @@ ultimate    → PG + Neo4j + Doris（单表 >100 万行启用列存）
 **ADR-3 数据隔离**：standard = 共享 PG + Schema 隔离；enterprise/ultimate = 每 service 独立 PG database。
 **ADR-7 服务间信任**：网关统一认证 + 双通道凭证 + 网络隔离；gateway 校验后 **strip 外部 `X-ECOS-*` 头并重新注入**（防伪造）。
 **ADR-8 审计统一 Kafka**：写操作走 Kafka `ecos.audit`（`KafkaTopics.AUDIT` 常量），sysman 消费落库；原 REST `POST /api/v1/security/audit/log` 保留过渡期（Phase 6 后下线）。
+
+### 1.5.1 DIKCW 闭环链 + W→D 现实反馈链（v1.4~v1.6）
+
+主认知链：`D → I → K → C → W`；现实反馈链：`W → D`。**两者共同构成 Enterprise Cognitive Loop：`D → I → K → C → W → D`**——行动执行产生新事实回流 D 层，是企业级智能闭环的关键。
+
+```
+D（事实）→ I（语义/本体）→ K（知识）→ C（情境+证据+模型 推理）→ W（决策/策略/行动）
+   ▲                                                                  │
+   │                 W→D 现实反馈链（行动结果/指标/新事件）             │
+   └──────────────────────────────────────────────────────────────────┘
+```
+
+> **v1.5**：认知（木 C）前端**归属 AI 工作台**（aiming :18084，与 ai-engine 同进程），引擎层 C↔AI 职责边界不变（cognitive 负责因果/假设/信念，ai 负责 Agent/Loop/LLM/Action 编排）。
+> **v1.6**：**场景工作台（workspace :18090）是 W 侧编排收口**——把完成某类业务决策所需的 D/I/K/C 能力装配成可执行、可演练、可闭环的「场景」；主实体「场景」≠「项目」，**不引入 `ecos_project`**；组成模型 = 🔴 子图 + 横切 + 出口。
 
 ### 1.6 关键架构判断
 

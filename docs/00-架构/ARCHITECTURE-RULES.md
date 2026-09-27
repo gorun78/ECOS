@@ -1,23 +1,51 @@
 # ECOS 架构铁律 — 所有PMO指令强制执行
 
-> 版本: 1.4 | 2026-09-24 | 基于 v1.3 + DIKCW 核心关系升级（架构铁律 v1.4，PMO-XX 指令批准）
-> 此文件是ECOS开发的**宪法**。每条PMO指令必须在开头引用，违反任一铁律=验收不通过。
+> 版本: 1.6 | 2026-09-26 | 微服务 v2 权威副本（与工厂副本 `.trae/rules/架构铁律.md` v1.6 同源对齐）
+> 此文件是 ECOS 开发的**宪法**。每条 PMO 指令必须在开头引用，违反任一铁律=验收不通过。
 >
-> **2026-09-24 v1.4 变更**（DIKCW 核心关系模型升级 · 架构哲学演进）: 五对象 (D/I/K/C/W) 对象定义升级；主认知链从「单向流水线」升级为 **Enterprise Cognitive Loop**（`D→I→K→C→W` 主链 + `W→D` 现实反馈链）；四转化「明」由 `K→W` **重新定义为 `C→W`**（`K→W` 仅作确定性知识驱动自动化特殊通道保留）；**C = f(D,I,K,Context,Evidence,Hypothesis,Belief,Cognitive Model)** 不是 K 的简单下游；**W ≠ AI/LLM/Agent**，W = Decision/Strategy/Policy/Action/Execution；cognitive↔ai 边界明文（LLM 不替代因果推理）；数据/数据库边界不变（认知层四表不变，禁止新增 cognitive_* 表）。
+> **2026-09-26 v1.6 变更**（新增 §0.6 场景工作台职责边界铁律 · 用户批准）: 明确场景工作台（`workspace` :18090）为 DIKCW 的 **W（决策/行动）侧落地与收口**；主实体「场景」非「项目」、**不引入 `ecos_project`**；组成模型 = **🔴 子图 + 横切 + 出口**；演练沙盘三铁律。认知（木 C）前端归属维持 v1.5（AI 工作台）。
+> **2026-09-24 v1.5 变更**（认知 C 前端归属 · 用户批准）: 认知（木 C）的前端工作台**归属 AI 工作台**（火 W + 木 C 共享 :18084 aiming），引擎层归属与 C↔AI 边界不变。
+> **2026-09-24 v1.4 变更**（DIKCW 核心关系升级）: 主认知链 `D→I→K→C→W` + 现实反馈链 `W→D` = **Enterprise Cognitive Loop**；四转化「诚 = K→C」「明 = **C→W**」（原 K→W 降级为「确定性知识驱动自动化」特殊通道）；**C = f(D,I,K,Context,Evidence,Hypothesis,Belief,Cognitive Model)** 非 K 的简单下游；**W ≠ AI/LLM/Agent**，W = Decision/Strategy/Policy/Action/Execution；认知四表不变。
+> **2026-09-19 v1.3 变更**（新增 §0.5 三工作台职责边界铁律 · 用户批准）: 数据工作台（土 D）/ 本体工作台（金 I）/ 知识工作台（水 K + 木 C）职责边界与五条边界铁律，依据 `docs/21-runtime/legacy-plans/knowledge-workbench-replan-v1.md`（v2.1）§1。
+> **2026-09-16 v1.1 变更**（§1.2 三滤波器「豁免写法」判据修正 · 用户批准）: 路径重写先于鉴权（`VersionPrefixRewriteFilter` `@Order(MIN+10)` 早于 Spring Security `-100`，鉴权层只见裸路径），三步判据（是否应匿名 → 是否在 `V1_REWRITE_MAP` 内 → 匿名回归）。
 >
-> **2026-09-16 v1.1 变更**（§1.2 三滤波器「豁免写法」判据修正 · 用户批准）: 实证**路径重写先于鉴权**（`VersionPrefixRewriteFilter` `@Order(MIN+10)` 早于 Spring Security `-100`，鉴权层只见裸路径），废止「双路径各写一遍」的机械表述，改为三步判据（是否应匿名 → 是否在 `V1_REWRITE_MAP` 内 → 匿名回归）。触发事故：误补 `/api/integration/**` permitAll 致未认证可读数据源 `host/port/username/jdbcUrl`（同 T3-006，违反 §2.4-6），已撤销。
->
-> **2026-09-19 变更**（新增 §0.5 三工作台职责边界铁律 · 用户批准）: 数据工作台（土 D）/ 本体工作台（金 I）/ 知识工作台（水 K + 木 C）职责边界与五条边界铁律，依据 `docs/plans/knowledge-workbench-replan-v1.md`（v2.1）§1。
->
-> ⚠ 本文件的结构描述仍为 v1.0 单体态；工厂副本 `.trae/rules/架构铁律.md` 与 v1.4 同步（DIKCW 核心哲学已对齐），冲突时以工厂副本 §0.2.1 + 本文件 §0.2 修订为准。
+> **单体→微服务 v2 迁移注记**：本文件 §0.2~§0.4 早期由单体（单体 gateway + Maven import）描述；v1.6 起工程落地为**微服务 v2**——见 §0.1（微服务 v2 权威描述）。旧「单体」表述在 §0.1 末尾作迁移注记，不再作为现行架构。
 
 ---
 
 ## 〇、总则
 
-### 0.1 单体架构
+### 0.1 微服务 v2（权威口径，v1.6 起）
 
-ECOS是**单体应用**，不是微服务。`gateway`是唯一Spring Boot入口(`GatewayApplication`)，通过Maven依赖导入所有业务模块。
+ECOS 自 v1.6 起为**微服务 v2 架构**，不再是单体。部署拓扑：
+
+```
+前端 (ecos_frontend :3000, BFF)
+        │  ── 所有 /api/* 经 BFF → gateway ──
+        ▼
+gateway (api-gateway :8080)  ← 唯一外部入口（组织/认证/限流 facade）
+        │  ── REST 跨服务路由（端口隔离 ADR-7）──
+        ├── services/sysman   :18081  安全/IAM/审计
+        ├── services/datanet  :18082  数据源/管道/DQ/数据湖
+        ├── services/buszhi   :18083  本体/对象/工作流
+        ├── services/aiming   :18084  智能体/LLM/认知(C↔W，认知前端归属此工作台)
+        ├── services/dccheng  :18086  知识图谱/RAG/规则
+        └── workspace         :18090  顶层场景应用层（W 侧编排收口，只调 service）
+                │
+                ▼  （各 service 内嵌对应 engine-impl，引擎不独立对外）
+        6 engine：security(护) / data(土D) / ontology(金I) / kb(水K) / cognitive(木C, run in aiming:18084) / ai(火W)
+        + 横切 runtime（runtime-access / runtime-task / runtime-monitor / llm-gateway）
+```
+
+| 维度 | 设定 |
+|:--|:--|
+| 可部署 JAR | **7 个**：gateway + 5 service（sysman/datanet/buszhi/aiming/dccheng）+ workspace |
+| 端口隔离 | sysman:18081 / datanet:18082 / buszhi:18083 / aiming:18084 / dccheng:18086 / workspace:18090（ADR-7，各 service 独占端口） |
+| 外部入口 | **gateway :8080 唯一**；`workspace → services/*`（REST），`services/* → engine-impl`（Maven dep），`engine-impl → engine-api → common-api` |
+| 认知归属 | cognitive-engine（木 C）实际部署 **run in aiming :18084**（PMO-60，前端归入 AI 工作台） |
+| 铁律 | 禁新增 Maven 模块 / 禁新增 Docker 容器（白名单基线，每 service 独立 Dockerfile） |
+
+> **单体→微服务迁移注记（历史）**：早期 v1.0~v1.2 本文件以「单体应用」描写——"`gateway` 是唯一 Spring Boot 入口、通过 Maven 依赖导入所有业务模块"。该**单体态废弃**；v1.6 微服务 v2 为准，此节仅作历史溯源。
 
 ### 0.2 五对象·五行（引擎层）＋ 四转化·格致诚明（服务层）
 
@@ -68,7 +96,7 @@ ECOS 反应中国古代智慧，全系统分两层核心：
 | **security-engine** | 护（横切，不入五行） | 18081 | 认证/授权/审计/脱敏/ABAC | 不执行业务规则判定 |
 | **data-engine** | 土（D 数据） | 18082 | 数据源/管道/血缘/DQ/查询 | 管道不执行>30min任务；血缘不追踪Neo4j |
 | **ontology-engine** | 金（I 信息·本体） | 18083 | 本体建模/实体/关系/版本 | — |
-| **cognitive-engine** | 木（C 认知） | 18089 | 因果推理/情景推演/混合推理 | 不新增DB表(推理实时计算)；不引入规则引擎(SpEL即可) |
+| **cognitive-engine** | 木（C 认知） | run in aiming（:18084，PMO-60） | 因果推理/情景推演/混合推理 | 不新增DB表(推理实时计算)；不引入规则引擎(SpEL即可) |
 | **kb-engine** | 水（K 知识） | 18086 | KG存储/检索/RAG/规则CRUD/知识抽取 | **不执行规则判定**(那是cognitive的)；不直接调LLM(那是ai的) |
 | **ai-engine** | 火（W 智慧） | 18084 | Agent/Loop/Memory/LLM调用 | — |
 
