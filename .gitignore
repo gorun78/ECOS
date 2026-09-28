@@ -6,7 +6,10 @@ node_modules\*
 *.7z
 .aider*
 *.m2*
-*win_tasks*
+# ⚠ 2026-09-28 修正：旧规则 `*win_tasks*` 曾把 _win_tasks/ 启动脚本整体忽略，导致脚本丢失不可恢复（返工根因）。
+# 开发脚本必须入库，只忽略其运行产物：
+/_win_tasks/logs/
+/_win_tasks/*.log
 # ecos-tests/ 已纳入版本控制（2026-09-16）：E2E 冒烟脚本是交付验收与 DONE 凭证的一部分，不再忽略；
 # 其内 node_modules 由上方 node_modules\* 规则继续排除
 *ecos-git-repos*
@@ -33,4 +36,18 @@ ecos_backend/services/dccheng/dccheng-run.log.*.old
 .vscode/
 ecos_frontend/tsc-data10.log
 node_modules/
+
+# 仓库卫生（2026-09-28 整理方案 C 组）：调试残留与运行日志不入库
+ecos-docker/mvn_*.log
+ecos_backend/_aiming-stdout.log
+ecos_login.json
+h.json
+o.json
+ecos_tests_body.json
+$null
+
+# 调试残留（2026-09-28 PMO-74/F6）：一次性探库脚本与 JWT 抓包，禁止入库（编译产物会污染全仓 grep 度量）
+ecos_backend/.pmo66/
+ecos_backend/_win_tasks/
+*.class
 

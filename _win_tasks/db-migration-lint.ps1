@@ -1,20 +1,26 @@
 ﻿<#
  数据库访问规范 自检脚本
 
- 13 项检查 (基于 .trae/rules/数据库访问规范.md IR/DR/EN/ST 红线):
+ 实跑 15 项检查 (基于 .trae/rules/数据库访问规范.md v1.1 IR/DR/ST/MC 红线):
    1. 表名带 ecos_ 前缀 (DR02)
-   2. JSONB 字段 _json 后缀 (DR04)
-   3. 布尔 is_ 前缀 (DR05)
-   4. 审计 5 字段齐全 (DR06)
-   5. 多租户 domain 列 (DR08)
-   6. version_no 乐观锁 (DR07)
-   7. 禁 DROP/ALTER (IR03)
-   8. Flyway 锁定 (IR02)
-   9. 新表前端 Mapper 三层 (IR01)
-  10. 敏感列加密 (ST03)
-  11. 写操作 Kafka audit (ST06)
-  12. V{n} + seed 同 commit (R9)
-  13. 零 SELECT * (IR04)
+   2. DR02 真新增表清单 (INFO)
+   3. JSONB 字段 _json 后缀 (DR04)
+   4. 布尔 is_ 前缀 (DR05)
+   5. 审计 create_time/created_at (DR06)
+   6. 多租户 domain 列 (DR08)
+   7. version_no 乐观锁 (DR07)
+   8. 禁 DROP/ALTER (IR03)
+   9. Flyway 锁定 (IR02)
+  10. 零 SELECT * — Mapper/DAO XML (IR04)
+  11. DDL schema 归属 5+1 (ST07)          — v1.1 新增 2026-09-28
+  12. 业务表禁入引擎/控制 schema (ST08)    — 启发式 WARN
+  13. schema 名硬编码扫描 (MC06)           — INFO 基线
+  14. PG 专有语法扫描 (MC01~MC03)          — WARN 存量基线
+  15. 数据源 currentSchema 白名单 (ST07 配置侧)
+
+ 规范中尚未机械化的条款（诚实声明，避免"已覆盖"误解）:
+   IR01 三层归属 / ST03 敏感列加密 / ST06 写操作 Kafka audit / R9 V{n}+seed 同 commit
+   → 依赖语义判断与 commit 级信息，仍走 §七 人工审查清单；如需机械化另立任务。
 
  用法:
    .\db-migration-lint.ps1 [-ProjectRoot D:\...\ECOS\ecos_backend] [-Format Text]
@@ -78,6 +84,22 @@ foreach ($root in @(
 )) {
     if (Test-Path -LiteralPath $root) {
         $javaFiles += Get-ChildItem -LiteralPath $root -Recurse -Filter '*.java' -File 2>$null
+    }
+}
+
+# IR04 扫描源：Mapper XML（与 $javaFiles 分开采集；此前误用 java 列表导致 IR04 空转）
+$xmlFiles = @()
+foreach ($root in @(
+    (Join-Path $ProjectRoot 'gateway\src'),
+    (Join-Path $ProjectRoot 'services'),
+    (Join-Path $ProjectRoot 'engine'),
+    (Join-Path $ProjectRoot 'runtime'),
+    (Join-Path $ProjectRoot 'workspace'),
+    (Join-Path $ProjectRoot 'common')
+)) {
+    if (Test-Path -LiteralPath $root) {
+        $xmlFiles += Get-ChildItem -LiteralPath $root -Recurse -Filter '*.xml' -File 2>$null |
+                     Where-Object { $_.FullName -notmatch '\\target\\' -and $_.Name -notmatch '^pom\.xml$' }
     }
 }
 
@@ -272,20 +294,24 @@ if ($flywayVi.Count -gt 0) {
     Add-Check 'IR02 Flyway 锁定' 'PASS' '全部 application.yml flyway.enabled=false' 'PASS'
 }
 
-# 10. SELECT * (IR04) - Mapper XML
+# 10. SELECT * (IR04) - Mapper XML + 注解 SQL
 $badSelect = @()
-foreach ($f in $javaFiles) {
-    if ($f.Name -match '^pom\.xml$') { continue }
-    if ($f.Extension -ne '.xml') { continue }
+foreach ($f in $xmlFiles) {
     $c = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
     if ($c -and $c -match '(?i)SELECT\s+\*\s*FROM') {
         $badSelect += "$(Split-Path $f.FullName -Parent):$($f.Name)"
     }
 }
+foreach ($f in $javaFiles) {
+    $c = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
+    if ($c -and $c -match '(?i)(@Select|@Update|@Insert|@Delete)\s*\([^)]*SELECT\s+\*\s*FROM') {
+        $badSelect += "$(Split-Path $f.FullName -Parent):$($f.Name)"
+    }
+}
 if ($badSelect.Count -gt 0) {
-    Add-Check 'IR04 禁 SELECT *' 'WARN' "$(Select-Object -First 3 $badSelect) 等 $($badSelect.Count) 个 Mapper 含 SELECT *" 'WARN'
+    Add-Check 'IR04 禁 SELECT *' 'WARN' "$(Select-Object -First 3 $badSelect) 等 $($badSelect.Count) 个 Mapper/DAO 含 SELECT * (扫描源: $($xmlFiles.Count) XML + $($javaFiles.Count) Java)" 'WARN'
 } else {
-    Add-Check 'IR04 禁 SELECT *' 'PASS' 'Mapper 零 SELECT *' 'PASS'
+    Add-Check 'IR04 禁 SELECT *' 'PASS' "零 SELECT * (扫描源: $($xmlFiles.Count) XML + $($javaFiles.Count) Java)" 'PASS'
 }
 
 # 11. _win_tasks 缺失检测
@@ -295,6 +321,104 @@ foreach ($wt in $winTasks) {
     if (-not (Test-Path (Join-Path $curDir $wt))) {
         Write-Host "WARN: $wt 不存在" -ForegroundColor Yellow
     }
+}
+
+# ============================================================
+# v1.1 新增检查 14~18 (ST07/ST08/MC01~MC06, 2026-09-28 数据域二分)
+# ============================================================
+$st07Cutoff = Get-Date '2026-09-28'
+$engineSchemas = @('ecos_data','ecos_ontology','ecos_knowledge','ecos_ai','ecos_cognitive')
+$allowedSchemas = @('public','ecos_dw','ecos_control') + $engineSchemas
+# knownLegacy schema 群: 规范生效日前已存在的限定名目标, 只 WARN 不 FAIL (ST07 只禁新增)
+$legacySchemaTargets = @('ecos_demo','ecos_sysman','ecos_security','ecos_infra','ecos_dq','ecos_task','ecos_rule','ecos_agent','ecos_identity','ecos_workflow','ecos_catalog','ecos_object','ecos_agent') | Sort-Object -Unique
+
+# 14. DDL schema 归属 (ST07): CREATE SCHEMA 白名单 + 限定名表 (生效日 2026-09-28 前文件 = knownLegacy WARN)
+$ddlFiles = @($allSql | Where-Object { $_.Name -notmatch 'rollback' })
+$csBad = @(); $csLegacy = @(); $qualNew = @(); $qualLegacy = @()
+foreach ($f in $ddlFiles) {
+    $sql = Get-Content -LiteralPath $f.FullName -Raw
+    $isLegacyFile = ($f.CreationTime -lt $st07Cutoff)
+    foreach ($m in [regex]::Matches($sql, 'CREATE\s+SCHEMA(?:\s+IF\s+NOT\s+EXISTS)?\s+([a-zA-Z_]\w*)')) {
+        $s = $m.Groups[1].Value
+        if ($allowedSchemas -notcontains $s) {
+            $item = "$($f.Name) -> CREATE SCHEMA $s"
+            if ($isLegacyFile -or ($legacySchemaTargets -contains $s)) { $csLegacy += $item } else { $csBad += $item }
+        }
+    }
+    foreach ($m in [regex]::Matches($sql, 'CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)')) {
+        $s = $m.Groups[1].Value
+        $item = "$($f.Name) -> $s.$($m.Groups[2].Value)"
+        if ($allowedSchemas -contains $s) { continue }
+        if (($legacySchemaTargets -contains $s) -or $isLegacyFile) { $qualLegacy += $item }
+        else { $qualNew += "$item (未知 schema)" }
+    }
+}
+if ($csBad.Count -gt 0 -or $qualNew.Count -gt 0) {
+    Add-Check 'ST07 schema 归属 (DDL)' 'FAIL' "CREATE SCHEMA 违规 $($csBad.Count) + 新增限定名 $($qualNew.Count): $((($csBad + $qualNew) | Select-Object -First 3) -join '; ')" 'FAIL'
+} elseif ($csLegacy.Count -gt 0 -or $qualLegacy.Count -gt 0) {
+    Add-Check 'ST07 schema 归属 (DDL)' 'WARN' "knownLegacy: 生效日前 CREATE SCHEMA $($csLegacy.Count) + 限定名 $($qualLegacy.Count) 处 (只禁新增)" 'WARN'
+} else {
+    Add-Check 'ST07 schema 归属 (DDL)' 'PASS' 'CREATE SCHEMA 与限定名均在 5+1 白名单' 'PASS'
+}
+
+# 15. 业务表禁入控制域 (ST08, 启发式): doc/chunk/raw/lake 形态表建在引擎/控制 schema (业务 schema ecos_dw/ecos_demo 本身除外)
+$bizHint = @()
+foreach ($f in $ddlFiles) {
+    $sql = Get-Content -LiteralPath $f.FullName -Raw
+    foreach ($m in [regex]::Matches($sql, 'CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([a-zA-Z_]\w*)\.((?:doc|doc_chunk|raw|lake|chunk)\w*)')) {
+        $s = $m.Groups[1].Value
+        if ($s -in @('ecos_dw','ecos_demo')) { continue }
+        $bizHint += "$($f.Name) -> $s.$($m.Groups[2].Value)"
+    }
+}
+if ($bizHint.Count -gt 0) {
+    Add-Check 'ST08 业务表入控制域 (启发式)' 'WARN' "疑似业务形态表落控制 schema: $(($bizHint | Select-Object -First 3) -join '; ')" 'WARN'
+} else {
+    Add-Check 'ST08 业务表入控制域 (启发式)' 'PASS' '未发现 doc/chunk/raw/lake 形态表建在限定 schema' 'PASS'
+}
+
+# 16. schema 名硬编码扫描 (MC06) — 基线 INFO, 目标趋零 (配置化注入)
+$xmlForSchema = Get-ChildItem -LiteralPath $ProjectRoot -Recurse -Include '*.xml','*.java' -File 2>$null | Where-Object { $_.FullName -notmatch '\\target\\|\\test\\' }
+$hardCount = 0
+foreach ($f in $xmlForSchema) {
+    $c = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
+    if ($c) { $hardCount += ([regex]::Matches($c, '\becos_(dw|data|ontology|knowledge|ai|cognitive|demo|sysman|security|infra|dq)\.')).Count }
+}
+Add-Check 'MC06 schema 硬编码' 'INFO' "源码限定名硬编码 $hardCount 处 (v1.1 基线 2026-09-28; 工程清单 #6 配置化后趋零)" 'INFO'
+
+# 17. PG 专有语法 (MC01~MC03) — 存量 WARN 基线, 新增 DDL 须走方言分支
+$mcHits = @()
+foreach ($f in $ddlFiles) {
+    $sql = Get-Content -LiteralPath $f.FullName -Raw
+    $pats = @('gen_random_uuid\s*\(', 'ON\s+CONFLICT', '\bRETURNING\b', 'timestamptz', '::\s*\w+')
+    foreach ($p in $pats) {
+        $n = ([regex]::Matches($sql, $p, 'IgnoreCase')).Count
+        if ($n -gt 0) { $mcHits += "$($f.Name):$p x$n" }
+    }
+}
+if ($mcHits.Count -gt 0) {
+    Add-Check 'MC01~MC03 PG 专有语法' 'WARN' "存量 $($mcHits.Count) 处文件x模式 (knownLegacy, 新 DDL 禁新增: 应用侧 UUID + databaseId 方言分支)" 'WARN'
+} else {
+    Add-Check 'MC01~MC03 PG 专有语法' 'PASS' 'DDL 零 PG 专有语法' 'PASS'
+}
+
+# 18. 数据源 currentSchema 白名单 (ST07 配置侧, 仅构建内 src/main yml)
+$dsVi = @()
+foreach ($root in @('gateway','services','engine','runtime','workspace','common')) {
+    $p = Join-Path $ProjectRoot $root
+    if (-not (Test-Path -LiteralPath $p)) { continue }
+    foreach ($y in (Get-ChildItem -LiteralPath $p -Recurse -Filter 'application*.yml' -File 2>$null | Where-Object { $_.FullName -notmatch '\\target\\' })) {
+        $c = Get-Content -LiteralPath $y.FullName -Raw
+        foreach ($m in [regex]::Matches($c, 'currentSchema=([a-zA-Z_]\w*)')) {
+            $s = $m.Groups[1].Value
+            if ($allowedSchemas -notcontains $s) { $dsVi += "$($y.FullName -replace [regex]::Escape($ProjectRoot),''): currentSchema=$s" }
+        }
+    }
+}
+if ($dsVi.Count -gt 0) {
+    Add-Check 'ST07 数据源 currentSchema' 'WARN' "非白名单 currentSchema $($dsVi.Count) 处: $(($dsVi | Select-Object -First 4) -join ' | ')" 'WARN'
+} else {
+    Add-Check 'ST07 数据源 currentSchema' 'PASS' '全部 currentSchema 在 public/ecos_control/五引擎/ecos_dw 白名单' 'PASS'
 }
 
 # 输出
