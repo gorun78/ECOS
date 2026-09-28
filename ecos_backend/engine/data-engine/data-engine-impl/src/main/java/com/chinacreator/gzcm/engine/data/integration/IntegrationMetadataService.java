@@ -57,6 +57,53 @@ public class IntegrationMetadataService {
     }
 
     /**
+     * 聚合 metadata bundle（GET /api/integration/metadata）。
+     * <p>返回 {@code { connections, syncTasks }} 供前端 data-workbench 首屏装载。
+     * connections = td_datasource（status=ACTIVE）。</p>
+     *
+     * @return  Map&lt;"connections"&gt; / Map&nbsp;&lt;syncTasks&gt 字段
+     */
+    public Map<String, Object> fetchIntegrationMetadataBundle() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        // connections — 启用的数据源（status="ACTIVE"）
+        try {
+            List<Map<String, Object>> conns = jdbc.queryForList(
+                "SELECT datasource_id, datasource_name, datasource_type, status " +
+                "FROM td_datasource WHERE status = 'ACTIVE' ORDER BY datasource_name");
+            List<Map<String, Object>> mapped = new ArrayList<>();
+            for (Map<String, Object> row : conns) {
+                Map<String, Object> c = new LinkedHashMap<>();
+                c.put("id", row.get("datasource_id"));
+                c.put("name", row.get("datasource_name"));
+                c.put("type", row.get("datasource_type"));
+                c.put("enabled", "ACTIVE".equalsIgnoreCase(String.valueOf(row.get("status"))));
+                mapped.add(c);
+            }
+            result.put("connections", mapped);
+        } catch (Exception e) {
+            log.warn("fetchIntegrationMetadataBundle td_datasource failed: {}", e.getMessage());
+            result.put("connections", new ArrayList<>());
+        }
+        // syncTasks — pipeline tasks（旧 ECS）
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> taskResult = pipelineTaskService.listTasks(1, 50);
+            Object itemsObj = taskResult.get("items");
+            List<Map<String, Object>> syncTasks;
+            if (itemsObj instanceof List) {
+                syncTasks = (List<Map<String, Object>>) itemsObj;
+            } else {
+                syncTasks = new ArrayList<>();
+            }
+            result.put("syncTasks", syncTasks);
+        } catch (Exception e) {
+            log.warn("fetchIntegrationMetadataBundle pipelineTaskService list failed: {}", e.getMessage());
+            result.put("syncTasks", new ArrayList<>());
+        }
+        return result;
+    }
+
+    /**
      * 查询集成审计日志。
      *
      * @param timeRange 时间窗口小时数（null=默认 24h）

@@ -35,10 +35,16 @@ public class IntegrationMetadataController {
     }
 
     /**
+     * GET /api/integration/metadata — 集成元数据 bundle（data-workbench 首屏）。
+     * <p>返回 {@code { connections, syncTasks }}。</p>
+     */
+    @org.springframework.web.bind.annotation.GetMapping("/metadata")
+    public ApiResponse<Map<String, Object>> fetchMetadataBundle() {
+        return ApiResponse.success(integrationMetadataService.fetchIntegrationMetadataBundle());
+    }
+
+    /**
      * GET /api/integration/logs — 真实审计日志。
-     *
-     * @param timeRange 时间窗口小时数（可选，默认 24，上限 720）
-     * @param limit     条数上限（可选，默认 200，上限 500）
      */
     @org.springframework.web.bind.annotation.GetMapping("/logs")
     public ApiResponse<Map<String, Object>> fetchIntegrationLogs(
