@@ -103,9 +103,9 @@ function TasksCenterRoute() {
 }
 
 createRoot(document.getElementById('root')!).render(
+  <LanguageProvider>
   <StrictMode>
     <HashRouter>
-      <LanguageProvider>
         <ThemeProvider>
           <ToastProvider>
           <Suspense fallback={<RouteFallback />}>
@@ -195,7 +195,7 @@ createRoot(document.getElementById('root')!).render(
           </Suspense>
           </ToastProvider>
         </ThemeProvider>
-      </LanguageProvider>
     </HashRouter>
   </StrictMode>
+  </LanguageProvider>
 );
