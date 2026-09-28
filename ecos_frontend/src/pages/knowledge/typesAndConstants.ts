@@ -331,11 +331,11 @@ export const KNOWLEDGE_TAB_GROUPS = [
 /** PMO-54 — Discriminated union of all tab ids — type-safe */
 export type KnowledgeTabId = (typeof KNOWLEDGE_TAB_GROUPS)[number]['tabs'][number]['id'];
 
-/** PMO-D Batch 1 — 撤下 8 Tab id（路由保留，侧栏不挂）。
- * 这 8 个 id 是 KNOWN 的「撤下」集合，与 KnowledgeTabId 取并集供 KnowledgeView 路由/deep-link 消费。 */
+/** 撤下 Tab ids（路由保留，侧栏不挂）。
+ * 除 engine_config 外的已撤下 Tab：deep-link 可达 + warn banner（F8）。
+ * engine_config 已由 2026-09-24 菜单调整重新纳入侧栏底部，不再视为"撤下"。 */
 export const DEPRECATED_TAB_IDS = [
   'rag',
-  'engine_config',
   'ontology_model',
   'graph_builder',
   'glossary',

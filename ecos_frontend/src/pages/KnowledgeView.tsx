@@ -18,7 +18,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
   ArrowLeft,
-  ArrowUpRight,
   Database,
   Download,
   FileText,
@@ -185,11 +184,14 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
 
   const PageIcon = ACTIVE_PAGE_ICONS[activePage];
 
-  // 侧栏底部 Global 入口（任务中心 / 引擎监控 — 跳 Hash 路由 #/engine-tasks / #/engine-knowledge）
-  const globalLinks: Array<{ key: 'task_center' | 'engine_monitor'; href: string; label: string; icon: LucideIcon }> = [
-    { key: 'task_center', href: '#/engine-tasks', label: t('knowledge.nav.global_task_center'), icon: ListChecks },
-    { key: 'engine_monitor', href: '#/engine-knowledge', label: t('knowledge.nav.global_engine_monitor'), icon: Gauge },
-  ];
+  /** 侧栏底部——引擎配置（原任务中心/引擎监控已移出知识工作台，全局功能在 Topbar 入口） */
+  const navigateToEngineConfig = useCallback(() => {
+    setSearchParams(params => {
+      params.set('tab', 'engine_config');
+      params.delete('page');
+      return params;
+    });
+  }, [setSearchParams]);
 
   const renderPageNav = (item: ActivePage, isActive: boolean, Icon: LucideIcon) => (
     <button
@@ -244,24 +246,23 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
               const Icon = ACTIVE_PAGE_ICONS[page];
               return renderPageNav(page, isActive, Icon);
             })}
-
-            {/* Global 入口（任务中心 / 引擎监控） */}
-            <div className="pt-3" />
-            <div className="px-4 pb-2 text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ color: styles.sidebarText }}>
-              {t('knowledge.nav.section_global')}
-            </div>
-            {globalLinks.map(link => (
-              <a
-                key={link.key}
-                href={link.href}
-                className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition-colors border-l-2 border-transparent ${styles.sidebarText} ${styles.sidebarHoverBg}`}
-              >
-                <link.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{link.label}</span>
-                <ArrowUpRight className="w-3 h-3 ml-auto opacity-50" />
-              </a>
-            ))}
           </div>
+
+          {/* 侧栏底部：引擎配置（与数据工作台引擎配置同款，靠底展示） */}
+          <div className="px-4 pb-2 text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ color: styles.sidebarText }}>
+            {t('knowledge.nav.section_config')}
+          </div>
+          <button
+            onClick={navigateToEngineConfig}
+            className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition-colors border-l-2 ${
+              activeTab === 'engine_config' && route.kind === 'tab'
+                ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText}`
+                : `border-transparent ${styles.sidebarText} ${styles.sidebarHoverBg}`
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{t('knowledge.nav.page_engine_config')}</span>
+          </button>
 
           {/* 底部状态 */}
           <div className="px-4 py-3 border-t text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ borderColor: styles.sidebarBorder }}>
