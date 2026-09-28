@@ -1,0 +1,60 @@
+/**
+ * main.ts - Vue 应用入口文件
+ *
+ * 用法：复制到 src/main.ts
+ * 需要同目录下有 App.vue 和 router/index.ts
+ */
+
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import App from './App.vue'
+import router from './router'
+
+// 全局样式
+import '@/styles/main.css'
+
+// 创建 Vue 应用实例
+const app = createApp(App)
+
+// 安装 Pinia 状态管理
+app.use(createPinia())
+
+// 安装 Vue Router
+app.use(router)
+
+// 挂载到 #app 元素
+app.mount('#app')
+
+/**
+ * 备选：使用自定义字体
+ *
+ * import '@/assets/fonts/Inter/Inter-Variable.woff2'
+ */
+
+/**
+ * 备选：使用 SVG 图标全局注册
+ *
+ * import * as icons from '@/components/icons'
+ *
+ * for (const [key, component] of Object.entries(icons)) {
+ *   app.component(key, component)
+ * }
+ */
+
+/**
+ * 备选：全局错误处理
+ *
+ * app.config.errorHandler = (err, instance, info) => {
+ *   console.error('Global error:', err)
+ *   console.error('Component:', instance)
+ *   console.error('Info:', info)
+ * }
+ */
+
+/**
+ * 备选：Vite 懒加载 + 预取
+ *
+ * const App = defineAsyncComponent(() =>
+ *   import('./App.vue')
+ * )
+ */

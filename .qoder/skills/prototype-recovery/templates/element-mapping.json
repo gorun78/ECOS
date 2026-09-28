@@ -1,0 +1,17 @@
+{
+  "$schema": "prototype-element-mapping.schema.json",
+  "prototypePath": "",
+  "implementationPath": "",
+  "elements": [
+    {
+      "name": "",
+      "prototypeSelector": "",
+      "implementationFile": "",
+      "cssClasses": [],
+      "style": {},
+      "children": [],
+      "events": [],
+      "bindings": []
+    }
+  ]
+}

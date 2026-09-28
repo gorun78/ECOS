@@ -1,0 +1,65 @@
+{
+  "name": "vue3-frontend-builder-delivery-template",
+  "version": "1.0.0",
+  "description": "Standard delivery report template for vue3-frontend-builder",
+
+  "deliverable_report": {
+    "project": "${PROJECT_NAME}",
+    "version": "${VERSION}",
+    "delivered_at": "${ISO_DATE}",
+
+    "scope": {
+      "total_pages": 0,
+      "total_components": 0,
+      "atoms": 0,
+      "molecules": 0,
+      "organisms": 0,
+      "pages": 0
+    },
+
+    "abstraction_gain": {
+      "reusable_components": 0,
+      "page_specific_components": 0,
+      "reuse_ratio": "0%"
+    },
+
+    "qa_summary": {
+      "components_approved": 0,
+      "components_pending": 0,
+      "critical_issues": 0,
+      "high_issues": 0,
+      "medium_issues": 0,
+      "low_issues": 0
+    },
+
+    "gate_checks": {
+      "phase1_requirements_gate": { "status": "pass", "approved_at": "" },
+      "phase2_design_gate": { "status": "pass", "approved_at": "" },
+      "phase3_component_gates": [],
+      "phase4_delivery_gate": { "status": "pending" }
+    },
+
+    "responsive_verification": {
+      "desktop_verified": false,
+      "tablet_verified": false,
+      "mobile_verified": false,
+      "breakpoints_tested": []
+    },
+
+    "deliverable_checklist": {
+      "source_code": false,
+      "package_json": false,
+      "vite_config": false,
+      "tailwind_config": false,
+      "tsconfig": false,
+      "responsive_screenshots": false,
+      "qa_reports": false,
+      "readme": false,
+      "component_approval_records": false
+    },
+
+    "deliverable_allowed": false,
+    "blockers": [],
+    "notes": []
+  }
+}

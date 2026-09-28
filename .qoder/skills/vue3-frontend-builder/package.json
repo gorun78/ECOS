@@ -1,0 +1,16 @@
+{
+  "name": "vue3-frontend-builder",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Vue3+TS+Tailwind frontend builder with component abstraction engine",
+  "scripts": {
+    "analyze": "node scripts/analyze_design.js",
+    "validate": "node scripts/validate_component.js",
+    "validate:full": "node scripts/validate_component_full.js",
+    "qa": "node scripts/run_component_qa.js",
+    "approval": "node scripts/generate_approval_records.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

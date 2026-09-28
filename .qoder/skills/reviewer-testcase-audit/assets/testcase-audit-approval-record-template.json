@@ -1,0 +1,37 @@
+{
+  "artifact": "TESTCASE_AUDIT_REPORT",
+  "name": "{{项目名称}} 测试用例审查报告",
+  "version": "v{{version}}",
+  "hash": "{{内容哈希}}",
+  "status": "{{APPROVED / REJECTED}}",
+  "workflow_mode": "{{L2 / L3}}",
+  "approvals": [
+    {
+      "role": "reviewer-testcase-audit",
+      "result": "{{APPROVED / REJECTED}}",
+      "timestamp": "{{ISO8601}}",
+      "conditions": []
+    }
+  ],
+  "issue_summary": {
+    "total": 0,
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "p3": 0
+  },
+  "coverage": "{{percent}}%",
+  "gates": {
+    "COVERAGE_GATE": "{{PASS / FAIL}}",
+    "GRANULARITY_GATE": "{{PASS / FAIL}}",
+    "BOUNDARY_GATE": "{{PASS / FAIL}}",
+    "TRACEABILITY_GATE": "{{PASS / FAIL}}",
+    "DATA_GATE": "{{PASS / FAIL}}"
+  },
+  "gates_passed": [],
+  "deliverable_allowed": false,
+  "test_cases_ref": "TEST_CASES@{{hash}}",
+  "test_plan_ref": "TEST_PLAN@{{hash}}",
+  "prd_ref": "PRD@{{hash}}",
+  "timestamp": "{{ISO8601}}"
+}
