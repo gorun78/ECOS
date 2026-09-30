@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 使用 ConcurrentHashMap，无需外部依赖
  */
 @Component
-@Order(2)
+@Order(5)
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);

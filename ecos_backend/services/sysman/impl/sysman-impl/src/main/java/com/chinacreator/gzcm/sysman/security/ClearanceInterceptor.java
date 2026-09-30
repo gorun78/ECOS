@@ -72,17 +72,12 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
 
-        // 公开端点免检查 — PMO-74 H9-T2（铁律 §1.2①/§2.4-6）：
-        // 业务前缀（knowledge/pipeline/aip/lineage/datanet/workspace/engine/ontology/dq/
-        // datasource/task/sysconfig/ecos/llm/agent 族…）已全部移出豁免表，改由准入等级校验；
-        // 仅保留 health/auth 类 + 安全控制面（security/audit 仅要求认证，见 SecurityPolicyController 设计口径）。
-        if (path.startsWith("/api/v1/auth/") || path.equals("/api/health") || path.equals("/health")
-                || path.startsWith("/api/v1/knowledge/health")
-                || path.startsWith("/api/security")
-                || path.startsWith("/api/v1/security")
-                || path.startsWith("/api/v1/audit")
-                || path.startsWith("/api/audit")
-                ) {
+        // 公开端点免检查 — PMO-74 H9-T2 + 详细设计-00 W05 (C.3.2)：
+        // 豁免统一由 AnonymousEndpointRegistry 单源驱动（ANONYMOUS + CLEARANCE_EXEMPT 展开集），
+        // 与 SecurityConfig permitAll、ClearanceMvcConfig excludePathPatterns 同源；
+        // 不再内联 startsWith 硬编码。
+        if (com.chinacreator.gzcm.common.security.anonymous
+                .AnonymousEndpointRegistry.isAnonymousOrExempt(path)) {
             return true;
         }
 

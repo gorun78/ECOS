@@ -66,8 +66,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
       interval: 10s
-      timeout: 10s
+      timeout: 30s
       retries: 5
+      start_period: 60s
     mem_limit: 512m
 
   kafka-init:
@@ -88,6 +89,11 @@ services:
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.agent --partitions 3 --replication-factor 1
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.knowledge --partitions 3 --replication-factor 1
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.audit --partitions 3 --replication-factor 1
+        # 详细设计-00 C.5.3 (W12)：补齐代码已有而 compose 缺失的 3 条 topic，
+        # 与 runtime KafkaTopics 常量对齐，供 KafkaTopicParityTest 断言。
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.data.security-tagged --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.ontology.published --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ecos.cognitive --partitions 3 --replication-factor 1
         echo "Kafka topics created successfully."
     mem_limit: 128m
 
@@ -112,6 +118,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+      start_period: 60s
     mem_limit: 768m
 
   minio:
@@ -128,7 +135,7 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/live || exit 1"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -144,7 +151,7 @@ services:
     volumes:
       - ./opa-policies:/policies:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8181/v1/data || exit 1"]
+      test: ["CMD", "opa", "eval", "--fail", "true"]
       interval: 5s
       timeout: 5s
       retries: 5

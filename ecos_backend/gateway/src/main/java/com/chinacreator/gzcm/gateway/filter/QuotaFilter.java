@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -43,6 +45,7 @@ import java.util.concurrent.TimeUnit;
  * </ol>
  */
 @Component
+@Order(6)  // W11: RateLimit(5) 之后按租户配额校验
 public class QuotaFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(QuotaFilter.class);

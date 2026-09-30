@@ -51,6 +51,14 @@ public class ApiResponse<T> implements Serializable {
     private T data;
     private Long timestamp;
 
+    /**
+     * 详细设计-00 W09 / C.5.1：全链 traceId（入口由 RequestContextFilter 生成/透传，
+     * {@code X-Request-Id} → MDC → 响应体）。
+     * <p>增量字段：新增不删除，`@JsonInclude(NON_NULL)` 保证未赋值时 JSON 不序列化
+     * `traceId`，与既有 5 字段序列化结果完全一致。</p>
+     */
+    private String traceId;
+
     // ── 构造器 ──────────────────────────────────────
 
     private ApiResponse() {
@@ -70,6 +78,29 @@ public class ApiResponse<T> implements Serializable {
         this.message = message;
         this.data = data;
         this.timestamp = Instant.now().toEpochMilli();
+    }
+
+    // ── traceId 填充 ────────────────────────────────
+
+    /**
+     * W09 工厂：从当前 MDC 读取 traceId 并填充到本响应。
+     * <p>调用点 = GlobalExceptionHandler / 各 Controller 出口 / filter 内 4xx 返回。
+     * 若 MDC 未设置（异步线程或 actuator-only 路径）保持 null，序列化时被 NON_NULL 忽略。</p>
+     */
+    public ApiResponse<T> withTraceIdFromMdc() {
+        try {
+            String tid = org.slf4j.MDC.get("traceId");
+            if (tid != null && !tid.isBlank()) this.traceId = tid;
+        } catch (Exception ignored) { }
+        return this;
+    }
+
+    /** W09 工厂：显式指定 traceId（用于单测）。 */
+    public ApiResponse<T> withTraceId(String traceId) {
+        if (traceId != null && !traceId.isBlank()) {
+            this.traceId = traceId.trim();
+        }
+        return this;
     }
 
     // ── 工厂方法 ────────────────────────────────────
@@ -137,6 +168,9 @@ public class ApiResponse<T> implements Serializable {
 
     public Long getTimestamp() { return timestamp; }
     public void setTimestamp(Long timestamp) { this.timestamp = timestamp; }
+
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
 
     // ── 便捷方法 ────────────────────────────────────
 

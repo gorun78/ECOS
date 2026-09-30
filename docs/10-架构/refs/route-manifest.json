@@ -1,0 +1,21 @@
+{
+  "$comment": "route-manifest 单源（详细设计-00 C.4 + ADR-15）。gateway ServiceEndpointResolver / BFF / vite / GatewayRouteIntegrityTest 均消费本文件。每条 prefix 必须对应一个 owner artifact 或 monolith 承载，禁止任意复制粘贴前缀字面量。route=service 表示已从 gateway 切流；route=monolith 表示 fallback 仍由 gateway fat-jar 承担。",
+  "version": "1",
+  "entries": [
+    { "prefix": "/api/v1/auth", "owner": "sysman", "artifact": "services/sysman/impl/sysman-impl", "ports": { "monolith": 8080, "service": 18081 }, "rewrite": "/api/*", "anonymous": ["/api/v1/auth/**", "/api/v1/auth/*", "/api/auth/**"], "route": "monolith", "reason": "登录/登出/refresh 匿名可达，未切流" },
+    { "prefix": "/api/v1/security", "owner": "sysman", "artifact": "services/sysman/impl/sysman-impl", "ports": { "monolith": 8080, "service": 18081 }, "rewrite": "/api/*", "anonymous": [], "route": "monolith", "reason": " Fam security profile 未切流，走主控制" },
+    { "prefix": "/api/v1/audit", "owner": "sysman", "artifact": "services/sysman/impl/sysman-impl", "ports": { "monolith": 8080, "service": 18081 }, "rewrite": "/api/*", "anonymous": [], "route": "monolith", "reason": "审计端点未切流" },
+    { "prefix": "/api/v1/data", "owner": "datanet", "artifact": "services/datanet", "ports": { "monolith": 8080, "service": 18082 }, "rewrite": "/api/*", "anonymous": [], "route": "service", "reason": "datanet data 域 3 条已切流（C.6.1）" },
+    { "prefix": "/api/v1/datanet", "owner": "datanet", "artifact": "services/datanet", "ports": { "monolith": 8080, "service": 18082 }, "rewrite": "/api/*", "anonymous": [], "route": "service", "reason": "datanet 域 domainPath" },
+    { "prefix": "/api/v1/ontology", "owner": "buszhi", "artifact": "services/buszhi/impl", "ports": { "monolith": 8080, "service": 18083 }, "rewrite": "/api/*", "anonymous": [], "route": "monolith", "reason": "ontology 未切流" },
+    { "prefix": "/api/v1/aiming", "owner": "aiming", "artifact": "services/aiming", "ports": { "monolith": 8080, "service": 18084 }, "rewrite": "/api/*", "anonymous": [], "route": "monolith", "reason": "cognitive/aiming 未切流" },
+    { "prefix": "/api/v1/knowledge", "owner": "dccheng", "artifact": "services/dccheng", "ports": { "monolith": 8080, "service": 18086 }, "rewrite": "/api/*", "anonymous": ["/api/v1/knowledge/health", "/api/v1/knowledge/extract/**"], "route": "monolith", "reason": "kb 域未切流；health 匿名 + extract 服务间豁免（H10 待收口）" },
+    { "prefix": "/api/v1/engine/data", "owner": "datanet", "artifact": "services/datanet", "ports": { "monolith": 8080, "service": 18082 }, "rewrite": "/api/*", "anonymous": ["/api/v1/engine/*/health", "/api/v1/engine/health"], "route": "service", "reason": "data-engine 已切流；engine 健康检查匿名" },
+    { "prefix": "/api/v1/engine/cognitive", "owner": "aiming", "artifact": "services/aiming", "ports": { "monolith": 8080, "service": 18084 }, "rewrite": "/api/*", "anonymous": ["/api/v1/engine/cognitive/health"], "route": "monolith", "reason": "cognitive 业务未切流；健康检查匿名" },
+    { "prefix": "/api/v1/engine/knowledge", "owner": "dccheng", "artifact": "services/dccheng", "ports": { "monolith": 8080, "service": 18086 }, "rewrite": "/api/*", "anonymous": ["/api/v1/engine/knowledge/health"], "route": "monolith", "reason": "kb-engine 未切流；健康检查匿名" },
+    { "prefix": "/api/v1/world-model", "owner": "buszhi", "artifact": "services/buszhi/impl", "ports": { "monolith": 8080, "service": 18089 }, "rewrite": "/api/*", "anonymous": [], "route": "monolith", "reason": "world-model 调试引擎，未切流" },
+    { "prefix": "/api/v1/workspace", "owner": "workspace", "artifact": "workspace/workspace-impl", "ports": { "monolith": 8080, "service": 18090 }, "rewrite": "/api/*", "anonymous": [], "route": "service", "reason": "workspace 场景层已切流（认知 4 卡）" },
+    { "prefix": "/api/v1/system", "owner": "gateway", "artifact": "gateway", "ports": { "monolith": 8080, "service": 8080 }, "rewrite": null, "anonymous": [], "route": "monolith", "reason": "gateway 入口诊断族（/api/v1/system/gateway-diagnostics）" },
+    { "prefix": "/api/v1/monitor", "owner": "gateway", "artifact": "gateway", "ports": { "monolith": 8080, "service": 8080 }, "rewrite": null, "anonymous": [], "route": "monolith", "reason": "monitor 告警 + DLQ 重放族" }
+  ]
+}

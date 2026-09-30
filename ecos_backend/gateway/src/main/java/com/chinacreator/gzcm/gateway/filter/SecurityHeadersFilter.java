@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -14,16 +15,19 @@ import java.io.IOException;
  * P3-2: 安全 HTTP 响应头过滤器
  *
  * 为所有响应添加标准安全头，防止常见的 Web 攻击：
- * - X-Content-Type-Options: nosniff — 防止 MIME 类型嗅探
- * - X-Frame-Options: DENY — 防止点击劫持（iframe 嵌入）
- * - Strict-Transport-Security — 强制 HTTPS（生产环境）
- * - Content-Security-Policy — 限制资源加载来源
- * - X-XSS-Protection — XSS 过滤
- * - Referrer-Policy — 限制 Referrer 泄露
- * - Cache-Control — 敏感端点禁止缓存
+ * - X-Content-Type-Options: nosniff
+ * - X-Frame-Options: DENY
+ * - Strict-Transport-Security
+ * - Content-Security-Policy
+ * - X-XSS-Protection
+ * - Referrer-Policy
+ * - Cache-Control
+ *
+ * <p>详细设计-00 C.1/W11 目标态：过滤器链顺序密度是 10/11/20/30/5/6，
+ * 本滤在 trust 头解出后（+30）重放响应头，以覆盖前置 SecurityContext 断言。</p>
  */
 @Component
-@Order(1)  // 最高优先级，确保安全头最先设置
+@Order(Ordered.HIGHEST_PRECEDENCE + 30)
 public class SecurityHeadersFilter extends OncePerRequestFilter {
 
     @Override
