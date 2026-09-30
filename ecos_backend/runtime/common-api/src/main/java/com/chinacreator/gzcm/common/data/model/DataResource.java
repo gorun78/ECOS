@@ -74,6 +74,24 @@ public class DataResource {
     /** 近源区（仅 layer=RAW 时有效）: STRUCTURED=结构化近源 / UNSTRUCTURED=非结构化近源 */
     private String zone;
 
+    /**
+     * 载体子类（F02-05）：数据湖五层内的载体子分类。
+     * 对应列 {@code layer_bucket VARCHAR(30)}（V260 新增，只加）。
+     */
+    private String layerBucket;
+
+    /**
+     * 载体标识（F02-05）：对象 key / 表名 / 视图名 / 图谱 label。
+     * 跨域只存定位符（铁律 §3.5），对应列 {@code carrier_ref VARCHAR(255)}。
+     */
+    private String carrierRef;
+
+    /**
+     * 存储载体类型（F02-05）：PG/MINIO/DORIS/CLICKHOUSE/NEO4J/PG_VECTOR。
+     * 对应列 {@code storage_kind VARCHAR(20)}（湖规范 v2.0 §七A 载体分档）。
+     */
+    private String storageKind;
+
     // ===== Getters/Setters =====
 
     public String getResourceId() { return resourceId; }
@@ -132,4 +150,13 @@ public class DataResource {
 
     public String getZone() { return zone; }
     public void setZone(String zone) { this.zone = zone; }
+
+    public String getLayerBucket() { return layerBucket; }
+    public void setLayerBucket(String layerBucket) { this.layerBucket = layerBucket; }
+
+    public String getCarrierRef() { return carrierRef; }
+    public void setCarrierRef(String carrierRef) { this.carrierRef = carrierRef; }
+
+    public String getStorageKind() { return storageKind; }
+    public void setStorageKind(String storageKind) { this.storageKind = storageKind; }
 }

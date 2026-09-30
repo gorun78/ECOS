@@ -34,6 +34,15 @@ public class DataSourceEntity {
     /** PMO-46: 密码密文（AES 加密后 Base64），读取自 td_datasource.password_enc。 */
     private String passwordEncrypted;
 
+    /**
+     * F02-01 数据域凭证治理（W52）: 读路径是否持有可信凭证（true|false）。
+     * <p>由 Service 出口（{@code maskProtected}）按 {@link #passwordEncrypted} 是否非空派生，
+     * 与密文字段同步 null-out —— 读路径<b>永不回显</b>明文/密文，仅暴露该布尔标志，
+     * 替代前端此前依赖 {@code password} 键（或已剥离的密文键）猜测"是否配置了密码"的隐式口径。</p>
+     * <p>transient 字段随 JSON 序列化作为新增出参（只增不改，既有消费者不受影响）。</p>
+     */
+    private boolean credentialPresent;
+
     private Timestamp lastCollectTime;
     
     public String getDatasourceId() {
@@ -204,6 +213,16 @@ public class DataSourceEntity {
     /** PMO-46: 密码密文 setter（Service 层读取 password_enc 列时填充） */
     public void setPasswordEncrypted(String passwordEncrypted) {
         this.passwordEncrypted = passwordEncrypted;
+    }
+
+    /** F02-01: 是否持有可信凭证（读路径出参，替代明文/密文回显） */
+    public boolean isCredentialPresent() {
+        return credentialPresent;
+    }
+
+    /** F02-01: 是否持有可信凭证 setter（Service maskProtected 按 passwordEncrypted 是否非空派生） */
+    public void setCredentialPresent(boolean credentialPresent) {
+        this.credentialPresent = credentialPresent;
     }
 
     public static class DataSourceType {

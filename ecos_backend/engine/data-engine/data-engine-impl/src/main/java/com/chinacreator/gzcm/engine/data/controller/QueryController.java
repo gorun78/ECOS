@@ -36,19 +36,29 @@ public class QueryController {
 
     private final QueryExecutionService queryExecutionService;
     private final RestTemplate restTemplate;
+    /** 详细设计-01 W32：两态寻址唯一出口，可选注入（缺失时 RLS 默认 DENY）。 */
+    private final com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver endpointResolver;
 
-    /** security-engine RLS apply 端点（架构规则 2.1：引擎间只调 REST） */
-    private static final String RLS_APPLY_URL = "http://localhost:8080/api/security/rls/apply";
-
-    public QueryController(QueryExecutionService queryExecutionService) {
+    public QueryController(QueryExecutionService queryExecutionService,
+                           @org.springframework.beans.factory.annotation.Autowired(required = false)
+                           com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver endpointResolver) {
         this.queryExecutionService = queryExecutionService;
         this.restTemplate = new RestTemplate();
+        this.endpointResolver = endpointResolver;
     }
 
     /**
      * 执行 SQL 查询。
      * 架构规则 2.4：若 body 传 tableName，查询前调 security-engine RLS 注入行级过滤。
      * 默认 DENY：RLS 调用失败/返回空 condition → 403 拒绝，不降级放行。
+     *
+     * <p>详细设计-01 W31（P0）：不再把 security 返回的<b>裸 RLS 条件字符串</b>直接
+     * 拼进 SQL（旧的「包裹用户 SQL + 追加 WHERE 裸条件」形态已删除，见门禁
+     * {@code RlsInjectionGuardArchTest}）。改为消费 security-engine 的<b>参数化谓词</b>
+     * （C.2.2）——{@code predicateTemplate} 已在策略写入期经 {@code RlsPredicateValidator}
+     * 白名单校验（禁 SQL 关键字/拼接语义），其 {@code :name} 占位符并入 {@code params}，
+     * 由执行层统一参数化解析；只把 <code>用户 intent SQL</code> 包进子查询，不拼接任何
+     * 客户端/策略原始条件串。</p>
      */
     @PostMapping("/execute")
     public ApiResponse<Map<String, Object>> execute(@RequestBody Map<String, Object> body,
@@ -58,7 +68,7 @@ public class QueryController {
             String sql = (String) body.get("sql");
             String tableName = (String) body.get("table_name");
             @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) body.getOrDefault("params", Map.of());
+            Map<String, Object> params = new LinkedHashMap<>((Map<String, Object>) body.getOrDefault("params", Map.of()));
             int maxRows = body.containsKey("max_rows") ? ((Number) body.get("max_rows")).intValue() : 10000;
             int timeoutSeconds = body.containsKey("timeout_seconds") ? ((Number) body.get("timeout_seconds")).intValue() : 30;
 
@@ -66,25 +76,45 @@ public class QueryController {
                 return ApiResponse.badRequest("数据源 ID 和 SQL 不能为空");
             }
 
-            // ── 架构规则 2.4: RLS 行级过滤接入 ──
-            // 若请求指定了 table_name，查询前调 security-engine RLS 注入行级过滤条件
+            // ── 架构规则 2.4: RLS 行级过滤接入（参数化谓词，W30/W31）──
             if (tableName != null && !tableName.isEmpty()) {
                 String userId = UserContext.getCurrentUserId();
                 if (userId == null) {
                     userId = "anonymous";
                 }
 
-                String rlsCondition = applyRls(tableName, userId, authHeader);
-                if (rlsCondition == null || rlsCondition.isEmpty()) {
-                    // 默认 DENY：RLS 不可用或返回空 → 拒绝，不降级放行
-                    log.warn("RLS 行级过滤拒绝: tableName={}, userId={}, condition 为空或 RLS 不可用", tableName, userId);
+                Map<String, Object> rls = applyRls(tableName, userId, authHeader);
+                if (rls == null) {
+                    // 默认 DENY：RLS 不可用 → 拒绝，不降级放行
+                    log.warn("RLS 不可用，默认 DENY: tableName={}, userId={}", tableName, userId);
                     return ApiResponse.forbidden("RLS 行级过滤不可用，查询被拒绝（默认 DENY）");
                 }
 
-                // 用子查询包裹原 SQL，注入 RLS WHERE 条件
-                final String rlsSql = "SELECT * FROM (" + sql + ") AS _rls WHERE " + rlsCondition;
-                sql = rlsSql;
-                log.info("RLS 行级过滤已注入: tableName={}, userId={}, condition={}", tableName, userId, rlsCondition);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> pred = (Map<String, Object>) rls.get("predicate");
+                if (pred == null) {
+                    return ApiResponse.forbidden("RLS 未返回参数化谓词，查询被拒绝（默认 DENY）");
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> predParams = (Map<String, Object>) rls.get("params");
+
+                String template = (String) pred.get("predicateTemplate");
+                boolean denyIfEmpty = !Boolean.FALSE.equals(pred.get("denyIfEmpty"));
+                if (template == null || template.isBlank() || "1=1".equals(template.trim())) {
+                    // 无有效谓词：denyIfEmpty（默认）→ DENY，不泄露存在性。
+                    log.warn("RLS 无有效谓词, denyIfEmpty={}, 默认 DENY: tableName={}, userId={}",
+                            denyIfEmpty, tableName, userId);
+                    return ApiResponse.forbidden("无匹配的行级安全策略，访问被拒绝（默认 DENY）");
+                }
+
+                // 谓词占位符并入 params（:name → 值），执行层统一参数化解析；不拼接裸条件串。
+                if (predParams != null) {
+                    params.putAll(predParams);
+                }
+                // 仅把「用户 intent SQL」包进子查询；WHERE 段 = 写期经 RlsPredicateValidator
+                // 白名单校验的谓词模板（只含列名/占位符，无客户端值），绑定值经 params 参数化。
+                sql = wrapWithRlsPredicate(sql, template);
+                log.info("RLS 参数化谓词已注入: tableName={}, userId={}, template={}", tableName, userId, template);
             }
 
             // 大表查询保护：ExecutorService 超时保护 (30秒)
@@ -113,54 +143,41 @@ public class QueryController {
     }
 
     /**
-     * 调 security-engine RLS apply 端点获取行级过滤条件。
-     * 架构规则 2.1：引擎间只调 REST，不调 Impl。
-     * 架构规则 2.4 第 6 条：RLS 不可用 → 返回 null（调用方默认 DENY）。
+     * 调 security-engine RLS apply 端点获取<b>参数化谓词</b>。
+     * 架构规则 2.1：引擎间只调 REST。2.4 第 6 条：RLS 不可用 → 返回 null（调用方默认 DENY）。
      *
-     * @param tableName 目标表名
-     * @param userId 当前用户 ID
-     * @return RLS 过滤条件字符串，null 表示 RLS 不可用（调用方应拒绝）
+     * @return RLS {@code data} 载荷（含 {@code predicate}/{@code params}），null 表示不可用（DENY）。
      */
     @SuppressWarnings("unchecked")
-    private String applyRls(String tableName, String userId, String authHeader) {
+    private Map<String, Object> applyRls(String tableName, String userId, String authHeader) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
-            // 转发调用方的 JWT token（架构规则 2.1：引擎间 REST 调用需认证）
             if (authHeader != null && !authHeader.isEmpty()) {
                 headers.set("Authorization", authHeader);
             }
 
+            String rlsUrl = resolveRlsApplyUrl();
+            if (rlsUrl == null) {
+                log.error("RLS 端点寻址失败（默认 DENY）: tableName={}, userId={}", tableName, userId);
+                return null;
+            }
             Map<String, Object> rlsRequest = Map.of("tableName", tableName, "userId", userId);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(rlsRequest, headers);
 
-            Map<String, Object> response = restTemplate.postForObject(
-                    RLS_APPLY_URL, entity, Map.class);
-
+            Map<String, Object> response = restTemplate.postForObject(rlsUrl, entity, Map.class);
             if (response == null) {
                 log.error("RLS apply 返回空响应: tableName={}, userId={}", tableName, userId);
                 return null;
             }
-
-            // ApiResponse 格式: {code:0, data:{condition:"...", ...}}
             Object code = response.get("code");
             if (code == null || !"0".equals(code.toString())) {
                 log.error("RLS apply 业务失败: code={}, message={}", code, response.get("message"));
                 return null;
             }
-
-            Map<String, Object> data = (Map<String, Object>) response.get("data");
-            if (data == null) {
-                return null;
-            }
-
-            // 优先取 condition，兼容 rlsCondition
-            Object condition = data.get("condition");
-            if (condition == null) {
-                condition = data.get("rlsCondition");
-            }
-            return condition != null ? condition.toString() : null;
+            Object data = response.get("data");
+            return data instanceof Map ? (Map<String, Object>) data : null;
         } catch (Exception e) {
             log.error("RLS apply REST 调用失败: tableName={}, userId={}, error={}", tableName, userId, e.getMessage());
             return null; // 默认 DENY
@@ -168,7 +185,37 @@ public class QueryController {
     }
 
     /**
-     * 获取 Schema 树结构。
+     * 详细设计-01 W32：security-engine 端点经 {@link ServiceEndpointResolver}（单源
+     * route-manifest.json，{@code /api/v1/security} → owner sysman）两态寻址，
+     * <b>禁止</b>引擎内硬编码本机单体端点常量。
+     * resolver 不可用 → 返回 null（RLS 不可用，调用方默认 DENY，不降级放行）。
+     */
+    private String resolveRlsApplyUrl() {
+        if (endpointResolver == null) {
+            log.warn("ServiceEndpointResolver 不可用，RLS 端点无法寻址（默认 DENY）");
+            return null;
+        }
+        return endpointResolver.resolve(
+                        "sysman", com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver.RouteMode.MONOLITH)
+                .map(base -> base + "/api/security/rls/apply")
+                .orElseGet(() -> {
+                    log.warn("route-manifest 未登记 sysman，RLS 端点无法寻址（默认 DENY）");
+                    return null;
+                });
+    }
+
+    /**
+     * 详细设计-01 W31：只把「用户 intent SQL」包进子查询套上参数化谓词 WHERE 段。
+     * <code>template</code> 是写期经 {@code RlsPredicateValidator} 白名单校验的谓词模板
+     * （仅含列名与 {@code :name} 占位符，无客户端值），绑定值经 params 参数化，
+     * 不拼接任何裸条件串。
+     */
+    private static String wrapWithRlsPredicate(String intentSql, String predicateTemplate) {
+        return String.format("SELECT * FROM (%s) AS _rls WHERE %s", intentSql, predicateTemplate);
+    }
+
+    /**
+     * 获取数据源 Schema 树。
      */
     @GetMapping("/schema/{dsId}")
     public ApiResponse<Map<String, Object>> getSchemaTree(@PathVariable String dsId) {

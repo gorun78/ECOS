@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  表 5: ecos_dw.ecos_forecast_input_snapshot（V167）
+  IR04 显式列清单；IR05 全部 #{}；MC06 ecos_dw. 限定。
+  *_json 列 = 受控 JSON 仅描述用，禁 WHERE/索引（MC02），本 mapper 中不出现在任何条件里。
+  本表无 project_id/period 列：pageQuery/countQuery 的同名参数被忽略（见 mapper 接口注释）。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.fact.dao.ForecastSnapshotMapper">
+
+    <sql id="cols">
+        id, forecast_run_id, as_of_time, scope_hash, fact_refs_json, metric_versions_json,
+        profile_versions_json, assumption_versions_json, caliber_id, caliber_version,
+        checksum, dq_status, is_active, batch_id, source_ref, evidence_ref,
+        domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+    </sql>
+
+    <insert id="insertBatch">
+        INSERT INTO ecos_dw.ecos_forecast_input_snapshot (
+            id, forecast_run_id, as_of_time, scope_hash, fact_refs_json,
+            metric_versions_json, profile_versions_json, assumption_versions_json,
+            caliber_id, caliber_version, checksum,
+            dq_status, is_active, batch_id, source_ref, evidence_ref,
+            domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+        ) VALUES
+        <foreach collection="rows" item="r" separator=",">
+            (
+                #{r.id}, #{r.forecastRunId}, #{r.asOfTime}, #{r.scopeHash},
+                #{r.factRefsJson}, #{r.metricVersionsJson}, #{r.profileVersionsJson},
+                #{r.assumptionVersionsJson}, #{r.caliberId}, #{r.caliberVersion},
+                #{r.checksum},
+                #{r.dqStatus}, #{r.isActive}, #{r.batchId}, #{r.sourceRef}, #{r.evidenceRef},
+                #{r.domain}, #{r.versionNo}, #{r.isDeleted},
+                NOW(), NOW(), #{r.createBy}, #{r.updateBy}
+            )
+        </foreach>
+    </insert>
+
+    <select id="countBatch" resultType="int">
+        SELECT count(1) FROM ecos_dw.ecos_forecast_input_snapshot
+        WHERE batch_id = #{batchId} AND is_deleted = 0
+    </select>
+
+    <select id="countBatchByStatus" resultType="int">
+        SELECT count(1) FROM ecos_dw.ecos_forecast_input_snapshot
+        WHERE batch_id = #{batchId} AND dq_status = #{dqStatus} AND is_deleted = 0
+    </select>
+
+    <select id="listBatch" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_forecast_input_snapshot
+        WHERE batch_id = #{batchId} AND is_deleted = 0
+        ORDER BY create_time ASC, id ASC
+    </select>
+
+    <select id="getDqStatusById" resultType="string">
+        SELECT dq_status FROM ecos_dw.ecos_forecast_input_snapshot
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <update id="touchUpdate">
+        UPDATE ecos_dw.ecos_forecast_input_snapshot
+        SET update_time = NOW(), update_by = #{updateBy}
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <select id="pageQuery" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_forecast_input_snapshot
+        WHERE is_deleted = 0
+        <if test="batchId != null"> AND batch_id = #{batchId}</if>
+        <if test="dqStatus != null"> AND dq_status = #{dqStatus}</if>
+        ORDER BY as_of_time DESC, id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countQuery" resultType="int">
+        SELECT count(1) FROM ecos_dw.ecos_forecast_input_snapshot
+        WHERE is_deleted = 0
+        <if test="batchId != null"> AND batch_id = #{batchId}</if>
+        <if test="dqStatus != null"> AND dq_status = #{dqStatus}</if>
+    </select>
+
+</mapper>

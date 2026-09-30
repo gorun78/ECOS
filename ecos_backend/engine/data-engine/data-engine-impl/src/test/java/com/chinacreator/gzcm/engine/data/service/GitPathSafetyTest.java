@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,29 +44,29 @@ class GitPathSafetyTest {
     @Test
     @DisplayName("2. 拒绝 '..' 段（路径穿越）")
     void repoIdContainingDotDotRejected() {
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath(".."));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath(".."));
     }
 
     @Test
     @DisplayName("3. 拒绝含 '/' 或 '\\\\' 或盘符 'c:' 的段")
     void repoIdWithSeparatorOrDriveRejected() {
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath("a/b"));
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath("a\\b"));
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath("c:/x"));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath("a/b"));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath("a\\b"));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath("c:/x"));
     }
 
     @Test
     @DisplayName("4. 空段/空白段/null 拒绝")
     void repoIdEmptyOrBlankRejected() {
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath(""));
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath("   "));
-        assertThrows(IllegalArgumentException.class, () -> resolver.resolveRepoPath(null));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath(""));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath("   "));
+        assertThrows(BusinessException.class, () -> resolver.resolveRepoPath(null));
     }
 
     @Test
     @DisplayName("5. 多段 resolveUnderRoot 也拒绝 '..' 和分隔符")
     void multiSegmentRequiresSafe() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> resolver.resolveUnderRoot("a", "..", "b"));
         assertTrue(resolver.resolveUnderRoot("a", "b").startsWith(resolver.resolveRepoRoot()));
     }
@@ -73,10 +74,10 @@ class GitPathSafetyTest {
     @Test
     @DisplayName("6. requireInsideRoot：越出 root 的路径 + 空 localPath 必须拒绝")
     void requireInsideRootRejectsEscape() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> resolver.requireInsideRoot(tmp.getParent().toString()),
                 "越出 root 的路径必须拒绝");
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> resolver.requireInsideRoot(""), "空 localPath 必须拒绝");
     }
 
@@ -84,17 +85,17 @@ class GitPathSafetyTest {
     @DisplayName("7. 静态 requireSafeSegment 边界")
     void staticSegmentGuards() {
         GitRepoRootResolver.requireSafeSegment("ok");              // 合法
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> GitRepoRootResolver.requireSafeSegment(".."));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> GitRepoRootResolver.requireSafeSegment("a/b"));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> GitRepoRootResolver.requireSafeSegment("a\\b"));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> GitRepoRootResolver.requireSafeSegment("a:b"));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> GitRepoRootResolver.requireSafeSegment(""));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BusinessException.class,
                 () -> GitRepoRootResolver.requireSafeSegment(null));
     }
 }

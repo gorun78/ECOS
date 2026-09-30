@@ -2,10 +2,13 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -88,11 +91,15 @@ public class KbEntityInstanceExtractionService {
 
     private final RestTemplate restTemplate;
 
-    /** data-engine REST 基址（直连 :18082，既有姿态；不新增 Security 绕过）。 */
-    private final String datanetBaseUrl;
+    /** data-engine 跨引擎取数 base URL 覆写（可覆写显式配置，默认空 = 走 resolver；F02-15 ①）。 */
+    private final String datanetBaseUrlOverride;
 
-    /** ontology-engine REST 基址（直连 :18083，既有姿态）。 */
+    /** data-engine engine-api base 覆写（同上；ontology-engine REST 既有姿态保留）。 */
     private final String ontologyApiBase;
+
+    /** 跨引擎 base URL 唯一寻址出口（optional；缺席时 datanet 寻址 fail-loud + ontology 回落既有配置）。 */
+    @Autowired(required = false)
+    private ServiceEndpointResolver endpointResolver;
 
     /** 列定义缓存（resourceId → 字段列表），避免循环查库。 */
     private final Map<String, List<Map<String, Object>>> fieldsCache = new LinkedHashMap<>();
@@ -100,12 +107,34 @@ public class KbEntityInstanceExtractionService {
     public KbEntityInstanceExtractionService(
             JdbcTemplate jdbc,
             RestTemplate restTemplate,
-            @Value("${ecos.datanet.base-url:http://localhost:18082}") String datanetBaseUrl,
+            @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride,
             @Value("${ecos.ontology-api-base:http://localhost:8080/api/v1}") String ontologyApiBase) {
         this.jdbc = jdbc;
         this.restTemplate = restTemplate;
-        this.datanetBaseUrl = datanetBaseUrl;
+        this.datanetBaseUrlOverride = datanetBaseUrlOverride;
         this.ontologyApiBase = ontologyApiBase;
+    }
+
+    /**
+     * data-engine base URL：覆写非空 → 用户值；否则经 ServiceEndpointResolver 两态寻址
+     * （route-manifest owner=datanet）；均不可得 → fail-loud 抛 ECOS-DATA-041（F02-15 ③）。
+     */
+    private String datanetBaseUrl() {
+        if (datanetBaseUrlOverride != null && !datanetBaseUrlOverride.isBlank()) {
+            return datanetBaseUrlOverride.trim();
+        }
+        if (endpointResolver == null) {
+            throw crossEngineUnavailable("datanet 服务寻址失败（ServiceEndpointResolver bean 不可用）");
+        }
+        return endpointResolver.resolve("datanet", ServiceEndpointResolver.RouteMode.MONOLITH)
+                .orElseThrow(() -> crossEngineUnavailable(
+                        "datanet 服务寻址失败（route-manifest 缺 datanet 条目）"));
+    }
+
+    /** 跨引擎取数依赖不可用 → fail-loud 503 + ECOS-DATA-041（禁静默空值，D-14）。
+     *  注：common-api 的 DataDomainErrorCode.ECOS_DATA_041 落地后应切换为常量引用。 */
+    private static DataBridgeException crossEngineUnavailable(String reason) {
+        return new DataBridgeException(503, 503, "ECOS-DATA-041: " + reason);
     }
 
     /**
@@ -569,24 +598,25 @@ public class KbEntityInstanceExtractionService {
         return codes;
     }
 
-    /** 拉 DW 层 CURATED 资源清单并建索引（一次拉取，避免逐实体重复请求）。 */
+    /** 拉 DW 层 CURATED 资源清单并建索引（一次拉取，避免逐实体重复请求）。
+     *  端点不可用 → fail-loud 抛 ECOS-DATA-041（禁空索引继续，D-14/F02-15 ③）。 */
     @SuppressWarnings("unchecked")
     private ResourceIndex loadCuratedResources(EntityInstanceExtractionReportVO report) {
-        String url = datanetBaseUrl + "/api/v1/engine/data/layers/" + DW_LAYER;
+        String url = datanetBaseUrl() + "/api/v1/engine/data/layers/" + DW_LAYER;
+        Map<String, Object> body;
         try {
-            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
-            Object data = body == null ? null : body.get("data");
-            if (data instanceof Map<?, ?> dataMap && dataMap.get("resources") instanceof List<?> list) {
-                return ResourceIndex.of((List<Map<String, Object>>) list);
-            }
-            report.addIssue(null, "METADATA_INVALID", "DW 层资源响应非法 " + url);
-            log.warn("DW 层资源响应非法: {}", url);
-            return ResourceIndex.empty();
+            body = restTemplate.getForObject(url, Map.class);
         } catch (Exception e) {
-            log.warn("DW 层资源端点不可用 ({}): {}", url, e.getMessage());
-            report.addIssue(null, "METADATA_UNAVAILABLE", "DW 层资源端点不可用 " + e.getMessage());
-            return ResourceIndex.empty();
+            log.error("DW 层资源端点不可用 ({}): {}", url, e.getMessage());
+            throw crossEngineUnavailable("DW 层资源端点不可用: " + url
+                    + " (" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()) + ")");
         }
+        Object data = body == null ? null : body.get("data");
+        if (data instanceof Map<?, ?> dataMap && dataMap.get("resources") instanceof List<?> list) {
+            return ResourceIndex.of((List<Map<String, Object>>) list);
+        }
+        log.error("DW 层资源响应非法: {}", url);
+        throw crossEngineUnavailable("DW 层资源响应非法: " + url);
     }
 
     /** 拉本体映射契约（含 materialized）；失败记告警不抛，返回空列表。 */
@@ -671,62 +701,69 @@ public class KbEntityInstanceExtractionService {
         return defs;
     }
 
-    /** DW 实例行增量读取（{@code rows?watermark=&limit=}）。失败返回 null（终止该资源分页）。 */
+    /** DW 实例行增量读取（{@code rows?watermark=&limit=}）。端点不可用 fail-loud 抛
+     *  ECOS-DATA-041（禁"停止分页继续抽取"的静默降级，D-14/F02-15 ③）。 */
     @SuppressWarnings("unchecked")
     private RowsPage readRows(String resourceId, String watermark, EntityInstanceExtractionReportVO report) {
-        StringBuilder url = new StringBuilder(datanetBaseUrl)
+        StringBuilder url = new StringBuilder(datanetBaseUrl())
                 .append("/api/v1/engine/data/layers/").append(DW_LAYER)
                 .append("/resources/").append(encode(resourceId))
                 .append("/rows?limit=").append(PAGE_LIMIT);
         if (watermark != null && !watermark.isBlank()) {
             url.append("&watermark=").append(encode(watermark));
         }
+        Map<String, Object> body;
         try {
-            Map<String, Object> body = restTemplate.getForObject(url.toString(), Map.class);
-            Object data = body == null ? null : body.get("data");
-            if (!(data instanceof Map<?, ?> dataMap)) {
-                report.addIssue(resourceId, "ROWS_INVALID", "实例行响应非法 resourceId=" + resourceId);
-                return null;
-            }
-            List<Map<String, Object>> rows = new ArrayList<>();
-            if (dataMap.get("rows") instanceof List<?> list) {
-                for (Object element : list) {
-                    if (element instanceof Map<?, ?> rowMap) {
-                        Map<String, Object> ordered = new LinkedHashMap<>();
-                        rowMap.forEach((k, v) -> ordered.put(String.valueOf(k), v));
-                        rows.add(ordered);
-                    }
+            body = restTemplate.getForObject(url.toString(), Map.class);
+        } catch (Exception e) {
+            log.error("DW 实例行端点不可用 ({}): {}", url, e.getMessage());
+            throw crossEngineUnavailable("DW 实例行端点不可用: " + url
+                    + " (" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()) + ")");
+        }
+        Object data = body == null ? null : body.get("data");
+        if (!(data instanceof Map<?, ?> dataMap)) {
+            log.error("DW 实例行响应非法: {}", url);
+            throw crossEngineUnavailable("DW 实例行响应非法: resourceId=" + resourceId);
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (dataMap.get("rows") instanceof List<?> list) {
+            for (Object element : list) {
+                if (element instanceof Map<?, ?> rowMap) {
+                    Map<String, Object> ordered = new LinkedHashMap<>();
+                    rowMap.forEach((k, v) -> ordered.put(String.valueOf(k), v));
+                    rows.add(ordered);
                 }
             }
-            boolean hasMore = Boolean.TRUE.equals(dataMap.get("hasMore"));
-            return new RowsPage(rows, text(dataMap.get("nextWatermark")), hasMore);
-        } catch (Exception e) {
-            log.warn("DW 实例行端点不可用 ({}): {}", url, e.getMessage());
-            report.addIssue(resourceId, "ROWS_UNAVAILABLE", e.getMessage());
-            return null;
         }
+        boolean hasMore = Boolean.TRUE.equals(dataMap.get("hasMore"));
+        return new RowsPage(rows, text(dataMap.get("nextWatermark")), hasMore);
     }
 
-    /** 列定义读取（resourceId 缓存，避免循环查库）。 */
+    /** 列定义读取（resourceId 缓存，避免循环查库）。
+     *  端点不可用 fail-loud 抛 ECOS-DATA-041；「端点可达但真无字段元数据」返回空列表
+     *  （调用方按 INVALID_MAPPING 拒绝该实体，属业务语义而非依赖故障）。 */
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> loadMetadataFields(String resourceId, EntityInstanceExtractionReportVO report) {
         List<Map<String, Object>> cached = fieldsCache.get(resourceId);
         if (cached != null) {
             return cached;
         }
-        String url = datanetBaseUrl + "/api/v1/datanet/metadata/fields/" + encode(resourceId);
-        List<Map<String, Object>> fields = Collections.emptyList();
+        String url = datanetBaseUrl() + "/api/v1/datanet/metadata/fields/" + encode(resourceId);
+        Map<String, Object> body;
         try {
-            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
-            Object data = body == null ? null : body.get("data");
-            if (data instanceof List<?> list) {
-                fields = (List<Map<String, Object>>) list;
-            } else {
-                report.addIssue(resourceId, "FIELDS_INVALID", "字段元数据响应非法 resourceId=" + resourceId);
-            }
+            body = restTemplate.getForObject(url, Map.class);
         } catch (Exception e) {
-            log.warn("字段元数据端点不可用 ({}): {}", url, e.getMessage());
-            report.addIssue(resourceId, "FIELDS_UNAVAILABLE", e.getMessage());
+            log.error("字段元数据端点不可用 ({}): {}", url, e.getMessage());
+            throw crossEngineUnavailable("字段元数据端点不可用: " + url
+                    + " (" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()) + ")");
+        }
+        Object data = body == null ? null : body.get("data");
+        List<Map<String, Object>> fields;
+        if (data instanceof List<?> list) {
+            fields = (List<Map<String, Object>>) list;
+        } else {
+            report.addIssue(resourceId, "FIELDS_INVALID", "字段元数据响应非法 resourceId=" + resourceId);
+            fields = Collections.emptyList();
         }
         fieldsCache.put(resourceId, fields);
         return fields;

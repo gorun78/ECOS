@@ -16,26 +16,48 @@ import com.chinacreator.gzcm.engine.data.datasource.storage.model.StorageConfig;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.datasource.IDataSourceService;
 import com.chinacreator.gzcm.engine.data.datasource.dao.impl.DataSourceDaoImpl;
+import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import com.chinacreator.gzcm.runtime.core.i18n.I18nUtils;
 import com.chinacreator.gzcm.runtime.core.i18n.LocaleResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
  * 数据源服务实现类
  * 提供数据源的CRUD、连接测试、推送等功能
- * 
+ *
  * @author CDRC Runtime Team
  */
 @Service("ecoDsDataSourceService")
 public class DataSourceServiceImpl implements IDataSourceService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(DataSourceServiceImpl.class);
-    
+
     private final DataSourceDaoImpl dao = new DataSourceDaoImpl();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JdbcAdapterFactory adapterFactory = new JdbcAdapterFactory();
-    
+
+    /**
+     * F02-13 / ARCH-06：建连唯一通道 = runtime-access {@link JdbcConnector}。
+     * 桥在此绑定到 {@link JdbcAdapterFactory}；connector 缺失（如纯单元测试）时桥留空，
+     * 适配器 {@code connect} 将 fail-fast，绝不回退裸 {@code DriverManager}。
+     */
+    public DataSourceServiceImpl(@Autowired(required = false) JdbcConnector jdbcConnector) {
+        if (jdbcConnector != null) {
+            adapterFactory.setConnectionBridge((url, u, p) -> jdbcConnector.openConnection(url, u, p, null));
+        }
+    }
+
+    /**
+     * 兼容构造器（无 JdbcConnector）：桥留空，适配器 {@code connect} fail-fast。
+     * 保留供非 Spring 环境 / 既有调用方（如 {@code SchemaRegistryServiceImpl}）以
+     * {@code new DataSourceServiceImpl()} 形式直接构造；建连仍强制经 runtime-access，绝不降级。
+     */
+    public DataSourceServiceImpl() {
+        this(null);
+    }
+
     @Override
     public String createDataSource(DataSourceEntity datasource) throws DataSourceException {
         try {

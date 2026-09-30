@@ -11,8 +11,19 @@ param(
 $ErrorActionPreference = 'Continue'
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
 $Backend    = Join-Path $RepoRoot 'ecos_backend'
-$MvnCmd     = 'D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd'
-$JavaExe    = 'C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot\bin\java.exe'
+# Toolchain paths are machine-local and NOT committed: resolve JAVA_HOME/MAVEN_HOME (only if real JDK 11+) -> PATH,
+# then override via _win_tasks/env.local.ps1 (gitignored; template env.local.ps1.example).
+function Test-Jdk11Plus([string]$JdkHome) {
+    $exe = if ($JdkHome) { Join-Path $JdkHome 'bin\java.exe' -ErrorAction Ignore } else { $null }
+    if (-not $exe -or -not (Test-Path $exe)) { return $false }
+    $ver = ((& $exe -version 2>&1 | Select-Object -First 1) -replace '[^0-9.].*','')
+    $major = if ($ver -match '^1\.(\d+)') { [int]$Matches[1] } elseif ($ver) { [int]($ver -split '\.')[0] } else { 0 }
+    return $major -ge 11
+}
+$JavaExe = if (Test-Jdk11Plus $env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin\java.exe' } else { 'java' }
+$MvnCmd  = if ($env:MAVEN_HOME -and (Test-Path (Join-Path $env:MAVEN_HOME 'bin\mvn.cmd' -ErrorAction Ignore))) { Join-Path $env:MAVEN_HOME 'bin\mvn.cmd' } else { 'mvn' }
+$LocalEnv = Join-Path $PSScriptRoot 'env.local.ps1'
+if (Test-Path $LocalEnv) { . $LocalEnv }
 $JwtPemFile = Join-Path $env:USERPROFILE '.config\ecos\jwt-private-key.pem'
 $HermesEnv  = Join-Path $env:USERPROFILE '.hermes\profiles\gorunkol\.env'
 $fail = 0
@@ -22,8 +33,8 @@ function Step([bool]$ok, [string]$name, [string]$detail) {
     if (-not $ok) { $script:fail++ }
 }
 
-Step (Test-Path $JavaExe) 'JDK 17' $JavaExe
-Step (Test-Path $MvnCmd)  'Maven 3.9.11' $MvnCmd
+Step ([bool](Get-Command $JavaExe -ErrorAction SilentlyContinue)) 'JDK 17' $JavaExe
+Step ([bool](Get-Command $MvnCmd -ErrorAction SilentlyContinue)) 'Maven 3.9.11' $MvnCmd
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 Step ($null -ne $nodeCmd) 'node on PATH' $(if ($nodeCmd) { (node -v) 2>$null } else { 'install Node.js or add to PATH' })
 

@@ -35,6 +35,11 @@ public class PipelineServiceImpl implements PipelineService {
     /** 节点类型全集（Wave 4 T1 抽到 PipelineNodeTypesCatalog，前后端枚举同源 §4.8.2） */
     private static final Set<String> VALID_NODE_TYPES = PipelineNodeTypesCatalog.SUPPORTED;
 
+    /** F02-04：节点类型不可用（未实现）/ 必填配置缺失 → 400（详细设计-02 §D.1）。 */
+    static final String ECOS_DATA_012 = "ECOS-DATA-012";
+    /** F02-04：DAG 非法（环 / 孤立节点 / 悬挂边）→ 400（详细设计-02 §D.1）。 */
+    static final String ECOS_DATA_013 = "ECOS-DATA-013";
+
     /** 列表（摘要）场景下不返回 nodes */
     private final PipelineRepository repository;
     private final PipelineSecurityService securityService;
@@ -321,6 +326,12 @@ public class PipelineServiceImpl implements PipelineService {
                     throw new ValidationException("type", "非法节点类型: " + node.getType()
                             + "（合法值: " + String.join("/", VALID_NODE_TYPES) + "）");
                 }
+                // F02-04：能力一致性 — 未实现（available=false）的节点在保存时即拒（ECOS-DATA-012）
+                if (!PipelineNodeTypesCatalog.isAvailable(node.getType())) {
+                    throw new ValidationException("type",
+                            ECOS_DATA_012 + " 节点类型不可用（未实现）: " + node.getType()
+                            + "（" + PipelineNodeTypesCatalog.unavailableReasonOf(node.getType()) + "）");
+                }
                 String nodeId = node.getNodeId() != null && !node.getNodeId().isBlank()
                         ? node.getNodeId() : node.getId();
                 if (nodeId == null || nodeId.isBlank()) {
@@ -330,6 +341,74 @@ public class PipelineServiceImpl implements PipelineService {
                     throw new ValidationException("nodeId", "节点 id 重复: " + nodeId);
                 }
             }
+        }
+        // F02-04 / C.4：DAG 静态校验 — 悬挂边 / 环 / 孤立节点 → ECOS-DATA-013
+        validateDagStructure(dto);
+    }
+
+    /**
+     * F02-04 DAG 静态校验（C.4-2）：仅当同时提供了 nodes 与 edges 时校验（纯节点、无边 = 平铺，合法）。
+     * <ul>
+     *   <li>悬挂边：edge.from / edge.to 指向不存在的 nodeId</li>
+     *   <li>环：Kahn 拓扑排序处理不完 → 循环依赖</li>
+     * </ul>
+     * 失败统一抛 {@code ECOS-DATA-013}（400）。
+     */
+    private void validateDagStructure(PipelineSaveDTO dto) {
+        List<PipelineSaveDTO.NodeSpec> nodes = dto.getNodes();
+        List<PipelineSaveDTO.EdgeSpec> edges = dto.getEdges();
+        if (nodes == null || nodes.isEmpty() || edges == null || edges.isEmpty()) {
+            return;
+        }
+        Set<String> nodeIds = new HashSet<>();
+        for (PipelineSaveDTO.NodeSpec node : nodes) {
+            String nodeId = node.getNodeId() != null && !node.getNodeId().isBlank()
+                    ? node.getNodeId() : node.getId();
+            if (nodeId != null && !nodeId.isBlank()) {
+                nodeIds.add(nodeId);
+            }
+        }
+        // ① 悬挂边
+        for (PipelineSaveDTO.EdgeSpec edge : edges) {
+            if (edge.getFrom() == null || !nodeIds.contains(edge.getFrom())) {
+                throw new ValidationException("edges",
+                        ECOS_DATA_013 + " DAG 非法：边 from 指向不存在的节点: " + edge.getFrom());
+            }
+            if (edge.getTo() == null || !nodeIds.contains(edge.getTo())) {
+                throw new ValidationException("edges",
+                        ECOS_DATA_013 + " DAG 非法：边 to 指向不存在的节点: " + edge.getTo());
+            }
+        }
+        // ② 环检测（to 依赖 from → 边 from→to）
+        Map<String, Integer> inDegree = new HashMap<>();
+        Map<String, List<String>> adj = new HashMap<>();
+        for (String nodeId : nodeIds) {
+            inDegree.put(nodeId, 0);
+            adj.put(nodeId, new ArrayList<>());
+        }
+        for (PipelineSaveDTO.EdgeSpec edge : edges) {
+            adj.computeIfAbsent(edge.getFrom(), k -> new ArrayList<>()).add(edge.getTo());
+            inDegree.merge(edge.getTo(), 1, Integer::sum);
+        }
+        Queue<String> queue = new ArrayDeque<>();
+        for (Map.Entry<String, Integer> e : inDegree.entrySet()) {
+            if (e.getValue() == 0) {
+                queue.add(e.getKey());
+            }
+        }
+        int processed = 0;
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            processed++;
+            for (String next : adj.getOrDefault(current, List.of())) {
+                if (inDegree.merge(next, -1, Integer::sum) == 0) {
+                    queue.add(next);
+                }
+            }
+        }
+        if (processed < nodeIds.size()) {
+            throw new ValidationException("edges",
+                    ECOS_DATA_013 + " DAG 非法：存在循环依赖（环），无法拓扑排序");
         }
     }
 

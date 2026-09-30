@@ -423,7 +423,7 @@ if ($DryRun) {
     Write-Host "      top-level dirs: $($dr.Count)"
     Pop-Location
     Write-Host "  [5] manual steps (script not enforced):"
-    Write-Host '      & "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f ecos_backend\pom.xml validate -q'
+    Write-Host '      mvn -f ecos_backend\pom.xml validate -q   # mvn/java local paths: _win_tasks/env.local.ps1 (gitignored)'
     Write-Host "      cd ecos_frontend; npm run lint"
   } finally { Pop-Location }
 }

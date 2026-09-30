@@ -10,6 +10,8 @@ node_modules\*
 # 开发脚本必须入库，只忽略其运行产物：
 /_win_tasks/logs/
 /_win_tasks/*.log
+# 本机环境配置（含个人路径）不入库；模板 env.local.ps1.example 入库
+/_win_tasks/env.local.ps1
 # ecos-tests/ 已纳入版本控制（2026-09-16）：E2E 冒烟脚本是交付验收与 DONE 凭证的一部分，不再忽略；
 # 其内 node_modules 由上方 node_modules\* 规则继续排除
 *ecos-git-repos*

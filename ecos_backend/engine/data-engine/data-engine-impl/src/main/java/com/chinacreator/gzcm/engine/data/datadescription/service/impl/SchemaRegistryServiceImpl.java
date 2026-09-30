@@ -33,7 +33,7 @@ public class SchemaRegistryServiceImpl implements ISchemaRegistryService {
     
     public SchemaRegistryServiceImpl() {
         this.discoveryService = new DataDescriptionDiscoveryImpl();
-        this.dataSourceService = new DataSourceServiceImpl();
+        this.dataSourceService = new DataSourceServiceImpl(null);
     }
     
     public SchemaRegistryServiceImpl(IDataDescriptionDiscovery discoveryService, IDataSourceService dataSourceService) {

@@ -18,8 +18,11 @@ import java.util.Map;
 @Service
 public class PipelineNodeTypesService {
 
-    /** schema 版本（SemVer，与 P2-01 规范联动） */
-    private static final String SCHEMA_VERSION = "2.1.0";
+    /**
+     * schema 版本（SemVer，与 P2-01 规范联动）。
+     * <p>F02-04：条目新增 {@code available}/{@code unavailableReason} 能力位 → 2.1.0 → 2.2.0。
+     */
+    private static final String SCHEMA_VERSION = "2.2.0";
 
     /**
      * 构建全部节点类型目录。
@@ -101,6 +104,12 @@ public class PipelineNodeTypesService {
         entry.setEnabled(enabled);
         if (!enabled) {
             entry.setDisabledReasonKey("dw.pipeline.node.cdcFlagshipOnly");
+        }
+        // F02-04：能力一致性 —— available 与执行器同源（PipelineNodeTypesCatalog.isAvailable）
+        boolean available = PipelineNodeTypesCatalog.isAvailable(type);
+        entry.setAvailable(available);
+        if (!available) {
+            entry.setUnavailableReason(PipelineNodeTypesCatalog.unavailableReasonOf(type));
         }
         PipelineNodeTypeMetaVO meta = new PipelineNodeTypeMetaVO();
         meta.setIcon(icon);

@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -151,10 +152,10 @@ class PipelineGitServiceH4Test {
     @Test
     @DisplayName("本地路径安全段校验：.. 与分隔符拒绝")
     void safeSegmentGuards() {
-        assertThrows(IllegalArgumentException.class, () -> GitRepoRootResolver.requireSafeSegment("../x"));
-        assertThrows(IllegalArgumentException.class, () -> GitRepoRootResolver.requireSafeSegment("a/b"));
-        assertThrows(IllegalArgumentException.class, () -> GitRepoRootResolver.requireSafeSegment("a\\b"));
-        assertThrows(IllegalArgumentException.class, () -> GitRepoRootResolver.requireSafeSegment(null));
+        assertThrows(BusinessException.class, () -> GitRepoRootResolver.requireSafeSegment("../x"));
+        assertThrows(BusinessException.class, () -> GitRepoRootResolver.requireSafeSegment("a/b"));
+        assertThrows(BusinessException.class, () -> GitRepoRootResolver.requireSafeSegment("a\\b"));
+        assertThrows(BusinessException.class, () -> GitRepoRootResolver.requireSafeSegment(null));
         assertDoesNotThrow(() -> GitRepoRootResolver.requireSafeSegment("pipeline-001"));
     }
 }

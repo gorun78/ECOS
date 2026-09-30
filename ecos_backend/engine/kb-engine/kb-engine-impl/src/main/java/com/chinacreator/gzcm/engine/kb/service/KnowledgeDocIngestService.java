@@ -17,10 +17,12 @@ import com.chinacreator.gzcm.runtime.access.document.DocumentChunk;
 import com.chinacreator.gzcm.runtime.access.document.DocumentChunkSplitter;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseResult;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -92,9 +94,14 @@ public class KnowledgeDocIngestService {
     private final KnowledgeVectorWriteService vectorWriteService;
     private final MinioStorageService minioStorageService;
     private final RestTemplate restTemplate;
-    private final String datanetBaseUrl;
+    /** data-engine 跨引擎取数 base URL 覆写（可覆写显式配置，默认空 = 走 resolver；F02-15 ①）。 */
+    private final String datanetBaseUrlOverride;
     private final int defaultChunkSize;
     private final int defaultChunkOverlap;
+
+    /** 跨引擎 base URL 唯一寻址出口（optional；缺席即 fail-loud ECOS-DATA-041，不回落硬编码端口）。 */
+    @Autowired(required = false)
+    private ServiceEndpointResolver endpointResolver;
 
     public KnowledgeDocIngestService(KbDocMapper kbDocMapper,
                                      KbDocChunkMapper kbDocChunkMapper,
@@ -103,7 +110,7 @@ public class KnowledgeDocIngestService {
                                      KnowledgeVectorWriteService vectorWriteService,
                                      MinioStorageService minioStorageService,
                                      RestTemplate restTemplate,
-                                     @Value("${ecos.datanet.base-url:http://localhost:18082}") String datanetBaseUrl,
+                                     @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride,
                                      @Value("${ecos.kb.doc.chunk-size:512}") int defaultChunkSize,
                                      @Value("${ecos.kb.doc.chunk-overlap:64}") int defaultChunkOverlap) {
         this.kbDocMapper = kbDocMapper;
@@ -113,9 +120,33 @@ public class KnowledgeDocIngestService {
         this.vectorWriteService = vectorWriteService;
         this.minioStorageService = minioStorageService;
         this.restTemplate = restTemplate;
-        this.datanetBaseUrl = datanetBaseUrl;
+        this.datanetBaseUrlOverride = datanetBaseUrlOverride;
         this.defaultChunkSize = defaultChunkSize;
         this.defaultChunkOverlap = defaultChunkOverlap;
+    }
+
+    /**
+     * data-engine base URL：覆写非空 → 用户值；否则经 ServiceEndpointResolver 两态寻址
+     * （route-manifest owner=datanet）；均不可得 → fail-loud 抛 ECOS-DATA-041（F02-15 ③：
+     * 登记失败必须中止 ingest，禁继续 with-empty）。
+     */
+    private String datanetBaseUrl() {
+        if (datanetBaseUrlOverride != null && !datanetBaseUrlOverride.isBlank()) {
+            return datanetBaseUrlOverride.trim();
+        }
+        if (endpointResolver == null) {
+            throw crossEngineUnavailable("datanet 服务寻址失败（ServiceEndpointResolver bean 不可用）");
+        }
+        return endpointResolver.resolve("datanet", ServiceEndpointResolver.RouteMode.MONOLITH)
+                .orElseThrow(() -> crossEngineUnavailable(
+                        "datanet 服务寻址失败（route-manifest 缺 datanet 条目）"));
+    }
+
+    /** 跨引擎依赖不可用 → fail-loud 503 + ECOS-DATA-041（ingest 编排层 catch 中按 DataBridgeException
+     *  原样上抛，不再包装为 500 DataAccessException）。 */
+    private static DataBridgeException crossEngineUnavailable(String reason) {
+        // 注：common-api DataDomainErrorCode.ECOS_DATA_041 落地后应切换为常量引用
+        return new DataBridgeException(503, 503, "ECOS-DATA-041: " + reason);
     }
 
     /**
@@ -243,7 +274,7 @@ public class KnowledgeDocIngestService {
         req.setOriginalFileName(fileName);
         req.setSize(size);
         req.setContentType(contentType);
-        postForRegistration(datanetBaseUrl + "/api/v1/datanet/datalake/unstructured", req, "非结构化原文登记");
+        postForRegistration(datanetBaseUrl() + "/api/v1/datanet/datalake/unstructured", req, "非结构化原文登记");
     }
 
     /** 解析文本登记为 CURATED 资源（数据工作台 /api/v1/datanet/metadata/resources）。 */
@@ -255,7 +286,7 @@ public class KnowledgeDocIngestService {
         req.setZone(null);
         req.setSourcePath(PARSED_TEXT_SOURCE_PATH);
         req.setDescription("A3 过渡态：kb-engine 文档解析文本分块表，A1 落地后迁入 DW 层");
-        postForRegistration(datanetBaseUrl + "/api/v1/datanet/metadata/resources", req, "解析文本资源登记");
+        postForRegistration(datanetBaseUrl() + "/api/v1/datanet/metadata/resources", req, "解析文本资源登记");
     }
 
     /** 跨引擎 REST 登记（统一返回体 code=0 为成功；非 0 或异常一律上抛）。 */

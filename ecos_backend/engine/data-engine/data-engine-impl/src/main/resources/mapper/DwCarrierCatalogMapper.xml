@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.engine.data.writechannel.DwCarrierCatalogMapper">
+
+    <!-- F02-05 / MC02：取目标表列类型（供列类型白名单守卫的「类型判」）。
+         IR04 显式列；IR05 #{} 占位；元数据不可得（非 PG 载体 / 表未建）→ 无行 → null，
+         守卫退化为保守的命名判（*_json）。 -->
+    <select id="columnTypeOf" resultType="string">
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = #{schema}
+          AND table_name = #{table}
+          AND column_name = #{column}
+        LIMIT 1
+    </select>
+
+</mapper>

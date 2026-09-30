@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.engine.data.datasource.storage.adapter.jdbc;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -14,6 +13,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +50,17 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
 
     /** WHERE子句构建器（PMO-C3 P1-2 策略模式） */
     private final WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder(this);
+
+    /**
+     * F02-13 建连桥接：适配器由 {@link JdbcAdapterFactory} 以 no-arg 构造生成，
+     * 桥接由工厂（Spring 管理面）在创建前 set 进来；若桥接缺失则 {@link #connect} 直接拒绝。
+     */
+    private AdapterConnectionBridge connectionBridge;
+
+    /** 由 JdbcAdapterFactory（或测试）注入建连桥。 */
+    public void setConnectionBridge(AdapterConnectionBridge bridge) {
+        this.connectionBridge = bridge;
+    }
     
     /**
      * 获取JDBC驱动类名（子类实现）
@@ -89,14 +100,16 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
         this.config = config;
 
         try {
-            // 加载驱动
-            Class.forName(getDriverClassName());
-            
-            // 构建连接URL
+            // 建立连接 — 详细设计-02 F02-13 / ARCH-06：DriverManager 清零后，
+            // 唯一建连通道 = runtime-access JdbcConnector（由 Spring 侧注入建连桥）。
+            if (connectionBridge == null) {
+                String errorMsg = I18nUtils.getErrorMessage("connection.failed", 
+                        LocaleResolver.getDefaultLocaleCode());
+                throw new IllegalStateException(errorMsg
+                        + "（F02-13：runtime-access JdbcConnector 建连桥未注入，禁止回退 DriverManager）");
+            }
             String url = buildConnectionUrl(config);
-            
-            // 建立连接
-            connection = DriverManager.getConnection(
+            connection = connectionBridge.open(
                     url,
                     config.getUsername(),
                     config.getPassword()
@@ -113,12 +126,6 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
             logger.info(I18nUtils.getMessage("storage.connect.success", 
                     LocaleResolver.getDefaultLocaleCode()));
             
-        } catch (ClassNotFoundException e) {
-            connected = false;
-            String errorMsg = I18nUtils.getErrorMessage("connection.failed", 
-                    LocaleResolver.getDefaultLocaleCode(), getDriverClassName());
-            logger.error(errorMsg, e);
-            throw new Exception(errorMsg, e);
         } catch (SQLException e) {
             connected = false;
             String errorMsg = I18nUtils.getErrorMessage("connection.failed", 

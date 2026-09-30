@@ -5,7 +5,11 @@
  *  (a) top-level shape  { id, name, nodes, edges }
  *  (b) nested ApiResponse<T> envelope  { code, success, data: { id, name, nodes, edges } }
  * and must return DataPipeline with non-empty normalized nodes in both shapes.
+ *
+ * (纯逻辑契约: 全部经 vi.stubGlobal 打桩 window/localStorage/fetch,
+ *  不依赖真实 DOM — 标 node env 避开 jsdom 的 ESM/require 环境故障)
  */
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getPipelineDefinition, fetchDataPipelines } from './api';
 

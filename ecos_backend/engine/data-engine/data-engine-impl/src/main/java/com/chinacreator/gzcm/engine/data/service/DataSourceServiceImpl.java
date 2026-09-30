@@ -385,11 +385,15 @@ public class DataSourceServiceImpl implements DataSourceService {
     /**
      * PMO-49: 响应脱敏 — 密文字段 passwordEncrypted 置 null，
      * connectionConfig 内密码字段掩码为 ********（GET/PUT/list 回显安全兜底）。
+     * F02-01（W52）：read 路径派生 credentialPresent（有密文=true）后立刻 null-out 密文，
+     * 确保出参既不含明文也不含密文，仅暴露布尔标志。
      */
     private DataSourceEntity maskProtected(DataSourceEntity entity) {
         if (entity == null) {
             return null;
         }
+        entity.setCredentialPresent(
+                entity.getPasswordEncrypted() != null && !entity.getPasswordEncrypted().isBlank());
         entity.setPasswordEncrypted(null);
         entity.setConnectionConfig(maskSensitiveFields(entity.getConnectionConfig()));
         return entity;

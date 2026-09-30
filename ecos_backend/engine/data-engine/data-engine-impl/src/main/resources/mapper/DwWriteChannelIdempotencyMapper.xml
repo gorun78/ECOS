@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  F02-05 / C.3.6 唯一写通道 · 幂等台账 Mapper（V260 td_dw_write_channel_idempotency）。
+  IR04 显式列；IR05 全 #{} 占位；MC01 id 应用侧 UUID。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.writechannel.DwWriteChannelIdempotencyMapper">
+
+    <resultMap id="IdempotencyMap" type="com.chinacreator.gzcm.engine.data.writechannel.DwWriteChannelIdempotency">
+        <id property="id" column="id"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="traceId" column="trace_id"/>
+        <result property="layer" column="layer"/>
+        <result property="layerBucket" column="layer_bucket"/>
+        <result property="carrierRef" column="carrier_ref"/>
+        <result property="storageKind" column="storage_kind"/>
+        <result property="targetTable" column="target_table"/>
+        <result property="writeId" column="write_id"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="isDeleted" column="is_deleted"/>
+        <result property="domain" column="domain"/>
+    </resultMap>
+
+    <!-- 幂等命中：按 idempotency_key 取首次写入（同 key 重放返回既有记录，不产生第二行） -->
+    <select id="findByKey" resultMap="IdempotencyMap">
+        SELECT id, idempotency_key, trace_id, layer, layer_bucket, carrier_ref,
+               storage_kind, target_table, write_id, create_by, create_time,
+               update_by, update_time, version_no, is_deleted, domain
+        FROM td_dw_write_channel_idempotency
+        WHERE idempotency_key = #{idempotencyKey}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <!-- 首次登记（唯一索引 uniq_dw_wc_idempotency_key 兜底并发竞态） -->
+    <insert id="insert">
+        INSERT INTO td_dw_write_channel_idempotency (
+            id, idempotency_key, trace_id, layer, layer_bucket, carrier_ref,
+            storage_kind, target_table, write_id,
+            create_by, create_time, update_by, update_time, version_no, is_deleted, domain
+        ) VALUES (
+            #{id}, #{idempotencyKey}, #{traceId}, #{layer}, #{layerBucket}, #{carrierRef},
+            #{storageKind}, #{targetTable}, #{writeId},
+            #{createBy}, NOW(), #{updateBy}, NOW(), '1', 0, #{domain}
+        )
+    </insert>
+
+</mapper>

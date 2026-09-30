@@ -320,22 +320,107 @@ public class DqScheduleServiceImpl implements DqScheduleService {
         }
     }
 
-    /** 组装 ScoringContext（参数经 DqSecurityService.maskParameters 脱敏 — 铁律 2.4 #3）。 */
-    private ScoringContext buildContext(DqRuleVO rule) {
+    /**
+     * 组装 ScoringContext（参数经 DqSecurityService.maskParameters 脱敏 — 铁律 2.4 #3）。
+     *
+     * <p>F02-09 上下文真实化：{@code lastCheck/totalRows/failedRows/sampleFailures}
+     * 从上一次 {@code ecos_dq.dq_rule_check} 行取真值（同源字段一致性），
+     * 禁止空 Map 造成评估器"高分通过"假象；本波环境不可接通真实 datasources 表
+     * 拉取连接配置，connectionConfig 显式注解 {@code contextIncomplete=true}
+     * 提示下游评估器降级为 UNKNOWN（对应 D.5 错误码 "contextIncomplete"）。
+     * 数据库不可达时同样置 incomplete=true，不阻断批执行。</p>
+     *
+     * <p>可见性 package-private 便于验收单测（ScoringContextHydrationTest）
+     * 直接驱动 mock JdbcTemplate → buildContext 分支。</p>
+     */
+    ScoringContext buildContext(DqRuleVO rule) {
         Map<String, Object> params = securityService.maskParameters(parseParamsJson(rule.getParametersJson()));
         ScoringContext ctx = new ScoringContext();
         ctx.setRuleId(rule.getId());
         ctx.setScopeType(scopeOf(rule));
         ctx.setScopeId(scopeIdOf(rule));
         ctx.setParameters(params);
-        ctx.setConnectionConfig(new LinkedHashMap<>());
-        ctx.setSampleFailures(new LinkedHashMap<>());
         ctx.setTotalRows(0L);
         ctx.setFailedRows(0L);
         ctx.setExecutedAt(LocalDateTime.now());
-        ctx.setLastCheck(new LinkedHashMap<>());
+        // F02-09：connectionConfig 显式标 incomplete（连接配置实值来自 pipeline 执行统计，
+        // 二期接入；本波以占位 Marker 让评估器能正确判 COMPLETE/UNKNOWN 降级）
+        Map<String, Object> connCfg = new LinkedHashMap<>();
+        connCfg.put("scopeKind", scopeOf(rule));
+        connCfg.put("scopeId", scopeIdOf(rule));
+        connCfg.put("contextIncomplete", Boolean.TRUE);
+        ctx.setConnectionConfig(connCfg);
+        Map<String, Object> sampleFailures = new LinkedHashMap<>();
+        sampleFailures.put("contextIncomplete", Boolean.TRUE);
+        ctx.setSampleFailures(sampleFailures);
+        Map<String, Object> lastCheck = new LinkedHashMap<>();
+        hydrateFromLastCheck(ctx, lastCheck, rule.getId());
+        ctx.setLastCheck(lastCheck);
         ctx.setTargetField(rule.getTargetField());
         return ctx;
+    }
+
+    /**
+     * F02-09：从最近一次 dq_rule_check 行回填 ctx 诊断位（1h 窗口，避免跨窗污染，
+     * 与评分窗口对齐）；无行/DB 不可达时保持 empty Map + contextIncomplete=true，
+     * 交由评估器降级为 UNKNOWN，不写"高分通过"假象。
+     *
+     * @param ctx         待回填上下文（需已 set totalRows=0 / failedRows=0 起始值）
+     * @param lastCheck   承接 check 行完整字段的 Map（即使空也不 null）
+     * @param ruleId      规则 ID
+     */
+    void hydrateFromLastCheck(ScoringContext ctx, Map<String, Object> lastCheck, String ruleId) {
+        if (ruleId == null || ruleId.isBlank()) {
+            lastCheck.put("contextIncomplete", Boolean.TRUE);
+            return;
+        }
+        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
+        if (jdbc == null) {
+            lastCheck.put("contextIncomplete", Boolean.TRUE);
+            return;
+        }
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbc.queryForList(
+                    "SELECT id, rule_id AS ruleId, schedule_id AS scheduleId, trigger_type AS triggerType,"
+                    + " executed_at AS executedAt, passed, total_rows AS totalRows,"
+                    + " failed_rows AS failedRows, pass_rate AS passRate, sample_size AS sampleSize,"
+                    + " sample_failures::text AS sampleFailuresJson, error_message AS errorMessage"
+                    + " FROM ecos_dq.dq_rule_check WHERE rule_id = ? AND is_deleted = FALSE"
+                    + "   AND executed_at >= NOW() - interval '1 hour'"
+                    + " ORDER BY executed_at DESC, id LIMIT 1",
+                    ruleId);
+        } catch (RuntimeException e) {
+            log.warn("DqSchedule hydrateFromLastCheck failed: ruleId={}, err={}", ruleId, e.getMessage());
+            lastCheck.put("contextIncomplete", Boolean.TRUE);
+            return;
+        }
+        if (rows == null || rows.isEmpty()) {
+            lastCheck.put("contextIncomplete", Boolean.TRUE);
+            return;
+        }
+        Map<String, Object> row = rows.get(0);
+        lastCheck.putAll(row);
+        Object total = row.get("totalRows");
+        Object failed = row.get("failedRows");
+        ctx.setTotalRows(total instanceof Number n ? n.longValue() : 0L);
+        ctx.setFailedRows(failed instanceof Number n ? n.longValue() : 0L);
+        Object sfJson = row.get("sampleFailuresJson");
+        if (sfJson != null && !sfJson.toString().isBlank()) {
+            try {
+                Map<String, Object> parsed = MAPPER.readValue(sfJson.toString(), MAP_TYPE);
+                (ctx.getSampleFailures()).putAll(parsed);
+            } catch (Exception e) {
+                log.warn("DqSchedule parse sample_failures failed: ruleId={}, err={}", ruleId, e.getMessage());
+            }
+        }
+        // 目标表可统计 → 上卷 connectionConfig.incomplete 假象解除（但完整连接信息来自 ds 表，
+        // 二期接入数据源元数据后再进一步细化对接）
+        Map<String, Object> conn = ctx.getConnectionConfig();
+        if (conn != null) {
+            conn.put("contextIncomplete", Boolean.FALSE);
+            conn.put("lastCheckId", row.get("id"));
+        }
     }
 
     /** 写 dq_rule_check（通过/未通过/评估失败统一语义）。 */

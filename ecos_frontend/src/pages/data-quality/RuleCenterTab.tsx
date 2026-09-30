@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
-import { DqRuleVO, fetchEcosDqRules } from "./api";
+import { DqRuleVO, fetchDqRulesWithFallback } from "./api";
 
 const PAGE_SIZE = 20;
 
@@ -144,7 +144,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
     setLoading(true);
     setError("");
     try {
-      const arr = await fetchEcosDqRules();
+      const arr = await fetchDqRulesWithFallback();
       // legacy 数据无 targetTable 字段：仅当返回结果中确有该字段时才按 initialTableFilter 过滤，
       // 否则忽略该参数（否则过滤条件恒不命中，列表会恒为空）
       const hasTargetTable = arr.some((r) => (r.targetTable ?? "").trim() !== "");

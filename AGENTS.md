@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\stop-backend.ps1 -WithFrontend
 
 # 构建
-& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests
+mvn -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests   # mvn/java 本机路径见 _win_tasks/env.local.ps1（不入库）
 ```
 
 **_win_tasks/ 脚本清单**（只增不改，禁止为新任务临时创建）：
@@ -46,7 +46,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 | `route-rewrite-lint.ps1` | 网关路由重写表 lint（校验 `VersionPrefixRewriteFilter` 正向 10 + 反向 13 = 23 条的 target/source 是否真有 Controller 服务，并打印 permitAll 匿名面；基线 `fail=4`（存量待裁 H9-T6b）/ `EXIT=2`） |
 | `docs-migration.ps1` / `.sh` | docs 五类目录迁移辅助 |
 
-**Java**: `C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot` | **Maven**: `D:\JavaProjects\env\apache-maven-3.9.11`
+**Java/Maven**: 本机工具链路径不入库 — 解析顺序 `JAVA_HOME`/`MAVEN_HOME` → PATH，可在 `_win_tasks/env.local.ps1` 覆盖（已 gitignore，模板 `env.local.ps1.example`）
 
 ## Frontend Quick Commands (Windows)
 
@@ -61,7 +61,7 @@ npm run test:watch                      # vitest watch
 ```
 
 **Env**: AI 功能用 `DEEPSEEK_API_KEY`（start-backend.ps1 按「DEEPSEEK」条注入链加载，本机推荐 `~\.config\ecos\.env`；`GEMINI_API_KEY` 系旧文档虚构，代码零引用）；`DISABLE_HMR=true` 关热更新。
-**Node**: `C:\Program Files\nodejs\node.exe`
+**Node**: 以 PATH 管理（本机路径不入库；本机已配置于用户 PATH，preflight 校验 node 可用性）
 **代理双轨（重要）**：
 - vite dev proxy（`vite.config.ts`）：18 条引擎前缀直连各 service（18081 security/audit、18082 data、18083 ontology、18084 aiming+knowledge+cognitive、18086 rules/kb、18089 world-model、18090 workspace），兜底 `/api`、`/datanet`、`/cases` → gateway :8080。
 - Express BFF（`server.ts`，ADR-10/PMO-B）：默认全部 `/api/*` → `GATEWAY_URL`（:8080）；仅 `ECOS_LOCAL_DIRECT_SERVICE_PROXY=true` 时解锁定向直连（默认 false，仅本地调试）。生产走 BFF，vite 直连只对 dev 生效。

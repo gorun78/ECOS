@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.handler;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * S6-1.2 全局异常处理器 — 网关层统一拦截 {@link DataBridgeException} 体系异常
@@ -73,6 +76,39 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleNotFound(NotFoundException ex) {
         log.info("NotFoundException: {}", ex.getMessage());
         return ApiResponse.notFound(ex.getMessage());
+    }
+
+    /**
+     * F02-08 规格 1：真实"路由/资源不存在" → 404。
+     * <p>Spring Boot 3.2 未匹配路由抛 {@link NoResourceFoundException}，未匹配 handler 抛
+     * {@link NoHandlerFoundException}。这是<b>唯一</b>合法返回 404 的业务外路径，
+     * 与 {@code ECOS-DATA-031}（500 数据层异常）严格区分（分册 00 D.5 错误码表同步）。</p>
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleRouteNotFound(Exception ex) {
+        log.info("Route/Resource not found: {}", ex.getMessage());
+        return ApiResponse.<Void>error(404, "404", "资源不存在").withTraceIdFromMdc();
+    }
+
+    /**
+     * F02-08 规格 1：Spring DAO 家族异常（DB/MyBatis SQL 失败）→ 500 + ECOS-DATA-031。
+     * <p>覆盖 {@code BadSqlGrammarException / MyBatisSystemException / DataIntegrityViolation}
+     * 之外的所有 {@code org.springframework.dao.DataAccessException} 子类（DB 连接失败、
+     * 超时、JDBC 执行错误等）。<b>不得</b>再掩蔽为 404（P0），响应体附 traceId 便于定位。</p>
+     * <p>注意：本 handler 覆盖 Spring DAO 根类；更具体的 {@code DataIntegrityViolationException}
+     * 由 {@link #handleDataIntegrityViolation} 更窄优先级处理（Spring 按最具体类型匹配）。</p>
+     */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseBody
+    public ApiResponse<Void> handleSpringDataAccess(
+            org.springframework.dao.DataAccessException ex) {
+        log.error("org.springframework.dao.DataAccessException (DB/MyBatis failure): {}",
+                ex.getMessage(), ex);
+        ApiResponse<Void> resp =
+                ApiResponse.error(500, DataDomainErrorCode.ECOS_DATA_031, "数据服务异常，请稍后重试");
+        return resp.withTraceIdFromMdc();
     }
 
     /**
@@ -182,22 +218,24 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Wave-8 兜底：所有未识别的 Exception → 404 Not Found (而非传统 500)。
-     * <p>Wave-7 G4 已把 NullPointerException / IllegalStateException 分别归 400。本补充继承同一思路：
-     * 部署范围内"功能未就绪 / 依赖 Bean 缺失 / 未合规二级 controller"抛出的裸 RuntimeException，
-     * 若仍裸露 500 则违反架构铁律 §1.4。映射为 404 (Not Found) 让前端 / smoke 脚本能区分
-     * "路由不存在/功能未就绪" 和 "Server 内部错误"。</p>
-     * <p>日志级别保留 error，便于运维在运行日志里定位真实的根因；响应体只给出通用提示，
-     * 不暴露异常类型或堆栈细节（避免技术侦察）。</p>
+     * F02-08 规格 1（P0 修复）：所有未识别的 Exception → 500 (而非 404)。
+     * <p>旧实现（Wave-8）把裸 RuntimeException 一律落 404 "端点暂未开放或服务未就绪"，
+     * 这是<b>错误掩蔽</b>：真实的服务内部错误被伪装成"路由不存在"，前端/smoke 无法区分
+     * "真 404" 与 "服务端故障"，违反分册 00 D.5 语义："仅真 NoHandlerFound/NoResourceFound
+     * 才 404"（二者已由 {@link #handleRouteNotFound} 独立处理）。</p>
+     * <p>响应体仍只给通用提示，不暴露异常类型或堆栈细节（避免技术侦察）；
+     * 完整堆栈走 error 日志（含 traceId MDC）。</p>
      */
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     @ResponseBody
     public ApiResponse<Void> handleAny(Exception ex) {
         // 只取异常类型和第一行 message，避免把 DATA 转成路径信息
         String type = ex.getClass().getSimpleName();
         String msg = ex.getMessage() != null ? ex.getMessage() : "";
-        log.error("Unhandled exception (routing/not-ready): type={}, msg={}", type, msg, ex);
-        return ApiResponse.error(404, "404", "端点暂未开放或服务未就绪，请稍后重试或联系管理员");
+        log.error("Unhandled exception (server internal error): type={}, msg={}", type, msg, ex);
+        ApiResponse<Void> resp =
+                ApiResponse.error(500, "ECOS-SYS-500", "服务内部错误，请稍后重试或联系管理员");
+        return resp.withTraceIdFromMdc();
     }
 }

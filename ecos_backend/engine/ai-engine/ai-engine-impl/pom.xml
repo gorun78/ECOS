@@ -23,17 +23,9 @@
 
         <!-- Aimod Impl -->
 
-        <!-- DcCheng API + Impl -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- PMO-09 (2026-09-14): 移除 dccheng-api/dccheng-impl 幽灵依赖。
+             reactor 中 services/dccheng 仅产出 dccheng-service 单 jar (不产 -api/-impl artifact)；
+             源码中无任何 import com.chinacreator.gzcm.dccheng.*，AGENTS.md 依赖清单也无 dccheng。 -->
 
         <!-- M0-P0 改造 (2026-09-01): 删除 cognitive-api/cognitive-impl 依赖。
              这是 pre-existing C1 类 (CognitiveService/CognitiveController 引用),
@@ -80,7 +72,9 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- Agent Service -->
+        <!-- Agent Service: gateway ComponentScan 扫 services.agent.runtime，
+             本模块 AgentChatController/SkillController/CronJobController/EvolutionController
+             直接 import services.agent.*，构建必须恢复该依赖（2026-09-14 误删后恢复） -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>agent-service</artifactId>

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  F02-11 血缘自动派生 — 血缘 node/edge 持久化 mapper（设计 详细设计-02 §F02-11）。
+  表: ecos_data.ecos_data_lineage_node / ecos_data.ecos_data_lineage_edge（控制域，V58 建表，V155 补 pipeline_task_id，V248 补水位线）。
+  IR04 显式列清单；IR05 全部 #{}（禁 ${} / 字符串拼接）；MC06 ecos_data. 限定；MC01 主键应用侧 UUID。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.lineage.dao.EcosDataLineageMapper">
+
+    <sql id="nodeCols">
+        id, node_type, name, schema_name, table_name, datasource_id, layer,
+        properties, pipeline_task_id, created_at, updated_at
+    </sql>
+
+    <sql id="edgeCols">
+        id, source_node_id, target_node_id, edge_type, pipeline_task_id,
+        transformation, properties, created_at
+    </sql>
+
+    <!-- 单条写入 node（ON CONFLICT DO NOTHING：同节点多次派生幂等） -->
+    <insert id="insertNode">
+        INSERT INTO ecos_data.ecos_data_lineage_node (
+            id, node_type, name, schema_name, table_name, datasource_id, layer,
+            properties, pipeline_task_id, created_at, updated_at
+        ) VALUES (
+            #{id}, #{nodeType}, #{name}, #{schemaName}, #{tableName},
+            #{datasourceId}, #{layer}, #{properties}::jsonb, #{pipelineTaskId}, NOW(), NOW()
+        )
+        ON CONFLICT (id) DO NOTHING
+    </insert>
+
+    <!-- 批量写入 node（血缘派生落主路径） -->
+    <insert id="insertNodes">
+        INSERT INTO ecos_data.ecos_data_lineage_node (
+            id, node_type, name, schema_name, table_name, datasource_id, layer,
+            properties, pipeline_task_id, created_at, updated_at
+        ) VALUES
+        <foreach collection="rows" item="r" separator=",">
+            (
+                #{r.id}, #{r.nodeType}, #{r.name}, #{r.schemaName}, #{r.tableName},
+                #{r.datasourceId}, #{r.layer}, #{r.properties}::jsonb, #{r.pipelineTaskId}, NOW(), NOW()
+            )
+        </foreach>
+        ON CONFLICT (id) DO NOTHING
+    </insert>
+
+    <!-- 单条写入 edge -->
+    <insert id="insertEdge">
+        INSERT INTO ecos_data.ecos_data_lineage_edge (
+            id, source_node_id, target_node_id, edge_type, pipeline_task_id,
+            transformation, properties, created_at
+        ) VALUES (
+            #{id}, #{sourceNodeId}, #{targetNodeId}, #{edgeType}, #{pipelineTaskId},
+            #{transformation}, #{properties}::jsonb, NOW()
+        )
+        ON CONFLICT (id) DO NOTHING
+    </insert>
+
+    <!-- 批量写入 edge -->
+    <insert id="insertEdges">
+        INSERT INTO ecos_data.ecos_data_lineage_edge (
+            id, source_node_id, target_node_id, edge_type, pipeline_task_id,
+            transformation, properties, created_at
+        ) VALUES
+        <foreach collection="rows" item="r" separator=",">
+            (
+                #{r.id}, #{r.sourceNodeId}, #{r.targetNodeId}, #{r.edgeType},
+                #{r.pipelineTaskId}, #{r.transformation}, #{r.properties}::jsonb, NOW()
+            )
+        </foreach>
+        ON CONFLICT (id) DO NOTHING
+    </insert>
+
+    <!-- 按 pipeline 查 nodes（pipeline_task_id 等值参数化，替代 ILIKE 全表扫） -->
+    <select id="findNodesByPipelineId" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="nodeCols"/>
+        FROM ecos_data.ecos_data_lineage_node
+        WHERE pipeline_task_id = #{pipelineTaskId}
+        ORDER BY created_at ASC, id ASC
+    </select>
+
+    <!-- 按 pipeline 查 edges -->
+    <select id="findEdgesByPipelineId" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="edgeCols"/>
+        FROM ecos_data.ecos_data_lineage_edge
+        WHERE pipeline_task_id = #{pipelineTaskId}
+        ORDER BY created_at ASC, id ASC
+    </select>
+
+    <!-- 按表名等值匹配 nodes（派生后查询路径，禁 yaml_content ILIKE — NoYamlLineageScanArchTest 守护） -->
+    <select id="findNodesByTableName" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="nodeCols"/>
+        FROM ecos_data.ecos_data_lineage_node
+        WHERE table_name = #{tableName}
+        ORDER BY created_at ASC, id ASC
+    </select>
+
+    <!-- 增量重建：已同步过的 pipeline 集合（node 表 pipeline_task_id 去重，按派生记录倒序分页） -->
+    <select id="listSyncedPipelineIds" resultType="string">
+        SELECT DISTINCT pipeline_task_id
+        FROM ecos_data.ecos_data_lineage_node
+        WHERE pipeline_task_id IS NOT NULL
+        ORDER BY pipeline_task_id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 某个 pipeline 是否已有派生记录（增量"跳过已同步"判定） -->
+    <select id="countNodesByPipelineId" resultType="int">
+        SELECT count(1) FROM ecos_data.ecos_data_lineage_node
+        WHERE pipeline_task_id = #{pipelineTaskId}
+    </select>
+
+    <!-- 清理某 pipeline 派生的 node/edge（增量重建幂等重放）；schema 只加不删：限制在 pipeline 粒度 -->
+    <delete id="deleteNodesByPipelineId">
+        DELETE FROM ecos_data.ecos_data_lineage_node WHERE pipeline_task_id = #{pipelineTaskId}
+    </delete>
+
+    <delete id="deleteEdgesByPipelineId">
+        DELETE FROM ecos_data.ecos_data_lineage_edge WHERE pipeline_task_id = #{pipelineTaskId}
+    </delete>
+
+    <!-- 增量重建水位线：MAX(updated_at) over nodes（无派生记录时返回 NULL） -->
+    <select id="maxWatermark" resultType="java.time.LocalDateTime">
+        SELECT MAX(updated_at) FROM ecos_data.ecos_data_lineage_node
+    </select>
+
+    <!-- 写入水位线（node 表 V248 新列；UPDATE 为该列首写，非 DDL） -->
+    <update id="touchWatermark">
+        UPDATE ecos_data.ecos_data_lineage_node
+        SET last_incremental_sync_at = #{ts}
+    </update>
+
+</mapper>

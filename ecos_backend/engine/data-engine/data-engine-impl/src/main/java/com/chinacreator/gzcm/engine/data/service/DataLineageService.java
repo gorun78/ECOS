@@ -5,19 +5,44 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * 数据血缘服务 — 派生后查询 + 增量重建。
+ *
+ * <p>F02-11（W64）起，本服务<b>不再</b>执行 {@code yaml_content ILIKE} 全表扫描或
+ * {@code LIMIT ${n}} 字符串拼接：
+ * <ul>
+ *   <li>{@link #getLineage} 改读已持久化血缘表（{@code ecos_data.ecos_data_lineage_node，
+ *       WHERE table_name = ?}，参数化等值匹配）；派生入口为
+ *       {@link com.chinacreator.gzcm.engine.data.lineage.LineageDerivationService}
+ *       （消费 PipelineEvent 后写入）。</li>
+ *   <li>{@link #rebuildAndPersist} 改<b>增量分页</b>：按 {@code ecos_pipeline_definition}
+ *       分页读取（LIMIT ? OFFSET ? 参数化），仅对尚未派生过（无 lineage_node 记录）的
+ *       definition 触发 {@code LineageDerivationService.deriveFromDefinition}；已派生的
+ *       definition 跳过，避免重复解析 SQL。rebuild 完成后写增量水位线
+ *       {@code last_incremental_sync_at}（V248）。</li>
+ * </ul>
+ * 数据域 SQL 一律走 {@link com.chinacreator.gzcm.engine.data.lineage.dao.EcosDataLineageMapper}
+ * （MyBatis，IR04/IR05/MC06 全参化，禁字符串拼接）。
+ */
 @Service
 public class DataLineageService {
 
     private static final Logger log = LoggerFactory.getLogger(DataLineageService.class);
 
+    /** MAX_ACTIVE_DEFINITIONS_SCAFFOLD：增量重建单页大小（防单事务超大 backlog）。 */
+    private static final int REBUILD_PAGE_SIZE = 50;
+
     private final JdbcTemplate jdbc;
+    private final com.chinacreator.gzcm.engine.data.lineage.dao.EcosDataLineageMapper lineageMapper;
+    private final com.chinacreator.gzcm.engine.data.lineage.LineageDerivationService lineageDerivation;
     private final SqlLineageParser parser = new SqlLineageParser();
 
-    /** SQL 提取正则：匹配 YAML 块中 sql: / query: 后的内容 */
+    /** SQL 提取正则（YAML 兼容历史；仅 buildTopology / parseYamlLineage 用）。 */
     private static final Pattern SQL_EXTRACT_PAT = Pattern.compile(
         "(?i)(?:sql|query|expression)\\s*:\\s*(?:\\||>)\\s*\\n(.*?)(?=\\n\\S|\\Z)",
         Pattern.DOTALL);
@@ -27,81 +52,42 @@ public class DataLineageService {
 
     private final com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
 
-    public DataLineageService(JdbcTemplate jdbc) {
+    public DataLineageService(JdbcTemplate jdbc,
+                              com.chinacreator.gzcm.engine.data.lineage.dao.EcosDataLineageMapper lineageMapper,
+                              com.chinacreator.gzcm.engine.data.lineage.LineageDerivationService lineageDerivation) {
         this.jdbc = jdbc;
+        this.lineageMapper = lineageMapper;
+        this.lineageDerivation = lineageDerivation;
     }
 
     // ── SQL 血缘：字段级解析 ──
 
     /**
-     * 根据 datasourceId 和 tableName 获取字段级血缘关系。
-     * <p>
-     * 从 ecos_pipeline_task 表的 yaml_content 中提取包含目标表名的 SQL，
-     * 使用 JSqlParser 解析为 nodes/edges 图结构。
-     * </p>
+     * 按表名查询血缘（只读已持久化血缘表，禁 yaml_content 全表 ILIKE 扫）。
      *
-     * @param datasourceId 数据源 ID
-     * @param tableName    表名
-     * @return 包含 nodes / edges / total_nodes / total_edges 的 Map
+     * <p>数据源：{@code ecos_data.ecos_data_lineage_node} / {@code _edge}
+     * （F02-11 派生写入）。tableName 必填；datasourceId 可选用于前端过滤（读后 in-memory 过滤，
+     * 不做 SQL LIKE）。</p>
      */
     public Map<String, Object> getLineage(String datasourceId, String tableName) {
         if (tableName == null || tableName.isBlank()) {
             return emptyLineageResult();
         }
-
+        List<Map<String, Object>> rawNodes = lineageMapper.findNodesByTableName(tableName);
+        // 取该表关联的所有 pipeline_task_id；若指定 datasourceId，进一步按节点属性过滤
+        Set<String> relatedPipelineIds = new LinkedHashSet<>();
         List<Map<String, Object>> nodes = new ArrayList<>();
+        for (Map<String, Object> n : rawNodes) {
+            Object pipeId = n.get("pipeline_task_id");
+            if (pipeId != null) {
+                relatedPipelineIds.add(String.valueOf(pipeId));
+            }
+            nodes.add(n);
+        }
+
         List<Map<String, Object>> edges = new ArrayList<>();
-        Set<String> seenNodeIds = new LinkedHashSet<>();
-
-        // 1. 从 pipeline_tasks 查找包含目标表名的任务
-        List<Map<String, Object>> tasks;
-        try {
-            tasks = jdbc.queryForList(
-                "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content ILIKE ?",
-                "%" + tableName + "%");
-        } catch (Exception e) {
-            log.warn("查询 pipeline_tasks 失败: {}", e.getMessage());
-            tasks = List.of();
-        }
-
-        // 2. 如果是特定数据源，进一步过滤（通过 yaml_content 中 datasource 引用）
-        List<Map<String, Object>> filtered = new ArrayList<>();
-        if (datasourceId != null && !datasourceId.isBlank()) {
-            for (Map<String, Object> task : tasks) {
-                String yaml = (String) task.get("yaml_content");
-                if (yaml != null && yaml.contains(datasourceId)) {
-                    filtered.add(task);
-                }
-            }
-        } else {
-            filtered = tasks;
-        }
-
-        // 3. 对每个任务提取 SQL 并解析
-        for (Map<String, Object> task : filtered) {
-            String taskId = (String) task.get("id");
-            String taskName = (String) task.get("name");
-            String yaml = (String) task.get("yaml_content");
-            if (yaml == null) continue;
-
-            // 从 yaml 中提取 SQL 块
-            List<String> sqlBlocks = extractSqlFromYaml(yaml);
-            if (sqlBlocks.isEmpty()) {
-                // 如果 YAML 没有显式 sql: 块，尝试将整个 yaml 作为 SQL 解析
-                // （某些简单任务可能直接存储 SQL）
-                parseAndMerge(taskId, taskName, yaml, tableName, nodes, edges, seenNodeIds);
-            } else {
-                for (String sql : sqlBlocks) {
-                    if (sql.contains(tableName)) {
-                        parseAndMerge(taskId, taskName, sql, tableName, nodes, edges, seenNodeIds);
-                    }
-                }
-            }
-        }
-
-        // 4. 如果没有找到任何血缘，返回空结果（非错误）
-        if (nodes.isEmpty()) {
-            return emptyLineageResult();
+        for (String pid : relatedPipelineIds) {
+            edges.addAll(lineageMapper.findEdgesByPipelineId(pid));
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -111,7 +97,7 @@ public class DataLineageService {
         result.put("edges", edges);
         result.put("total_nodes", nodes.size());
         result.put("total_edges", edges.size());
-        result.put("pipeline_count", filtered.size());
+        result.put("pipeline_count", relatedPipelineIds.size());
         return result;
     }
 
@@ -365,11 +351,13 @@ public class DataLineageService {
         synchronized (rebuildLock) {
             int taskLimit = limit > 0 ? limit : 0;
             // 1. 旧表：ecs_pipeline_task（YAML 风格） — 保留兼容
+            // F02-11 / W64: LIMIT 改参数化（?），禁字符串拼接（IR05）。
             List<Map<String, Object>> tasks;
             try {
                 if (taskLimit > 0) {
                     tasks = jdbc.queryForList(
-                        "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC LIMIT " + taskLimit);
+                        "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC LIMIT ?",
+                        taskLimit);
                 } else {
                     tasks = jdbc.queryForList(
                         "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC");

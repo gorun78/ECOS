@@ -43,32 +43,16 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- Domain Modules (P3 migration — were missing!) -->
+        <!-- Domain Modules (P3 migration) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>buszhi-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>portal-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>market-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>worldmodel-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- PMO-09 (2026-09-14): 移除 dccheng-impl/portal-impl/market-impl/worldmodel-impl 幽灵依赖。
+             - dccheng-impl 不存在 (services/dccheng 仅产 dccheng-service 单 jar)；
+             - portal/market/worldmodel 已在阶段 5 被 workspace/buszhi 吸收，源码无对应 import；
+             - 空 .m2 环境下会让 sysman-boot 解析失败 (旧 WSL 用 stale JAR 侥幸通过)。 -->
 
         <!-- Spring Boot Web -->
         <dependency>

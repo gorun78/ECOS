@@ -153,11 +153,23 @@ public class PipelineGitService {
 
     private PipelineGitCommitResultVO doCommit(String id, String localPath, String message,
                                                PipelineGitCommitResultVO vo) throws GitException {
-        Map<String, Object> task = jdbc.queryForMap(
-                "SELECT id, git_url, git_branch, yaml_content FROM ecos_pipeline_task WHERE id = ?", id);
-        String gitUrl = (String) task.get("git_url");
-        String gitBranch = (String) task.getOrDefault("git_branch", "main");
-        String yamlContent = (String) task.get("yaml_content");
+        // F02-03：Git 归档内容读源切换到 JSON DAG 单模型 ecos_pipeline_definition/node/edge
+        // （YAML 模型 yaml_content 只读归档，不再作为归档制品）。
+        // git 元数据（git_url/git_branch）沿用存量 task 行只读（YAML 侧写已停），缺失时走本地仓库。
+        String gitUrl = null;
+        String gitBranch = "main";
+        try {
+            Map<String, Object> task = jdbc.queryForMap(
+                    "SELECT git_url, git_branch FROM ecos_pipeline_task WHERE id = ?", id);
+            gitUrl = (String) task.get("git_url");
+            Object b = task.get("git_branch");
+            if (b != null && !b.toString().isBlank()) {
+                gitBranch = b.toString();
+            }
+        } catch (Exception e) {
+            log.debug("无存量 YAML task 行，git 元数据按本地仓库处理: id={}, {}", id, e.getMessage());
+        }
+        String content = loadDefinitionJson(id);
 
         if (gitUrl != null && !gitUrl.isEmpty()) {
             validateGitUrl(gitUrl);
@@ -173,7 +185,7 @@ public class PipelineGitService {
             log.info("未配置 gitUrl，使用本地仓库: {}", localPath);
         }
 
-        writePipelineYaml(localPath, id, yamlContent);
+        writePipelineYaml(localPath, id, content);
         gitService.commit(localPath, message, List.of("pipelines/" + id + "/pipeline.yaml"));
         if (gitUrl != null && !gitUrl.isEmpty()) {
             String[] credentials = resolveGitCredentials();
@@ -224,18 +236,107 @@ public class PipelineGitService {
 
     private PipelineGitOperationResultVO doPull(String id, String localPath,
                                                 PipelineGitOperationResultVO vo) throws GitException {
-        jdbc.queryForMap("SELECT id, yaml_content FROM ecos_pipeline_task WHERE id = ?", id);
+        // F02-03：YAML 模型只读，pull 改为把 Git 上的 pipeline.yaml（现承载 JSON DAG）
+        // 读回并 upsert 进 ecos_pipeline_definition 的 node/edge（不再写 yaml_content）。
+        Map<String, Object> defRow = jdbc.queryForMap(
+                "SELECT id, name FROM ecos_pipeline_definition WHERE id = ?", id);
         gitService.pull(localPath, "origin", "main");
 
-        String yamlContent = loadPipelineYaml(localPath, id);
-        jdbc.update(
-                "UPDATE ecos_pipeline_task SET yaml_content = ?, updated_at = NOW() WHERE id = ?",
-                yamlContent, id);
+        String definitionJson = loadPipelineYaml(localPath, id);
+        int upserted = upsertDefinitionFromJson(id, defRow.get("name"), definitionJson);
 
-        log.info("从 Git 拉取成功: taskId={}", id);
+        log.info("从 Git 拉取 Pipeline 定义成功: definitionId={}, nodes={}", id, upserted);
         vo.setTaskId(id);
         vo.setYamlUpdated(true);
         return vo;
+    }
+
+    /**
+     * 解析 Git 归档的 pipeline.yaml（F02-03 起承载 JSON DAG）并 upsert 进
+     * {@code ecos_pipeline_node}/{@code ecos_pipeline_edge}。全量替换（先删后插）。
+     * 归档为空/非 JSON 时返回 0 且不阻断 pull（归档制品可能仍是历史 YAML）。
+     */
+    int upsertDefinitionFromJson(String definitionId, Object nameObj, String definitionJson) {
+        if (definitionJson == null || definitionJson.isBlank()) {
+            return 0;
+        }
+        List<Map<String, Object>> nodes;
+        List<Map<String, Object>> edges;
+        String name;
+        try {
+            Map<String, Object> root = JSON_MAPPER.readValue(definitionJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() {});
+            nodes = asMapList(root.get("nodes"));
+            edges = asMapList(root.get("edges"));
+            name = root.get("name") instanceof String s ? s
+                    : (nameObj != null ? nameObj.toString() : "Pipeline " + definitionId);
+            // 规范化 JSON 文本回写 definition（definition_json 合规列 + definition jsonb 双写）
+            String canonical = JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+            jdbc.update("UPDATE ecos_pipeline_definition SET definition_json = ?, definition = ?::jsonb, "
+                    + "updated_at = NOW() WHERE id = ?", canonical, canonical, definitionId);
+        } catch (Exception e) {
+            log.warn("Git 归档内容非 JSON DAG 模型，跳过节点回写: definitionId={}, {}", definitionId, e.getMessage());
+            return 0;
+        }
+
+        jdbc.update("DELETE FROM ecos_pipeline_node WHERE definition_id = ?", definitionId);
+        jdbc.update("DELETE FROM ecos_pipeline_edge WHERE definition_id = ?", definitionId);
+        int n = 0;
+        for (Map<String, Object> node : nodes) {
+            String nodeId = str(node.get("nodeId"));
+            if (nodeId == null || nodeId.isBlank()) {
+                continue;
+            }
+            String nodeType = str(node.get("type"));
+            String config = str(node.get("config"));
+            String dependsOn = str(node.get("dependsOn"));
+            jdbc.update(
+                    "INSERT INTO ecos_pipeline_node (id, definition_id, node_id, type, config, depends_on, "
+                            + "position_x, position_y, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, 0, 0, NOW(), NOW())",
+                    deterministicId(definitionId + "/node/" + nodeId), definitionId, nodeId,
+                    nodeType != null ? nodeType : "TRANSFORM_SQL",
+                    config != null ? config : "{}",
+                    dependsOn != null ? dependsOn : "[]");
+            n++;
+        }
+        for (Map<String, Object> edge : edges) {
+            String from = str(edge.get("from"));
+            String to = str(edge.get("to"));
+            if (from == null || from.isBlank() || to == null || to.isBlank()) {
+                continue;
+            }
+            jdbc.update(
+                    "INSERT INTO ecos_pipeline_edge (id, definition_id, from_node_id, to_node_id, created_at) "
+                            + "VALUES (?, ?, ?, ?, NOW())",
+                    deterministicId(definitionId + "/edge/" + from + "->" + to),
+                    definitionId, from, to);
+        }
+        return n;
+    }
+
+    /** 确定性主键（UUID v5 风格，按 32 位去连字符）。 */
+    private static String deterministicId(String seed) {
+        return java.util.UUID.nameUUIDFromBytes(seed.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .toString().replace("-", "");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> asMapList(Object raw) {
+        if (!(raw instanceof List<?> list)) {
+            return new ArrayList<>();
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> m) {
+                out.add((Map<String, Object>) m);
+            }
+        }
+        return out;
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : v.toString();
     }
 
     // ==================== 3. loadFromGit ====================
@@ -537,6 +638,57 @@ public class PipelineGitService {
         } catch (Exception e) {
             log.warn("Git 凭据解密失败，按匿名访问处理: {}", e.getMessage());
             return new String[]{null, null};
+        }
+    }
+
+    // ==================== F02-03：Git 归档内容 = JSON DAG 单模型 ====================
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * F02-03：读取 {@code ecos_pipeline_definition} 的规范化 JSON（含 nodes/edges）作为 Git 归档制品。
+     * <p>原 {@code yaml_content} 只读归档，不再解析/写入；归档布局（pipelines/{id}/pipeline.yaml）
+     * 保持不变，仅内容换成定义 JSON。显式列（IR04 禁 SELECT *），参数化（IR05 禁字符串拼接）。
+     *
+     * @param definitionId Pipeline 定义 ID
+     * @return 规范化 JSON 文本（nodes/edges 为空时给出明确占位，不静默）
+     */
+    String loadDefinitionJson(String definitionId) {
+        List<Map<String, Object>> nodeRows = jdbc.queryForList(
+                "SELECT node_id, type, config, depends_on FROM ecos_pipeline_node "
+                        + "WHERE definition_id = ? ORDER BY created_at", definitionId);
+        List<Map<String, Object>> edgeRows = jdbc.queryForList(
+                "SELECT from_node_id, to_node_id FROM ecos_pipeline_edge "
+                        + "WHERE definition_id = ? ORDER BY created_at", definitionId);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", "pipeline-definition-json");
+        payload.put("version", 1);
+        payload.put("id", definitionId);
+        List<Map<String, Object>> nodes = new ArrayList<>(nodeRows.size());
+        for (Map<String, Object> n : nodeRows) {
+            Map<String, Object> node = new LinkedHashMap<>();
+            node.put("nodeId", n.get("node_id"));
+            node.put("type", n.get("type"));
+            node.put("config", n.get("config"));
+            node.put("dependsOn", n.get("depends_on"));
+            nodes.add(node);
+        }
+        payload.put("nodes", nodes);
+        List<Map<String, Object>> edges = new ArrayList<>(edgeRows.size());
+        for (Map<String, Object> e : edgeRows) {
+            Map<String, Object> edge = new LinkedHashMap<>();
+            edge.put("from", e.get("from_node_id"));
+            edge.put("to", e.get("to_node_id"));
+            edges.add(edge);
+        }
+        payload.put("edges", edges);
+
+        try {
+            return JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("序列化 Pipeline 定义 JSON 失败: " + definitionId, e);
         }
     }
 

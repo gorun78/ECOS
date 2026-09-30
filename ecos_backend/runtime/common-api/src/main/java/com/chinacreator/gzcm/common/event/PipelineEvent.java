@@ -31,7 +31,9 @@ public class PipelineEvent implements Serializable {
         /** 管道执行失败 */
         PIPELINE_FAILED,
         /** 数据源状态变更 */
-        DATASOURCE_STATUS_CHANGED
+        DATASOURCE_STATUS_CHANGED,
+        /** F02-05 / C.3.6：唯一写通道完成一次业务域写入（含 idempotency 命中/首次）。 */
+        WRITE_CHANNEL_WRITE
     }
 
     // ── 字段 ────────────────────────────────────────

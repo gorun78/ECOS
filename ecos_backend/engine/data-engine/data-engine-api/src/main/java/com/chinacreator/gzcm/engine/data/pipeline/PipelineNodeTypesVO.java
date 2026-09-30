@@ -52,6 +52,15 @@ public class PipelineNodeTypesVO {
         /** 禁用原因 i18n key（enabled=false 时） */
         private String disabledReasonKey;
 
+        /**
+         * F02-04：该类型在保存/执行侧是否可用（执行器是否有真实实现分支）。
+         * available=false 的节点在创建/更新 definition 时被拒（ECOS-DATA-012）。
+         */
+        private Boolean available;
+
+        /** F02-04：不可用原因（available=false 时非空，可直接展示） */
+        private String unavailableReason;
+
         /** 属性 schema 与必填字段 */
         private PipelineNodeTypeMetaVO meta;
     }

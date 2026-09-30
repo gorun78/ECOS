@@ -22,11 +22,16 @@
         <result property="updateTime" column="update_time"/>
         <result property="layer" column="layer"/>
         <result property="zone" column="zone"/>
+        <result property="layerBucket" column="layer_bucket"/>
+        <result property="carrierRef" column="carrier_ref"/>
+        <result property="storageKind" column="storage_kind"/>
     </resultMap>
 
     <!--
       layer / zone 采用条件列：调用方未设置时不写入，
       保留 DB 默认值（layer DEFAULT 'RAW'，见 V54）与既有元数据采集行为不变。
+      layer_bucket / carrier_ref / storage_kind（V260，F02-05）同为条件列：
+      仅在非空时写入，避免覆盖既有登记的 NULL 值。
     -->
     <insert id="insert">
         INSERT INTO td_data_resource (
@@ -35,12 +40,18 @@
             field_count, record_count, last_sync_time, create_by, create_time
             <if test="layer != null">, layer</if>
             <if test="zone != null">, zone</if>
+            <if test="layerBucket != null">, layer_bucket</if>
+            <if test="carrierRef != null">, carrier_ref</if>
+            <if test="storageKind != null">, storage_kind</if>
         ) VALUES (
             #{resourceId}, #{resourceName}, #{resourceType}, #{orgId}, #{orgName},
             #{datasourceId}, #{sourcePath}, #{description}, #{tags}, #{status},
             #{fieldCount}, #{recordCount}, #{lastSyncTime}, #{createBy}, NOW()
             <if test="layer != null">, #{layer}</if>
             <if test="zone != null">, #{zone}</if>
+            <if test="layerBucket != null">, #{layerBucket}</if>
+            <if test="carrierRef != null">, #{carrierRef}</if>
+            <if test="storageKind != null">, #{storageKind}</if>
         )
     </insert>
 
@@ -59,6 +70,9 @@
             update_time = NOW(),
             <if test="layer != null">layer = #{layer},</if>
             <if test="zone != null">zone = #{zone},</if>
+            <if test="layerBucket != null">layer_bucket = #{layerBucket},</if>
+            <if test="carrierRef != null">carrier_ref = #{carrierRef},</if>
+            <if test="storageKind != null">storage_kind = #{storageKind},</if>
         </set>
         WHERE resource_id = #{resourceId}
     </update>
@@ -71,6 +85,14 @@
             update_time = NOW()
         WHERE resource_id = #{resourceId}
     </update>
+
+    <!-- F02-05：按层统计已登记载体数（供 /engine/data/layers 的 declared 存在性校验）。
+         IR04 显式列；IR05 #{} 占位；口径 = 该层登记了 carrier_ref 的资源数。 -->
+    <select id="countRegisteredCarriersByLayer" resultType="int">
+        SELECT COUNT(*) FROM td_data_resource
+        WHERE layer = #{layer}
+          AND carrier_ref IS NOT NULL
+    </select>
 
     <select id="findById" resultMap="DataResourceMap">
         SELECT * FROM td_data_resource WHERE resource_id = #{id}

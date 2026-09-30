@@ -118,10 +118,10 @@ workspace → (REST) → services/* → (Maven dep) → engine-impl → engine-a
 
 ```powershell
 # 全量构建 (Windows 原生, 2026-09-09 起)
-& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests
+mvn -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests   # 本机 mvn/java 路径见 _win_tasks/env.local.ps1（不入库）
 
 # 单 service 构建 (仅依赖)
-& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml -pl services/sysman -am install -DskipTests
+mvn -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml -pl services/sysman -am install -DskipTests
 
 # 启动 gateway（唯一 Spring Boot 启动器；_win_tasks 无 start-gateway.ps1，此名系历史遗留）
 powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\start-backend.ps1 -Modules gateway -Profile enterprise
@@ -156,10 +156,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 
 | 项 | 版本/路径 |
 |---|---|
-| JDK | `C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot` |
-| Maven | `D:\JavaProjects\env\apache-maven-3.9.11` |
-| JWT | `C:\Users\guoro\.config\ecos\jwt-private-key.pem` |
-| DEEPSEEK | `C:\Users\guoro\.hermes\profiles\gorunkol\.env` |
+| JDK | 本机路径不入库：`_win_tasks/env.local.ps1`（gitignored，模板 `.example`）或 `JAVA_HOME` |
+| Maven | 同上（`MAVEN_HOME` 或 env.local.ps1） |
+| Node | PATH 管理（本机路径不入库） |
+| JWT | `%USERPROFILE%\.config\ecos\jwt-private-key.pem` |
+| DEEPSEEK | `%USERPROFILE%\.config\ecos\.env`（当前未配置；缺失时仅 AI 功能降级） |
 | Docker | Windows Docker Desktop (PG/Neo4j/MinIO/Kafka/ZK/OPA) |
 
 ## Hard Rules (ArchUnit 守卫)

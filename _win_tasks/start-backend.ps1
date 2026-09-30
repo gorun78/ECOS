@@ -20,8 +20,19 @@ if ($Modules.Count -eq 1 -and $Modules[0] -match '[,;]') {
 }
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
 $Backend    = Join-Path $RepoRoot 'ecos_backend'
-$JavaExe    = 'C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot\bin\java.exe'
-$MvnCmd     = 'D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd'
+# Toolchain paths are machine-local and NOT committed: resolve JAVA_HOME/MAVEN_HOME (only if real JDK 11+) -> PATH,
+# then override via _win_tasks/env.local.ps1 (gitignored; template env.local.ps1.example).
+function Test-Jdk11Plus([string]$JdkHome) {
+    $exe = if ($JdkHome) { Join-Path $JdkHome 'bin\java.exe' -ErrorAction Ignore } else { $null }
+    if (-not $exe -or -not (Test-Path $exe)) { return $false }
+    $ver = ((& $exe -version 2>&1 | Select-Object -First 1) -replace '[^0-9.].*','')
+    $major = if ($ver -match '^1\.(\d+)') { [int]$Matches[1] } elseif ($ver) { [int]($ver -split '\.')[0] } else { 0 }
+    return $major -ge 11
+}
+$JavaExe = if (Test-Jdk11Plus $env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin\java.exe' } else { 'java' }
+$MvnCmd  = if ($env:MAVEN_HOME -and (Test-Path (Join-Path $env:MAVEN_HOME 'bin\mvn.cmd' -ErrorAction Ignore))) { Join-Path $env:MAVEN_HOME 'bin\mvn.cmd' } else { 'mvn' }
+$LocalEnv = Join-Path $PSScriptRoot 'env.local.ps1'
+if (Test-Path $LocalEnv) { . $LocalEnv }
 $LogDir     = Join-Path $PSScriptRoot 'logs'
 $JwtPemFile = Join-Path $env:USERPROFILE '.config\ecos\jwt-private-key.pem'
 $JwtPubPemFile = Join-Path $env:USERPROFILE '.config\ecos\jwt-public-key.pem'
@@ -55,23 +66,22 @@ function Import-EnvFile([string]$Path) {
 
 if (-not $NoEnv) {
     if (Test-Path $JwtPemFile) {
-        # gateway/sysman read JWT_PRIVATE_KEY with literal \n as line separator (application.yml SEC-P0-2)
-        $pem = (Get-Content $JwtPemFile -Raw).Trim("`r", "`n") -replace "`r", ''
-        $env:JWT_PRIVATE_KEY = ($pem -split "`n") -join '\n'
-        Write-Host "[OK] JWT_PRIVATE_KEY loaded ($($env:JWT_PRIVATE_KEY.Length) chars)"
+        # JwtTokenProvider.decodePemOrBase64 accepts PEM or single-line Base64 DER, but NOT armor+\n-escape
+        # (literal backslashes survive its \s-stripping -> "Illegal base64 character 5c"). Inject as armor-stripped Base64.
+        $pem = ((Get-Content $JwtPemFile | Where-Object { $_ -notmatch '-----BEGIN|-----END' } | ForEach-Object { $_.Trim() }) -join '')
+        $env:JWT_PRIVATE_KEY = $pem
+        Write-Host "[OK] JWT_PRIVATE_KEY loaded ($($env:JWT_PRIVATE_KEY.Length) chars, base64-der)"
     } else {
         Write-Host "[WARN] JWT pem missing: $JwtPemFile - auth will fail"
     }
-    # PMO-74 H2-T11: jwt.public-key is only hardcoded in the gateway/sysman ymls. Every other
-    # service that bundles sysman-impl (datanet, buszhi, workspace-service, dccheng, aiming) still
-    # creates the JwtTokenProvider bean, sees the env-injected private key as non-blank, and then
-    # hits loadPublicKey("") -> InvalidKeyException: Missing key encoding (JwtTokenProvider:65-66).
-    # The public key is not a secret; injecting it is what makes the standard entry point usable
-    # for the curl acceptance gates. Verified identical to all three yml blocks and to the private key.
+    # PMO-74 H2-T11: jwt.public-key only hardcoded in gateway/sysman ymls; every other service bundling
+    # sysman-impl creates JwtTokenProvider, sees env-injected private key non-blank, then hits
+    # loadPublicKey("") -> InvalidKeyException: Missing key encoding. Inject public key as armor-stripped
+    # Base64 (literal \n-escaped PEM breaks decodePemOrBase64 the same way the private key did).
     if (Test-Path $JwtPubPemFile) {
-        $pubPem = (Get-Content $JwtPubPemFile -Raw).Trim("`r", "`n") -replace "`r", ''
-        $env:JWT_PUBLIC_KEY = ($pubPem -split "`n") -join '\n'
-        Write-Host "[OK] JWT_PUBLIC_KEY loaded ($($env:JWT_PUBLIC_KEY.Length) chars)"
+        $pub = ((Get-Content $JwtPubPemFile | Where-Object { $_ -notmatch '-----BEGIN|-----END' } | ForEach-Object { $_.Trim() }) -join '')
+        $env:JWT_PUBLIC_KEY = $pub
+        Write-Host "[OK] JWT_PUBLIC_KEY loaded ($($env:JWT_PUBLIC_KEY.Length) chars, base64-der)"
     } else {
         Write-Host "[WARN] JWT public pem missing: $JwtPubPemFile - services without jwt.public-key in yml will fail JwtTokenProvider init"
     }

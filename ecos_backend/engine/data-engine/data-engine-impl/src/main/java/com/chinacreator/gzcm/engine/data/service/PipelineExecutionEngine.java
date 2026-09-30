@@ -18,6 +18,18 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
 
+/**
+ * Pipeline 2.0 YAML 执行引擎（读取 {@code ecos_pipeline_task/step}，按步骤串行执行）。
+ *
+ * @deprecated F02-03（R-2 a 已批准）：YAML 管道模型转只读归档，JSON DAG 单模型
+ *             （{@code ecos_pipeline_definition/node/edge} + {@code PipelineExecutionService}）
+ *             为唯一承流模型，{@code /api/v1/pipeline/definitions/{id}/execute} 走 runtime-task。
+ *             本类无 {@code /execute} 直连路由 —— 唯一调用方
+ *             {@link PipelineTaskServiceImpl#triggerRun} 已在 F02-03 收敛为 409 桩
+ *             （{@code POST /api/v1/engine/data/pipeline/tasks/{id}/run} 返回 ECOS-DATA-011），
+ *             故本引擎进入休眠状态。代码保留不删（IR03 只停写不删），禁止新增引用。
+ */
+@Deprecated
 @Component
 public class PipelineExecutionEngine {
 

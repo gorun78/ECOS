@@ -44,4 +44,14 @@ public interface DataResourceRepository {
     List<DataResource> search(@Param("keyword") String keyword);
 
     int deleteById(@Param("id") String id);
+
+    /**
+     * F02-05：按层统计已登记载体（{@code carrier_ref} 非空）数。
+     * <p>供 {@code /api/v1/engine/data/layers} 的载体存在性校验（D-9）：
+     * 计数为 0 的层在响应体里必须回 {@code declared:false}，禁止前端呈现为"有数据"。
+     *
+     * @param layer 数据分层（{@link com.chinacreator.gzcm.engine.data.model.DataLayer} 枚举名）
+     * @return 该层已登记载体数（0 = 未声明载体）
+     */
+    int countRegisteredCarriersByLayer(@Param("layer") String layer);
 }

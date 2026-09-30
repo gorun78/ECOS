@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  表 3: ecos_dw.ecos_biz_resource_fact（V167）
+  IR04 显式列清单；IR05 全部 #{}；MC06 ecos_dw. 限定。
+  staff_ref_hash（VARCHAR(64)）= 工号单向哈希，不可逆脱敏存储（V167 头注：非 ST03-A 豁免）。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.fact.dao.ResourceFactMapper">
+
+    <sql id="cols">
+        id, project_id, department_id, period, staff_ref_hash, staff_hash_algo, fte,
+        work_hours, hourly_rate, cost_category, fact_type, dq_status, is_active, batch_id,
+        source_ref, evidence_ref, domain, version_no, is_deleted, create_time, update_time,
+        create_by, update_by
+    </sql>
+
+    <insert id="insertBatch">
+        INSERT INTO ecos_dw.ecos_biz_resource_fact (
+            id, project_id, department_id, period, staff_ref_hash, staff_hash_algo,
+            fte, work_hours, hourly_rate, cost_category, fact_type,
+            dq_status, is_active, batch_id, source_ref, evidence_ref,
+            domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+        ) VALUES
+        <foreach collection="rows" item="r" separator=",">
+            (
+                #{r.id}, #{r.projectId}, #{r.departmentId}, #{r.period},
+                #{r.staffRefHash}, #{r.staffHashAlgo}, #{r.fte}, #{r.workHours},
+                #{r.hourlyRate}, #{r.costCategory}, #{r.factType},
+                #{r.dqStatus}, #{r.isActive}, #{r.batchId}, #{r.sourceRef}, #{r.evidenceRef},
+                #{r.domain}, #{r.versionNo}, #{r.isDeleted},
+                NOW(), NOW(), #{r.createBy}, #{r.updateBy}
+            )
+        </foreach>
+    </insert>
+
+    <select id="countBatch" resultType="int">
+        SELECT count(1) FROM ecos_dw.ecos_biz_resource_fact
+        WHERE batch_id = #{batchId} AND is_deleted = 0
+    </select>
+
+    <select id="countBatchByStatus" resultType="int">
+        SELECT count(1) FROM ecos_dw.ecos_biz_resource_fact
+        WHERE batch_id = #{batchId} AND dq_status = #{dqStatus} AND is_deleted = 0
+    </select>
+
+    <select id="listBatch" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_biz_resource_fact
+        WHERE batch_id = #{batchId} AND is_deleted = 0
+        ORDER BY create_time ASC, id ASC
+    </select>
+
+    <select id="getDqStatusById" resultType="string">
+        SELECT dq_status FROM ecos_dw.ecos_biz_resource_fact
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <update id="touchUpdate">
+        UPDATE ecos_dw.ecos_biz_resource_fact
+        SET update_time = NOW(), update_by = #{updateBy}
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <select id="pageQuery" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_biz_resource_fact
+        WHERE is_deleted = 0
+        <if test="projectId != null"> AND project_id = #{projectId}</if>
+        <if test="period != null"> AND period = #{period}</if>
+        <if test="batchId != null"> AND batch_id = #{batchId}</if>
+        <if test="dqStatus != null"> AND dq_status = #{dqStatus}</if>
+        ORDER BY create_time DESC, id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countQuery" resultType="int">
+        SELECT count(1) FROM ecos_dw.ecos_biz_resource_fact
+        WHERE is_deleted = 0
+        <if test="projectId != null"> AND project_id = #{projectId}</if>
+        <if test="period != null"> AND period = #{period}</if>
+        <if test="batchId != null"> AND batch_id = #{batchId}</if>
+        <if test="dqStatus != null"> AND dq_status = #{dqStatus}</if>
+    </select>
+
+</mapper>

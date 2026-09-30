@@ -25,16 +25,7 @@
             <artifactId>ai-engine-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>dccheng-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- PMO-09 (2026-09-14): 移除 dccheng-api/dccheng-impl 幽灵依赖 (不存在的 artifact, 源码无 import) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>runtime-core</artifactId>
