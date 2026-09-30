@@ -57,7 +57,7 @@ public class SecurityPolicyController {
 
         } catch (Exception e) {
             log.error("ABAC策略评估失败", e);
-            return ApiResponse.internalError("ABAC评估失败: " + e.getMessage());
+            return ApiResponse.internalError("ABAC评估失败");
         }
     }
 }

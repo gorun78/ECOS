@@ -63,8 +63,8 @@ export default function KnowledgeUpdateTab({ showToast }: TabProps) {
       await knowledgeApi.triggerFullSync();
       toast('success', t('knowledge.kupdate.trigger_ok'));
       loadAll();
-    } catch (e: any) {
-      toast('error', t('knowledge.kupdate.trigger_fail') + ' ' + (e?.message || ''));
+    } catch (e: unknown) {
+      toast('error', t('knowledge.kupdate.trigger_fail') + ' ' + ((e as { message?: string } | undefined)?.message || ''));
     }
   };
 

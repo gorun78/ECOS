@@ -105,6 +105,7 @@ public class AIPAgentController {
         try {
             entity.setMetadata(mapper.writeValueAsString(meta));
         } catch (Exception e) {
+            log.warn("[AIPAgent] metadata 序列化失败，本次创建将落空对象: id={}", id, e);
             entity.setMetadata("{}");
         }
 
@@ -113,6 +114,7 @@ public class AIPAgentController {
         try {
             entity.setCapability(mapper.writeValueAsString(Map.of("tools", tools)));
         } catch (Exception e) {
+            log.warn("[AIPAgent] capability 序列化失败，本次创建将落空对象: id={}", id, e);
             entity.setCapability("{}");
         }
 
@@ -143,13 +145,17 @@ public class AIPAgentController {
         if (body.containsKey("systemPrompt")) meta.put("systemPrompt", String.valueOf(body.get("systemPrompt")));
         try {
             existing.setMetadata(mapper.writeValueAsString(meta));
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("AIP Agent metadata 序列化失败，本次更新将保留旧 metadata: id={} reason={}", id, e.getMessage());
+        }
 
         // Merge tools in capability
         if (body.containsKey("tools")) {
             try {
                 existing.setCapability(mapper.writeValueAsString(Map.of("tools", body.get("tools"))));
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("AIP Agent capability 序列化失败，本次更新将保留旧 capability: id={} reason={}", id, e.getMessage());
+            }
         }
 
         agentRepo.update(existing);
@@ -204,9 +210,11 @@ public class AIPAgentController {
             AgentRegistryEntity entity = templateService.instantiate(templateId, userId, body);
             return ApiResponse.success(toDetailMap(entity));
         } catch (IllegalArgumentException e) {
-            return ApiResponse.badRequest(e.getMessage());
+            log.warn("[AIPAgent] 实例化请求不合法: templateId={}", templateId, e);
+            return ApiResponse.badRequest("Agent 实例化请求不合法");
         } catch (IllegalStateException e) {
-            return ApiResponse.internalError(e.getMessage());
+            log.error("[AIPAgent] 实例化失败: templateId={}", templateId, e);
+            return ApiResponse.internalError("Agent 实例化失败");
         }
     }
 
@@ -268,7 +276,7 @@ public class AIPAgentController {
             }
         } catch (Exception e) {
             log.error("[AIPAgent] testAgent failed for id={}", id, e);
-            return ApiResponse.internalError("Agent 测试失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent 测试失败");
         }
     }
 

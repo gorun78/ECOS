@@ -12,12 +12,19 @@ param(
     [switch]$NoEnv
 )
 $ErrorActionPreference = 'Stop'
+# powershell -File binds every argument as a single string, so the documented
+# "-Modules gateway,sysman" arrives here as one token 'gateway,sysman' and fails the
+# module lookup. Split comma/semicolon separated values back into an array.
+if ($Modules.Count -eq 1 -and $Modules[0] -match '[,;]') {
+    $Modules = @($Modules[0] -split '[,;]\s*' | Where-Object { $_ -and $_ -ne '' })
+}
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
 $Backend    = Join-Path $RepoRoot 'ecos_backend'
 $JavaExe    = 'C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot\bin\java.exe'
 $MvnCmd     = 'D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd'
 $LogDir     = Join-Path $PSScriptRoot 'logs'
 $JwtPemFile = Join-Path $env:USERPROFILE '.config\ecos\jwt-private-key.pem'
+$JwtPubPemFile = Join-Path $env:USERPROFILE '.config\ecos\jwt-public-key.pem'
 $HermesEnv  = Join-Path $env:USERPROFILE '.hermes\profiles\gorunkol\.env'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
@@ -54,6 +61,19 @@ if (-not $NoEnv) {
         Write-Host "[OK] JWT_PRIVATE_KEY loaded ($($env:JWT_PRIVATE_KEY.Length) chars)"
     } else {
         Write-Host "[WARN] JWT pem missing: $JwtPemFile - auth will fail"
+    }
+    # PMO-74 H2-T11: jwt.public-key is only hardcoded in the gateway/sysman ymls. Every other
+    # service that bundles sysman-impl (datanet, buszhi, workspace-service, dccheng, aiming) still
+    # creates the JwtTokenProvider bean, sees the env-injected private key as non-blank, and then
+    # hits loadPublicKey("") -> InvalidKeyException: Missing key encoding (JwtTokenProvider:65-66).
+    # The public key is not a secret; injecting it is what makes the standard entry point usable
+    # for the curl acceptance gates. Verified identical to all three yml blocks and to the private key.
+    if (Test-Path $JwtPubPemFile) {
+        $pubPem = (Get-Content $JwtPubPemFile -Raw).Trim("`r", "`n") -replace "`r", ''
+        $env:JWT_PUBLIC_KEY = ($pubPem -split "`n") -join '\n'
+        Write-Host "[OK] JWT_PUBLIC_KEY loaded ($($env:JWT_PUBLIC_KEY.Length) chars)"
+    } else {
+        Write-Host "[WARN] JWT public pem missing: $JwtPubPemFile - services without jwt.public-key in yml will fail JwtTokenProvider init"
     }
     # DEEPSEEK etc.: later files win; missing files are skipped silently by design
     Import-EnvFile (Join-Path $env:USERPROFILE '.config\ecos\.env')   # 本机密钥落点（.hermes 已不存在，2026-09-28 实证）

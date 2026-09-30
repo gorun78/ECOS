@@ -2,7 +2,7 @@
  * ObjectTypeDetail Tab 组件共享类型
  * @license Apache-2.0
  */
-import type { ObjectType, PropertyType, Dataset, SharedProperty, InterfaceType, OntologyDomain } from '../../../types/ontology';
+import type { ObjectType, PropertyType, Dataset, SharedProperty, InterfaceType, OntologyDomain, LinkType, ActionType } from '../../../types/ontology';
 import type { DocAnchor, DocAnchorType, MappingValidationReport } from '../../../types/ontology';
 
 export interface ObjectDetailTabProps {
@@ -18,7 +18,7 @@ export interface PropertiesTabProps extends ObjectDetailTabProps {
   handleAddProperty: () => void;
   /** 切换属性标志位（主键 ↔ unique_flag；必填 ↔ required_flag） */
   handleTogglePropertyFlag: (propId: string, field: 'isPrimaryKey' | 'required') => void;
-  handlePropertyFieldChange: (propId: string, field: keyof PropertyType, value: any) => void;
+  handlePropertyFieldChange: (propId: string, field: keyof PropertyType, value: unknown) => void;
   handleRemoveProperty: (propId: string) => void;
   sharedProperties: SharedProperty[];
 }
@@ -30,7 +30,7 @@ export interface PropertiesTabProps extends ObjectDetailTabProps {
  */
 export interface MetadataTabProps {
   objectType: ObjectType;
-  handleMetaChange: (key: keyof ObjectType, value: any) => void;
+  handleMetaChange: (key: keyof ObjectType, value: unknown) => void;
   domains: OntologyDomain[];
   interfaces: InterfaceType[];
   /** 基础信息是否存在未保存改动 */
@@ -69,12 +69,12 @@ export interface MappingTabProps extends ObjectDetailTabProps {
 
 export interface LinksTabProps {
   objectType: ObjectType;
-  relatedLinks: any[];
+  relatedLinks: LinkType[];
   onNavigateToLink: (linkId: string) => void;
 }
 
 export interface ActionsTabProps {
   objectType: ObjectType;
-  relatedActions: any[];
+  relatedActions: ActionType[];
   onNavigateToAction: (actionId: string) => void;
 }

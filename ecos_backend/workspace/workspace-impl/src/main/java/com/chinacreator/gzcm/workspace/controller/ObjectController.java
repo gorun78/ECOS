@@ -583,7 +583,7 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("Status change failed for {}/{}: {}", entityCode, id, e.getMessage());
-            return ApiResponse.internalError("状态变更失败: " + e.getMessage());
+            return ApiResponse.internalError("状态变更失败");
         }
     }
 
@@ -626,7 +626,7 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
                 "SELECT id, entity_code, object_data FROM ecos_object_data ORDER BY entity_code, id");
         } catch (Exception e) {
             log.error("查询 ecos_object_data 失败: {}", e.getMessage());
-            return ApiResponse.internalError("查询对象数据失败: " + e.getMessage());
+            return ApiResponse.internalError("查询对象数据失败");
         }
 
         int synced = 0;

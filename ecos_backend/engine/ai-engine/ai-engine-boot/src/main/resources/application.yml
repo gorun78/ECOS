@@ -7,14 +7,11 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/sys_man
     username: postgres
-    password: postgres
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
-  jpa:
-    hibernate:
-      ddl-auto: none
   flyway:
     enabled: false
   autoconfigure:

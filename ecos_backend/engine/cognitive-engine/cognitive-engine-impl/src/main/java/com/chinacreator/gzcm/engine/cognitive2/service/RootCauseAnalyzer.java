@@ -193,7 +193,9 @@ public class RootCauseAnalyzer {
             try {
                 String confStr = entry.substring(parenIdx + 12, entry.indexOf(")", parenIdx));
                 conf = Double.parseDouble(confStr);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("因果链节点置信度解析失败，回退默认值 0.5: entry={}", entry);
+            }
 
             CausalChainNode node = new CausalChainNode(
                 currentSize + i + 1, nodeDesc,

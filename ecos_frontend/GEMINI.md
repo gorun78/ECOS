@@ -152,6 +152,8 @@ These standard styling frameworks can be safely copy-pasted and adapted by agent
 ### C. Standard Action Buttons (状态反馈完备的控制键)
 Support both English and Chinese with standard disabled style adjustments.
 
+> **豁免范围（PMO-74 Q6 定调，见 `.trae/rules/前端开发规范.md` §七.7）**：本节 `bg-indigo-600` / `text-white` 这类"品牌填充 + 反色前景"字面量，只允许出现在公共组件内部实现（`src/components/common/Button.tsx`、`Badge.tsx`）；业务页面/Tab 一律使用 `<Button>`，不得就地复制这套 className。结构性容器（页面/卡片/区块的底、边、大面积前景）仍必须走 `useTheme()` token。文案同理走 `t()`，本节示例不作为业务页面的可直接复制粘贴模板。
+
 ```tsx
 // 1. Primary Action Button (高亮行动)
 <button 

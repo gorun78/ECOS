@@ -136,7 +136,7 @@ public class DiagnosticAgentController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Tool execution failed: {}", toolCode, e);
-            return ApiResponse.internalError("工具执行失败: " + e.getMessage());
+            return ApiResponse.internalError("工具执行失败");
         }
     }
 
@@ -183,7 +183,7 @@ public class DiagnosticAgentController {
 
             return ApiResponse.notFound("Agent " + agentId + " 不存在");
         } catch (Exception e) {
-            log.warn("Agent config query failed: {}", e.getMessage());
+            log.warn("Agent config query failed", e);
 
             // 硬编码fallback
             if ("diagnostic".equals(agentId)) {
@@ -193,7 +193,7 @@ public class DiagnosticAgentController {
                 config.put("tools", List.of("query_worldmodel_deviation", "trace_causal_chain", "generate_scenarios"));
                 return ApiResponse.success(config);
             }
-            return ApiResponse.internalError("获取Agent配置失败: " + e.getMessage());
+            return ApiResponse.internalError("获取Agent配置失败");
         }
     }
 
@@ -246,7 +246,7 @@ public class DiagnosticAgentController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Agent chat failed", e);
-            return ApiResponse.internalError("Agent聊天失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent聊天失败");
         }
     }
 
@@ -297,7 +297,7 @@ public class DiagnosticAgentController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Agent call failed", e);
-            return ApiResponse.internalError("Agent诊断执行失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent诊断执行失败");
         }
     }
 
@@ -331,13 +331,13 @@ public class DiagnosticAgentController {
             result.put("queryEntity", entityName);
             result.put("dispatched", true);
         } catch (Exception e) {
-            log.warn("知识图谱查询失败: {}", e.getMessage());
+            log.warn("知识图谱查询失败", e);
             result.put("nodes", List.of());
             result.put("edges", List.of());
             result.put("nodeCount", 0);
             result.put("edgeCount", 0);
             result.put("dispatched", false);
-            result.put("error", "Neo4j 不可用或因果图服务未启动: " + e.getMessage());
+            result.put("error", "Neo4j 不可用或因果图服务未启动");
         }
         return result;
     }

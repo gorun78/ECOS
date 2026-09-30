@@ -5,48 +5,27 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ObjectType, LinkType, ActionType, Dataset } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+// 鉴权头单源定义见 services/auth.ts (H6-T1)
+import { fetchOntologyDataJson } from '../../services/ontologyWorkbenchApi';
+import {
+  SavedSearch,
+  FilterQuery,
+  ResolvedRelation,
+  normalizeObjectTypes,
+} from './businessObjectExplorerTypes';
+import { ExplorerSidebar, ExplorerWelcome } from './BusinessObjectExplorerSidebar';
+import { ExplorerHeader } from './BusinessObjectExplorerHeader';
+import { ExplorerTable } from './BusinessObjectExplorerTable';
+import { ExplorerAnalytics } from './BusinessObjectExplorerAnalytics';
+import { ExplorerDetailPanel } from './BusinessObjectExplorerDetailPanel';
+import { SaveSearchListModal, ExecuteActionModal } from './BusinessObjectExplorerModals';
 
 // ── Backend API helpers ────────────────────────────────────────
 // ObjectExplorerView augments its prop/seed data with real ontology instance
 // data fetched from the ECOS backend. On any failure it gracefully degrades
 // to the seed data supplied via props (mockObjectTypes from seedData.ts).
-
-/** Build standard request headers including the Bearer auth token. */
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('token') || '';
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
-/**
- * Normalise the various possible shapes of the `/api/v1/ontology/data`
- * response payload into a flat ObjectType[] array.
- *
- * Handles: bare arrays, `{ data: [...] }`, and objects that nest the list
- * under a key such as `objectTypes` / `objects` / `list` / `records`.
- * Items missing a stable `id` are dropped so they cannot corrupt the
- * dedup-by-id merge performed later.
- */
-function normalizeObjectTypes(payload: any): ObjectType[] {
-  let raw: any[] | null = null;
-  if (Array.isArray(payload)) {
-    raw = payload;
-  } else if (payload && typeof payload === 'object') {
-    if (Array.isArray(payload.data)) {
-      raw = payload.data;
-    } else {
-      for (const key of ['objectTypes', 'objects', 'objectList', 'list', 'records', 'items']) {
-        if (Array.isArray(payload[key])) { raw = payload[key]; break; }
-      }
-    }
-  }
-  if (!raw) return [];
-  return raw.filter((it: any) => it && typeof it === 'object' && typeof it.id === 'string');
-}
+// (normalizeObjectTypes / SavedSearch / FilterQuery 已抽至 businessObjectExplorerTypes.ts — H6-T4 拆分)
 
 interface ObjectExplorerViewProps {
   objectTypes: ObjectType[];
@@ -57,21 +36,6 @@ interface ObjectExplorerViewProps {
   showToast: (type: 'success' | 'info' | 'error', message: string) => void;
   initialActiveObjectTypeId?: string | null;
   onActiveObjectTypeIdChange?: (id: string | null) => void;
-}
-
-interface SavedSearch {
-  id: string;
-  name: string;
-  objectTypeId: string;
-  filters: FilterQuery[];
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
-}
-
-interface FilterQuery {
-  propertyId: string;
-  operator: 'equals' | 'contains' | 'gt' | 'lt' | 'is_empty' | 'is_not_empty';
-  value: string;
 }
 
 export default function BusinessObjectExplorer({
@@ -106,8 +70,7 @@ export default function BusinessObjectExplorer({
   useEffect(() => {
     let cancelled = false;
     setApiLoading(true);
-    fetch('/api/v1/ontology/data', { headers: authHeaders() })
-      .then(r => r.json())
+    fetchOntologyDataJson()
       .then((resp: any) => {
         if (cancelled) return;
         // Backend signals success with code === 0 (and sometimes code === 200).
@@ -433,7 +396,7 @@ export default function BusinessObjectExplorer({
   };
 
   // 6. Relational Connection Traversal Parser
-  const resolvedRelations = useMemo(() => {
+  const resolvedRelations = useMemo<ResolvedRelation[]>(() => {
     if (!selectedInstance || !activeObjectType) return [];
 
     const relations: Array<{
@@ -660,321 +623,78 @@ export default function BusinessObjectExplorer({
     }, 100);
   };
 
+  // 8. Small wiring helpers for the extracted sub-components (H6-T4)
+  const handleSidebarSelectObjectType = (id: string) => {
+    setActiveObjectTypeId(id);
+    setActiveTab('table');
+  };
+
+  const handleSortColumn = (propId: string) => {
+    setSortBy(propId);
+    setSortOrder(sortBy === propId && sortOrder === 'asc' ? 'desc' : 'asc');
+  };
+
+  const handleSelectInstance = (inst: any) => {
+    setSelectedInstance(inst);
+    setDetailTab('properties');
+  };
+
+  const handleDrillFilter = (propertyId: string, value: string) => {
+    setActiveFilters([...activeFilters, { propertyId, operator: 'equals', value }]);
+    setActiveTab('table');
+    showToast('info', `已通过图表下钻筛选 ${propertyId} = "${value}"`);
+  };
+
   return (
     <div className={`h-full flex overflow-hidden ${styles.appBg} relative select-none`}>
 
       {/* LEFT PANEL: Object Selector & Saved Searches */}
-      <div className={`w-64 border-r ${styles.appBorder} ${styles.cardBg} flex flex-col shrink-0 text-xs`}>
-        {/* Section title */}
-        <div className={`p-4 border-b ${styles.divider} flex items-center justify-between`}>
-          <div className={`font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-            <LucideIcon name="Compass" size={14} className="text-blue-600" />
-            <span>对象浏览器目录</span>
-            {apiLoading && (
-              <span className="ml-1 inline-flex items-center gap-1 text-[9px] font-normal text-blue-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                同步后端…
-              </span>
-            )}
-          </div>
-          {apiError && (
-            <span
-              title={`后端同步失败：${apiError}（已降级为本地种子数据）`}
-              className="text-[9px] text-amber-500 cursor-help"
-            >
-              离线
-            </span>
-          )}
-        </div>
-
-        {/* Object Types list */}
-        <div className="p-3 space-y-1">
-          <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block px-2 mb-2`}>对象实体 (Objects)</span>
-          {objectTypes.map(ot => {
-            const isActive = ot.id === activeObjectTypeId;
-            // Get mock instances count
-            const ds = datasets.find(d => d.id === ot.mapping?.datasetId);
-            const count = ds ? ds.sampleData.length : 0;
-
-            return (
-              <button
-                key={ot.id}
-                onClick={() => {
-                  setActiveObjectTypeId(ot.id);
-                  setActiveTab('table');
-                }}
-                className={`w-full text-left py-2 px-2.5 rounded-lg flex items-center justify-between transition-all group ${
-                  isActive
-                    ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                    : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span className={`p-1 rounded border ${isActive ? 'bg-blue-500 border-blue-400 text-white' : ot.color}`}>
-                    <LucideIcon name={ot.icon} size={12} />
-                  </span>
-                  <span className="truncate">{ot.displayName}</span>
-                </div>
-                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-blue-500 text-white' : `${styles.sidebarBg} ${styles.cardTextMuted}`}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Saved Search Lists */}
-        <div className={`flex-1 border-t ${styles.divider} p-3 space-y-1.5 overflow-y-auto`}>
-          <div className="flex justify-between items-center px-2 mb-1">
-            <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>我的保存列表 (Object Lists)</span>
-            <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1 py-0.2 rounded-sm font-mono`}>{savedSearches.length}</span>
-          </div>
-
-          {savedSearches.length === 0 ? (
-            <div className={`p-4 text-center ${styles.cardTextMuted} border border-dashed ${styles.sidebarBorder} rounded-lg text-[10px]`}>
-              暂无保存的对象列表。
-              可以在筛选过滤后，将其保存。
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {savedSearches.map(search => (
-                <div
-                  key={search.id}
-                  onClick={() => handleLoadSavedSearch(search)}
-                  className={`group flex items-center justify-between p-2 rounded-lg border ${styles.divider} hover:border-blue-400 ${styles.appBg} hover:bg-blue-50/20 cursor-pointer transition-all`}
-                >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <LucideIcon name="Bookmark" size={11} className="text-blue-500 shrink-0" />
-                    <span className={`font-medium ${styles.accentText} truncate`}>{search.name}</span>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteSavedSearch(search.id, e)}
-                    className={`opacity-0 group-hover:opacity-100 hover:text-red-500 ${styles.cardTextMuted} transition-opacity p-0.5`}
-                  >
-                    <LucideIcon name="Trash2" size={11} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <ExplorerSidebar
+        objectTypes={objectTypes}
+        datasets={datasets}
+        activeObjectTypeId={activeObjectTypeId}
+        onSelectObjectType={handleSidebarSelectObjectType}
+        savedSearches={savedSearches}
+        onLoadSavedSearch={handleLoadSavedSearch}
+        onDeleteSavedSearch={handleDeleteSavedSearch}
+        apiLoading={apiLoading}
+        apiError={apiError}
+      />
 
       {/* CENTER & MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        
+
         {/* Active Stage Header */}
         {activeObjectType ? (
-          <div className={`${styles.cardBg} border-b ${styles.appBorder} px-6 py-4 flex flex-col gap-3`}>
-            {/* Breadcrumb & Title */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
-                  <LucideIcon name={activeObjectType.icon} size={15} />
-                </span>
-                <div>
-                  <h2 className={`text-sm font-bold ${styles.text} flex items-center gap-1.5`}>
-                    {activeObjectType.displayName}
-                    <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono uppercase`}>{activeObjectType.id}</span>
-                  </h2>
-                  <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>{activeObjectType.description}</p>
-                </div>
-              </div>
-
-              {/* View Selector Tabs */}
-              <div className={`flex ${styles.sidebarBg} p-1 rounded-lg`}>
-                <button
-                  onClick={() => setActiveTab('table')}
-                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'table' ? `${styles.cardBg} ${styles.text} shadow-3xs` : `${styles.cardTextMuted} hover:${styles.text}`
-                  }`}
-                >
-                  <LucideIcon name="Table2" size={13} />
-                  数据实例列表
-                </button>
-                <button
-                  onClick={() => setActiveTab('analytics')}
-                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'analytics' ? `${styles.cardBg} ${styles.text} shadow-3xs` : `${styles.cardTextMuted} hover:${styles.text}`
-                  }`}
-                >
-                  <LucideIcon name="BarChart3" size={13} />
-                  运行统计与聚合
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Filter & Save Search Toolbar */}
-            <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border ${styles.divider}`}>
-              <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${styles.cardTextMuted} shrink-0`}>
-                <LucideIcon name="Filter" size={13} />
-                筛选器:
-              </div>
-
-              {/* Existing active filters badges */}
-              {activeFilters.length === 0 && (
-                <span className={`text-[10px] ${styles.cardTextMuted} italic`}>当前没有添加任何筛选过滤器</span>
-              )}
-              {activeFilters.map((f, idx) => {
-                const prop = activeObjectType.properties.find(p => p.id === f.propertyId);
-                const propName = prop ? prop.displayName : f.propertyId;
-                
-                const opName = f.operator === 'equals' ? '=' 
-                  : f.operator === 'contains' ? '包含'
-                  : f.operator === 'gt' ? '>'
-                  : f.operator === 'lt' ? '<'
-                  : f.operator === 'is_empty' ? '为空' : '不为空';
-
-                return (
-                  <span key={idx} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded font-medium text-[10px]">
-                    <span className="text-blue-500">{propName}</span>
-                    <span className="text-blue-400 italic font-mono">{opName}</span>
-                    {f.operator !== 'is_empty' && f.operator !== 'is_not_empty' && (
-                      <strong className="text-blue-900 font-semibold">{f.value}</strong>
-                    )}
-                    <button
-                      onClick={() => handleRemoveFilter(idx)}
-                      className="text-blue-400 hover:text-blue-600 ml-1 font-bold"
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-
-              {/* Add filter creator dropdown trigger */}
-              <div className="relative ml-auto flex items-center gap-2">
-                <button
-                  onClick={() => setShowFilterCreator(!showFilterCreator)}
-                  className={`${styles.cardBg} border ${styles.inputBorder} ${styles.inputText} hover:bg-blue-50/20 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
-                >
-                  <LucideIcon name="Plus" size={11} />
-                  添加筛选过滤器
-                </button>
-
-                {/* Filter Creator Popover */}
-                {showFilterCreator && (
-                  <div className={`absolute right-0 top-7 ${styles.cardBg} border ${styles.inputBorder} rounded-lg shadow-lg p-3 z-30 w-72 space-y-3`}>
-                    <h4 className={`font-semibold ${styles.cardText} text-[11px]`}>新建筛选规则</h4>
-                    <div className="space-y-2">
-                      <div>
-                        <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>选择属性</label>
-                        <select
-                          value={newFilterProp}
-                          onChange={e => setNewFilterProp(e.target.value)}
-                          className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2`}
-                        >
-                          <option value="">-- 请选择 --</option>
-                          {activeObjectType.properties.map(p => (
-                            <option key={p.id} value={p.id}>{p.displayName} ({p.id})</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>比较算子</label>
-                          <select
-                            value={newFilterOp}
-                            onChange={e => setNewFilterOp(e.target.value as any)}
-                            className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2`}
-                          >
-                            <option value="equals">等于 (Equals)</option>
-                            <option value="contains">包含 (Contains)</option>
-                            <option value="gt">大于 (&gt;)</option>
-                            <option value="lt">小于 (&lt;)</option>
-                            <option value="is_empty">为空 (Is Empty)</option>
-                            <option value="is_not_empty">不为空 (Is Not Empty)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>设定值</label>
-                          <input
-                            type="text"
-                            disabled={newFilterOp === 'is_empty' || newFilterOp === 'is_not_empty'}
-                            placeholder="搜索值"
-                            value={newFilterVal}
-                            onChange={e => setNewFilterVal(e.target.value)}
-                            className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-1.5 pt-1">
-                      <button
-                        onClick={() => setShowFilterCreator(false)}
-                        className={`h-7 px-2.5 rounded text-[10px] ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted}`}
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={handleAddFilter}
-                        disabled={!newFilterProp}
-                        className="h-7 px-3 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        应用规则
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Save exploration list */}
-                {activeFilters.length > 0 && (
-                  <button
-                    onClick={() => setShowSaveModal(true)}
-                    className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors"
-                  >
-                    <LucideIcon name="Bookmark" size={11} />
-                    保存为对象列表
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <ExplorerHeader
+            activeObjectType={activeObjectType}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            activeFilters={activeFilters}
+            onRemoveFilter={handleRemoveFilter}
+            showFilterCreator={showFilterCreator}
+            onToggleFilterCreator={setShowFilterCreator}
+            newFilterProp={newFilterProp}
+            onNewFilterPropChange={setNewFilterProp}
+            newFilterOp={newFilterOp}
+            onNewFilterOpChange={setNewFilterOp}
+            newFilterVal={newFilterVal}
+            onNewFilterValChange={setNewFilterVal}
+            onAddFilter={handleAddFilter}
+            onOpenSaveModal={() => setShowSaveModal(true)}
+          />
         ) : null}
 
         {/* Workspace Central Canvas */}
         <div className="flex-1 overflow-hidden relative">
-          
+
           {/* Welcome view when no activeObjectType selected */}
           {!activeObjectTypeId ? (
-            <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${styles.appBg}`}>
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-4 animate-pulse">
-                <LucideIcon name="Compass" size={32} />
-              </div>
-              <h2 className={`text-sm font-semibold ${styles.cardText}`}>欢迎使用 Palantir Foundry 对象浏览器 (Object Explorer)</h2>
-              <p className={`text-xs ${styles.cardTextMuted} max-w-lg leading-relaxed mt-2`}>
-                对象浏览器是围绕底层异构数据源构建的数据模型透视工作台。
-                在此您可以全局探索所有数字孪生实例、设定复杂的交叉筛选条件、跨对象级联穿透挖掘、以及触发运行微事务 Action。
-              </p>
-
-              {/* Grid of quick choices */}
-              <div className="grid grid-cols-2 gap-4 w-full max-w-xl mt-8">
-                {objectTypes.map(ot => {
-                  const ds = datasets.find(d => d.id === ot.mapping?.datasetId);
-                  const count = ds ? ds.sampleData.length : 0;
-                  return (
-                    <div
-                      key={ot.id}
-                      onClick={() => setActiveObjectTypeId(ot.id)}
-                      className={`${styles.cardBg} border ${styles.appBorder} hover:border-blue-500 p-4 rounded-xl shadow-3xs hover:shadow-xs transition-all cursor-pointer flex items-start gap-3 group text-left`}
-                    >
-                      <span className={`p-2.5 rounded-lg border ${ot.color} shrink-0`}>
-                        <LucideIcon name={ot.icon} size={16} />
-                      </span>
-                      <div className="space-y-0.5">
-                        <div className={`text-xs font-semibold ${styles.cardText} group-hover:text-blue-600`}>{ot.displayName}</div>
-                        <p className={`text-[10px] ${styles.cardTextMuted} line-clamp-1`}>{ot.description}</p>
-                        <div className={`text-[10px] font-mono ${styles.cardTextMuted} mt-1`}>
-                          <strong>{count}</strong> 个当前运行实体
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <ExplorerWelcome
+              objectTypes={objectTypes}
+              datasets={datasets}
+              onSelectObjectType={setActiveObjectTypeId}
+            />
           ) : (
             <div className="h-full flex overflow-hidden">
 
@@ -982,415 +702,41 @@ export default function BusinessObjectExplorer({
               <div className="flex-1 flex flex-col overflow-hidden">
 
                 {activeTab === 'table' ? (
-                  <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
-                    {/* Search & Statistics bar */}
-                    <div className={`px-6 py-2 ${styles.appBg} border-b ${styles.appBorder} flex items-center justify-between`}>
-                      <div className="relative w-80">
-                        <span className={`absolute left-2.5 top-2.5 ${styles.cardTextMuted}`}>
-                          <LucideIcon name="Search" size={12} />
-                        </span>
-                        <input
-                          type="text"
-                          placeholder="局部搜索当前展示的数据实例..."
-                          value={localSearch}
-                          onChange={e => setLocalSearch(e.target.value)}
-                          className={`w-full h-7 pl-7 pr-3 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden ${styles.inputText}`}
-                        />
-                      </div>
-                      <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
-                        正在展示 <strong>{processedInstances.length}</strong> / {allInstances.length} 个实例化对象
-                      </div>
-                    </div>
-
-                    {/* Table stage — 移动端横滚 / 桌面占满剩余高度 */}
-                    <div className="flex-1 overflow-auto overflow-x-auto md:overflow-visible">
-                      <table className="w-full text-left border-collapse text-xs select-none">
-                        <thead>
-                          <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>
-                            <th className="py-2.5 px-4 w-10">#</th>
-                            {activeObjectType?.properties.map(prop => {
-                              const isSorting = sortBy === prop.id;
-                              return (
-                                <th
-                                  key={prop.id}
-                                  onClick={() => {
-                                    setSortBy(prop.id);
-                                    setSortOrder(isSorting && sortOrder === 'asc' ? 'desc' : 'asc');
-                                  }}
-                                  className="py-2.5 px-4 cursor-pointer hover:bg-blue-50/20 transition-colors"
-                                >
-                                  <div className="flex items-center gap-1">
-                                    <span>{prop.displayName}</span>
-                                    {isSorting ? (
-                                      <LucideIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className="text-blue-600" />
-                                    ) : (
-                                      <LucideIcon name="ChevronsUpDown" size={10} className={styles.cardTextMuted} />
-                                    )}
-                                  </div>
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody className={`divide-y ${styles.divider} ${styles.sidebarText}`}>
-                          {processedInstances.length === 0 ? (
-                            <tr>
-                              <td colSpan={(activeObjectType?.properties.length || 0) + 1} className={`text-center py-24 ${styles.cardTextMuted} font-medium italic`}>
-                                未能查询到符合任何当前筛选条件的实例化对象 (No results)
-                              </td>
-                            </tr>
-                          ) : (
-                            processedInstances.map((inst, idx) => {
-                              const isSelected = selectedInstance && selectedInstance[activeObjectType!.primaryKey] === inst[activeObjectType!.primaryKey];
-                              return (
-                                <tr
-                                  key={idx}
-                                  onClick={() => {
-                                    setSelectedInstance(inst);
-                                    setDetailTab('properties');
-                                  }}
-                                  className={`hover:bg-blue-50/20 cursor-pointer transition-colors ${
-                                    isSelected ? 'bg-blue-50/40 text-blue-950 font-medium border-l-2 border-blue-600' : ''
-                                  }`}
-                                >
-                                  <td className={`py-2.5 px-4 font-mono ${styles.cardTextMuted}`}>{idx + 1}</td>
-                                  {activeObjectType?.properties.map(prop => {
-                                    const val = inst[prop.id];
-                                    const isPk = prop.isPrimaryKey;
-                                    return (
-                                      <td key={prop.id} className="py-2.5 px-4">
-                                        {isPk ? (
-                                          <span className={`font-mono ${styles.text} ${styles.sidebarBg} border ${styles.appBorder}/80 rounded-md px-1.5 py-0.5 text-[10px] font-semibold`}>
-                                            {String(val ?? '')}
-                                          </span>
-                                        ) : prop.id === 'status' ? (
-                                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                            val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
-                                            val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800 font-semibold' :
-                                            `${styles.appBg} ${styles.cardTextMuted}`
-                                          }`}>
-                                            {String(val ?? '')}
-                                          </span>
-                                        ) : (
-                                          <span className="truncate max-w-[160px] inline-block">{String(val ?? '')}</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  <ExplorerTable
+                    activeObjectType={activeObjectType}
+                    processedInstances={processedInstances}
+                    totalInstanceCount={allInstances.length}
+                    localSearch={localSearch}
+                    onLocalSearchChange={setLocalSearch}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSort={handleSortColumn}
+                    selectedInstance={selectedInstance}
+                    onSelectInstance={handleSelectInstance}
+                  />
                 ) : (
                   // ANALYTICS / CHART TAB
-                  <div className={`flex-1 ${styles.cardBg} p-6 space-y-6 overflow-y-auto`}>
-                    <div className="space-y-1">
-                      <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-                        <LucideIcon name="AreaChart" size={14} className="text-blue-600" />
-                        分布聚合分析 (Categorical Distribution)
-                      </h3>
-                      <p className={`text-[10px] ${styles.cardTextMuted}`}>
-                        智能分析当前筛选规则下的数据集。基于标准关键枚举属性<strong>「{analyticsData ? (analyticsData as any).property?.displayName : ''}」</strong>进行快速分组及分布统计。
-                      </p>
-                    </div>
-
-                    {processedInstances.length === 0 ? (
-                      <div className={`text-center py-20 ${styles.cardTextMuted}`}>暂无数据用以绘图统计。</div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-8 items-start">
-                        {/* Custom visual distribution bars */}
-                        <div className={`border ${styles.appBorder} rounded-xl p-5 space-y-3 shadow-3xs ${styles.appBg}`}>
-                          <h4 className={`text-[11px] font-semibold ${styles.cardText}`}>条形占比统计图 (点击柱体可直接追加筛选)</h4>
-                          <div className="space-y-3 pt-2">
-                            {(analyticsData as any).data?.map((item: any) => (
-                              <div
-                                key={item.name}
-                                onClick={() => {
-                                  // Add filter on click
-                                  const propId = (analyticsData as any).property.id;
-                                  setActiveFilters([...activeFilters, {
-                                    propertyId: propId,
-                                    operator: 'equals',
-                                    value: item.name
-                                  }]);
-                                  setActiveTab('table');
-                                  showToast('info', `已通过图表下钻筛选 ${propId} = "${item.name}"`);
-                                }}
-                                className="group cursor-pointer space-y-1"
-                              >
-                                <div className="flex justify-between text-[11px]">
-                                  <span className={`font-medium ${styles.cardText} group-hover:text-blue-600 font-mono transition-colors`}>{item.name}</span>
-                                  <span className={`${styles.cardTextMuted} font-mono`}><strong>{item.count}</strong> 个 ({item.percentage}%)</span>
-                                </div>
-                                <div className={`h-4 w-full ${styles.appBg} rounded overflow-hidden flex`}>
-                                  <div
-                                    style={{ width: `${item.percentage}%` }}
-                                    className="bg-blue-600 group-hover:bg-blue-500 transition-all rounded-r duration-500"
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Summary table list */}
-                        <div className={`border ${styles.appBorder} rounded-xl p-5 space-y-3 ${styles.cardBg}`}>
-                          <h4 className={`text-[11px] font-semibold ${styles.cardText}`}>分组计数表</h4>
-                          <table className="w-full text-left border-collapse text-[11px]">
-                            <thead>
-                              <tr className={`border-b ${styles.divider} ${styles.cardTextMuted}`}>
-                                <th className="pb-2">分组类别</th>
-                                <th className="pb-2 text-right">实例数</th>
-                                <th className="pb-2 text-right">所占比例</th>
-                              </tr>
-                            </thead>
-                            <tbody className={`divide-y ${styles.divider} ${styles.sidebarText}`}>
-                              {(analyticsData as any).data?.map((item: any) => (
-                                <tr key={item.name} className="hover:bg-blue-50/20">
-                                  <td className={`py-2 font-mono ${styles.cardText} font-medium`}>{item.name}</td>
-                                  <td className={`py-2 text-right font-mono font-semibold ${styles.text}`}>{item.count}</td>
-                                  <td className={`py-2 text-right font-mono ${styles.cardTextMuted}`}>{item.percentage}%</td>
-                                </tr>
-                              ))}
-                              <tr className={`border-t ${styles.appBorder} ${styles.text} font-bold`}>
-                                <td className="py-2">总计 (Total)</td>
-                                <td className="py-2 text-right font-mono">{processedInstances.length}</td>
-                                <td className="py-2 text-right font-mono">100.0%</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <ExplorerAnalytics
+                    analyticsData={analyticsData}
+                    processedCount={processedInstances.length}
+                    onDrillFilter={handleDrillFilter}
+                  />
                 )}
               </div>
 
               {/* DETAILED SLIDE-OVER OR SPLIT PANEL (Right hand side) */}
               {selectedInstance ? (
-                <div className={`w-96 border-l ${styles.appBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-hidden relative`}>
-
-                  {/* Detailed Panel Header */}
-                  <div className={`p-4 border-b ${styles.appBorder} ${styles.appBg} flex flex-col gap-3`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
-                          <LucideIcon name={activeObjectType.icon} size={14} />
-                        </span>
-                        <div>
-                          <div className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>{activeObjectType.displayName} 详情</div>
-                          <h3 className={`text-xs font-bold font-mono ${styles.text} mt-0.5`}>
-                            {selectedInstance[activeObjectType.titleProperty]}
-                          </h3>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setSelectedInstance(null)}
-                        className={`p-1 rounded hover:bg-blue-50/20 ${styles.cardTextMuted} opacity-80 hover:opacity-100 transition-opacity`}
-                      >
-                        <LucideIcon name="X" size={14} />
-                      </button>
-                    </div>
-
-                    {/* Action Execution Button Dropdown */}
-                    {availableActions.length > 0 && (
-                      <div className="pt-1.5">
-                        <div className={`text-[10px] ${styles.cardTextMuted} uppercase tracking-wider font-semibold mb-1 flex items-center gap-1`}>
-                          <LucideIcon name="Terminal" size={10} />
-                          <span>绑定的可用操作 (Actions)</span>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          {availableActions.map(act => (
-                            <button
-                              key={act.id}
-                              onClick={() => handleOpenActionModal(act)}
-                              className="w-full h-8 px-2.5 rounded border border-amber-200 bg-amber-50/40 hover:bg-amber-50 text-amber-800 text-[10px] font-semibold flex items-center justify-between transition-all"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <LucideIcon name="Zap" size={12} className="fill-amber-400/20 text-amber-600" />
-                                <span>触发：{act.displayName}</span>
-                              </div>
-                              <LucideIcon name="ChevronRight" size={10} className="text-amber-500" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Panel Tab switch */}
-                  <div className={`flex border-b ${styles.divider} px-2 text-[11px] font-medium ${styles.appBg}`}>
-                    <button
-                      onClick={() => setDetailTab('properties')}
-                      className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'properties' ? 'border-blue-600 text-blue-700 font-bold' : `border-transparent ${styles.cardTextMuted} opacity-80 hover:opacity-100`
-                      }`}
-                    >
-                      实体属性 (Properties)
-                    </button>
-                    <button
-                      onClick={() => setDetailTab('relations')}
-                      className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all flex items-center justify-center gap-1 ${
-                        detailTab === 'relations' ? 'border-blue-600 text-blue-700 font-bold' : `border-transparent ${styles.cardTextMuted} opacity-80 hover:opacity-100`
-                      }`}
-                    >
-                      关联探索 ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
-                    </button>
-                    <button
-                      onClick={() => setDetailTab('activity')}
-                      className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'activity' ? 'border-blue-600 text-blue-700 font-bold' : `border-transparent ${styles.cardTextMuted} opacity-80 hover:opacity-100`
-                      }`}
-                    >
-                      事件记录
-                    </button>
-                  </div>
-
-                  {/* Panel tab bodies */}
-                  <div className="flex-1 overflow-y-auto p-4">
-                    
-                    {/* tab 1: Properties */}
-                    {detailTab === 'properties' && (
-                      <div className="space-y-4">
-                        {activeObjectType.properties.map(p => {
-                          const val = selectedInstance[p.id];
-                          const isPk = p.isPrimaryKey;
-
-                          return (
-                            <div key={p.id} className={`p-2.5 rounded-lg border ${styles.divider} hover:${styles.appBorder} hover:${styles.appBg} transition-colors`}>
-                              <div className={`flex items-center justify-between text-[10px] ${styles.cardTextMuted} font-mono`}>
-                                <span className={`font-semibold ${styles.cardTextMuted}`}>{p.displayName}</span>
-                                <span className="uppercase">{p.dataType}</span>
-                              </div>
-                              <div className={`mt-1 font-mono text-xs font-semibold ${styles.text} flex items-center justify-between`}>
-                                {isPk ? (
-                                  <span className={`${styles.sidebarBg} ${styles.sidebarText} rounded px-1.5 py-0.5 text-[10px]`}>
-                                    {String(val ?? '未指定')}
-                                  </span>
-                                ) : p.id === 'status' ? (
-                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                                    val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
-                                    val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800' :
-                                    `${styles.appBg} ${styles.cardTextMuted}`
-                                  }`}>
-                                    {String(val ?? 'N/A')}
-                                  </span>
-                                ) : (
-                                  <span>{String(val ?? '未赋值 (Null)')}</span>
-                                )}
-
-                                {isPk && (
-                                  <span className="text-[9px] font-semibold text-red-500 bg-red-50 border border-red-100 px-1 rounded uppercase">Primary Key</span>
-                                )}
-                              </div>
-                              <p className={`text-[10px] ${styles.cardTextMuted} mt-1 leading-relaxed`}>{p.description}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* tab 2: Relations / Connection Traversal */}
-                    {detailTab === 'relations' && (
-                      <div className="space-y-5">
-                        <div className={`text-[10px] ${styles.cardTextMuted} font-semibold uppercase leading-relaxed`}>
-                          当前关系网跨对象关联查找
-                        </div>
-
-                        {resolvedRelations.length === 0 ? (
-                          <div className={`text-center py-10 border border-dashed ${styles.sidebarBorder} rounded-lg ${styles.cardTextMuted} text-[10px]`}>
-                            当前对象类型在本体中没有声明关联。
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {resolvedRelations.map(rel => (
-                              <div key={rel.linkType.id} className={`space-y-2 border ${styles.appBorder}/60 rounded-lg p-3 ${styles.appBg}`}>
-                                {/* Header */}
-                                <div className={`flex items-center justify-between text-[11px] pb-1.5 border-b ${styles.divider}`}>
-                                  <div className={`flex items-center gap-1.5 font-semibold ${styles.cardText}`}>
-                                    <LucideIcon name="GitMerge" size={12} className="text-emerald-600" />
-                                    <span>{rel.linkType.displayName}</span>
-                                  </div>
-                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded font-mono font-bold uppercase">
-                                    {rel.linkType.cardinality}
-                                  </span>
-                                </div>
-
-                                <p className={`text-[10px] ${styles.cardTextMuted}`}>{rel.linkType.description}</p>
-
-                                {/* List matching connected instances */}
-                                {rel.instances.length === 0 ? (
-                                  <div className={`text-[10px] ${styles.cardTextMuted} italic ${styles.appBg} p-2 rounded text-center`}>
-                                    没有查找到关联的 {rel.otherObjectType.displayName}
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1 pt-1">
-                                    {rel.instances.map(inst => (
-                                      <div
-                                        key={inst[rel.otherObjectType.primaryKey]}
-                                        onClick={() => handleJumpToInstance(rel.otherObjectType.id, inst[rel.otherObjectType.primaryKey])}
-                                        className={`p-2 border ${styles.appBorder} hover:border-blue-400 ${styles.cardBg} hover:bg-blue-50/10 rounded-md cursor-pointer flex justify-between items-center transition-all group`}
-                                      >
-                                        <div className="flex items-center gap-2 truncate">
-                                          <span className={`p-1 rounded ${rel.otherObjectType.color}`}>
-                                            <LucideIcon name={rel.otherObjectType.icon} size={11} />
-                                          </span>
-                                          <span className={`font-mono text-xs font-semibold ${styles.text}`}>
-                                            {inst[rel.otherObjectType.primaryKey]}
-                                          </span>
-                                          <span className={`text-[10px] ${styles.cardTextMuted} truncate max-w-[100px]`}>
-                                            ({inst[rel.otherObjectType.titleProperty]})
-                                          </span>
-                                        </div>
-                                        <LucideIcon name="Compass" size={11} className={`${styles.cardTextMuted} group-hover:text-blue-600 transition-colors`} />
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* tab 3: Timeline Activity */}
-                    {detailTab === 'activity' && (
-                      <div className="space-y-4">
-                        <div className={`relative border-l ${styles.appBorder} pl-4 ml-2 space-y-5 py-2`}>
-                          <div className="relative text-[11px]">
-                            <span className={`absolute -left-6 top-1 w-3 h-3 rounded-full bg-blue-500 border-2 ${styles.cardBg}`} />
-                            <div className={`font-semibold ${styles.cardText}`}>实体已装载</div>
-                            <p className={`${styles.cardTextMuted} text-[10px] mt-0.5`}>从关联的原始数据集成功实例化并部署在内存沙箱中。</p>
-                            <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>2026-07-02 20:34</span>
-                          </div>
-
-                          {selectedInstance.status === 'MAINTENANCE' && (
-                            <div className="relative text-[11px]">
-                              <span className={`absolute -left-6 top-1 w-3 h-3 rounded-full bg-amber-500 border-2 ${styles.cardBg}`} />
-                              <div className={`font-semibold ${styles.cardText}`}>触发适航检修维护</div>
-                              <p className={`${styles.cardTextMuted} text-[10px] mt-0.5`}>飞机运营状态转设为 MAINTENANCE 并更新检修戳记。</p>
-                              <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>刚刚</span>
-                            </div>
-                          )}
-
-                          {selectedInstance.status === 'DELAYED' && (
-                            <div className="relative text-[11px]">
-                              <span className={`absolute -left-6 top-1 w-3 h-3 rounded-full bg-red-400 border-2 ${styles.cardBg}`} />
-                              <div className={`font-semibold ${styles.cardText}`}>修改航班运行状态为 DELAYED</div>
-                              <p className={`${styles.cardTextMuted} text-[10px] mt-0.5`}>触发副作用：运行状态修改写回至对应航班物理数据行中。</p>
-                              <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>刚刚</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ExplorerDetailPanel
+                  activeObjectType={activeObjectType}
+                  selectedInstance={selectedInstance}
+                  onClose={() => setSelectedInstance(null)}
+                  availableActions={availableActions}
+                  onOpenAction={handleOpenActionModal}
+                  detailTab={detailTab}
+                  onDetailTabChange={setDetailTab}
+                  resolvedRelations={resolvedRelations}
+                  onJumpToInstance={handleJumpToInstance}
+                />
               ) : null}
 
             </div>
@@ -1401,153 +747,25 @@ export default function BusinessObjectExplorer({
 
       {/* MODAL 1: Save Exploration Object List */}
       {showSaveModal && (
-        <div className={`fixed inset-0 ${styles.overlayBg} backdrop-blur-3xs flex items-center justify-center z-50`}>
-          <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl shadow-2xl p-5 w-96 space-y-4`}>
-            <div className={`flex justify-between items-center pb-2 border-b ${styles.divider}`}>
-              <h3 className={`text-xs font-semibold ${styles.text} flex items-center gap-1.5`}>
-                <LucideIcon name="Bookmark" size={13} className="text-blue-600" />
-                保存当前过滤器为对象列表 (Object List)
-              </h3>
-              <button onClick={() => setShowSaveModal(false)} className={`${styles.cardTextMuted} hover:${styles.text}`}>
-                <LucideIcon name="X" size={14} />
-              </button>
-            </div>
-            <div>
-              <label className={`text-[10px] ${styles.cardTextMuted} block mb-1`}>输入对象列表名称</label>
-              <input
-                type="text"
-                placeholder="例如：旧金山基地待检修飞机"
-                value={newSearchName}
-                onChange={e => setNewSearchName(e.target.value)}
-                className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2.5 focus:border-blue-500 focus:outline-hidden`}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-1 text-[11px]">
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className={`h-8 px-3 rounded ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted} font-semibold`}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveSearch}
-                disabled={!newSearchName.trim()}
-                className="h-8 px-4 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                确定保存
-              </button>
-            </div>
-          </div>
-        </div>
+        <SaveSearchListModal
+          newSearchName={newSearchName}
+          onNameChange={setNewSearchName}
+          onClose={() => setShowSaveModal(false)}
+          onSave={handleSaveSearch}
+        />
       )}
 
       {/* MODAL 2: Execute Action Parameters Form */}
       {selectedAction && (
-        <div className={`fixed inset-0 ${styles.overlayBg} backdrop-blur-3xs flex items-center justify-center z-50`}>
-          <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl shadow-2xl p-5 w-full sm:w-[420px] mx-4 sm:mx-auto space-y-4`}>
-            <div className={`flex justify-between items-center pb-2.5 border-b ${styles.divider}`}>
-              <div className="flex items-center gap-1.5">
-                <LucideIcon name="Zap" size={14} className="text-amber-500 fill-amber-500/10" />
-                <h3 className={`text-xs font-semibold ${styles.text}`}>
-                  执行操作：{selectedAction.displayName}
-                </h3>
-              </div>
-              <button onClick={() => setSelectedAction(null)} className={`${styles.cardTextMuted} hover:${styles.text}`}>
-                <LucideIcon name="X" size={14} />
-              </button>
-            </div>
-
-            <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed`}>{selectedAction.description}</p>
-
-            <div className="space-y-3 pt-1">
-              {selectedAction.parameters.map(param => {
-                const isObjectParam = param.dataType === 'object';
-                const isLocked = isObjectParam && param.objectTypeId === activeObjectType?.id;
-
-                return (
-                  <div key={param.id} className="space-y-1 text-xs">
-                    <label className={`text-[10px] ${styles.cardTextMuted} font-semibold flex items-center justify-between`}>
-                      <span>{param.displayName} ({param.id})</span>
-                      {param.isRequired && <span className="text-red-500 font-bold">* 必填</span>}
-                    </label>
-
-                    {isLocked ? (
-                      <input
-                        type="text"
-                        disabled
-                        value={actionParams[param.id] || ''}
-                        className={`w-full h-8 text-[11px] ${styles.sidebarBg} border ${styles.inputBorder} rounded px-2.5 ${styles.cardTextMuted} font-mono`}
-                      />
-                    ) : param.id === 'new_status_param' ? (
-                      <select
-                        value={actionParams[param.id] || ''}
-                        onChange={e => setActionParams({ ...actionParams, [param.id]: e.target.value })}
-                        className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2 focus:border-blue-500`}
-                      >
-                        <option value="">-- 请选择目标状态 --</option>
-                        {activeObjectType?.id === 'flight' && (
-                          <>
-                            <option value="ON_TIME">ON_TIME (准点)</option>
-                            <option value="DELAYED">DELAYED (延误)</option>
-                            <option value="BOARDING">BOARDING (登机中)</option>
-                            <option value="CANCELLED">CANCELLED (取消)</option>
-                          </>
-                        )}
-                        {activeObjectType?.id === 'aircraft' && (
-                          <>
-                            <option value="ACTIVE">ACTIVE (活跃运行)</option>
-                            <option value="MAINTENANCE">MAINTENANCE (适航检修)</option>
-                            <option value="INSPECTION">INSPECTION (深度安全安检)</option>
-                          </>
-                        )}
-                      </select>
-                    ) : param.dataType === 'date' ? (
-                      <input
-                        type="date"
-                        value={actionParams[param.id] || ''}
-                        onChange={e => setActionParams({ ...actionParams, [param.id]: e.target.value })}
-                        className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2.5 focus:border-blue-500`}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder={`请输入 ${param.displayName}`}
-                        value={actionParams[param.id] || ''}
-                        onChange={e => setActionParams({ ...actionParams, [param.id]: e.target.value })}
-                        className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2.5 focus:border-blue-500`}
-                      />
-                    )}
-
-                    <p className={`text-[9px] ${styles.cardTextMuted}`}>{param.description}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* validation error line */}
-            {actionError && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-600 font-medium">
-                ❌ 事务约束违背：{actionError}
-              </div>
-            )}
-
-            <div className={`flex justify-end gap-2 pt-2 border-t ${styles.divider} text-[11px]`}>
-              <button
-                onClick={() => setSelectedAction(null)}
-                className={`h-8 px-3 rounded ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted} font-semibold`}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleExecuteAction}
-                className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-white font-semibold flex items-center gap-1"
-              >
-                <LucideIcon name="CheckCircle" size={12} />
-                <span>执行写回 (Execute)</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <ExecuteActionModal
+          action={selectedAction}
+          activeObjectType={activeObjectType}
+          actionParams={actionParams}
+          onActionParamsChange={setActionParams}
+          actionError={actionError}
+          onClose={() => setSelectedAction(null)}
+          onExecute={handleExecuteAction}
+        />
       )}
 
     </div>

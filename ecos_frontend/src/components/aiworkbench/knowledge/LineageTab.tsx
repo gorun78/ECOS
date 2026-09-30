@@ -7,11 +7,35 @@ import React from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { ThemeStyles } from '../../../components/ThemeContext';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const Comp = (Icons[name as keyof typeof Icons] || Icons.HelpCircle) as LucideIcon;
   return <Comp size={size} className={className} />;
 };
+
+/** 血缘图节点（父层解析 payload / 后端 lineage 端点产物；本 Tab 只读展示） */
+interface LineageNode {
+  id: string;
+  label?: string;
+  type?: string;
+}
+
+/** 影响链上的单个下游节点 */
+interface LineageImpactNode {
+  id: string;
+  type?: string;
+  path: string[];
+  hopCount: number;
+  riskScore: number;
+}
+
+/** 影响分析结果（未分析时为 null） */
+interface LineageImpactResult {
+  severity?: string;
+  totalRisk?: number;
+  impactedNodes: LineageImpactNode[];
+}
 
 interface LineageTabProps {
   styles: ThemeStyles;
@@ -22,11 +46,11 @@ interface LineageTabProps {
   setParserFormatSelected: (v: 'openlineage' | 'atlas') => void;
   handleParseLineage: () => Promise<void>;
   isParsing: boolean;
-  lineageNodes: any[];
-  lineageLinks: any[];
+  lineageNodes: LineageNode[];
+  lineageLinks: unknown[];
   selectedStartNode: string;
   setSelectedStartNode: (v: string) => void;
-  impactResult: any;
+  impactResult: LineageImpactResult | null;
   isAnalyzing: boolean;
   handleRunImpactAnalysis: (startNodeId: string) => Promise<void>;
 }
@@ -366,7 +390,7 @@ export default function LineageTab({
                 </div>
               ) : (
                 <div className="space-y-2.5 max-h-48 overflow-y-auto">
-                  {impactResult.impactedNodes.map((node: any, i: number) => (
+                  {impactResult.impactedNodes.map((node: LineageImpactNode, i: number) => (
                     <div key={i} className={`flex items-center justify-between p-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} hover:styles.appBg/70 transition-all text-[10px]`}>
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1.5">

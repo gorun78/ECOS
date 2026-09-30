@@ -83,7 +83,7 @@ public class AgentCallController {
             return ApiResponse.success(resp);
         } catch (Exception e) {
             log.error("Agent 聊天执行失败", e);
-            return ApiResponse.internalError("Agent 执行失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent 执行失败");
         }
     }
 
@@ -100,7 +100,7 @@ public class AgentCallController {
             return ApiResponse.success(stats);
         } catch (Exception e) {
             log.error("获取全局统计失败", e);
-            return ApiResponse.internalError("获取统计失败: " + e.getMessage());
+            return ApiResponse.internalError("获取统计失败");
         }
     }
 
@@ -117,7 +117,7 @@ public class AgentCallController {
             return ApiResponse.success(stats);
         } catch (Exception e) {
             log.error("获取子系统统计失败: subsystem={}", subsystem, e);
-            return ApiResponse.internalError("获取统计失败: " + e.getMessage());
+            return ApiResponse.internalError("获取统计失败");
         }
     }
 }

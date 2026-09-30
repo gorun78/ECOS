@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchSystemDictItems, type DictItem } from '../services/systemDictApi';
 
-export interface DictItem {
-  dictCode: string;
-  dictLabel: string;
-  dictLabelEn: string;
-  extValue?: string;
-  sortOrder: number;
-}
+export type { DictItem };
 
 // 全局缓存
 const globalCache = new Map<string, DictItem[]>();
@@ -18,21 +13,7 @@ export async function fetchDictItems(dictType: string): Promise<DictItem[]> {
   const pending = pendingRequests.get(dictType);
   if (pending) return pending;
 
-  const promise = (async () => {
-    const token = localStorage.getItem('token') || '';
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-    const res = await fetch(`/api/v1/system/dict/${dictType}`, { headers });
-    const json = await res.json();
-    if (json.code !== 0 || !json.data) return [];
-    return (json.data || []).map((d: any) => ({
-      dictCode: d.dictCode,
-      dictLabel: d.dictLabel,
-      dictLabelEn: d.dictLabelEn || d.dictLabel,
-      extValue: d.extValue || undefined,
-      sortOrder: d.sortOrder || 0,
-    }));
-  })();
+  const promise = fetchSystemDictItems(dictType);
 
   pendingRequests.set(dictType, promise);
   promise.finally(() => pendingRequests.delete(dictType));

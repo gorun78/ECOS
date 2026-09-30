@@ -34,7 +34,7 @@ public class RlsController {
             return ApiResponse.success(rlsService.apply(tableName, userId));
         } catch (Exception e) {
             log.error("RLS策略应用失败", e);
-            return ApiResponse.internalError("策略应用失败: " + e.getMessage());
+            return ApiResponse.internalError("策略应用失败");
         }
     }
 
@@ -57,7 +57,7 @@ public class RlsController {
             return ApiResponse.success(rlsService.createPolicy(body));
         } catch (Exception e) {
             log.error("创建RLS策略失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 

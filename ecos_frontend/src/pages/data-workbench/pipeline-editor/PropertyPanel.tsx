@@ -76,7 +76,7 @@ const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, 
 
   const loadUdfs = useCallback(() => {
     apiFetchData<{ data?: UdfItem[]; list?: UdfItem[] } | UdfItem[]>('/api/v1/engine/data/udf/list')
-      .then((resp: any) => {
+      .then((resp) => {
         const list = Array.isArray(resp) ? resp : (resp?.data ?? resp?.list ?? []);
         if (Array.isArray(list)) setUdfs(list);
       })

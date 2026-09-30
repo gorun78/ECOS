@@ -29,9 +29,10 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqScheduleVO;
  * POST   /api/v1/dq/schedules/{id}/trigger?triggerBy=xxx — 手动触发规则批执行
  * </pre>
  *
- * <p>三滤波器（铁律 1.2）：本路径由既有 {@code /api/v1/dq/**} 通配覆盖
- * （T2 已注册 VersionPrefixRewriteFilter KEEP + SecurityConfig permitAll
- * + ClearanceInterceptor 豁免双路径 + auth.whitelist），无需改三滤波器。</p>
+ * <p>三滤波器（PMO-74 H9-T5c 按实测更正）：本路径<b>无需改三滤波器登记</b>，但<b>不再匿名放行</b>——
+ * VersionPrefixRewriteFilter 正向表无 dq 条目（{@code /api/v1/dq/**} = KEEP），SecurityConfig permitAll
+ * 经 H9-T1 收敛为 8 条且不含 dq，ClearanceInterceptor 的业务前缀豁免经 H9-T2 移除，yml
+ * {@code auth.whitelist} 已删除。故创建/触发等写操作需 Bearer Token + L1 准入等级。</p>
  *
  * <p>安全卡（铁律 2.4）：读操作 auditRead / 写操作 auditWrite 由
  * {@code DqScheduleServiceImpl} 统一异步走 security-engine。</p>

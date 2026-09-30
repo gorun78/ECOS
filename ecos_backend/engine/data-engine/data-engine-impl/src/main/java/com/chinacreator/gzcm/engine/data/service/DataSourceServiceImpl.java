@@ -1,14 +1,12 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataAsyncTrigger;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataStrategyConfig;
-import com.chinacreator.gzcm.engine.security.crypto.IDataEncryptionService;
-import com.chinacreator.gzcm.engine.security.crypto.IKeyManagementService;
-import com.chinacreator.gzcm.engine.security.crypto.impl.DataEncryptionServiceImpl;
-import com.chinacreator.gzcm.engine.security.crypto.service.impl.KeyManagementServiceImpl;
+import com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +45,9 @@ public class DataSourceServiceImpl implements DataSourceService {
             "password", "secret", "secretkey", "secretaccesskey", "passwd", "apitoken");
     /** PMO-46: 掩码值（与 security-engine SecurityService.mask() 口径一致）。 */
     private static final String MASK_VALUE = "********";
+    /** PMO-74 H10-T4b：解析失败时的 fail-closed 响应体（不回显任何原文）。 */
+    static final String FAIL_CLOSED_MASKED_CONFIG =
+            "{\"masked\":\"********\",\"reason\":\"connectionConfig 无法解析，响应层按 fail-closed 掩码\"}";
 
     /** PMO-45: 支持的全部数据源类型（与数据模型 7 种基础类型对齐） */
     public static final Set<String> SUPPORTED_TYPES = Set.of(
@@ -90,34 +91,39 @@ public class DataSourceServiceImpl implements DataSourceService {
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // PMO-49: 数据源密码加密（security-engine，Authentication 直接 new 模式）
+    // PMO-49: 数据源密码加密（经 runtime SecurityCryptoEgress 出口，见下方 H3-T-ARCH）
     //   - 写前 encryptPassword：明文 → 密文 → password_enc 列；config 中密码字段剥离
     //   - 读后 resolvePassword：密文解密回填 connectionConfig（内存回填，读路径不写库）
     //   - maskSensitiveFields：响应层密码字段回显 "********"
     //   - 降级策略：加密/解密异常 → 明文落库/跳过回填 + WARN（降密不降级服务）
-    //   - key 管理：IKeyManagementService 按 keyId 自管 key，首次写入前 ensureKey（幂等）
+    //   - key 管理：出口按 keyId 自管 key，首次写入前 ensureKey（幂等）
     // ──────────────────────────────────────────────────────────────────
 
     /**
-     * PMO-49: 数据源密码加密服务（data-engine 自持实例）。
-     * 直接 new 实例化 security-engine 提供的 KeyManagementServiceImpl +
-     * DataEncryptionServiceImpl，避免跨模块 Bean 循环依赖。
-     * 同一进程内 data-engine 所有 DataSourceService 实例共享同一 keyId 因此
-     * 解密数据源间可互访（密文互通 = 同一密钥体系）。
+     * H3-T-ARCH（裁决 C）：数据源密码加解密改经 runtime 持有的安全出口。
+     * 原 PMO-49 模式为 data-engine 直接 new security-engine 的
+     * KeyManagementServiceImpl + DataEncryptionServiceImpl（编译期直依 engine-impl，
+     * ArchUnit 违例 12 次）。出口内部仍是同一套 security-engine 实现（Bean 优先、
+     * 无 Bean 时反射自持），故密钥体系与密文互通语义不变。
      */
-    private final IKeyManagementService kms = new KeyManagementServiceImpl();
-    private final IDataEncryptionService dataEncryptionService = new DataEncryptionServiceImpl(kms);
+    private SecurityCryptoEgress cryptoEgress;
     private volatile boolean keyReady;
+
+    /** 出口为可选依赖：无 Spring 上下文（纯单测 new 出来）时加解密走降级路径。 */
+    @Autowired(required = false)
+    public void setCryptoEgress(SecurityCryptoEgress cryptoEgress) {
+        this.cryptoEgress = cryptoEgress;
+    }
 
     /** PMO-49: 确保 KMS 中数据源密码 key 存在（幂等，首次调用创建）。 */
     private synchronized void ensureKey() {
         if (keyReady) return;
+        if (cryptoEgress == null) {
+            log.warn("PMO-49: SecurityCryptoEgress 未注入（加解密不可用，写路径按降级处理）");
+            return;
+        }
         try {
-            byte[] kb = kms.getKeyBytes(KEY_DATA_SOURCE_PASSWORD);
-            if (kb == null || kb.length == 0) {
-                kms.createKey(KEY_DATA_SOURCE_PASSWORD, "AES", 128);
-                log.info("PMO-49: KMS key created for datasource passwords (keyId={})", KEY_DATA_SOURCE_PASSWORD);
-            }
+            cryptoEgress.ensureKey(KEY_DATA_SOURCE_PASSWORD, "AES", 128);
             keyReady = true;
         } catch (Exception e) {
             log.warn("PMO-49: KMS key ensure 失败（encrypt/decrypt 时重试）: {}", e.getMessage(), e);
@@ -127,18 +133,24 @@ public class DataSourceServiceImpl implements DataSourceService {
     /**
      * PMO-49: 写入前加密密码。
      * @param password 明文密码（null/空白返回 null）
-     * @return 密文（Base64 AES）；加密失败时降级返回原明文并告警
+     * @return 密文（Base64 AES）
+     * @throws ValidationException 加密能力缺席或加密失败 —— 拒绝保存口令，不降级明文（fail-closed）
      */
     String encryptPassword(String password) {
         if (password == null || password.isBlank()) {
             return null;
         }
+        if (cryptoEgress == null) {
+            log.error("PMO-49: SecurityCryptoEgress 未注入，拒绝保存数据源口令（keyId={}）", KEY_DATA_SOURCE_PASSWORD);
+            throw new ValidationException("加密服务不可用，已拒绝保存数据源口令，请联系管理员恢复 KMS 后重试");
+        }
         ensureKey();
         try {
-            return dataEncryptionService.encrypt(password, KEY_DATA_SOURCE_PASSWORD);
+            return cryptoEgress.encrypt(password, KEY_DATA_SOURCE_PASSWORD);
         } catch (Exception e) {
-            log.warn("PMO-49: 密码加密失败，降级明文存储: {}", e.getMessage(), e);
-            return password;
+            // 异常详情只落日志：口令不得进入响应体或异常文案
+            log.error("PMO-49: 密码加密失败，拒绝保存口令（不降级明文）: {}", e.getMessage(), e);
+            throw new ValidationException("数据源口令加密失败，已拒绝保存");
         }
     }
 
@@ -186,8 +198,12 @@ public class DataSourceServiceImpl implements DataSourceService {
         if (encCipher == null || encCipher.isBlank()) {
             return null;
         }
+        if (cryptoEgress == null) {
+            log.warn("PMO-49: SecurityCryptoEgress 未注入，密码解密不可用（返回 null 不回填）");
+            return null;
+        }
         try {
-            String plain = dataEncryptionService.decrypt(encCipher, KEY_DATA_SOURCE_PASSWORD);
+            String plain = cryptoEgress.decrypt(encCipher, KEY_DATA_SOURCE_PASSWORD);
             return (plain == null || plain.isBlank()) ? null : plain;
         } catch (Exception e) {
             log.warn("PMO-49: 数据源密码解密失败（key 可能丢失/轮换）: {}", e.getMessage(), e);
@@ -217,6 +233,7 @@ public class DataSourceServiceImpl implements DataSourceService {
     /**
      * PMO-46: 响应脱敏——config 密码字段回显为 ********（存在但不可用）。
      * 用于 DataSourceController/DataWorkbenchController 的详情/列表回显。
+     * PMO-74 H10-T4b（N-A）：解析失败原样回显 = fail-open，改为 fail-closed 全量掩码。
      */
     String maskSensitiveFields(String cfgJson) {
         if (cfgJson == null || cfgJson.isBlank()) {
@@ -231,7 +248,8 @@ public class DataSourceServiceImpl implements DataSourceService {
             }
             return OBJECT_MAPPER.writeValueAsString(cfg);
         } catch (Exception e) {
-            return cfgJson;
+            log.warn("响应脱敏 fail-closed：connectionConfig 非合法 JSON 对象，已整列掩码（不回显原文）", e);
+            return FAIL_CLOSED_MASKED_CONFIG;
         }
     }
 
@@ -333,9 +351,12 @@ public class DataSourceServiceImpl implements DataSourceService {
 
     @Override
     public List<DataSourceEntity> listAll() {
+        // PMO-74 H8-T-DS-PLAIN: 列表出口统一脱敏（与 getById 同口径）。
+        // 收口点选在 listAll() 而非 DataSourceRegistryService:41，因为 DataSourceController:29
+        // 直接调 service.listAll() 绕过缓存；此处掩码后两个 HTTP 出口 + Caffeine 缓存同时闭环。
         return jdbc.query(
             "SELECT * FROM " + TABLE + " ORDER BY create_time DESC",
-            (rs, i) -> mapRow(rs)
+            (rs, i) -> maskProtected(mapRow(rs))
         );
     }
 
@@ -800,7 +821,9 @@ public class DataSourceServiceImpl implements DataSourceService {
                     try {
                         List<Map<String, Object>> rows = connector.queryPreview(cfg, firstObj, 5);
                         columnPreview = rows;
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) {
+                        log.debug("列预览取数失败，返回结果不含 columnPreview: object={} reason={}", firstObj, ignored.getMessage());
+                    }
                 }
             }
             result.put("columnPreview", columnPreview);

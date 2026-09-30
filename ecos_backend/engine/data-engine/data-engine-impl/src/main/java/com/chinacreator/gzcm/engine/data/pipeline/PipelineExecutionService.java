@@ -329,11 +329,12 @@ public class PipelineExecutionService {
      * 读取 SOURCE_JDBC 源行（不含 affectedRows 包装）。
      */
     private List<Map<String, Object>> readSourceJdbcRows(Map<String, Object> config) throws Exception {
-        DataSourceEntity ds = resolveDatasource(config.get("datasourceId"), "SOURCE_JDBC: datasourceId 必填");
+        // 必填校验先于数据源解析（PMO-74 H5-T-VALORDER）：两个字段都缺时应报字段名，而非 DataSource not found
         String sql = (String) config.get("sql");
         if (sql == null || sql.isEmpty()) {
             throw new ValidationException("sql", "SOURCE_JDBC: sql 必填");
         }
+        DataSourceEntity ds = resolveDatasource(config.get("datasourceId"), "SOURCE_JDBC: datasourceId 必填");
         Connector connector = connectorFactory.getConnector("JDBC");
         JdbcConnector jdbcConnector = requireJdbcConnector(connector);
         int fetchSize = toInt(config.get("fetchSize"), 1000);
@@ -1957,7 +1958,8 @@ public class PipelineExecutionService {
     private void logInfo(String pattern, Object... args) {
         log.info(pattern, args);
         if (loggingService != null) {
-            try { loggingService.log(ILoggingService.LogLevel.INFO, formatSlf(pattern, args)); } catch (Exception ignored) {}
+            try { loggingService.log(ILoggingService.LogLevel.INFO, formatSlf(pattern, args)); }
+            catch (Exception e) { log.debug("ILoggingService 旁路 INFO 投递失败: {}", e.getMessage()); }
         }
     }
 
@@ -1968,7 +1970,9 @@ public class PipelineExecutionService {
             try {
                 if (cause != null) loggingService.log(ILoggingService.LogLevel.ERROR, formatSlf(pattern, args), cause);
                 else loggingService.log(ILoggingService.LogLevel.ERROR, formatSlf(pattern, args));
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.debug("ILoggingService 旁路 ERROR 投递失败: {}", e.getMessage());
+            }
         }
     }
 

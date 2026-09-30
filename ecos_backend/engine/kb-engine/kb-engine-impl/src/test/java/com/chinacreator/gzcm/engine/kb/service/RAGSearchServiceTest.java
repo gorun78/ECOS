@@ -47,6 +47,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RAGSearchServiceTest {
 
+    /** PMO-74 H5-T-ENGINEQA: ragQuery 向量路径先经 QueryEmbeddingHelper.embed 取查询向量，再以此调 searchByVector。 */
+    private static final String QUERY_VECTOR = "[0.11,0.22,0.33]";
+
     private KnowledgeNodeMapper nodeMapper;
     private KnowledgeEdgeMapper edgeMapper;
     private KnowledgeArticleMapper articleMapper;
@@ -100,7 +103,8 @@ class RAGSearchServiceTest {
         row2.put("chunktext", "客户回款周期");
         row2.put("score", 0.81);
         row2.put("articleid", "art-2");
-        when(embeddingMapper.searchByVector(eq("毛利率"), eq(3))).thenReturn(List.of(row1, row2));
+        when(embeddingMapper.searchByVector(eq(QUERY_VECTOR), eq(3))).thenReturn(List.of(row1, row2));
+        when(queryEmbeddingHelper.embed(eq("毛利率"), anyString(), anyString())).thenReturn(QUERY_VECTOR);
 
         Map<String, Object> res = service.ragQuery("毛利率", 3);
 
@@ -116,7 +120,7 @@ class RAGSearchServiceTest {
         assertEquals("art-1", sources.get(0).get("source"));
         assertEquals(2, res.get("totalTokens"));
         // 验证 mapper 用了正确的 topK 参数 (3)
-        verify(embeddingMapper).searchByVector(eq("毛利率"), eq(3));
+        verify(embeddingMapper).searchByVector(eq(QUERY_VECTOR), eq(3));
     }
 
     // ── ragQuery 不传 topK — 由 controller 默认 5, service 必须尊重 topK 参数 ──
@@ -130,12 +134,13 @@ class RAGSearchServiceTest {
         row.put("chunktext", "x");
         row.put("score", 0.7);
         row.put("articleid", "art-x");
-        when(embeddingMapper.searchByVector(eq("销售"), eq(5))).thenReturn(List.of(row));
+        when(embeddingMapper.searchByVector(eq(QUERY_VECTOR), eq(5))).thenReturn(List.of(row));
+        when(queryEmbeddingHelper.embed(eq("销售"), anyString(), anyString())).thenReturn(QUERY_VECTOR);
 
         Map<String, Object> res = service.ragQuery("销售", 5);  // controller 默认 5
 
         assertEquals(5, res.get("topK"));
-        verify(embeddingMapper).searchByVector(eq("销售"), eq(5));
+        verify(embeddingMapper).searchByVector(eq(QUERY_VECTOR), eq(5));
     }
 
     // ── ragQuery 空 query → 空 sources ──
@@ -197,6 +202,7 @@ class RAGSearchServiceTest {
     @DisplayName("ragQuery: searchByVector 异常 → 降级 searchByKeyword (业务不阻断)")
     void ragQueryVectorFailureFallsBackToKeyword() {
         setPgVectorAvailable(true);
+        when(queryEmbeddingHelper.embed(eq("毛利率"), anyString(), anyString())).thenReturn(QUERY_VECTOR);
         when(embeddingMapper.searchByVector(anyString(), anyInt()))
             .thenThrow(new RuntimeException("pgvector 不可用"));
         KnowledgeEmbedding emb = new KnowledgeEmbedding();

@@ -34,4 +34,4 @@
 ## 禁止
 1. 不执行规则判定（那是cognitive-engine的事）
 2. 不直接调LLM（那是ai-engine的事）
-3. Neo4j只在enterprise/flagship版本启用
+3. Neo4j只在enterprise/ultimate版本启用

@@ -59,7 +59,6 @@ public class MetadataController {
     private final MetadataAsyncTrigger asyncTrigger;
     private final MetadataCollectGitArchive gitArchive;
     private final MetadataService metadataService;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     /** 数据湖分层资源登记服务（B5-1：通用资源登记，供知识工作台登记解析文本）。 */
     private final DataLakeResourceService dataLakeResourceService;
@@ -75,7 +74,6 @@ public class MetadataController {
                               MetadataAsyncTrigger asyncTrigger,
                               MetadataCollectGitArchive gitArchive,
                               MetadataService metadataService,
-                              org.springframework.jdbc.core.JdbcTemplate jdbc,
                               DataLakeResourceService dataLakeResourceService) {
         this.collectionService = collectionService;
         this.taskService = taskService;
@@ -85,7 +83,6 @@ public class MetadataController {
         this.asyncTrigger = asyncTrigger;
         this.gitArchive = gitArchive;
         this.metadataService = metadataService;
-        this.jdbc = jdbc;
         this.dataLakeResourceService = dataLakeResourceService;
     }
 
@@ -260,8 +257,8 @@ public class MetadataController {
         try {
             items = collectionService.getResourcePages(datasourceId, pn, ps);
         } catch (Exception e) {
-            log.warn("catalog 查询失败 {}: {}", datasourceId, e.getMessage());
-            return error("目录查询失败: " + e.getMessage());
+            log.warn("catalog 查询失败 {}", datasourceId, e);
+            return error("目录查询失败");
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -312,10 +309,7 @@ public class MetadataController {
                                            @RequestParam(defaultValue = "5") int limit) {
         Map<String, Object> data = new LinkedHashMap<>();
         try {
-            List<Map<String, Object>> logs = jdbc.queryForList(
-                    "SELECT result, created_at, task_id FROM td_metadata_collect_log " +
-                    "WHERE datasource_id = ? AND result IS NOT NULL ORDER BY created_at DESC LIMIT ?",
-                    datasourceId, Math.max(1, limit));
+            List<Map<String, Object>> logs = rowCountService.recentCollectResults(datasourceId, limit);
             // 解析 result JSON 提取 diffSummary/diffMarkdown
             List<Map<String, Object>> diffs = new java.util.ArrayList<>();
             for (Map<String, Object> row : logs) {
@@ -340,8 +334,8 @@ public class MetadataController {
             }
             data.put("diffs", diffs);
         } catch (Exception e) {
-            log.warn("collect-diff 查询失败: {}", e.getMessage());
-            return error("差异记录查询失败: " + e.getMessage());
+            log.warn("collect-diff 查询失败", e);
+            return error("差异记录查询失败");
         }
         data.put("datasourceId", datasourceId);
         Map<String, Object> r = new LinkedHashMap<>();
@@ -369,8 +363,8 @@ public class MetadataController {
         } catch (IllegalArgumentException e) {
             return error(e.getMessage());
         } catch (Exception e) {
-            log.warn("version-history 查询失败 ds={}: {}", datasourceId, e.getMessage());
-            return error("历史版本查询失败: " + e.getMessage());
+            log.warn("version-history 查询失败 ds={}", datasourceId, e);
+            return error("历史版本查询失败");
         }
     }
 
@@ -393,8 +387,8 @@ public class MetadataController {
         } catch (IllegalArgumentException e) {
             return error(e.getMessage());
         } catch (Exception e) {
-            log.warn("version-diff 查询失败 ds={} version={}: {}", datasourceId, version, e.getMessage());
-            return error("版本比较失败: " + e.getMessage());
+            log.warn("version-diff 查询失败 ds={} version={}", datasourceId, version, e);
+            return error("版本比较失败");
         }
     }
 
@@ -411,20 +405,13 @@ public class MetadataController {
         }
         if (collectedTs != null) {
             try {
-                List<Map<String, Object>> logs = jdbc.queryForList(
-                        "SELECT result FROM td_metadata_collect_log " +
-                        "WHERE datasource_id = ? AND created_at <= ? AND result LIKE '%gitCommit%' " +
-                        "ORDER BY created_at DESC LIMIT 1",
-                        datasourceId, collectedTs);
-                if (!logs.isEmpty()) {
-                    String resultJson = (String) logs.get(0).get("result");
-                    if (resultJson != null && !resultJson.isEmpty()) {
-                        Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
-                                .readValue(resultJson, MAP_TYPE);
-                        Object gc = parsed.get("gitCommit");
-                        if (gc != null && !String.valueOf(gc).isEmpty()) {
-                            commitMessage = String.valueOf(gc);
-                        }
+                String resultJson = rowCountService.latestCollectResultJsonWithCommit(datasourceId, collectedTs);
+                if (resultJson != null && !resultJson.isEmpty()) {
+                    Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(resultJson, MAP_TYPE);
+                    Object gc = parsed.get("gitCommit");
+                    if (gc != null && !String.valueOf(gc).isEmpty()) {
+                        commitMessage = String.valueOf(gc);
                     }
                 }
             } catch (Exception e) {
@@ -513,8 +500,8 @@ public class MetadataController {
             String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(cfg);
             dataSourceService.updateMetadataConfig(datasourceId, json);
         } catch (Exception e) {
-            log.warn("策略保存失败 datasource={}: {}", datasourceId, e.getMessage());
-            return error("策略保存失败: " + e.getMessage());
+            log.warn("策略保存失败 datasource={}", datasourceId, e);
+            return error("策略保存失败");
         }
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("code", 0);

@@ -18,7 +18,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       minimum-idle: 5
@@ -33,9 +33,6 @@ spring:
     # 铁律 §3.1: Flyway 禁用
     enabled: false
 
-  jpa:
-    hibernate:
-      ddl-auto: none
 
   # Neo4j — PMO-49 Q2: dccheng 是 kb(cognitive 因果链>3 层启用 neo4j) 强依赖,
   # 显式补标准凭据让 Neo4jReactiveHealthIndicator 顶层 health UP
@@ -43,7 +40,7 @@ spring:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:neo4j123}
+      password: ${NEO4J_PASSWORD:}
 
 # MyBatis
 mybatis:
@@ -58,6 +55,10 @@ mybatis:
 # + ADR-7 X-ECOS-* 头校验开关 + Neo4j (enterprise 档; runtime-access 收敛 Driver)
 # 三档位: standard 不启用, enterprise 启用, ultimate 额外启用 Doris
 ecos:
+  event:
+    kafka:
+      # PMO-74 H2-T7 裁决 T-C 双投递：跨进程走 Kafka，同 JVM 仍本地分发，broker 缺席不丢本进程事件
+      enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.engine
   header-auth:
@@ -81,7 +82,10 @@ ecos:
   # ⚠️ REST consumer of kb 的 OntologyTreeController / KbEntityInstanceExtractionService:
   # 默认走 gateway 同进程路由（fat-JAR 加载 OntologyController 直读 sys_man.public.ecos_ontology），
   # 避免 buszhi:18083 停服时本体树静默空（ADR-7 服务端口仅内网，buszhi 挂 = 403/连接拒绝 → 静默空树）。
-  # body: gateway 的 /api/v1/ecos/** 在 auth.whitelist（见 gateway application.yml:80），匿名可达。
+  # body: ⚠️ PMO-74 H9-T5c 更正 —— 原陈述「/api/v1/ecos/** 在 auth.whitelist，匿名可达」已失效：
+  # gateway 的 auth.whitelist 块经 H9-T5 删除（从未有存活 Java 消费方），且 sysman SecurityConfig
+  # permitAll 经 H9-T1 收敛为 8 条、明确不含 /api/v1/ecos/** ⇒ 该调用需 Bearer Token，
+  # 无凭证的内部 RestTemplate 会得 401（服务间凭证归 H10-T1）。本默认值的选型理由须重估（T5d 运行期差分）。
   ontology-api-base: ${ECOS_ONTOLOGY_API_BASE:http://localhost:8080/api/v1}
   # DCCheng 双跑期 (gateway 与 dccheng 共进程时) 自动识别:
   # 双跑时 event 走 Spring 同 JVM, REST 通过 X-ECOS- 头走 18083 也可

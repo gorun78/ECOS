@@ -13,6 +13,8 @@ import java.util.Map;
 import com.chinacreator.gzcm.engine.data.transform.TransformException;
 import com.chinacreator.gzcm.engine.data.transform.TransformStep;
 import com.chinacreator.gzcm.engine.data.transform.model.DataFrame;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 类型转换转换步骤
@@ -25,6 +27,9 @@ import com.chinacreator.gzcm.engine.data.transform.model.DataFrame;
  * - onError: String (可选)，错误处理方式：skip（跳过该字段）、fail（抛出异常）、keep（保留原值），默认keep
  */
 public class TypeConversionStep implements TransformStep {
+
+    private static final Logger log = LoggerFactory.getLogger(TypeConversionStep.class);
+
     @Override
     public String getName() {
         return "TypeConversion";
@@ -128,6 +133,7 @@ public class TypeConversionStep implements TransformStep {
                         try {
                             return new SimpleDateFormat(fmt).parse(strValue);
                         } catch (ParseException ignored) {
+                            log.trace("日期格式候选未命中，继续尝试下一个: fmt={}", fmt);
                         }
                     }
                     throw e;

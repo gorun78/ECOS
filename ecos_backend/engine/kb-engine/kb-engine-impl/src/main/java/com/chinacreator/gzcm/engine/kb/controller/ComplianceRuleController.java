@@ -1,18 +1,22 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.kb.dto.RuleDeleteResultVO;
+import com.chinacreator.gzcm.engine.kb.dto.RuleVersionVO;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import com.chinacreator.gzcm.engine.kb.service.ComplianceRuleVersionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
 /**
  * 合规规则 CRUD Controller（{@code /api/v1/knowledge/compliance-rules/*}）。
+ *
+ * <p>PMO-74 H11-T3/T4：字段级 {@code @Autowired} 改构造器注入；
+ * delete/versions 出参由 Map 收口为强类型 VO。</p>
  *
  * @group GOVERN
  */
@@ -22,11 +26,15 @@ public class ComplianceRuleController {
 
     private static final Logger log = LoggerFactory.getLogger(ComplianceRuleController.class);
 
-    @Autowired
-    private ComplianceRuleMapper complianceRuleMapper;
+    private final ComplianceRuleMapper complianceRuleMapper;
 
-    @Autowired
-    private ComplianceRuleVersionService complianceRuleVersionService;
+    private final ComplianceRuleVersionService complianceRuleVersionService;
+
+    public ComplianceRuleController(ComplianceRuleMapper complianceRuleMapper,
+                                    ComplianceRuleVersionService complianceRuleVersionService) {
+        this.complianceRuleMapper = complianceRuleMapper;
+        this.complianceRuleVersionService = complianceRuleVersionService;
+    }
 
     // ── GET / — 查询所有规则 ──────────────────────
 
@@ -108,25 +116,49 @@ public class ComplianceRuleController {
     // ── DELETE /{id} — 删除规则 ────────────────────
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Map<String, Object>> delete(@PathVariable String id) {
+    public ApiResponse<RuleDeleteResultVO> delete(@PathVariable String id) {
         ComplianceRule existing = complianceRuleMapper.findById(id);
         if (existing == null) {
             return ApiResponse.notFound("Rule " + id + " not found");
         }
         complianceRuleMapper.deleteById(id);
         log.info("Deleted compliance rule: id={}", id);
-        return ApiResponse.success(Map.of("deleted", id));
+        return ApiResponse.success(new RuleDeleteResultVO(id));
     }
 
     // ── GET /{id}/versions — 查询版本历史 ──────────
 
     @GetMapping("/{id}/versions")
-    public ApiResponse<List<Map<String, Object>>> getVersions(@PathVariable String id) {
+    public ApiResponse<List<RuleVersionVO>> getVersions(@PathVariable String id) {
         ComplianceRule rule = complianceRuleMapper.findById(id);
         if (rule == null) {
             return ApiResponse.notFound("Rule " + id + " not found");
         }
-        List<Map<String, Object>> versions = complianceRuleVersionService.getVersions(id);
+        List<Map<String, Object>> rows = complianceRuleVersionService.getVersions(id);
+        List<RuleVersionVO> versions = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            RuleVersionVO vo = new RuleVersionVO();
+            vo.setId(asString(row.get("id")));
+            vo.setRuleId(asString(row.get("rule_id")));
+            vo.setVersionNumber(asInteger(row.get("version_number")));
+            vo.setSnapshot(asString(row.get("snapshot")));
+            vo.setChangedBy(asString(row.get("changed_by")));
+            vo.setChangedAt(asLong(row.get("changed_at")));
+            vo.setChangeNote(asString(row.get("change_note")));
+            versions.add(vo);
+        }
         return ApiResponse.success(versions);
+    }
+
+    private static String asString(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private static Integer asInteger(Object v) {
+        return v instanceof Number n ? n.intValue() : null;
+    }
+
+    private static Long asLong(Object v) {
+        return v instanceof Number n ? n.longValue() : null;
     }
 }

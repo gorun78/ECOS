@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { apiTaskList, apiTaskSubmit, apiTaskStatus, apiTaskCancel } from "../api";
+import { apiTaskList, apiTaskSubmit, apiTaskStatus, apiTaskCancel, taskDorisHealth, taskExecuteOk } from "../services/taskCenter";
 
 interface Task {
   taskId: string;
@@ -78,10 +78,9 @@ export default function TaskCenter() {
 
   const checkDoris = useCallback(async () => {
     try {
-      const r = await fetch("/api/v1/task/doris/health");
-      if (r.ok) {
-        const json = await r.json();
-        setDorisHealth(json.data ?? json);
+      const res = await taskDorisHealth();
+      if (res.ok) {
+        setDorisHealth(res.json?.data ?? res.json);
       }
     } catch {
       // Doris 未就绪
@@ -112,8 +111,8 @@ export default function TaskCenter() {
 
   const handleExecute = async (taskId: string) => {
     try {
-      const r = await fetch(`/api/v1/task/${taskId}/execute`, { method: "POST" });
-      if (r.ok) loadTasks();
+      const ok = await taskExecuteOk(taskId);
+      if (ok) loadTasks();
     } catch (e: any) {
       alert("执行失败: " + (e?.message ?? "未知错误"));
     }

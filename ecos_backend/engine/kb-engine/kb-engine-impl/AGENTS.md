@@ -1,6 +1,6 @@
 # kb-engine-impl — 知识库引擎·实现层
 
-> 子模块: kb-engine/impl | 端口: 共享父模块 18086 | 依赖: PostgreSQL (MyBatis) + Neo4j (enterprise/flagship)
+> 子模块: kb-engine/impl | 端口: 共享父模块 18086 | 依赖: PostgreSQL (MyBatis) + Neo4j (enterprise/ultimate)
 > 上层: 见 ../AGENTS.md（kb-engine 顶层）
 
 ## 本模块干什么

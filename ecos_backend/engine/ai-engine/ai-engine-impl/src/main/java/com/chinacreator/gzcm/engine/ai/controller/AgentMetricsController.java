@@ -71,7 +71,7 @@ public class AgentMetricsController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to get metrics for agentId={}", agentId, e);
-            return ApiResponse.internalError("查询 Agent 指标失败: " + e.getMessage());
+            return ApiResponse.internalError("查询 Agent 指标失败");
         }
     }
 
@@ -99,7 +99,7 @@ public class AgentMetricsController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to get errors for agentId={}", agentId, e);
-            return ApiResponse.internalError("查询 Agent 错误失败: " + e.getMessage());
+            return ApiResponse.internalError("查询 Agent 错误失败");
         }
     }
 }

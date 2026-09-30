@@ -64,7 +64,7 @@ public class ScenarioController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询场景列表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -81,7 +81,7 @@ public class ScenarioController {
             return ApiResponse.success(scenario);
         } catch (Exception e) {
             log.error("查询场景失败, id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -118,7 +118,7 @@ public class ScenarioController {
             return ApiResponse.success(scenario);
         } catch (Exception e) {
             log.error("创建场景失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -153,7 +153,7 @@ public class ScenarioController {
             return ApiResponse.success(scenario);
         } catch (Exception e) {
             log.error("更新场景失败, id={}", id, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -178,7 +178,7 @@ public class ScenarioController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除场景失败, id={}", id, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.metadata;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.engine.data.service.GitRepoRootResolver;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,13 +53,14 @@ public class MetadataCollectGitArchive {
 
     private final GitService gitService;
     private final JdbcTemplate jdbc;
+    /** 仓库根路径单源解析（sys_config ecos_git_repo_root，含 path-traversal 校验） */
+    private final GitRepoRootResolver repoRootResolver;
 
-    /** 仓库根路径，从 sys_config 读取（Windows/WSL 通用） */
-    private String repoRoot = Paths.get(System.getProperty("user.home"), "ecos-git-repos").toString();
-
-    public MetadataCollectGitArchive(GitService gitService, JdbcTemplate jdbc) {
+    public MetadataCollectGitArchive(GitService gitService, JdbcTemplate jdbc,
+                                     GitRepoRootResolver repoRootResolver) {
         this.gitService = gitService;
         this.jdbc = jdbc;
+        this.repoRootResolver = repoRootResolver;
     }
 
     /**
@@ -73,7 +75,14 @@ public class MetadataCollectGitArchive {
             return Map.of("archived", false, "error", "无表清单可归档");
         }
 
-        initRepoRoot();
+        String repoRoot;
+        try {
+            repoRoot = repoRootResolver.resolveRepoRoot();
+            GitRepoRootResolver.requireSafeSegment(datasourceId);
+        } catch (Exception e) {
+            log.warn("非法 Git 仓库根路径配置或数据源 ID，拒绝归档: {}", e.getMessage());
+            return Map.of("archived", false, "error", "非法 Git 仓库根路径配置: " + e.getMessage());
+        }
         Path dsDirPath = Paths.get(repoRoot, "metadata", datasourceId);
         String dsDir = dsDirPath.toString();
         String snapshotPath = Paths.get(dsDir, "metadata.json").toString();
@@ -131,19 +140,7 @@ public class MetadataCollectGitArchive {
         return result;
     }
 
-    /** 从 sys_config 读取仓库根路径 */
-    private void initRepoRoot() {
-        try {
-            String val = jdbc.queryForObject(
-                    "SELECT config_value FROM sys_config WHERE config_key = 'ecos_git_repo_root'",
-                    String.class);
-            if (val != null && !val.trim().isEmpty()) {
-                repoRoot = val.trim();
-            }
-        } catch (Exception e) {
-            log.debug("读取 ecos_git_repo_root 失败，使用默认值 {}", repoRoot);
-        }
-    }
+    /** 仓库根路径经 GitRepoRootResolver 单源解析（sys_config ecos_git_repo_root） */
 
     /**
      * 从 sys_config 读取历史版本保留份数上限（配置键 dw.metadata.history_versions，
@@ -233,7 +230,19 @@ public class MetadataCollectGitArchive {
      *         versions 按时间降序（新→旧）；目录不存在时返回空列表（非错误）
      */
     public Map<String, Object> listHistoryVersions(String datasourceId) {
-        initRepoRoot();
+        String repoRoot;
+        try {
+            repoRoot = repoRootResolver.resolveRepoRoot();
+            GitRepoRootResolver.requireSafeSegment(datasourceId);
+        } catch (Exception e) {
+            log.warn("非法 Git 仓库根路径配置或数据源 ID，返回空版本列表: {}", e.getMessage());
+            Map<String, Object> rejected = new LinkedHashMap<>();
+            rejected.put("versions", new ArrayList<>());
+            rejected.put("current", Map.of("exists", false));
+            rejected.put("status", "not_available");
+            rejected.put("reason", "非法 Git 仓库根路径配置: " + e.getMessage());
+            return rejected;
+        }
         Map<String, Object> result = new LinkedHashMap<>();
         List<Map<String, Object>> versions = new ArrayList<>();
 
@@ -291,7 +300,8 @@ public class MetadataCollectGitArchive {
         if (versionId == null || !versionId.matches("^\\d{8}_\\d{6}$")) {
             throw new IllegalArgumentException("非法版本号: " + versionId);
         }
-        initRepoRoot();
+        String repoRoot = repoRootResolver.resolveRepoRoot();
+        GitRepoRootResolver.requireSafeSegment(datasourceId);
 
         String baseDir = Paths.get(repoRoot, "metadata", datasourceId).toString();
         Map<String, Object> currentSnap = readSnapshot(Paths.get(baseDir, "metadata.json").toString());

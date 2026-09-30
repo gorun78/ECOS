@@ -11,11 +11,24 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.*;
 public class ArchitectureGuardTest {
     private static JavaClasses allClasses;
 
+    /** 业务模块根包 —— 全部锚定到全限定根，不用裸段（裸段 "..cognitive.." 会同时命中 gzcm.common.cognitive） */
+    private static final String[] BUSINESS_PACKAGES = {
+        "com.chinacreator.gzcm.buszhi..", "com.chinacreator.gzcm.dccheng..",
+        "com.chinacreator.gzcm.datanet..", "com.chinacreator.gzcm.workspace..",
+        "com.chinacreator.gzcm.worldmodel..", "com.chinacreator.gzcm.aimod..",
+        "com.chinacreator.gzcm.portal..", "com.chinacreator.gzcm.market..",
+        "com.chinacreator.gzcm.cognitive..", "com.chinacreator.gzcm.gateway..",
+        "com.chinacreator.gzcm.sysman.."
+    };
+
     @BeforeAll
     static void setUp() {
         allClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.chinacreator.gzcm");
+        // 导入分母必须可见：importPackages 走 classpath，本模块 classpath 上 0 个业务构件，
+        // 分母只含 common 自身编译产物。没有这个数字，绿色会被误读为"全仓依赖方向合规"。
+        System.out.println("Imported " + allClasses.size() + " classes for ArchitectureGuardTest scope analysis.");
     }
 
     // ── 层次违规 ──────────────────────────────
@@ -40,14 +53,14 @@ public class ArchitectureGuardTest {
 
     @Test
     void common层不得依赖任何业务模块() {
-        noClasses().that().resideInAPackage("..common..")
+        // 两侧都锚定全限定根：
+        //   主语用精确的平台公共层根包，不用 "..common.."（裸段会把 gzcm.sysman.common.* 也算成公共层，
+        //       于是 sysman 内部自依赖被误判为「公共层依赖业务模块」）；
+        //   宾语用锚定根包，不用 "..cognitive.." 等裸段（会同时命中 gzcm.common.cognitive，
+        //       使「引用自身嵌套类」被误判为依赖业务模块 —— 本规则此前 3 次开火全部源于此）。
+        noClasses().that().resideInAPackage("com.chinacreator.gzcm.common..")
             .should().dependOnClassesThat()
-            .resideInAnyPackage(
-                "..buszhi..", "..dccheng..", "..datanet..",
-                "..workspace..", "..worldmodel..", "..aimod..",
-                "..portal..", "..market..", "..cognitive..",
-                "..gateway..", "..sysman.."
-            )
+            .resideInAnyPackage(BUSINESS_PACKAGES)
             .check(allClasses);
     }
 

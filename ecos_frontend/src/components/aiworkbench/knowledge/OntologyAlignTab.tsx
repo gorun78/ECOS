@@ -7,26 +7,54 @@ import React from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { ThemeStyles } from '../../../components/ThemeContext';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+/** PMO-74 H6-T3 M3-a — 本地类型（与 knowledge/tabs/OntologyModelTab 的消费形状一致；共享化留待后续单元） */
+interface OntologyMappingField {
+  logicalField: string;
+  logicalType: string;
+  physicalTable: string;
+  physicalColumn: string;
+  description?: string;
+}
+
+interface OntologyEntity {
+  entityId: string;
+  entityName?: string;
+  chineseName?: string;
+  description?: string;
+  mappings?: OntologyMappingField[];
+}
+
+interface PhysicalTableColumn {
+  name: string;
+  type?: string;
+}
+
+interface PhysicalTable {
+  tableName: string;
+  columns?: PhysicalTableColumn[];
+}
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const Comp = (Icons[name as keyof typeof Icons] || Icons.HelpCircle) as LucideIcon;
   return <Comp size={size} className={className} />;
 };
 
 interface OntologyAlignTabProps {
   styles: ThemeStyles;
   showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
-  ontologyMappings: any[];
-  setOntologyMappings: (v: any[]) => void;
-  availableTables: any[];
-  editingOntology: any | null;
-  setEditingOntology: (v: any | null) => void;
+  ontologyMappings: OntologyEntity[];
+  setOntologyMappings: (v: OntologyEntity[]) => void;
+  availableTables: PhysicalTable[];
+  editingOntology: OntologyEntity | null;
+  setEditingOntology: (v: OntologyEntity | null) => void;
   isExporting: boolean;
   handleExportOntology: () => Promise<void>;
   exportedMarkdown: string;
   showExportModal: boolean;
   setShowExportModal: (v: boolean) => void;
-  handleSaveOntologyMappings: (mappings: any[]) => Promise<void>;
+  handleSaveOntologyMappings: (mappings: OntologyEntity[]) => Promise<void>;
 }
 
 export default function OntologyAlignTab({
@@ -121,7 +149,7 @@ export default function OntologyAlignTab({
                   if (newId) {
                     const name = prompt('请输入该本体实体的中文显示名称 (如 飞机维保本体):') || newId;
                     const desc = prompt('请输入本体描述:') || 'New Entity';
-                    const newEntity: any = {
+                    const newEntity: OntologyEntity = {
                       entityId: newId,
                       entityName: newId,
                       chineseName: name,
@@ -271,7 +299,7 @@ export default function OntologyAlignTab({
                           </td>
                         </tr>
                       ) : (
-                        editingOntology.mappings.map((m: any, idx: number) => {
+                        editingOntology.mappings.map((m, idx) => {
                           // Find available columns for the selected physicalTable
                           const matchedTable = availableTables.find(t => t.tableName === m.physicalTable);
                           const availableCols = matchedTable ? matchedTable.columns : [];
@@ -374,7 +402,7 @@ export default function OntologyAlignTab({
                                   }}
                                   className={`px-1.5 py-1 border ${styles.cardBorder} rounded-md font-mono text-[10px] font-bold ${styles.cardBg} text-emerald-800`}
                                 >
-                                  {availableCols.map((c: any) => (
+                                  {availableCols.map(c => (
                                     <option key={c.name} value={c.name}>{c.name} ({c.type})</option>
                                   ))}
                                 </select>
@@ -408,7 +436,7 @@ export default function OntologyAlignTab({
                                   onClick={() => {
                                     const updated = ontologyMappings.map(ent => {
                                       if (ent.entityId === editingOntology.entityId) {
-                                        const newM = ent.mappings.filter((_: any, i: number) => i !== idx);
+                                        const newM = ent.mappings.filter((_, i) => i !== idx);
                                         return { ...ent, mappings: newM };
                                       }
                                       return ent;

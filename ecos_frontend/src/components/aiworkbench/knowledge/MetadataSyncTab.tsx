@@ -7,13 +7,22 @@ import React, { useState, useMemo } from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { ThemeStyles } from '../../../components/ThemeContext';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { MetadataAsset } from './types';
 import Pagination from '../../common/Pagination';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const Comp = (Icons[name as keyof typeof Icons] || Icons.HelpCircle) as LucideIcon;
   return <Comp size={size} className={className} />;
 };
+
+/** 异常/漂移审计行（/api/v1/integration/logs 原始条目，父层透传；本 Tab 只读展示） */
+interface AuditLogEntry {
+  severity?: string;
+  event?: string;
+  details?: string;
+  timestamp?: string;
+}
 
 interface MetadataSyncTabProps {
   styles: ThemeStyles;
@@ -24,7 +33,7 @@ interface MetadataSyncTabProps {
   handleToggleSimulation: (type: 'drift' | 'sla' | 'reset') => Promise<void>;
   isSchemaDrift: boolean;
   isSlaBreach: boolean;
-  auditLogs: any[];
+  auditLogs: AuditLogEntry[];
   syncLogs: string[];
   handleSyncAsset: (id: string) => void;
 }
@@ -158,7 +167,7 @@ export default function MetadataSyncTab({
               {auditLogs.length === 0 ? (
                 <p className={`${styles.cardTextMuted} py-4 text-center`}>{t('aiworkbench.knowledge.sync.noAnomaly')}</p>
               ) : (
-                auditLogs.map((log: any, i: number) => (
+                auditLogs.map((log: AuditLogEntry, i: number) => (
                   <div key={i} className={`p-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} flex items-start justify-between gap-4`}>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">

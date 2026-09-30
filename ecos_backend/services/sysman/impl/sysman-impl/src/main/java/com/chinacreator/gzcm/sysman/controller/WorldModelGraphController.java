@@ -110,7 +110,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询目标列表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -138,7 +138,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(roots);
         } catch (Exception e) {
             log.error("查询目标树失败", e);
-            return ApiResponse.internalError("查询目标树失败: " + e.getMessage());
+            return ApiResponse.internalError("查询目标树失败");
         }
     }
 
@@ -232,7 +232,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(goal);
         } catch (Exception e) {
             log.error("查询目标失败, id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -262,7 +262,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(goal);
         } catch (Exception e) {
             log.error("创建目标失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -286,7 +286,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(goal);
         } catch (Exception e) {
             log.error("更新目标失败, id={}", id, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -311,7 +311,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除目标失败, id={}", id, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -329,7 +329,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询因果链列表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -390,7 +390,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("构建因果图失败", e);
-            return ApiResponse.internalError("构建因果图失败: " + e.getMessage());
+            return ApiResponse.internalError("构建因果图失败");
         }
     }
 
@@ -404,7 +404,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(link);
         } catch (Exception e) {
             log.error("查询因果链失败, id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -442,7 +442,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(link);
         } catch (Exception e) {
             log.error("创建因果链失败, sourceId={}", id, e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -461,7 +461,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除因果链失败, id={}", id, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 }

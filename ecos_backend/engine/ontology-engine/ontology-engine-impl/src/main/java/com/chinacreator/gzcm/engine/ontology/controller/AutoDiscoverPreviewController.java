@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverPreviewQueryService;
 import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -36,13 +36,14 @@ public class AutoDiscoverPreviewController {
 
     private static final Logger log = LoggerFactory.getLogger(AutoDiscoverPreviewController.class);
 
-    private final JdbcTemplate jdbc;
+    private final AutoDiscoverPreviewQueryService previewQueryService;
 
     /** DW 层取数源（经 data-engine REST，禁直查 td_data_*）。 */
     private final AutoDiscoverService autoDiscoverService;
 
-    public AutoDiscoverPreviewController(JdbcTemplate jdbc, AutoDiscoverService autoDiscoverService) {
-        this.jdbc = jdbc;
+    public AutoDiscoverPreviewController(AutoDiscoverPreviewQueryService previewQueryService,
+                                         AutoDiscoverService autoDiscoverService) {
+        this.previewQueryService = previewQueryService;
         this.autoDiscoverService = autoDiscoverService;
     }
 
@@ -52,9 +53,7 @@ public class AutoDiscoverPreviewController {
      */
     private boolean datasourceExists(String datasourceId) {
         try {
-            Integer cnt = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM td_datasource WHERE datasource_id = ?",
-                Integer.class, datasourceId);
+            Integer cnt = previewQueryService.countDatasourceById(datasourceId);
             return cnt != null && cnt > 0;
         } catch (Exception e) {
             log.warn("Preview: datasource existence check failed: {}", e.getMessage());
@@ -135,11 +134,8 @@ public class AutoDiscoverPreviewController {
                 // 3) 检查实体是否已存在（只读查询）
                 boolean alreadyExists;
                 try {
-                    Integer cnt = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM ecos_ontology_entity " +
-                        "WHERE code = ? AND domain_id = " +
-                        "(SELECT id FROM ecos_domain WHERE code = ?)",
-                        Integer.class, toEntityCode(resourceName), domainCode);
+                    Integer cnt = previewQueryService.countEntityByCodeAndDomain(
+                            toEntityCode(resourceName), domainCode);
                     alreadyExists = cnt != null && cnt > 0;
                 } catch (Exception e) {
                     alreadyExists = false;

@@ -62,7 +62,7 @@ public class DataMaskingController {
             return ApiResponse.badRequest("请求格式错误: data 和 rules 必须为字符串数组");
         } catch (Exception e) {
             log.error("数据脱敏处理异常", e);
-            return ApiResponse.internalError("脱敏处理失败: " + e.getMessage());
+            return ApiResponse.internalError("脱敏处理失败");
         }
     }
 }

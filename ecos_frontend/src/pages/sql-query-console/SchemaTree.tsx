@@ -12,8 +12,14 @@ interface SchemaTreeProps {
   datasourceId: string | null;
 }
 
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+/** Schema 接口原始响应：数组形态或 { schemas } 包装形态（仅本文件消费） */
+type SchemaResponse = SchemaTreeNode[] | { schemas?: SchemaTreeNode[] } | null;
+
 const Icon = ({ name, size = 14, className = '' }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const iconMap = Icons as unknown as Record<string, IconComponent>;
+  const Comp = iconMap[name] || iconMap.HelpCircle;
   return <Comp size={size} className={className} />;
 };
 
@@ -26,7 +32,7 @@ export default function SchemaTree({ datasourceId }: SchemaTreeProps) {
   useEffect(() => {
     if (!datasourceId) { setTree([]); return; }
     setLoading(true);
-    apiFetchData<any>(`/api/v1/engine/data/query/schema/${datasourceId}`)
+    apiFetchData<SchemaResponse>(`/api/v1/engine/data/query/schema/${datasourceId}`)
       .then(data => setTree(Array.isArray(data) ? data : (data?.schemas || [])))
       .catch(() => setTree([]))
       .finally(() => setLoading(false));

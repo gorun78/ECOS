@@ -15,8 +15,14 @@ interface TemplatePanelProps {
   onClose: () => void;
 }
 
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+/** 模板列表响应：裸数组或 { data } 信封（apiFetchData 已解包一层） */
+type TemplatesResponse = QueryTemplate[] | { data?: QueryTemplate[] } | null;
+
 const Icon = ({ name, size = 14 }: { name: string; size?: number }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const iconMap = Icons as unknown as Record<string, IconComponent>;
+  const Comp = iconMap[name] || iconMap.HelpCircle;
   return <Comp size={size} />;
 };
 
@@ -28,8 +34,11 @@ export default function TemplatePanel({ show, datasourceId, onLoad, onClose }: T
   const loadTemplates = () => {
     if (!datasourceId) return;
     setLoading(true);
-    apiFetchData<any>(`/api/v1/engine/data/query/templates?datasourceId=${datasourceId}&page=1&pageSize=50`)
-      .then((d: any) => setTemplates(Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : [])))
+    apiFetchData<TemplatesResponse>(`/api/v1/engine/data/query/templates?datasourceId=${datasourceId}&page=1&pageSize=50`)
+      .then((d) => {
+        const list = Array.isArray(d) ? d : d?.data;
+        setTemplates(Array.isArray(list) ? list : []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   };

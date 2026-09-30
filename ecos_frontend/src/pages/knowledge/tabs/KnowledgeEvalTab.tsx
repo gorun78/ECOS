@@ -62,15 +62,18 @@ async function localEval(seeds: EvalSeedQuery[]): Promise<Pick<EvalReport, 'reca
   for (const seed of seeds) {
     try {
       const hits = await knowledgeApi.graphSearch(seed.question);
-      const result = (hits as any)?.results || (hits as any)?.nodes || [];
+      const hitsObj = hits as { results?: unknown[]; nodes?: unknown[] } | null | undefined;
+      const result = hitsObj?.results || hitsObj?.nodes || [];
       const top5 = (Array.isArray(result) ? result : []).slice(0, 5);
       const labeled: string[] = seed.labeledChunkIds ?? seed.question.split(/\s+/).slice(0, 3) ?? [];
-      const anyHit = top5.some(n => {
+      const anyHit = top5.some((raw) => {
+        const n = raw as Record<string, unknown>;
         const id = String(n.id ?? n.nodeId ?? '');
         const label = String(n.label ?? n.name ?? '');
         return labeled.includes(id) || labeled.includes(label);
       });
-      const hitRank = top5.findIndex(n => {
+      const hitRank = top5.findIndex((raw) => {
+        const n = raw as Record<string, unknown>;
         const id = String(n.id ?? n.nodeId ?? '');
         const label = String(n.label ?? n.name ?? '');
         return labeled.includes(id) || labeled.includes(label);
@@ -111,7 +114,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
   const handleUploadSeed = useCallback(async (file: File) => {
     try {
       const raw = await file.text();
-      let parsed: any;
+      let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) throw new Error('expected array');
@@ -138,8 +141,8 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
       setSeeds(next);
       toast('success', tl('已导入 seed: ', 'Imported seeds: ') + items.length);
       setFileInputKey(k => k + 1);
-    } catch (e: any) {
-      toast('error', tl('seed 解析失败: ', 'seed parse failed: ') + (e?.message || ''));
+    } catch (e: unknown) {
+      toast('error', tl('seed 解析失败: ', 'seed parse failed: ') + ((e as { message?: string } | undefined)?.message || ''));
     }
   }, [toast]);
 
@@ -158,7 +161,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
       } else {
         report = backendReport;
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       const local = await localEval(seeds);
       report = {
         reportId: `local-${Date.now()}`,

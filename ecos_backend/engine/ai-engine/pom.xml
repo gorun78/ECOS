@@ -11,7 +11,7 @@
 
     <artifactId>ai-engine</artifactId>
     <packaging>pom</packaging>
-    <name>ECOS Cognitive Engine :: Parent</name>
+    <name>ECOS AI Engine :: Parent</name>
 
     <modules>
         <module>ai-engine-api</module>

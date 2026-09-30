@@ -1,6 +1,7 @@
-package com.chinacreator.gzcm.engine.cognitive2;
+package com.chinacreator.gzcm.engine.cognitive2.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.cognitive2.ForecastService;
 import com.chinacreator.gzcm.engine.cognitive2.model.ForecastRequest;
 import com.chinacreator.gzcm.engine.cognitive2.model.ForecastResult;
 import org.slf4j.Logger;

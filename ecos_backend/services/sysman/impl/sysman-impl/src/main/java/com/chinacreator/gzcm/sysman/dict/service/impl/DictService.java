@@ -44,17 +44,9 @@ public class DictService implements IDictService {
 
     public DictService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        ensureSchema();
+        // H8-T1: sys_dict.subsystem 列补齐 ALTER 收编至 db/migration（V162），构造函数不再执行 DDL。
         // 启动时初始化缓存
         refreshCache();
-    }
-
-    private void ensureSchema() {
-        try {
-            jdbc.execute("ALTER TABLE sys_dict ADD COLUMN IF NOT EXISTS subsystem VARCHAR(20)");
-        } catch (Exception e) {
-            log.debug("添加 subsystem 列: {}", e.getMessage());
-        }
     }
 
     @Override

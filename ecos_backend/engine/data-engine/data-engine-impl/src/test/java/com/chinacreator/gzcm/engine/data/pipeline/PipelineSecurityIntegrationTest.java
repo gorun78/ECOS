@@ -63,6 +63,13 @@ class PipelineSecurityIntegrationTest {
         f.set(target, value);
     }
 
+    /**
+     * ABAC 走 postForEntity(..., String.class)，stub 需返回 JSON 文本响应体。
+     */
+    private static org.springframework.http.ResponseEntity<String> jsonEntity(String body) {
+        return new org.springframework.http.ResponseEntity<>(body, org.springframework.http.HttpStatus.OK);
+    }
+
     // =============== 1. 写操作异步审计（§2.4 ⑤） ===============
 
     @Test
@@ -160,10 +167,10 @@ class PipelineSecurityIntegrationTest {
     @DisplayName("ABAC — RestTemplate Connection Refused → AllowedResult(false, SECURITY_ENGINE_UNAVAILABLE)")
     void abacDenyWhenSecurityEngineUnavailable() {
         doThrow(new org.springframework.web.client.ResourceAccessException("refused"))
-                .when(restTemplate).postForObject(
+                .when(restTemplate).postForEntity(
                         org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.anyMap(),
-                        org.mockito.ArgumentMatchers.eq(Object.class));
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.eq(String.class));
 
         PipelineSecurityService.AllowedResult r = security.evaluateExecute("p-1");
         assertFalse(r.allowed());
@@ -173,11 +180,11 @@ class PipelineSecurityIntegrationTest {
     @Test
     @DisplayName("ABAC — 响应 allow=false → AllowedResult(false, fallback/deny)")
     void abacDenyWhenPolicyDenies() {
-        when(restTemplate.postForObject(
+        when(restTemplate.postForEntity(
                 org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyMap(),
-                org.mockito.ArgumentMatchers.eq(Object.class)))
-                .thenReturn(java.util.Map.of("allow", false, "fallback", "POLICY_DENY"));
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(String.class)))
+                .thenReturn(jsonEntity("{\"allow\":false,\"fallback\":\"POLICY_DENY\"}"));
 
         PipelineSecurityService.AllowedResult r = security.evaluateExecute("p-2");
         assertFalse(r.allowed());
@@ -187,11 +194,11 @@ class PipelineSecurityIntegrationTest {
     @Test
     @DisplayName("ABAC — 响应 allow=true → AllowedResult(true, ALLOW)")
     void abacAllowWhenPolicyAllows() {
-        when(restTemplate.postForObject(
+        when(restTemplate.postForEntity(
                 org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyMap(),
-                org.mockito.ArgumentMatchers.eq(Object.class)))
-                .thenReturn(java.util.Map.of("allow", true));
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(String.class)))
+                .thenReturn(jsonEntity("{\"data\":{\"allow\":true}}"));
 
         PipelineSecurityService.AllowedResult r = security.evaluateExecute("p-3");
         assertTrue(r.allowed());

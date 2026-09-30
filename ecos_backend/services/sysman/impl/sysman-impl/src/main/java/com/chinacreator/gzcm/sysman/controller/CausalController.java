@@ -120,7 +120,7 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取因果图失败", e);
-            return ApiResponse.internalError("获取因果图失败: " + e.getMessage());
+            return ApiResponse.internalError("获取因果图失败");
         }
     }
 
@@ -144,7 +144,7 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取因果路径失败", e);
-            return ApiResponse.internalError("获取因果路径失败: " + e.getMessage());
+            return ApiResponse.internalError("获取因果路径失败");
         }
     }
 
@@ -282,7 +282,7 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("场景对比失败", e);
-            return ApiResponse.internalError("场景对比失败: " + e.getMessage());
+            return ApiResponse.internalError("场景对比失败");
         }
     }
 }

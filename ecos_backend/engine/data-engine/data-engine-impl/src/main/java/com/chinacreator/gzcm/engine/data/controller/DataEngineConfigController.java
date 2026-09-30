@@ -217,7 +217,7 @@ public class DataEngineConfigController {
             return ApiResponse.success(groupBySubGroup(loadConfigRows()));
         } catch (Exception e) {
             log.error("获取数据引擎配置失败", e);
-            return ApiResponse.internalError("获取配置失败: " + e.getMessage());
+            return ApiResponse.internalError("获取配置失败");
         }
     }
 
@@ -233,7 +233,7 @@ public class DataEngineConfigController {
             return ApiResponse.success(groupBySegment(loadConfigRows()));
         } catch (Exception e) {
             log.error("获取数据引擎分段配置失败", e);
-            return ApiResponse.internalError("获取配置失败: " + e.getMessage());
+            return ApiResponse.internalError("获取配置失败");
         }
     }
 
@@ -309,7 +309,7 @@ public class DataEngineConfigController {
             return ApiResponse.success(groupBySubGroup(rows));
         } catch (Exception e) {
             log.error("获取配置组 {} 失败", group, e);
-            return ApiResponse.internalError("获取配置失败: " + e.getMessage());
+            return ApiResponse.internalError("获取配置失败");
         }
     }
 
@@ -327,7 +327,7 @@ public class DataEngineConfigController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("批量更新配置失败", e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -345,7 +345,7 @@ public class DataEngineConfigController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("刷新配置缓存失败", e);
-            return ApiResponse.internalError("刷新失败: " + e.getMessage());
+            return ApiResponse.internalError("刷新失败");
         }
     }
 

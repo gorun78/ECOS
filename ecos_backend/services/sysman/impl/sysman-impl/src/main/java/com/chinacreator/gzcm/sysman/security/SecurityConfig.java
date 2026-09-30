@@ -26,160 +26,22 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // PMO-74 H9-T1 匿名面清零（铁律 §1.2① + §2.4-6 默认 DENY）：
+                // 原 87 条 permitAll 收敛为 8 条，仅登录/刷新 + 健康检查 + error；
+                // 其余（ecos/git、privacy、mfa、sysconfig、datasource、pipeline、llm、
+                // policy-engine、task、workspace、integration、kb、ontology、dq…）一律
+                // anyRequest().authenticated()。内部无凭证 RestTemplate 调用方（kb-engine
+                // /api/v1/llm/{chat,embedding}、data/ontology/kb 的 policy-engine/evaluate、
+                // agent-service ontology/graph）须由 H10 补服务凭证，不在此放开匿名。
                 .requestMatchers(
-                    // ── Auth (public)
                     "/auth/**",
                     "/api/v1/auth/**",
-                    // ── P0-1: /api/security/** 已移出 permitAll（需认证）
-                    // ── Public read-only domains (GET on reference domains only)
-                    // M0 改造 (2026-09-01): 移除 3 条过宽 permitAll (暴露敏感数据 + 违反默认 DENY):
-                    //   - /api/v1/system/**       → Tenant/Roles/Users/Permissions 不可匿名 (QA T2-003/004/005, T4-005, T5-007/008 5 项)
-                    //   - /datanet/** + /api/v1/datanet/**  → 数据源连接池凭据 (username/password) 不可匿名 (QA T3-006)
-                    //   - /api/v1/knowledge/**    → 知识正文含敏感业务, 不可匿名 (QA T5-007)
-                    // 当前 public 范围: ecos 公开元数据 + marketplace 商品目录 + catalog 元数据 + glossary + oag 公开 query.
-                    "/api/v1/ecos/**",
-                    "/api/v1/marketplace/**",
-                    "/api/v1/agent/**",
-                    "/api/v1/agent-loop/**",
-                    "/api/v1/agent-mesh/**",
-                    // ── PMO-50 LLM 网关原语 — 暴露 runtime/llm-gateway embed/chat，公共底座复用
-                    // (aiming 服务承载 /api/v1/llm/**，kb-engine/cognitive-engine 走 gateway 8080 转发)
-                    "/api/v1/llm/**",
-                    // "◄ /api/v1/knowledge/** — 移除 (敏感正文, QA T5-007)"
-                    // ── PMO-55 E-A: workspace 知识工作台三端点放行 (与 KnowledgeApiController /api/v1/knowledge/index-status 同前缀) ──
-                    // 新增端点: /api/v1/knowledge/health | /stats | /engine-config — 仅查公开元数据 + 引擎 health
-                    // PUT 端点由 method 级在 KnowledgeWorkbenchController + sys_config role check 把关, 此层 permitAll 保持粒度一致
-                    "/api/v1/knowledge/health",
-                    "/api/knowledge/health",
-                    "/api/v1/knowledge/stats",
-                    "/api/knowledge/stats",
-                    "/api/v1/knowledge/engine-config",
-                    "/api/knowledge/engine-config",
-                    "/api/v1/knowledge/engine-config/**",
-                    "/api/knowledge/engine-config/**",
-                    "/api/v1/glossary/**",
-                    "/api/v1/catalog/**",
-                    "/api/v1/oag/**",
-                    // ── System management (M0 改造 移除 /api/v1/system/**)
-                    "/api/v1/dict/**",
-                    "/api/v1/pipeline/**",
-                    "/api/pipeline/**",
-                    // PMO-WX 断点调试 Panel：调试会话 / 日志 SSE 端点（T1+T3）
-                    "/api/v1/pipeline/debug/**",
-                    "/api/pipeline/debug/**",
-                    "/api/v1/dq/**",
-                    // ── PMO-48-A T2: DQ 裸路径双路径豁免 ──
-                    "/api/dq/**",
-                    // PMO-48-B T7b: /api/v1/dq/scores/** (score API)
-                    "/api/v1/dq/scores/**",
-                    // PMO-48-B T7b: /api/dq/scores/** 双路径
-                    "/api/dq/scores/**",
-                    "/api/v1/query/**",
-                    "/api/v1/causal/**",
-                    "/api/v1/monitor/**",
-                    "/api/v1/twins/**",
-                    "/api/v1/pareto/**",
-                    "/api/v1/portal/**",
-                    "/api/portal/**",
-                    "/api/cognitive/**",
-                    "/api/v1/integration/**",
-                    // ⚠ 勿为 /api/integration 补 permitAll（曾按铁律 §1.2 补过，已撤销）：
-                    // VersionPrefixRewriteFilter(@Order MIN+10) 先于 Spring Security(-100) 执行，
-                    // 鉴权层只见**裸路径**，补该条目＝放行未认证访问并暴露数据源 host/port/username/jdbcUrl
-                    // （同 M0 改造移除 /datanet/** 的 T3-006 缺陷，违反 §2.4-6 默认 DENY）。
-                    // 集成元数据端点双路径一律要求认证（前端调用均带 Bearer）。
-                    "/api/v1/ontology/**",
-                    "/api/v1/lineage/**",
-                    "/api/v1/guardrails/**",
-                    "/api/v1/aip/**",
-                    "/api/v1/agent-metrics/**",
-                    "/api/agent-metrics/**",
-                    "/api/v1/agents/**",
-                    "/api/v1/mfa/**",
-                    "/api/v1/privacy/**",
-                    "/api/v1/world-model/**",
-                    "/api/v1/worldmodel/**",
-                    "/api/v1/agent-runtime/**",
-                    "/api/v1/evolution/**",
-                    "/api/v1/cognitive/**",
-                    // ── 2026-09-16 收敛: 原 blanket "/api/v1/engine/**" 已移除 ──
-                    // 该通配使全部引擎业务端点匿名可读（实测匿名 200：lineage/topology、
-                    // data/query（匿名 SQL 执行）、data/udf/list、ontology/settings、
-                    // ontology/graph/full、data/status、data/config），违反 §2.4-6 默认 DENY。
-                    // 现收敛为「仅健康检查公开」+ 一处内部消费方例外：
-                    //   /api/v1/engine/*/health — workspace KnowledgeHealthAggregator 以 RestTemplate
-                    //                             直连 :8080 聚合各引擎健康，不带凭证（不可移除）
-                    //   /api/v1/engine/ontology/graph/** — agent-service SearchOntologyGraphTool 以
-                    //                             RestTemplate 直连 :8080 且无凭证；待内部调用鉴权
-                    //                             机制落地后收敛（登记 §12.8 遗留）
-                    // 其余 /api/v1/engine/** 一律 authenticated（前端调用均带 Bearer）。
                     "/api/v1/engine/*/health",
-                    "/api/v1/engine/ontology/graph/**",
-                    // ── PMO-38 T5: 新增 4 条 permitAll (sysman/knowledge-bases/sysconfig 三组) ──
-                    // ── PMO-39 T5: 双路径全覆盖 — 5 新端点的 /api/ 与 /api/v1/ ──
-                    // cognitive T1: /plan, /plan/{id}, /optimize
-                    "/api/cognitive/plan",
-                    "/api/cognitive/plan/**",
-                    "/api/cognitive/optimize",
-                    // ontology T2: workflow definitions
-                    "/api/engine/ontology/workflow/definitions",
-                    "/api/engine/ontology/workflow/definitions/**",
-                    // ontology T3: versions diff
-                    "/api/ontology/versions/diff",
-                    "/api/ontology/versions/diff/**",
-                    // portal T4: search
-                    "/api/portal/search",
-                    "/api/portal/search/**",
-                    "/api/v1/knowledge-bases",
-                    "/api/knowledge-bases",
-                    "/api/v1/sysconfig/**",
-                    "/api/sysconfig/**",
-                    // ── PMO-40 T5: agent-metrics 双路径 (已有) + ontology auto-discover/preview 裸路径 ──
-                    // agent-metrics 双路径已在上方 (第 66-67 行)
-                    // ontology sources (GET /api/v1/ecos/ontology/sources) 已被 /api/v1/ecos/** 覆盖
-                    // ontology auto-discover preview (POST /api/v1/ecos/domains/{code}/auto-discover/preview) 已被 /api/v1/ecos/** 覆盖
-                    // auto-discover preview 裸路径 /api/ecos/domains/ 需单独加
-                    "/api/ecos/domains/**",
-                    "/api/v1/ecos/domains/**",
-                    // PMO-40 T2: metadata strategy 裸路径双路径（v1 路径 /api/v1/datanet/metadata/** 已被 Controller 直接映射）
-                    "/api/datanet/metadata/**",
-                    // ── PMO-45 T5: datasource 三路径 (PMO45DataSourceController 双路径 /api/v1/datasource + /datasource) ──
-                    // Wave2: 补全 /api/v1/datasource/** v1 路径 permitAll (Wave1 只放行 /api/datasource + /datasource)
-                    "/api/v1/datasource/**",
-                    "/api/datasource/**",
-                    "/datasource/**",
-                    // ── P0-1: 安全端点移出 permitAll（需认证）
-                    // /api/v1/abac/**, /api/v1/audit/**, /api/v1/data-masking/**,
-                    // /api/v1/policy-engine/**, /api/v1/data-permission/**,
-                    // /api/security/**, /api/v1/security/** — 全部需认证
-                    // Triangle-47: pipeline ABAC 裁决（内部 service→service 调用，鉴权由 OPA 策略本身把关）
-                    "/api/v1/security/policy-engine/**",
-                    "/api/security/policy-engine/**",
-                    // ── Cases
-                    "/cases/**",
-                    // ── Alerts + WebSocket
-                    "/api/v1/alerts/**",
-                    "/api/alerts/**",
-                    "/ws/**",
-                    // ── Infrastructure
+                    "/api/v1/knowledge/health",
                     "/api/health",
                     "/health",
                     "/actuator/health",
-                    "/error",
-                    // ── Datanet (M0 改造 移除 permits, 数据源凭据不可匿名)
-                    // "◄ /datanet/**, /api/v1/datanet/** — 移除 (QA T3-006)"
-                    // ── Data Lake / Workbook
-                    "/api/datalake/**",
-                    "/api/workbook/**",
-                    // ── Task
-                    "/api/v1/task/**",
-                    // ── Workspace
-                    "/api/v1/workspace/**",
-                    // ── Agent tools
-                    "/api/agent/tools/**"
-                    // ── PMO-60 v2.0 P4 P0-2: 移除 /api/v1/interfaces/** permitAll ──
-                    // 原 T4b 误加 permitAll 致 InterfaceRefController 匿名可访问（违反 §2.4-6 默认 DENY）。
-                    // 现走 .anyRequest().authenticated()，需 Bearer Token。
+                    "/error"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

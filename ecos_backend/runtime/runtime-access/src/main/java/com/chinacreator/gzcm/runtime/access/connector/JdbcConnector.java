@@ -61,7 +61,7 @@ public class JdbcConnector implements Connector {
         Map<String, Object> r = new java.util.LinkedHashMap<>();
         r.put("type", type);
         try {
-            Map<String, String> cfg = parseConfig(connectionConfig);
+            Map<String, String> cfg = readConnectionConfig(connectionConfig);
             String url = buildJdbcUrl(type, cfg);
             String driver = resolveDriverClass(type, url);
             r.put("driverClass", driver);
@@ -237,7 +237,7 @@ public class JdbcConnector implements Connector {
     @Override
     public List<DataResource> listResources(String connectionConfig, String orgId, String orgName) {
         List<DataResource> resources = new ArrayList<>();
-        Map<String, String> config = parseConfig(connectionConfig);
+        Map<String, String> config = readConnectionConfig(connectionConfig);
 
         try (Connection conn = DriverManager.getConnection(
                 config.get("jdbcUrl"),
@@ -301,7 +301,7 @@ public class JdbcConnector implements Connector {
     @Override
     public List<Map<String, Object>> queryPreview(String connectionConfig, String tableName, int limit) {
         List<Map<String, Object>> rows = new ArrayList<>();
-        Map<String, String> config = parseConfig(connectionConfig);
+        Map<String, String> config = readConnectionConfig(connectionConfig);
         String sql = "SELECT * FROM " + tableName + " LIMIT " + limit;
 
         try (Connection conn = DriverManager.getConnection(
@@ -343,7 +343,7 @@ public class JdbcConnector implements Connector {
      */
     public List<Map<String, Object>> executeSql(String connectionConfig, String sql, int fetchSize) {
         List<Map<String, Object>> rows = new ArrayList<>();
-        Map<String, String> config = parseConfig(connectionConfig);
+        Map<String, String> config = readConnectionConfig(connectionConfig);
 
         try (Connection conn = DriverManager.getConnection(
                 config.get("jdbcUrl"),
@@ -398,7 +398,7 @@ public class JdbcConnector implements Connector {
         if (values == null || values.isEmpty()) {
             return 0;
         }
-        Map<String, String> config = parseConfig(connectionConfig);
+        Map<String, String> config = readConnectionConfig(connectionConfig);
         int totalWritten = 0;
         int effectiveBatch = batchSize > 0 ? batchSize : values.size();
 
@@ -450,8 +450,131 @@ public class JdbcConnector implements Connector {
         return r;
     }
 
+    // ═══════════════ H2-T6 公共通道增量能力（只加不改，既有方法签名与行为不变） ═══════════════
+
+    /** 查询列的 JDBC 原生元数据三元组。 */
+    public record ColumnDescriptor(String name, String label, String typeName) {
+    }
+
+    /** 受保护查询的结果：列元数据 + 按 label 取值的行 + 是否触顶截断。 */
+    public record GuardedResult(List<ColumnDescriptor> columns,
+                                List<Map<String, Object>> rows,
+                                boolean truncated) {
+    }
+
+    /**
+     * 建立到外部数据源的原始连接 —— 全仓唯一被许可的建连通道。
+     *
+     * <p>调用方拿到 {@link Connection} 后可继续使用 {@code DatabaseMetaData} 等原生 API，
+     * 但不得自行调用 {@code DriverManager} 或封装连接池（数据库访问规范 IR 系列）。
+     *
+     * @param connectionConfig 连接配置 JSON（jdbcUrl/username/password/schema）
+     */
+    public Connection openConnection(String connectionConfig) throws SQLException {
+        Map<String, String> cfg = readConnectionConfig(connectionConfig);
+        return openConnection(cfg.get("jdbcUrl"), cfg.get("username"), cfg.get("password"), null);
+    }
+
+    /**
+     * 显式 driverClass + URL 形态的建连，供调用方自持连接描述对象（非 JSON 配置）时使用。
+     *
+     * @param driverClass 驱动类全名；为空时按 URL scheme 推断，推断不到则依赖 JDBC4 自动注册
+     */
+    public Connection openConnection(String jdbcUrl, String username, String password,
+                                     String driverClass) throws SQLException {
+        if (jdbcUrl == null || jdbcUrl.isBlank()) {
+            throw new SQLException("jdbcUrl 为空，拒绝建连");
+        }
+        String driver = (driverClass == null || driverClass.isBlank())
+            ? resolveDriverClass("JDBC", jdbcUrl) : driverClass;
+        if (driver != null && !driver.isBlank()) {
+            try {
+                Class.forName(driver);
+            } catch (ClassNotFoundException | LinkageError e) {
+                log.debug("JDBC 驱动未显式加载，回退 ServiceLoader 自动注册: {}", driver);
+            }
+        }
+        return DriverManager.getConnection(jdbcUrl,
+            username == null ? "" : username, password == null ? "" : password);
+    }
+
+    /**
+     * 带超时、行数上限与列元数据的受保护查询。
+     *
+     * @param maxRows        驱动侧行数上限（&lt;=0 不设置）
+     * @param timeoutSeconds 查询超时秒数（&lt;=0 不设置）
+     * @param rowLimit       应用侧行数上限，触顶则 {@code truncated=true}（&lt;=0 不限制）
+     */
+    public GuardedResult executeQueryGuarded(String connectionConfig, String sql,
+                                             int maxRows, int timeoutSeconds,
+                                             int rowLimit) throws SQLException {
+        List<ColumnDescriptor> columns = new ArrayList<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        boolean truncated = false;
+
+        try (Connection conn = openConnection(connectionConfig);
+             Statement stmt = conn.createStatement()) {
+            if (timeoutSeconds > 0) {
+                stmt.setQueryTimeout(timeoutSeconds);
+            }
+            if (maxRows > 0) {
+                stmt.setMaxRows(maxRows);
+            }
+            try (ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSetMetaData rsmd = rs.getMetaData();
+                int colCount = rsmd.getColumnCount();
+                for (int i = 1; i <= colCount; i++) {
+                    columns.add(new ColumnDescriptor(
+                        rsmd.getColumnName(i), rsmd.getColumnLabel(i), rsmd.getColumnTypeName(i)));
+                }
+                while (rs.next()) {
+                    if (rowLimit > 0 && rows.size() >= rowLimit) {
+                        truncated = true;
+                        break;
+                    }
+                    Map<String, Object> row = new java.util.LinkedHashMap<>();
+                    for (int i = 1; i <= colCount; i++) {
+                        row.put(rsmd.getColumnLabel(i), rs.getObject(i));
+                    }
+                    rows.add(row);
+                }
+            }
+        }
+        return new GuardedResult(columns, rows, truncated);
+    }
+
+    /**
+     * 参数化标量查询：取首行首列为 {@code long}；无行或值为 NULL 时返回 {@code fallback}。
+     *
+     * <p>参数经 {@code PreparedStatement} 绑定，不做字符串拼接。
+     */
+    public long queryScalarLong(String connectionConfig, String sql,
+                                List<?> params, long fallback) throws SQLException {
+        try (Connection conn = openConnection(connectionConfig);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (params != null) {
+                for (int i = 0; i < params.size(); i++) {
+                    ps.setObject(i + 1, params.get(i));
+                }
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    long v = rs.getLong(1);
+                    return rs.wasNull() ? fallback : v;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * 连接配置 JSON 的唯一解析通道 —— 消费方不得再各自解析 connectionConfig（铁律 #4：基础设施收敛 runtime）。
+     *
+     * <p>值一律 coerce 为 String；异常消息只含长度与失败原因，绝不回显配置原文（H10-T4）。
+     * 本方法不建连、不记日志，纯读取场景（如 jdbcUrl 前缀做方言探测）亦可复用。
+     */
     @SuppressWarnings("unchecked")
-    private Map<String, String> parseConfig(String connectionConfig) {
+    public Map<String, String> readConnectionConfig(String connectionConfig) {
         try {
             // PMO-49 W4 fix: JSON 数字/布尔端口等值此前按 Integer 装入 Map<String,String>，
             // 后续 cfg.get("port") 触发 ClassCastException 导致 testConnectionDetailed 全量不可用。
@@ -463,7 +586,10 @@ public class JdbcConnector implements Connector {
             }
             return r;
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid connection config JSON: " + connectionConfig, e);
+            // H10-T4：原实现把整段 connectionConfig 拼进异常消息，password 随日志外泄；只保留失败原因
+            throw new IllegalArgumentException(
+                "Invalid connection config JSON (" + (connectionConfig == null ? 0 : connectionConfig.length())
+                    + " chars): " + e.getMessage(), e);
         }
     }
 }

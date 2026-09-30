@@ -18,7 +18,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       minimum-idle: 5
@@ -33,16 +33,13 @@ spring:
     # 铁律 §3.1: Flyway 已禁用, 不启用
     enabled: false
 
-  jpa:
-    hibernate:
-      ddl-auto: none
 
   # Neo4j — PMO-49 Q2: 补 spring.neo4j 标准凭据避免 Neo4jReactiveHealthIndicator DOWN (standard 档 Neo4j 非必需, 但 classpath driver 自动探测会做 health probe)
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:neo4j123}
+      password: ${NEO4J_PASSWORD:}
 
 # MyBatis Configuration
 mybatis:
@@ -57,12 +54,16 @@ mybatis:
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:}
   bucket: ${MINIO_BUCKET:ecos-datalake}
 
 # PMO-49 D1: 收窄 MyBatis 类型别名扫包到 engine.data 域
 # + ADR-7 X-ECOS-* 头校验开关
 ecos:
+  event:
+    kafka:
+      # PMO-74 H2-T7 裁决 T-C 双投递：跨进程走 Kafka，同 JVM 仍本地分发，broker 缺席不丢本进程事件
+      enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.engine.data
   header-auth:

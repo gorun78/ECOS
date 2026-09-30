@@ -5,9 +5,20 @@ import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
 import type { MetadataAsset } from '../typesAndConstants';
 
+// 本地响应形态（knowledgeApi 的 these 端点当前无精确返回类型，此处在边界处收窄）
+interface AuditLogEntry {
+  severity?: string;
+  event?: string;
+  details?: string;
+  timestamp?: string;
+}
+interface SyncVectorsResponse {
+  logs?: string[];
+}
+
 // PMO-54: 不再硬编码 DEMO_ASSETS；列表从 /api/integration/metadata 加载（真实数据源）
 
-function lastSyncedOf(s: any): string | undefined {
+function lastSyncedOf(s: Record<string, unknown> | null | undefined): string | undefined {
   if (!s) return undefined;
   const d = s.update_time ?? s.updated_at ?? s.last_sync_time ?? s.lastSyncTime;
   return d ? String(d).substring(0, 16) : undefined;
@@ -21,7 +32,7 @@ export default function SyncTab() {
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [isSchemaDrift, setIsSchemaDrift] = useState(false);
   const [isSlaBreach, setIsSlaBreach] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
   const loadMetadata = async () => {
@@ -34,24 +45,27 @@ export default function SyncTab() {
       }
     } catch { /* fallback to defaults */ }
     try {
-      const logs = await knowledgeApi.fetchIntegrationLogs();
-      if (Array.isArray(logs)) setAuditLogs(logs);
+      const logs: unknown = await knowledgeApi.fetchIntegrationLogs();
+      if (Array.isArray(logs)) setAuditLogs(logs as AuditLogEntry[]);
     } catch { /* fallback */ }
     // PMO-54: real asset list — /api/integration/metadata returns sources
     try {
       const raw = await (await fetch('/api/integration/metadata', { headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } })).json();
       const sources = raw?.sources || raw?.data?.sources || raw?.data || raw;
-      const list = Array.isArray(sources) ? sources : [];
-      setAssets(list.map((s: any, i: number) => ({
-        id: String(s.id ?? s.dsId ?? `int-${i}`),
-        source: (s.source ?? s.sourceType ?? 'integration') as MetadataAsset['source'],
-        name: String(s.name ?? s.tableName ?? s.id ?? `asset-${i}`),
-        type: String(s.type ?? s.sourceType ?? 'physical_table'),
-        recordsOrFields: String(s.recordsOrFields ?? s.records ?? '—'),
-        syncStatus: (s.syncStatus ?? (s.status === 'synced' ? 'synced' : 'pending')) as MetadataAsset['syncStatus'],
-        chunksCount: Number(s.chunksCount ?? s.chunkCount ?? 0),
-        lastSynced: String(s.lastSynced ?? s.updatedAt ?? lastSyncedOf(s) ?? '—'),
-      })));
+      const list: unknown[] = Array.isArray(sources) ? sources : [];
+      setAssets(list.map((s, i) => {
+        const o = s as Record<string, unknown>;
+        return {
+          id: String(o.id ?? o.dsId ?? `int-${i}`),
+          source: (o.source ?? o.sourceType ?? 'integration') as MetadataAsset['source'],
+          name: String(o.name ?? o.tableName ?? o.id ?? `asset-${i}`),
+          type: String(o.type ?? o.sourceType ?? 'physical_table'),
+          recordsOrFields: String(o.recordsOrFields ?? o.records ?? '—'),
+          syncStatus: (o.syncStatus ?? (o.status === 'synced' ? 'synced' : 'pending')) as MetadataAsset['syncStatus'],
+          chunksCount: Number(o.chunksCount ?? o.chunkCount ?? 0),
+          lastSynced: String(o.lastSynced ?? o.updatedAt ?? lastSyncedOf(o) ?? '—'),
+        };
+      }));
     } catch {
       setAssets([]);
     } finally {
@@ -69,7 +83,7 @@ export default function SyncTab() {
         embeddingModel: 'text-embedding-004',
         chunkSize: 512,
         overlap: 50,
-      }) as any;
+      }) as unknown as SyncVectorsResponse;
       const logs = result?.logs || [];
       setSyncLogs([]);
       for (let i = 0; i < logs.length; i++) {
@@ -77,8 +91,8 @@ export default function SyncTab() {
         setSyncLogs(prev => [...prev, logs[i]]);
       }
       if (logs.length === 0) setSyncLogs(prev => [...prev, '✅ 同步任务已提交']);
-    } catch (e: any) {
-      setSyncLogs(prev => [...prev, `❌ 同步异常: ${e.message}`]);
+    } catch (e: unknown) {
+      setSyncLogs(prev => [...prev, `❌ 同步异常: ${(e as { message?: string } | undefined)?.message}`]);
     } finally {
       setIsSyncingAll(false);
     }
@@ -151,7 +165,7 @@ export default function SyncTab() {
             <div className="space-y-1.5 max-h-36 overflow-y-auto font-mono text-[9px]">
               {auditLogs.length === 0
                 ? <p className={`${styles.muted} py-4 text-center`}>{t("knowledge.synctab.暂无审计事件")}</p>
-                : auditLogs.map((log: any, i: number) => (
+                : auditLogs.map((log, i: number) => (
                   <div key={i} className={`p-2 rounded-lg bg-slate-50 border border-slate-150 flex items-start justify-between gap-4`}>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">

@@ -33,7 +33,8 @@ public class AgentMetricsCollector {
                 new LinkedBlockingQueue<>(2000),
                 r -> new Thread(r, "agent-metrics-writer"),
                 new ThreadPoolExecutor.DiscardOldestPolicy());
-        ensureTables();
+        // H8-T1: ecos_agent_metrics / ecos_agent_alert 建表 DDL 收编至 db/migration（V162），
+        // 构造函数不再内嵌 DDL；写入路径保留，表缺失时降级为 debug 日志。
     }
 
     /**
@@ -88,44 +89,8 @@ public class AgentMetricsCollector {
         });
     }
 
-    // ─── DDL 自建 ────────────────────────────────────────────
-
-    private void ensureTables() {
-        try {
-            jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS ecos_agent_metrics (\n" +
-                "    id BIGSERIAL PRIMARY KEY,\n" +
-                "    agent_id VARCHAR(64),\n" +
-                "    action VARCHAR(32),\n" +
-                "    success BOOLEAN,\n" +
-                "    elapsed_ms BIGINT,\n" +
-                "    tokens_in INT DEFAULT 0,\n" +
-                "    tokens_out INT DEFAULT 0,\n" +
-                "    trace_id VARCHAR(16),\n" +
-                "    created_at TIMESTAMP DEFAULT NOW()\n" +
-                ")");
-            jdbc.execute(
-                "CREATE INDEX IF NOT EXISTS idx_agent_metrics_agent " +
-                "ON ecos_agent_metrics(agent_id, created_at DESC)");
-        } catch (Exception e) {
-            log.debug("[AgentMetrics] Metrics table ensure: {}", e.getMessage());
-        }
-
-        try {
-            jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS ecos_agent_alert (\n" +
-                "    id BIGSERIAL PRIMARY KEY,\n" +
-                "    trace_id VARCHAR(16),\n" +
-                "    agent_id VARCHAR(64),\n" +
-                "    alert_type VARCHAR(32),\n" +
-                "    message TEXT,\n" +
-                "    created_at TIMESTAMP DEFAULT NOW()\n" +
-                ")");
-        } catch (Exception e) {
-            log.debug("[AgentMetrics] Alert table ensure: {}", e.getMessage());
-        }
-        log.info("[AgentMetrics] Tables ensured");
-    }
+    // H8-T1: ecos_agent_metrics / ecos_agent_alert 建表 DDL（含索引）收编至 db/migration（V162），
+    // 运行时不再内嵌 DDL；写入失败降级为日志。
 
     private static String nvl(String val, String fallback) {
         return val != null ? val : fallback;

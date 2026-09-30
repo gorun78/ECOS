@@ -14,7 +14,7 @@ interface Props {
   objectTypes: ObjectType[];
   handleAddRule: (type: ActionRuleType) => void;
   handleRemoveRule: (ruleId: string) => void;
-  handleRuleChange: (ruleId: string, field: keyof ActionRule, value: any) => void;
+  handleRuleChange: (ruleId: string, field: keyof ActionRule, value: unknown) => void;
   handleAddPropertyEdit: (ruleId: string, propertyId: string) => void;
   handlePropertyEditValueChange: (ruleId: string, propertyId: string, expr: string) => void;
   handleRemovePropertyEdit: (ruleId: string, propertyId: string) => void;

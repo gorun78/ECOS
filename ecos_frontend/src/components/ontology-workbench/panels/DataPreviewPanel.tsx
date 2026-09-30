@@ -63,8 +63,8 @@ export default function DataPreviewPanel({
     setError(null);
     setPage(0);
 
-    fetchDataPreview(entityId).catch((err) => {
-      const msg = err?.message || DATA_CATALOG_UNAVAILABLE;
+    fetchDataPreview(entityId).catch((err: unknown) => {
+      const msg = (err as { message?: string } | undefined)?.message || DATA_CATALOG_UNAVAILABLE;
       setError(msg);
     });
   }, [entityId, fetchDataPreview]);
@@ -94,8 +94,9 @@ export default function DataPreviewPanel({
     setError(null);
     try {
       await fetchDataPreview(entityId);
-    } catch (err: any) {
-      setError(err?.message || DATA_CATALOG_UNAVAILABLE);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string } | undefined)?.message;
+      setError(msg || DATA_CATALOG_UNAVAILABLE);
     } finally {
       setRetrying(false);
     }

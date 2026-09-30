@@ -15,13 +15,49 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
 
+/** PMO-74 H6-T3 M3-a — 本地类型（行为不变，仅为去 any；共享化留待后续单元） */
+interface OntologyMappingField {
+  logicalField: string;
+  logicalType: string;
+  physicalTable: string;
+  physicalColumn: string;
+  description?: string;
+}
+
+interface OntologyEntity {
+  entityId: string;
+  entityName?: string;
+  chineseName?: string;
+  description?: string;
+  mappings?: OntologyMappingField[];
+}
+
+interface PhysicalTableColumn {
+  name: string;
+  type?: string;
+}
+
+interface PhysicalTable {
+  tableName: string;
+  columns?: PhysicalTableColumn[];
+}
+
+/** fetchOntologyMappings 载荷形状（与本文件既有消费一致） */
+interface OntologyMappingsPayload {
+  mappings?: OntologyEntity[];
+  availableTables?: PhysicalTable[];
+}
+
+/** exportOntology 载荷：RAG markdown 对象或纯字符串（与既有 `result?.knowledgeMarkdown || result || ''` 消费一致） */
+type OntologyExportPayload = { knowledgeMarkdown?: string } | string;
+
 export default function OntologyModelTab() {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
-  const [ontologyMappings, setOntologyMappings] = useState<any[]>([]);
-  const [availableTables, setAvailableTables] = useState<any[]>([]);
-  const [editingOntology, setEditingOntology] = useState<any | null>(null);
+  const [ontologyMappings, setOntologyMappings] = useState<OntologyEntity[]>([]);
+  const [availableTables, setAvailableTables] = useState<PhysicalTable[]>([]);
+  const [editingOntology, setEditingOntology] = useState<OntologyEntity | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportedMarkdown, setExportedMarkdown] = useState('');
@@ -30,7 +66,7 @@ export default function OntologyModelTab() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await knowledgeApi.fetchOntologyMappings() as any;
+      const data = await knowledgeApi.fetchOntologyMappings() as OntologyMappingsPayload | null;
       setOntologyMappings(data?.mappings || []);
       setAvailableTables(data?.availableTables || []);
     } catch { setOntologyMappings([]); setAvailableTables([]); }
@@ -39,7 +75,7 @@ export default function OntologyModelTab() {
 
   useEffect(() => { loadData(); }, []);
 
-  const handleSaveMappings = async (mappings: any[]) => {
+  const handleSaveMappings = async (mappings: OntologyEntity[]) => {
     try {
       await knowledgeApi.saveOntologyMappings({ mappings });
     } catch { /* fallback */ }
@@ -48,8 +84,8 @@ export default function OntologyModelTab() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const result = await knowledgeApi.exportOntology() as any;
-      setExportedMarkdown(result?.knowledgeMarkdown || result || '');
+      const result = await knowledgeApi.exportOntology() as OntologyExportPayload | null;
+      setExportedMarkdown((typeof result === 'string' ? result : result?.knowledgeMarkdown) || '');
       setShowExportModal(true);
     } catch { setExportedMarkdown(''); }
     setIsExporting(false);
@@ -60,7 +96,7 @@ export default function OntologyModelTab() {
     if (!newId) return;
     const name = prompt(t("knowledge.ontologytab.显示名称")) || newId;
     const desc = prompt(t("knowledge.ontologytab.描述")) || '';
-    const newEntity: any = { entityId: newId, entityName: newId, chineseName: name, description: desc, mappings: [] };
+    const newEntity: OntologyEntity = { entityId: newId, entityName: newId, chineseName: name, description: desc, mappings: [] };
     const updated = [...ontologyMappings, newEntity];
     setOntologyMappings(updated);
     setEditingOntology(newEntity);
@@ -91,7 +127,7 @@ export default function OntologyModelTab() {
     if (!editingOntology) return;
     const updated = ontologyMappings.map(ent => {
       if (ent.entityId === editingOntology.entityId) {
-        return { ...ent, mappings: ent.mappings.filter((_: any, i: number) => i !== idx) };
+        return { ...ent, mappings: ent.mappings.filter((_, i) => i !== idx) };
       }
       return ent;
     });
@@ -197,15 +233,15 @@ export default function OntologyModelTab() {
                     <tbody className={`divide-y ${styles.sidebarBorder} text-[11px]`}>
                       {(!editingOntology.mappings || editingOntology.mappings.length === 0) ? (
                         <tr><td colSpan={6} className={`p-8 text-center ${styles.muted} font-sans`}>{t("knowledge.ontologytab.尚未配置映射")}</td></tr>
-                      ) : editingOntology.mappings.map((m: any, idx: number) => {
-                        const matchedTable = availableTables.find((t: any) => t.tableName === m.physicalTable);
+                      ) : editingOntology.mappings.map((m, idx) => {
+                        const matchedTable = availableTables.find(t => t.tableName === m.physicalTable);
                         const availableCols = matchedTable?.columns || [];
                         return (
                           <tr key={idx} className={styles.sidebarHoverBg}>
                             <td className="p-3"><input type="text" value={m.logicalField} onChange={e => updateMapping(idx, 'logicalField', e.target.value)} className={`w-full px-2 py-1 border ${styles.inputBorder} rounded-md font-mono text-[10px] font-bold ${styles.inputText} ${styles.inputBg}`} /></td>
                             <td className="p-3"><select value={m.logicalType} onChange={e => updateMapping(idx, 'logicalType', e.target.value)} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-bold text-[10px] ${styles.inputBg} ${styles.sidebarText}`}><option value="String">String</option><option value="Integer">Integer</option><option value="Double">Double</option><option value="DateTime">DateTime</option><option value="Boolean">Boolean</option></select></td>
-                            <td className="p-3"><select value={m.physicalTable} onChange={e => { updateMapping(idx, 'physicalTable', e.target.value); const mt = availableTables.find((t: any) => t.tableName === e.target.value); updateMapping(idx, 'physicalColumn', mt?.columns?.[0]?.name || ''); }} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-bold text-[10px] ${styles.inputBg} text-blue-800`}>{availableTables.map((t: any) => <option key={t.tableName} value={t.tableName}>{t.tableName}</option>)}</select></td>
-                            <td className="p-3"><select value={m.physicalColumn} onChange={e => updateMapping(idx, 'physicalColumn', e.target.value)} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-mono text-[10px] font-bold ${styles.inputBg} text-emerald-800`}>{availableCols.map((c: any) => <option key={c.name} value={c.name}>{c.name} ({c.type})</option>)}</select></td>
+                            <td className="p-3"><select value={m.physicalTable} onChange={e => { updateMapping(idx, 'physicalTable', e.target.value); const mt = availableTables.find(t => t.tableName === e.target.value); updateMapping(idx, 'physicalColumn', mt?.columns?.[0]?.name || ''); }} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-bold text-[10px] ${styles.inputBg} text-blue-800`}>{availableTables.map(t => <option key={t.tableName} value={t.tableName}>{t.tableName}</option>)}</select></td>
+                            <td className="p-3"><select value={m.physicalColumn} onChange={e => updateMapping(idx, 'physicalColumn', e.target.value)} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-mono text-[10px] font-bold ${styles.inputBg} text-emerald-800`}>{availableCols.map(c => <option key={c.name} value={c.name}>{c.name} ({c.type})</option>)}</select></td>
                             <td className="p-3"><input type="text" value={m.description} onChange={e => updateMapping(idx, 'description', e.target.value)} className={`w-full px-2 py-1 border ${styles.inputBorder} rounded-md text-[10px] ${styles.sidebarText} ${styles.inputBg}`} /></td>
                             <td className="p-3 text-center"><button onClick={() => removeMapping(idx)} className="p-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer transition-colors"><Trash2 size={11} /></button></td>
                           </tr>

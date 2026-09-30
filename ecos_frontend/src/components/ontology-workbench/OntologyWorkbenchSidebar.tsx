@@ -192,8 +192,8 @@ export default function OntologyWorkbenchSidebar({
       ]);
       setDomains(Array.isArray(d) ? d : []);
       setObjects(Array.isArray(o) ? o : []);
-    } catch (e: any) {
-      setError(e?.message || "加载本体数据失败");
+    } catch (e: unknown) {
+      setError((e as { message?: string } | undefined)?.message || "加载本体数据失败");
       setDomains([]);
       setObjects([]);
     } finally {

@@ -9,6 +9,7 @@ import {
   Loader2, X, Check, ChevronDown, Plus,
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
+import { getErrorMessage } from '../helpers';
 import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Types ────────────────────────────────────────────
@@ -68,22 +69,22 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
     const load = async () => {
       try {
         const [branchesData, statusData] = await Promise.all([
-          apiFetchData<{ data?: GitBranch[] }>(
+          apiFetchData<{ data?: GitBranch[]; branches?: GitBranch[] }>(
             `/api/v1/engine/data/pipeline/git/branches?pipelineId=${encodeURIComponent(pipelineId)}`
-          ).catch(() => ({ data: [{ name: 'main', current: true }] })),
-          apiFetchData<{ data?: { files: GitFileStatus[] } }>(
+          ).catch((): { data?: GitBranch[]; branches?: GitBranch[] } => ({ data: [{ name: 'main', current: true }] })),
+          apiFetchData<{ data?: { files?: GitFileStatus[] }; files?: GitFileStatus[] }>(
             `/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/status`
           ).catch((): { data: { files: GitFileStatus[] } } => ({ data: { files: [] as GitFileStatus[] } })),
         ]);
 
         if (cancelled) return;
 
-        const brs = (branchesData as any)?.data || (branchesData as any)?.branches || [{ name: 'main', current: true }];
+        const brs = branchesData?.data || branchesData?.branches || [{ name: 'main', current: true }];
         setBranches(Array.isArray(brs) ? brs : []);
         const current = Array.isArray(brs) ? brs.find((b: GitBranch) => b.current)?.name || brs[0]?.name || 'main' : 'main';
         setSelectedBranch(current);
 
-        const fileList = (statusData as any)?.data?.files || [];
+        const fileList = statusData?.data?.files || [];
         setFiles(fileList);
       } catch {
         setBranches([{ name: 'main', current: true }]);
@@ -107,9 +108,9 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
       });
       showToast?.('success', 'Pipeline 已保存');
       onClose();
-    } catch (e: any) {
-      setError(e?.message || '保存失败');
-      showToast?.('error', `保存失败: ${e?.message || '未知错误'}`);
+    } catch (e) {
+      setError(getErrorMessage(e) || '保存失败');
+      showToast?.('error', `保存失败: ${getErrorMessage(e) || '未知错误'}`);
     } finally {
       setSavingOnly(false);
     }
@@ -124,7 +125,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
     setError(null);
     try {
       const branchName = showNewBranch && newBranchName.trim() ? newBranchName.trim() : selectedBranch;
-      const resp = await apiFetchData<{ data?: { commitId: string } }>(
+      const resp = await apiFetchData<{ data?: { commitId?: string }; commitId?: string }>(
         `/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/commit`,
         {
           method: 'POST',
@@ -135,13 +136,13 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
           }),
         }
       );
-      const commitId = (resp as any)?.data?.commitId || (resp as any)?.commitId || '';
+      const commitId = resp?.data?.commitId || resp?.commitId || '';
       showToast?.('success', commitId ? `已提交: ${commitId.slice(0, 7)}` : `已提交到 ${branchName}`);
       onSuccess?.(commitId, commitMessage.trim());
       onClose();
-    } catch (e: any) {
-      setError(e?.message || '提交失败');
-      showToast?.('error', `Git 提交失败: ${e?.message || '未知错误'}`);
+    } catch (e) {
+      setError(getErrorMessage(e) || '提交失败');
+      showToast?.('error', `Git 提交失败: ${getErrorMessage(e) || '未知错误'}`);
     } finally {
       setCommitting(false);
     }

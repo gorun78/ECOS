@@ -29,29 +29,8 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
 
     @PostConstruct
     public void init() {
-        ensureSchema();
+        // H8-T1: 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL
         seedBuiltinFunctions();
-    }
-
-    private void ensureSchema() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_pipeline_function (
-                    id VARCHAR(36) PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL UNIQUE,
-                    category VARCHAR(50) NOT NULL,
-                    signature TEXT NOT NULL,
-                    return_type VARCHAR(50),
-                    description TEXT,
-                    example TEXT,
-                    is_builtin BOOLEAN DEFAULT true,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            log.info("ecos_pipeline_function 表已就绪");
-        } catch (Exception e) {
-            log.warn("ecos_pipeline_function 表创建异常: {}", e.getMessage());
-        }
     }
 
     private void seedBuiltinFunctions() {

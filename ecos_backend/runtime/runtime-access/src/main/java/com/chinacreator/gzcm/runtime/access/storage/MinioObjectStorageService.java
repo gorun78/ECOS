@@ -16,7 +16,7 @@ import java.io.InputStream;
  * 从 gateway 的 MinioStorageService 迁出核心 put/get/delete 逻辑，
  * 通过 {@link IObjectStorageService} 接口暴露。
  * <p>
- * 激活条件：Spring profile {@code enterprise} 或 {@code flagship}。
+ * 激活条件：Spring profile {@code enterprise} 或 {@code ultimate}（历史别名 flagship 已弃用）。
  */
 @Service
 public class MinioObjectStorageService implements IObjectStorageService {

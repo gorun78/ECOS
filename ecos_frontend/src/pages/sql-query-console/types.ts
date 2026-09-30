@@ -18,7 +18,7 @@ export interface SchemaTreeNode {
 
 export interface QueryResult {
   columns: string[];
-  rows: Record<string, any>[];
+  rows: Record<string, unknown>[];
   rowCount: number;
   elapsedMs: number;
 }
@@ -30,7 +30,7 @@ export interface QueryTemplate {
   datasourceId: string;
   sqlContent: string;
   sql?: string;
-  paramsJson?: Record<string, any>;
+  paramsJson?: Record<string, unknown>;
   timeoutSeconds: number;
   maxRows: number;
   createdAt: string;

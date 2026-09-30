@@ -117,8 +117,8 @@ export default function CreateRelationshipModal({
 
       await store.createRelationship(dto);
       onClose();
-    } catch (err: any) {
-      setError(err?.message || '创建关系失败');
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || '创建关系失败');
     } finally {
       setSubmitting(false);
     }

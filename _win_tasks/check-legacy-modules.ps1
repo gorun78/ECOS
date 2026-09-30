@@ -8,15 +8,40 @@ $rootPom = Join-Path $repo "ecos_backend/pom.xml"
 
 $FAIL = 0
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 检查 1: legacy 目录不得出现在 reactor modules
+# Check 1: legacy directories must not appear as reactor modules.
+# agent-service was REMOVED from this list by PMO-74 H11-T2 (Q4 ruling): it is a real
+# reactor module now, referenced by ai-engine-impl and aiming. Leaving it here made this
+# gate fail against an approved change (see PMO-74 ledger section 9.6 reverse corrections).
 $LEGACY_PATTERNS = @(
-    "agent-service",
     "ontology-service",
     "identity-service",
     "api-gateway",
     "legacy"
 )
+
+# Check 1b: ghost module directories must not sit under services/ anymore.
+# PMO-74 Q3 batch A moved them to ecos_backend/archive/legacy/services-ghost/.
+$ARCHIVED_MODULES = @(
+    "ecos_backend/services/api-gateway",
+    "ecos_backend/services/identity-service",
+    "ecos_backend/services/ontology-service"
+)
+$GHOST_LANDING_DIR = "ecos_backend/archive/legacy/services-ghost"
+foreach ($ghost in $ARCHIVED_MODULES) {
+    $ghostPath = Join-Path $repo $ghost
+    if (Test-Path $ghostPath) {
+        Write-Host "[FAIL] archived module still present under services/: $ghost" -ForegroundColor Red
+        $FAIL = 1
+    }
+}
+foreach ($ghost in $ARCHIVED_MODULES) {
+    $name = Split-Path -Leaf $ghost
+    $landing = Join-Path $repo (Join-Path $GHOST_LANDING_DIR $name)
+    if (-not (Test-Path $landing)) {
+        Write-Host "[FAIL] archived module missing at landing: $landing" -ForegroundColor Red
+        $FAIL = 1
+    }
+}
 
 $modules = Select-String -Path $rootPom -Pattern "<module>([^<]+)</module>" |
     ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() }
@@ -34,7 +59,9 @@ foreach ($legacy in $LEGACY_PATTERNS) {
 # 基线 = 当前 POM 中去重后的 module 数量
 $uniqueModules = $modules | Sort-Object -Unique
 $expectedCount = $uniqueModules.Count
-$baselineCount = 11  # 默认 reactor (default modules 去重后): engine + runtime + buszhi/impl + sysman/impl + workspace + 5 services + gateway
+# Baseline 12 = previous 11 + services/agent-service (PMO-74 H11-T2 brought it into the
+# reactor to kill the ghost dependency). Default reactor per-module count is unchanged.
+$baselineCount = 12
 
 if ($expectedCount -gt $baselineCount) {
     Write-Host "[WARN] Module count = $expectedCount (baseline $baselineCount). New modules added!" -ForegroundColor Yellow

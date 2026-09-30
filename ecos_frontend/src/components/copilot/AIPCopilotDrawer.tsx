@@ -24,6 +24,7 @@ import CopilotMessageList from './CopilotMessageList';
 import CopilotInputBar from './CopilotInputBar';
 import { useAipAutomation } from './useAipAutomation';
 import { AgentScenarioType, scenarioPrompt } from './AgentScenarioData';
+import { knowledgeQueryAnonymous, fetchSecurityAuditLogs } from '../../services/knowledgeQueryApi';
 
 interface AIPCopilotDrawerProps {
   isOpen: boolean;
@@ -235,20 +236,15 @@ export default function AIPCopilotDrawer({
         else if (securitySimUser === 'EU_DPO') clientIp = '10.120.9.15';
         else if (securitySimUser === 'unauthorized_ip_user') clientIp = '198.51.100.45';
 
-        const res = await fetch('/api/v1/knowledge/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            userId: securitySimUser,
-            orgId,
-            projectId,
-            datasetId: securitySimDataset,
-            purposeId: securitySimPurpose,
-            clientIp,
-          }),
+        const data = await knowledgeQueryAnonymous({
+          query,
+          userId: securitySimUser,
+          orgId,
+          projectId,
+          datasetId: securitySimDataset,
+          purposeId: securitySimPurpose,
+          clientIp,
         });
-        const data = await res.json();
         const answerMsgId = `agent-qa-${Date.now()}`;
         // Push message through the hook's setMessages
         setMessages((prev: any) => [...(prev || []), {
@@ -260,10 +256,9 @@ export default function AIPCopilotDrawer({
 
         if (data.verdict === 'DENIED') {
           showToast('error', t('copilot.qa.denied'));
-          const logsRes = await fetch('/api/v1/security/audit-logs');
-          if (logsRes.ok) {
-            const logs = await logsRes.json();
-            (setSecurityAuditLogs as any)(logs);
+          const logs = await fetchSecurityAuditLogs();
+          if (logs.ok) {
+            (setSecurityAuditLogs as any)(logs.json);
           }
         }
       } catch (err) {

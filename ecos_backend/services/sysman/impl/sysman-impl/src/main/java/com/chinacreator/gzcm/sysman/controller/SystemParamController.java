@@ -38,7 +38,7 @@ public class SystemParamController {
             return ApiResponse.success(r);
         } catch (Throwable e) {
             log.error("查询系统参数失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -50,7 +50,7 @@ public class SystemParamController {
             return p == null ? ApiResponse.notFound("参数不存在") : ApiResponse.success(p);
         } catch (Throwable e) {
             log.error("查询系统参数失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -62,7 +62,7 @@ public class SystemParamController {
             return ApiResponse.success(paramService.createParam(param, "admin"));
         } catch (Throwable e) {
             log.error("创建系统参数失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -73,7 +73,7 @@ public class SystemParamController {
             return ApiResponse.success(paramService.updateParam(id, param, "admin"));
         } catch (Throwable e) {
             log.error("更新系统参数失败", e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -85,7 +85,7 @@ public class SystemParamController {
             return ApiResponse.success(Map.of("success", true));
         } catch (Throwable e) {
             log.error("删除系统参数失败", e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 }

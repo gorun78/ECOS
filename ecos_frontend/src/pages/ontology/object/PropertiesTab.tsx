@@ -37,7 +37,7 @@ export default function PropertiesTab({
           />
           <select
             value={newPropType}
-            onChange={e => setNewPropType(e.target.value as any)}
+            onChange={e => setNewPropType(e.target.value as PropertiesTabProps['newPropType'])}
             className={`px-2 py-1 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:border-blue-500 focus:outline-hidden`}
           >
             <option value="string">{t('ow.prop.typeString')}</option>

@@ -20,6 +20,9 @@ import { knowledgeApi } from '../services/knowledgeApi';
 import type { ExtractUploadGate } from '../typesAndConstants';
 import ExtractionReviewPanel from '../components/ExtractionReviewPanel';
 
+/** ExtractionReviewPanel 的 reviewData 契约形状（由组件 props 推导，不改共享/面板类型定义） */
+type ReviewDataShape = React.ComponentProps<typeof ExtractionReviewPanel>['reviewData'];
+
 // ── 阶段状态机 ──────────────────────────────────────────────────────────────
 
 type Phase = 'idle' | 'uploading' | 'queued' | 'parsing' | 'extracting' | 'reviewing' | 'done' | 'failed';
@@ -66,7 +69,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
   const [phase, setPhase] = useState<Phase>('idle');
   const [uploadRatio, setUploadRatio] = useState(0); // 0..1
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [reviewData, setReviewData] = useState<{ sourceText: string; data: any } | null>(null);
+  const [reviewData, setReviewData] = useState<{ sourceText: string; data: ReviewDataShape | null } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -104,9 +107,9 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
       setPhase('queued');
       // Start polling for PARSING→EXTRACTING→PENDING_REVIEW
       startPolling(fileId);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setPhase('failed');
-      toast('error', tl('上传失败: ', 'Upload failed: ') + (e?.message || e));
+      toast('error', tl('上传失败: ', 'Upload failed: ') + ((e as { message?: string } | undefined)?.message || String(e)));
     }
   }, [uploadAllowed]);
 
@@ -197,7 +200,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
       <ExtractionReviewPanel
         extractionId={taskId}
         sourceText={reviewData.sourceText}
-        reviewData={(reviewData.data as any) || { entities: [], relations: [], rules: [] }}
+        reviewData={reviewData.data || { entities: [], relations: [], rules: [] }}
         onBack={handleReset}
       />
     );

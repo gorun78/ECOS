@@ -105,7 +105,7 @@ public class AgentMeshController {
             agentRegistryRepo.insert(agent);
         } catch (org.springframework.dao.DataAccessException ex) {
             log.error("Agent insert failed: id={}, name={}", agent.getId(), agent.getName(), ex);
-            return ApiResponse.badRequest("Agent 注册失败: " + ex.getMostSpecificCause().getMessage());
+            return ApiResponse.badRequest("Agent 注册失败：提交内容与现有记录冲突或字段不合法");
         }
         log.info("Agent registered: {} [{}]", agent.getId(), agent.getName());
         return ApiResponse.success(agent);
@@ -173,6 +173,7 @@ public class AgentMeshController {
             Object params = body.get("inputParams");
             mission.setInputParams(params != null ? mapper.writeValueAsString(params) : "{}");
         } catch (Exception e) {
+            log.warn("[AgentMesh] mission inputParams 序列化失败，本次将以空参数落库", e);
             mission.setInputParams("{}");
         }
         missionRepo.insert(mission);
@@ -215,7 +216,7 @@ public class AgentMeshController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Mission {} 执行失败", id, e);
-            return ApiResponse.internalError("执行失败: " + e.getMessage());
+            return ApiResponse.internalError("任务执行失败");
         }
     }
 

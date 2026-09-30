@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Globe, Box, Database, Layers, Plus, Pencil, Trash2, X, Save, Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { ontologyDomainApiFetch as apiFetch } from '../../services/ontologyWorkbenchApi';
 
 // ── 本体 → 图标映射 ──
 const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
@@ -21,17 +22,7 @@ const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
 const ONTOLOGY_API = '/api/v1/ecos/ontologies';
 const ENTITY_API = '/api/v1/ecos/ontologies'; // {ontologyId}/entities
 
-async function apiFetch(path: string, options?: RequestInit): Promise<any> {
-  const token = localStorage.getItem('token') || '';
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(path, { ...options, headers });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  return json.data ?? json;
-}
-
-async function fetchOntologies(): Promise<any[]> {
+async function fetchOntologies(): Promise<OntologyItem[]> {
   return apiFetch(ONTOLOGY_API);
 }
 
@@ -99,8 +90,8 @@ export default function OntologyDomainPanel({
         }),
       );
       setEntityCounts(Object.fromEntries(counts));
-    } catch (err: any) {
-      setError(err?.message || '加载本体列表失败');
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || '加载本体列表失败');
       // 回退到硬编码数据
     } finally {
       setLoading(false);
@@ -125,8 +116,8 @@ export default function OntologyDomainPanel({
       setFormName('');
       setFormDescription('');
       await loadOntologies();
-    } catch (err: any) {
-      setError(err?.message || '创建失败');
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || '创建失败');
     } finally {
       setSaving(false);
     }
@@ -143,8 +134,8 @@ export default function OntologyDomainPanel({
       });
       setEditingId(null);
       await loadOntologies();
-    } catch (err: any) {
-      setError(err?.message || '更新失败');
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || '更新失败');
     } finally {
       setSaving(false);
     }
@@ -163,8 +154,8 @@ export default function OntologyDomainPanel({
         if (next) onOntologyChange(next.id);
       }
       await loadOntologies();
-    } catch (err: any) {
-      setError(err?.message || '删除失败');
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || '删除失败');
     } finally {
       setSaving(false);
     }

@@ -7,8 +7,8 @@ import java.io.Serializable;
 /**
  * 提交到 Git 响应（POST /tasks/{id}/git/commit）。
  *
- * <p>commitId 当前为 null（JGit commit 不回填 SHA 到响应，前端按 message 提示已提交处理）；
- * branch/message 与既有 Map 响应字段名对齐，保证前后端契约兼容。
+ * <p>status="not_available" + reason 表示服务端拒绝执行（如仅传已废弃的 localPath），
+ * 属显式失败而非伪成功。
  */
 @Data
 public class PipelineGitCommitResultVO implements Serializable {
@@ -26,4 +26,10 @@ public class PipelineGitCommitResultVO implements Serializable {
 
     /** 提交说明回显 */
     private String message;
+
+    /** 执行状态：null=成功；not_available=未开放/被拒绝 */
+    private String status;
+
+    /** status=not_available 时的指引原因 */
+    private String reason;
 }

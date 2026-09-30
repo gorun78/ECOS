@@ -243,7 +243,9 @@ public class CsvConnector implements Connector {
         try {
             return mapper.readValue(connectionConfig, Map.class);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid CSV connection config JSON: " + connectionConfig, e);
+            // H10-T4e：原实现把整段 connectionConfig 拼进异常消息，凭据随日志外泄；只保留长度与失败原因
+            throw new IllegalArgumentException("Invalid CSV connection config JSON ("
+                    + (connectionConfig == null ? 0 : connectionConfig.length()) + " chars): " + e.getMessage(), e);
         }
     }
 }

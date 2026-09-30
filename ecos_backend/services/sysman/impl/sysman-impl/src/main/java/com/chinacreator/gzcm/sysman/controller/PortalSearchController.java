@@ -29,8 +29,8 @@ import java.util.Set;
  * <p>实体级检索（非全文）：agent/workflow/glossary/scenario 4 类，合并为统一
  * {@code items[]}（type/id/name/url）返回 — 字段对齐前端
  * {@code ecos_frontend/src/api.ts SearchHit}（type/id/name/url，SPA hash 路由）。
- * 数据源只读走 {@link PortalSearchQueryService}（Controller 禁止直接使用
- * JdbcTemplate — 硬规则）。RLS：UserContext 已认证时 rlsApplied=true，
+ * 数据源只读走 {@link PortalSearchQueryService}（Controller 不直接持有数据访问模板 —
+ * 硬规则，PMO-74 H9-T4 全量复核通过）。RLS：UserContext 已认证时 rlsApplied=true，
  * 行级收窄由 SecurityConfig permitAll + ClearanceInterceptor 联动保证。</p>
  */
 @RestController

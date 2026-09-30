@@ -17,12 +17,15 @@ import java.util.concurrent.TimeUnit;
 /**
  * Neo4j 统一配置 Bean。
  * <p>
- * 仅在配置了 {@code neo4j.uri} 且 classpath 中存在 neo4j-java-driver 时激活。
+ * 只在档位声明 {@code ecos.graph.provider=neo4j}（enterprise / ultimate）且 classpath
+ * 中存在 neo4j-java-driver 时激活；standard 档 provider=pg，不创建 Driver，
+ * 各引擎经 {@code Neo4jClient.isAvailable()} 降级为 no-op。
+ * 连接参数取 {@code neo4j.*}（可由 {@code NEO4J_URI} 等环境变量覆盖）。
  * 使用连接池配置 connectionTimeout=5s, maxConnectionPoolSize=10。
  * </p>
  */
 @Configuration
-@ConditionalOnProperty("neo4j.uri")
+@ConditionalOnProperty(name = "ecos.graph.provider", havingValue = "neo4j")
 @ConditionalOnClass(Driver.class)
 public class Neo4jConfig {
 
@@ -30,7 +33,7 @@ public class Neo4jConfig {
 
     @Bean
     public Driver neo4jDriver(
-            @Value("${neo4j.uri}") String uri,
+            @Value("${ecos.graph.neo4j-uri:${neo4j.uri}}") String uri,
             @Value("${neo4j.username:neo4j}") String username,
             @Value("${neo4j.password:neo4j}") String password,
             @Value("${neo4j.database:neo4j}") String database) {

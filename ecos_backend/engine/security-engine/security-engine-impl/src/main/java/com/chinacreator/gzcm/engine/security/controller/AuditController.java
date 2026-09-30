@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.sysman.audit.model.AuditEvent;
 import com.chinacreator.gzcm.sysman.audit.service.IAuditLogService;
 import com.chinacreator.gzcm.engine.security.service.AuditHashChainService;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
+import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,8 @@ import java.util.*;
 @RequestMapping({"/api/v1/audit", "/api/v1/security/audit"})
 public class AuditController {
     private static final Logger log = LoggerFactory.getLogger(AuditController.class);
+
+    static final String ANONYMOUS_OPERATOR = "anonymous";
 
     @Autowired(required = false)
     private IAuditLogService auditLogService;
@@ -60,7 +63,7 @@ public class AuditController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询审计日志失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询审计日志失败");
         }
     }
 
@@ -72,8 +75,8 @@ public class AuditController {
             if (log == null) return ApiResponse.notFound("日志不存在");
             return ApiResponse.success(log);
         } catch (Exception e) {
-            log.error("查询审计日志详情失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            log.error("查询审计日志详情失败: id={}", id, e);
+            return ApiResponse.internalError("查询审计日志详情失败");
         }
     }
 
@@ -134,7 +137,7 @@ public class AuditController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("审计统计失败", e);
-            return ApiResponse.internalError("统计失败: " + e.getMessage());
+            return ApiResponse.internalError("审计统计失败");
         }
     }
 
@@ -154,7 +157,7 @@ public class AuditController {
             return ApiResponse.success(hashChainService.verifyHashChain());
         } catch (Exception e) {
             log.error("审计哈希链验证失败", e);
-            return ApiResponse.internalError("验证失败: " + e.getMessage());
+            return ApiResponse.internalError("审计哈希链验证失败");
         }
     }
 
@@ -199,13 +202,32 @@ public class AuditController {
             }
 
             // 异步写入（IAuditLogService.log 内部已用 CompletableFuture.runAsync 异步落库）
+            // N-24 取证：主体仍由调用方自报（信任模型待裁 Q15），此处旁录服务端已认证主体供对账
+            log.info("审计摄取: claimedUserId={} action={} ingestActor={} eventId={}",
+                    event.getUserId(), event.getAction(), resolveIngestActor(), event.getEventId());
             auditLogService.log(event);
 
             return ApiResponse.success(Map.of("status", "accepted"));
         } catch (Exception e) {
             log.error("写入审计日志失败", e);
-            return ApiResponse.internalError("写入失败: " + e.getMessage());
+            return ApiResponse.internalError("写入审计日志失败");
         }
+    }
+
+    /**
+     * 服务端已认证主体（仅供旁录对账，不改写入库的自报主体 —— 待裁 Q15）。
+     * 未认证时记 anonymous，不伪装成看似可信的 admin/system。
+     */
+    String resolveIngestActor() {
+        String userId = UserContext.getCurrentUserId();
+        if (userId != null && !userId.isBlank()) {
+            return userId;
+        }
+        String username = UserContext.getCurrentUsername();
+        if (username != null && !username.isBlank()) {
+            return username;
+        }
+        return ANONYMOUS_OPERATOR;
     }
 
     private static String asString(Object o) {

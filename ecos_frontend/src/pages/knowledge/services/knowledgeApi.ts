@@ -127,9 +127,9 @@ export async function runRAGQuerySSE(query: string, onToken: (token: string) => 
       }
     }
     return { answerGenerated };
-  } catch (e) {
+  } catch (e: unknown) {
     // SSE not available — fall back to POST; report answer not generated
-    console.info('SSE fallback to POST:', (e as Error).message);
+    console.info('SSE fallback to POST:', (e as { message?: string } | undefined)?.message);
     const result = await runRAGQuery({ query });
     onToken(result.answer || '');
     return { answerGenerated: Boolean(result.answerGenerated) };
@@ -470,9 +470,22 @@ export interface GraphStats {
   embeddingDim?: number;
 }
 
+// /knowledge/stats 原始响应形态（JSON 边界本地收窄，字段均可能缺失；仅本文件消费）
+interface KnowledgeStatsRaw {
+  graphNodeCount?: number;
+  graphEdgeCount?: number;
+  embeddingCount?: number;
+  ruleCount?: number;
+  complianceRuleCount?: number;
+  articleCount?: number;
+  docCount?: number;
+  lastUpdatedAt?: string;
+  embeddingDim?: number;
+}
+
 export async function fetchGraphStats(): Promise<GraphStats> {
   try {
-    const data = await apiFetchData<any>('/api/v1/knowledge/stats');
+    const data = await apiFetchData<KnowledgeStatsRaw | null>('/api/v1/knowledge/stats');
     return {
       graphNodeCount: data?.graphNodeCount ?? 0,
       graphEdgeCount: data?.graphEdgeCount ?? 0,
@@ -500,7 +513,7 @@ export interface EntityMappingItem {
 
 export async function fetchEntityMappings(): Promise<EntityMappingItem[]> {
   try {
-    const data = await apiFetchData<any>('/api/v1/ontology/entity-mappings');
+    const data = await apiFetchData<unknown>('/api/v1/ontology/entity-mappings');
     return Array.isArray(data) ? (data as EntityMappingItem[]) : [];
   } catch {
     return [];
@@ -522,10 +535,15 @@ export async function fetchEngineHealth(): Promise<EngineHealthMap> {
 
 // ── PMO-54 — Graph build (jobs) ──────────────────────────────────────────────
 
+// /sync/jobs 端点兼容两种形态：裸数组 或 { data: [...] } 包装（JSON 边界本地收窄）
+interface GraphJobsResponse {
+  data?: GraphBuildJob[];
+}
+
 export async function fetchGraphJobs(): Promise<GraphBuildJob[]> {
   try {
-    const data = await apiFetchData<any>(`${KB_V1}/sync/jobs`);
-    return Array.isArray(data) ? (data as GraphBuildJob[]) : (data?.data as GraphBuildJob[]) || [];
+    const data = await apiFetchData<GraphBuildJob[] | GraphJobsResponse | null>(`${KB_V1}/sync/jobs`);
+    return Array.isArray(data) ? data : data?.data || [];
   } catch {
     return [];
   }
@@ -749,9 +767,9 @@ export async function runEval(seedSetName: string): Promise<EvalReport> {
       body: JSON.stringify({ seedSetName }),
     });
     return data || { reportId: '', seedSetName, printedAt: new Date().toISOString(), recallAt5: 0, mrrAt5: 0, ndcgAt5: 0 };
-  } catch (e) {
+  } catch (e: unknown) {
     // Degraded mode: hint that backend isn't ready; run degraded stub locally
-    console.info('runEval backend unavailable — degraded', (e as Error).message);
+    console.info('runEval backend unavailable — degraded', (e as { message?: string } | undefined)?.message);
     const evalDegraded: EvalReport = {
       reportId: `local-${Date.now()}`,
       seedSetName,
@@ -767,11 +785,30 @@ export async function runEval(seedSetName: string): Promise<EvalReport> {
 
 // ── PMO-54 — Lifecycle ────────────────────────────────────────────────────────
 
+// /assets 原始行形态（后端字段命名新旧并存：assetId/id、assetName/name…；仅本文件消费）
+interface LifecycleAssetRaw {
+  id?: string | number;
+  assetId?: string | number;
+  name?: string;
+  assetName?: string;
+  type?: string;
+  assetType?: string;
+  state?: LifecycleState;
+  status?: string;
+  updatedAt?: string;
+  updateTime?: string;
+  updatedBy?: string;
+}
+
+interface LifecycleAssetsResponse {
+  data?: LifecycleAssetRaw[];
+}
+
 export async function fetchLifecycleAssets(): Promise<LifecycleAsset[]> {
   try {
-    const data = await apiFetchData<any>(`${KB_V1}/assets`);
-    const items = Array.isArray(data) ? data : (data?.data as any[]) || [];
-    return (items as any[]).map((a: any) => ({
+    const data = await apiFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KB_V1}/assets`);
+    const items: LifecycleAssetRaw[] = Array.isArray(data) ? data : data?.data || [];
+    return items.map((a) => ({
       id: String(a.id ?? a.assetId ?? ''),
       name: String(a.name ?? a.assetName ?? a.id ?? ''),
       type: String(a.type ?? a.assetType ?? 'unknown'),
@@ -857,11 +894,31 @@ export interface DataWorkbenchSource {
   pipelines?: Array<{ pipelineId: string; name: string }>;
 }
 
+// /integration/metadata 原始行形态（sources/data 两种包装，字段新旧并存；仅本文件消费）
+interface DataWorkbenchSourceRaw {
+  id?: string | number;
+  dsId?: string;
+  name?: string;
+  tableName?: string;
+  sourceType?: string;
+  type?: string;
+  status?: string;
+  syncStatus?: string;
+  records?: string;
+  recordsOrFields?: string;
+  pipelines?: DataWorkbenchSource['pipelines'];
+}
+
+interface DataWorkbenchSourcesResponse {
+  data?: DataWorkbenchSourceRaw[];
+  sources?: DataWorkbenchSourceRaw[];
+}
+
 export async function fetchDataWorkbenchSources(): Promise<DataWorkbenchSource[]> {
   try {
-    const data = await apiFetchData<any>('/api/v1/integration/metadata');
-    const items = Array.isArray(data) ? data : (data?.data as any[]) || data?.sources || [];
-    return (items as any[]).map((s: any) => ({
+    const data = await apiFetchData<DataWorkbenchSourceRaw[] | DataWorkbenchSourcesResponse>('/api/v1/integration/metadata');
+    const items = Array.isArray(data) ? data : data?.data || data?.sources || [];
+    return items.map((s) => ({
       dsId: String(s.id ?? s.dsId ?? s.name ?? ''),
       name: String(s.name ?? s.tableName ?? s.id ?? ''),
       type: String(s.sourceType ?? s.type ?? 'integration'),
@@ -874,6 +931,15 @@ export async function fetchDataWorkbenchSources(): Promise<DataWorkbenchSource[]
   }
 }
 
+// /metadata/drift 原始响应形态（schemaDelta/fields、rows/samples 两套命名；仅本文件消费）
+interface MetadataDriftRaw {
+  schemaDelta?: Array<Record<string, unknown>>;
+  fields?: Array<Record<string, unknown>>;
+  rows?: Array<Record<string, unknown>>;
+  samples?: Array<Record<string, unknown>>;
+  lineage?: { nodes: Array<Record<string, unknown>>; links: Array<Record<string, unknown>> };
+}
+
 export async function fetchMetadataDrift(sample?: boolean): Promise<{
   schemaDelta: Array<Record<string, unknown>>;
   rows?: Array<Record<string, unknown>>;
@@ -881,7 +947,7 @@ export async function fetchMetadataDrift(sample?: boolean): Promise<{
 }> {
   try {
     const q = sample ? '?sample=true' : '';
-    const data = await apiFetchData<any>(`/api/v1/integration/metadata/drift${q}`);
+    const data = await apiFetchData<MetadataDriftRaw | null>(`/api/v1/integration/metadata/drift${q}`);
     return {
       schemaDelta: data?.schemaDelta || data?.fields || [],
       rows: data?.rows || data?.samples,

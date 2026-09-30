@@ -25,15 +25,14 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqScoreTrendVO;
  * POST /api/v1/dq/scores/recompute  — 手动触发重算（?assetType=TABLE&amp;assetId=xxx）
  * </pre>
  *
- * <p>三滤波器（铁律 1.2）：本 Controller 路径 {@code /api/v1/dq/scores} 由 T7b 的
- * {@code /api/v1/dq/**} 通配覆盖，无需改 VersionPrefixRewriteFilter /
- * SecurityConfig / ClearanceInterceptor（已注册双路径）。
- * 核验项：
+ * <p>三滤波器（铁律 1.2，PMO-74 H9-T5c 按实测更正）：本 Controller 路径 {@code /api/v1/dq/scores}
+ * 无需追加登记（正向 rewrite 无 dq 条目 = KEEP，新增子路径零注册），但<b>不再是匿名端点</b>。
+ * 当前核验项（三处事实源逐条实测，非通配推断）：
  * <ul>
- *   <li>{@code VersionPrefixRewriteFilter} KEEP — 已在 T2 配置</li>
- *   <li>{@code SecurityConfig.permitAll("/api/v1/dq/**")} ✓</li>
- *   <li>{@code ClearanceInterceptor} 豁免 {@code /api/v1/dq/**} ✓</li>
- *   <li>{@code application.yml auth.whitelist.paths} 含 {@code /api/v1/dq/**} ✓</li>
+ *   <li>{@code VersionPrefixRewriteFilter} KEEP — ✓（V1_REWRITE_MAP 正向 10 条无 dq）</li>
+ *   <li>{@code SecurityConfig.permitAll} — ✗ 不含 dq（H9-T1 由 87 条收敛为 8 条，`:36-45`）⇒ 需 Bearer Token</li>
+ *   <li>{@code ClearanceInterceptor} 豁免 — ✗ 不含 dq（H9-T2 移除业务前缀，`:79-85`）⇒ 按 {@code /api/v1/ → L1} 校验</li>
+ *   <li>{@code application.yml auth.whitelist.paths} — ✗ 键已删除（H9-T5/T5b），存活 Java 消费方 0</li>
  * </ul>
  * </p>
  *

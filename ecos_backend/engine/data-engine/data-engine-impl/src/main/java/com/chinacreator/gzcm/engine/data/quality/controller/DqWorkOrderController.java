@@ -34,10 +34,11 @@ import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
  * GET    /api/v1/dq/work-orders/rank?grade=P0   — 风险工单排行（top N 摘要，按 severity+retry DESC）
  * </pre>
  *
- * <p><b>三滤波器</b>（铁律 1.2）：本路径 {@code /api/v1/dq/work-orders/**} 由 T2 已注册的
- * {@code /api/v1/dq/**} 通配覆盖：VersionPrefixRewriteFilter KEEP /
- * SecurityConfig permitAll + ClearanceInterceptor 双路径豁免 / application.yml
- * auth.whitelist — 无需改三滤波器。</p>
+ * <p><b>三滤波器</b>（铁律 1.2，PMO-74 H9-T5c 按实测更正）：本路径 {@code /api/v1/dq/work-orders/**}
+ * 无需追加登记（正向 rewrite 无 dq 条目 = KEEP），但原注释所称的三层豁免<b>均已不存在</b>：
+ * SecurityConfig permitAll 经 H9-T1 收敛为 8 条不含 dq、ClearanceInterceptor 的业务前缀豁免经
+ * H9-T2 移除、yml {@code auth.whitelist} 键经 H9-T5/T5b 删除 ⇒ 指派/关闭/驳回等写操作
+ * 需 Bearer Token 且过 {@code /api/v1/ → L1} 准入等级校验。</p>
  *
  * <p><b>安全卡</b>（铁律 2.4）：写操作（assign/start/resolve/verify/close/reject/run-rca）
  * 异步 {@code auditWrite}；读操作 {@code auditRead}；默认 DENY 由
@@ -219,7 +220,7 @@ public class DqWorkOrderController {
         try {
             return ApiResponse.success(workOrderService.runRca(id));
         } catch (RuntimeException e) {
-            // 工单不存在 / JdbcTemplate 不可用 等 — 返回结构化错误，不抛 500
+            // 工单不存在 / 数据访问层不可用 等 — 返回结构化错误，不抛 500
             return ApiResponse.<Map<String, Object>>error(ApiResponse.CODE_BAD_REQUEST,
                     "RCA_FAILED", e.getMessage());
         }

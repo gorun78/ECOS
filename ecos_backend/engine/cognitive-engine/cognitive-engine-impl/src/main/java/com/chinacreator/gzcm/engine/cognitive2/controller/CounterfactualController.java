@@ -20,9 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
  *        + 敏感性 Top3 + 假设前提留痕；纯 Java 数值，LLM 零参与；同 seed 双跑可复现）
  * </pre>
  *
- * <p>三滤波器（PMO-59 P3a 指令 §实现决策 2 核对，零新增登记）：
- * {@code /api/v1/cognitive/**} 已被 SecurityConfig permitAll + ClearanceInterceptor 豁免
- * + auth.whitelist 既有通配覆盖；VersionPrefixRewriteFilter V1_REWRITE_MAP 无 cognitive 条目=KEEP。
+ * <p>三滤波器（PMO-74 H9-T5c 按实测更正）：{@code V1_REWRITE_MAP} 无 cognitive 条目 = KEEP（正向 10 条实测）。
+ * 但本路径<b>不匿名可达</b>：sysman {@code SecurityConfig:36-45} 的 permitAll 已收敛为 8 条（H9-T1），
+ * 不含 {@code /api/v1/cognitive/**}；yml {@code auth.whitelist} 机制已随 H9-T5/T5b 删除且从未有存活 Java 消费方。
+ * 故请求需 Bearer Token，并经 {@code ClearanceInterceptor} 按 {@code PATH_RULES} 的 {@code /api/v1/ → L1} 做准入校验。
  * 推演仅读不写心智状态；审计经 EventBus 发 Kafka {@code ecos.audit}（Simulator 内单点）。</p>
  */
 @RestController

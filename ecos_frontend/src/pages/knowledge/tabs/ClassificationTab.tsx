@@ -13,12 +13,12 @@
  *
  * 主题 / i18n / lucide 严格遵守铁律 §4.1 / §4.2 / §4.3：
  *   硬编码上色禁止，全部走 useTheme().styles；硬编码中文禁止，全部走 t()。
+ *
+ * 组件拆分（前端开发规范 §十 收口）：树 / 标签云 / 资产列表 / 推荐浮层
+ *   已拆至 ./classification/ 子目录，本文件仅保留状态与业务处理器。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  FolderTree, Tag, Plus, Trash2, RefreshCw, Sparkles,
-  Layers, ShieldCheck, ChevronRight,
-} from 'lucide-react';
+import { Layers, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { showToastGlobal } from '../../../components/common/Toast';
@@ -41,27 +41,16 @@ import {
   type NavProductItemVO,
   type NavRecommendVO,
 } from '../../../services/knowledgeNavApi';
-
-/** 右侧资产分页大小（按设计稿约定） */
-const PAGE_SIZE = 20;
-
-/** 标签云热门标签 TopN */
-const TOP_TAGS = 20;
-
-/** domain 值集合（按 PRD v1.0 约定：default 为默认，跨域切换） */
-const DEFAULT_DOMAIN = 'default';
+import { DEFAULT_DOMAIN, PAGE_SIZE, TOP_TAGS } from './classification/constants';
+import type { CatEditMode } from './classification/types';
+import { CategoryTreePanel } from './classification/CategoryTreePanel';
+import { TagCloudPanel } from './classification/TagCloudPanel';
+import { ProductsPanel } from './classification/ProductsPanel';
+import { RecommendModal } from './classification/RecommendModal';
 
 /** 通知 Overview 总览重拉 KB 统计（与 DatasyncTab 同契约 `kb:stats:refresh`） */
 function emitRefresh(): void {
   window.dispatchEvent(new CustomEvent('kb:stats:refresh'));
-}
-
-/** 取一节点的下级 child 列表（直接子节点，含 articleCount） */
-function findChildren(items: NavCategoryVO[], parentId: string): NavCategoryVO[] {
-  return items.filter(c => {
-    const pid = c.parentId ?? null;
-    return (pid ? String(pid) : '') === String(parentId);
-  });
 }
 
 export default function ClassificationTab() {
@@ -103,11 +92,7 @@ export default function ClassificationTab() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   // ── 输入辅助 ──
-  const [catEditMode, setCatEditMode] = useState<{
-    mode: 'create' | 'rename';
-    parentId?: string | null;
-    targetId?: string;
-  } | null>(null);
+  const [catEditMode, setCatEditMode] = useState<CatEditMode | null>(null);
   const [catDraft, setCatDraft] = useState<NavCategorySaveDTO>({
     domain: DEFAULT_DOMAIN,
     name: '',
@@ -435,481 +420,85 @@ export default function ClassificationTab() {
 
       {/* ─── 主区：左 3 级树 / 中标签云 / 右资产列表 ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start min-w-0">
-        {/* 左：3 级目录树 */}
-        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3 min-w-0`}>
-          <div className="flex items-center justify-between border-b border-slate-150 pb-2">
-            <span className={`font-bold text-xs ${styles.cardText} flex items-center gap-1.5`}>
-              <FolderTree size={13} className="text-indigo-600" />
-              {t('knowledge.nav.tree_title')}
-            </span>
-            <button
-              type="button"
-              className="px-2.5 py-1 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg cursor-pointer flex items-center gap-1 disabled:opacity-50"
-              onClick={startCreateTopCategory}
-              disabled={busy}
-            >
-              <Plus size={12} />
-              {t('knowledge.nav.tree_new_top')}
-            </button>
-          </div>
-          {categories.length === 0 && !categoriesLoading ? (
-            <div className="py-8 text-center">
-              <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('knowledge.nav.tree_empty')}</p>
-            </div>
-          ) : (
-            <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
-              {topLevelItems.map(node => (
-                <TreeRow
-                  key={node.id}
-                  category={categories.find(c => c.id === node.id) ?? null}
-                  categories={categories}
-                  depth={1}
-                  selectedId={selectedCatId}
-                  expandedIds={expandedIds}
-                  onSelect={(id) => setSelectedCatId(prev => (prev === id ? null : id))}
-                  onToggle={id => {
-                    setExpandedIds(prev => {
-                      const next = new Set(prev);
-                      if (next.has(id)) next.delete(id);
-                      else next.add(id);
-                      return next;
-                    });
-                  }}
-                  onRename={startRename}
-                  onCreateChild={startCreateChildCategory}
-                  onDelete={handleDeleteCategory}
-                  styles={styles}
-                  t={t}
-                />
-              ))}
-              {categoriesLoading && (
-                <div className="py-4 text-center">
-                  <RefreshCw size={18} className={`mx-auto animate-spin ${styles.muted}`} />
-                </div>
-              )}
-            </div>
-          )}
-          {/* 目录编辑态（新增一级 / 子级 / 重命名） */}
-          {catEditMode && (
-            <div className={`mt-3 ${styles.cardBg} border ${styles.inputBorder} rounded-lg p-2.5 space-y-2`}>
-              <span className={`text-[10px] font-bold ${styles.muted} uppercase tracking-wider block`}>
-                {catEditMode.mode === 'create'
-                  ? t('knowledge.nav.tree_new_node')
-                  : t('knowledge.nav.tree_rename')}
-              </span>
-              <input
-                type="text"
-                value={catDraft.name}
-                onChange={e => setCatDraft(d => ({ ...d, name: e.target.value }))}
-                placeholder={t('knowledge.nav.tree_name_placeholder')}
-                className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500`}
-              />
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => { void submitCategory(); }}
-                  disabled={busy}
-                  className="flex-1 px-2.5 py-1 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
-                >
-                  <Plus size={11} />
-                  {t('knowledge.nav.tree_confirm')}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  disabled={busy}
-                  className={`flex-1 px-2.5 py-1 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded cursor-pointer border ${styles.cardBorder} flex items-center justify-center gap-1 disabled:opacity-50`}
-                >
-                  {t('knowledge.nav.tree_cancel')}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <CategoryTreePanel
+          styles={styles}
+          t={t}
+          categories={categories}
+          topLevelItems={topLevelItems}
+          categoriesLoading={categoriesLoading}
+          busy={busy}
+          selectedCatId={selectedCatId}
+          expandedIds={expandedIds}
+          catEditMode={catEditMode}
+          catDraft={catDraft}
+          onSelect={(id) => setSelectedCatId(prev => (prev === id ? null : id))}
+          onToggle={id => {
+            setExpandedIds(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          }}
+          onRename={startRename}
+          onCreateChild={startCreateChildCategory}
+          onDelete={handleDeleteCategory}
+          onCreateTop={startCreateTopCategory}
+          onDraftNameChange={name => setCatDraft(d => ({ ...d, name }))}
+          onSubmit={() => { void submitCategory(); }}
+          onCancelEdit={cancelEdit}
+        />
 
-        {/* 中：标签云 + 热门标签 Top20 */}
-        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3 min-w-0`}>
-          <div className="flex items-center justify-between border-b border-slate-150 pb-2">
-            <span className={`font-bold text-xs ${styles.cardText} flex items-center gap-1.5`}>
-              <Tag size={13} className="text-emerald-600" />
-              {t('knowledge.nav.tags_title')}
-            </span>
-            <span className={`text-[9px] ${styles.muted} font-mono`}>
-              {tags.length}
-            </span>
-          </div>
-          <div className="space-y-1.5">
-            <input
-              type="text"
-              value={tagDraft}
-              onChange={e => setTagDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { void submitTag(); } }}
-              placeholder={t('knowledge.nav.tag_new_placeholder')}
-              className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-emerald-500`}
-            />
-            <button
-              type="button"
-              onClick={() => { void submitTag(); }}
-              disabled={busy || !tagDraft.trim()}
-              className="w-full px-2.5 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
-            >
-              <Plus size={11} />
-              {t('knowledge.nav.tag_new')}
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {hotTags.length === 0 ? (
-              <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('knowledge.nav.tag_empty')}</p>
-            ) : (
-              hotTags.map(tag => {
-                const isHot = tag.useCount > 0;
-                const isSel = selectedTag === tag.tagName;
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    title={isSel ? t('knowledge.nav.tag_selected') : t('knowledge.nav.tag_count').replace('{n}', String(tag.useCount))}
-                    onClick={() => setSelectedTag(prev => (prev === tag.tagName ? null : tag.tagName))}
-                    className={`px-2 py-1 text-[11px] rounded-lg border cursor-pointer transition ${
-                      isSel
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : isHot
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      <Tag size={10} className={isSel ? '' : `text-emerald-500`} />
-                      {tag.tagName}
-                      <span className={`text-[9px] ${isSel ? 'opacity-90' : 'opacity-70'}`}>
-                        ({tag.useCount})
-                      </span>
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-          {tags.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedTag) {
-                  const cur = tags.find(x => x.tagName === selectedTag);
-                  if (cur?.id) { void handleDeleteTag(cur.id); }
-                }
-              }}
-              disabled={!selectedTag || busy}
-              className={`w-full mt-3 px-2.5 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40`}
-            >
-              <Trash2 size={11} />
-              {t('knowledge.nav.tag_delete_hint')}
-            </button>
-          )}
-        </div>
+        <TagCloudPanel
+          styles={styles}
+          t={t}
+          tags={tags}
+          hotTags={hotTags}
+          selectedTag={selectedTag}
+          tagDraft={tagDraft}
+          busy={busy}
+          onTagDraftChange={setTagDraft}
+          onSubmitTag={() => { void submitTag(); }}
+          onToggleTag={tagName => setSelectedTag(prev => (prev === tagName ? null : tagName))}
+          onDeleteSelectedTag={() => {
+            if (selectedTag) {
+              const cur = tags.find(x => x.tagName === selectedTag);
+              if (cur?.id) { void handleDeleteTag(cur.id); }
+            }
+          }}
+        />
 
-        {/* 右：资产列表 + 操作（关键词 / 推荐 / Undo） */}
-        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3 min-w-0`}>
-          <div className="flex items-center justify-between border-b border-slate-150 pb-2">
-            <span className={`font-bold text-xs ${styles.cardText} flex items-center gap-1.5`}>
-              <ShieldCheck size={13} className="text-amber-600" />
-              {t('knowledge.nav.products_title')}
-              <span className={`text-[9px] ${styles.muted} font-mono`}>({total})</span>
-            </span>
-          </div>
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={keyword}
-              onChange={e => { setKeyword(e.target.value); if (pageNum !== 1) setPageNum(1); }}
-              placeholder={t('knowledge.nav.product_search_placeholder')}
-              className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-amber-500`}
-            />
-          </div>
-
-          {/* 资产表 */}
-          {products.length === 0 && !productsLoading ? (
-            <div className="py-10 text-center">
-              <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('knowledge.nav.products_empty')}</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-150">
-              {products.map(p => {
-                const checked = selectedRows.has(p.id);
-                return (
-                  <div
-                    key={p.id}
-                    className={`py-2.5 flex items-start gap-2 cursor-pointer transition px-1.5 ${
-                      checked ? 'bg-blue-50/40' : 'hover:bg-slate-50/50'
-                    }`}
-                    onClick={() => toggleSelect(p.id)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSelect(p.id)}
-                      onClick={e => e.stopPropagation()}
-                      className="mt-1 h-3.5 w-3.5 cursor-pointer"
-                    />
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[11px] font-bold truncate ${styles.cardText}`}>{p.title}</span>
-                        {p.domain && (
-                          <span className={`px-1 py-0.5 text-[9px] rounded bg-slate-100 ${styles.cardTextMuted}`}>
-                            {p.domain}
-                          </span>
-                        )}
-                      </div>
-                      {p.matchedTags && p.matchedTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {p.matchedTags.slice(0, 4).map(tn => (
-                            <span
-                              key={tn}
-                              className={`px-1.5 py-0.5 text-[9px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200`}
-                            >
-                              #{tn}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {p.updatedAt && (
-                        <p className={`text-[9px] font-mono ${styles.cardTextMuted}`}>
-                          {t('knowledge.nav.product_updated')} {p.updatedAt}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        title={t('knowledge.nav.product_recommend')}
-                        onClick={() => { void handleRecommend(p.id); }}
-                        disabled={busy || recommendingId === p.id}
-                        className={`p-1.5 rounded-lg ${styles.sidebarBg} hover:bg-blue-50 text-blue-500 cursor-pointer disabled:opacity-50`}
-                      >
-                        {recommendingId === p.id ? (
-                          <RefreshCw size={11} className="animate-spin" />
-                        ) : (
-                          <Sparkles size={11} />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        title={t('knowledge.nav.product_undo')}
-                        onClick={() => { void handleUndo(p.id); }}
-                        disabled={busy}
-                        className={`p-1.5 rounded-lg ${styles.sidebarBg} hover:bg-rose-50 text-rose-500 cursor-pointer disabled:opacity-50`}
-                      >
-                        <RefreshCw size={11} className="-scale-x-100" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {productsLoading && (
-            <div className="py-6 text-center">
-              <RefreshCw size={18} className={`mx-auto animate-spin ${styles.muted}`} />
-            </div>
-          )}
-          {/* 分页控制 */}
-          {total > 0 && (
-            <div className="flex items-center justify-between pt-2 border-t border-slate-150">
-              <span className={`text-[10px] ${styles.muted}`}>
-                {t('knowledge.nav.product_page')}: {pageNum} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
-              </span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={pageNum <= 1}
-                  onClick={() => setPageNum(p => Math.max(1, p - 1))}
-                  className={`px-2 py-1 ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} text-[11px] rounded cursor-pointer disabled:opacity-40`}
-                >
-                  {'←'}
-                </button>
-                <button
-                  type="button"
-                  disabled={pageNum * PAGE_SIZE >= total}
-                  onClick={() => setPageNum(p => p + 1)}
-                  className={`px-2 py-1 ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} text-[11px] rounded cursor-pointer disabled:opacity-40`}
-                >
-                  {'→'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <ProductsPanel
+          styles={styles}
+          t={t}
+          products={products}
+          total={total}
+          pageNum={pageNum}
+          keyword={keyword}
+          productsLoading={productsLoading}
+          selectedRows={selectedRows}
+          recommendingId={recommendingId}
+          busy={busy}
+          onKeywordChange={v => { setKeyword(v); if (pageNum !== 1) setPageNum(1); }}
+          onToggleSelect={toggleSelect}
+          onRecommend={id => { void handleRecommend(id); }}
+          onUndo={id => { void handleUndo(id); }}
+          onPrevPage={() => setPageNum(p => Math.max(1, p - 1))}
+          onNextPage={() => setPageNum(p => p + 1)}
+        />
       </div>
 
       {/* ─── 推荐候选浮层（仅建议，不落库） ─── */}
       {recommendOpen && recommendResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={closeRecommend}>
-          <div
-            className={`${styles.appBg} border ${styles.cardBorder} rounded-xl w-[480px] p-5 space-y-3 shadow-2xl`}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
-                <Sparkles size={14} className="text-purple-600" />
-                {t('knowledge.nav.recommend_panel')}
-              </h3>
-              <button type="button" onClick={closeRecommend} className="p-1 cursor-pointer">
-                <RefreshCw size={14} className="rotate-90" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {recommendResult.tags && recommendResult.tags.length > 0 ? (
-                <div className="space-y-1.5">
-                  <span className={`text-[10px] font-bold ${styles.muted} uppercase`}>
-                    {t('knowledge.nav.recommend_tags')}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {recommendResult.tags.map((tn, i) => (
-                      <span key={`${tn}-${i}`} className="px-2 py-0.5 text-[11px] bg-purple-50 text-purple-700 rounded border border-purple-200">
-                        #{tn}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className={`text-[11px] ${styles.muted}`}>{t('knowledge.nav.recommend_tags_empty')}</p>
-              )}
-              {recommendResult.suggestedCategoryPath && (
-                <div className="space-y-1.5">
-                  <span className={`text-[10px] font-bold ${styles.muted} uppercase`}>
-                    {t('knowledge.nav.recommend_category_suggested')}
-                  </span>
-                  <p className={`text-[11px] ${styles.cardText} font-mono`}>{recommendResult.suggestedCategoryPath}</p>
-                </div>
-              )}
-              {recommendResult.reason && (
-                <p className={`text-[10px] ${styles.cardTextMuted}`}>{recommendResult.reason}</p>
-              )}
-            </div>
-            <div className="flex gap-2 pt-3 border-t border-slate-150">
-              <button
-                type="button"
-                onClick={closeRecommend}
-                className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} cursor-pointer`}
-              >
-                {t('knowledge.nav.recommend_cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={() => { void applyRecommend(); }}
-                disabled={busy}
-                className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-purple-600 hover:bg-purple-500 text-white rounded-lg cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <Sparkles size={11} />
-                {t('knowledge.nav.recommend_apply')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** 单行目录渲染 + 递归 children（≤3 级 depth 限制） */
-interface TreeRowProps {
-  category: NavCategoryVO | null;
-  categories: NavCategoryVO[];
-  depth: number;
-  selectedId: string | null;
-  expandedIds: Set<string>;
-  onSelect: (id: string) => void;
-  onToggle: (id: string) => void;
-  onRename: (node: NavCategoryVO) => void;
-  onCreateChild: (parentId: string) => void;
-  onDelete: (id: string) => void;
-  styles: Record<string, string>;
-  t: (key: string) => string;
-}
-
-function TreeRow({
-  category,
-  categories,
-  depth,
-  selectedId,
-  expandedIds,
-  onSelect,
-  onToggle,
-  onRename,
-  onCreateChild,
-  onDelete,
-  styles,
-  t,
-}: TreeRowProps) {
-  if (!category) return null;
-  const isExpanded = expandedIds.has(category.id);
-  const isSelected = selectedId === category.id;
-  const children = findChildren(categories, category.id);
-  const canHaveChildren = depth < 3;
-  const indent = (depth - 1) * 14;
-
-  return (
-    <div className="space-y-0.5">
-      <div
-        className={`group px-2 py-1.5 rounded cursor-pointer flex items-center gap-1.5 ${
-          isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/50'
-        }`}
-        style={{ paddingLeft: `${indent + 8}px` }}
-        onClick={() => onSelect(category.id)}
-      >
-        <ChevronRight
-          size={12}
-          className={`${styles.muted} transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-          onClick={e => { e.stopPropagation(); onToggle(category.id); }}
-        />
-        <span className={`text-[11px] flex-1 truncate ${styles.cardText}`}>{category.name}</span>
-        <span className={`text-[9px] ${styles.muted} font-mono`}>({category.articleCount})</span>
-        <div className="hidden group-hover:flex gap-0.5" onClick={e => e.stopPropagation()}>
-          {canHaveChildren && (
-            <button
-              type="button"
-              title={t('knowledge.nav.tree_new_child')}
-              onClick={() => onCreateChild(category.id)}
-              className="p-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-600 cursor-pointer"
-            >
-              <Plus size={10} />
-            </button>
-          )}
-          <button
-            type="button"
-            title={t('knowledge.nav.tree_rename')}
-            onClick={() => onRename(category)}
-            className="p-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer"
-          >
-            <span className="text-[10px] leading-none inline-flex justify-center w-3">§</span>
-          </button>
-          <button
-            type="button"
-            title={t('knowledge.nav.tree_delete')}
-            onClick={() => onDelete(category.id)}
-            className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
-          >
-            <Trash2 size={10} />
-          </button>
-        </div>
-      </div>
-      {isExpanded && children.map(child => (
-        <TreeRow
-          key={child.id}
-          category={child}
-          categories={categories}
-          depth={depth + 1}
-          selectedId={selectedId}
-          expandedIds={expandedIds}
-          onSelect={onSelect}
-          onToggle={onToggle}
-          onRename={onRename}
-          onCreateChild={onCreateChild}
-          onDelete={onDelete}
+        <RecommendModal
           styles={styles}
           t={t}
+          recommendResult={recommendResult}
+          busy={busy}
+          onClose={closeRecommend}
+          onApply={() => { void applyRecommend(); }}
         />
-      ))}
+      )}
     </div>
   );
 }

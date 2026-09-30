@@ -1,0 +1,158 @@
+package com.chinacreator.gzcm.services.identity.controller;
+
+import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.UnauthorizedException;
+import com.chinacreator.gzcm.services.identity.service.MfaService;
+import com.chinacreator.gzcm.sysman.iam.context.UserContext;
+import org.springframework.web.bind.annotation.*;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
+import java.security.SecureRandom;
+import java.util.*;
+
+@RestController
+@RequestMapping("/api/v1/mfa")
+public class MfaController {
+
+    private final MfaService mfaService;
+    private final SecureRandom random = new SecureRandom();
+
+    public MfaController(MfaService mfaService) {
+        this.mfaService = mfaService;
+    }
+
+    @PostMapping("/totp/setup")
+    public ApiResponse setupTotp(@RequestParam String userId) {
+        String subject = authenticatedSubject(userId);
+        byte[] secretBytes = new byte[20];
+        random.nextBytes(secretBytes);
+        String base32Secret = base32Encode(secretBytes);
+
+        String otpauthUrl = String.format(
+            "otpauth://totp/ECOS:user_%s?secret=%s&issuer=ECOS&algorithm=SHA1&digits=6&period=30",
+            subject, base32Secret
+        );
+
+        mfaService.saveTotpSecret(subject, base32Secret);
+
+        Map<String, String> result = new HashMap<>();
+        result.put("secret", base32Secret);
+        result.put("otpauthUrl", otpauthUrl);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/totp/verify")
+    public ApiResponse verifyTotp(@RequestParam String userId, @RequestParam String code) {
+        String subject = authenticatedSubject(userId);
+        Map<String, Object> user = mfaService.getUserMfaInfo(subject);
+
+        String secret = (String) user.get("mfa_secret");
+        if (secret == null) {
+            return ApiResponse.badRequest("MFA not set up. Call /mfa/totp/setup first.");
+        }
+
+        boolean valid = verifyTotpCode(secret, code);
+        if (valid) {
+            if (!Boolean.TRUE.equals(user.get("mfa_enabled"))) {
+                mfaService.enableMfa(subject);
+            }
+            return ApiResponse.success("MFA verification successful");
+        }
+        return ApiResponse.badRequest("Invalid TOTP code");
+    }
+
+    @PostMapping("/disable")
+    public ApiResponse disableMfa(@RequestParam String userId, @RequestParam String code) {
+        String subject = authenticatedSubject(userId);
+        Map<String, Object> user = mfaService.getUserMfaInfo(subject);
+
+        String secret = (String) user.get("mfa_secret");
+        if (secret == null) return ApiResponse.badRequest("MFA not set up");
+
+        if (verifyTotpCode(secret, code)) {
+            mfaService.disableMfa(subject);
+            return ApiResponse.success("MFA disabled");
+        }
+        return ApiResponse.badRequest("Invalid TOTP code");
+    }
+
+    // userId 入参仅保留以兼容既有签名（铁律「API 只增不改」），值一律忽略：MFA 主体必须来自已认证 token，
+    // 否则 A 的 token 可为 B 生成/摘除 MFA（PMO-74 N2）。
+    private String authenticatedSubject(String requestedUserId) {
+        String subject = UserContext.getCurrentUserId();
+        if (subject == null || subject.isBlank()) {
+            throw new UnauthorizedException("MFA 操作需已认证主体");
+        }
+        return subject;
+    }
+
+    private boolean verifyTotpCode(String base32Secret, String code) {
+        try {
+            byte[] secretBytes = base32Decode(base32Secret);
+            long timeStep = System.currentTimeMillis() / 30000;
+            for (long i = -1; i <= 1; i++) {
+                String generatedCode = generateTotp(secretBytes, timeStep + i);
+                if (generatedCode.equals(code)) return true;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
+    private String generateTotp(byte[] secret, long timeStep) throws Exception {
+        byte[] timeBytes = ByteBuffer.allocate(8).putLong(timeStep).array();
+        Mac mac = Mac.getInstance("HmacSHA1");
+        mac.init(new SecretKeySpec(secret, "HmacSHA1"));
+        byte[] hash = mac.doFinal(timeBytes);
+        int offset = hash[hash.length - 1] & 0xf;
+        int binary = ((hash[offset] & 0x7f) << 24) |
+                     ((hash[offset + 1] & 0xff) << 16) |
+                     ((hash[offset + 2] & 0xff) << 8) |
+                     (hash[offset + 3] & 0xff);
+        int otp = binary % 1000000;
+        return String.format("%06d", otp);
+    }
+
+    private String base32Encode(byte[] data) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        StringBuilder result = new StringBuilder();
+        int buffer = 0, bitsLeft = 0;
+        for (byte b : data) {
+            buffer = (buffer << 8) | (b & 0xff);
+            bitsLeft += 8;
+            while (bitsLeft >= 5) {
+                result.append(chars.charAt((buffer >> (bitsLeft - 5)) & 0x1f));
+                bitsLeft -= 5;
+            }
+        }
+        if (bitsLeft > 0) {
+            result.append(chars.charAt((buffer << (5 - bitsLeft)) & 0x1f));
+        }
+        return result.toString();
+    }
+
+    private byte[] base32Decode(String base32) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        int[] lookup = new int[256];
+        Arrays.fill(lookup, -1);
+        for (int i = 0; i < chars.length(); i++) lookup[chars.charAt(i)] = i;
+
+        ByteBuffer buffer = ByteBuffer.allocate(base32.length() * 5 / 8 + 1);
+        int accum = 0, bits = 0;
+        for (char c : base32.toUpperCase().toCharArray()) {
+            if (lookup[c] == -1) continue;
+            accum = (accum << 5) | lookup[c];
+            bits += 5;
+            if (bits >= 8) {
+                buffer.put((byte) (accum >> (bits - 8)));
+                bits -= 8;
+            }
+        }
+        byte[] result = new byte[buffer.position()];
+        System.arraycopy(buffer.array(), 0, result, 0, result.length);
+        return result;
+    }
+}

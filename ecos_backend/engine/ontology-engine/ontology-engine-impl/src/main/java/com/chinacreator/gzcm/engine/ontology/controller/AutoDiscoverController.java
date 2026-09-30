@@ -5,6 +5,8 @@ import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverMappingVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverQuery;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverResultVO;
 import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +25,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ecos")
 public class AutoDiscoverController {
+
+    private static final Logger log = LoggerFactory.getLogger(AutoDiscoverController.class);
 
     private final AutoDiscoverService autoDiscoverService;
 
@@ -54,7 +58,8 @@ public class AutoDiscoverController {
                 autoDiscoverService.autoDiscoverVO(domainCode, datasourceId, resourceNames);
             return ApiResponse.success(results);
         } catch (Exception e) {
-            return ApiResponse.internalError("AutoDiscover failed: " + e.getMessage());
+            log.error("AutoDiscover failed", e);
+            return ApiResponse.internalError("AutoDiscover failed");
         }
     }
 

@@ -37,7 +37,7 @@ public class CopilotController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Copilot chat 失败", e);
-            return ApiResponse.internalError("Copilot chat 失败: " + e.getMessage());
+            return ApiResponse.internalError("Copilot chat 失败");
         }
     }
 
@@ -48,7 +48,7 @@ public class CopilotController {
             return ApiResponse.success(questions);
         } catch (Exception e) {
             log.error("获取快捷问题失败: agentId={}", agentId, e);
-            return ApiResponse.internalError("获取快捷问题失败: " + e.getMessage());
+            return ApiResponse.internalError("获取快捷问题失败");
         }
     }
 }

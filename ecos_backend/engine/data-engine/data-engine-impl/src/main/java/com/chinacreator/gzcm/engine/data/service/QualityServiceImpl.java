@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.web.client.RestTemplate;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -29,49 +28,8 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
         this.restTemplate = new RestTemplate();
     }
 
-    @PostConstruct
-    public void init() {
-        ensureSchema();
-    }
-
-    private void ensureSchema() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_quality_rule (
-                    rule_id VARCHAR(64) PRIMARY KEY,
-                    rule_name VARCHAR(200) NOT NULL,
-                    rule_type VARCHAR(30) NOT NULL,
-                    target VARCHAR(200) NOT NULL,
-                    dataset_id VARCHAR(100),
-                    parameters JSONB,
-                    severity VARCHAR(10) DEFAULT 'WARN',
-                    enabled BOOLEAN DEFAULT true,
-                    description TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_quality_evaluation (
-                    id VARCHAR(36) PRIMARY KEY,
-                    dataset_id VARCHAR(100),
-                    rule_id VARCHAR(64),
-                    passed BOOLEAN,
-                    total_rows BIGINT,
-                    failed_rows BIGINT,
-                    pass_rate DOUBLE PRECISION,
-                    sample_size INTEGER,
-                    sample_failures JSONB,
-                    severity VARCHAR(10),
-                    message TEXT,
-                    evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            log.info("ecos_quality_rule / ecos_quality_evaluation 表已就绪");
-        } catch (Exception e) {
-            log.warn("质量表初始化异常: {}", e.getMessage());
-        }
-    }
+    // H8-T1: ecos_quality_rule / ecos_quality_evaluation 建表 DDL 收编至 db/migration（V162），
+    // 运行时不再内嵌 DDL。
 
     @Override
     public Map<String, Object> createRule(Map<String, Object> body) {
@@ -396,7 +354,9 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
                     } else if (expression.contains("<")) {
                         return num < Double.parseDouble(expression.split("<")[1].trim());
                     }
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                    log.debug("质量规则表达式无法数值化，按现有语义返回通过: expression={}", expression);
+                }
                 return true; // 无法解析的表达式，默认通过
             }
             default:

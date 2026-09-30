@@ -4,12 +4,17 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { AreaChart, BarChart3, Bookmark, CheckCircle, ChevronRight, ChevronsUpDown, Compass, Filter, GitMerge, Plus, Search, Table2, Terminal, Trash2, X, Zap } from 'lucide-react';
-import DynamicIcon from '../components/ontology/DynamicIcon';
 
 import SaveSearchModal from './object-explorer/SaveSearchModal';
 import ActionExecutorModal from './object-explorer/ActionExecutorModal';
+import ExplorerLeftPanel from './object-explorer/ExplorerLeftPanel';
+import ExplorerStageHeader from './object-explorer/ExplorerStageHeader';
+import ExplorerWelcomeView from './object-explorer/ExplorerWelcomeView';
+import ExplorerTableView from './object-explorer/ExplorerTableView';
+import ExplorerAnalyticsView from './object-explorer/ExplorerAnalyticsView';
+import InstanceDetailPanel from './object-explorer/InstanceDetailPanel';
 import { ObjectType, LinkType, ActionType, Dataset, DataRecord } from '../types/ontology';
+import type { FilterQuery, SavedSearch } from './object-explorer/types';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { fetchOntologyData } from '../services/ontologyApi';
@@ -23,21 +28,6 @@ interface ObjectExplorerViewProps {
   showToast: (type: 'success' | 'info' | 'error', message: string) => void;
   initialActiveObjectTypeId?: string | null;
   onActiveObjectTypeIdChange?: (id: string | null) => void;
-}
-
-interface SavedSearch {
-  id: string;
-  name: string;
-  objectTypeId: string;
-  filters: FilterQuery[];
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
-}
-
-interface FilterQuery {
-  propertyId: string;
-  operator: 'equals' | 'contains' | 'gt' | 'lt' | 'is_empty' | 'is_not_empty';
-  value: string;
 }
 
 export default function ObjectExplorerView({
@@ -537,258 +527,41 @@ export default function ObjectExplorerView({
     <div className={`h-full flex overflow-hidden ${styles.appBg} relative select-none`}>
       
       {/* LEFT PANEL: Object Selector & Saved Searches */}
-      <div className={`w-64 border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 text-xs`}>
-        {/* Section title */}
-        <div className={`p-4 border-b ${styles.cardBorder} flex items-center justify-between`}>
-          <div className={`font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-            <Compass size={14} className={styles.accentText} />
-            <span>{t('ow.explore.directoryTitle')}</span>
-          </div>
-        </div>
-
-        {/* Object Types list */}
-        <div className="p-3 space-y-1">
-          <span className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider block px-2 mb-2`}>{t('ow.explore.objectsSection')}</span>
-          {objectTypes.map(ot => {
-            const isActive = ot.id === activeObjectTypeId;
-            const count = (ot.id === activeObjectTypeId && instanceData.length > 0) ? dataTotal : (relatedInstanceCache[ot.id]?.length ?? 0);
-
-            return (
-              <button
-                key={ot.id}
-                onClick={() => {
-                  setActiveObjectTypeId(ot.id);
-                  setActiveTab('table');
-                }}
-                className={`w-full text-left py-2 px-2.5 rounded-lg flex items-center justify-between transition-all group ${
-                  isActive
-                    ? `${styles.accentBg} text-white font-semibold shadow-xs`
-                    : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span className={`p-1 rounded border ${isActive ? 'bg-blue-500 border-blue-400 text-white' : ot.color}`}>
-                    <DynamicIcon name={ot.icon} size={12} />
-                  </span>
-                  <span className="truncate">{ot.displayName}</span>
-                </div>
-                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-blue-500 text-white' : `${styles.appBg} ${styles.cardTextMuted}`}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Saved Search Lists */}
-        <div className={`flex-1 border-t ${styles.cardBorder} p-3 space-y-1.5 overflow-y-auto`}>
-          <div className="flex justify-between items-center px-2 mb-1">
-            <span className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider`}>{t('ow.explore.savedLists')}</span>
-            <span className={`text-[10px] ${styles.appBg} ${styles.cardTextMuted} px-1 py-0.2 rounded-sm font-mono`}>{savedSearches.length}</span>
-          </div>
-
-          {savedSearches.length === 0 ? (
-            <div className={`p-4 text-center ${styles.muted} border border-dashed ${styles.cardBorder} rounded-lg text-[10px]`}>
-              {t('ow.empty.noSavedLists')}
-              {t('ow.empty.noSavedListsHint')}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {savedSearches.map(search => (
-                <div
-                  key={search.id}
-                  onClick={() => handleLoadSavedSearch(search)}
-                  className={`group flex items-center justify-between p-2 rounded-lg border ${styles.cardBorder} hover:border-blue-400 ${styles.appBg} hover:bg-blue-50/20 cursor-pointer transition-all`}
-                >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Bookmark size={11} className="text-blue-500 shrink-0" />
-                    <span className={`font-medium ${styles.cardTextMuted} truncate`}>{search.name}</span>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteSavedSearch(search.id, e)}
-                    className={`opacity-0 group-hover:opacity-100 hover:text-red-500 ${styles.muted} transition-opacity p-0.5`}
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <ExplorerLeftPanel
+        objectTypes={objectTypes}
+        activeObjectTypeId={activeObjectTypeId}
+        instanceData={instanceData}
+        dataTotal={dataTotal}
+        relatedInstanceCache={relatedInstanceCache}
+        savedSearches={savedSearches}
+        setActiveObjectTypeId={setActiveObjectTypeId}
+        setActiveTab={setActiveTab}
+        handleLoadSavedSearch={handleLoadSavedSearch}
+        handleDeleteSavedSearch={handleDeleteSavedSearch}
+      />
 
       {/* CENTER & MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Active Stage Header */}
         {activeObjectType ? (
-          <div className={`${styles.cardBg} border-b ${styles.cardBorder} px-6 py-4 flex flex-col gap-3`}>
-            {/* Breadcrumb & Title */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
-                  <DynamicIcon name={activeObjectType.icon} size={15} />
-                </span>
-                <div>
-                  <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-1.5`}>
-                    {activeObjectType.displayName}
-                    <span className={`text-[10px] ${styles.appBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono uppercase`}>{activeObjectType.id}</span>
-                  </h2>
-                  <p className={`text-[10px] ${styles.muted} mt-0.5`}>{activeObjectType.description}</p>
-                </div>
-              </div>
-
-              {/* View Selector Tabs */}
-              <div className={`flex ${styles.appBg} p-1 rounded-lg`}>
-                <button
-                  onClick={() => setActiveTab('table')}
-                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'table' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
-                  }`}
-                >
-                  <Table2 size={13} />
-                  {t('ow.explore.tabTable')}
-                </button>
-                <button
-                  onClick={() => setActiveTab('analytics')}
-                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
-                    activeTab === 'analytics' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
-                  }`}
-                >
-                  <BarChart3 size={13} />
-                  {t('ow.explore.tabAnalytics')}
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Filter & Save Search Toolbar */}
-            <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border ${styles.cardBorder}`}>
-              <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${styles.cardTextMuted} shrink-0`}>
-                <Filter size={13} />
-                {t('ow.explore.filtersLabel')}
-              </div>
-
-              {/* Existing active filters badges */}
-              {activeFilters.length === 0 && (
-                <span className={`text-[10px] ${styles.muted} italic`}>{t('ow.empty.noFilters')}</span>
-              )}
-              {activeFilters.map((f, idx) => {
-                const prop = activeObjectType.properties.find(p => p.id === f.propertyId);
-                const propName = prop ? prop.displayName : f.propertyId;
-                
-                const opName = f.operator === 'equals' ? '=' 
-                  : f.operator === 'contains' ? t('ow.explore.opContains')
-                  : f.operator === 'gt' ? '>'
-                  : f.operator === 'lt' ? '<'
-                  : f.operator === 'is_empty' ? t('ow.explore.opIsEmpty') : t('ow.explore.opIsNotEmpty');
-
-                return (
-                  <span key={idx} className={`flex items-center gap-1 ${styles.sidebarActiveBg} border ${styles.accentBorder} text-blue-700 px-2 py-1 rounded font-medium text-[10px]`}>
-                    <span className="text-blue-500">{propName}</span>
-                    <span className="text-blue-400 italic font-mono">{opName}</span>
-                    {f.operator !== 'is_empty' && f.operator !== 'is_not_empty' && (
-                      <strong className="text-blue-900 font-semibold">{f.value}</strong>
-                    )}
-                    <button
-                      onClick={() => handleRemoveFilter(idx)}
-                      className="text-blue-400 hover:text-blue-600 ml-1 font-bold"
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-
-              {/* Add filter creator dropdown trigger */}
-              <div className="relative ml-auto flex items-center gap-2">
-                <button
-                  onClick={() => setShowFilterCreator(!showFilterCreator)}
-                  className={`${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
-                >
-                  <Plus size={11} />
-                  {t('ow.btn.addFilter')}
-                </button>
-
-                {/* Filter Creator Popover */}
-                {showFilterCreator && (
-                  <div className={`absolute right-0 top-7 ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-lg p-3 z-30 w-72 space-y-3`}>
-                    <h4 className={`font-semibold ${styles.cardText} text-[11px]`}>{t('ow.explore.newFilterRule')}</h4>
-                    <div className="space-y-2">
-                      <div>
-                        <label className={`text-[10px] ${styles.muted} block mb-0.5`}>{t('ow.label.selectProperty')}</label>
-                        <select
-                          value={newFilterProp}
-                          onChange={e => setNewFilterProp(e.target.value)}
-                          className={`w-full h-8 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded px-2`}
-                        >
-                          <option value="">{t('ow.placeholder.selectOption')}</option>
-                          {activeObjectType.properties.map(p => (
-                            <option key={p.id} value={p.id}>{p.displayName} ({p.id})</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className={`text-[10px] ${styles.muted} block mb-0.5`}>{t('ow.label.comparisonOperator')}</label>
-                          <select
-                            value={newFilterOp}
-                            onChange={e => setNewFilterOp(e.target.value as any)}
-                            className={`w-full h-8 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded px-2`}
-                          >
-                            <option value="equals">{t('ow.explore.opEquals')}</option>
-                            <option value="contains">{t('ow.explore.opContainsFull')}</option>
-                            <option value="gt">{t('ow.explore.opGreaterThan')}</option>
-                            <option value="lt">{t('ow.explore.opLessThan')}</option>
-                            <option value="is_empty">{t('ow.explore.opIsEmptyFull')}</option>
-                            <option value="is_not_empty">{t('ow.explore.opIsNotEmptyFull')}</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className={`text-[10px] ${styles.muted} block mb-0.5`}>{t('ow.label.setValue')}</label>
-                          <input
-                            type="text"
-                            disabled={newFilterOp === 'is_empty' || newFilterOp === 'is_not_empty'}
-                            placeholder={t('ow.placeholder.searchValue')}
-                            value={newFilterVal}
-                            onChange={e => setNewFilterVal(e.target.value)}
-                            className={`w-full h-8 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded px-2`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-1.5 pt-1">
-                      <button
-                        onClick={() => setShowFilterCreator(false)}
-                        className={`h-7 px-2.5 rounded text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardTextMuted}`}
-                      >
-                        {t('ow.btn.cancel')}
-                      </button>
-                      <button
-                        onClick={handleAddFilter}
-                        disabled={!newFilterProp}
-                        className={`h-7 px-3 rounded text-[10px] ${styles.accentBg} hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {t('ow.btn.applyRule')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Save exploration list */}
-                {activeFilters.length > 0 && (
-                  <button
-                    onClick={() => setShowSaveModal(true)}
-                    className={`${styles.sidebarActiveBg} border ${styles.accentBorder} text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors`}
-                  >
-                    <Bookmark size={11} />
-                    {t('ow.btn.saveAsList')}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <ExplorerStageHeader
+            activeObjectType={activeObjectType}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            activeFilters={activeFilters}
+            handleRemoveFilter={handleRemoveFilter}
+            showFilterCreator={showFilterCreator}
+            setShowFilterCreator={setShowFilterCreator}
+            newFilterProp={newFilterProp}
+            setNewFilterProp={setNewFilterProp}
+            newFilterOp={newFilterOp}
+            setNewFilterOp={setNewFilterOp}
+            newFilterVal={newFilterVal}
+            setNewFilterVal={setNewFilterVal}
+            handleAddFilter={handleAddFilter}
+            setShowSaveModal={setShowSaveModal}
+          />
         ) : null}
 
         {/* Workspace Central Canvas */}
@@ -796,487 +569,64 @@ export default function ObjectExplorerView({
           
           {/* Welcome view when no activeObjectType selected */}
           {!activeObjectTypeId ? (
-            <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${styles.appBg}`}>
-              <div className={`w-16 h-16 rounded-2xl ${styles.sidebarActiveBg} border ${styles.accentBorder} flex items-center justify-center ${styles.accentText} mb-4 animate-pulse`}>
-                <Compass size={32} />
-              </div>
-              <h2 className={`text-sm font-semibold ${styles.cardText}`}>{t('ow.explore.welcomeTitle')}</h2>
-              <p className={`text-xs ${styles.cardTextMuted} max-w-lg leading-relaxed mt-2`}>
-                {t('ow.explore.welcomeDesc1')}
-                {t('ow.explore.welcomeDesc2')}
-              </p>
-              
-              {/* Grid of quick choices */}
-              <div className="grid grid-cols-2 gap-4 w-full max-w-xl mt-8">
-                {objectTypes.map(ot => {
-                  const count = (ot.id === activeObjectTypeId && instanceData.length > 0) ? dataTotal : (relatedInstanceCache[ot.id]?.length ?? 0);
-                  return (
-                    <div
-                      key={ot.id}
-                      onClick={() => setActiveObjectTypeId(ot.id)}
-                      className={`${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 p-4 rounded-xl shadow-3xs hover:shadow-xs transition-all cursor-pointer flex items-start gap-3 group text-left`}
-                    >
-                      <span className={`p-2.5 rounded-lg border ${ot.color} shrink-0`}>
-                        <DynamicIcon name={ot.icon} size={16} />
-                      </span>
-                      <div className="space-y-0.5">
-                        <div className={`text-xs font-semibold ${styles.cardText} group-hover:text-blue-600`}>{ot.displayName}</div>
-                        <p className={`text-[10px] ${styles.muted} line-clamp-1`}>{ot.description}</p>
-                        <div className={`text-[10px] font-mono ${styles.cardTextMuted} mt-1`}>
-                          <strong>{count}</strong> {t('ow.explore.runningInstances')}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <ExplorerWelcomeView
+              objectTypes={objectTypes}
+              activeObjectTypeId={activeObjectTypeId}
+              instanceData={instanceData}
+              dataTotal={dataTotal}
+              relatedInstanceCache={relatedInstanceCache}
+              setActiveObjectTypeId={setActiveObjectTypeId}
+            />
           ) : (
             <div className="h-full flex overflow-hidden">
               
               {/* Work Desk Stage */}
               <div className="flex-1 flex flex-col overflow-hidden">
-                
                 {activeTab === 'table' ? (
-                  <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
-                    {/* Search & Statistics bar */}
-                    <div className={`px-6 py-2 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
-                      <div className="relative w-80">
-                        <span className={`absolute left-2.5 top-2.5 ${styles.muted}`}>
-                          <Search size={12} />
-                        </span>
-                        <input
-                          type="text"
-                          placeholder={t('ow.placeholder.localSearch')}
-                          value={localSearch}
-                          onChange={e => setLocalSearch(e.target.value)}
-                          className={`w-full h-7 pl-7 pr-3 text-[10px] ${styles.cardBg} border ${styles.cardBorder} rounded focus:border-blue-500 focus:outline-hidden ${styles.cardTextMuted}`}
-                        />
-                      </div>
-                      <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
-                        {t('ow.explore.showingInstances')} <strong>{processedInstances.length}</strong> / {allInstances.length}
-                      </div>
-                    </div>
-
-                    {dataLoading ? (
-                      <div className={`flex-1 flex items-center justify-center py-24 ${styles.muted} font-medium italic text-xs`}>
-                        {t('ow.label.loadingData')}
-                      </div>
-                    ) : allInstances.length === 0 ? (
-                      <div className={`flex-1 flex items-center justify-center py-24 ${styles.muted} font-medium italic text-xs`}>
-                        {t('ow.empty.noInstanceData')}
-                      </div>
-                    ) : (
-                    <div className="flex-1 overflow-auto overflow-x-auto md:overflow-visible">
-                      <table className="w-full text-left border-collapse text-xs select-none">
-                        <thead>
-                          <tr className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.cardTextMuted} font-semibold sticky top-0 ${styles.cardBg} z-10 shadow-3xs`}>
-                            <th className="py-2.5 px-4 w-10">#</th>
-                            {activeObjectType?.properties.map(prop => {
-                              const isSorting = sortBy === prop.id;
-                              return (
-                                <th
-                                  key={prop.id}
-                                  onClick={() => {
-                                    setSortBy(prop.id);
-                                    setSortOrder(isSorting && sortOrder === 'asc' ? 'desc' : 'asc');
-                                  }}
-                                  className={`py-2.5 px-4 cursor-pointer ${styles.sidebarHoverBg} transition-colors`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    <span>{prop.displayName}</span>
-                                    {isSorting ? (
-                                      <DynamicIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className={styles.accentText} />
-                                    ) : (
-                                      <ChevronsUpDown size={10} className={`${styles.muted} opacity-40`} />
-                                    )}
-                                  </div>
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
-                          {processedInstances.length === 0 ? (
-                            <tr>
-                              <td colSpan={(activeObjectType?.properties.length || 0) + 1} className={`text-center py-24 ${styles.muted} font-medium italic`}>
-                                {t('ow.empty.noResults')}
-                              </td>
-                            </tr>
-                          ) : (
-                            processedInstances.map((inst, idx) => {
-                              const isSelected = selectedInstance && selectedInstance[activeObjectType!.primaryKey] === inst[activeObjectType!.primaryKey];
-                              return (
-                                <tr
-                                  key={idx}
-                                  onClick={() => {
-                                    setSelectedInstance(inst);
-                                    setDetailTab('properties');
-                                  }}
-                                  className={`${styles.sidebarHoverBg} cursor-pointer transition-colors ${
-                                    isSelected ? `bg-blue-50/40 text-blue-950 font-medium border-l-2 ${styles.accentBorder}` : ''
-                                  }`}
-                                >
-                                  <td className={`py-2.5 px-4 font-mono ${styles.muted}`}>{idx + 1}</td>
-                                  {activeObjectType?.properties.map(prop => {
-                                    const val = inst[prop.id];
-                                    const isPk = prop.isPrimaryKey;
-                                    return (
-                                      <td key={prop.id} className="py-2.5 px-4">
-                                        {isPk ? (
-                                          <span className={`font-mono ${styles.cardText} ${styles.appBg} border ${styles.cardBorder} rounded-md px-1.5 py-0.5 text-[10px] font-semibold`}>
-                                            {String(val ?? '')}
-                                          </span>
-                                        ) : prop.id === 'status' ? (
-                                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                            val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
-                                            val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800 font-semibold' :
-                                            `${styles.appBg} ${styles.cardTextMuted}`
-                                          }`}>
-                                            {String(val ?? '')}
-                                          </span>
-                                        ) : (
-                                          <span className="truncate max-w-[160px] inline-block">{String(val ?? '')}</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                       </table>
-                      <div className={`px-6 py-2 border-t ${styles.cardBorder} flex items-center justify-between`}>
-                        <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
-                          {t('ow.explore.showingInstances')} {dataPage} / {dataTotalPages}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            disabled={dataPage <= 1}
-                            onClick={() => setDataPage(p => Math.max(1, p - 1))}
-                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed ${styles.sidebarHoverBg} transition-colors`}
-                          >
-                            {t('ow.btn.previousPage')}
-                          </button>
-                          <button
-                            disabled={dataPage >= dataTotalPages}
-                            onClick={() => setDataPage(p => Math.min(dataTotalPages, p + 1))}
-                            className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed ${styles.sidebarHoverBg} transition-colors`}
-                          >
-                            {t('ow.btn.nextPage')}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    )}
-                   </div>
+                  <ExplorerTableView
+                    activeObjectType={activeObjectType}
+                    localSearch={localSearch}
+                    setLocalSearch={setLocalSearch}
+                    dataLoading={dataLoading}
+                    allInstances={allInstances}
+                    processedInstances={processedInstances}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    setSortBy={setSortBy}
+                    setSortOrder={setSortOrder}
+                    selectedInstance={selectedInstance}
+                    setSelectedInstance={setSelectedInstance}
+                    setDetailTab={setDetailTab}
+                    dataPage={dataPage}
+                    setDataPage={setDataPage}
+                    dataTotalPages={dataTotalPages}
+                  />
                 ) : (
                   // ANALYTICS / CHART TAB
-                  <div className={`flex-1 ${styles.cardBg} p-6 space-y-6 overflow-y-auto`}>
-                    <div className="space-y-1">
-                      <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-                        <AreaChart size={14} className={styles.accentText} />
-                        {t('ow.explore.analyticsTitle')}
-                      </h3>
-                      <p className={`text-[10px] ${styles.cardTextMuted}`}>
-                        {t('ow.explore.analyticsDesc')}<strong>「{analyticsData ? (analyticsData as any).property?.displayName : ''}」</strong>
-                      </p>
-                    </div>
-
-                    {processedInstances.length === 0 ? (
-                      <div className={`text-center py-20 ${styles.muted}`}>{t('ow.empty.noDataForChart')}</div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-8 items-start">
-                        {/* Custom visual distribution bars */}
-                        <div className={`border ${styles.cardBorder} rounded-xl p-5 space-y-3 shadow-3xs ${styles.appBg}`}>
-                          <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.explore.barChartTitle')}</h4>
-                          <div className="space-y-3 pt-2">
-                            {(analyticsData as any).data?.map((item: any) => (
-                              <div
-                                key={item.name}
-                                onClick={() => {
-                                  // Add filter on click
-                                  const propId = (analyticsData as any).property.id;
-                                  setActiveFilters([...activeFilters, {
-                                    propertyId: propId,
-                                    operator: 'equals',
-                                    value: item.name
-                                  }]);
-                                  setActiveTab('table');
-                                  showToast('info', t('ow.msg.chartDrillDown').replace('{prop}', propId).replace('{value}', item.name));
-                                }}
-                                className="group cursor-pointer space-y-1"
-                              >
-                                <div className="flex justify-between text-[11px]">
-                                  <span className={`font-medium ${styles.cardTextMuted} group-hover:text-blue-600 font-mono transition-colors`}>{item.name}</span>
-                                  <span className={`${styles.cardTextMuted} font-mono`}><strong>{item.count}</strong> {t('ow.label.countUnit')} ({item.percentage}%)</span>
-                                </div>
-                                <div className={`h-4 w-full ${styles.appBg} rounded overflow-hidden flex`}>
-                                  <div
-                                    className={`${styles.accentBg} group-hover:bg-blue-500 transition-all rounded-r duration-500`}
-                                    style={{ width: `${item.percentage}%` } as React.CSSProperties}
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Summary table list */}
-                        <div className={`border ${styles.cardBorder} rounded-xl p-5 space-y-3 ${styles.cardBg}`}>
-                          <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.explore.groupCountTable')}</h4>
-                          <table className="w-full text-left border-collapse text-[11px]">
-                            <thead>
-                              <tr className={`border-b ${styles.cardBorder} ${styles.muted}`}>
-                                <th className="pb-2">{t('ow.explore.groupCategory')}</th>
-                                <th className="pb-2 text-right">{t('ow.explore.instanceCount')}</th>
-                                <th className="pb-2 text-right">{t('ow.explore.percentage')}</th>
-                              </tr>
-                            </thead>
-                            <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
-                              {(analyticsData as any).data?.map((item: any) => (
-                                <tr key={item.name} className={styles.sidebarHoverBg}>
-                                  <td className={`py-2 font-mono ${styles.cardTextMuted} font-medium`}>{item.name}</td>
-                                  <td className={`py-2 text-right font-mono font-semibold ${styles.cardText}`}>{item.count}</td>
-                                  <td className={`py-2 text-right font-mono ${styles.cardTextMuted}`}>{item.percentage}%</td>
-                                </tr>
-                              ))}
-                              <tr className={`border-t ${styles.cardBorder} ${styles.cardText} font-bold`}>
-                                <td className="py-2">{t('ow.explore.total')}</td>
-                                <td className="py-2 text-right font-mono">{processedInstances.length}</td>
-                                <td className="py-2 text-right font-mono">100.0%</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <ExplorerAnalyticsView
+                    analyticsData={analyticsData}
+                    processedCount={processedInstances.length}
+                    activeFilters={activeFilters}
+                    setActiveFilters={setActiveFilters}
+                    setActiveTab={setActiveTab}
+                    showToast={showToast}
+                  />
                 )}
               </div>
 
               {/* DETAILED SLIDE-OVER OR SPLIT PANEL (Right hand side) */}
               {selectedInstance ? (
-                <div className={`w-96 border-l ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-hidden relative`}>
-                  
-                  {/* Detailed Panel Header */}
-                  <div className={`p-4 border-b ${styles.cardBorder} ${styles.appBg} flex flex-col gap-3`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
-                          <DynamicIcon name={activeObjectType.icon} size={14} />
-                        </span>
-                        <div>
-                          <div className={`text-[10px] ${styles.muted} font-bold uppercase tracking-wider`}>{activeObjectType.displayName} {t('ow.explore.detail')}</div>
-                          <h3 className={`text-xs font-bold font-mono ${styles.appText} mt-0.5`}>
-                            {selectedInstance[activeObjectType.titleProperty]}
-                          </h3>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setSelectedInstance(null)}
-                        className={`p-1 rounded ${styles.sidebarHoverBg} ${styles.muted} hover:opacity-70`}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-
-                    {/* Action Execution Button Dropdown */}
-                    {availableActions.length > 0 && (
-                      <div className="pt-1.5">
-                        <div className={`text-[10px] ${styles.muted} uppercase tracking-wider font-semibold mb-1 flex items-center gap-1`}>
-                          <Terminal size={10} />
-                          <span>{t('ow.explore.boundActions')}</span>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          {availableActions.map(act => (
-                            <button
-                              key={act.id}
-                              onClick={() => handleOpenActionModal(act)}
-                              className="w-full h-8 px-2.5 rounded border border-amber-200 bg-amber-50/40 hover:bg-amber-50 text-amber-800 text-[10px] font-semibold flex items-center justify-between transition-all"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <Zap size={12} className="fill-amber-400/20 text-amber-600" />
-                                <span>{t('ow.explore.trigger')}{act.displayName}</span>
-                              </div>
-                              <ChevronRight size={10} className="text-amber-500" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Panel Tab switch */}
-                  <div className={`flex border-b ${styles.cardBorder} px-2 text-[11px] font-medium ${styles.appBg}`}>
-                    <button
-                      onClick={() => setDetailTab('properties')}
-                      className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'properties' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
-                      }`}
-                    >
-                      {t('ow.explore.tabProperties')}
-                    </button>
-                    <button
-                      onClick={() => setDetailTab('relations')}
-                      className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all flex items-center justify-center gap-1 ${
-                        detailTab === 'relations' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
-                      }`}
-                    >
-                      {t('ow.explore.tabRelations')} ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
-                    </button>
-                    <button
-                      onClick={() => setDetailTab('activity')}
-                      className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
-                        detailTab === 'activity' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
-                      }`}
-                    >
-                      {t('ow.explore.tabActivity')}
-                    </button>
-                  </div>
-
-                  {/* Panel tab bodies */}
-                  <div className="flex-1 overflow-y-auto p-4">
-                    
-                    {/* tab 1: Properties */}
-                    {detailTab === 'properties' && (
-                      <div className="space-y-4">
-                        {activeObjectType.properties.map(p => {
-                          const val = selectedInstance[p.id];
-                          const isPk = p.isPrimaryKey;
-
-                          return (
-                            <div key={p.id} className={`p-2.5 rounded-lg border ${styles.cardBorder} ${styles.sidebarHoverBg} hover:bg-blue-50/10 transition-colors`}>
-                              <div className={`flex items-center justify-between text-[10px] ${styles.muted} font-mono`}>
-                                <span className={`font-semibold ${styles.cardTextMuted}`}>{p.displayName}</span>
-                                <span className="uppercase">{p.dataType}</span>
-                              </div>
-                              <div className={`mt-1 font-mono text-xs font-semibold ${styles.cardText} flex items-center justify-between`}>
-                                {isPk ? (
-                                  <span className={`${styles.appBg} border ${styles.cardBorder} ${styles.cardText} rounded px-1.5 py-0.5 text-[10px]`}>
-                                    {String(val ?? t('ow.label.unspecifiedValue'))}
-                                  </span>
-                                ) : p.id === 'status' ? (
-                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                                    val === 'ACTIVE' || val === 'ON_TIME' ? 'bg-emerald-100 text-emerald-800' :
-                                    val === 'MAINTENANCE' || val === 'DELAYED' ? 'bg-amber-100 text-amber-800' :
-                                    `${styles.appBg} ${styles.cardTextMuted}`
-                                  }`}>
-                                    {String(val ?? 'N/A')}
-                                  </span>
-                                ) : (
-                                  <span>{String(val ?? t('ow.label.nullValue'))}</span>
-                                )}
-                                
-                                {isPk && (
-                                  <span className="text-[9px] font-semibold text-red-500 bg-red-50 border border-red-100 px-1 rounded uppercase">Primary Key</span>
-                                )}
-                              </div>
-                              <p className={`text-[10px] ${styles.muted} mt-1 leading-relaxed`}>{p.description}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* tab 2: Relations / Connection Traversal */}
-                    {detailTab === 'relations' && (
-                      <div className="space-y-5">
-                        <div className={`text-[10px] ${styles.muted} font-semibold uppercase leading-relaxed`}>
-                          {t('ow.explore.relationTraversal')}
-                        </div>
-
-                        {resolvedRelations.length === 0 ? (
-                          <div className={`text-center py-10 border border-dashed ${styles.cardBorder} rounded-lg ${styles.muted} text-[10px]`}>
-                            {t('ow.empty.noDeclaredRelations')}
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {resolvedRelations.map(rel => (
-                              <div key={rel.linkType.id} className={`space-y-2 border ${styles.cardBorder} rounded-lg p-3 ${styles.appBg}`}>
-                                {/* Header */}
-                                <div className={`flex items-center justify-between text-[11px] pb-1.5 border-b ${styles.divider}`}>
-                                  <div className={`flex items-center gap-1.5 font-semibold ${styles.cardText}`}>
-                                    <GitMerge size={12} className="text-emerald-600" />
-                                    <span>{rel.linkType.displayName}</span>
-                                  </div>
-                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded font-mono font-bold uppercase">
-                                    {rel.linkType.cardinality}
-                                  </span>
-                                </div>
-                                
-                                <p className={`text-[10px] ${styles.muted}`}>{rel.linkType.description}</p>
-
-                                {/* List matching connected instances */}
-                                {rel.instances.length === 0 ? (
-                                  <div className={`text-[10px] ${styles.muted} italic ${styles.appBg} p-2 rounded text-center`}>
-                                    {t('ow.empty.noRelatedInstances').replace('{name}', rel.otherObjectType.displayName)}
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1 pt-1">
-                                    {rel.instances.map(inst => (
-                                      <div
-                                        key={inst[rel.otherObjectType.primaryKey]}
-                                        onClick={() => handleJumpToInstance(rel.otherObjectType.id, inst[rel.otherObjectType.primaryKey])}
-                                        className={`p-2 border ${styles.cardBorder} hover:border-blue-400 ${styles.cardBg} hover:bg-blue-50/10 rounded-md cursor-pointer flex justify-between items-center transition-all group`}
-                                      >
-                                        <div className="flex items-center gap-2 truncate">
-                                          <span className={`p-1 rounded ${rel.otherObjectType.color}`}>
-                                            <DynamicIcon name={rel.otherObjectType.icon} size={11} />
-                                          </span>
-                                          <span className={`font-mono text-xs font-semibold ${styles.cardText}`}>
-                                            {inst[rel.otherObjectType.primaryKey]}
-                                          </span>
-                                          <span className={`text-[10px] ${styles.muted} truncate max-w-[100px]`}>
-                                            ({inst[rel.otherObjectType.titleProperty]})
-                                          </span>
-                                        </div>
-                                        <Compass size={11} className={`${styles.muted} group-hover:text-blue-600 transition-colors`} />
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* tab 3: Timeline Activity */}
-                    {detailTab === 'activity' && (
-                      <div className="space-y-4">
-                        <div className={`relative border-l ${styles.cardBorder} pl-4 ml-2 space-y-5 py-2`}>
-                          <div className="relative text-[11px]">
-                            <span className={`absolute -left-6 top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white`} />
-                            <div className={`font-semibold ${styles.cardText}`}>{t('ow.explore.activityLoaded')}</div>
-                            <p className={`${styles.muted} text-[10px] mt-0.5`}>{t('ow.explore.activityLoadedDesc')}</p>
-                            <span className={`text-[9px] font-mono ${styles.muted}`}>2026-07-02 20:34</span>
-                          </div>
-                          
-                          {selectedInstance.status === 'MAINTENANCE' && (
-                            <div className="relative text-[11px]">
-                              <span className="absolute -left-6 top-1 w-3 h-3 rounded-full bg-amber-500 border-2 border-white" />
-                              <div className={`font-semibold ${styles.cardText}`}>{t('ow.explore.activityMaintenance')}</div>
-                              <p className={`${styles.muted} text-[10px] mt-0.5`}>{t('ow.explore.activityMaintenanceDesc')}</p>
-                              <span className={`text-[9px] font-mono ${styles.muted}`}>{t('ow.label.justNow')}</span>
-                            </div>
-                          )}
-
-                          {selectedInstance.status === 'DELAYED' && (
-                            <div className="relative text-[11px]">
-                              <span className="absolute -left-6 top-1 w-3 h-3 rounded-full bg-red-400 border-2 border-white" />
-                              <div className={`font-semibold ${styles.cardText}`}>{t('ow.explore.activityDelayed')}</div>
-                              <p className={`${styles.muted} text-[10px] mt-0.5`}>{t('ow.explore.activityDelayedDesc')}</p>
-                              <span className={`text-[9px] font-mono ${styles.muted}`}>{t('ow.label.justNow')}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <InstanceDetailPanel
+                  activeObjectType={activeObjectType}
+                  selectedInstance={selectedInstance}
+                  setSelectedInstance={setSelectedInstance}
+                  detailTab={detailTab}
+                  setDetailTab={setDetailTab}
+                  availableActions={availableActions}
+                  handleOpenActionModal={handleOpenActionModal}
+                  resolvedRelations={resolvedRelations}
+                  handleJumpToInstance={handleJumpToInstance}
+                />
               ) : null}
 
             </div>

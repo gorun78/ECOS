@@ -175,7 +175,9 @@ public class PipelineExecutionEngine {
                 jdbc.update(
                     "UPDATE ecos_pipeline_run SET status = 'FAILED', finished_at = NOW(), elapsed_ms = ?, error_msg = ? WHERE id = ?",
                     elapsed, errorDetail, runId);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.error("无法写入 FAILED 终态，run 记录可能一直停留在非终态: runId={} reason={}", runId, ignored.getMessage(), ignored);
+            }
         }
     }
 

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Service
-@Profile("!enterprise & !flagship")
+@Profile("!enterprise & !ultimate")
 public class StubGraphService implements IGraphService {
     private static final Logger log = LoggerFactory.getLogger(StubGraphService.class);
 

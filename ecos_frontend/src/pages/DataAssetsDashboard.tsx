@@ -16,6 +16,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTheme } from '../components/ThemeContext';
+import { dataAssetsRequest as api } from '../services/dataAssetsApi';
 import type { DataAssetVO, DataAssetFieldVO, DataLevelDef, DataCategoryTreeItem } from '../types/dataAssets';
 
 interface Props {
@@ -25,21 +26,6 @@ interface Props {
 }
 
 const API = '/api/v1/datanet';
-
-/** 从 localStorage 读取 Bearer Token（与 data-workbench/api.ts 同一套逻辑） */
-function authHeaders(): Record<string, string> {
-  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('accessToken') || '') : '';
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(init?.headers ?? {}) },
-    ...init,
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
 
 function CardBlock({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const { styles } = useTheme();

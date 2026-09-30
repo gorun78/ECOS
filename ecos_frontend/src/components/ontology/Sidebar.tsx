@@ -1,27 +1,28 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Sidebar — 本体工作台左侧栏（业务划分域 + 本体元素分节 + 新建元素）
+ *
+ * H6-T4 组件行数治理：域配色纯工具 / 域 CRUD 有状态逻辑 / 域下拉面板 / 域表单弹窗 /
+ * 元素分节列表 / 底部新建菜单已机械抽取至 ./sidebar/* ，本文件保留为组合根。
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Archive, BookOpen, Box, Check, ChevronDown, ChevronRight, ChevronUp, Code, Database, Edit, GitMerge, Layers, LayoutDashboard, Plus, PlusCircle, Rocket, Tag, Trash2, X, Zap } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { BookOpen, ChevronDown, LayoutDashboard, Plus } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
-import {
-  createWorkbenchDomain,
-  deleteWorkbenchDomain,
-  deprecateWorkbenchDomain,
-  publishWorkbenchDomain,
-  reassignObjectDomain,
-  updateWorkbenchDomain,
-} from '../../services/ontologyApi';
+import DynamicIcon from './sidebar/SidebarDynamicIcon';
+import { getDomainColorText } from './sidebar/domainColors';
+import { useDomainManager } from './sidebar/useDomainManager';
+import DomainDropdownMenu from './sidebar/DomainDropdownMenu';
+import DomainFormModal from './sidebar/DomainFormModal';
+import SidebarElementSections from './sidebar/SidebarElementSections';
+import CreateElementMenu from './sidebar/CreateElementMenu';
 
-function DynamicIcon({ name, size = 14, className }: { name: string; size?: number; className?: string }) {
-  const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
-  return <IconComponent size={size} className={className} />;
-}
+type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
+
 interface SidebarProps {
   objectTypes: ObjectType[];
   allObjectTypes: ObjectType[];
@@ -40,7 +41,7 @@ interface SidebarProps {
   selectedCategory: 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
   selectedId: string | null;
 
-  onSelectCategory: (category: any, id: string | null) => void;
+  onSelectCategory: (category: SidebarCategory, id: string | null) => void;
   onCreateNew: (type: 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function') => void;
   /** T8: 域 CRUD/workflow 结果 toast（由 Layout 提供 showToast） */
   onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
@@ -85,208 +86,17 @@ export default function Sidebar({
 
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [showDomainDropdown, setShowDomainDropdown] = useState(false);
-  const [showDomainModal, setShowDomainModal] = useState(false);
-  const [editingDomain, setEditingDomain] = useState<OntologyDomain | null>(null);
   const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  // Modal states
-  const [formId, setFormId] = useState('');
-  const [formName, setFormName] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formColor, setFormColor] = useState('blue');
-  const [formAssignedObjects, setFormAssignedObjects] = useState<string[]>([]);
-  const [formError, setFormError] = useState('');
-
-  const getDomainColorText = (color: string) => {
-    switch (color) {
-      case 'blue': return 'text-blue-500';
-      case 'emerald': return 'text-emerald-500';
-      case 'amber': return 'text-amber-500';
-      case 'purple': return 'text-purple-500';
-      case 'rose': return 'text-rose-500';
-      case 'indigo': return 'text-indigo-500';
-      case 'slate': return 'text-slate-500';
-      default: return 'text-slate-500';
-    }
-  };
-
-  const getDomainColorDotClass = (color: string) => {
-    switch (color) {
-      case 'blue': return 'bg-blue-500';
-      case 'emerald': return 'bg-emerald-500';
-      case 'amber': return 'bg-amber-500';
-      case 'purple': return 'bg-purple-500';
-      case 'rose': return 'bg-rose-500';
-      case 'indigo': return 'bg-indigo-500';
-      case 'slate': return 'bg-slate-500';
-      default: return 'bg-slate-500';
-    }
-  };
-
-  /** code 归一化：小写 + 仅保留 [a-z0-9_]（后端 code 唯一约束） */
-  const normalizeDomainCode = (raw: string) => raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-
-  const handleStartAddDomain = () => {
-    setEditingDomain(null);
-    setFormId('');
-    setFormName('');
-    setFormDesc('');
-    setFormColor('blue');
-    setFormAssignedObjects([]);
-    setFormError('');
-    setShowDomainModal(true);
-  };
-
-  const handleStartEditDomain = (domain: OntologyDomain) => {
-    setEditingDomain(domain);
-    setFormId(domain.code || domain.id);
-    setFormName(domain.displayName);
-    setFormDesc(domain.description || '');
-    setFormColor(domain.color);
-    const assigned = allObjectTypes.filter(ot => ot.domainId === domain.id).map(ot => ot.id);
-    setFormAssignedObjects(assigned);
-    setFormError('');
-    setShowDomainModal(true);
-  };
-
-  /** T8: 删除域 → 先打后端，成功后本地移除 + 受影响对象置未分类，失败 toast 不盲改本地 */
-  const handleDeleteDomain = (domainId: string) => {
-    const targetDomain = domains.find(d => d.id === domainId);
-    if (!targetDomain) return;
-
-    if (!window.confirm(t('ow.msg.confirmDeleteDomain').replace('{name}', targetDomain.displayName))) {
-      return;
-    }
-
-    deleteWorkbenchDomain(targetDomain.code || targetDomain.id)
-      .then(() => {
-        const updatedDomains = domains.filter(d => d.id !== domainId);
-        onUpdateDomains(updatedDomains);
-        const updatedObjects = allObjectTypes.map(ot => (ot.domainId === domainId ? { ...ot, domainId: undefined } : ot));
-        onUpdateObjectTypes(updatedObjects);
-        if (selectedDomainId === domainId) {
-          onSelectDomainId(null);
-        }
-        onToast?.('success', t('ow.domain.deleted').replace('{name}', targetDomain.displayName));
-      })
-      .catch((e: any) => {
-        onToast?.('error', t('ow.domain.delete_failed').replace('{error}', String(e?.message || e)));
-      });
-  };
-
-  /**
-   * T8: 创建/编辑域 → 打后端 POST/PUT，成功后本地同步 domains + 对象归属。
-   * 校验：code 必填且唯一、name 必填（i18n toast，停留弹窗）。
-   */
-  const handleSaveDomain = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (saving) return;
-    setFormError('');
-
-    const code = normalizeDomainCode(formId);
-    if (!code) {
-      setFormError(t('ow.domain.validation.code_required'));
-      return;
-    }
-    if (!formName.trim()) {
-      setFormError(t('ow.domain.validation.name_required'));
-      return;
-    }
-    if (!editingDomain && domains.some(d => (d.code || d.id) === code)) {
-      setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
-      return;
-    }
-
-    const savedName = formName.trim();
-    const savedDescription = formDesc.trim();
-
-    setSaving(true);
-    const savePromise = editingDomain
-      ? updateWorkbenchDomain(editingDomain.code || editingDomain.id, {
-          code,
-          name: savedName,
-          description: savedDescription,
-        })
-      : createWorkbenchDomain({
-          code,
-          name: savedName,
-          description: savedDescription,
-        });
-
-    savePromise
-      .then((vo) => {
-        const savedDomain: OntologyDomain = {
-          // id 取域表主键（与实体表 domain_id 外键口径一致），code 单独保留供删除/更新端点使用
-          id: vo?.id || code,
-          code: vo?.code || code,
-          displayName: vo?.name || savedName,
-          description: vo?.description || savedDescription,
-          color: formColor,
-          status: vo?.status,
-        };
-        let newDomains: OntologyDomain[];
-        if (editingDomain) {
-          newDomains = domains.map(d => d.id === editingDomain.id ? savedDomain : d);
-        } else {
-          newDomains = [...domains, savedDomain];
-        }
-        onUpdateDomains(newDomains);
-
-        // 对象归属：本地即时映射 + 后端 best-effort reassign（新增绑定逐对象 PUT）
-        // 本地 domainId 用域主键（与实体表 domain_id 口径一致）；PUT body 用 domainCode（后端两者皆可解析）
-        const assignedSet = new Set(formAssignedObjects);
-        const savedDomainKey = savedDomain.id;
-        const updatedObjects = allObjectTypes.map(ot => {
-          const shouldHave = assignedSet.has(ot.id);
-          if (shouldHave && (ot.domainId || undefined) !== savedDomainKey) {
-            reassignObjectDomain(ot.id, { domainCode: code }).catch((rErr: any) => {
-              console.warn('T8 reassignObjectDomain failed:', ot.id, rErr?.message || rErr);
-            });
-          }
-          if (shouldHave) return { ...ot, domainId: savedDomainKey };
-          if (ot.domainId === savedDomainKey) return { ...ot, domainId: undefined };
-          return ot;
-        });
-        onUpdateObjectTypes(updatedObjects);
-
-        setShowDomainModal(false);
-        setEditingDomain(null);
-        setFormAssignedObjects([]);
-        onToast?.('success', (editingDomain ? t('ow.domain.updated') : t('ow.domain.created')).replace('{name}', savedName));
-      })
-      .catch((err: any) => {
-        const msg = String(err?.message || err || '');
-        // 后端 code 唯一约束 (ONT-009) → 本地 i18n 提示
-        if (msg.toLowerCase().includes('ont-009') || msg.toLowerCase().includes('already exists')) {
-          setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
-        } else {
-          setFormError(t('ow.domain.save_failed').replace('{error}', msg));
-        }
-      })
-      .finally(() => setSaving(false));
-  };
-
-  /** T8: 发布/废弃 — 经后端 PUT status（无独立端点），成功后回刷本地 status */
-  const handleStatusChange = (domain: OntologyDomain, target: 'Published' | 'Deprecated') => {
-    const call = target === 'Published' ? publishWorkbenchDomain : deprecateWorkbenchDomain;
-    call(domain.code || domain.id)
-      .then((vo) => {
-        onUpdateDomains(domains.map(d => d.id === domain.id ? { ...d, status: vo?.status || target, code: vo?.code || d.code, displayName: vo?.name || d.displayName } : d));
-        onToast?.('success', t(target === 'Published' ? 'ow.domain.published' : 'ow.domain.deprecated').replace('{name}', domain.displayName));
-      })
-      .catch((e: any) => {
-        onToast?.('error', t('ow.domain.status_failed').replace('{error}', String(e?.message || e)));
-      });
-  };
-
-  const toggleObjectAssignment = (objId: string) => {
-    setFormAssignedObjects(prev =>
-      prev.includes(objId)
-        ? prev.filter(id => id !== objId)
-        : [...prev, objId]
-    );
-  };
+  const domainManager = useDomainManager({
+    domains,
+    allObjectTypes,
+    selectedDomainId,
+    onSelectDomainId,
+    onUpdateDomains,
+    onUpdateObjectTypes,
+    onToast,
+  });
 
   const selectedDomain = domains.find(d => d.id === selectedDomainId);
 
@@ -319,122 +129,25 @@ export default function Sidebar({
 
             {/* Dropdown Menu */}
             {showDomainDropdown && (
-              <div className={`absolute top-10 left-0 right-0 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-40 max-h-64 overflow-y-auto divide-y ${styles.divider}`}>
-                {/* 1. Global Panorama Option */}
-                <div
-                  onClick={() => {
-                    onSelectDomainId(null);
-                    onSelectCategory('overview', null);
-                    setShowDomainDropdown(false);
-                    setStatusMenuFor(null);
-                  }}
-                  className={`px-2.5 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                    selectedDomainId === null ? `${styles.sidebarActiveBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <LayoutDashboard size={12} className="text-blue-500" />
-                    <span>{t('ow.sidebar.globalPanorama')}</span>
-                  </div>
-                  {selectedDomainId === null && <Check size={11} className="text-blue-600" />}
-                </div>
-
-                {/* 2. Domains Options with Edit/Publish/Deprecate/Delete */}
-                {domains.map(d => {
-                  const isSelected = selectedDomainId === d.id;
-                  const count = allObjectTypes.filter(ot => ot.domainId === d.id).length;
-                  return (
-                    <div
-                      key={d.id}
-                      className={`px-2.5 py-1.5 text-xs flex items-center justify-between cursor-pointer group transition-colors ${
-                        isSelected ? `${styles.sidebarActiveBg} ${styles.cardText} font-bold` : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                      }`}
-                      onClick={() => {
-                        onSelectDomainId(d.id);
-                        onSelectCategory('overview', null);
-                        setShowDomainDropdown(false);
-                        setStatusMenuFor(null);
-                      }}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span className={`w-1.5 h-1.5 rounded-full ${getDomainColorDotClass(d.color)}`} />
-                        <span className="truncate" title={d.displayName}>{d.displayName}</span>
-                        <span className={`text-[9px] ${styles.muted} font-mono`}>({count})</span>
-                      </div>
-
-                      {/* Edit / Publish·Deprecate / Delete Icons (T8: 新增状态菜单) */}
-                      <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            handleStartEditDomain(d);
-                            setShowDomainDropdown(false);
-                            setStatusMenuFor(null);
-                          }}
-                          className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} hover:${styles.cardText} rounded transition-colors`}
-                          title={t('ow.btn.editDomain')}
-                        >
-                          <Edit size={11} />
-                        </button>
-                        <div className="relative">
-                          <button
-                            onClick={() => setStatusMenuFor(statusMenuFor === d.id ? null : d.id)}
-                            className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} rounded transition-colors`}
-                            title={t('ow.btn.domainStatus')}
-                          >
-                            <Layers size={11} />
-                          </button>
-                          {statusMenuFor === d.id && (
-                            <div className={`absolute right-0 top-6 w-32 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-50`}>
-                              <button
-                                onClick={() => {
-                                  setStatusMenuFor(null);
-                                  setShowDomainDropdown(false);
-                                  handleStatusChange(d, 'Published');
-                                }}
-                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 text-emerald-600 transition-colors"
-                              >
-                                <Rocket size={11} />
-                                <span>{t('ow.domain.publish')}</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setStatusMenuFor(null);
-                                  setShowDomainDropdown(false);
-                                  handleStatusChange(d, 'Deprecated');
-                                }}
-                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 text-amber-600 transition-colors"
-                              >
-                                <Archive size={11} />
-                                <span>{t('ow.domain.deprecate')}</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => {
-                            handleDeleteDomain(d.id);
-                            setShowDomainDropdown(false);
-                            setStatusMenuFor(null);
-                          }}
-                          className={`p-1 hover:bg-red-50 ${styles.muted} hover:text-red-600 rounded transition-colors`}
-                          title={t('ow.btn.deleteDomain')}
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {domains.length === 0 && (
-                  <div className={`px-2.5 py-2 text-[10px] ${styles.muted}`}>{t('ow.domain.empty')}</div>
-                )}
-              </div>
+              <DomainDropdownMenu
+                domains={domains}
+                allObjectTypes={allObjectTypes}
+                selectedDomainId={selectedDomainId}
+                statusMenuFor={statusMenuFor}
+                setStatusMenuFor={setStatusMenuFor}
+                setShowDomainDropdown={setShowDomainDropdown}
+                onSelectDomainId={onSelectDomainId}
+                onSelectCategory={onSelectCategory}
+                onEditDomain={domainManager.handleStartEditDomain}
+                onDeleteDomain={domainManager.handleDeleteDomain}
+                onStatusChange={domainManager.handleStatusChange}
+              />
             )}
           </div>
 
           {/* Plus button to add domain */}
           <button
-            onClick={handleStartAddDomain}
+            onClick={domainManager.handleStartAddDomain}
             className={`p-2 ${styles.sidebarActiveBg} ${styles.sidebarHoverBg} ${styles.accentText} border ${styles.accentBorder} rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
             title={t('ow.btn.addDomain')}
           >
@@ -457,551 +170,51 @@ export default function Sidebar({
       </div>
 
       {/* Accordions List */}
-      <div className="flex-1 overflow-y-auto py-3 space-y-1">
-
-        {/* 1. OBJECT TYPES */}
-        <div className="space-y-0.5">
-          <button
-            onClick={() => toggleExpand('object')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.objectTypes')}</span>
-            </div>
-            <span>{objectTypes.length}</span>
-          </button>
-          {expanded.object && (
-            <div className="px-2 space-y-0.5">
-              {objectTypes.map(ot => {
-                const isActive = selectedCategory === 'object' && selectedId === ot.id;
-                return (
-                  <button
-                    key={ot.id}
-                    onClick={() => onSelectCategory('object', ot.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className={`p-0.5 rounded border ${isActive ? `${styles.sidebarActiveBg} ${styles.accentBorder} ${styles.sidebarActiveText}` : `${styles.cardBg} ${styles.sidebarBorder} ${styles.muted}`}`}>
-                        <DynamicIcon name={ot.icon} size={11} />
-                      </span>
-                      <span className="truncate">{ot.displayName}</span>
-                    </div>
-                    <span className={`text-[9px] font-mono opacity-65 uppercase ${styles.muted}`}>{ot.id}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 2. LINK TYPES */}
-        <div className="space-y-0.5">
-          <button
-            onClick={() => toggleExpand('link')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.linkTypes')}</span>
-            </div>
-            <span>{linkTypes.length}</span>
-          </button>
-          {expanded.link && (
-            <div className="px-2 space-y-0.5">
-              {linkTypes.map(lt => {
-                const isActive = selectedCategory === 'link' && selectedId === lt.id;
-                return (
-                  <button
-                    key={lt.id}
-                    onClick={() => onSelectCategory('link', lt.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className={styles.muted}>
-                        <GitMerge size={11} />
-                      </span>
-                      <span className="truncate">{lt.displayName}</span>
-                    </div>
-                    <span className={`text-[9px] font-mono opacity-50 font-bold ${styles.muted}`}>{lt.cardinality}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 3. ACTION TYPES */}
-        <div className="space-y-0.5">
-          <button
-            onClick={() => toggleExpand('action')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.actionTypes')}</span>
-            </div>
-            <span>{actionTypes.length}</span>
-          </button>
-          {expanded.action && (
-            <div className="px-2 space-y-0.5">
-              {actionTypes.map(at => {
-                const isActive = selectedCategory === 'action' && selectedId === at.id;
-                return (
-                  <button
-                    key={at.id}
-                    onClick={() => onSelectCategory('action', at.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-amber-500">
-                        <Zap size={11} className="fill-amber-400/30" />
-                      </span>
-                      <span className="truncate">{at.displayName}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 3.5. FUNCTION TYPES */}
-        <div className="space-y-0.5">
-          <button
-            onClick={() => toggleExpand('function')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.functionTypes')}</span>
-            </div>
-            <span>{functionTypes.length}</span>
-          </button>
-          {expanded.function && (
-            <div className="px-2 space-y-0.5">
-              {functionTypes.map(fn => {
-                const isActive = selectedCategory === 'function' && selectedId === fn.id;
-                return (
-                  <button
-                    key={fn.id}
-                    onClick={() => onSelectCategory('function', fn.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} font-semibold border-l-2 ${styles.accentBorder}`
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-violet-500">
-                        <Code size={11} />
-                      </span>
-                      <span className="truncate">{fn.displayName}</span>
-                    </div>
-                    <span className={`text-[9px] font-mono opacity-50 uppercase ${styles.muted}`}>{fn.returnType}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 4. INTERFACE TYPES */}
-        <div className="space-y-0.5">
-          <button
-            onClick={() => toggleExpand('interface')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.interfaces')}</span>
-            </div>
-            <span>{interfaces.length}</span>
-          </button>
-          {expanded.interface && (
-            <div className="px-2 space-y-0.5">
-              {interfaces.map(it => {
-                const isActive = selectedCategory === 'interface' && selectedId === it.id;
-                return (
-                  <button
-                    key={it.id}
-                    onClick={() => onSelectCategory('interface', it.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-indigo-500">
-                        <Layers size={11} />
-                      </span>
-                      <span className="truncate">{it.displayName}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 5. SHARED PROPERTIES */}
-        <div className="space-y-0.5">
-          <button
-            onClick={() => toggleExpand('shared_property')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.sharedProperties')}</span>
-            </div>
-            <span>{sharedProperties.length}</span>
-          </button>
-          {expanded.shared_property && (
-            <div className="px-2 space-y-0.5">
-              {sharedProperties.map(sp => {
-                const isActive = selectedCategory === 'shared_property' && selectedId === sp.id;
-                return (
-                  <button
-                    key={sp.id}
-                    onClick={() => onSelectCategory('shared_property', sp.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-teal-500">
-                        <Tag size={11} />
-                      </span>
-                      <span className="truncate">{sp.displayName}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 6. RAW DATASETS */}
-        <div className={`space-y-0.5 border-t ${styles.appBorder} pt-2 mt-2`}>
-          <button
-            onClick={() => toggleExpand('dataset')}
-            className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
-          >
-            <div className="flex items-center gap-1">
-              <DynamicIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
-              <span>{t('ow.sidebar.datasets')}</span>
-            </div>
-            <span>{datasets.length}</span>
-          </button>
-          {expanded.dataset && (
-            <div className="px-2 space-y-0.5">
-              {datasets.map(ds => {
-                const isActive = selectedCategory === 'dataset' && selectedId === ds.id;
-                return (
-                  <button
-                    key={ds.id}
-                    onClick={() => onSelectCategory('dataset', ds.id)}
-                    className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
-                        : `${styles.sidebarText} ${styles.sidebarHoverBg}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className={`${styles.muted}`}>
-                        <Database size={11} />
-                      </span>
-                      <span className="truncate font-mono text-[10px]">{ds.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+      <SidebarElementSections
+        objectTypes={objectTypes}
+        linkTypes={linkTypes}
+        actionTypes={actionTypes}
+        interfaces={interfaces}
+        sharedProperties={sharedProperties}
+        datasets={datasets}
+        functionTypes={functionTypes}
+        selectedCategory={selectedCategory}
+        selectedId={selectedId}
+        onSelectCategory={onSelectCategory}
+        expanded={expanded}
+        toggleExpand={toggleExpand}
+      />
 
       {/* Bottom Action bar — T4: 替换原来的 白底/黑底 硬编码 → theme tokens */}
-      <div className={`p-3 border-t ${styles.appBorder} ${styles.cardBg} relative`}>
-        <button
-          onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-          className={`w-full ${styles.accentBg} text-white ${styles.accentHover} font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs`}
-        >
-          <PlusCircle size={14} />
-          <span>{t('ow.btn.createNewElement')}</span>
-          <DynamicIcon name={showCreateDropdown ? "ChevronDown" : "ChevronUp"} size={12} />
-        </button>
-
-        {/* Create Dropdown */}
-        {showCreateDropdown && (
-          <div className={`absolute bottom-14 left-3 right-3 ${styles.cardBg} border ${styles.appBorder} rounded-lg shadow-lg py-1 z-30 divide-y ${styles.divider}`}>
-            <button
-              onClick={() => {
-                onCreateNew('object');
-                setShowCreateDropdown(false);
-              }}
-              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
-            >
-              <span className="text-blue-500">
-                <Box size={13} />
-              </span>
-              <span>{t('ow.btn.newObjectType')}</span>
-            </button>
-            <button
-              onClick={() => {
-                onCreateNew('link');
-                setShowCreateDropdown(false);
-              }}
-              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
-            >
-              <span className={`${styles.muted}`}>
-                <GitMerge size={13} />
-              </span>
-              <span>{t('ow.btn.newLinkType')}</span>
-            </button>
-            <button
-              onClick={() => {
-                onCreateNew('action');
-                setShowCreateDropdown(false);
-              }}
-              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
-            >
-              <span className="text-amber-500">
-                <Zap size={13} />
-              </span>
-              <span>{t('ow.btn.newActionType')}</span>
-            </button>
-            <button
-              onClick={() => {
-                onCreateNew('interface');
-                setShowCreateDropdown(false);
-              }}
-              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
-            >
-              <span className="text-indigo-500">
-                <Layers size={13} />
-              </span>
-              <span>{t('ow.btn.newInterface')}</span>
-            </button>
-            <button
-              onClick={() => {
-                onCreateNew('shared_property');
-                setShowCreateDropdown(false);
-              }}
-              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
-            >
-              <span className="text-teal-500">
-                <Tag size={13} />
-              </span>
-              <span>{t('ow.btn.newSharedProperty')}</span>
-            </button>
-            <button
-              onClick={() => {
-                onCreateNew('function');
-                setShowCreateDropdown(false);
-              }}
-              className={`w-full text-left px-3 py-2 ${styles.cardText} ${styles.sidebarHoverBg} flex items-center gap-2 transition-colors`}
-            >
-              <span className="text-violet-500">
-                <Code size={13} />
-              </span>
-              <span>{t('ow.btn.newFunction')}</span>
-            </button>
-          </div>
-        )}
-      </div>
+      <CreateElementMenu
+        showCreateDropdown={showCreateDropdown}
+        setShowCreateDropdown={setShowCreateDropdown}
+        onCreateNew={onCreateNew}
+      />
 
       {/* 业务划分域模态对话框 — T8: CRUD 已接后端 (OntologyDomainApiController) */}
-      {showDomainModal && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.overlayBg} backdrop-blur-xs`}>
-          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.appBorder} w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]`}>
-
-            {/* Modal Header */}
-            <div className={`px-4 py-3 border-b ${styles.appBorder} ${styles.sidebarBg} flex items-center justify-between`}>
-              <div className="flex items-center gap-2">
-                <span className={`p-1 rounded ${styles.badgeBg} ${styles.badgeText}`}>
-                  <Layers size={14} />
-                </span>
-                <h3 className={`text-sm font-bold ${styles.cardText}`}>
-                  {editingDomain ? t('ow.btn.editDomainTitle') : t('ow.btn.newDomainTitle')}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDomainModal(false);
-                  setEditingDomain(null);
-                }}
-                className={`${styles.muted} hover:${styles.cardText} p-1 rounded-lg hover:${styles.sidebarHoverBg} transition-colors cursor-pointer`}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Modal Form — T8: 表单 error 用 danger semantic + 保存按钮 loading */}
-            <form onSubmit={handleSaveDomain} className="flex-1 overflow-y-auto p-4 space-y-4">
-              {formError && (
-                <div className={`p-2.5 ${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder} rounded-lg text-xs font-semibold flex items-center gap-2`}>
-                  <AlertCircle size={13} />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* ID Input (Only shown on Create) */}
-              <div className="space-y-1">
-                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
-                  {t('ow.label.domainId')} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  disabled={!!editingDomain}
-                  value={formId}
-                  onChange={e => setFormId(e.target.value)}
-                  placeholder={t('ow.placeholder.domainId')}
-                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs ${styles.inputBg} disabled:opacity-60`}
-                  required
-                />
-              </div>
-
-              {/* Display Name Input */}
-              <div className="space-y-1">
-                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
-                  {t('ow.label.domainDisplayName')} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={e => setFormName(e.target.value)}
-                  placeholder={t('ow.placeholder.domainDisplayName')}
-                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs ${styles.inputBg} ${styles.inputText}`}
-                  required
-                />
-              </div>
-
-              {/* Description Input */}
-              <div className="space-y-1">
-                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
-                  {t('ow.label.domainDescription')}
-                </label>
-                <textarea
-                  value={formDesc}
-                  onChange={e => setFormDesc(e.target.value)}
-                  placeholder={t('ow.placeholder.domainDescription')}
-                  rows={2}
-                  className={`w-full px-3 py-2 border ${styles.appBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none ${styles.inputBg} ${styles.inputText}`}
-                />
-              </div>
-
-              {/* Color Theme Selector */}
-              <div className="space-y-1.5">
-                <label className={`block ${styles.sidebarText} font-semibold text-[11px]`}>
-                  {t('ow.label.domainColor')}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {['blue', 'emerald', 'amber', 'purple', 'rose', 'indigo', 'slate'].map(color => {
-                    const isSelected = formColor === color;
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setFormColor(color)}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                          isSelected ? `${styles.accentBorder} scale-110 shadow-sm` : 'border-transparent hover:scale-105'
-                        }`}
-                        style={{ backgroundColor:
-                          color === 'blue' ? '#3b82f6' :
-                          color === 'emerald' ? '#10b981' :
-                          color === 'amber' ? '#f59e0b' :
-                          color === 'purple' ? '#8b5cf6' :
-                          color === 'rose' ? '#f43f5e' :
-                          color === 'indigo' ? '#6366f1' : '#64748b'
-                        }}
-                      >
-                        {isSelected && <Check size={12} className={styles.cardText} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Assign Object Types Checklist */}
-              <div className="space-y-1.5">
-                <label className={`block ${styles.sidebarText} font-semibold flex justify-between items-center text-[11px]`}>
-                  <span>{t('ow.label.domainAssignedObjects').replace('{count}', String(formAssignedObjects.length))}</span>
-                  <span className={`text-[9px] ${styles.muted} font-normal`}>{t('ow.label.multiSelect')}</span>
-                </label>
-                <div className={`border ${styles.appBorder} rounded-lg max-h-36 overflow-y-auto p-1 ${styles.inputBg} divide-y`}>
-                  {allObjectTypes.map(ot => {
-                    const isChecked = formAssignedObjects.includes(ot.id);
-                    return (
-                      <div
-                        key={ot.id}
-                        onClick={() => toggleObjectAssignment(ot.id)}
-                        className={`flex items-center gap-2 py-1 px-1.5 ${styles.sidebarHoverBg} rounded-md cursor-pointer text-xs`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}} // Handle on parent div click
-                          className={`rounded ${styles.inputBorder} text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none`}
-                        />
-                        <span className={`p-0.5 rounded border ${styles.cardBg} ${styles.appBorder} ${styles.muted}`}>
-                          <DynamicIcon name={ot.icon} size={11} />
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-semibold ${styles.cardText} truncate text-[11px]`}>{ot.displayName}</p>
-                        </div>
-                        <span className={`text-[9px] font-mono ${styles.muted} uppercase`}>{ot.id}</span>
-                      </div>
-                    );
-                  })}
-                  {allObjectTypes.length === 0 && (
-                    <div className={`p-4 text-center ${styles.muted}`}>
-                      {t('ow.empty.noObjectTypesForAssign')}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer Actions */}
-              <div className={`pt-3 border-t ${styles.appBorder} flex items-center justify-end gap-2`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDomainModal(false);
-                    setEditingDomain(null);
-                  }}
-                  className={`px-3 py-1.5 border ${styles.appBorder} ${styles.cardBg} ${styles.cardText} hover:${styles.sidebarHoverBg} transition-colors font-semibold cursor-pointer text-xs`}
-                >
-                  {t('ow.btn.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className={`px-3.5 py-1.5 ${styles.accentBg} text-white ${styles.accentHover} rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs disabled:opacity-50`}
-                >
-                  {saving ? '...' : t('ow.btn.save')}
-                </button>
-              </div>
-            </form>
-
-          </div>
-        </div>
+      {domainManager.showDomainModal && (
+        <DomainFormModal
+          editingDomain={domainManager.editingDomain}
+          allObjectTypes={allObjectTypes}
+          saving={domainManager.saving}
+          formId={domainManager.formId}
+          formName={domainManager.formName}
+          formDesc={domainManager.formDesc}
+          formColor={domainManager.formColor}
+          formAssignedObjects={domainManager.formAssignedObjects}
+          formError={domainManager.formError}
+          setFormId={domainManager.setFormId}
+          setFormName={domainManager.setFormName}
+          setFormDesc={domainManager.setFormDesc}
+          setFormColor={domainManager.setFormColor}
+          onClose={() => {
+            domainManager.setShowDomainModal(false);
+            domainManager.setEditingDomain(null);
+          }}
+          onSave={domainManager.handleSaveDomain}
+          onToggleObject={domainManager.toggleObjectAssignment}
+        />
       )}
 
       {/* 📖 术语（Glossary）快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}

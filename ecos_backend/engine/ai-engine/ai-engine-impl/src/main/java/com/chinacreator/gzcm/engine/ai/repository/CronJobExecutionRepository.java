@@ -62,24 +62,5 @@ public class CronJobExecutionRepository {
         return result != null ? result : 0L;
     }
 
-    /** 检查表是否存在，不存在则创建 */
-    public void ensureTable() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_cron_job_execution (
-                    id              BIGSERIAL       PRIMARY KEY,
-                    cron_job_id     BIGINT          NOT NULL,
-                    started_at      TIMESTAMP,
-                    finished_at     TIMESTAMP,
-                    status          VARCHAR(50)     DEFAULT 'RUNNING',
-                    result          TEXT,
-                    error_message   TEXT,
-                    created_at      TIMESTAMP       DEFAULT NOW()
-                )
-                """);
-            log.info("Table ecos_cron_job_execution ensured");
-        } catch (Exception ex) {
-            log.warn("Failed to ensure table ecos_cron_job_execution: {}", ex.getMessage());
-        }
-    }
+    // H8-T1: ecos_cron_job_execution 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL。
 }

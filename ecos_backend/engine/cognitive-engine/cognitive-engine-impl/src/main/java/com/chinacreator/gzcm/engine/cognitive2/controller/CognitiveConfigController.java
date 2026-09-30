@@ -1,6 +1,5 @@
 package com.chinacreator.gzcm.engine.cognitive2.controller;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,10 +9,10 @@ import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveConfigItemVO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveConfigSaveDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveConfigSaveResult;
+import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveConfigQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,7 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>数据源：sys_config 表（config_group='cognitive'，与前端 CognitiveConfigTab
  * 默认 {@code cognitive.*} 前缀的 key 对齐）。
- * 直接通过 JdbcTemplate 读 / 写，避免跨模块 import sysman 包
+ * 读写全部下沉 {@link CognitiveConfigQueryService}（架构铁律 §3.6：Controller
+ * 不得直接访问数据库），避免跨模块 import sysman 包
  * （架构铁律：引擎层不依赖服务层）。
  * 写入完成发 {@code ecos.audit} 审计日志（log 兜底；正式 Kafka 接 PMO-50 EventBus 后切换）。</p>
  *
@@ -50,10 +50,10 @@ public class CognitiveConfigController {
     /** 与前端 CognitiveConfigTab 默认 cognitive.* 前缀 key 同组 */
     static final String GROUP = "cognitive";
 
-    private final JdbcTemplate jdbcTemplate;
+    private final CognitiveConfigQueryService cognitiveConfigQueryService;
 
-    public CognitiveConfigController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public CognitiveConfigController(CognitiveConfigQueryService cognitiveConfigQueryService) {
+        this.cognitiveConfigQueryService = cognitiveConfigQueryService;
     }
 
     /**
@@ -62,11 +62,7 @@ public class CognitiveConfigController {
     @GetMapping
     public ApiResponse<List<CognitiveConfigItemVO>> list() {
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT config_key, config_value, description, config_type, config_label " +
-                    "FROM sys_config WHERE config_group = ? AND status = 'active' " +
-                    "ORDER BY sort_order, config_key",
-                    GROUP);
+            List<Map<String, Object>> rows = cognitiveConfigQueryService.listActiveConfigRows(GROUP);
             List<CognitiveConfigItemVO> vos = new ArrayList<>(rows.size());
             for (Map<String, Object> row : rows) {
                 vos.add(new CognitiveConfigItemVO(
@@ -103,7 +99,8 @@ public class CognitiveConfigController {
             if (key == null || key.isBlank()) {
                 throw new BusinessException("configKey 不能为空");
             }
-            int rows = upsertSingle(key, value == null ? "" : value);
+            int rows = cognitiveConfigQueryService.upsertConfigValue(
+                    key, value == null ? "" : value, GROUP);
             if (rows > 0) {
                 updated++;
             } else {
@@ -114,36 +111,6 @@ public class CognitiveConfigController {
         emitAudit("cognitiveConfig.save",
                 "updated=" + updated + " inserted=" + inserted + " size=" + items.size());
         return ApiResponse.success(new CognitiveConfigSaveResult(updated, inserted, items.size()));
-    }
-
-    /**
-     * 单条 upsert：先查存在 → 走 UPDATE，否则走 INSERT。
-     *
-     * @return 实际 UPDATE 命中行数（命中即视为已存在；insert 命中返回 0）
-     */
-    private int upsertSingle(String key, String value) {
-        LocalDateTime now = LocalDateTime.now();
-        // 1) 尝试 update（命中 → 视为已存在）
-        int rows = jdbcTemplate.update(
-                "UPDATE sys_config SET config_value = ?, updated_at = ? " +
-                "WHERE config_key = ? AND status = 'active'",
-                value, now, key);
-        if (rows > 0) {
-            return rows;
-        }
-        // 2) 不存在 → insert（保持与 Group 一致）
-        jdbcTemplate.update(
-                "INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, " +
-                "config_label, description, sort_order, status, edition, created_at, updated_at) " +
-                "VALUES (gen_random_uuid(), ?, ?, ?, 'string', ?, '', 100, 'active', 'all', ?, ?)",
-                key, value, GROUP, labelFor(key), now, now);
-        return 0;
-    }
-
-    /** 从 key 末段推 label：cognitive.model.default → default。 */
-    private static String labelFor(String key) {
-        int dot = key.lastIndexOf('.');
-        return (dot < 0 || dot == key.length() - 1) ? key : key.substring(dot + 1);
     }
 
     private static String str(Object o) {

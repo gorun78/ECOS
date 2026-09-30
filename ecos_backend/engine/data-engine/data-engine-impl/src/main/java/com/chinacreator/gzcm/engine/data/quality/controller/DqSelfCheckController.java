@@ -8,13 +8,13 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.data.quality.model.SelfCheckResult;
+import com.chinacreator.gzcm.engine.data.quality.service.DqHealthCheckService;
 import com.chinacreator.gzcm.engine.data.quality.service.DqSecurityService;
 
 /**
@@ -52,14 +52,14 @@ public class DqSelfCheckController {
     private static final List<String> DQ_TABLES = List.of(
             "dq_rule", "dq_rule_version", "dq_rule_check", "dq_alert_record", "dq_work_order");
 
-    private final JdbcTemplate jdbc;
+    private final DqHealthCheckService healthCheckService;
 
     /** ObjectProvider 让 DqSecurityService 缺失时不阻断 Controller 启动，自检项报 false */
     private final ObjectProvider<DqSecurityService> securityServiceProvider;
 
-    public DqSelfCheckController(JdbcTemplate jdbc,
+    public DqSelfCheckController(DqHealthCheckService healthCheckService,
                                  ObjectProvider<DqSecurityService> securityServiceProvider) {
-        this.jdbc = jdbc;
+        this.healthCheckService = healthCheckService;
         this.securityServiceProvider = securityServiceProvider;
     }
 
@@ -103,7 +103,8 @@ public class DqSelfCheckController {
         r.setRewriteKeep(false);
         r.setYmlWhitelist(false);
         issues.add("rewriteKeep: VersionPrefixRewriteFilter 的 /api/v1/dq 条目需人工验证（预期 KEEP，不应再有 REMOVE 改写）");
-        issues.add("ymlWhitelist: application.yml 的 auth.whitelist.paths 需人工验证 /api/v1/dq/** 已注册");
+        issues.add("ymlWhitelist: gateway application.yml 的 auth.whitelist.paths 僵尸块已删除（PMO-74 H9-T5），"
+                + "匿名端点唯一事实源 = sysman SecurityConfig permitAll；需人工验证 /api/v1/dq/** 不在 permitAll（预期需 Bearer Token）");
 
         r.setIssues(issues);
         boolean allOk = schema && missing.isEmpty() && security;
@@ -118,10 +119,7 @@ public class DqSelfCheckController {
     /** 检查 schema 存在性。异常时记 issue 并返回 false。 */
     private boolean checkSchema(List<String> issues) {
         try {
-            Integer count = jdbc.queryForObject(
-                    "SELECT count(*)::int FROM information_schema.schemata WHERE schema_name = ?",
-                    Integer.class, DQ_SCHEMA);
-            return count != null && count > 0;
+            return healthCheckService.countSchema(DQ_SCHEMA) > 0;
         } catch (Exception e) {
             log.warn("DQ selfcheck: schema probe failed, error={}", e.getMessage());
             issues.add("PG schema 探测失败（DB 不可用?）：" + e.getMessage());
@@ -135,9 +133,7 @@ public class DqSelfCheckController {
         for (String table : DQ_TABLES) {
             try {
                 // to_regclass('schema.table') 返回 OID；表缺失时返回 NULL
-                Long oid = jdbc.queryForObject(
-                        "SELECT to_regclass(?)::int8",
-                        Long.class, DQ_SCHEMA + "." + table);
+                Long oid = healthCheckService.resolveTableOid(DQ_SCHEMA + "." + table);
                 if (oid == null || oid == 0L) {
                     missing.add(table);
                 }

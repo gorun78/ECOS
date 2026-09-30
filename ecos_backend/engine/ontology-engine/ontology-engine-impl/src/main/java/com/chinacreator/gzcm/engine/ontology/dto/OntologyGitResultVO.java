@@ -28,9 +28,33 @@ public class OntologyGitResultVO {
     /** 提交信息（commit 填充） */
     private String commitMessage;
 
-    /** 操作状态（committed / pulled / loaded） */
+    /** 操作状态（committed/pulled 为真实结果；not_available 表示未接入或失败，禁止伪成功） */
     private String status;
+
+    /** 不可用原因（status=not_available 时必填，禁止伪成功） */
+    private String reason;
 
     /** 时间戳（epoch millis） */
     private Long timestamp;
+
+    /** 服务端仓库逻辑标识（commit/pull 填充） */
+    private String repositoryId;
+
+    /** 真实提交号（来自 runtime GitService.getCurrentCommitId，禁止伪造；仅 committed 时填充） */
+    private String commitId;
+
+    /** 归档标签，格式 {assetType}/{assetId}/{versionNo}（仅 commit 且提供 versionNo 时填充） */
+    private String tag;
+
+    /** 资产类型（commit 填充，缺省 ontology） */
+    private String assetType;
+
+    /** 版本号（commit 填充） */
+    private String versionNo;
+
+    /** pull 使用的服务端 remote（默认 origin，非客户端入参） */
+    private String remote;
+
+    /** pull 使用的分支（来自服务端仓库注册表 defaultBranch） */
+    private String branch;
 }

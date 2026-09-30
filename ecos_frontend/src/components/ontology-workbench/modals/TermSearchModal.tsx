@@ -107,8 +107,9 @@ export default function TermSearchModal({
 
       const terms = await fetchTerms(filters);
       setAllTerms(terms);
-    } catch (err: any) {
-      setError(err?.message || "获取术语列表失败");
+    } catch (err: unknown) {
+      const msg = (err as { message?: string } | undefined)?.message;
+      setError(msg || "获取术语列表失败");
     } finally {
       setLoading(false);
     }

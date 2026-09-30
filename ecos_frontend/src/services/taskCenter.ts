@@ -5,6 +5,9 @@
  *           runtime-task JdbcTaskPersistenceService 持久化 (cron/next_run_at/last_run_at/last_status)
  */
 
+import { apiFetchData } from "../api";
+import { authOnlyHeaders } from "./auth";
+
 const BASE = "/api/v1/task";
 
 // ── 类型 ──────────────────────────────────────────────
@@ -69,15 +72,8 @@ export interface TaskTypesPayload {
 }
 
 // ── 内部工具 ──────────────────────────────────────────
-function authHeaders(): Record<string, string> {
-  try {
-    const token = sessionStorage.getItem("jwt") || localStorage.getItem("jwt") || "";
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch { return {}; }
-}
-
 async function jget<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
+  const res = await fetch(url, { headers: authOnlyHeaders(), cache: "no-store" });
   if (!res.ok) return null;
   const json = await res.json();
   return (json?.data ?? null as T);
@@ -86,7 +82,7 @@ async function jget<T>(url: string): Promise<T | null> {
 async function jpost<T>(url: string, body?: unknown): Promise<T | null> {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authOnlyHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) return null;
@@ -205,3 +201,108 @@ export const CATEGORY_LABELS: Record<TaskCategory, string> = {
   metadata: "元数据",
   cron: "定时任务",
 };
+
+// ── Task Center (S5-1.5) — 自 src/api.ts 迁入，签名与路径不变 (H6-T1) ──
+const TASK_BASE = "/api/v1/task";
+
+/** GET /api/v1/task/list — 任务列表 */
+export async function apiTaskList(params?: {
+  status?: string;
+  type?: string;
+  page?: number;
+  size?: number;
+}): Promise<any> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.type) qs.set("type", params.type);
+  if (params?.page != null) qs.set("page", String(params.page));
+  if (params?.size != null) qs.set("size", String(params.size));
+  const q = qs.toString();
+  return apiFetchData(`${TASK_BASE}/list${q ? "?" + q : ""}`);
+}
+
+/** POST /api/v1/task/submit — 提交任务 */
+export async function apiTaskSubmit(body: {
+  taskName: string;
+  taskType: string;
+  config: Record<string, any>;
+  runner: string;
+  priority?: string;
+  maxRetries?: number;
+}): Promise<any> {
+  return apiFetchData(`${TASK_BASE}/submit`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** GET /api/v1/task/{id}/status — 查询任务状态 */
+export async function apiTaskStatus(id: string): Promise<any> {
+  return apiFetchData(`${TASK_BASE}/${encodeURIComponent(id)}/status`);
+}
+
+/** POST /api/v1/task/{id}/cancel — 取消任务 */
+export async function apiTaskCancel(id: string): Promise<any> {
+  return apiFetchData(`${TASK_BASE}/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });
+}
+
+/** GET /api/v1/task/stats — 任务实时统计 */
+export async function apiTaskStats(): Promise<TaskStats> {
+  return apiFetchData(`${TASK_BASE}/stats`);
+}
+
+// ── 裸 fetch 收口 (H6-T2)：TaskPanel / TaskCenter 原语义（无鉴权头、整包 JSON）迁移 ──
+
+/** 整包 JSON GET（保留 code/data 原判断语义，失败抛错由调用方 catch） */
+async function rawGetJson(url: string): Promise<any> {
+  const r = await fetch(url);
+  return r.json();
+}
+
+/** 整包 JSON POST（原 TaskPanel 无/有 Content-Type 两种形态分别保留） */
+async function rawPostJson(url: string, body?: unknown, withContentType = false): Promise<any> {
+  const r = await fetch(url, {
+    method: "POST",
+    ...(withContentType ? { headers: { "Content-Type": "application/json" } } : {}),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  return r.json();
+}
+
+export function taskPanelTypesJson(): Promise<any> {
+  return rawGetJson(`${BASE}/types`);
+}
+
+export function taskPanelStatsJson(): Promise<any> {
+  return rawGetJson(`${BASE}/stats`);
+}
+
+export function taskPanelListJson(params: URLSearchParams): Promise<any> {
+  return rawGetJson(`${BASE}/list?${params.toString()}`);
+}
+
+export function taskPanelDetailJson(taskId: string): Promise<any> {
+  return rawGetJson(`${BASE}/${taskId}`);
+}
+
+export function taskPanelActionJson(taskId: string, action: string): Promise<any> {
+  return rawPostJson(`${BASE}/${taskId}/${action}`);
+}
+
+export function taskPanelBatchJson(taskIds: string[], action: string): Promise<any> {
+  return rawPostJson(`${BASE}/batch`, { taskIds, action }, true);
+}
+
+/** GET /api/v1/task/doris/health — 返回 {ok, json}，仅 ok 时解析 */
+export async function taskDorisHealth(): Promise<{ ok: boolean; json?: any }> {
+  const r = await fetch(`${BASE}/doris/health`);
+  return { ok: r.ok, json: r.ok ? await r.json() : undefined };
+}
+
+/** POST /api/v1/task/{id}/execute — 仅返回是否成功（原 TaskCenter 语义） */
+export async function taskExecuteOk(taskId: string): Promise<boolean> {
+  const r = await fetch(`${BASE}/${taskId}/execute`, { method: "POST" });
+  return r.ok;
+}

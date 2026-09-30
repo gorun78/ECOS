@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
 import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * K1 结构化抽取任务执行器 — 实现 ITaskExecutor，将 KbEntityInstanceExtractionService.extract
@@ -49,11 +52,11 @@ public class KbImportTaskExecutor implements ITaskExecutor {
     @Value("${ecos.architecture.tier:standard}")
     private String tier;
 
-    /** 可选 — 容器中存在 KafkaTemplate Bean 时注入（反射访问容忍 classpath 差异，对齐 SecurityEngineClient 双态）。
+    /** 可选 — 容器中存在 EventBusService Bean 时注入（runtime-event 底座；铁律 §2.5 唯一事件出口）。
      *     架构铁律 §2.4-5：写操作必发 Kafka ecos.audit；缺失时 fallback 仅 log + JDBC，不阻断业务。
      */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
+    @Autowired(required = false)
+    private EventBusService eventBusService;
 
     public KbImportTaskExecutor(KbEntityInstanceExtractionService extractionService,
                                 JdbcTemplate jdbc) {
@@ -222,29 +225,36 @@ public class KbImportTaskExecutor implements ITaskExecutor {
     }
 
     /**
-     * Kafka 审计事件发送（铁律 §2.4-5）：
-     * 通过反射调用 {@code KafkaTemplate.send(String, Object)} 容忍 classpath 缺失（与
-     * {@code SecurityEngineClient.audit} 同波形）；Kafka 缺失时 warn 不抛。
+     * 审计事件发送（铁律 §2.4-5 / §2.5）— 统一走 runtime-event {@link EventBusService}
+     * 发布到 {@link KafkaTopics#AUDIT}；EventBusService 缺失或发送异常时 warn 不抛，
+     * 保持 JDBC 台账独立可用（双态降级）。
      */
     private void publishAuditEvent(String jobId, String taskId, String status, String mode,
                                    long durationMs, long rowsTotal, long rowsOk,
                                    long rowsFailed, String errorMessage) {
-        String payload = String.format(
-                "{\"action\":\"kg_instance_extract\",\"jobId\":\"%s\",\"taskId\":\"%s\",\"tier\":\"%s\","
-                        + "\"mode\":\"%s\",\"status\":\"%s\",\"durationMs\":%d,\"rowsTotal\":%d,"
-                        + "\"rowsOk\":%d,\"rowsFailed\":%d,\"kt\":\"knowledge\",\"ts\":%d}",
-                jobId, taskId, tier, mode, status, durationMs, rowsTotal, rowsOk, rowsFailed,
-                System.currentTimeMillis());
-        if (kafkaTemplate == null) {
-            log.warn("KbImportTaskExecutor.audit: KafkaTemplate 不可用，审计事件仅记 JDBC: jobId={} status={}",
+        if (eventBusService == null) {
+            log.warn("KbImportTaskExecutor.audit: EventBusService 不可用，审计事件仅记 JDBC: jobId={} status={}",
                     jobId, status);
             return;
         }
+        Map<String, Object> audit = new LinkedHashMap<>();
+        audit.put("action", "kg_instance_extract");
+        audit.put("jobId", jobId);
+        audit.put("taskId", taskId);
+        audit.put("tier", tier);
+        audit.put("mode", mode);
+        audit.put("status", status);
+        audit.put("durationMs", durationMs);
+        audit.put("rowsTotal", rowsTotal);
+        audit.put("rowsOk", rowsOk);
+        audit.put("rowsFailed", rowsFailed);
+        audit.put("kt", "knowledge");
+        audit.put("ts", System.currentTimeMillis());
         try {
-            kafkaTemplate.send(KafkaTopics.AUDIT, payload);
-            log.info("KB_IMPORT audit Kafka 已发: topic={} jobId={}", KafkaTopics.AUDIT, jobId);
+            eventBusService.publish(KafkaTopics.AUDIT, audit);
+            log.info("KB_IMPORT audit EventBus 已发: topic={} jobId={}", KafkaTopics.AUDIT, jobId);
         } catch (Exception e) {
-            log.warn("KB_IMPORT audit Kafka 发送失败（不阻断业务）: jobId={} err={}", jobId, e.getMessage());
+            log.warn("KB_IMPORT audit EventBus 发送失败（不阻断业务）: jobId={} err={}", jobId, e.getMessage());
         }
     }
 

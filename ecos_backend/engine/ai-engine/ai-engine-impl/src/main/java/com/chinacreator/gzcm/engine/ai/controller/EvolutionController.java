@@ -32,7 +32,7 @@ public class EvolutionController {
             return ApiResponse.success(Map.of("missionId", missionId, "status", "STARTED"));
         } catch (Exception e) {
             log.error("Evolution trigger failed", e);
-            return ApiResponse.internalError("Evolution trigger failed: " + e.getMessage());
+            return ApiResponse.internalError("Evolution trigger failed");
         }
     }
 
@@ -43,7 +43,7 @@ public class EvolutionController {
             return ApiResponse.success(logEntries);
         } catch (Exception e) {
             log.error("Get evolution log failed: missionId={}", missionId, e);
-            return ApiResponse.internalError("Get evolution log failed: " + e.getMessage());
+            return ApiResponse.internalError("Get evolution log failed");
         }
     }
 }

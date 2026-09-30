@@ -16,10 +16,11 @@ import lombok.Data;
  *       {@link #securityLoaded} 通过 {@code DqSecurityService} Bean 是否注入成功判定
  *       （能注入即说明 sec-engine 的 mask/audit 方法可用）。</li>
  *   <li><b>人工验证</b>：{@link #filtersPresent}（三滤波器生效，等价于访问 /api/v1/dq/**
- *       非 403/404）、{@link #rewriteKeep}（VersionPrefixRewriteFilter
- *       /api/v1/dq 走 KEEP）、{@link #ymlWhitelist}（application.yml
- *       auth.whitelist.paths 含 /api/v1/dq/**）——这三项已在 PMO-48-A T2 静态确认，
- *       本端点检测靠「当前请求已能到达本端点」推断，details 详见 issues 字段。</li>
+ *       未被拒）、{@link #rewriteKeep}（VersionPrefixRewriteFilter
+ *       /api/v1/dq 走 KEEP）、{@link #ymlWhitelist}（PMO-74 H9-T5c 更正：yml
+ *       {@code auth.whitelist.paths} 键已删除，此项恒为 false，不再是「待人工确认」）。
+ *       原注释所称「三项已在 PMO-48-A T2 静态确认」已失效：H9-T1 把 permitAll 收敛为 8 条、
+ *       H9-T2 移出 dq 豁免 ⇒ dq 现为需认证 + L1 准入，而非匿名白名单。</li>
  * </ul>
  * 任何探测异常都不抛出，封装进 {@link #issues}，HTTP 永远 200（对齐项目 ApiResponse 约定）。
  *
@@ -38,16 +39,19 @@ public class SelfCheckResult {
     /** 缺失的表名列表（齐备时为空） */
     private List<String> missingTables;
 
-    /** 三滤波器（VersionPrefixRewriteFilter + SecurityConfig + ClearanceInterceptor + yml）是否生效。
-     * 本 Phase 简化实现：以「当前 POST /api/v1/dq/health/selfcheck 能进入 Controller」间接证明 filter 链放行。 */
+    /** 三滤波器（VersionPrefixRewriteFilter + SecurityConfig + ClearanceInterceptor）是否生效。
+     * 本 Phase 简化实现：以「当前 POST /api/v1/dq/health/selfcheck 能进入 Controller」间接证明。
+     * PMO-74 H9-T5c 语义更正：dq 已移出匿名面，故该间接证明成立时同时意味着调用方带了有效
+     * Token 且过 L1 准入校验，不再等价于「白名单放行」。 */
     private boolean filtersPresent;
 
     /** VersionPrefixRewriteFilter 中 /api/v1/dq 是否走 KEEP（即无 REMOVE 改写条目）。
-     * 本 Phase 需人工确认，issues 会标注此项需手动验证 T2 已加。 */
+     * 实测：正向 V1_REWRITE_MAP 10 条无 dq，仅反向 {@code /api/dq/ → /api/v1/dq/} 一条。 */
     private boolean rewriteKeep;
 
-    /** application.yml 的 auth.whitelist.paths 是否含 {@code /api/v1/dq/**}。
-     * 本 Phase 需人工确认，issues 会标注此项需手动验证 T2 已加。 */
+    /** 历史字段名保留（出参契约不可改）：原意是「application.yml 的 auth.whitelist.paths
+     * 是否含 {@code /api/v1/dq/**}」。PMO-74 H9-T5/T5b 已删除该 yml 键且全仓无存活 Java 消费方
+     * ⇒ 本项<b>恒为 false</b>，{@code DqSelfCheckController} 显式置 false 并在 issues 说明。 */
     private boolean ymlWhitelist;
 
     /** DqSecurityService Bean 是否构造成功（mask + audit 能力可用） */

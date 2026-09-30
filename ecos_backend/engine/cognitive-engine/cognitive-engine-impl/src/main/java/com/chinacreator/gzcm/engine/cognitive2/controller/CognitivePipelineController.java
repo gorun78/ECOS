@@ -92,7 +92,7 @@ public class CognitivePipelineController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to create pipeline", e);
-            return ApiResponse.internalError("Failed to create pipeline: " + e.getMessage());
+            return ApiResponse.internalError("Failed to create pipeline");
         }
     }
 
@@ -133,7 +133,7 @@ public class CognitivePipelineController {
             return ApiResponse.success(map);
         } catch (Exception e) {
             log.error("Failed to get pipeline: {}", id, e);
-            return ApiResponse.internalError("Failed to get pipeline: " + e.getMessage());
+            return ApiResponse.internalError("Failed to get pipeline");
         }
     }
 
@@ -156,7 +156,7 @@ public class CognitivePipelineController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to execute pipeline", e);
-            return ApiResponse.internalError("Failed to execute: " + e.getMessage());
+            return ApiResponse.internalError("Failed to execute");
         }
     }
 

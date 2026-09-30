@@ -102,18 +102,14 @@ public class KnowledgeExtractionService {
 
     @PostConstruct
     public void init() {
-        ensureColumns();
-        try { Files.createDirectories(Paths.get(UPLOAD_DIR)); } catch (IOException ignored) {}
+        // H8-T1: extraction_drafts 补列（extracted_links_json / rejected_reason）ALTER
+        // 收编至 db/migration（V162），运行时不再内嵌 DDL。
+        try {
+            Files.createDirectories(Paths.get(UPLOAD_DIR));
+        } catch (IOException e) {
+            log.warn("上传目录创建失败，后续上传将不可用: dir={} reason={}", UPLOAD_DIR, e.getMessage());
+        }
         log.info("KnowledgeExtractionService initialized");
-    }
-
-    // ── DDL 补列 (只增不删) ──────────────────────────
-
-    private void ensureColumns() {
-        // extracted_links_json 列 (05 文档 §四: 3 类抽取)
-        jdbc.execute("ALTER TABLE extraction_drafts ADD COLUMN IF NOT EXISTS extracted_links_json TEXT");
-        // rejected_reason 列 (05 文档 §六: 拒绝原因)
-        jdbc.execute("ALTER TABLE extraction_drafts ADD COLUMN IF NOT EXISTS rejected_reason TEXT");
     }
 
     // ── 上传 ─────────────────────────────────────────
@@ -192,7 +188,13 @@ public class KnowledgeExtractionService {
                 if (retry > MAX_RETRY) {
                     handleError(id, "LLM抽取失败(已重试" + MAX_RETRY + "次): " + e.getMessage(), "EXTRACTING");
                 } else {
-                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("重试等待被中断，终止本轮抽取: id={} retry={}", id, retry);
+                        return;
+                    }
                 }
             }
         }

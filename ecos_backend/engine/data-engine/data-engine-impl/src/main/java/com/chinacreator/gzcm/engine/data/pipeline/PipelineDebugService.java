@@ -11,12 +11,20 @@ import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.CsvConnector;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import com.chinacreator.gzcm.runtime.access.connector.RestApiConnector;
+import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
+import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
+import com.chinacreator.gzcm.runtime.core.task.parser.ITaskParser;
+import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.PrintWriter;
@@ -72,6 +80,8 @@ public class PipelineDebugService {
     private static final int MAX_NODE_LOGS = 500;
     /** execution 日志保留时长（毫秒） */
     private static final long EXEC_LOG_TTL_MS = 60 * 60 * 1000L;
+    /** runtime-task 会话清理任务类型。 */
+    private static final String TASK_TYPE_SESSION_CLEANUP = "PIPELINE_DEBUG_SESSION_CLEANUP";
 
     private final PipelineRepository repository;
     private final ConnectorFactory connectorFactory;
@@ -80,6 +90,8 @@ public class PipelineDebugService {
     private final UdfService udfService;
     /** 主执行器：SOURCE_MINIO / SINK_MINIO 节点复用其近源层读写逻辑（避免两处实现漂移） */
     private final PipelineExecutionService pipelineExecutionService;
+    private final ITaskManagementService taskManagementService;
+    private final TaskSchedulerService taskSchedulerService;
 
     /** 全部调试会话（内存态，惰性清理） */
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
@@ -98,13 +110,29 @@ public class PipelineDebugService {
                                 JdbcTemplate jdbc,
                                 DataSourceService dataSourceService,
                                 UdfService udfService,
-                                PipelineExecutionService pipelineExecutionService) {
+                                PipelineExecutionService pipelineExecutionService,
+                                ITaskManagementService taskManagementService,
+                                TaskSchedulerService taskSchedulerService) {
         this.repository = repository;
         this.connectorFactory = connectorFactory;
         this.jdbc = jdbc;
         this.dataSourceService = dataSourceService;
         this.udfService = udfService;
         this.pipelineExecutionService = pipelineExecutionService;
+        this.taskManagementService = taskManagementService;
+        this.taskSchedulerService = taskSchedulerService;
+    }
+
+    @PostConstruct
+    public void registerSessionCleanup() {
+        taskManagementService.registerParser(TASK_TYPE_SESSION_CLEANUP, new SessionCleanupParser());
+        taskManagementService.registerExecutor(TASK_TYPE_SESSION_CLEANUP, new SessionCleanupExecutor());
+        TaskDescription description = new TaskDescription();
+        description.setTaskName("pipeline-debug-session-cleanup");
+        description.setTaskType(TASK_TYPE_SESSION_CLEANUP);
+        description.setDescription("Pipeline 调试会话 TTL 清理，每 60s 扫过期会话与执行日志");
+        description.setParameters(new java.util.HashMap<>());
+        taskSchedulerService.schedulePeriodicTask(description, 60_000L, 60_000L);
     }
 
     // ==================== 会话创建 ====================
@@ -908,9 +936,8 @@ public class PipelineDebugService {
         return out;
     }
 
-    // ==================== 会话过期清理（@Scheduled，60s 一次） ====================
+    // ==================== 会话过期清理（runtime-task 周期任务，60s 一次） ====================
 
-    @Scheduled(fixedDelay = 60_000L)
     public void cleanupSessions() {
         long now = System.currentTimeMillis();
         for (Map.Entry<String, Session> e : sessions.entrySet()) {
@@ -1247,5 +1274,72 @@ public class PipelineDebugService {
         }
         vo.setHitRecords(hitVos);
         return vo;
+    }
+
+    private final class SessionCleanupParser implements ITaskParser {
+        @Override
+        public TaskExecutionPlan parse(TaskDescription taskDescription) throws TaskParseException {
+            validate(taskDescription);
+            TaskExecutionPlan plan = new TaskExecutionPlan();
+            plan.setTaskId(taskDescription.getTaskId());
+            TaskExecutionPlan.ExecutionStep step = new TaskExecutionPlan.ExecutionStep();
+            step.setStepId("step-1");
+            step.setStepName("Pipeline debug 会话 TTL 清理");
+            step.setStepType(TASK_TYPE_SESSION_CLEANUP);
+            step.setExecutor(TASK_TYPE_SESSION_CLEANUP);
+            step.setConfig(taskDescription.getParameters() == null
+                    ? new java.util.HashMap<>() : new java.util.HashMap<>(taskDescription.getParameters()));
+            List<TaskExecutionPlan.ExecutionStep> steps = new ArrayList<>();
+            steps.add(step);
+            plan.setSteps(steps);
+            return plan;
+        }
+
+        @Override
+        public boolean supports(String taskType) {
+            return TASK_TYPE_SESSION_CLEANUP.equalsIgnoreCase(taskType);
+        }
+
+        @Override
+        public void validate(TaskDescription taskDescription) throws TaskParseException {
+            if (taskDescription == null
+                    || taskDescription.getTaskId() == null
+                    || taskDescription.getTaskId().isEmpty()) {
+                throw new TaskParseException("pipeline debug session cleanup task id is required");
+            }
+            if (!supports(taskDescription.getTaskType())) {
+                throw new TaskParseException("unsupported pipeline debug task type: "
+                        + taskDescription.getTaskType());
+            }
+        }
+    }
+
+    private final class SessionCleanupExecutor implements ITaskExecutor {
+        @Override
+        public String execute(TaskExecutionPlan executionPlan, ITaskStatusCallback statusCallback)
+                throws TaskExecutionException {
+            try {
+                cleanupSessions();
+                return String.format("{\"taskType\":\"%s\",\"completedAt\":\"%s\"}",
+                        TASK_TYPE_SESSION_CLEANUP, java.time.Instant.now().toString());
+            } catch (Exception ex) {
+                log.error("Pipeline debug 会话清理 runtime-task 执行失败: {}", ex.getMessage(), ex);
+                throw new TaskExecutionException("pipeline debug session cleanup failed", ex);
+            }
+        }
+
+        @Override
+        public void cancel(String taskId) { }
+
+        @Override
+        public void pause(String taskId) { }
+
+        @Override
+        public void resume(String taskId) { }
+
+        @Override
+        public TaskStatus getStatus(String taskId) {
+            return null;
+        }
     }
 }

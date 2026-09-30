@@ -42,7 +42,7 @@ public class AgentProfileController {
             return ApiResponse.success(list);
         } catch (Exception e) {
             log.error("查询所有 Profile 失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -59,7 +59,7 @@ public class AgentProfileController {
             return ApiResponse.success(list);
         } catch (Exception e) {
             log.error("按子系统查询 Profile 失败: subsystem={}", subsystem, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -79,7 +79,7 @@ public class AgentProfileController {
             return ApiResponse.success(config);
         } catch (Exception e) {
             log.error("查询 Profile 详情失败: id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -99,7 +99,7 @@ public class AgentProfileController {
             return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建 Profile 失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -120,7 +120,7 @@ public class AgentProfileController {
             return ApiResponse.success(updated);
         } catch (Exception e) {
             log.error("更新 Profile 失败: id={}", id, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -139,7 +139,7 @@ public class AgentProfileController {
             return ApiResponse.success(m);
         } catch (Exception e) {
             log.error("删除 Profile 失败: id={}", id, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -161,7 +161,7 @@ public class AgentProfileController {
             return ApiResponse.success(m);
         } catch (Exception e) {
             log.error("切换 Profile 启用状态失败: id={}", id, e);
-            return ApiResponse.internalError("操作失败: " + e.getMessage());
+            return ApiResponse.internalError("操作失败");
         }
     }
 
@@ -181,7 +181,7 @@ public class AgentProfileController {
             return ApiResponse.success(m);
         } catch (Exception e) {
             log.error("测试连接失败: id={}", id, e);
-            return ApiResponse.internalError("连接测试失败: " + e.getMessage());
+            return ApiResponse.internalError("连接测试失败");
         }
     }
 }

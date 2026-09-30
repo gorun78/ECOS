@@ -85,7 +85,7 @@ public class NavTaxonController {
             return ApiResponse.success(navService.listCategories(domain, parentId, search));
         } catch (Exception e) {
             log.error("nav 目录列表失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -102,7 +102,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 创建目录失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -123,7 +123,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 更新目录失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -144,7 +144,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 删除目录失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -175,7 +175,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 批量移动失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("移动失败: " + e.getMessage());
+            return ApiResponse.internalError("移动失败");
         }
     }
 
@@ -192,7 +192,7 @@ public class NavTaxonController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("nav 子树统计失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("统计失败: " + e.getMessage());
+            return ApiResponse.internalError("统计失败");
         }
     }
 
@@ -206,7 +206,7 @@ public class NavTaxonController {
             return ApiResponse.success(navService.listTags(domain));
         } catch (Exception e) {
             log.error("nav 标签列表失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -225,7 +225,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 创建标签失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -243,7 +243,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 删除标签失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -267,7 +267,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 设置文章目录失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("设置失败: " + e.getMessage());
+            return ApiResponse.internalError("设置失败");
         }
     }
 
@@ -289,7 +289,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 设置文章标签失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("设置失败: " + e.getMessage());
+            return ApiResponse.internalError("设置失败");
         }
     }
 
@@ -311,7 +311,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 追加文章目录失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("追加失败: " + e.getMessage());
+            return ApiResponse.internalError("追加失败");
         }
     }
 
@@ -333,7 +333,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 追加文章标签失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("追加失败: " + e.getMessage());
+            return ApiResponse.internalError("追加失败");
         }
     }
 
@@ -353,7 +353,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 删文章目录失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -377,7 +377,7 @@ public class NavTaxonController {
             return ApiResponse.forbidden(e.getMessage());
         } catch (Exception e) {
             log.error("nav 撤销失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("撤销失败: " + e.getMessage());
+            return ApiResponse.internalError("撤销失败");
         }
     }
 
@@ -423,7 +423,7 @@ public class NavTaxonController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("nav 资产列表失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -438,7 +438,7 @@ public class NavTaxonController {
             return ApiResponse.success(navService.listDomains());
         } catch (Exception e) {
             log.error("nav domains 列表失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -484,7 +484,7 @@ public class NavTaxonController {
             // 这里同样走合规兜底，不抛
             NavRecommendVO vo = new NavRecommendVO();
             vo.setTags(List.of());
-            vo.setReason("llm-gateway 不可用 或 服务异常: " + e.getMessage());
+            vo.setReason("llm-gateway 不可用 或 服务异常");
             vo.setGeneratedAt(java.time.Instant.now());
             return ApiResponse.success(vo);
         }

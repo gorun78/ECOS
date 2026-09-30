@@ -94,7 +94,9 @@ export function detectEdition(): EcosEdition {
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
   const raw = env?.VITE_ECOS_VERSION;
   const v = (raw || 'standard').toLowerCase();
-  if (v === 'enterprise' || v === 'flagship' || v === 'standard') return v;
+  if (v === 'enterprise' || v === 'standard') return v;
+  // H5 档位更名：canonical 名为 ultimate，flagship 是历史别名，两者等价
+  if (v === 'ultimate' || v === 'flagship') return 'flagship';
   return 'standard';
 }
 

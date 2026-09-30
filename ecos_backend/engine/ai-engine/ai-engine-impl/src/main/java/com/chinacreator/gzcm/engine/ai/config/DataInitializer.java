@@ -119,17 +119,12 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        ensureTables();
+        // H8-T1: ecos_cron_job / ecos_cron_job_execution / ecos_skill 建表 DDL 收编至
+        // db/migration（V162），运行时不再内嵌 DDL；仅保留种子数据初始化。
         seedRoles();
         seedCronJobs();
         seedSkills();
         seedBuiltinAgents();
-    }
-
-    private void ensureTables() {
-        cronJobRepository.ensureTable();
-        executionRepository.ensureTable();
-        skillRepository.ensureTable();
     }
 
     private void seedCronJobs() {

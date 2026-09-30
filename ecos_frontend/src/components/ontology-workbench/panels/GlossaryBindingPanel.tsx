@@ -112,9 +112,9 @@ export default function GlossaryBindingPanel({
           setTerms(list);
         }
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err?.message || "");
+          setError((err as { message?: string } | undefined)?.message || "");
         }
       })
       .finally(() => {
@@ -151,11 +151,11 @@ export default function GlossaryBindingPanel({
           await bindTermToEntity(Number(termId), entityId);
         }
         await refreshTerms();
-      } catch (err: any) {
+      } catch (err: unknown) {
         setOpError(
           t("ow.glossaryBinding.saveFailed").replace(
             "{error}",
-            String(err?.message || err),
+            String((err as { message?: string } | undefined)?.message || err),
           ),
         );
       }
@@ -171,11 +171,11 @@ export default function GlossaryBindingPanel({
       try {
         await bindTermToEntity(termId, null);
         await refreshTerms();
-      } catch (err: any) {
+      } catch (err: unknown) {
         setOpError(
           t("ow.glossaryBinding.saveFailed").replace(
             "{error}",
-            String(err?.message || err),
+            String((err as { message?: string } | undefined)?.message || err),
           ),
         );
       } finally {

@@ -8,6 +8,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import type { DataConnection, ConnType } from './types';
+import { getErrorMessage } from './helpers';
 import { CONNECTION_TYPES, STANDARD_DISABLED_TYPES } from './types';
 import { detectEdition, type EcosEdition } from './DataEngineConfigPanelTypes';
 import {
@@ -252,8 +253,8 @@ export function AddConnectionModal({
       } else {
         setTestResult({ ok: false, msg: result?.message || t('dw.conn.testConnFailed') });
       }
-    } catch (e: any) {
-      setTestResult({ ok: false, msg: e.message || t('dw.conn.testConnFailed') });
+    } catch (e) {
+      setTestResult({ ok: false, msg: getErrorMessage(e) || t('dw.conn.testConnFailed') });
     } finally {
       setTesting(false);
     }

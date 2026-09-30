@@ -118,7 +118,9 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService#execTransformSqlCapture — SELECT 走 queryForList（不调 update）")
     void debugServiceTransformSqlSelectRoutesToQueryForList() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
+                mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
 
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =
@@ -156,7 +158,9 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService TRANSFORM_UDF — 执行器 switch 已补 TRANSFORM_UDF 分支")
     void debugServiceUdfTransformRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
+                mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         // mock UDF 数据
         when(udfService.getById("udf-1")).thenReturn(Map.of(
                 "name", "doubling_udf",
@@ -179,10 +183,11 @@ class PipelineTransformSqlRoutingTest {
         when(repository.insertExecution(org.mockito.ArgumentMatchers.any(PipelineExecution.class)))
                 .thenReturn(rec);
         dbg.step(created.getSessionId());
-        // UDF python 沙箱执行成功 → 会话状态 COMPLETED（单节点执行完毕 auto-complete）
+        // advance(false) 每步只执行 1 节点，队列耗尽的终态判定在下一入口，故需 cont() 收尾
+        dbg.cont(created.getSessionId());
         PipelineDebugSessionVO after = dbg.getSession(created.getSessionId());
         assertEquals("completed", after.getState(),
-                "TRANSFORM_UDF 单节点执行后应 completed，实际 state=" + after.getState()
+                "TRANSFORM_UDF step+cont 后应 completed，实际 state=" + after.getState()
                         + " / error=" + after.getError());
         // 验证 UdfService 被调用了
         verify(udfService).getById("udf-1");
@@ -194,7 +199,9 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService JOIN — 执行器 switch 已补 JOIN 分支")
     void debugServiceJoinRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
+                mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =
                 new PipelineDebugStartDTO.PipelineDebugDefinitionDTO();
@@ -218,9 +225,10 @@ class PipelineTransformSqlRoutingTest {
         when(repository.insertExecution(org.mockito.ArgumentMatchers.any(PipelineExecution.class)))
                 .thenReturn(rec);
         dbg.step(created.getSessionId());
+        dbg.cont(created.getSessionId());
         PipelineDebugSessionVO after = dbg.getSession(created.getSessionId());
         assertEquals("completed", after.getState(),
-                "JOIN 单节点执行后应 completed，实际 state=" + after.getState()
+                "JOIN step+cont 后应 completed，实际 state=" + after.getState()
                         + " / error=" + after.getError());
     }
 
@@ -230,7 +238,9 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService SINK — 执行器 switch 已补 SINK 分支")
     void debugServiceSinkRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
+                mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         // mock 数据源
         DataSourceEntity ds = new DataSourceEntity();
         ds.setDatasourceId("ds-1");
@@ -267,9 +277,10 @@ class PipelineTransformSqlRoutingTest {
         when(repository.insertExecution(org.mockito.ArgumentMatchers.any(PipelineExecution.class)))
                 .thenReturn(rec);
         dbg.step(created.getSessionId());
+        dbg.cont(created.getSessionId());
         PipelineDebugSessionVO after = dbg.getSession(created.getSessionId());
         assertEquals("completed", after.getState(),
-                "SINK 单节点执行后应 completed，实际 state=" + after.getState()
+                "SINK step+cont 后应 completed，实际 state=" + after.getState()
                         + " / error=" + after.getError());
         // 验证 JdbcConnector 被调用了（INSERT 走 executeBatch）
         verify(mockJdbcConn, org.mockito.Mockito.atLeast(1)).executeBatch(
@@ -284,7 +295,9 @@ class PipelineTransformSqlRoutingTest {
         // 3 节点 DAG: s → t → e
         // 输入顺序故意打乱: e(依赖t), t(依赖s), s(无依赖)
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service);
+                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
+                mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         // 通过 createSession 触发 topologicalSort
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
         PipelineDebugStartDTO.PipelineDebugDefinitionDTO def =

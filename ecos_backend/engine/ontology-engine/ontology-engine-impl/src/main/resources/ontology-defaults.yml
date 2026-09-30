@@ -4,7 +4,7 @@ ontology:
     neo4j:
       uri: bolt://localhost:7687
       user: neo4j
-      password: neo4j123
+      password: ${NEO4J_PASSWORD:}
   cache:
     ttl_seconds: 300
   version:

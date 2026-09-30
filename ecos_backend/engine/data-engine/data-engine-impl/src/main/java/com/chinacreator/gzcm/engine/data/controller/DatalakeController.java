@@ -159,7 +159,7 @@ public class DatalakeController {
         } catch (Exception e) {
             log.error("非结构化上传失败: source={}, docId={}, err={}",
                     req.getSource(), req.getDocId(), e.getMessage(), e);
-            return ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR, "上传失败: " + e.getMessage());
+            return ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR, "上传失败");
         }
     }
 
@@ -219,7 +219,7 @@ public class DatalakeController {
             return ApiResponse.success(files);
         } catch (IOException e) {
             log.error("列出文件夹数据源失败：datasourceId={}, err={}", datasourceId, e.getMessage(), e);
-            return ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR, "读取目录失败: " + e.getMessage());
+            return ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR, "读取目录失败");
         }
     }
 
@@ -344,8 +344,8 @@ public class DatalakeController {
             log.warn("近源层登记失败：docId={}, name={}, err={}", docId, fileName, e.getMessage());
             return FolderCollectResult.CollectItem.of(fileName, "FAILED", e.getMessage());
         } catch (Exception e) {
-            log.warn("文件采集失败：docId={}, name={}, err={}", docId, fileName, e.getMessage());
-            return FolderCollectResult.CollectItem.of(fileName, "FAILED", "采集失败: " + e.getMessage());
+            log.warn("文件采集失败：docId={}, name={}", docId, fileName, e);
+            return FolderCollectResult.CollectItem.of(fileName, "FAILED", "采集失败");
         }
     }
 
@@ -372,7 +372,8 @@ public class DatalakeController {
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
-            throw new ValidationException("连接配置 JSON 解析失败: " + e.getMessage());
+            log.warn("连接配置 JSON 解析失败", e);
+            throw new ValidationException("连接配置 JSON 非法，无法定位文件目录");
         }
     }
 

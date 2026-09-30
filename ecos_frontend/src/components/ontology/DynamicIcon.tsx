@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface DynamicIconProps {
   name: string;
@@ -16,6 +17,6 @@ interface DynamicIconProps {
 }
 
 export default function DynamicIcon({ name, size = 14, className }: DynamicIconProps) {
-  const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
+  const IconComponent = (LucideIcons[name as keyof typeof LucideIcons] || LucideIcons.HelpCircle) as LucideIcon;
   return <IconComponent size={size} className={className} />;
 }

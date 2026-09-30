@@ -45,7 +45,7 @@ public class ProvenanceController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to query provenance", e);
-            return ApiResponse.internalError("Failed to query provenance: " + e.getMessage());
+            return ApiResponse.internalError("Failed to query provenance");
         }
     }
 }

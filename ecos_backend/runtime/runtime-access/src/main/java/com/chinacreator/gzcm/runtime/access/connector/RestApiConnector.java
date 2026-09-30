@@ -385,7 +385,9 @@ public class RestApiConnector implements Connector {
         try {
             return mapper.readValue(connectionConfig, Map.class);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid REST connection config JSON: " + connectionConfig, e);
+            // H10-T4e：原实现把整段 connectionConfig 拼进异常消息，REST 配置常含 token/apiKey；只保留长度与失败原因
+            throw new IllegalArgumentException("Invalid REST connection config JSON ("
+                    + (connectionConfig == null ? 0 : connectionConfig.length()) + " chars): " + e.getMessage(), e);
         }
     }
 }

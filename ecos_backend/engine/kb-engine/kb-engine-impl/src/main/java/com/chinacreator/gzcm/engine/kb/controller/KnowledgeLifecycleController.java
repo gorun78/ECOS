@@ -54,7 +54,7 @@ public class KnowledgeLifecycleController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("生命周期资产查询失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -72,7 +72,7 @@ public class KnowledgeLifecycleController {
             return ApiResponse.success(lifecycleService.listAudit(pageNum, pageSize));
         } catch (Exception e) {
             log.error("生命周期审计查询失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 }

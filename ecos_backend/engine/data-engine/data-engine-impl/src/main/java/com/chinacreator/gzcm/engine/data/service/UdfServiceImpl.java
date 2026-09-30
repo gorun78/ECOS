@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,35 +26,7 @@ public class UdfServiceImpl implements UdfService {
         this.jdbc = jdbc;
     }
 
-    @PostConstruct
-    public void init() {
-        ensureSchema();
-    }
-
-    private void ensureSchema() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_pipeline_udf (
-                    id VARCHAR(36) PRIMARY KEY,
-                    name VARCHAR(200) NOT NULL UNIQUE,
-                    category VARCHAR(50),
-                    language VARCHAR(20) DEFAULT 'python',
-                    signature TEXT,
-                    source_code TEXT NOT NULL,
-                    compiled_path VARCHAR(500),
-                    version INTEGER DEFAULT 1,
-                    author VARCHAR(100),
-                    is_shared BOOLEAN DEFAULT false,
-                    description TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            log.info("ecos_pipeline_udf 表已就绪");
-        } catch (Exception e) {
-            log.warn("ecos_pipeline_udf 表初始化异常: {}", e.getMessage());
-        }
-    }
+    // H8-T1: ecos_pipeline_udf 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL
 
     @Override
     public Map<String, Object> register(Map<String, Object> body) {

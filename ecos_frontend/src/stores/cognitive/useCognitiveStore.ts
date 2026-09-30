@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import {
+  fetchWorldStateJson,
+  fetchScenariosJson,
+  fetchCausalGraphJson,
+  postSimulationJson,
+  postStrategyRecommendJson,
+} from '../../services/worldModelGraphApi';
 
 export interface WorldState {
   id: string;
@@ -73,9 +80,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       fetchWorldState: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/ecos/world-model-graph/state');
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchWorldStateJson();
           set({ worldState: json.data || json, loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to fetch world state';
@@ -86,9 +91,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       fetchScenarios: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/ecos/world-model-graph/scenarios');
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchScenariosJson();
           set({ scenarios: json.data || json || [], loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to fetch scenarios';
@@ -101,13 +104,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       runSimulation: async (scenario) => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/ecos/world-model-graph/scenarios', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(scenario),
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await postSimulationJson(scenario);
           set({ simulationResult: json.data || json, loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Simulation failed';
@@ -118,11 +115,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       getStrategyRecommendation: async (goal) => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch(`/api/v1/ecos/world-model-graph/strategy/recommend?goal=${encodeURIComponent(goal)}`, {
-            method: 'POST',
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await postStrategyRecommendJson(goal);
           set({ strategyRecommendation: json.data || json, loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Strategy recommendation failed';
@@ -133,9 +126,7 @@ export const useCognitiveStore = create<CognitiveState>()(
       fetchCausalGraph: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/ecos/world-model-graph/causal-graph');
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchCausalGraphJson();
           set({ causalGraph: json.data || json || [], loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to fetch causal graph';

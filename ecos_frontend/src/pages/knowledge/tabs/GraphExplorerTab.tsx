@@ -5,51 +5,72 @@
  * GraphExplorerTab — 知识图谱探索器
  * 图谱可视化交互、节点搜索、邻居展开、路径分析
  * 复用 GraphCanvas 组件做图谱可视化渲染
+ *
+ * 组件拆分（前端开发规范 §十 收口）：左工具栏 / 右详情面板 / 新建弹窗
+ *   已拆至 ./graph-explorer/ 子目录，本文件仅保留状态与业务处理器。
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  Search, Share2, Network, Plus, ArrowRight, Loader2,
-  X, ExternalLink, GitBranch, Info, Hash, Tag,
-  Minimize2, CornerDownRight
+  ArrowRight, Loader2, Network, Plus,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
 import { fetchNavCategories, fetchNavDomains, type NavCategoryVO } from '../../../services/knowledgeNavApi';
 import GraphCanvas from '../../../components/GraphCanvas';
-
-// ── Graph Node / Edge types (compatible with GraphCanvas) ──
-interface GraphNode {
-  id: string;
-  label: string;
-  type: string;
-  properties?: Record<string, any>;
-  description?: string;
-}
-
-interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  relationship?: string;
-  weight?: number;
-}
+import type { GraphEdge, GraphNode } from './graph-explorer/types';
+import { LeftToolbar } from './graph-explorer/LeftToolbar';
+import { DetailPanel } from './graph-explorer/DetailPanel';
+import { CreateModal } from './graph-explorer/CreateModal';
 
 interface GraphExplorerTabProps {
   // Independent tab, no external props
 }
 
+/**
+ * PMO-74 H6-T3 M3-a — 本地响应类型（仅描述本文件既有消费形状，不改运行时；
+ * knowledgeApi 返回 unknown/占位类型，共享化留待后续单元）。
+ */
+interface GraphPayload {
+  nodes?: unknown[];
+  edges?: unknown[];
+  links?: unknown[];
+}
+
+interface RawSearchNode {
+  id?: string;
+  nodeId?: string;
+  label?: string;
+  name?: string;
+  type?: string;
+  nodeType?: string;
+  properties?: Record<string, unknown>;
+  description?: string;
+}
+
+interface GraphSearchResponse {
+  results?: RawSearchNode[];
+  nodes?: RawSearchNode[];
+}
+
+/** fetchNode 响应：既可能是 { node, edges } 包装，也可能直接就是节点本身（与既有 `data?.node || data` 消费一致） */
+interface NodeDetailResponse extends GraphNode {
+  node?: GraphNode;
+  edges?: GraphEdge[];
+  links?: GraphEdge[];
+}
+
+interface PathResponse {
+  path?: string[];
+  nodeIds?: string[];
+  pathEdges?: string[];
+  edgeIds?: string[];
+}
+
 export default function GraphExplorerTab() {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
-
-  const DOMAIN_OPTIONS = [
-    { value: '', label: t('knowledge.graph.all') },
-    { value: 'ontology', label: t('knowledge.graph.ontologyDomain') },
-    { value: 'data', label: t('knowledge.graph.dataDomain') },
-    { value: 'business', label: t('knowledge.graph.businessDomain') },
-  ];
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -112,9 +133,9 @@ export default function GraphExplorerTab() {
     setIsLoading(true);
     try {
       // PMO-C T3 — 后端下沉：categoryIds 非空时透传，后端按 kb_nav_article_rel 白名单过滤
-      const data = await knowledgeApi.fetchGraph(domain, selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined) as any;
-      const rawNodes: GraphNode[] = data?.nodes || [];
-      const rawEdges: GraphEdge[] = data?.edges || data?.links || [];
+      const data = await knowledgeApi.fetchGraph(domain, selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined) as GraphPayload | null;
+      const rawNodes = (data?.nodes || []) as GraphNode[];
+      const rawEdges = (data?.edges || data?.links || []) as GraphEdge[];
       // P3 优化点：后端已按 nav 白名单过滤 nodes/edges；前端保留二次兜底（兼容旧后端无 categoryIds 参数）
       if (selectedCategoryIds.length > 0) {
         const idSet = new Set(selectedCategoryIds);
@@ -133,7 +154,7 @@ export default function GraphExplorerTab() {
       }
       setPathNodes(new Set());
       setPathEdges(new Set());
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('knowledge.graph.loadGraphError') + e.message);
     } finally {
       setIsLoading(false);
@@ -145,8 +166,8 @@ export default function GraphExplorerTab() {
     setIsLoading(true);
     setShowSearchResults(true);
     try {
-      const data = await knowledgeApi.graphSearch(searchQuery) as any;
-      const results = (data?.results || data?.nodes || []).map((r: any) => ({
+      const data = await knowledgeApi.graphSearch(searchQuery) as GraphSearchResponse | null;
+      const results = (data?.results || data?.nodes || []).map(r => ({
         id: r.id || r.nodeId,
         label: r.label || r.name || r.id,
         type: r.type || r.nodeType || 'default',
@@ -155,7 +176,7 @@ export default function GraphExplorerTab() {
       }));
       setSearchResults(results);
       if (results.length === 0) showToast('info', t('knowledge.graph.noMatch'));
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('knowledge.graph.searchError') + e.message);
     } finally {
       setIsLoading(false);
@@ -186,9 +207,9 @@ export default function GraphExplorerTab() {
   const handleExpandNeighbors = async (nodeId: string) => {
     setIsLoading(true);
     try {
-      const data = await knowledgeApi.fetchNeighbors(nodeId, neighborDegree) as any;
-      const newNodes: GraphNode[] = data?.nodes || [];
-      const newEdges: GraphEdge[] = data?.edges || data?.links || [];
+      const data = await knowledgeApi.fetchNeighbors(nodeId, neighborDegree) as GraphPayload | null;
+      const newNodes = (data?.nodes || []) as GraphNode[];
+      const newEdges = (data?.edges || data?.links || []) as GraphEdge[];
       // Track expansion children for collapse
       const childIds = new Set(newNodes.map(n => n.id));
       expansionChildrenRef.current.set(nodeId, childIds);
@@ -196,7 +217,7 @@ export default function GraphExplorerTab() {
       setNodes(prev => { const existing = new Set(prev.map(n => n.id)); return [...prev, ...newNodes.filter((n: GraphNode) => !existing.has(n.id))]; });
       setEdges(prev => { const existing = new Set(prev.map(e => e.id)); return [...prev, ...newEdges.filter((e: GraphEdge) => !existing.has(e.id))]; });
       showToast('success', t('knowledge.graph.expandSuccess', { nodeId }));
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('knowledge.graph.expandError') + e.message);
     } finally {
       setIsLoading(false);
@@ -227,7 +248,7 @@ export default function GraphExplorerTab() {
     if (nodeId) {
       setShowDetailPanel(true);
       try {
-        const data = await knowledgeApi.fetchNode(nodeId) as any;
+        const data = await knowledgeApi.fetchNode(nodeId) as NodeDetailResponse | null;
         setNodeDetail(data?.node || data || null);
         setNodeEdges(data?.edges || data?.links || []);
       } catch {
@@ -244,13 +265,13 @@ export default function GraphExplorerTab() {
     if (!pathSource || !pathTarget) { showToast('error', t('knowledge.graph.pathRequired')); return; }
     setIsComputingPath(true);
     try {
-      const data = await knowledgeApi.findPath(pathSource, pathTarget) as any;
+      const data = await knowledgeApi.findPath(pathSource, pathTarget) as PathResponse | null;
       const pathNodeList: string[] = data?.path || data?.nodeIds || [];
       const pathEdgeList: string[] = data?.pathEdges || data?.edgeIds || [];
       setPathNodes(new Set(pathNodeList));
       setPathEdges(new Set(pathEdgeList));
       showToast('success', t('knowledge.graph.pathSuccess', { count: pathNodeList.length }));
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('knowledge.graph.pathError') + e.message);
     } finally {
       setIsComputingPath(false);
@@ -267,7 +288,7 @@ export default function GraphExplorerTab() {
       setShowCreateForm(null);
       setNewNodeForm({ label: '', nodeType: '', description: '', properties: '' });
       loadGraph();
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('knowledge.graph.nodeCreateError') + e.message);
     }
   };
@@ -280,7 +301,7 @@ export default function GraphExplorerTab() {
       setShowCreateForm(null);
       setNewEdgeForm({ sourceNodeId: '', targetNodeId: '', relationship: '', weight: '1' });
       loadGraph();
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('knowledge.graph.edgeCreateError') + e.message);
     }
   };
@@ -304,189 +325,40 @@ export default function GraphExplorerTab() {
 
   return (
     <div className={`flex flex-1 min-h-0 ${styles.appBg} rounded-xl border ${styles.cardBorder} overflow-hidden`}>
-      {/* Left Toolbar */}
-      <div className={`w-56 border-r ${styles.cardBorder} flex flex-col shrink-0 p-3 space-y-3 ${styles.appBg} z-10 relative`}>
-        {/* Search — full-text graph search */}
-        <div className="space-y-1.5 relative">
-          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.fullTextSearch')}</label>
-          <div className="flex gap-1.5">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(false); }}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
-              placeholder={t('knowledge.graph.searchPlaceholder')}
-              className={`flex-1 px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
-            />
-            <button
-              onClick={handleSearch}
-              className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer transition"
-            >
-              <Search size={13} />
-            </button>
-          </div>
-          {/* Search results dropdown */}
-          {showSearchResults && searchResults.length > 0 && (
-            <div className={`${styles.sidebarBg} border ${styles.sidebarBorder} rounded-lg shadow-xl max-h-48 overflow-y-auto`}>
-              {searchResults.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => handleSearchResultClick(r.id)}
-                  className={`w-full text-left px-2.5 py-1.5 text-[11px] ${styles.sidebarText} ${styles.sidebarHoverBg} border-b ${styles.cardBorder} last:border-0 flex items-center gap-2 transition cursor-pointer`}
-                >
-                  <CornerDownRight size={10} className="text-blue-400 shrink-0" />
-                  <span className="truncate">{r.label}</span>
-                  <span className={`text-[9px] ${styles.muted} shrink-0 ml-auto`}>{r.type}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Path finder — inline inputs */}
-        <div className="space-y-1.5">
-          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.pathFinder')}</label>
-          <div className="flex flex-wrap gap-1 items-center">
-            <input
-              type="text"
-              value={pathSource}
-              onChange={(e) => setPathSource(e.target.value)}
-              placeholder={t('knowledge.graph.pathSourcePlaceholder')}
-              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
-            />
-            <ArrowRight size={10} className={`${styles.muted} shrink-0`} />
-            <input
-              type="text"
-              value={pathTarget}
-              onChange={(e) => setPathTarget(e.target.value)}
-              placeholder={t('knowledge.graph.pathTargetPlaceholder')}
-              className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
-            />
-            <button
-              onClick={() => { if (pathSource && pathTarget) handleComputePath(); else showToast('error', t('knowledge.graph.pathRequired')); }}
-              disabled={isComputingPath}
-              className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
-            >
-              {isComputingPath ? <Loader2 size={10} className="animate-spin" /> : <GitBranch size={10} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Domain Filter */}
-        <div className="space-y-1.5">
-          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('knowledge.graph.domainFilter')}</label>
-          <select
-            value={domainFilter}
-            onChange={(e) => handleDomainChange(e.target.value)}
-            className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-blue-500 cursor-pointer`}
-          >
-            {DOMAIN_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* PMO-C T2 — nav domain 切换（kb_nav_category.domain，区别于上方 graph domainFilter） */}
-        <div className="space-y-1.5">
-          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
-            {t('knowledge.nav.domain_filter_label')}
-          </label>
-          <select
-            value={navDomain}
-            onChange={(e) => setNavDomain(e.target.value)}
-            className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-blue-500 cursor-pointer`}
-          >
-            {!navDomains.includes('default') && (
-              <option value="default">{t('knowledge.nav.domain_default')}</option>
-            )}
-            {navDomains.map(d => (
-              <option key={d} value={d}>{d === 'default' ? t('knowledge.nav.domain_default') : d}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* PMO-B T3 — 按业务域过滤（多 checkbox 单选可叠加） */}
-        <div className="space-y-1.5">
-          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
-            {t('knowledge.nav.nav_filter_pair')}
-            <span className="ml-1 normal-case font-mono text-emerald-600">
-              {selectedCategoryIds.length > 0 ? `(${selectedCategoryIds.length})` : ''}
-            </span>
-          </label>
-          {navCategories.length === 0 ? (
-            <p className={`text-[9px] ${styles.muted}`}>{t('knowledge.nav.tree_empty')}</p>
-          ) : (
-            <div className={`max-h-32 overflow-y-auto space-y-1 pr-1 border rounded-lg p-1.5 ${styles.sidebarBg}`}>
-              {navCategories.slice(0, 15).map(cat => (
-                <label
-                  key={cat.id}
-                  className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-blue-50 cursor-pointer text-[10px] ${styles.muted} transition`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedCategoryIds.includes(cat.id)}
-                    onChange={() => {
-                      toggleCategoryId(cat.id);
-                      // 选择变更立即重载（保持 domainFilter 联动）
-                      loadGraph(domainFilter || undefined);
-                    }}
-                    className="h-3 w-3 cursor-pointer"
-                  />
-                  <span className="truncate flex-1">{cat.name}</span>
-                  <span className={`text-[8px] ${styles.muted} shrink-0`}>({cat.articleCount})</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Load Full Graph */}
-        <button
-          onClick={handleLoadFullGraph}
-          disabled={isLoading}
-          className={`w-full px-3 py-2 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50`}
-        >
-          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Network size={12} />}
-          {t('knowledge.graph.loadFullGraph')}
-        </button>
-
-        {/* Neighbor Expand */}
-        <div className="space-y-1.5">
-          <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
-            {t('knowledge.graph.neighborDegree')}
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={3}
-            value={neighborDegree}
-            onChange={(e) => setNeighborDegree(parseInt(e.target.value))}
-            className="w-full accent-blue-500 cursor-pointer"
-          />
-          <div className={`flex justify-between text-[10px] ${styles.muted}`}>
-            <span>1</span>
-            <span className="font-bold text-blue-400">{neighborDegree}</span>
-            <span>3</span>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className={`mt-auto p-2.5 ${styles.sidebarBg} rounded-lg border ${styles.cardBorder} space-y-1.5`}>
-          <span className={`text-[9px] font-bold ${styles.muted} uppercase`}>{t('knowledge.graph.legend')}</span>
-          <div className={`space-y-1 text-[10px] ${styles.cardTextMuted}`}>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500" /> {t('knowledge.graph.dataDomain')}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t('knowledge.graph.ontologyDomain')}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500" /> {t('knowledge.graph.businessDomain')}
-            </div>
-          </div>
-        </div>
-      </div>
+      <LeftToolbar
+        styles={styles}
+        t={t}
+        searchQuery={searchQuery}
+        onSearchQueryChange={(v) => { setSearchQuery(v); setShowSearchResults(false); }}
+        onSearchSubmit={handleSearch}
+        onSearchInputFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
+        showSearchResults={showSearchResults}
+        searchResults={searchResults}
+        onSearchResultClick={handleSearchResultClick}
+        pathSource={pathSource}
+        pathTarget={pathTarget}
+        onPathSourceChange={setPathSource}
+        onPathTargetChange={setPathTarget}
+        onComputePath={handleComputePath}
+        onPathMissing={() => showToast('error', t('knowledge.graph.pathRequired'))}
+        isComputingPath={isComputingPath}
+        domainFilter={domainFilter}
+        onDomainChange={handleDomainChange}
+        navDomain={navDomain}
+        onNavDomainChange={setNavDomain}
+        navDomains={navDomains}
+        navCategories={navCategories}
+        selectedCategoryIds={selectedCategoryIds}
+        onCategoryToggle={(id) => {
+          toggleCategoryId(id);
+          // 选择变更立即重载（保持 domainFilter 联动）
+          loadGraph(domainFilter || undefined);
+        }}
+        onLoadFullGraph={handleLoadFullGraph}
+        isLoading={isLoading}
+        neighborDegree={neighborDegree}
+        onNeighborDegreeChange={(n) => setNeighborDegree(n)}
+      />
 
       {/* Middle Graph Canvas */}
       <div className="flex-1 min-h-0 relative">
@@ -544,266 +416,34 @@ export default function GraphExplorerTab() {
 
       {/* Right Detail Panel (slide-out) */}
       {showDetailPanel && (
-        <div className={`w-72 border-l ${styles.cardBorder} flex flex-col shrink-0 ${styles.appBg} overflow-y-auto`}>
-          <div className={`px-3 py-2.5 border-b ${styles.cardBorder} flex items-center justify-between`}>
-            <h3 className={`text-xs font-bold ${styles.sidebarText} flex items-center gap-1.5`}>
-              <Info size={12} className="text-blue-400" />
-              {t('knowledge.graph.nodeDetail')}
-            </h3>
-            <button
-              onClick={() => { setShowDetailPanel(false); setSelectedNodeId(null); }}
-              className={`p-1 ${styles.sidebarHoverBg} rounded ${styles.muted} hover:${styles.cardText} cursor-pointer transition`}
-            >
-              <X size={13} />
-            </button>
-          </div>
-
-          {detailDisplayNode ? (
-            <div className="p-3 space-y-3 text-[11px]">
-              {/* Basic Info */}
-              <div className="space-y-1.5">
-                <div className={`text-sm font-bold ${styles.cardText}`}>
-                  {detailDisplayNode.label}
-                </div>
-                <div className={`flex items-center gap-1.5 ${styles.cardTextMuted}`}>
-                  <Tag size={10} />
-                  <span>{detailDisplayNode.type || 'N/A'}</span>
-                </div>
-                {detailDisplayNode.description && (
-                  <p className={`${styles.cardTextMuted} leading-relaxed`}>
-                    {detailDisplayNode.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Properties */}
-              {detailDisplayNode.properties && Object.keys(detailDisplayNode.properties).length > 0 && (
-                <div className="space-y-1.5">
-                  <span className={`text-[10px] font-bold ${styles.muted} uppercase tracking-wider`}>
-                    {t('knowledge.graph.properties')}
-                  </span>
-                  <div className={`${styles.sidebarBg} rounded-lg p-2 space-y-1`}>
-                    {Object.entries(detailDisplayNode.properties).map(([key, value]) => (
-                      <div key={key} className="flex justify-between text-[10px]">
-                        <span className={styles.cardTextMuted}>{key}</span>
-                        <span className={`${styles.cardText} font-mono`}>
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Related Edges */}
-              <div className="space-y-1.5">
-                <span className={`text-[10px] font-bold ${styles.muted} uppercase tracking-wider`}>
-                  {t('knowledge.graph.relatedEdges', { count: nodeEdges.length })}
-                </span>
-                {nodeEdges.length === 0 ? (
-                  <p className={`${styles.muted} text-[10px]`}>{t('knowledge.graph.noRelatedEdges')}</p>
-                ) : (
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {nodeEdges.map((edge) => (
-                      <div
-                        key={edge.id}
-                        className={`${styles.sidebarBg} rounded-md px-2 py-1.5 text-[10px] flex items-center justify-between`}
-                      >
-                        <span className={`${styles.cardText} truncate flex-1`}>
-                          {edge.source} → {edge.target}
-                        </span>
-                        {edge.relationship && (
-                          <span className="text-blue-400 font-bold shrink-0 ml-1">
-                            {edge.relationship}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className={`space-y-1.5 pt-2 border-t ${styles.cardBorder}`}>
-                {expandedNodeIds.has(detailDisplayNode.id) ? (
-                  <button
-                    onClick={() => handleCollapseNode(detailDisplayNode.id)}
-                    className="w-full px-3 py-1.5 text-[11px] font-bold bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <Minimize2 size={11} />
-                    {t('knowledge.graph.collapseNode')}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleExpandNeighbors(detailDisplayNode.id)}
-                    className="w-full px-3 py-1.5 text-[11px] font-bold bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <ExternalLink size={11} />
-                    {t('knowledge.graph.expandNode')}
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setPathSource(detailDisplayNode.id);
-                  }}
-                  className="w-full px-3 py-1.5 text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
-                >
-                  <GitBranch size={11} />
-                  {t('knowledge.graph.setAsPathSource')}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={`flex items-center justify-center h-full ${styles.muted} text-[11px]`}>
-              {t('knowledge.graph.noNodeSelected')}
-            </div>
-          )}
-        </div>
+        <DetailPanel
+          styles={styles}
+          t={t}
+          node={detailDisplayNode}
+          nodeEdges={nodeEdges}
+          expandedNodeIds={expandedNodeIds}
+          onCollapse={handleCollapseNode}
+          onExpand={handleExpandNeighbors}
+          onSetPathSource={setPathSource}
+          onClose={() => { setShowDetailPanel(false); setSelectedNodeId(null); }}
+        />
       )}
 
       {/* Create Node/Edge Modal */}
       {showCreateForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl w-96 p-5 space-y-4 shadow-2xl`}>
-            <div className="flex items-center justify-between">
-              <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
-                {showCreateForm === 'node'
-                  ? <><Plus size={14} className="text-blue-400" /> {t('knowledge.graph.newNode')}</>
-                  : <><ArrowRight size={14} className="text-emerald-400" /> {t('knowledge.graph.newEdge')}</>
-                }
-              </h3>
-              <button
-                onClick={() => setShowCreateForm(null)}
-                className={`p-1 ${styles.sidebarHoverBg} rounded ${styles.muted} hover:${styles.cardText} cursor-pointer`}
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            {showCreateForm === 'node' ? (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeLabel')}</label>
-                  <input
-                    type="text"
-                    value={newNodeForm.label}
-                    onChange={(e) => setNewNodeForm(p => ({ ...p, label: e.target.value }))}
-                    placeholder={t('knowledge.graph.nodeLabelPlaceholder')}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeType')}</label>
-                  <input
-                    type="text"
-                    value={newNodeForm.nodeType}
-                    onChange={(e) => setNewNodeForm(p => ({ ...p, nodeType: e.target.value }))}
-                    placeholder={t('knowledge.graph.nodeTypePlaceholder')}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeDescription')}</label>
-                  <textarea
-                    value={newNodeForm.description}
-                    onChange={(e) => setNewNodeForm(p => ({ ...p, description: e.target.value }))}
-                    placeholder={t('knowledge.graph.nodeDescriptionPlaceholder')}
-                    rows={2}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500 resize-none`}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.nodeProperties')}</label>
-                  <textarea
-                    value={newNodeForm.properties}
-                    onChange={(e) => setNewNodeForm(p => ({ ...p, properties: e.target.value }))}
-                    placeholder='{"domain": "finance", "owner": "admin"}'
-                    rows={2}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500 resize-none font-mono`}
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => setShowCreateForm(null)}
-                    className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} transition cursor-pointer`}
-                  >
-                    {t('knowledge.graph.cancel')}
-                  </button>
-                  <button
-                    onClick={handleCreateNode}
-                    className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition cursor-pointer"
-                  >
-                    {t('knowledge.graph.create')}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.sourceNode')}</label>
-                  <select
-                    value={newEdgeForm.sourceNodeId}
-                    onChange={(e) => setNewEdgeForm(p => ({ ...p, sourceNodeId: e.target.value }))}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-emerald-500 cursor-pointer`}
-                  >
-                    <option value="">{t('knowledge.graph.selectNode')}</option>
-                    {nodes.map(n => (
-                      <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.targetNode')}</label>
-                  <select
-                    value={newEdgeForm.targetNodeId}
-                    onChange={(e) => setNewEdgeForm(p => ({ ...p, targetNodeId: e.target.value }))}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-emerald-500 cursor-pointer`}
-                  >
-                    <option value="">{t('knowledge.graph.selectNode')}</option>
-                    {nodes.map(n => (
-                      <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.relationship')}</label>
-                  <input
-                    type="text"
-                    value={newEdgeForm.relationship}
-                    onChange={(e) => setNewEdgeForm(p => ({ ...p, relationship: e.target.value }))}
-                    placeholder={t('knowledge.graph.relationshipPlaceholder')}
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-emerald-500`}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase`}>{t('knowledge.graph.weight')}</label>
-                  <input
-                    type="number"
-                    value={newEdgeForm.weight}
-                    onChange={(e) => setNewEdgeForm(p => ({ ...p, weight: e.target.value }))}
-                    min="0"
-                    step="0.1"
-                    className={`w-full px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} outline-none focus:border-emerald-500`}
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => setShowCreateForm(null)}
-                    className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} transition cursor-pointer`}
-                  >
-                    {t('knowledge.graph.cancel')}
-                  </button>
-                  <button
-                    onClick={handleCreateEdge}
-                    className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer"
-                  >
-                    {t('knowledge.graph.create')}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <CreateModal
+          styles={styles}
+          t={t}
+          mode={showCreateForm}
+          nodes={nodes}
+          newNodeForm={newNodeForm}
+          onNewNodeFormChange={(patch) => setNewNodeForm(p => ({ ...p, ...patch }))}
+          newEdgeForm={newEdgeForm}
+          onNewEdgeFormChange={(patch) => setNewEdgeForm(p => ({ ...p, ...patch }))}
+          onCreateNode={handleCreateNode}
+          onCreateEdge={handleCreateEdge}
+          onClose={() => setShowCreateForm(null)}
+        />
       )}
     </div>
   );

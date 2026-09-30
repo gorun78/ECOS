@@ -29,7 +29,7 @@ public class OrganizationController {
             return ApiResponse.success(orgs.stream().map(this::toFlatMap).collect(Collectors.toList()));
         } catch (Exception e) {
             log.error("查询机构列表失败", e);
-            return ApiResponse.internalError("查询机构列表失败: " + e.getMessage());
+            return ApiResponse.internalError("查询机构列表失败");
         }
     }
 
@@ -40,7 +40,7 @@ public class OrganizationController {
             return ApiResponse.success(toTreeMap(root));
         } catch (Exception e) {
             log.error("查询机构树失败", e);
-            return ApiResponse.internalError("查询机构树失败: " + e.getMessage());
+            return ApiResponse.internalError("查询机构树失败");
         }
     }
 
@@ -51,7 +51,7 @@ public class OrganizationController {
             return ApiResponse.success(children.stream().map(this::toFlatMap).collect(Collectors.toList()));
         } catch (Exception e) {
             log.error("查询子机构失败", e);
-            return ApiResponse.internalError("查询子机构失败: " + e.getMessage());
+            return ApiResponse.internalError("查询子机构失败");
         }
     }
 
@@ -63,7 +63,7 @@ public class OrganizationController {
             return ApiResponse.success(toFlatMap(org));
         } catch (Exception e) {
             log.error("查询机构详情失败", e);
-            return ApiResponse.internalError("查询机构详情失败: " + e.getMessage());
+            return ApiResponse.internalError("查询机构详情失败");
         }
     }
 
@@ -90,7 +90,7 @@ public class OrganizationController {
             return ApiResponse.success(toFlatMap(org));
         } catch (Exception e) {
             log.error("创建机构失败", e);
-            return ApiResponse.internalError("创建机构失败: " + e.getMessage());
+            return ApiResponse.internalError("创建机构失败");
         }
     }
 
@@ -109,7 +109,7 @@ public class OrganizationController {
             return ApiResponse.success(toFlatMap(org));
         } catch (Exception e) {
             log.error("更新机构失败", e);
-            return ApiResponse.internalError("更新机构失败: " + e.getMessage());
+            return ApiResponse.internalError("更新机构失败");
         }
     }
 
@@ -121,7 +121,7 @@ public class OrganizationController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("删除机构失败", e);
-            return ApiResponse.internalError("删除机构失败: " + e.getMessage());
+            return ApiResponse.internalError("删除机构失败");
         }
     }
 
@@ -134,7 +134,7 @@ public class OrganizationController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("分配用户到机构失败", e);
-            return ApiResponse.internalError("分配用户到机构失败: " + e.getMessage());
+            return ApiResponse.internalError("分配用户到机构失败");
         }
     }
 
@@ -146,7 +146,7 @@ public class OrganizationController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("移除用户机构关联失败", e);
-            return ApiResponse.internalError("移除用户机构关联失败: " + e.getMessage());
+            return ApiResponse.internalError("移除用户机构关联失败");
         }
     }
 

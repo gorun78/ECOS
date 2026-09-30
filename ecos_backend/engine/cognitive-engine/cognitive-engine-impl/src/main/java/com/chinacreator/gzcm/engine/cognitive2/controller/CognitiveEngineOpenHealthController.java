@@ -3,12 +3,12 @@ package com.chinacreator.gzcm.engine.cognitive2.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveEngineOpenHealthVO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveEngineOpenHealthVO.Components;
+import com.chinacreator.gzcm.engine.cognitive2.service.EngineOpenHealthQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>探测内容：</p>
  * <ul>
- *   <li>{@code db} — JdbcTemplate 探活 PG (sys_man)</li>
+ *   <li>{@code db} — 经 {@link EngineOpenHealthQueryService} 探活 PG (sys_man)</li>
  *   <li>{@code pipelineCount} — {@code kb_cognitive_pipeline} 行数（仅未删除 is_deleted=0）</li>
  *   <li>{@code pipelineActiveCount} — {@code kb_cognitive_pipeline} 中 status='ACTIVE' 行数</li>
  * </ul>
@@ -43,8 +43,9 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  *
  * <p>Bean name 加 {@code ecos} 前缀（架构铁律 §1.3：新 Bean 加 ecos 前缀避免 default
- * name 冲突）。JdbcTemplate 构造器注入（铁律 §1.3：JdbcTemplate 必须构造器注入，
- * 不绕 @Autowired 走字段注入）。</p>
+ * name 冲突）。DB 访问全部下沉 {@link EngineOpenHealthQueryService}（架构铁律 §3.6：
+ * Controller 不得直接访问数据库），Service 构造器注入（铁律 §1.3：不绕 @Autowired
+ * 走字段注入）。</p>
  *
  * @author ecos-factory
  * @since PMO-55 批次 E-C (2026-09-13)
@@ -58,19 +59,19 @@ public class CognitiveEngineOpenHealthController {
     /** 引擎版本标识 — 用于前端 / 上游聚合器识别版本。 */
     static final String VERSION = "v2.0";
 
-    /** Spring 托管的 JdbcTemplate（指向 sys_man PG）。 */
-    private final JdbcTemplate jdbcTemplate;
+    /** 本引擎 Open Health 探活查询服务（DB 访问收敛在 Service 层，铁律 §3.6）。 */
+    private final EngineOpenHealthQueryService engineOpenHealthQueryService;
 
     /** 服务器启动（JVM/Web 启动）时间戳，用于计算 uptimeMs。 */
     private volatile long startTimestamp = System.currentTimeMillis();
 
     /**
-     * 构造器注入 JdbcTemplate（铁律 §1.3）。
+     * 构造器注入探活查询服务（铁律 §1.3）。
      *
-     * @param jdbcTemplate Spring 托管的 JdbcTemplate Bean（由 gateway 启动时装配，指向 sys_man）
+     * @param engineOpenHealthQueryService Open Health 探活 / 计数查询服务（指向 sys_man PG）
      */
-    public CognitiveEngineOpenHealthController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public CognitiveEngineOpenHealthController(EngineOpenHealthQueryService engineOpenHealthQueryService) {
+        this.engineOpenHealthQueryService = engineOpenHealthQueryService;
     }
 
     /**
@@ -115,7 +116,7 @@ public class CognitiveEngineOpenHealthController {
 
         // ── 1) PG DB 探活 ──
         try {
-            Long one = jdbcTemplate.queryForObject("SELECT 1", Long.class);
+            Long one = engineOpenHealthQueryService.probeDb();
             dbUp = (one != null && one == 1L);
             components.setDb(dbUp ? "UP" : "DOWN");
         } catch (DataAccessException ex) {
@@ -127,9 +128,7 @@ public class CognitiveEngineOpenHealthController {
         if (dbUp) {
             boolean countFailed = false;
             try {
-                Long total = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM kb_cognitive_pipeline WHERE is_deleted = 0",
-                        Long.class);
+                Long total = engineOpenHealthQueryService.countPipelines();
                 components.setPipelineCount(total == null ? 0L : total);
             } catch (DataAccessException ex) {
                 countFailed = true;
@@ -138,9 +137,7 @@ public class CognitiveEngineOpenHealthController {
                         shortMsg(ex));
             }
             try {
-                Long active = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM kb_cognitive_pipeline WHERE status = 'ACTIVE' AND is_deleted = 0",
-                        Long.class);
+                Long active = engineOpenHealthQueryService.countActivePipelines();
                 components.setPipelineActiveCount(active == null ? 0L : active);
             } catch (DataAccessException ex) {
                 countFailed = true;

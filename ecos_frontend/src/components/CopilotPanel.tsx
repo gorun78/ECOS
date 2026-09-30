@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, Clock, Wrench, Download } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
+import { fetchCopilotQuickQuestions, copilotChat } from '../services/copilotApi';
 
 interface CopilotPanelProps {
   agentType: string;
@@ -33,9 +34,8 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
 
   const fetchQuickQuestions = async () => {
     try {
-      const res = await fetch(`/api/v1/agent/copilot/quick-questions?agentId=agent-${agentType}`);
-      if (res.ok) {
-        const data = await res.json();
+      const { ok, json: data } = await fetchCopilotQuickQuestions(agentType);
+      if (ok) {
         setQuickQuestions((data.data || data).map((q: any) => q.question));
       }
     } catch { /* ignore */ }
@@ -49,13 +49,8 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/v1/agent/copilot/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: `agent-${agentType}`, message: text, sessionId })
-      });
-      if (res.ok) {
-        const wrapped = await res.json();
+      const { ok, json: wrapped } = await copilotChat({ agentId: `agent-${agentType}`, message: text, sessionId });
+      if (ok) {
         const data = wrapped.data || wrapped;
         const assistantMsg: Message = {
           role: 'assistant',

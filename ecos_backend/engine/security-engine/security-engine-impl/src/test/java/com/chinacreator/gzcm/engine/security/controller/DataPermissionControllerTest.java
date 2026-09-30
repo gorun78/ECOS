@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.datapermission.entity.DataPermissionPolicy;
 import com.chinacreator.gzcm.sysman.datapermission.service.IDataPermissionPolicyService;
+import com.chinacreator.gzcm.sysman.iam.context.UserContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,15 @@ class DataPermissionControllerTest {
     void setUp() {
         this.controller = new DataPermissionController();
         ReflectionTestUtils.setField(controller, "policyService", policyService);
+        UserContext context = new UserContext();
+        context.setUserId("u-77");
+        context.setUsername("alice");
+        UserContext.setCurrent(context);
+    }
+
+    @AfterEach
+    void tearDown() {
+        UserContext.clear();
     }
 
     @Test
@@ -70,11 +81,11 @@ class DataPermissionControllerTest {
     void createPolicyGeneratesId() throws Exception {
         DataPermissionPolicy policy = new DataPermissionPolicy();
         policy.setPolicyName("new-policy");
-        when(policyService.createPolicy(policy, "admin")).thenReturn(policy);
+        when(policyService.createPolicy(policy, "u-77")).thenReturn(policy);
 
         ApiResponse<?> resp = controller.create(policy);
         assertTrue(resp.isSuccess());
-        verify(policyService).createPolicy(policy, "admin");
+        verify(policyService).createPolicy(policy, "u-77");
     }
 
     @Test
@@ -89,7 +100,7 @@ class DataPermissionControllerTest {
     void updatePolicySetsId() throws Exception {
         DataPermissionPolicy policy = new DataPermissionPolicy();
         policy.setPolicyName("updated");
-        when(policyService.updatePolicy(policy, "admin")).thenReturn(policy);
+        when(policyService.updatePolicy(policy, "u-77")).thenReturn(policy);
 
         ApiResponse<?> resp = controller.update("pol-7", policy);
         assertTrue(resp.isSuccess());

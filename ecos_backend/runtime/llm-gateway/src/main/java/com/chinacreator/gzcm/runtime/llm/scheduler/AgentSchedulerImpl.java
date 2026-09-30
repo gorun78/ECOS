@@ -138,7 +138,11 @@ public class AgentSchedulerImpl implements AgentScheduler {
                         llmConfig.getMaxTokens(),
                         false // 非流式
                 );
-                chatRequest.setApiKey(llmConfig.getApiKey());
+                // PMO-74 N14 接线：profile 的 apiKeyRef（引用，非明文）随请求下传，
+                // 真实密钥由 LLMGatewayImpl 经 security-engine 密钥服务在服务端解析；
+                // 旧 setApiKey(明文) 通道已废弃（服务端不消费）。
+                chatRequest.setApiKeyRef(llmConfig.getApiKeyRef());
+                chatRequest.setCallerId("llm-gateway:" + subsystem + ":" + profileName);
 
                 // 调用 LLM
                 log.debug("Calling LLM: subsystem={}, profile={}, model={}, session={}",

@@ -10,7 +10,7 @@ import { useTheme } from '../../../components/ThemeContext';
 
 interface CodeTabProps {
   func: FunctionType;
-  handleFieldChange: (key: keyof FunctionType, value: any) => void;
+  handleFieldChange: (key: keyof FunctionType, value: unknown) => void;
   loadTemplate: (type: 'validation' | 'default' | 'computed' | 'aggregation') => void;
 }
 

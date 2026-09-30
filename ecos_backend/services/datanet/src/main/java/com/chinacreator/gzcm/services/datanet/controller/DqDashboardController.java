@@ -282,7 +282,7 @@ public class DqDashboardController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Causal deviation analysis failed", e);
-            return ApiResponse.internalError("因果偏差分析失败: " + e.getMessage());
+            return ApiResponse.internalError("因果偏差分析失败");
         }
     }
 
@@ -342,7 +342,7 @@ public class DqDashboardController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Goal tracking query failed", e);
-            return ApiResponse.internalError("目标追踪查询失败: " + e.getMessage());
+            return ApiResponse.internalError("目标追踪查询失败");
         }
     }
 }

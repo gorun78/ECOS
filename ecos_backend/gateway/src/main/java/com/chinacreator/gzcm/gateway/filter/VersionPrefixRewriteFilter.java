@@ -56,9 +56,9 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         // 与 PipelineController 同粒度（防止未来新增裸路径 Controller 时漏配三滤波器）。
         // ── PMO-45 T5: /api/v1/datasource/ → /datasource/ (PMO45DataSourceController 裸路径) ──
         Map.entry("/api/v1/datasource/",   "/datasource/"),
-        // ── PMO-38 T5: 新增两条 v1 前缀正/反向重写 ──
-        // /api/v1/knowledge-bases → /api/knowledge-bases (Controller 双路径)
-        Map.entry("/api/v1/knowledge-bases",  "/api/knowledge-bases"),
+        // ── PMO-38 T5 遗留条目已收口：knowledge-bases 只做反向，不做正向 ──
+        // KEEP /api/v1/knowledge-bases — KnowledgeListController 只映射 v1 单路径，全库无
+        // /api/knowledge-bases 的 RequestMapping，正向条目会把正典路径改到空目标（网关 404）。
         // /api/v1/sysconfig/ → /api/sysconfig/ (T4 双路径)
         Map.entry("/api/v1/sysconfig/",     "/api/sysconfig/"),
         Map.entry("/api/v1/marketplace/",   "/api/marketplace/"),

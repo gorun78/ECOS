@@ -17,7 +17,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       minimum-idle: 5
@@ -30,16 +30,13 @@ spring:
 
   flyway:
     enabled: false
-  jpa:
-    hibernate:
-      ddl-auto: none
 
   # Neo4j (workspace 场景 KG 同步 Operation 需要) — PMO-49 Q2 补标准凭据避免 health DOWN
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:neo4j123}
+      password: ${NEO4J_PASSWORD:}
 
   # Kafka (workspace 事件)
   kafka:
@@ -63,6 +60,10 @@ mybatis:
 
 # PMO-49 D1: 收窄 MyBatis 类型别名扫包
 ecos:
+  event:
+    kafka:
+      # PMO-74 H2-T7 裁决 T-C 双投递：跨进程走 Kafka，同 JVM 仍本地分发，broker 缺席不丢本进程事件
+      enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.workspace
   header-auth:

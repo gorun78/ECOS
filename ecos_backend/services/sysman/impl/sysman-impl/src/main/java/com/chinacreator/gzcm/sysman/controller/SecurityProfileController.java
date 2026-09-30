@@ -169,7 +169,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取安全配置失败", e);
-            return ApiResponse.internalError("获取安全配置失败: " + e.getMessage());
+            return ApiResponse.internalError("获取安全配置失败");
         }
     }
 
@@ -263,7 +263,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("更新安全配置失败", e);
-            return ApiResponse.internalError("更新安全配置失败: " + e.getMessage());
+            return ApiResponse.internalError("更新安全配置失败");
         }
     }
 
@@ -284,7 +284,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(profile);
         } catch (Exception e) {
             log.error("查询用户安全配置失败: userId={}", userId, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -337,7 +337,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(updated != null ? updated : Map.of("userId", userId, "success", true));
         } catch (Exception e) {
             log.error("更新用户安全配置失败: userId={}", userId, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -354,7 +354,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(profile);
         } catch (Exception e) {
             log.error("查询角色安全配置失败: roleId={}", roleId, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -407,7 +407,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(updated != null ? updated : Map.of("roleId", roleId, "success", true));
         } catch (Exception e) {
             log.error("更新角色安全配置失败: roleId={}", roleId, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -421,7 +421,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(list);
         } catch (Exception e) {
             log.error("查询角色安全配置列表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -435,7 +435,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             return ApiResponse.success(list);
         } catch (Exception e) {
             log.error("查询用户安全配置列表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 

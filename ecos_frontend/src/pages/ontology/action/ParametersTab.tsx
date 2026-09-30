@@ -16,7 +16,7 @@ interface Props {
   newParamObjType: string; setNewParamObjType: (v: string) => void;
   handleAddParam: () => void;
   handleRemoveParam: (paramId: string) => void;
-  handleParamFieldChange: (paramId: string, field: keyof ActionParameter, value: any) => void;
+  handleParamFieldChange: (paramId: string, field: keyof ActionParameter, value: unknown) => void;
   onNavigateToObject: (objectId: string) => void;
 }
 
@@ -33,7 +33,7 @@ export default function ParametersTab({
         <div className="flex items-center gap-2">
           <input type="text" placeholder={t('ow.placeholder.newParamName')} value={newParamName} onChange={e => setNewParamName(e.target.value)}
             className={`px-3 py-1 text-xs border ${styles.cardBorder} rounded focus:border-blue-500 focus:outline-hidden`} />
-          <select value={newParamType} onChange={e => setNewParamType(e.target.value as any)}
+          <select value={newParamType} onChange={e => setNewParamType(e.target.value as ActionParamDataType)}
             className={`px-2 py-1 text-xs border ${styles.cardBorder} rounded ${styles.cardBg} focus:outline-hidden font-mono`}>
             <option value="string">string</option><option value="integer">integer</option><option value="decimal">decimal</option>
             <option value="boolean">boolean</option><option value="date">date</option><option value="object">{t('ow.action.paramTypeObject')}</option>

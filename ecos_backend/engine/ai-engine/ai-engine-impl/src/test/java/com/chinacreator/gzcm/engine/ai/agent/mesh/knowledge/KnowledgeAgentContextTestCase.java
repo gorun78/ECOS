@@ -42,7 +42,7 @@ class KnowledgeAgentContextTestCase {
         ReflectionTestUtils.setField(service, "nodeRepo", nodeRepo);
         ReflectionTestUtils.setField(service, "edgeRepo", edgeRepo);
         ReflectionTestUtils.setField(service, "neo4jService", neo4j);
-        ReflectionTestUtils.setField(neo4j, "driver", mock(org.neo4j.driver.Driver.class));
+        ReflectionTestUtils.setField(neo4j, "neo4jClient", mock(com.chinacreator.gzcm.runtime.access.graph.Neo4jClient.class));
     }
 
     @Test

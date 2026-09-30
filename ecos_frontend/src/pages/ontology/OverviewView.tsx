@@ -28,7 +28,7 @@ interface OverviewViewProps {
   onSelectDomainFilter: (id: string | null) => void;
   onSelectNode: (nodeId: string) => void;
   onSelectEdge: (edgeId: string) => void;
-  onQuickNavigate: (category: any, id: string) => void;
+  onQuickNavigate: (category: string, id: string) => void;
   onViewModeChange?: (mode: string) => void;
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objectTypes: ObjectType[]) => void;

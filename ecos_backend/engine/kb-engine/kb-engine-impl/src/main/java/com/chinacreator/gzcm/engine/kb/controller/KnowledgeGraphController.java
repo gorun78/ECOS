@@ -35,7 +35,7 @@ public class KnowledgeGraphController {
             return ApiResponse.success(graph);
         } catch (Exception e) {
             log.error("Failed to fetch knowledge graph: {}", e.getMessage(), e);
-            return ApiResponse.internalError("图谱数据获取失败: " + e.getMessage());
+            return ApiResponse.internalError("图谱数据获取失败");
         }
     }
 

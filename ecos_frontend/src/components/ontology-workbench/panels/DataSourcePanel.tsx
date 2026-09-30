@@ -162,8 +162,8 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
       for (const rid of resourceIds) {
         try {
           await bindEntityToTable(entityId, rid);
-        } catch (err: any) {
-          setError(err?.message || `绑定资源失败: ${rid}`);
+        } catch (err: unknown) {
+          setError((err as { message?: string } | undefined)?.message || `绑定资源失败: ${rid}`);
         }
       }
     },
@@ -216,8 +216,8 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
           // 跳过绑定失败的
         }
       }
-    } catch (err: any) {
-      setError(err?.message || DATA_CATALOG_UNAVAILABLE);
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || DATA_CATALOG_UNAVAILABLE);
     } finally {
       setAutoDiscovering(false);
     }

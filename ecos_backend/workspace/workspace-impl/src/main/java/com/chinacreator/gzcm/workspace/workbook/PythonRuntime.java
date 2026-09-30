@@ -93,6 +93,7 @@ public class PythonRuntime {
                         stdout.append(line).append("\n");
                     }
                 } catch (Exception ignored) {
+                    log.warn("Python stdout 读取失败，结果可能不完整: {}", ignored.getMessage());
                 }
             });
 
@@ -104,6 +105,7 @@ public class PythonRuntime {
                         stderr.append(line).append("\n");
                     }
                 } catch (Exception ignored) {
+                    log.warn("Python stderr 读取失败，错误信息可能丢失: {}", ignored.getMessage());
                 }
             });
 
@@ -141,6 +143,7 @@ public class PythonRuntime {
             try {
                 Files.deleteIfExists(scriptFile);
             } catch (Exception ignored) {
+                log.warn("Python 临时脚本清理失败: path={} reason={}", scriptFile, ignored.getMessage());
             }
 
         } catch (Exception e) {

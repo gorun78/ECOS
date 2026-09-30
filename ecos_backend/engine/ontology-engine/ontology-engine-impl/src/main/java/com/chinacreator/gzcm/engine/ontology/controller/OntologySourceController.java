@@ -65,7 +65,7 @@ public class OntologySourceController {
             return ApiResponse.success(sourceService.listSources(query));
         } catch (Exception e) {
             log.error("Failed to query ontology sources: {}", e.getMessage(), e);
-            return ApiResponse.internalError("查询本体来源失败: " + e.getMessage());
+            return ApiResponse.internalError("查询本体来源失败");
         }
     }
 }

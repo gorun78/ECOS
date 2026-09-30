@@ -7,7 +7,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
@@ -25,6 +24,7 @@ import com.chinacreator.gzcm.engine.data.datadescription.model.DataSchema;
 import com.chinacreator.gzcm.engine.data.datadescription.model.impl.DataSchemaImpl;
 import com.chinacreator.gzcm.engine.data.datadescription.service.IDataDescriptionService;
 import com.chinacreator.gzcm.engine.data.datadescription.service.impl.DataDescriptionServiceImpl;
+import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 
 /**
  * 数据描述发现服务实现
@@ -35,13 +35,40 @@ import com.chinacreator.gzcm.engine.data.datadescription.service.impl.DataDescri
 public class DataDescriptionDiscoveryImpl implements IDataDescriptionDiscovery {
     
     private final IDataDescriptionService dataDescriptionService;
-    
+
+    /** 全仓唯一 JDBC 建连通道（数据库访问规范 IR 系列）；本类不得再自行加载驱动或裸建连。 */
+    private final JdbcConnector jdbcConnector;
+
+    /**
+     * 遗留手工构造入口（无 Spring 上下文）：仅文件/API 发现可用；
+     * 数据库表发现需要 {@link JdbcConnector}，请改用
+     * {@link #DataDescriptionDiscoveryImpl(IDataDescriptionService, JdbcConnector)}。
+     */
+    @Deprecated
     public DataDescriptionDiscoveryImpl() {
-        this.dataDescriptionService = new DataDescriptionServiceImpl();
+        this(new DataDescriptionServiceImpl(), null);
     }
-    
+
+    /** 遗留手工构造入口，同 {@link #DataDescriptionDiscoveryImpl()} 的连接器约束。 */
+    @Deprecated
     public DataDescriptionDiscoveryImpl(IDataDescriptionService dataDescriptionService) {
+        this(dataDescriptionService, null);
+    }
+
+    /** 注入构造（Spring / 显式装配走此通道） */
+    public DataDescriptionDiscoveryImpl(IDataDescriptionService dataDescriptionService,
+                                        JdbcConnector jdbcConnector) {
         this.dataDescriptionService = dataDescriptionService;
+        this.jdbcConnector = jdbcConnector;
+    }
+
+    private JdbcConnector requireJdbcConnector() {
+        if (jdbcConnector == null) {
+            throw new IllegalStateException(
+                "未注入 runtime-access JdbcConnector，数据库表发现不可用；"
+                    + "请使用 DataDescriptionDiscoveryImpl(IDataDescriptionService, JdbcConnector) 构造");
+        }
+        return jdbcConnector;
     }
     
     @Override
@@ -54,17 +81,13 @@ public class DataDescriptionDiscoveryImpl implements IDataDescriptionDiscovery {
         Connection conn = null;
         
         try {
-            // 加载驱动
-            if (connectionInfo.getDriverClass() != null) {
-                Class.forName(connectionInfo.getDriverClass());
-            }
-            
-            // 建立连接
-            String jdbcUrl = connectionInfo.buildJdbcUrl();
-            conn = DriverManager.getConnection(
-                jdbcUrl,
+            // H2-T6：驱动加载与建连收敛到 runtime-access JdbcConnector（显式 URL/凭据/驱动类重载），
+            // 表与列的 DatabaseMetaData 遍历留在引擎侧
+            conn = requireJdbcConnector().openConnection(
+                connectionInfo.buildJdbcUrl(),
                 connectionInfo.getUsername(),
-                connectionInfo.getPassword()
+                connectionInfo.getPassword(),
+                connectionInfo.getDriverClass()
             );
             
             DatabaseMetaData metaData = conn.getMetaData();

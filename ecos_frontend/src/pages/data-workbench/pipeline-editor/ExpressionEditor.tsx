@@ -13,6 +13,42 @@ import { useMediaQuery } from '../../../hooks/useMediaQuery';
 // Monaco 类型通过 @monaco-editor/react 内部暴露；这里不再手动 declare module 'monaco-editor'
 // （官方 types 自带 editor namespace，declare 会冲突 TS2451）
 
+// ─── Monaco 结构化类型（只声明本文件实际用到的能力，不绑定 monaco-editor 具体版本的可辨识联合） ───
+
+type ExpressionEditorHandle = Parameters<OnMount>[0];
+
+interface ExpressionPosition {
+  lineNumber: number;
+  column: number;
+}
+
+interface ExpressionRange {
+  startLineNumber: number;
+  endLineNumber: number;
+  startColumn: number;
+  endColumn: number;
+}
+
+interface ExpressionWordExtent {
+  startColumn: number;
+  endColumn: number;
+}
+
+interface ExpressionWordAtPosition extends ExpressionWordExtent {
+  word: string;
+}
+
+interface ExpressionTextModel {
+  getWordUntilPosition(position: ExpressionPosition): ExpressionWordExtent;
+  getWordAtPosition(position: ExpressionPosition): ExpressionWordAtPosition | null;
+}
+
+interface ExpressionKeyboardEvent {
+  keyCode: number;
+  preventDefault(): void;
+  stopPropagation(): void;
+}
+
 // ─── Props ────────────────────────────────────────────
 
 interface ExpressionEditorProps {
@@ -31,11 +67,11 @@ interface ExpressionEditorProps {
 // ─── Monaco integration ──────────────────────────────
 
 // Register PB functions as completion items
-function buildCompletionProvider(range: any) {
+function buildCompletionProvider(range: ExpressionRange) {
   return {
-    provideCompletionItems: (model: any, position: any) => {
+    provideCompletionItems: (model: ExpressionTextModel, position: ExpressionPosition) => {
       const word = model.getWordUntilPosition(position);
-      const currentRange: any = {
+      const currentRange: ExpressionRange = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
         startColumn: word.startColumn,
@@ -43,7 +79,7 @@ function buildCompletionProvider(range: any) {
       };
 
       // Build function completions
-      const suggestions: any[] = PB_FUNCTIONS.map(
+      const suggestions = PB_FUNCTIONS.map(
         (fn: PBFunctionDef) => ({
           label: fn.name,
           kind: window.monaco?.languages.CompletionItemKind.Function ?? 1,
@@ -61,16 +97,16 @@ function buildCompletionProvider(range: any) {
       );
 
       // Add column name suggestions
-      const columnSuggestions: any[] = (
-        (window as any).__expressionColumns__ || []
-      ).map((col: string) => ({
-        label: col,
-        kind: window.monaco?.languages.CompletionItemKind.Field ?? 5,
-        insertText: col,
-        detail: 'Column',
-        range: currentRange,
-        sortText: `1_${col}`,
-      }));
+      const columnSuggestions = (window.__expressionColumns__ || []).map(
+        (col: string) => ({
+          label: col,
+          kind: window.monaco?.languages.CompletionItemKind.Field ?? 5,
+          insertText: col,
+          detail: 'Column',
+          range: currentRange,
+          sortText: `1_${col}`,
+        })
+      );
 
       return { suggestions: [...suggestions, ...columnSuggestions] };
     },
@@ -125,13 +161,13 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
   onOperatorButtonClick,
 }) => {
   const { styles } = useTheme();
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<ExpressionEditorHandle | null>(null);
   // 移动端断言: 视口 ≤ 767px 时, 单行 Monaco 手势较多, 降级为原生 input 仅用于输入表达式
   const isMobile = useMediaQuery("(max-width: 767px)");
 
   // Store available columns globally for completion provider
   useEffect(() => {
-    (window as any).__expressionColumns__ = availableColumns || [];
+    window.__expressionColumns__ = availableColumns || [];
   }, [availableColumns]);
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
@@ -209,7 +245,10 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 
     // Register completion provider
     monaco.languages.registerCompletionItemProvider('pb-expression', {
-      provideCompletionItems: (model: any, position: any) => {
+      provideCompletionItems: (
+        model: ExpressionTextModel,
+        position: ExpressionPosition
+      ) => {
         return buildCompletionProvider({
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
@@ -221,7 +260,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
 
     // Register hover provider for function docs
     monaco.languages.registerHoverProvider('pb-expression', {
-      provideHover: (model: any, position: any) => {
+      provideHover: (model: ExpressionTextModel, position: ExpressionPosition) => {
         const word = model.getWordAtPosition(position);
         if (!word) return null;
         const fn = PB_FUNCTIONS.find((f) => f.name === word.word);
@@ -243,7 +282,7 @@ const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
     editorRef.current = editor;
 
     // Single-line mode: intercept Enter to prevent new lines
-    editor.onKeyDown((e: any) => {
+    editor.onKeyDown((e: ExpressionKeyboardEvent) => {
       if (e.keyCode === monaco.KeyCode.Enter) {
         e.preventDefault();
         e.stopPropagation();

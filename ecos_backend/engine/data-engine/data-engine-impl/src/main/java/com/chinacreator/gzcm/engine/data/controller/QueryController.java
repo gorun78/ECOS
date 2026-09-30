@@ -108,7 +108,7 @@ public class QueryController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("Query execution failed", e);
-            return ApiResponse.internalError("查询执行失败: " + e.getMessage());
+            return ApiResponse.internalError("查询执行失败");
         }
     }
 
@@ -179,7 +179,7 @@ public class QueryController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to get schema tree for dsId={}", dsId, e);
-            return ApiResponse.internalError("获取 Schema 失败: " + e.getMessage());
+            return ApiResponse.internalError("获取 Schema 失败");
         }
     }
 
@@ -195,7 +195,7 @@ public class QueryController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to save template", e);
-            return ApiResponse.internalError("保存模板失败: " + e.getMessage());
+            return ApiResponse.internalError("保存模板失败");
         }
     }
 
@@ -212,7 +212,7 @@ public class QueryController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to list templates", e);
-            return ApiResponse.internalError("获取模板列表失败: " + e.getMessage());
+            return ApiResponse.internalError("获取模板列表失败");
         }
     }
 
@@ -228,7 +228,7 @@ public class QueryController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to get template id={}", id, e);
-            return ApiResponse.internalError("获取模板失败: " + e.getMessage());
+            return ApiResponse.internalError("获取模板失败");
         }
     }
 
@@ -244,7 +244,7 @@ public class QueryController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to delete template id={}", id, e);
-            return ApiResponse.internalError("删除模板失败: " + e.getMessage());
+            return ApiResponse.internalError("删除模板失败");
         }
     }
 
@@ -260,7 +260,7 @@ public class QueryController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to get query history", e);
-            return ApiResponse.internalError("获取查询历史失败: " + e.getMessage());
+            return ApiResponse.internalError("获取查询历史失败");
         }
     }
 
@@ -276,7 +276,7 @@ public class QueryController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to cancel query historyId={}", historyId, e);
-            return ApiResponse.internalError("取消查询失败: " + e.getMessage());
+            return ApiResponse.internalError("取消查询失败");
         }
     }
 }

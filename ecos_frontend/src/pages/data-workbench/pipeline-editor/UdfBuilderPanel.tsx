@@ -10,6 +10,7 @@ import {
   ChevronRight, Loader2, CheckCircle, XCircle,
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
+import { getErrorMessage } from '../helpers';
 import { useTheme } from '../../../components/ThemeContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 
@@ -23,6 +24,9 @@ interface UdfBuilderPanelProps {
 
 type UdfLanguage = 'python' | 'sql' | 'java';
 
+/** 后端 UdfController /test 返回 { success, output?, error? }（apiFetchData 已解包 ApiResponse.data） */
+interface UdfTestResult { success: boolean; output?: string; error?: string }
+
 // ─── Component ────────────────────────────────────────
 
 const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => {
@@ -35,7 +39,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
   const [udfName, setUdfName] = useState('');
   const [registering, setRegistering] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; output?: string; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<UdfTestResult | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
 
   const showToast = (type: 'success' | 'error' | 'info', msg: string) => {
@@ -47,7 +51,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
   const handleConvert = useCallback(async () => {
     if (!inputCode.trim()) return;
     try {
-      const resp = await apiFetchData<{ data: { code: string } }>(
+      const resp = await apiFetchData<{ code?: string; data?: { code?: string } }>(
         '/api/v1/engine/data/udf/convert',
         {
           method: 'POST',
@@ -58,7 +62,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
           }),
         }
       );
-      const generated = (resp as any)?.data?.code || (resp as any)?.code;
+      const generated = resp?.data?.code || resp?.code;
       if (generated) {
         setOutputCode(generated);
         showToast('success', 'UDF 代码已生成');
@@ -95,8 +99,8 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
         }),
       });
       showToast('success', `UDF "${udfName}" 已注册`);
-    } catch (e: any) {
-      showToast('error', `注册失败: ${e?.message || '未知错误'}`);
+    } catch (e) {
+      showToast('error', `注册失败: ${getErrorMessage(e) || '未知错误'}`);
     } finally {
       setRegistering(false);
     }
@@ -111,7 +115,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
     setTesting(true);
     setTestResult(null);
     try {
-      const resp = await apiFetchData<{ data: { success: boolean; output?: string; error?: string } }>(
+      const resp = await apiFetchData<UdfTestResult & { data?: UdfTestResult }>(
         `/api/v1/engine/data/udf/test`,
         {
           method: 'POST',
@@ -121,12 +125,12 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
           }),
         }
       );
-      const result = (resp as any)?.data || resp;
+      const result = resp?.data || resp;
       setTestResult(result);
       showToast(result?.success ? 'success' : 'error', result?.success ? '测试通过' : `测试失败: ${result?.error || ''}`);
-    } catch (e: any) {
-      setTestResult({ success: false, error: e?.message || '未知错误' });
-      showToast('error', `测试失败: ${e?.message || ''}`);
+    } catch (e) {
+      setTestResult({ success: false, error: getErrorMessage(e) || '未知错误' });
+      showToast('error', `测试失败: ${getErrorMessage(e) || ''}`);
     } finally {
       setTesting(false);
     }

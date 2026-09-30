@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -71,114 +72,17 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
 
-        // 公开端点免检查
+        // 公开端点免检查 — PMO-74 H9-T2（铁律 §1.2①/§2.4-6）：
+        // 业务前缀（knowledge/pipeline/aip/lineage/datanet/workspace/engine/ontology/dq/
+        // datasource/task/sysconfig/ecos/llm/agent 族…）已全部移出豁免表，改由准入等级校验；
+        // 仅保留 health/auth 类 + 安全控制面（security/audit 仅要求认证，见 SecurityPolicyController 设计口径）。
         if (path.startsWith("/api/v1/auth/") || path.equals("/api/health") || path.equals("/health")
-                || path.startsWith("/api/v1/ecos/world-model")
-                || path.startsWith("/api/v1/worldmodel")
-                || path.startsWith("/api/v1/knowledge")
-                || path.startsWith("/api/v1/guardrails")
-                || path.startsWith("/api/v1/pipeline")
-                || path.startsWith("/api/pipeline")
-                // PMO-WX 断点调试 Panel（同时受 /api/v1/pipeline 通配）
-                || path.startsWith("/api/v1/pipeline/debug")
-                || path.startsWith("/api/pipeline/debug")
-                || path.startsWith("/api/v1/agents")
-                || path.startsWith("/api/v1/agent-loop")
-                // ── PMO-50 LLM 网关原语：embed/chat 公共底座豁免（与 /api/v1/agent-loop 同粒度，
-                //    kb-engine/cognitive-engine 走 gateway 8080 转发时不应被 clearance 拦截）
-                || path.startsWith("/api/v1/llm")
-                || path.startsWith("/api/v1/aip")
-                || path.startsWith("/api/ontology")
-                || path.startsWith("/api/integration")
-                // 集合B 修复: 补 v1 形式（铁律 §1.2 双路径各写一遍；gateway 重写与
-                // Spring Security 过滤链先后顺序不可假设，此处需自行覆盖）
-                || path.startsWith("/api/v1/integration")
-                || path.startsWith("/api/metadata")
-                || path.startsWith("/api/lineage")
-                || path.startsWith("/api/agent-mesh")
-                || path.startsWith("/datanet")
-                || path.startsWith("/api/v1/datanet")
+                || path.startsWith("/api/v1/knowledge/health")
                 || path.startsWith("/api/security")
                 || path.startsWith("/api/v1/security")
                 || path.startsWith("/api/v1/audit")
                 || path.startsWith("/api/audit")
-                || path.startsWith("/api/twins")
-                || path.startsWith("/api/v1/system/tenants")
-                || path.startsWith("/api/v1/system/users")
-                || path.startsWith("/api/v1/system/roles")
-                || path.startsWith("/api/v1/system/organizations")
-                || path.startsWith("/api/v1/system/permissions")
-                || path.startsWith("/api/v1/ecos/ontologies")
-                || path.startsWith("/api/v1/workspace")
-                || path.startsWith("/api/v1/ontology/proposals")
-                || path.startsWith("/api/monitor")
-                || path.startsWith("/api/v1/ontology/action-types")
-                || path.startsWith("/api/v1/ontology/functions")
-                || path.startsWith("/api/v1/engine")
-                || path.startsWith("/api/v1/cognitive/")
-                || path.startsWith("/api/v1/cognitive/health")
-                || path.startsWith("/api/v1/knowledge/")
-                || path.startsWith("/api/v1/knowledge/health")
-                || path.startsWith("/api/v1/knowledge/stats")
-                || path.startsWith("/api/v1/knowledge/engine-config")
-                || path.startsWith("/api/v1/knowledge/engine-config/**")
-                // ── PMO-38 T5: 新增豁免（双路径）──
-                // knowledge-bases 列表端点
-                || path.startsWith("/api/v1/knowledge-bases")
-                || path.startsWith("/api/knowledge-bases")
-                // sysconfig/{key}/reset 双路径
-                || path.startsWith("/api/v1/sysconfig/")
-                || path.startsWith("/api/sysconfig/")
-                // ── PMO-39 T5: 5 新端点双路径豁免 ──
-                // T1 cognitive /plan, /plan/{id}, /optimize
-                || path.startsWith("/api/cognitive/plan")
-                || path.startsWith("/api/cognitive/optimize")
-                // T2 ontology workflow definitions
-                || path.startsWith("/api/engine/ontology/workflow/definitions")
-                // T3 ontology versions diff
-                || path.startsWith("/api/ontology/versions/diff")
-                || path.startsWith("/api/v1/ontology/versions/diff")
-                // T4 portal search
-                || path.startsWith("/api/portal/search")
-                // ── PMO-40 T5: 3 新端点双路径豁免 ──
-                // T1 agent-metrics 兼容路径
-                || path.startsWith("/api/v1/agent-metrics")
-                || path.startsWith("/api/agent-metrics")
-                // T4a ontology sources (GET /api/v1/ecos/ontology/** 已豁免 /api/v1/ecos/ontologies 同前缀)
-                || path.startsWith("/api/v1/ecos/ontology/sources")
-                || path.startsWith("/api/ecos/ontology/sources")
-                // T4b ontology auto-discover preview (under /api/v1/ecos/ already exempt)
-                || path.startsWith("/api/ecos/domains")
-                // T2 metadata strategy 双路径
-                || path.startsWith("/api/v1/datanet/metadata/strategy")
-                || path.startsWith("/api/datanet/metadata/strategy")
-                // ── PMO-45 T5: datasource 双路径豁免 (PMO45DataSourceController) ──
-                || path.startsWith("/api/v1/datasource")
-                || path.startsWith("/datasource")
-                // ── PMO-48-A T2: DQ 基础设施双路径豁免 (T3 DqGovernanceController) ──
-                // 显式写 /api/v1/dq 与 /api/dq 完整前缀，不依赖父级 /** 通配 (Ant 路径陷阱)
-                || path.startsWith("/api/v1/dq")
-                || path.startsWith("/api/dq")
-                // PMO-48-B T7b: /api/v1/dq/scores 与 /api/dq/scores 双路径
-                || path.startsWith("/api/v1/dq/scores")
-                || path.startsWith("/api/dq/scores")
-                // ── P3-C: workspace 场景层迁出端点 (双跑期 browse 无需 admission) ──
-                // twins: DigitalTwinService + TwinController 迁至 workspace, mock 数据
-                // alerts: AlertController 迁至 workspace, mock 告警
-                // task: TaskController 迁至 workspace, 静态查询
-                // engine: EngineTaskController 已 matches 前面 (L0 排除)
-                // ecos/knowledge-graph: EcosKnowledgeGraphController 迁至 workspace, 语义快照
-                || path.startsWith("/api/twins")
-                || path.startsWith("/api/v1/alerts")
-                || path.startsWith("/api/alerts")
-                || path.startsWith("/api/v1/task")
-                || path.startsWith("/api/v1/ecos/knowledge-graph")
                 ) {
-            return true;
-        }
-
-        // OAG Pipeline — 8步闭环对话
-        if (path.startsWith("/api/v1/oag")) {
             return true;
         }
 
@@ -200,7 +104,10 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                     .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()))) {
                 return true;
             }
-        } catch (Throwable ignore) {}
+        } catch (Exception e) {
+            // fail-closed：判定异常不放行，按非超管继续走准入等级校验
+            log.warn("super-admin 旁路判定失败，按非超管继续准入校验: path={}", path, e);
+        }
 
         // ── 2. 获取当前用户的准入等级 ──────────────────
         String userId = UserContext.getCurrentUserId();
@@ -338,7 +245,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                     return oid != null ? oid.toString() : null;
                 }
             } catch (Exception e) {
-                log.debug("查询用户机构失败: userId={}, {}", userId, e.getMessage());
+                log.warn("查询用户机构失败，跳过机构级: userId={}", userId, e);
             }
         }
         return null;
@@ -369,7 +276,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                 }
             }
         } catch (Exception e) {
-            log.warn("查询{}安全配置失败: {}", tableName, e.getMessage());
+            log.warn("查询{}安全配置失败，级联继续下一档", tableName, e);
         }
         return null;
     }
@@ -398,7 +305,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             Integer val = jdbc.queryForObject(sql, Integer.class, params);
             return (val != null && val >= 0) ? val : null;
         } catch (Exception e) {
-            log.warn("查询用户角色安全配置失败: userId={}, {}", userId, e.getMessage());
+            log.warn("查询用户角色安全配置失败，级联继续下一档: userId={}", userId, e);
             return null;
         }
     }
@@ -416,8 +323,11 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             }
             Integer val = jdbc.queryForObject(sql, Integer.class, params);
             return val;
+        } catch (EmptyResultDataAccessException e) {
+            log.debug("未查到全局默认安全配置行: tenantId={}", tenantId);
+            return null;
         } catch (Exception e) {
-            log.debug("查询全局默认安全配置失败: {}", e.getMessage());
+            log.warn("查询全局默认安全配置失败，落到兜底等级", e);
             return null;
         }
     }
@@ -437,8 +347,11 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             }
             Integer val = jdbc.queryForObject(sql, Integer.class, params);
             return val;
+        } catch (EmptyResultDataAccessException e) {
+            log.debug("未查到机构级安全配置行: orgId={}", orgId);
+            return null;
         } catch (Exception e) {
-            log.debug("查询机构级安全配置失败: orgId={}, {}", orgId, e.getMessage());
+            log.warn("查询机构级安全配置失败，级联继续下一档: orgId={}", orgId, e);
             return null;
         }
     }
@@ -448,8 +361,11 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             String sql = "SELECT clearance_level FROM td_user_security_profile WHERE tenant_id = ? AND scope_type = 'TENANT' ORDER BY clearance_level DESC LIMIT 1";
             Integer val = jdbc.queryForObject(sql, Integer.class, tenantId);
             return val;
+        } catch (EmptyResultDataAccessException e) {
+            log.debug("未查到租户级安全配置行: tenantId={}", tenantId);
+            return null;
         } catch (Exception e) {
-            log.debug("查询租户级安全配置失败: tenantId={}, {}", tenantId, e.getMessage());
+            log.warn("查询租户级安全配置失败，级联继续下一档: tenantId={}", tenantId, e);
             return null;
         }
     }

@@ -12,13 +12,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useTheme } from "./ThemeContext";
+import { authMeProbe, getAuthToken } from "../services/auth";
 
 type AuthState = "loading" | "ok" | "no-access" | "login";
 
 export default function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { styles } = useTheme();
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const [state, setState] = useState<AuthState>("loading");
   const checkedRef = useRef(false);
 
@@ -34,10 +35,7 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
     if (checkedRef.current) return;
 
     const ctrl = new AbortController();
-    fetch("/api/v1/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: ctrl.signal,
-    })
+    authMeProbe(token, ctrl.signal)
       .then((res) => {
         // Settle: auth decision is final — record the check.
         checkedRef.current = true;

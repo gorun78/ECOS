@@ -1,8 +1,6 @@
 package com.chinacreator.gzcm.workspace.service;
 
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Session;
-import org.neo4j.driver.Values;
+import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,21 +24,21 @@ public class ObjectKgSyncService {
 
     // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
     @Autowired(required = false)
-    private Driver driver;
+    private Neo4jClient neo4jClient;
 
     @PostConstruct
     void init() {
-        if (driver == null) {
-            log.warn("ObjectKgSyncService init: Neo4j Driver 不可用, Object→KG 同步禁用 (no-op)");
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
+            log.warn("ObjectKgSyncService init: Neo4j 不可用, Object→KG 同步禁用 (no-op)");
             return;
         }
-        log.info("ObjectKgSyncService init: 使用 runtime-access 统一 Driver");
+        log.info("ObjectKgSyncService init: 使用 runtime-access 统一 Neo4jClient");
     }
 
     @PreDestroy
     void close() {
         // Driver 是 runtime-access 管理的 Bean, 不在此 close
-        log.info("ObjectKgSyncService close: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
+        log.info("ObjectKgSyncService close: Neo4j 客户端由 runtime-access 管理, 不在此处 close");
     }
 
     /**
@@ -53,9 +51,9 @@ public class ObjectKgSyncService {
      */
     public void syncObjectToNeo4j(String entityCode, String objectId,
                                    Map<String, Object> properties, String operation) {
-        if (driver == null) {
-            // M0 改造 (2026-09): Neo4j Driver 不可用 (standard 档), no-op
-            log.debug("syncObjectToNeo4j: Neo4j Driver 不可用, skip (entityCode={}, op={})", entityCode, operation);
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
+            // M0 改造 (2026-09): Neo4j 不可用 (standard 档), no-op
+            log.debug("syncObjectToNeo4j: Neo4j 不可用, skip (entityCode={}, op={})", entityCode, operation);
             return;
         }
         // 安全校验：Label 名仅允许字母、数字、下划线
@@ -65,26 +63,26 @@ public class ObjectKgSyncService {
         }
 
         CompletableFuture.runAsync(() -> {
-            try (Session session = driver.session()) {
+            try {
                 switch (operation) {
                     case "CREATE" -> {
                         // 参数化写入：防止 Cypher 注入
                         // Label 名已通过正则安全校验
-                        session.run(
+                        neo4jClient.write(
                             "MERGE (n:`" + entityCode + "` {id: $id}) SET n += $props",
                             Map.of("id", objectId, "props", properties != null ? properties : Map.of())
                         );
                         log.debug("KG sync CREATE: {} id={}", entityCode, objectId);
                     }
                     case "UPDATE" -> {
-                        session.run(
+                        neo4jClient.write(
                             "MATCH (n:`" + entityCode + "` {id: $id}) SET n += $props",
                             Map.of("id", objectId, "props", properties != null ? properties : Map.of())
                         );
                         log.debug("KG sync UPDATE: {} id={}", entityCode, objectId);
                     }
                     case "DELETE" -> {
-                        session.run(
+                        neo4jClient.write(
                             "MATCH (n:`" + entityCode + "` {id: $id}) DETACH DELETE n",
                             Map.of("id", objectId)
                         );
@@ -115,6 +113,10 @@ public class ObjectKgSyncService {
      */
     public void syncRelationToNeo4j(String sourceEntityCode, String sourceId,
                                      String relationType, String targetEntityCode, String targetId) {
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
+            log.debug("syncRelationToNeo4j: Neo4j 不可用, skip");
+            return;
+        }
         // 安全校验
         if (sourceEntityCode == null || !sourceEntityCode.matches("[A-Za-z0-9_]+")
                 || targetEntityCode == null || !targetEntityCode.matches("[A-Za-z0-9_]+")
@@ -125,10 +127,10 @@ public class ObjectKgSyncService {
         }
 
         CompletableFuture.runAsync(() -> {
-            try (Session session = driver.session()) {
+            try {
                 // 使用参数化查询保护 id
                 // Label 和 Relationship Type 已通过正则安全校验
-                session.run(
+                neo4jClient.write(
                     "MERGE (a:`" + sourceEntityCode + "` {id: $sourceId}) " +
                     "MERGE (b:`" + targetEntityCode + "` {id: $targetId}) " +
                     "MERGE (a)-[:`" + relationType + "`]->(b)",
@@ -141,7 +143,8 @@ public class ObjectKgSyncService {
                         sourceEntityCode, sourceId, relationType, targetEntityCode, targetId, e.getMessage());
             }
         }).exceptionally(ex -> {
-            log.warn("KG sync RELATION async failed: {}", ex.getMessage());
+            log.warn("KG sync async RELATION failed for ({}:{})-[:{}]->({}:{}): {}",
+                    sourceEntityCode, sourceId, relationType, targetEntityCode, targetId, ex.getMessage());
             return null;
         });
     }

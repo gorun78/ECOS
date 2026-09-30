@@ -1,12 +1,17 @@
 package com.chinacreator.gzcm.engine.data.scheduler;
 
+import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
+import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
+import com.chinacreator.gzcm.runtime.core.task.parser.ITaskParser;
 import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -19,7 +24,7 @@ import java.util.*;
  * 每小时对比 information_schema.columns 快照，检测 Schema 变更。
  * <p>
  * 自动维护 schema_snapshots 和 schema_changes 两张表。
- * 双重调度：runtime-task 注册（可见性）+ Spring @Scheduled（实际执行）。
+ * 单一调度：runtime-task 注册 + cron 触发（H8-T3 收口，已移除 Spring @Scheduled 双轨）。
  * </p>
  */
 @Component
@@ -27,23 +32,30 @@ public class SchemaChangeDetector {
 
     private static final Logger log = LoggerFactory.getLogger(SchemaChangeDetector.class);
     private static final String CRON_HOURLY = "0 0 * * * ?";
+    private static final String TASK_TYPE = "SCHEMA_CHANGE_DETECT";
 
     private final JdbcTemplate jdbc;
     private final TaskSchedulerService taskScheduler;
+    private final ITaskManagementService taskManagementService;
 
-    public SchemaChangeDetector(JdbcTemplate jdbc, TaskSchedulerService taskScheduler) {
+    public SchemaChangeDetector(JdbcTemplate jdbc,
+                                TaskSchedulerService taskScheduler,
+                                ITaskManagementService taskManagementService) {
         this.jdbc = jdbc;
         this.taskScheduler = taskScheduler;
+        this.taskManagementService = taskManagementService;
     }
 
     @PostConstruct
     public void init() {
-        ensureTables();
-        // 注册到 runtime-task 全局调度（满足架构铁律2.3）
+        // H8-T1: schema_snapshots / schema_changes 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL。
+        taskManagementService.registerParser(TASK_TYPE, new SchemaDetectParser());
+        taskManagementService.registerExecutor(TASK_TYPE, new SchemaDetectExecutor());
+
         TaskDescription desc = new TaskDescription();
         desc.setTaskId("schema-change-detector");
         desc.setTaskName("Schema变更检测");
-        desc.setTaskType("SCHEMA_CHANGE_DETECT");
+        desc.setTaskType(TASK_TYPE);
         desc.setDescription("每小时对比information_schema.columns快照，检测新增/删除/类型变更");
         desc.setAsync(true);
         desc.setTimeout(300_000L);
@@ -54,44 +66,11 @@ public class SchemaChangeDetector {
         log.info("SchemaChangeDetector registered with runtime-task: cron={}", CRON_HOURLY);
     }
 
-    // ── DDL ──────────────────────────────────────────
-
-    private void ensureTables() {
-        jdbc.execute("""
-            CREATE TABLE IF NOT EXISTS schema_snapshots (
-                id          BIGSERIAL PRIMARY KEY,
-                datasource_id VARCHAR(128) NOT NULL,
-                table_name  VARCHAR(256) NOT NULL,
-                column_hash VARCHAR(64)  NOT NULL,
-                col_sig     TEXT,
-                snapshot_at TIMESTAMP    NOT NULL DEFAULT NOW()
-            )
-            """);
-
-        jdbc.execute("""
-            CREATE TABLE IF NOT EXISTS schema_changes (
-                id            BIGSERIAL PRIMARY KEY,
-                datasource_id VARCHAR(128) NOT NULL,
-                table_name    VARCHAR(256) NOT NULL,
-                change_type   VARCHAR(32)  NOT NULL,
-                detail_json   TEXT,
-                detected_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
-                acknowledged  BOOLEAN      NOT NULL DEFAULT FALSE
-            )
-            """);
-
-        jdbc.execute("""
-            CREATE INDEX IF NOT EXISTS idx_schema_changes_ack
-                ON schema_changes (acknowledged, detected_at)
-            """);
-    }
-
     // ── 调度执行 ─────────────────────────────────────
 
     /**
      * 每小时执行一次 schema 变更检测。
      */
-    @Scheduled(cron = "0 0 * * * ?")
     public void scheduledDetect() {
         log.debug("SchemaChangeDetector hourly scan starting");
         try {
@@ -294,20 +273,11 @@ public class SchemaChangeDetector {
     }
 
     private void insertSnapshot(SchemaInfo si) {
-        // schema_snapshots 表需要 col_sig 列 — 我们 ALTER 添加（幂等）
-        ensureColSigColumn();
+        // H8-T1: schema_snapshots.col_sig 列由 db/migration（V162）建表时即包含，运行时不再 ALTER。
         jdbc.update(
             "INSERT INTO schema_snapshots (datasource_id, table_name, column_hash, snapshot_at, col_sig) VALUES (?,?,?,?,?)",
             si.datasourceId, si.tableName, si.columnHash, LocalDateTime.now(), si.colSig
         );
-    }
-
-    private void ensureColSigColumn() {
-        try {
-            jdbc.execute("ALTER TABLE schema_snapshots ADD COLUMN IF NOT EXISTS col_sig TEXT");
-        } catch (Exception e) {
-            log.debug("col_sig column may already exist: {}", e.getMessage());
-        }
     }
 
     private void insertChange(SchemaChange sc) {
@@ -393,5 +363,72 @@ public class SchemaChangeDetector {
 
         public int getChangeCount() { return changeCount; }
         public int getTableCount() { return tableCount; }
+    }
+
+    private final class SchemaDetectParser implements ITaskParser {
+        @Override
+        public TaskExecutionPlan parse(TaskDescription taskDescription) throws TaskParseException {
+            validate(taskDescription);
+            TaskExecutionPlan plan = new TaskExecutionPlan();
+            plan.setTaskId(taskDescription.getTaskId());
+            TaskExecutionPlan.ExecutionStep step = new TaskExecutionPlan.ExecutionStep();
+            step.setStepId("step-1");
+            step.setStepName("Schema 变更检测");
+            step.setStepType(TASK_TYPE);
+            step.setExecutor(TASK_TYPE);
+            step.setConfig(taskDescription.getParameters() == null
+                    ? new HashMap<>() : new HashMap<>(taskDescription.getParameters()));
+            List<TaskExecutionPlan.ExecutionStep> steps = new ArrayList<>();
+            steps.add(step);
+            plan.setSteps(steps);
+            return plan;
+        }
+
+        @Override
+        public boolean supports(String taskType) {
+            return TASK_TYPE.equalsIgnoreCase(taskType);
+        }
+
+        @Override
+        public void validate(TaskDescription taskDescription) throws TaskParseException {
+            if (taskDescription == null
+                    || taskDescription.getTaskId() == null
+                    || taskDescription.getTaskId().isEmpty()) {
+                throw new TaskParseException("schema change detect task id is required");
+            }
+            if (!supports(taskDescription.getTaskType())) {
+                throw new TaskParseException("unsupported schema change task type: "
+                        + taskDescription.getTaskType());
+            }
+        }
+    }
+
+    private final class SchemaDetectExecutor implements ITaskExecutor {
+        @Override
+        public String execute(TaskExecutionPlan executionPlan, ITaskStatusCallback statusCallback)
+                throws TaskExecutionException {
+            try {
+                scheduledDetect();
+                return String.format("{\"taskType\":\"%s\",\"completedAt\":\"%s\"}",
+                        TASK_TYPE, java.time.Instant.now().toString());
+            } catch (Exception ex) {
+                log.error("SchemaChangeDetector runtime-task 执行失败: {}", ex.getMessage(), ex);
+                throw new TaskExecutionException("schema change detect failed", ex);
+            }
+        }
+
+        @Override
+        public void cancel(String taskId) { }
+
+        @Override
+        public void pause(String taskId) { }
+
+        @Override
+        public void resume(String taskId) { }
+
+        @Override
+        public TaskStatus getStatus(String taskId) {
+            return null;
+        }
     }
 }

@@ -166,7 +166,7 @@ public class FunctionController {
             return ApiResponse.success(vo);
         } catch (Exception e) {
             log.error("Function compile failed: expression={}", expression, e);
-            return ApiResponse.internalError("编译失败: " + e.getMessage());
+            return ApiResponse.internalError("编译失败");
         }
     }
 
@@ -255,7 +255,7 @@ public class FunctionController {
             return ApiResponse.success(vo);
         } catch (Exception e) {
             log.error("Function audit query failed", e);
-            return ApiResponse.internalError("审计查询失败: " + e.getMessage());
+            return ApiResponse.internalError("审计查询失败");
         }
     }
 

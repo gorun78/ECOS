@@ -73,7 +73,7 @@ public class AgentChatController {
             return ApiResponse.success(resp);
         } catch (Exception e) {
             log.error("Agent chat 执行失败", e);
-            return ApiResponse.internalError("Agent 执行失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent 执行失败");
         }
     }
 }

@@ -5,9 +5,10 @@
  * @license Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type SetStateAction } from 'react';
 import type { DataConnection, DataSyncTask, DataPipeline } from '../types';
 import type { ConnType } from '../types';
+import { getErrorMessage } from '../helpers';
 
 type ShowToast = (type: 'success' | 'info' | 'error', message: string) => void;
 type TFn = (key: string, params?: Record<string, unknown>) => string;
@@ -51,9 +52,9 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   // (its other fields are never populated) so we cannot read the tick from
   // it directly. We mirror the incoming tick whenever setPbOutput is called.
   const [refreshTick, setRefreshTick] = useState(0);
-  const setPbOutput = useCallback((v: PbOutput | null) => {
+  const setPbOutput = useCallback((v: SetStateAction<PbOutput | null>) => {
     setPbOutputState(v);
-    if (v?.refreshTick) setRefreshTick(v.refreshTick);
+    if (typeof v !== 'function' && v?.refreshTick) setRefreshTick(v.refreshTick);
   }, []);
   useEffect(() => {
     if (refreshTick === 0) return; // mount tick already covered above
@@ -126,7 +127,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
         setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'error' as const } : c));
         showToast('error', t('databench.layout.toast.connTestFailed', { name: conn.name }));
       }
-    } catch (e: any) {
+    } catch (e) {
       addLog(t('databench.layout.testLog.testFailed'));
       setConnections(p => p.map(c => c.id === connId ? { ...c, status: 'error' as const } : c));
       showToast('error', t('databench.layout.toast.connTestFailed', { name: conn.name }));
@@ -152,7 +153,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       } else {
         showToast('error', t('databench.layout.toast.connTestFailed', { name: ncName }));
       }
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('databench.layout.toast.connTestFailed', { name: ncName }));
     }
   }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, ncExtra, showToast, t, testConnection]);
@@ -171,7 +172,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       } else {
         showToast('error', t('dw.conn.testConnFailed'));
       }
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('dw.conn.testConnFailed'));
     }
   }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, ncExtra, showToast, t]);
@@ -192,9 +193,9 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
         const task = syncTasks.find(tk => tk.id === taskId);
         showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
       }
-    } catch (e: any) {
+    } catch (e) {
       const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: tn, errorMessage: e.message } : tk));
+      setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: tn, errorMessage: getErrorMessage(e) } : tk));
       const task = syncTasks.find(tk => tk.id === taskId);
       showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
     }
@@ -218,7 +219,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
       } else {
         showToast('error', t('databench.layout.toast.syncFormIncomplete'));
       }
-    } catch (e: any) {
+    } catch (e) {
       showToast('error', t('databench.layout.toast.syncFormIncomplete'));
     }
   }, [nsName, nsTable, nsConn, nsMode, nsSched, connections, showToast, t]);

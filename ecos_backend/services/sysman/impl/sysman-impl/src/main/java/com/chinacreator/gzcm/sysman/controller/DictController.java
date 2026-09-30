@@ -39,7 +39,7 @@ public class DictController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询字典类型失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -62,7 +62,7 @@ public class DictController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询字典类型失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -87,7 +87,7 @@ public class DictController {
             return ApiResponse.success(grouped);
         } catch (Exception e) {
             log.error("按子系统查询字典失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -101,7 +101,7 @@ public class DictController {
             return ApiResponse.success(items);
         } catch (Exception e) {
             log.error("查询字典项失败: type={}", type, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -118,7 +118,7 @@ public class DictController {
             return ApiResponse.success(item);
         } catch (Exception e) {
             log.error("查询字典项失败: type={}, code={}", type, code, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -148,7 +148,7 @@ public class DictController {
             return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建字典项失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -169,7 +169,7 @@ public class DictController {
             return ApiResponse.success(updated);
         } catch (Exception e) {
             log.error("更新字典项失败: type={}, code={}", type, code, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -189,7 +189,7 @@ public class DictController {
             return ApiResponse.success(Map.of("success", true, "dictType", type, "dictCode", code));
         } catch (Exception e) {
             log.error("删除字典项失败: type={}, code={}", type, code, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -204,7 +204,7 @@ public class DictController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("刷新字典缓存失败", e);
-            return ApiResponse.internalError("刷新失败: " + e.getMessage());
+            return ApiResponse.internalError("刷新失败");
         }
     }
 
@@ -218,7 +218,7 @@ public class DictController {
             return ApiResponse.success(usage);
         } catch (Exception e) {
             log.error("查询字典审计失败: type={}", type, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 }

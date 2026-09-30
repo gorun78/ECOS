@@ -71,7 +71,7 @@ export default function ResultTable({ result, loading, error }: ResultTableProps
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 500).map((row: any, i: number) => (
+            {rows.slice(0, 500).map((row, i) => (
               <tr key={i} className={`hover:bg-white/5 ${i % 2 === 0 ? '' : 'bg-black/10'}`}>
                 {columns.map(col => (
                   <td key={col} className={`px-3 py-1 ${styles.cardTextMuted} border-b ${styles.divider} max-w-[300px] truncate`}>
@@ -87,7 +87,7 @@ export default function ResultTable({ result, loading, error }: ResultTableProps
   );
 }
 
-function exportCSV(columns: string[], rows: Record<string, any>[]) {
+function exportCSV(columns: string[], rows: Record<string, unknown>[]) {
   const header = columns.join(',');
   const body = rows.map(row => columns.map(c => {
     const v = row[c];

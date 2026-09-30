@@ -22,5 +22,5 @@ export interface Relation {
   sourceObjectId: string;
   targetObjectId: string;
   targetEntityCode?: string;
-  targetData?: Record<string, any>;
+  targetData?: { name?: string; code?: string };
 }

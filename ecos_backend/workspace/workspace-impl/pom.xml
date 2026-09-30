@@ -47,10 +47,11 @@
         <!-- ★ G4 断链（PMO-50 决策2）：计算属性/Action 钩子改走 common-api 接口
              IFunctionPropertyEvaluator / IActionHookExecutor，真实 bean 由
              workspace-service（独立部署）或 gateway（monolith）的 classpath 提供 -->
-        <!-- ★ KG 同步依赖 Neo4j -->
+        <!-- ★ KG 同步依赖 Neo4j (PMO-74.3 T3: 收敛 runtime-access, Driver 经其传递提供) -->
         <dependency>
-            <groupId>org.neo4j.driver</groupId>
-            <artifactId>neo4j-java-driver</artifactId>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
@@ -63,5 +64,17 @@
             <artifactId>minio</artifactId>
         </dependency>
         <!-- 阶段5.1: market→workspace 已吸收，源码已复制，无需外部依赖 -->
+
+        <!-- 测试（H10-T1b：AbacQueryFilter 默认 DENY 用例；版本由根 pom dependencyManagement 单源管理） -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

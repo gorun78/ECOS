@@ -20,8 +20,11 @@ interface QueryToolbarProps {
   isHistoryOpen: boolean;
 }
 
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
 const Icon = ({ name, size = 16, className = '' }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const iconMap = Icons as unknown as Record<string, IconComponent>;
+  const Comp = iconMap[name] || iconMap.HelpCircle;
   return <Comp size={size} className={className} />;
 };
 

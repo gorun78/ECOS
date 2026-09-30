@@ -13,17 +13,9 @@ import {
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { useToast } from '../components/common/Toast';
+import { knowledgeQueryWithAuth } from '../services/knowledgeQueryApi';
 
 // ═══════════════════ API helpers ═══════════════════
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token') || '';
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) headers.Authorization = ['Bearer', token].join(' ');
-  return headers;
-}
 
 // ═══════════════════ Component ═══════════════════
 
@@ -47,12 +39,7 @@ export default function AIPKnowledgeView() {
     setLlmOutput('');
 
     try {
-      const response = await fetch('/api/v1/knowledge/query', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ query: queryInput })
-      });
-      const data = await response.json();
+      const data = await knowledgeQueryWithAuth({ query: queryInput });
 
       if (data.success || data.code === 0 || data.code === 200) {
       const payload = data.data || data;

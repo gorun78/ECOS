@@ -86,8 +86,8 @@ export default function DataResourcePickerModal({
     try {
       const data = await fetchAllResources();
       setResources(data);
-    } catch (err: any) {
-      setError(err?.message || DATA_CATALOG_UNAVAILABLE);
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || DATA_CATALOG_UNAVAILABLE);
       setResources([]);
     } finally {
       setLoading(false);

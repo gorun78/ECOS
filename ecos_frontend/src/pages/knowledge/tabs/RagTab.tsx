@@ -21,6 +21,22 @@ interface QARound {
   question: string; answer: string; sources: RagSource[]; overallConfidence: number;
 }
 
+/** knowledgeApi.runRAGQuery 返回的原始来源条目（由既有函数签名推导，不改动 API 层） */
+type RagApiSource = Awaited<ReturnType<typeof knowledgeApi.runRAGQuery>>['sources'][number];
+
+/** 旧 /knowledge/query 端点返回形态（runKnowledgeQuery 返回 unknown，在此边界收窄） */
+interface LegacyGroundedDoc {
+  title?: string;
+  name?: string;
+  snippet?: string;
+  description?: string;
+  score?: number;
+}
+interface LegacyKnowledgeQueryResult {
+  llmOutput?: string;
+  groundedDocs?: LegacyGroundedDoc[];
+}
+
 const MAX_HISTORY = 3;
 
 function confStyle(s: number) {
@@ -75,7 +91,7 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
         query: q, topK: 5,
         categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
-      const srcs: RagSource[] = (result.sources || []).map((s: any) => ({
+      const srcs: RagSource[] = (result.sources || []).map((s: RagApiSource) => ({
         title: s.title || 'Unknown', type: s.type || 'document',
         snippet: s.snippet || '', score: s.score ?? 0, page: s.page,
       }));
@@ -87,10 +103,10 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
       setOverallConfidence(avg);
 
       if (!result.answer) {
-        const legacy = await knowledgeApi.runKnowledgeQuery(q) as any;
+        const legacy = await knowledgeApi.runKnowledgeQuery(q) as LegacyKnowledgeQueryResult;
         if (legacy?.llmOutput) setLlmOutput(legacy.llmOutput);
         if (!srcs.length && legacy?.groundedDocs) {
-          const ls: RagSource[] = (legacy.groundedDocs || []).map((d: any) => ({
+          const ls: RagSource[] = (legacy.groundedDocs || []).map((d: LegacyGroundedDoc) => ({
             title: d.title || d.name || 'Unknown', type: 'document',
             snippet: d.snippet || d.description || '', score: d.score ?? 0,
           }));

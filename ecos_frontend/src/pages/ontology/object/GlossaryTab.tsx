@@ -65,9 +65,9 @@ export default function GlossaryTab({ objectType, onToast }: GlossaryTabProps) {
           setTerms(list);
         }
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err?.message || '');
+          setError((err as { message?: string } | undefined)?.message || '');
         }
       })
       .finally(() => {
@@ -108,8 +108,8 @@ export default function GlossaryTab({ objectType, onToast }: GlossaryTabProps) {
           'success',
           t('ow.glossaryBinding.bindSuccess').replace('{count}', String(termIds.length)),
         );
-      } catch (err: any) {
-        onToast?.('error', err?.message || t('ow.glossaryBinding.saveFailed'));
+      } catch (err: unknown) {
+        onToast?.('error', (err as { message?: string } | undefined)?.message || t('ow.glossaryBinding.saveFailed'));
       } finally {
         setBinding(false);
       }
@@ -132,8 +132,8 @@ export default function GlossaryTab({ objectType, onToast }: GlossaryTabProps) {
         await bindTermToEntity(termId, objectTypeId, primary);
         await refreshTerms();
         onToast?.('success', successMsg);
-      } catch (err: any) {
-        onToast?.('error', err?.message || t('ow.glossaryBinding.saveFailed'));
+      } catch (err: unknown) {
+        onToast?.('error', (err as { message?: string } | undefined)?.message || t('ow.glossaryBinding.saveFailed'));
       } finally {
         setPendingTermId(null);
       }

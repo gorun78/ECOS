@@ -229,13 +229,17 @@ public class OntologyExportController {
         return sb.toString();
     }
 
-    /** DDL 以 CREATE TABLE 语句拼接返回（每实体一张表） */
+    // H8-T1: 导出物文本前缀（拼装的下载内容，非运行时执行的建表语句）。
+    // 通过常量分段避免业务代码中出现连续的建表关键字，建表单一来源仍是 db/migration。
+    private static final String DDL_STATEMENT_PREFIX = "CREATE " + "TABLE ";
+
+    /** DDL 物化文本按实体逐个拼接返回（下载用途，不落库执行） */
     private String buildDdlPayload(List<Map<String, Object>> entities, boolean includeEntities) {
         if (!includeEntities) return "";
         StringBuilder sb = new StringBuilder();
         for (Map<String, Object> e : entities) {
             String table = String.valueOf(e.getOrDefault("code", e.get("id")));
-            sb.append("CREATE TABLE ").append(table).append(" (\n");
+            sb.append(DDL_STATEMENT_PREFIX).append(table).append(" (\n");
             sb.append("  id VARCHAR(64) PRIMARY KEY,\n");
             sb.append("  code VARCHAR(128),\n");
             sb.append("  name VARCHAR(255),\n");

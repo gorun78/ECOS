@@ -1,5 +1,8 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlSecurityGate;
+import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +68,22 @@ public class ToolExecutorService {
     @Autowired
     private ToolRegistry toolRegistry;
 
+    // H8-T4 (PMO-74 L3): Agent 工具 SQL 安全闸 —— 表/列白名单 + security-engine
+    // policy-engine/evaluate 裁决（铁律 §2.4-4/§2.4-6；不可用/超时/不可解析 = DENY）。
+    // setter 注入与本类 jdbcTemplate 既有风格一致（字段注入存量清单归 H11-T3 统一整改）。
+    private AgentToolSqlSecurityGate sqlSecurityGate;
+    private AgentToolSqlWhitelist sqlWhitelist;
+
+    @Autowired(required = false)
+    public void setSqlSecurityGate(AgentToolSqlSecurityGate sqlSecurityGate) {
+        this.sqlSecurityGate = sqlSecurityGate;
+    }
+
+    @Autowired(required = false)
+    public void setSqlWhitelist(AgentToolSqlWhitelist sqlWhitelist) {
+        this.sqlWhitelist = sqlWhitelist;
+    }
+
     public ToolExecutorService() {
         this.restTemplate = new RestTemplate();
         initFallbackTools();
@@ -102,6 +121,11 @@ public class ToolExecutorService {
 
         // 优先走 ToolRegistry（统一工具管理）
         if (toolRegistry != null && toolRegistry.has(toolName)) {
+            // H8-T4: 注册表路径（如 query_db，sql 为 LLM 直供参数）同样先过安全闸
+            ToolResult registryDeny = guardSqlFromArguments(toolName, arguments, callId, startNs);
+            if (registryDeny != null) {
+                return registryDeny;
+            }
             return toolRegistry.execute(toolName, arguments);
         }
 
@@ -109,6 +133,18 @@ public class ToolExecutorService {
             ToolDefinitionEntry def = loadToolDefinition(toolName);
             if (def == null) {
                 return buildError(callId, toolName, "工具未找到: " + toolName, startNs);
+            }
+
+            // H8-T4: SQL 型工具在调用方线程完成「白名单 + security-engine 裁决」
+            // （dispatch 运行在独立 executor 线程，SecurityContext/TenantContextHolder
+            //  等 token 上下文 ThreadLocal 不可见，裁决必须在此取主体）
+            if ("SQL".equalsIgnoreCase(def.toolType)) {
+                String guardedSql = resolveToolSql(def, arguments);
+                ToolResult sqlDeny = guardSql(toolName, guardedSql,
+                        extractBoundParamNames(def.schemaJson), callId, startNs);
+                if (sqlDeny != null) {
+                    return sqlDeny;
+                }
             }
 
             String result = executeWithTimeout(def, arguments);
@@ -171,10 +207,16 @@ public class ToolExecutorService {
             // 4. 高危指令 → 调 SecuritySandboxService 审查
             Boolean highRisk = reviewBySandboxService(instruction, userId);
             if (highRisk == null) {
-                // SecuritySandboxService 不可用 → 降级放行，但记录警告日志
-                log.warn("R1.3 SecuritySandboxService 不可用，高危指令降级放行: tool={}, user={}, instruction={}",
-                        toolName, userId, truncate(instruction, 200));
-                return null;
+                // H8-T4 收口：SecuritySandboxService 不可用 → 默认 DENY（铁律 §2.4-6
+                // 「宁可误拒不可误放」，废止原「降级放行」路径）
+                log.warn("R1.3/H8-T4 SecuritySandboxService 不可用，高危指令默认拒绝（fail-closed）: "
+                        + "tool={}, user={}, instruction={}",
+                        toolName, userId, truncate(instruction, 200),
+                        new IllegalStateException("SecuritySandboxService unavailable (RLS §2.4-6 DENY)"));
+                writeSandboxBlockAudit(userId, toolName, instruction);
+                long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+                return ToolResult.fail(callId, toolName,
+                        "安全裁决服务不可用，高危指令默认拒绝（fail-closed，铁律 §2.4-6）", elapsedMs);
             }
 
             if (highRisk) {
@@ -190,15 +232,29 @@ public class ToolExecutorService {
             // 审查通过 → 放行
             return null;
         } catch (Exception e) {
-            log.warn("R1.3 沙盒审查异常，降级放行: tool={}, error={}", toolName, e.getMessage());
+            // 审查器自身异常（高危判定前）：维持放行，但日志带堆栈（M15 空/裸日志治理）
+            log.warn("R1.3 沙盒审查异常（未达高危判定阶段，维持放行）: tool={}, error={}",
+                    toolName, e.getMessage(), e);
             return null;
         }
     }
 
     /**
-     * R1.3: 从 SecurityContext 获取当前用户 ID。
+     * R1.3 / H8-T4: 从 token 上下文获取当前用户 ID。
+     * <p>解析顺序：sysman UserContext（ThreadLocal，由 HeaderAuthInterceptor 从
+     * gateway token 链路还原）→ Spring SecurityContext principal。
+     * <b>禁止</b>从工具参数/请求体自报值取主体（PMO-74 H9-T1 口径）。</p>
      */
     private String getCurrentUserId() {
+        try {
+            Class<?> uc = Class.forName("com.chinacreator.gzcm.sysman.iam.context.UserContext");
+            Object id = uc.getMethod("getCurrentUserId").invoke(null);
+            if (id != null && !String.valueOf(id).isBlank()) {
+                return String.valueOf(id);
+            }
+        } catch (Throwable ignored) {
+            // sysman 不在 classpath（独立 ai-engine-boot 进程），落到 SecurityContext
+        }
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.isAuthenticated()) {
@@ -421,12 +477,14 @@ public class ToolExecutorService {
             throw new IllegalStateException("JdbcTemplate 不可用，无法执行 SQL 工具");
         }
 
-        Object schemaObj = def.schemaJson;
-        String sql = extractSqlFromSchema(schemaObj, arguments);
-
-        if (sql == null || sql.isBlank()) {
-            sql = (String) arguments.get("sql");
+        // H8-T4: 防御纵深 —— 安全闸未装配时拒绝一切 SQL 工具（fail-closed，§2.4-6）
+        if (sqlSecurityGate == null) {
+            throw new IllegalStateException(
+                    "[H8-T4] SQL 安全闸（AgentToolSqlSecurityGate）未装配，拒绝执行 SQL 工具（fail-closed）");
         }
+
+        Object schemaObj = def.schemaJson;
+        String sql = resolveToolSql(def, arguments);
         if (sql == null || sql.isBlank()) {
             throw new IllegalArgumentException("SQL 工具缺少 SQL 语句定义");
         }
@@ -440,6 +498,85 @@ public class ToolExecutorService {
             "rows", rows,
             "count", rows.size()
         ));
+    }
+
+    // ── H8-T4 SQL 安全闸 helpers ──────────────────────────────────────────
+
+    /**
+     * 解析工具的最终 SQL 文本（与 executeSql 的解析顺序完全一致）：
+     * schema 定义优先，其次 arguments 的 sql 字段。
+     */
+    private String resolveToolSql(ToolDefinitionEntry def, Map<String, Object> arguments) {
+        String sql = extractSqlFromSchema(def.schemaJson, arguments);
+        if (sql == null || sql.isBlank()) {
+            Object arg = arguments != null ? arguments.get("sql") : null;
+            if (arg instanceof String s) sql = s;
+        }
+        return sql;
+    }
+
+    /** 注册表路径：arguments 若携带 sql 参数（如 query_db，sql 由 LLM 直供），先过安全闸 */
+    private ToolResult guardSqlFromArguments(String toolName, Map<String, Object> arguments,
+                                             String callId, long startNs) {
+        Object arg = arguments != null ? arguments.get("sql") : null;
+        if (!(arg instanceof String s) || s.isBlank()) {
+            return null; // 非 SQL 类注册工具，维持原路径
+        }
+        return guardSql(toolName, s, Collections.emptyList(), callId, startNs);
+    }
+
+    /**
+     * H8-T4: SQL 工具执行前统一安全闸（必须在调用方线程执行，以读取 token 上下文）。
+     * 主体一律取 SecurityContext / sysman UserContext（token 链路），禁止取参数自报值。
+     *
+     * @return 拒绝执行的 ToolResult；null = 裁决 ALLOW
+     */
+    private ToolResult guardSql(String toolName, String sql, Collection<String> boundParams,
+                                String callId, long startNs) {
+        if (sqlSecurityGate == null) {
+            log.warn("H8-T4 SQL 安全闸未装配，拒绝执行（fail-closed）: tool={}", toolName);
+            return buildError(callId, toolName,
+                    "[H8-T4] SQL 安全闸不可用，拒绝执行（默认 DENY）", startNs);
+        }
+        if (sql == null || sql.isBlank()) {
+            return null; // 无 SQL 可裁决，交由 executeSql 报「缺少 SQL」原有错误
+        }
+        String userId = getCurrentUserId();
+        String tenantId = TenantContextHolder.getTenantId();
+        AgentToolSqlSecurityGate.Decision decision =
+                sqlSecurityGate.review(toolName, sql, boundParams, userId, tenantId);
+        if (!decision.allowed()) {
+            log.warn("H8-T4 Agent SQL 工具被安全闸拒绝: tool={} user={} reason={}",
+                    toolName, userId, decision.reason());
+            return buildError(callId, toolName, "[H8-T4] SQL 被安全裁决拒绝: " + decision.reason(), startNs);
+        }
+        return null;
+    }
+
+    /** schema 声明的绑定参数名（将拼入 WHERE 子句或作为 ? 的列约束），供白名单校验 */
+    @SuppressWarnings("unchecked")
+    private List<String> extractBoundParamNames(Object schemaObj) {
+        List<String> names = new ArrayList<>();
+        try {
+            Map<String, Object> schemaMap;
+            if (schemaObj instanceof String s) {
+                schemaMap = objectMapper.readValue(s, Map.class);
+            } else if (schemaObj instanceof Map) {
+                schemaMap = (Map<String, Object>) schemaObj;
+            } else {
+                return names;
+            }
+            List<Map<String, Object>> parameters = (List<Map<String, Object>>) schemaMap.get("parameters");
+            if (parameters != null) {
+                for (Map<String, Object> param : parameters) {
+                    Object name = param.get("name");
+                    if (name instanceof String s && !s.isBlank()) names.add(s);
+                }
+            }
+        } catch (Exception ignored) {
+            // 解析失败 → 空参数名列表；SQL 文本本身仍会被安全闸全量校验
+        }
+        return names;
     }
 
     // ── REST Execution ────────────────────────────────────────────────────
@@ -613,28 +750,49 @@ public class ToolExecutorService {
                 return null;
             }
 
-            // 直接 sql 字段
+            // 直接 sql 字段（管理端定义的 SQL —— 仍会经由 H8-T4 安全闸在调用方线程裁决）
             Object sql = schemaMap.get("sql");
             if (sql instanceof String s && !s.isBlank()) {
                 return s;
             }
 
-            // 从参数列表构建占位符 SQL（表名 + 参数拼 WHERE）
+            // 从参数列表构建占位符 SQL。
+            // H8-T4 (PMO-74 L3) 整改：table 与参数名不再裸拼进 SQL ——
+            //   ① 表名必须为合法标识符且在 Agent 工具 SQL 白名单中显式授权；
+            //   ② SELECT 列 = 白名单授权列清单（仅当管理员显式授权 "*" 时才保留 SELECT *）；
+            //   ③ WHERE 参数名必须是合法标识符且属于该表授权列（阻断 IR04 注入面）。
             List<Map<String, Object>> parameters = (List<Map<String, Object>>) schemaMap.get("parameters");
             Object tableObj = schemaMap.get("table");
             if (tableObj instanceof String table && parameters != null) {
-                StringBuilder sb = new StringBuilder("SELECT * FROM ").append(table).append(" WHERE 1=1");
+                if (sqlWhitelist == null) {
+                    throw new IllegalStateException(
+                            "[H8-T4] SQL 白名单组件未装配，拒绝按 schema 生成 SQL（fail-closed）");
+                }
+                Set<String> allowedCols = sqlWhitelist.requireAllowedColumns(table);
+                boolean allCols = allowedCols.contains(AgentToolSqlWhitelist.ALL_COLUMNS);
+                StringBuilder sb = new StringBuilder("SELECT ");
+                if (allCols) {
+                    sb.append("*");
+                } else {
+                    sb.append(String.join(",", allowedCols));
+                }
+                sb.append(" FROM ").append(table).append(" WHERE 1=1");
                 for (Map<String, Object> param : parameters) {
                     String name = (String) param.get("name");
+                    if (name == null || name.isBlank()) continue;
                     if (arguments.containsKey(name)) {
+                        sqlWhitelist.requireAllowedColumn(table, name);
                         sb.append(" AND ").append(name).append(" = ?");
                     }
                 }
                 sb.append(" LIMIT 100");
                 return sb.toString();
             }
+        } catch (IllegalArgumentException | IllegalStateException guarded) {
+            // H8-T4 白名单拒绝 —— 原样上抛，不吞进「schema 即 SQL」兜底分支
+            throw guarded;
         } catch (Exception e) {
-            // schema 本身可能就是 SQL 字符串
+            // schema 本身可能就是 SQL 字符串（同样会过安全闸）
             if (schemaObj instanceof String s) return s;
         }
         return null;
@@ -662,6 +820,7 @@ public class ToolExecutorService {
                 }
             }
         } catch (Exception ignored) {
+            log.warn("从 schema 提取位置参数失败，本次仅传递已识别参数: {}", ignored.getMessage());
         }
         return params;
     }
@@ -672,7 +831,9 @@ public class ToolExecutorService {
         if (val instanceof Number n) return n.doubleValue();
         if (val instanceof String s) {
             try { return Double.parseDouble(s); }
-            catch (NumberFormatException ignored) {}
+            catch (NumberFormatException ignored) {
+                log.debug("double 参数解析失败，回退默认值: key={} default={}", key, defaultValue);
+            }
         }
         return defaultValue;
     }

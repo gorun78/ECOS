@@ -7,9 +7,10 @@ import React from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { ThemeStyles } from '../../../components/ThemeContext';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const Comp = (Icons[name as keyof typeof Icons] ?? Icons.HelpCircle) as LucideIcon;
   return <Comp size={size} className={className} />;
 };
 

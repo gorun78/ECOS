@@ -128,8 +128,8 @@ public class MetadataStrategyCompatController {
             String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(cfg);
             dataSourceService.updateMetadataConfig(datasourceId, json);
         } catch (Exception e) {
-            log.warn("Compat: strategy save failed for datasource={}: {}", datasourceId, e.getMessage());
-            return ApiResponse.internalError("策略保存失败: " + e.getMessage());
+            log.warn("Compat: strategy save failed for datasource={}", datasourceId, e);
+            return ApiResponse.internalError("策略保存失败");
         }
 
         // 切换到 ON_SAVE 时触发异步采集（复用 MetadataAsyncTrigger，不重复实现，§2.5）

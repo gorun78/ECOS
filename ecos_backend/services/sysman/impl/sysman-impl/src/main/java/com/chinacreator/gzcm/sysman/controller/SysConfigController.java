@@ -104,8 +104,8 @@ public class SysConfigController {
             r.put("total", rows.size());
             return ApiResponse.success(r);
         } catch (Exception e) {
-            log.error("查询配置失败: {}", e.getMessage());
-            return ApiResponse.internalError("查询配置失败: " + e.getMessage());
+            log.error("查询配置失败", e);
+            return ApiResponse.internalError("查询配置失败");
         }
     }
 
@@ -132,8 +132,8 @@ public class SysConfigController {
             r.put("updated", true);
             return ApiResponse.success(r);
         } catch (Exception e) {
-            log.error("更新配置失败: {}", e.getMessage());
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            log.error("更新配置失败", e);
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -176,8 +176,8 @@ public class SysConfigController {
 
             return ApiResponse.success(result);
         } catch (Exception e) {
-            log.error("查询配置元数据失败: {}", e.getMessage());
-            return ApiResponse.internalError("查询配置元数据失败: " + e.getMessage());
+            log.error("查询配置元数据失败", e);
+            return ApiResponse.internalError("查询配置元数据失败");
         }
     }
 
@@ -237,8 +237,8 @@ public class SysConfigController {
 
             return ApiResponse.success(wrapper);
         } catch (Exception e) {
-            log.error("配置审计失败: {}", e.getMessage());
-            return ApiResponse.internalError("配置审计失败: " + e.getMessage());
+            log.error("配置审计失败", e);
+            return ApiResponse.internalError("配置审计失败");
         }
     }
 }

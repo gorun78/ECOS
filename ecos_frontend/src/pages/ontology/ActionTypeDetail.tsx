@@ -38,7 +38,7 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
   const [newValExpression, setNewValExpression] = useState('');
   const [newValError, setNewValError] = useState('');
 
-  const handleFieldChange = (key: keyof ActionType, value: any) => { onUpdate({ ...actionType, [key]: value }); };
+  const handleFieldChange = (key: keyof ActionType, value: unknown) => { onUpdate({ ...actionType, [key]: value }); };
 
   const handleAddParam = () => {
     if (!newParamName.trim()) return;
@@ -52,7 +52,7 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
     onUpdate({ ...actionType, parameters: actionType.parameters.filter(p => p.id !== paramId), rules: actionType.rules.filter(r => r.targetParameterId !== paramId) });
   };
 
-  const handleParamFieldChange = (paramId: string, field: keyof ActionParameter, value: any) => {
+  const handleParamFieldChange = (paramId: string, field: keyof ActionParameter, value: unknown) => {
     onUpdate({ ...actionType, parameters: actionType.parameters.map(p => p.id === paramId ? { ...p, [field]: value } : p) });
   };
 
@@ -63,7 +63,7 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
   };
 
   const handleRemoveRule = (ruleId: string) => { onUpdate({ ...actionType, rules: actionType.rules.filter(r => r.id !== ruleId) }); };
-  const handleRuleChange = (ruleId: string, field: keyof ActionRule, value: any) => { onUpdate({ ...actionType, rules: actionType.rules.map(r => r.id === ruleId ? { ...r, [field]: value } : r) }); };
+  const handleRuleChange = (ruleId: string, field: keyof ActionRule, value: unknown) => { onUpdate({ ...actionType, rules: actionType.rules.map(r => r.id === ruleId ? { ...r, [field]: value } : r) }); };
 
   const handleAddPropertyEdit = (ruleId: string, propertyId: string) => {
     const rule = actionType.rules.find(r => r.id === ruleId);

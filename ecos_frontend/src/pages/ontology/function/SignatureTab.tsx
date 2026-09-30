@@ -11,10 +11,10 @@ import { useTheme } from '../../../components/ThemeContext';
 interface SignatureTabProps {
   func: FunctionType;
   objectTypes: ObjectType[];
-  handleFieldChange: (key: keyof FunctionType, value: any) => void;
+  handleFieldChange: (key: keyof FunctionType, value: unknown) => void;
   handleAddParam: () => void;
   handleRemoveParam: (name: string) => void;
-  handleParamFieldChange: (name: string, field: keyof FunctionParameter, value: any) => void;
+  handleParamFieldChange: (name: string, field: keyof FunctionParameter, value: unknown) => void;
   newParamName: string;
   setNewParamName: (v: string) => void;
   newParamType: string;

@@ -35,7 +35,7 @@ public class PipelineFunctionController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("列出函数失败", e);
-            return ApiResponse.internalError("列出函数失败: " + e.getMessage());
+            return ApiResponse.internalError("列出函数失败");
         }
     }
 
@@ -46,7 +46,7 @@ public class PipelineFunctionController {
             return ApiResponse.success(functionService.listByCategory(category));
         } catch (Exception e) {
             log.error("按分类列出函数失败: category={}", category, e);
-            return ApiResponse.internalError("按分类列出函数失败: " + e.getMessage());
+            return ApiResponse.internalError("按分类列出函数失败");
         }
     }
 
@@ -57,7 +57,7 @@ public class PipelineFunctionController {
             return ApiResponse.success(functionService.search(q));
         } catch (Exception e) {
             log.error("搜索函数失败: q={}", q, e);
-            return ApiResponse.internalError("搜索函数失败: " + e.getMessage());
+            return ApiResponse.internalError("搜索函数失败");
         }
     }
 
@@ -70,7 +70,7 @@ public class PipelineFunctionController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("获取函数详情失败: id={}", id, e);
-            return ApiResponse.internalError("获取函数详情失败: " + e.getMessage());
+            return ApiResponse.internalError("获取函数详情失败");
         }
     }
 
@@ -81,7 +81,7 @@ public class PipelineFunctionController {
             return ApiResponse.success(functionService.getCategories());
         } catch (Exception e) {
             log.error("获取函数分类失败", e);
-            return ApiResponse.internalError("获取函数分类失败: " + e.getMessage());
+            return ApiResponse.internalError("获取函数分类失败");
         }
     }
 
@@ -94,7 +94,7 @@ public class PipelineFunctionController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("创建函数失败", e);
-            return ApiResponse.internalError("创建函数失败: " + e.getMessage());
+            return ApiResponse.internalError("创建函数失败");
         }
     }
 
@@ -108,7 +108,7 @@ public class PipelineFunctionController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("更新函数失败: id={}", id, e);
-            return ApiResponse.internalError("更新函数失败: " + e.getMessage());
+            return ApiResponse.internalError("更新函数失败");
         }
     }
 
@@ -122,7 +122,7 @@ public class PipelineFunctionController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("删除函数失败: id={}", id, e);
-            return ApiResponse.internalError("删除函数失败: " + e.getMessage());
+            return ApiResponse.internalError("删除函数失败");
         }
     }
 }

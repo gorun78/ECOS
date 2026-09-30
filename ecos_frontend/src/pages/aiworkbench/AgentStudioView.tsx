@@ -7,15 +7,16 @@ import React, { useState, useEffect } from 'react';
 import { AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
 import { authHeaders, convertMeshAgentToAIP } from '../../services/aiworkbenchApi';
 import type { AgentMeshAgentRaw } from '../../services/aiworkbenchApi';
-import * as Icons from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import SimulationModal from '../../components/aiworkbench/agent-studio/SimulationModal';
-
-const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
-  return <Comp size={size} className={className} />;
-};
+import { Icon } from './agent-studio/Icon';
+import AgentListSidebar from './agent-studio/AgentListSidebar';
+import AgentConfigEditor from './agent-studio/AgentConfigEditor';
+import ChatPlayground from './agent-studio/ChatPlayground';
+import AgentFormModal from './agent-studio/AgentFormModal';
+import { buildMockAgentReply } from './agent-studio/agentStudioHelpers';
+import type { ChatMessage } from './agent-studio/agentStudioHelpers';
 
 interface AgentStudioViewProps {
   agents: AIPAgent[];
@@ -24,21 +25,6 @@ interface AgentStudioViewProps {
   onUpdateAgents: (updated: AIPAgent[]) => void;
   onAddAuditLog: (log: AIPAuditLog) => void;
   showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
-}
-
-interface ChatMessage {
-  id: string;
-  sender: 'user' | 'agent' | 'system';
-  content: string;
-  timestamp: string;
-  thinkingTrace?: string[];
-  actionProposal?: {
-    id?: string;
-    actionId: string;
-    actionName: string;
-    payload: Record<string, string>;
-    status: 'pending' | 'approved' | 'rejected';
-  };
 }
 
 export default function AgentStudioView({
@@ -287,46 +273,9 @@ export default function AgentStudioView({
 
     setTimeout(() => {
       const replyMsgId = `agent-${Date.now()}`;
-      
-      let replyContent = '';
-      let thinkingTrace: string[] = [];
-      let proposal: ChatMessage['actionProposal'] = undefined;
 
-      const lowerText = text.toLowerCase();
-      if (lowerText.includes('ua102') || lowerText.includes('查询')) {
-        thinkingTrace = [
-          '⚡ 正在解析用户请求，提取 Ontology 目标：航班 "UA102"',
-          '🔍 触发系统集成查询：检索 ObjectType: Flight (ID: UA102)',
-          '🔗 级联读取关联属性：执飞飞机 N101UA, 指派飞行员 P01 (张建国)',
-          '📊 融合数据安全审计：PII 脱敏机制启动，正常运行。'
-        ];
-        replyContent = `已为您成功从航空本体库拉取 **UA102** 航班的实时多维详情：\n\n*   **航班号**: UA102 (芝加哥 ORD → 旧金山 SFO)\n*   **计划起飞**: 今日 08:00 (ON_TIME 准点)\n*   **执飞机型**: Boeing 737-800 (尾号: **N101UA**)\n*   **责任机长**: **张建国** (Captain, 累积飞行 8200 小时)\n\n**AI 安全评估建议**：\n执飞飞机 N101UA 的最后维保时间为 2026-05-12，气象检测显示 ORD 机场阵风 12 节，适航评级为【极佳(Excellent)】。无需调配改签。`;
-      } else if (lowerText.includes('延误') || lowerText.includes('小时') || lowerText.includes('改') || lowerText.includes('reschedule')) {
-        thinkingTrace = [
-          '⚡ 用户请求对本体数据发起修改指令。操作意图: 重新调度/航班重新指派',
-          '🛡️ 安全审查：触发 Guardrail: Ontology Action 强制人工确认 (gr-approval)',
-          '⚠️ 检测到操作对象：Flight: UA102, 修改延误参数：120 分钟',
-          '💾 构造 Ontology Action Payload, 暂停事务，发送授权请求卡片...'
-        ];
-        replyContent = `我已理解您的调配指令：因突发设备检测，需将 **UA102** 航班延误状态更新。由于该操作涉及本体状态修改，受 **AIP Guardrails 安全护栏约束**，必须由您点击下方卡片人工确认授权，方可写入企业主本体数据库。`;
-        proposal = {
-          actionId: 'act_reschedule_flight',
-          actionName: '重新指派航班与状态修改 (act_reschedule_flight)',
-          payload: {
-            flight_number: 'UA102',
-            new_status: 'DELAYED',
-            delay_minutes: '120',
-            auth_required_by: 'AOC_DIRECTOR'
-          },
-          status: 'pending'
-        };
-      } else {
-        thinkingTrace = [
-          '⚡ 解析通用会话指令...',
-          '🧠 调用大语言模型大局观评估...'
-        ];
-        replyContent = `我是一个工作在航空运行控制大厅的智能助手。我可以协助您高效检索以下本体信息：\n\n1.  **航班与气象级联查询** (如："帮我查询 UA102 航班状态及风险")\n2.  **机组与CAAC合规审查** (如："评估飞行员 P02 的疲劳与资质风险")\n3.  **拟定 Ontology 修改意图** (如："帮我把 UA102 航班延误改派为2小时")`;
-      }
+      // mock 回复决策为纯函数，已抽取至 agent-studio/agentStudioHelpers.ts（逐行一致）
+      const { replyContent, thinkingTrace, proposal } = buildMockAgentReply(text);
 
       if (proposal) {
         fetch('/api/v1/ontology/proposals', {
@@ -443,166 +392,28 @@ export default function AgentStudioView({
 
   return (
     <div className={`flex h-full overflow-hidden select-none ${styles.appBg} ${styles.appText} text-xs`}>
-      
-      {/* 1. Left Agents List */}
-      <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
-        <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between ${styles.inputBg}`}>
-          <span className={`font-bold ${styles.cardText}`}>智能助手工坊 ({agents.length})</span>
-          <button
-            onClick={handleStartCreate}
-            className={`p-1 ${styles.badgeBg} hover:opacity-80 ${styles.accentText} ${styles.accentBorder} border rounded-md transition-colors cursor-pointer`}
-            title="新增智能体"
-          >
-            <Icon name="Plus" size={12} />
-          </button>
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
-          {agents.map(a => {
-            const isSelected = selectedAgentId === a.id;
-            return (
-              <div
-                key={a.id}
-                onClick={() => setSelectedAgentId(a.id)}
-                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 ${
-                  isSelected
-                    ? `${styles.accentBg} text-white shadow-xs`
-                    : `${styles.cardTextMuted} hover:${styles.inputBg}`
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold">
-                  <span className={`p-1 rounded ${isSelected ? 'bg-blue-600 text-white' : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
-                    <Icon name={a.avatar} size={11} />
-                  </span>
-                  <span className="truncate">{a.name}</span>
-                </div>
-                <p className={`text-[10px] line-clamp-2 leading-relaxed ${styles.cardTextMuted}`}>
-                  {a.role}
-                </p>
-                <div className={`flex items-center justify-between text-[9px] pt-1 mt-0.5 border-t ${styles.inputBorder}/10`}>
-                  <span className={`font-mono ${styles.cardTextMuted}`}>{a.modelId.replace('-1.5-pro', '')}</span>
-                  <span className={`px-1 ${styles.badgeBg} ${styles.accentText} rounded text-[8px] font-bold`}>ACTIVE</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* 1. Left Agents List */}
+      <AgentListSidebar
+        agents={agents}
+        selectedAgentId={selectedAgentId}
+        onSelect={setSelectedAgentId}
+        onCreate={handleStartCreate}
+      />
 
       {/* 2. Central Agent Settings Config Editor */}
       {selectedAgent ? (
         <div className="flex-1 flex overflow-hidden">
-          <div className={`flex-1 flex flex-col h-full ${styles.inputBg} overflow-y-auto p-5 space-y-4`}>
-            
-            {/* Agent Header */}
-            <div className={`${styles.cardBg} border ${styles.cardBorder} p-4 rounded-xl shadow-xs flex items-start justify-between`}>
-              <div className="flex gap-3">
-                <span className={`p-3 rounded-xl ${styles.badgeBg} ${styles.accentText} shrink-0`}>
-                  <Icon name={selectedAgent.avatar} size={20} />
-                </span>
-                <div className="space-y-1">
-                  <h2 className={`text-sm font-black ${styles.cardText}`}>{selectedAgent.name}</h2>
-                  <p className={`text-xs font-bold ${styles.accentText}`}>{selectedAgent.role}</p>
-                  <p className={`text-[11px] ${styles.cardTextMuted} max-w-lg leading-relaxed`}>{selectedAgent.description}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleStartEdit(selectedAgent)}
-                  className={`px-2.5 py-1.5 ${styles.appBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-all cursor-pointer flex items-center gap-1`}
-                >
-                  <Icon name="Settings2" size={11} />
-                  <span>管理智能体</span>
-                </button>
-                <button
-                  onClick={() => handleDelete(selectedAgent.id)}
-                  className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <Icon name="XCircle" size={11} />
-                  <span>注销</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Config Panels */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Box 1: Prompt Guidelines */}
-              <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
-                <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
-                  <Icon name="Sliders" size={12} className={styles.accentText} />
-                  <span>系统角色指令 (System Persona)</span>
-                </h3>
-                <div className={`h-56 overflow-y-auto ${styles.inputBg} p-3 border ${styles.cardBorder} rounded-lg text-[11px] ${styles.cardTextMuted} font-sans leading-relaxed whitespace-pre-line`}>
-                  {selectedAgent.systemPrompt}
-                </div>
-              </div>
-
-              {/* Box 2: Tool Actions & Guardrails */}
-              <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-4`}>
-                
-                <div className="space-y-3">
-                  <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
-                    <Icon name="Boxes" size={12} className={styles.accentText} />
-                    <span>挂载本体动作与函数能力 (Tools Plugin)</span>
-                  </h3>
-                  
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {selectedAgent.assignedTools.actionIds.map(act => (
-                      <div key={act} className="flex items-center gap-2 p-1.5 bg-amber-500/5 border border-amber-200/50 rounded-lg">
-                        <span className="p-0.5 rounded bg-amber-100 text-amber-600">
-                          <Icon name="Zap" size={10} />
-                        </span>
-                        <div className="flex-1">
-                          <p className={`font-bold text-[10px] ${styles.cardText}`}>{act}</p>
-                          <p className={`text-[9px] ${styles.cardTextMuted} font-mono`}>Ontology Action Write-Back</p>
-                        </div>
-                        <span className="px-1.5 bg-amber-500/10 text-amber-600 text-[8px] font-bold rounded">已提权</span>
-                      </div>
-                    ))}
-                    {selectedAgent.assignedTools.functionIds.map(fn => (
-                      <div key={fn} className="flex items-center gap-2 p-1.5 bg-blue-500/5 border border-blue-200/50 rounded-lg">
-                        <span className="p-0.5 rounded bg-blue-100 text-blue-600">
-                          <Icon name="Code" size={10} />
-                        </span>
-                        <div className="flex-1">
-                          <p className={`font-bold text-[10px] ${styles.cardText}`}>{fn}</p>
-                          <p className={`text-[9px] ${styles.cardTextMuted} font-mono`}>Ontology Function Query</p>
-                        </div>
-                        <span className={`px-1.5 ${styles.badgeBg} ${styles.accentText} text-[8px] font-bold rounded`}>只读</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={`space-y-3 pt-3 border-t ${styles.cardBorder}`}>
-                  <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
-                    <Icon name="ShieldAlert" size={12} className="text-rose-500" />
-                    <span>激活关联安全护栏 (Active Guardrails)</span>
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedAgent.guardrailIds.map(grid => {
-                      const g = guardrails.find(x => x.id === grid);
-                      return (
-                        <span key={grid} className="px-2 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded-full font-bold text-[9px] flex items-center gap-1">
-                          <span className="w-1 h-1 rounded-full bg-rose-600" />
-                          <span>{g?.name || grid}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
+          <AgentConfigEditor
+            agent={selectedAgent}
+            guardrails={guardrails}
+            onEdit={() => handleStartEdit(selectedAgent)}
+            onDelete={() => handleDelete(selectedAgent.id)}
+          />
 
           {/* 3. Right: Live Sandbox Playground */}
           <div className={`w-full max-w-[450px] ${styles.cardBg} border-l ${styles.cardBorder} flex flex-col h-full shrink-0`}>
-            
+
             {/* 右侧沙箱 header + simulation 子组件 (chat mode 由主组件渲染) */}
             <SimulationModal
               sandboxMode={sandboxMode}
@@ -623,160 +434,15 @@ export default function AgentStudioView({
 
             {/* TAB 1: Chat Mode */}
             {sandboxMode === 'chat' && (
-              <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Message Area */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {chatMessages.map(msg => {
-                    const isUser = msg.sender === 'user';
-                    const isSys = msg.sender === 'system';
-
-                    if (isSys) {
-                      return (
-                        <div key={msg.id} className={`p-2.5 ${styles.appBg} rounded-lg text-[11px] ${styles.cardTextMuted} border ${styles.cardBorder}/50 leading-relaxed font-sans`}>
-                          {msg.content}
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div key={msg.id} className={`flex flex-col gap-1.5 ${isUser ? 'items-end' : 'items-start'}`}>
-                        
-                        {/* Message Head */}
-                        <div className={`flex items-center gap-1.5 text-[9px] ${styles.cardTextMuted} font-mono`}>
-                          {!isUser && <span className={`font-bold ${styles.cardTextMuted}`}>{selectedAgent.name}</span>}
-                          <span>{msg.timestamp}</span>
-                          {isUser && <span className={`font-bold ${styles.accentText}`}>You (签派总监)</span>}
-                        </div>
-
-                        {/* Chat Bubble */}
-                        <div className={`p-3 rounded-2xl max-w-[85%] leading-relaxed whitespace-pre-wrap text-[11px] ${
-                          isUser
-                            ? `${styles.accentBg} text-white rounded-tr-none font-medium`
-                            : `${styles.inputBg} ${styles.cardText} rounded-tl-none border ${styles.cardBorder}/40`
-                        }`}>
-                          {msg.content}
-                        </div>
-
-                        {/* Embedded Reasoning Trace */}
-                        {msg.thinkingTrace && msg.thinkingTrace.length > 0 && (
-                          <div className={`w-[85%] ${styles.appBg} ${styles.cardTextMuted} rounded-lg p-2.5 font-mono text-[9px] space-y-1`}>
-                            <span className={`text-[8px] ${styles.accentText} uppercase font-extrabold block mb-1`}>AIP 逻辑链追踪 (AIP Trace):</span>
-                            {msg.thinkingTrace.map((log, idx) => (
-                              <div key={idx} className="flex items-start gap-1">
-                                <span className={styles.cardTextMuted}>▶</span>
-                                <span>{log}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Embedded Action Consent Approval Card */}
-                        {msg.actionProposal && msg.actionProposal.status === 'pending' && (
-                          <div className="w-[85%] border-2 border-amber-400 bg-amber-50/50 rounded-xl p-3 space-y-2.5 shadow-sm">
-                            <div className="flex items-center gap-2 font-bold text-amber-800 text-[10px] border-b border-amber-200 pb-1.5">
-                              <span className="p-1 rounded bg-amber-100 text-amber-600">
-                                <Icon name="ShieldAlert" size={11} className="animate-pulse" />
-                              </span>
-                              <span>{msg.actionProposal.actionName}</span>
-                            </div>
-                            
-                            <div className={`space-y-1 font-mono text-[9px] ${styles.cardTextMuted}`}>
-                              <div><span className={`font-bold ${styles.cardText}`}>目标航班 (flight_number):</span> {msg.actionProposal.payload.flight_number}</div>
-                              <div><span className={`font-bold ${styles.cardText}`}>延误时长 (delay_minutes):</span> {msg.actionProposal.payload.delay_minutes} 分钟</div>
-                              <div><span className={`font-bold ${styles.cardText}`}>执行指令 (new_status):</span> {msg.actionProposal.payload.new_status}</div>
-                              <div className="text-[8px] text-rose-500 font-bold bg-rose-50 p-1 rounded mt-1">⚠️ 警告: 该操作将覆盖全局航空本体运行图，需签派总监密钥授权。</div>
-                            </div>
-
-                            <div className="flex gap-1.5 pt-1 border-t border-amber-200/50">
-                              <button
-                                onClick={() => handleActionConsent(msg.id, true)}
-                                className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors cursor-pointer flex items-center justify-center gap-1"
-                              >
-                                <Icon name="Check" size={10} />
-                                <span>确认授权并写入</span>
-                              </button>
-                              <button
-                                onClick={() => handleActionConsent(msg.id, false)}
-                                className={`px-2.5 py-1.5 border ${styles.cardBorder} hover:${styles.inputBg} rounded-lg text-[10px] font-semibold ${styles.cardTextMuted} transition-colors cursor-pointer`}
-                              >
-                                <span>拒绝</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {msg.actionProposal && msg.actionProposal.status === 'approved' && (
-                          <div className={`w-[85%] ${styles.appBg} border border-emerald-300 rounded-xl p-2.5 flex items-center gap-2 text-[10px] text-emerald-700 font-semibold`}>
-                            <span className="p-1 rounded bg-emerald-100 text-emerald-600">
-                              <Icon name="CheckCircle2" size={12} />
-                            </span>
-                            <span>Ontology Action 已通过授权，写入完毕。</span>
-                          </div>
-                        )}
-
-                        {msg.actionProposal && msg.actionProposal.status === 'rejected' && (
-                          <div className={`w-[85%] ${styles.appBg} border border-red-200 rounded-xl p-2.5 flex items-center gap-2 text-[10px] text-red-600 font-semibold`}>
-                            <span className="p-1 rounded bg-red-100 text-red-600">
-                              <Icon name="XCircle" size={12} />
-                            </span>
-                            <span>操作已被安全护栏拦截丢弃。</span>
-                          </div>
-                        )}
-
-                      </div>
-                    );
-                  })}
-
-                  {isReplying && (
-                    <div className="flex flex-col gap-1.5 items-start">
-                      <div className={`flex items-center gap-1.5 text-[9px] ${styles.cardTextMuted} font-mono`}>
-                        <span className={`font-bold ${styles.cardTextMuted}`}>{selectedAgent.name}</span>
-                        <span>正在思考...</span>
-                      </div>
-                      <div className={`p-3 ${styles.appBg} rounded-2xl rounded-tl-none border ${styles.cardBorder}/40 flex items-center gap-1.5`}>
-                        <span className={`w-1.5 h-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '0ms' }} />
-                        <span className={`w-1.5 h-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '150ms' }} />
-                        <span className={`w-1.5 h-1.5 ${styles.cardTextMuted} rounded-full animate-bounce`} style={{ animationDelay: '300ms' }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick Prompts list */}
-                <div className={`px-3 py-1.5 border-t ${styles.cardBorder} flex items-center gap-1.5 overflow-x-auto shrink-0 ${styles.appBg}`}>
-                  {[
-                    '查询 UA102 航班状态',
-                    'UA102 出现异常怎么调配'
-                  ].map(p => (
-                    <button
-                      key={p}
-                      onClick={() => handleSendChat(p)}
-                      className={`px-2.5 py-1 ${styles.cardBg} ${styles.accentHover} ${styles.accentBorder} hover:border-blue-200 border ${styles.cardBorder} rounded-full text-[10px] ${styles.cardTextMuted} font-medium whitespace-nowrap cursor-pointer transition-colors`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Input Bar */}
-                <div className={`p-3 border-t ${styles.cardBorder} ${styles.cardBg} flex items-center gap-2 shrink-0`}>
-                  <input
-                    type="text"
-                    placeholder="发送指令（可尝试询问：查询UA102航班）..."
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSendChat()}
-                    className={`flex-1 h-8 px-3 border ${styles.cardBorder} rounded-lg text-xs focus:outline-hidden focus:border-blue-500`}
-                  />
-                  <button
-                    onClick={() => handleSendChat()}
-                    disabled={isReplying || !chatInput.trim()}
-                    className={`h-8 w-8 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0`}
-                  >
-                    <Icon name="Send" size={13} />
-                  </button>
-                </div>
-              </div>
+              <ChatPlayground
+                chatMessages={chatMessages}
+                agentName={selectedAgent.name}
+                isReplying={isReplying}
+                chatInput={chatInput}
+                onChatInputChange={setChatInput}
+                onSend={handleSendChat}
+                onConsent={handleActionConsent}
+              />
             )}
 
           </div>
@@ -790,156 +456,27 @@ export default function AgentStudioView({
 
       {/* Create / Edit Agent Modal */}
       {showCreateModal && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.appBg}/40 backdrop-blur-xs`}>
-          <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]`}>
-            
-            <div className={`px-4 py-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
-              <h3 className={`font-bold ${styles.cardText} text-xs`}>
-                {editingAgent ? '配置智能体核心参数' : '部署全新智能体'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className={`${styles.cardTextMuted} cursor-pointer`}
-              >
-                <Icon name="X" size={15} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>智能体名称 (Name) <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={e => setFormName(e.target.value)}
-                  placeholder="例如: 机场地面调度专家"
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>业务职责角色 (Role) <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={formRole}
-                  onChange={e => setFormRole(e.target.value)}
-                  placeholder="例如: 机场廊桥与行李分发智能化调度管家"
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>简介描述 (Description)</label>
-                <textarea
-                  value={formDesc}
-                  onChange={e => setFormDesc(e.target.value)}
-                  placeholder="说明该智能体的定位及服务群体"
-                  rows={2}
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none ${styles.cardBg} ${styles.cardText}`}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>挂载大语言模型 (Model) <span className="text-red-500">*</span></label>
-                <select
-                  value={formModel}
-                  onChange={e => setFormModel(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
-                >
-                  {models.map(m => (
-                    <option key={m.id} value={m.id}>{m.displayName}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>设定系统提示词 (System Instructions) <span className="text-red-500">*</span></label>
-                <textarea
-                  value={formPrompt}
-                  onChange={e => setFormPrompt(e.target.value)}
-                  placeholder="在此写入详细的 Persona、操作规范、CAAC 执照评定约束和工具调用流程..."
-                  rows={4}
-                  className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs resize-none font-sans leading-relaxed ${styles.cardBg} ${styles.cardText}`}
-                  required
-                />
-              </div>
-
-              {/* Tools assignment */}
-              <div className="space-y-1.5">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>提权挂载 Ontology 动作工具</label>
-                <div className={`space-y-1 border ${styles.cardBorder} p-2 rounded-lg ${styles.appBg} max-h-24 overflow-y-auto`}>
-                  {['act_reschedule_flight', 'act_assign_pilot'].map(tool => {
-                    const isChecked = formTools.includes(tool);
-                    return (
-                      <label key={tool} className="flex items-center gap-2 cursor-pointer py-0.5">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setFormTools(formTools.filter(t => t !== tool));
-                            } else {
-                              setFormTools([...formTools, tool]);
-                            }
-                          }}
-                          className={`rounded ${styles.accentText} ${styles.inputBorder} h-3 w-3`}
-                        />
-                        <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{tool}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Safety Guardrails */}
-              <div className="space-y-1.5">
-                <label className={`block ${styles.cardTextMuted} font-semibold`}>关联平台安全审计护栏</label>
-                <div className={`space-y-1 border ${styles.cardBorder} p-2 rounded-lg ${styles.appBg} max-h-24 overflow-y-auto`}>
-                  {guardrails.map(g => {
-                    const isChecked = formGuardrails.includes(g.id);
-                    return (
-                      <label key={g.id} className="flex items-center gap-2 cursor-pointer py-0.5">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setFormGuardrails(formGuardrails.filter(gid => gid !== g.id));
-                            } else {
-                              setFormGuardrails([...formGuardrails, g.id]);
-                            }
-                          }}
-                          className={`rounded ${styles.accentText} ${styles.inputBorder} h-3 w-3`}
-                        />
-                        <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>{g.name}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className={`pt-3 border-t ${styles.cardBorder} flex items-center justify-end gap-2`}>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg hover:${styles.inputBg} ${styles.cardTextMuted} transition-colors cursor-pointer text-[11px] font-semibold`}
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  className={`px-4 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-[11px]`}
-                >
-                  确认部署
-                </button>
-              </div>
-            </form>
-
-          </div>
-        </div>
+        <AgentFormModal
+          editingAgent={editingAgent}
+          models={models}
+          guardrails={guardrails}
+          formName={formName}
+          setFormName={setFormName}
+          formRole={formRole}
+          setFormRole={setFormRole}
+          formDesc={formDesc}
+          setFormDesc={setFormDesc}
+          formModel={formModel}
+          setFormModel={setFormModel}
+          formPrompt={formPrompt}
+          setFormPrompt={setFormPrompt}
+          formTools={formTools}
+          setFormTools={setFormTools}
+          formGuardrails={formGuardrails}
+          setFormGuardrails={setFormGuardrails}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleSave}
+        />
       )}
 
     </div>

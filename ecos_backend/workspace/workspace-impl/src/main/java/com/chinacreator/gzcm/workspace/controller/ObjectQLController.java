@@ -110,7 +110,7 @@ public class ObjectQLController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("ObjectQL 查询失败", e);
-            return ApiResponse.internalError("查询执行失败: " + e.getMessage());
+            return ApiResponse.internalError("查询执行失败");
         }
     }
 

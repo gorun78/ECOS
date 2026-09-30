@@ -21,19 +21,6 @@ declare module '@apollo/client' {
   export function ApolloProvider(props: { client: ApolloClient<unknown>; children?: React.ReactNode }): React.ReactElement;
 }
 
-declare module 'monaco-editor' {
-  export function create(container: HTMLElement, options?: unknown, override?: unknown): unknown;
-  export const editor: {
-    create(container: HTMLElement, options?: unknown, override?: unknown): unknown;
-    defineTheme(name: string, theme: unknown): void;
-    setTheme(name: string): void;
-  };
-  export const languages: {
-    register(options: unknown): void;
-    setMonarchTokensProvider(languageId: string, tokenizer: unknown): void;
-  };
-}
-
 declare module 'react-markdown' {
   import type { ComponentType } from 'react';
   const _a: any;
@@ -43,127 +30,6 @@ declare module 'react-markdown' {
     [key: string]: unknown;
   }
   export type Components = Record<string, ComponentType<Record<string, unknown>>>;
-}
-
-declare module 'monaco-editor' {
-  export function create(container: HTMLElement, options?: unknown, override?: unknown): any;
-  namespace editor {
-    export function getModels(): any[];
-    export function createModel(text: string, uri?: string): any;
-    export function create(container: HTMLElement, options?: unknown, override?: unknown): any;
-    export function createModelValue(text: string, options?: unknown): any;
-    export function defineTheme(name: string, theme: unknown): void;
-    export function setTheme(name: string): void;
-    export function trigger(id: string, reason: string, ranges: unknown, inputValue: unknown): void;
-    export interface IPosition {
-      lineNumber: number;
-      column: number;
-    }
-    export interface IRange {
-      startLineNumber: number;
-      startColumn: number;
-      endLineNumber: number;
-      endColumn: number;
-    }
-    export interface IModel {
-      getValue(): string;
-      setValue(value: string): void;
-      getLineCount(): number;
-      onDidContentChange(listener: (e: unknown) => void): { dispose(): void };
-      onDidChangeCursorPosition(listener: (e: { position: IPosition }) => void): { dispose(): void };
-      dispose(): void;
-    }
-    export interface ITextModel {
-      getValue(): string;
-      setValue(value: string): void;
-      getLineCount(): number;
-      getLineMaxLength(): number;
-      getValueLength(): number;
-      onDidChangeContent(listener: (e: unknown) => void): { dispose(): void };
-      onDidChangeDecorations(listener: (e: unknown) => void): { dispose(): void };
-      dispose(): void;
-    }
-    export interface ITextBuffer {
-      append(value: string): void;
-      replace(range: IRange, value: string): void;
-    }
-    export interface IStandaloneCodeEditor extends IModel, ITextModel {
-      getModel(): ITextModel | null;
-      setModel(model: ITextModel | null): void;
-      layout(dims?: unknown): void;
-      focus(): void;
-      getDomNode(): HTMLElement;
-      getValue(): string;
-      setValue(value: string): void;
-      onDidFocus(listener: () => void): { dispose(): void };
-      onDidBlur(listener: () => void): { dispose(): void };
-      onDidChangeModelContent(listener: (e: { model: ITextModel; hasUndoStack: () => boolean }) => void): { dispose(): void };
-      trigger(source: string, commandId: string, commandArgs?: unknown): void;
-    }
-    export interface IDimension { width: number; height: number };
-    export interface IReadonlyEditorOption<T> { value: T };
-    export interface IEditorOption<T> { value: T };
-    export interface IEditorOptions {
-      [key: string]: unknown;
-    }
-  }
-  namespace languages {
-    export function register(options: unknown): void;
-    export function setMonarchTokensProvider(languageId: string, tokenizer: unknown): void;
-    export interface ICompletionItem {
-      label: string;
-      kind?: number;
-      insertText?: string;
-      detail?: string;
-      documentation?: string;
-    }
-    export interface ISignature {
-      label: string;
-      documentation?: string;
-      parameters?: unknown[];
-    }
-    export interface ISignatureHelp {
-      signatures: ISignature[];
-      activeSignature?: number;
-      activeParameter?: number;
-    }
-    export interface ICompletionList {
-      suggestions: ICompletionItem[];
-    }
-    export interface ISignatureHelpProvider {
-      signatureHelpProvider?: unknown;
-    }
-    export interface CompletionTriggerKind {
-      Invoke: number;
-      TriggerCharacter: number;
-      TriggerForIncompleteCompletions: number;
-    }
-    export const CompletionTriggerKind: Record<string, number>;
-    export interface ITextModelUpdate {
-      versionId: number;
-      [key: string]: unknown;
-    }
-    export interface TypescriptMap {
-      [key: string]: unknown;
-    }
-    export interface typescript {
-      registerCompletionItemProvider(language: string, provider: unknown): { dispose(): void };
-      registerSignatureHelpProvider(language: string, provider: unknown): { dispose(): void };
-      registerDefinitionProvider(language: string, provider: unknown): { dispose(): void };
-      registerHoverProvider(language: string, provider: unknown): { dispose(): void };
-      ScriptTarget: Record<string, unknown>;
-      ModuleResolutionKind: Record<string, unknown>;
-      ModuleKind: Record<string, unknown>;
-    }
-    export const typescript: typescript;
-    export const javascript: Record<string, unknown>;
-  }
-  export const languages: unknown;
-  export const editor: unknown;
-
-  export interface IStandaloneEditorConstructionOptions extends Record<string, unknown> {}
-  export interface IEditorConstructionOptions extends Record<string, unknown> {}
-  export function registerEditorOption(name: string, option: unknown): void;
 }
 
 declare module '@xyflow/react' {
@@ -469,4 +335,6 @@ declare module '@xyflow/react' {
 
 declare interface Window {
   monaco?: any;
+  /** ExpressionEditor 自动补全的列名来源：provider 在 beforeMount 一次性注册，列名随节点变化，故走全局 */
+  __expressionColumns__?: string[];
 }

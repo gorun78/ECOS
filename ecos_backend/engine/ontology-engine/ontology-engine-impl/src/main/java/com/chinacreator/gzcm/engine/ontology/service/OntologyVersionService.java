@@ -7,11 +7,15 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.OntologyPublishedEvent;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
+import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionPreviousDiffVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionVO;
@@ -44,17 +48,66 @@ public class OntologyVersionService {
     private final ApplicationEventPublisher appEventPublisher;
     /** 发布事件 Kafka/总线路径（跨 JVM 路由）；runtime-event 未装配时为空。 */
     private final Optional<EventBusService> eventBus;
+    /** Git 归档通道（runtime GitService 委托）；未装配时为空，发布流程降级为不归档。 */
+    private final Optional<OntologyGitService> gitService;
 
+    /** 旧 5 参构造保留（Wave31 单测直接 new；Git 归档默认关闭）。 */
     public OntologyVersionService(OntologyVersionRepository versionRepository,
                                    OntologyRepository ontologyRepository,
                                    OntologyProposalService proposalService,
                                    ApplicationEventPublisher appEventPublisher,
                                    Optional<EventBusService> eventBus) {
+        this(versionRepository, ontologyRepository, proposalService, appEventPublisher, eventBus,
+                Optional.empty());
+    }
+
+    /** Spring 装配入口（新增 Git 归档通道，API 只增不改）。 */
+    @Autowired
+    public OntologyVersionService(OntologyVersionRepository versionRepository,
+                                   OntologyRepository ontologyRepository,
+                                   OntologyProposalService proposalService,
+                                   ApplicationEventPublisher appEventPublisher,
+                                   Optional<EventBusService> eventBus,
+                                   Optional<OntologyGitService> gitService) {
         this.versionRepository = versionRepository;
         this.ontologyRepository = ontologyRepository;
         this.proposalService = proposalService;
         this.appEventPublisher = appEventPublisher;
         this.eventBus = eventBus;
+        this.gitService = gitService != null ? gitService : Optional.empty();
+    }
+
+    /**
+     * 发布成功后委托 runtime Git 归档真实链路（H4-T4 / VG-2，best-effort 不阻塞主流程）。
+     *
+     * <p>内容来源 = 版本快照 {@code snapshot}（{@link #generateSnapshot} 序列化产物）；
+     * 仓库仅由服务端逻辑 {@code repositoryId="ontology"} 定位，禁止任何客户端 localPath/gitUrl。
+     * 归档失败/仓库未注册时 {@link OntologyGitService} 内部返回 {@code not_available}，
+     * 此处仅记日志，不影响已提交的发布状态（与事件 fan-out 同降级口径）。
+     */
+    private void archiveToGit(OntologyVersion ver, String actor) {
+        gitService.ifPresent(svc -> {
+            try {
+                OntologyGitArchiveRequest req = new OntologyGitArchiveRequest();
+                req.setRepositoryId("ontology");
+                req.setAssetType("ontology");
+                req.setAssetId(ver.getOntologyId());
+                req.setVersionNo(ver.getVersionNo());
+                req.setContent(ver.getSnapshot());
+                req.setCommitMessage("Publish ontology " + ver.getOntologyId() + " " + ver.getVersionNo());
+                req.setAuthorName(actor == null || actor.isBlank() ? "system" : actor);
+                OntologyGitArchiveResult r = svc.archiveVersion(req);
+                if (r == null || !OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())) {
+                    log.info("Git 归档未落地（best-effort）: ontologyId={} version={} status={} reason={}",
+                        ver.getOntologyId(), ver.getVersionNo(),
+                        r == null ? "null" : r.getStatus(),
+                        r == null ? "null result" : r.getReason());
+                }
+            } catch (Exception e) {
+                log.error("Git 归档异常（best-effort，不影响发布）: ontologyId={} version={}",
+                    ver.getOntologyId(), ver.getVersionNo(), e);
+            }
+        });
     }
 
     /** 版本主键：库内最大后缀自增（重启安全）；方法级加锁避免并发取到同一序号。 */
@@ -140,6 +193,7 @@ public class OntologyVersionService {
         }
         versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
+        archiveToGit(ver, ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
     }
 
@@ -154,6 +208,7 @@ public class OntologyVersionService {
         }
         versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
+        archiveToGit(ver, ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toVO).orElse(null);
     }
 
@@ -421,6 +476,7 @@ public class OntologyVersionService {
         }
         versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
+        archiveToGit(ver, ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
     }
 
@@ -435,6 +491,7 @@ public class OntologyVersionService {
         }
         versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
+        archiveToGit(ver, ver.getPublisher());
         return versionRepository.findById(versionId).map(this::toVO).orElse(null);
     }
 

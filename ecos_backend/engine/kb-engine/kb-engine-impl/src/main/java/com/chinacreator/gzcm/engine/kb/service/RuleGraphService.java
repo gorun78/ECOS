@@ -4,13 +4,10 @@ import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
+import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Record;
-import org.neo4j.driver.Result;
-import org.neo4j.driver.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,11 +17,9 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Neo4j 知识图谱服务 — 将抽取的实体/关系子图和合规规则写入 Neo4j 图数据库，
@@ -52,20 +47,20 @@ public class RuleGraphService {
     private String neo4jSwitchOnWrite;
 
     @Autowired(required = false)
-    private Driver driver;
+    private Neo4jClient neo4jClient;
 
     // ── Lifecycle ──
 
     @PostConstruct
     public void init() {
-        if (driver == null) {
-            log.warn("RuleGraphService init: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), 规则图谱功能禁用");
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
+            log.warn("RuleGraphService init: Neo4j 不可用 (standard 档 或 neo4j.uri 未配置), 规则图谱功能禁用");
             return;
         }
-        log.info("RuleGraphService init: 使用 runtime-access 统一 Driver, switchOnWrite={}", switchNeo4jEnabled());
-        try (Session session = driver.session()) {
-            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE");
-            session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (r:Rule) REQUIRE r.id IS UNIQUE");
+        log.info("RuleGraphService init: 使用 runtime-access 统一客户端, switchOnWrite={}", switchNeo4jEnabled());
+        try {
+            neo4jClient.write("CREATE CONSTRAINT IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE", Map.of());
+            neo4jClient.write("CREATE CONSTRAINT IF NOT EXISTS FOR (r:Rule) REQUIRE r.id IS UNIQUE", Map.of());
             log.info("Neo4j constraints ensured");
         } catch (Exception e) {
             log.warn("Failed to create constraints (may already exist): {}", e.getMessage());
@@ -75,7 +70,7 @@ public class RuleGraphService {
     @PreDestroy
     public void close() {
         // Driver 是 runtime-access 管理的 Bean (Neo4jConfig), 不在此 close (生命周期统一)
-        log.info("RuleGraphService close: Neo4j Driver 由 runtime-access 管理, 不在此处 close");
+        log.info("RuleGraphService close: Neo4j 客户端由 runtime-access 管理, 不在此处 close");
     }
 
     /**
@@ -83,12 +78,12 @@ public class RuleGraphService {
      *
      * <p>M0 改造 (2026-09) 补全: 此前该方法是 switch statement 直接读配置, 现改写为 instance method。
      * 同时 {@link #createExtractedEntityGraph(ExtractedSubGraph)} / {@link #createRuleGraph(ComplianceRule)}
-     * 调用处若 driver == null (standard 档) 直接 no-op。</p>
+     * 调用处若 Neo4j 客户端不可用 (standard 档) 直接 no-op。</p>
      */
     public boolean switchNeo4jEnabled() {
         String sw = neo4jSwitchOnWrite;
         if (sw == null || sw.isBlank()) {
-            return true; // 默认启用 (enterprise/flagship 档)
+            return true; // 默认启用 (enterprise/ultimate 档)
         }
         try {
             return Boolean.parseBoolean(sw.trim());
@@ -113,9 +108,9 @@ public class RuleGraphService {
             log.warn("createExtractedEntityGraph: subGraph is null, nothing to write");
             return new WriteStats(0, 0, 0, 0);
         }
-        if (driver == null) {
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
             // M0 改造 (2026-09): standard 档 Neo4j 不可用, no-op
-            log.debug("createExtractedEntityGraph: Neo4j Driver 不可用, skip");
+            log.debug("createExtractedEntityGraph: Neo4j 不可用, skip");
             return new WriteStats(0, 0, 0, 0);
         }
         int entitiesCreated = 0;
@@ -123,42 +118,40 @@ public class RuleGraphService {
         int relationsCreated = 0;
         int relationsSkipped = 0;
 
-        try (Session session = driver.session()) {
-            // Phase 1: 写入/更新实体节点，构建 name→id 索引
-            Map<String, String> nameToId = new LinkedHashMap<>();
+        // Phase 1: 写入/更新实体节点，构建 name→id 索引
+        Map<String, String> nameToId = new LinkedHashMap<>();
 
-            if (subGraph.getEntities() != null) {
-                for (ExtractedEntity entity : subGraph.getEntities()) {
-                    if (entity == null || entity.getName() == null || entity.getName().isBlank()) {
-                        continue;
-                    }
-                    String entityId = mergeEntity(session, entity);
-                    nameToId.put(entity.getName().trim(), entityId);
-
-                    // 通过判断 entity id 是否为新生成来判断创建 vs 更新
-                    // MERGE 不区分新建和匹配，这里简化：始终计数为写入
-                    entitiesCreated++;
+        if (subGraph.getEntities() != null) {
+            for (ExtractedEntity entity : subGraph.getEntities()) {
+                if (entity == null || entity.getName() == null || entity.getName().isBlank()) {
+                    continue;
                 }
+                String entityId = mergeEntity(entity);
+                nameToId.put(entity.getName().trim(), entityId);
+
+                // 通过判断 entity id 是否为新生成来判断创建 vs 更新
+                // MERGE 不区分新建和匹配，这里简化：始终计数为写入
+                entitiesCreated++;
             }
+        }
 
-            // Phase 2: 写入关系边（依赖 Phase 1 的 name→id 索引）
-            if (subGraph.getRelations() != null) {
-                for (ExtractedRelation rel : subGraph.getRelations()) {
-                    if (rel == null) continue;
+        // Phase 2: 写入关系边（依赖 Phase 1 的 name→id 索引）
+        if (subGraph.getRelations() != null) {
+            for (ExtractedRelation rel : subGraph.getRelations()) {
+                if (rel == null) continue;
 
-                    String sourceId = nameToId.get(rel.getSourceEntity());
-                    String targetId = nameToId.get(rel.getTargetEntity());
+                String sourceId = nameToId.get(rel.getSourceEntity());
+                String targetId = nameToId.get(rel.getTargetEntity());
 
-                    if (sourceId == null || targetId == null) {
-                        log.warn("Skipping relation '{}' → '{}' ({}) — source or target entity not found",
-                                rel.getSourceEntity(), rel.getTargetEntity(), rel.getRelationType());
-                        relationsSkipped++;
-                        continue;
-                    }
-
-                    mergeRelation(session, sourceId, targetId, rel);
-                    relationsCreated++;
+                if (sourceId == null || targetId == null) {
+                    log.warn("Skipping relation '{}' → '{}' ({}) — source or target entity not found",
+                            rel.getSourceEntity(), rel.getTargetEntity(), rel.getRelationType());
+                    relationsSkipped++;
+                    continue;
                 }
+
+                mergeRelation(sourceId, targetId, rel);
+                relationsCreated++;
             }
         }
 
@@ -183,58 +176,53 @@ public class RuleGraphService {
             log.warn("createRuleGraph: rule or rule.id is null, cannot create graph");
             return;
         }
-        if (driver == null) {
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
             // M0 改造 (2026-09): standard 档 Neo4j 不可用, no-op
-            log.debug("createRuleGraph: Neo4j Driver 不可用, skip (ruleId={})", rule.getId());
+            log.debug("createRuleGraph: Neo4j 不可用, skip (ruleId={})", rule.getId());
             return;
         }
-        try (Session session = driver.session()) {
-            // 创建/更新规则节点
-            session.writeTransaction(tx -> {
-                tx.run(
-                    "MERGE (r:Rule {id: $id}) " +
-                    "SET r.name = $name, " +
-                    "    r.domain = $domain, " +
-                    "    r.condition = $condition, " +
-                    "    r.action = $action, " +
-                    "    r.status = $status, " +
-                    "    r.extractedRuleId = $extractedRuleId, " +
-                    "    r.priority = $priority, " +
-                    "    r.createdAt = $createdAt ",
-                    Map.of(
-                        "id", rule.getId(),
-                        "name", rule.getName() != null ? rule.getName() : "",
-                        "domain", rule.getDomain() != null ? rule.getDomain() : "",
-                        "condition", rule.getCondition() != null ? rule.getCondition() : "",
-                        "action", rule.getAction() != null ? rule.getAction() : "",
-                        "status", rule.getStatus() != null ? rule.getStatus() : "DRAFT",
-                        "extractedRuleId", rule.getExtractedRuleId() != null ? rule.getExtractedRuleId() : "",
-                        "priority", rule.getPriority(),
-                        "createdAt", System.currentTimeMillis()
-                    )
-                );
+        try {
+            // 创建/更新规则节点 (多条语句置于同一写事务)
+            List<String> cyphers = new ArrayList<>();
+            List<Map<String, Object>> paramsList = new ArrayList<>();
 
-                // DERIVED_FROM 边：规则 → 源实体
-                if (rule.getExtractedRuleId() != null && !rule.getExtractedRuleId().isBlank()) {
-                    tx.run(
-                        "MATCH (r:Rule {id: $ruleId}) " +
-                        "MATCH (e:Entity {id: $entityId}) " +
-                        "MERGE (r)-[:DERIVED_FROM]->(e)",
-                        Map.of("ruleId", rule.getId(), "entityId", rule.getExtractedRuleId())
-                    );
-                }
+            cyphers.add("MERGE (r:Rule {id: $id}) " +
+                        "SET r.name = $name, " +
+                        "    r.domain = $domain, " +
+                        "    r.condition = $condition, " +
+                        "    r.action = $action, " +
+                        "    r.status = $status, " +
+                        "    r.extractedRuleId = $extractedRuleId, " +
+                        "    r.priority = $priority, " +
+                        "    r.createdAt = $createdAt ");
+            paramsList.add(Map.of(
+                "id", rule.getId(),
+                "name", rule.getName() != null ? rule.getName() : "",
+                "domain", rule.getDomain() != null ? rule.getDomain() : "",
+                "condition", rule.getCondition() != null ? rule.getCondition() : "",
+                "action", rule.getAction() != null ? rule.getAction() : "",
+                "status", rule.getStatus() != null ? rule.getStatus() : "DRAFT",
+                "extractedRuleId", rule.getExtractedRuleId() != null ? rule.getExtractedRuleId() : "",
+                "priority", rule.getPriority(),
+                "createdAt", System.currentTimeMillis()
+            ));
 
-                // 描述文本中提及的实体也建立 DERIVED_FROM
-                if (rule.getDescription() != null && !rule.getDescription().isBlank()) {
-                    tx.run(
-                        "MATCH (r:Rule {id: $ruleId}) " +
-                        "SET r.description = $description",
-                        Map.of("ruleId", rule.getId(), "description", rule.getDescription())
-                    );
-                }
+            // DERIVED_FROM 边：规则 → 源实体
+            if (rule.getExtractedRuleId() != null && !rule.getExtractedRuleId().isBlank()) {
+                cyphers.add("MATCH (r:Rule {id: $ruleId}) " +
+                            "MATCH (e:Entity {id: $entityId}) " +
+                            "MERGE (r)-[:DERIVED_FROM]->(e)");
+                paramsList.add(Map.of("ruleId", rule.getId(), "entityId", rule.getExtractedRuleId()));
+            }
 
-                return null;
-            });
+            // 描述文本中提及的实体也建立 DERIVED_FROM
+            if (rule.getDescription() != null && !rule.getDescription().isBlank()) {
+                cyphers.add("MATCH (r:Rule {id: $ruleId}) " +
+                            "SET r.description = $description");
+                paramsList.add(Map.of("ruleId", rule.getId(), "description", rule.getDescription()));
+            }
+
+            neo4jClient.writeBatch(cyphers, paramsList);
 
             log.info("createRuleGraph: rule '{}' (id={}) written to Neo4j", rule.getName(), rule.getId());
         } catch (Exception e) {
@@ -257,18 +245,22 @@ public class RuleGraphService {
             log.warn("getRuleGraph: ruleId is null or blank");
             return Map.of("rule", null, "entities", List.of(), "relations", List.of());
         }
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
+            throw new RuntimeException("Neo4j query failed for rule " + ruleId,
+                    new IllegalStateException("Neo4j 客户端不可用 (runtime-access Driver 未装配)"));
+        }
 
         Map<String, Object> subGraph = new LinkedHashMap<>();
 
-        try (Session session = driver.session()) {
+        try {
             // 查询规则节点
-            Result ruleResult = session.run(
+            List<Map<String, Object>> ruleRows = neo4jClient.run(
                 "MATCH (r:Rule {id: $ruleId}) RETURN r",
                 Map.of("ruleId", ruleId)
             );
 
-            if (ruleResult.hasNext()) {
-                subGraph.put("rule", recordToMap(ruleResult.next(), "r"));
+            if (!ruleRows.isEmpty()) {
+                subGraph.put("rule", nodeValueToMap(ruleRows.get(0).get("r")));
             } else {
                 log.warn("getRuleGraph: rule '{}' not found", ruleId);
                 subGraph.put("rule", null);
@@ -278,17 +270,16 @@ public class RuleGraphService {
             }
 
             // 查询关联的实体节点（通过 DERIVED_FROM 或 APPLIES_TO 关联）
-            Result entityResult = session.run(
+            List<Map<String, Object>> entityRows = neo4jClient.run(
                 "MATCH (r:Rule {id: $ruleId})-[rel:DERIVED_FROM|APPLIES_TO]->(e:Entity) " +
                 "RETURN DISTINCT e, type(rel) AS relType",
                 Map.of("ruleId", ruleId)
             );
 
             List<Map<String, Object>> entities = new ArrayList<>();
-            while (entityResult.hasNext()) {
-                Record rec = entityResult.next();
-                Map<String, Object> entityMap = recordToMap(rec, "e");
-                entityMap.put("_relType", rec.get("relType").asString());
+            for (Map<String, Object> row : entityRows) {
+                Map<String, Object> entityMap = nodeValueToMap(row.get("e"));
+                entityMap.put("_relType", (String) row.get("relType"));
                 entities.add(entityMap);
             }
             subGraph.put("entities", entities);
@@ -301,7 +292,7 @@ public class RuleGraphService {
                     entityIds.add((String) e.get("id"));
                 }
 
-                Result relResult = session.run(
+                List<Map<String, Object>> relRows = neo4jClient.run(
                     "MATCH (e1:Entity)-[rel]->(e2:Entity) " +
                     "WHERE e1.id IN $entityIds AND e2.id IN $entityIds " +
                     "RETURN e1.id AS sourceId, e2.id AS targetId, type(rel) AS relationship, " +
@@ -309,13 +300,12 @@ public class RuleGraphService {
                     Map.of("entityIds", entityIds)
                 );
 
-                while (relResult.hasNext()) {
-                    Record rec = relResult.next();
+                for (Map<String, Object> row : relRows) {
                     Map<String, Object> relMap = new LinkedHashMap<>();
-                    relMap.put("sourceId", rec.get("sourceId").asString());
-                    relMap.put("targetId", rec.get("targetId").asString());
-                    relMap.put("relationship", rec.get("relationship").asString());
-                    relMap.put("confidence", rec.get("confidence").asDouble(0.0));
+                    relMap.put("sourceId", (String) row.get("sourceId"));
+                    relMap.put("targetId", (String) row.get("targetId"));
+                    relMap.put("relationship", (String) row.get("relationship"));
+                    relMap.put("confidence", toDouble(row.get("confidence")));
                     relations.add(relMap);
                 }
             }
@@ -334,31 +324,28 @@ public class RuleGraphService {
     /**
      * MERGE 实体节点 — 按 entity.id 幂等，已存在则更新属性。
      */
-    private String mergeEntity(Session session, ExtractedEntity entity) {
+    private String mergeEntity(ExtractedEntity entity) {
         // 使用 name 作为稳定 ID（配合约束保证唯一性）
         String entityId = entity.getName().trim().replaceAll("\\s+", "_");
 
         String propertiesJson = serializeToJson(entity.getProperties());
 
-        session.writeTransaction(tx -> {
-            tx.run(
-                "MERGE (e:Entity {id: $id}) " +
-                "SET e.name = $name, " +
-                "    e.type = $type, " +
-                "    e.confidence = $confidence, " +
-                "    e.properties = $properties, " +
-                "    e.createdAt = coalesce(e.createdAt, $createdAt) ",
-                Map.of(
-                    "id", entityId,
-                    "name", entity.getName().trim(),
-                    "type", entity.getType() != null ? entity.getType() : "UNKNOWN",
-                    "confidence", entity.getConfidence(),
-                    "properties", propertiesJson != null ? propertiesJson : "{}",
-                    "createdAt", System.currentTimeMillis()
-                )
-            );
-            return null;
-        });
+        neo4jClient.write(
+            "MERGE (e:Entity {id: $id}) " +
+            "SET e.name = $name, " +
+            "    e.type = $type, " +
+            "    e.confidence = $confidence, " +
+            "    e.properties = $properties, " +
+            "    e.createdAt = coalesce(e.createdAt, $createdAt) ",
+            Map.of(
+                "id", entityId,
+                "name", entity.getName().trim(),
+                "type", entity.getType() != null ? entity.getType() : "UNKNOWN",
+                "confidence", entity.getConfidence(),
+                "properties", propertiesJson != null ? propertiesJson : "{}",
+                "createdAt", System.currentTimeMillis()
+            )
+        );
 
         log.debug("Merged entity: '{}' (id={}, type={})", entity.getName(), entityId, entity.getType());
         return entityId;
@@ -367,7 +354,7 @@ public class RuleGraphService {
     /**
      * MERGE 关系边 — 按 source/target/relationship 三元组幂等。
      */
-    private void mergeRelation(Session session, String sourceId, String targetId, ExtractedRelation rel) {
+    private void mergeRelation(String sourceId, String targetId, ExtractedRelation rel) {
         String relType = rel.getRelationType() != null ? rel.getRelationType() : "RELATED_TO";
 
         // Neo4j 不支持动态关系类型直接参数化，需用字符串拼接
@@ -380,17 +367,14 @@ public class RuleGraphService {
             relType
         );
 
-        session.writeTransaction(tx -> {
-            tx.run(cypher,
-                Map.of(
-                    "sourceId", sourceId,
-                    "targetId", targetId,
-                    "confidence", rel.getConfidence(),
-                    "createdAt", System.currentTimeMillis()
-                )
-            );
-            return null;
-        });
+        neo4jClient.write(cypher,
+            Map.of(
+                "sourceId", sourceId,
+                "targetId", targetId,
+                "confidence", rel.getConfidence(),
+                "createdAt", System.currentTimeMillis()
+            )
+        );
 
         log.debug("Merged relation: [{}]-[{}]->[{}]", sourceId, relType, targetId);
     }
@@ -412,23 +396,26 @@ public class RuleGraphService {
     // ── Record → Map helper ──
 
     /**
-     * 将 Neo4j Record 中的指定节点字段转换为 Map。
+     * 将 runtime-access 扁平化节点结构 {elementId, labels, properties} 还原为
+     * 原有对外形状: 属性平铺 + "_labels"。
      */
-    private static Map<String, Object> recordToMap(Record record, String key) {
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> nodeValueToMap(Object nodeValue) {
         Map<String, Object> map = new LinkedHashMap<>();
-
-        org.neo4j.driver.Value nodeValue = record.get(key);
-        if (nodeValue.isNull()) {
+        if (!(nodeValue instanceof Map)) {
             return map;
         }
-
-        org.neo4j.driver.types.Node node = nodeValue.asNode();
-        for (String propKey : node.keys()) {
-            map.put(propKey, node.get(propKey).asObject());
+        Map<String, Object> nodeMap = (Map<String, Object>) nodeValue;
+        Object props = nodeMap.get("properties");
+        if (props instanceof Map) {
+            ((Map<String, Object>) props).forEach(map::put);
         }
-        // 添加节点标签
-        map.put("_labels", node.labels());
+        map.put("_labels", nodeMap.getOrDefault("labels", List.of()));
         return map;
+    }
+
+    private static double toDouble(Object value) {
+        return value instanceof Number n ? n.doubleValue() : 0.0;
     }
 
     // ── Write stats ──

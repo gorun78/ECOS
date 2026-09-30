@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import {
+  fetchMeshAgentsJson,
+  fetchMeshMissionsJson,
+  createMeshMissionJson,
+  executeMeshMissionJson,
+} from '../../services/agentMeshApi';
 
 export interface AgentDefinition {
   id: string;
@@ -67,9 +73,7 @@ export const useAgentStore = create<AgentState>()(
       fetchAgents: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/agent-mesh/agents');
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchMeshAgentsJson();
           set({ agents: json.data || json || [], loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to fetch agents';
@@ -82,9 +86,7 @@ export const useAgentStore = create<AgentState>()(
       fetchMissions: async () => {
         set({ loading: true, error: null });
         try {
-          const resp = await fetch('/api/v1/agent-mesh/missions');
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchMeshMissionsJson();
           set({ missions: json.data || json || [], loading: false });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to fetch missions';
@@ -97,12 +99,7 @@ export const useAgentStore = create<AgentState>()(
       createMission: async (mission) => {
         set({ error: null });
         try {
-          const resp = await fetch('/api/v1/agent-mesh/missions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(mission),
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          await createMeshMissionJson(mission);
           await get().fetchMissions();
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to create mission';
@@ -113,10 +110,7 @@ export const useAgentStore = create<AgentState>()(
       executeMission: async (id) => {
         set({ error: null });
         try {
-          const resp = await fetch(`/api/v1/agent-mesh/missions/${id}/execute`, {
-            method: 'POST',
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          await executeMeshMissionJson(id);
           await get().fetchMissions();
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to execute mission';

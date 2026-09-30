@@ -39,12 +39,17 @@ public class ArchitectureTest {
     private static final Path ECOS_ROOT = findEcosRoot();
 
     /**
-     * 向上查找 ecos_backend 项目根目录（包含 pom.xml 和 common 子目录）。
+     * 向上查找 ecos_backend 项目根目录。
+     *
+     * <p>PMO-74 H11-T3 修复：旧判据是「pom.xml + common 子目录」，但 PMO-E1/PMO-C 之后
+     * 顶层 `common/` 已重命名为 `runtime/common-api`，该目录全仓不存在，判据永远匹配失败，
+     * PROJECT_ROOT 退化到当前工作目录，导致模块清单整体失配（实测铁律5 空转）。
+     * 新判据用 reactor 中稳定存在的 `gateway` 模块目录，与 ModuleDependencyArchTest 同口径。
      */
     private static Path findProjectRoot() {
         Path dir = Paths.get("").toAbsolutePath();
         while (dir != null) {
-            if (Files.exists(dir.resolve("pom.xml")) && Files.exists(dir.resolve("common"))) {
+            if (Files.exists(dir.resolve("pom.xml")) && Files.isDirectory(dir.resolve("gateway"))) {
                 return dir;
             }
             dir = dir.getParent();
@@ -70,43 +75,22 @@ public class ArchitectureTest {
     static void importClasses() {
         List<Path> classPaths = new ArrayList<>();
 
-        // 当前实际模块清单（PMO-E1 更新：删旧 DIKW 模块，加六引擎 impl + runtime-access + services 4 子服务）
-        String[] modules = {
-            "common/common-api",
-            // 六引擎 impl
-            "engine/data-engine/data-engine-impl",
-            "engine/ontology-engine/ontology-engine-impl",
-            "engine/kb-engine/kb-engine-impl",
-            "engine/cognitive-engine/cognitive-engine-impl",
-            "engine/ai-engine/ai-engine-impl",
-            "engine/security-engine/security-engine-impl",
-            // runtime
-            "runtime/runtime-core",
-            "runtime/runtime-access",
-            "runtime/runtime-task",
-            "runtime/runtime-monitor",
-            "runtime/llm-gateway",
-            // sysman
-            "sysman/sysman-api",
-            "sysman/sysman-impl",
-            "sysman/sysman-boot",
-            // 业务模块
-            "buszhi/buszhi-impl",
-            "workspace/workspace-impl",
-            // services 4 子服务（有内容，D2 保留）
-            "services/api-gateway",
-            "services/identity-service",
-            "services/ontology-service",
-            "services/agent-service",
-            // gateway
-            "gateway"
-        };
-
-        for (String module : modules) {
-            Path targetClasses = PROJECT_ROOT.resolve(module).resolve("target/classes");
-            if (Files.isDirectory(targetClasses)) {
-                classPaths.add(targetClasses);
-            }
+        // PMO-74 H11-T3：模块清单不再硬编码。旧数组本身就是漂移源——`common/common-api`、
+        // `sysman/sysman-*`、`buszhi/buszhi-impl` 在 PMO-E1/PMO-C 重命名后已全部失配，
+        // 且缺 services/{datanet,dccheng,aiming} 与 services/sysman|buszhi/impl/*，
+        // 即使 PROJECT_ROOT 正确也只覆盖部分 Controller。
+        // 现改为遍历 PROJECT_ROOT 下所有已构建的 `target/classes`，跳过 archive/（Q3 归档区）。
+        Path archiveRoot = PROJECT_ROOT.resolve("archive");
+        try (java.util.stream.Stream<Path> walk = Files.walk(PROJECT_ROOT)) {
+            walk.filter(Files::isDirectory)
+                    .filter(p -> !p.startsWith(archiveRoot))
+                    .filter(p -> p.getFileName().toString().equals("classes"))
+                    .filter(p -> p.getParent() != null
+                            && p.getParent().getFileName().toString().equals("target"))
+                    .sorted()
+                    .forEach(classPaths::add);
+        } catch (IOException e) {
+            System.err.println("WARNING: 模块 target/classes 遍历失败: " + e.getMessage());
         }
 
         if (!classPaths.isEmpty()) {
@@ -162,7 +146,10 @@ public class ArchitectureTest {
             }
 
             // PMO-E1: baseline 13→11（D2 删 6 空壳 + D2 前已减到 11）
-            int baselineModules = 11;
+            // PMO-74 H11-T2: 11→12 —— `services/agent-service` 经裁决归入 reactor 以消除幽灵依赖
+            // （ai-engine-impl / aiming 显式依赖它，此前未挂 reactor 会解析 .m2 陈旧 SNAPSHOT）。
+            // 与 _win_tasks/check-legacy-modules.ps1 的 baselineCount 同批更正。
+            int baselineModules = 12;
             if (moduleCount > baselineModules) {
                 throw new AssertionError(
                     String.format("❌ 禁止新增Maven模块！当前: %d, 基线: %d", moduleCount, baselineModules));

@@ -16,15 +16,7 @@ import {
 } from "../pages/aiworkbench/api";
 
 // ── Auth Helpers ────────────────────────────────────────────────
-
-/** Get authorization headers with Bearer token from localStorage */
-export function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("token") || "";
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+export { authHeaders } from "./auth";
 
 // ── Type aliases for backend raw responses ──────────────────────
 

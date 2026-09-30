@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from 'lucide-react';
 import { apiFetchData } from '../../api';
+import { getErrorMessage } from './helpers';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import {
@@ -160,7 +161,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
       setDefaults(mergedDefaults);
       setValues(merged);
       setOriginalValues({ ...merged });
-    } catch (e: any) {
+    } catch (e) {
       console.warn('[EngineConfig] Failed to load config:', e);
       setLoadError(t('dw.cfg.toast.loadFailed'));
     } finally {
@@ -231,8 +232,8 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
       setOriginalValues({ ...values });
       setGroups(prev => prev.map(g => ({ ...g, modified: false })));
       showToast?.('success', t('dw.cfg.toast.saved', { count: changedItems.length }));
-    } catch (e: any) {
-      showToast?.('error', t('dw.cfg.toast.saveFailed', { error: e?.message || '' }));
+    } catch (e) {
+      showToast?.('error', t('dw.cfg.toast.saveFailed', { error: getErrorMessage(e) }));
     } finally {
       setSaving(false);
     }
@@ -244,8 +245,8 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
     try {
       await apiFetchData('/api/v1/engine/data/settings/refresh', { method: 'POST' });
       showToast?.('success', t('dw.cfg.toast.cacheRefreshed'));
-    } catch (e: any) {
-      showToast?.('error', t('dw.cfg.toast.refreshFailed', { error: e?.message || '' }));
+    } catch (e) {
+      showToast?.('error', t('dw.cfg.toast.refreshFailed', { error: getErrorMessage(e) }));
     } finally {
       setRefreshing(false);
     }

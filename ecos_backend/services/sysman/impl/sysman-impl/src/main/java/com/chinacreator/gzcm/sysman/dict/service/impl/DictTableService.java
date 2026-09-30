@@ -24,51 +24,8 @@ public class DictTableService implements IDictTableService {
 
     public DictTableService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        ensureSchema();
-    }
-
-    private void ensureSchema() {
-        try {
-            jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS dict_table (" +
-                "  id VARCHAR(36) PRIMARY KEY," +
-                "  code VARCHAR(200)," +
-                "  name VARCHAR(200) NOT NULL," +
-                "  name_zh VARCHAR(200)," +
-                "  schema_name VARCHAR(200)," +
-                "  description TEXT," +
-                "  status VARCHAR(32) DEFAULT 'DRAFT'," +
-                "  source VARCHAR(100)," +
-                "  row_count BIGINT," +
-                "  storage_size VARCHAR(50)," +
-                "  owner VARCHAR(100)," +
-                "  tags TEXT," +
-                "  created_by VARCHAR(100)," +
-                "  created_at TIMESTAMP DEFAULT NOW()," +
-                "  updated_at TIMESTAMP DEFAULT NOW())");
-
-            jdbc.execute(
-                "CREATE TABLE IF NOT EXISTS dict_column (" +
-                "  id VARCHAR(36) PRIMARY KEY," +
-                "  table_id VARCHAR(36) NOT NULL REFERENCES dict_table(id) ON DELETE CASCADE," +
-                "  name VARCHAR(200) NOT NULL," +
-                "  type VARCHAR(100) NOT NULL," +
-                "  length INT," +
-                "  precision_val INT," +
-                "  scale INT," +
-                "  nullable BOOLEAN DEFAULT true," +
-                "  primary_key BOOLEAN DEFAULT false," +
-                "  default_value VARCHAR(500)," +
-                "  description TEXT," +
-                "  sort_order INT DEFAULT 0," +
-                "  created_at TIMESTAMP DEFAULT NOW()," +
-                "  updated_at TIMESTAMP DEFAULT NOW())");
-
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_dict_column_table_id ON dict_column(table_id)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_dict_table_status ON dict_table(status)");
-        } catch (Exception e) {
-            log.error("创建 dict_table/dict_column 表失败: {}", e.getMessage());
-        }
+        // H8-T1: dict_table / dict_column 建表 DDL（含外键与索引）收编至 db/migration（V162），
+        // 构造函数不再内嵌 DDL。
     }
 
     private static final RowMapper<DictTable> TABLE_MAPPER = (rs, rowNum) -> {

@@ -77,6 +77,10 @@ class Wave31OntologyConvergenceTest {
     void c1_entityRelationCrud() {
         OntologyService svc = new OntologyService(ontRepo, mappingStore);
 
+        // 未打桩时 mock 返回 null → setId(null) → entityToMap 里 ConcurrentHashMap.get(null) NPE；形状与生产 nextId 一致
+        when(ontRepo.nextId(anyString(), anyString()))
+            .thenAnswer(inv -> inv.<String>getArgument(0) + "9001");
+
         // ── 创建 entity ──
         Map<String, Object> body = new HashMap<>();
         body.put("code", "ENT_FIN_INVOICE");
@@ -221,6 +225,7 @@ class Wave31OntologyConvergenceTest {
         when(versionRepo.findLatestPublished("ont001")).thenReturn(Optional.of(existing));
         when(ontRepo.findEntitiesByOntology("ont001")).thenReturn(List.of());
         // versionService.createVersion 内部会调 versionRepository.insert → mock 默认返回 1
+        when(versionRepo.nextId()).thenReturn("ver9002");
         when(versionRepo.findById(anyString())).thenAnswer(inv -> {
             OntologyVersion v = new OntologyVersion();
             v.setId(inv.getArgument(0));

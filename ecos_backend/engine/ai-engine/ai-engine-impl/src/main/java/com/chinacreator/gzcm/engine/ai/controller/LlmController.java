@@ -37,11 +37,12 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code POST /api/v1/llm/chat}      — 对话生成，供 RAG answer 生成/智能问答等使用</li>
  * </ul>
  *
- * <p>三滤波器已放行（pmo-50）：
+ * <p>三滤波器（PMO-74 H9-T5c 按实测更正，原「pmo-50 已放行」三句中两句已失效）：
  * <ul>
- *   <li>{@code VersionPrefixRewriteFilter} — /api/v1/llm 不在 REMOVE map，KEEP</li>
- *   <li>{@code SecurityConfig} — permitAll 加 /api/v1/llm/**</li>
- *   <li>{@code ClearanceInterceptor} — 公开豁免加 /api/v1/llm</li>
+ *   <li>{@code VersionPrefixRewriteFilter} — /api/v1/llm 无正向改写条目，KEEP ✓</li>
+ *   <li>{@code SecurityConfig} — permitAll 经 H9-T1 收敛为 8 条，<b>不含 /api/v1/llm/**</b> ⇒ 需 Bearer Token
+ *       （{@code SecurityConfig:33-34} 明确把 kb-engine 的 chat/embedding 内部调用列为待 H10 补凭证）</li>
+ *   <li>{@code ClearanceInterceptor} — 业务前缀豁免经 H9-T2 移除 ⇒ 按 {@code /api/v1/ → L1} 校验</li>
  * </ul>
  *
  * <p>请求体使用 {@link EmbeddingRequest} / {@link ChatRequest}（强类型 DTO，
@@ -91,7 +92,7 @@ public class LlmController {
             return ApiResponse.success(resp);
         } catch (Exception e) {
             log.error("llm/embedding 异常: {}", e.getMessage(), e);
-            return ApiResponse.internalError("嵌入调用异常: " + e.getMessage());
+            return ApiResponse.internalError("嵌入调用异常");
         }
     }
 
@@ -122,7 +123,7 @@ public class LlmController {
             return ApiResponse.success(resp);
         } catch (Exception e) {
             log.error("llm/chat 异常: {}", e.getMessage(), e);
-            return ApiResponse.internalError("对话调用异常: " + e.getMessage());
+            return ApiResponse.internalError("对话调用异常");
         }
     }
 }

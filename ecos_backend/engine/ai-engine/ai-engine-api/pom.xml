@@ -11,7 +11,7 @@
 
     <artifactId>ai-engine-api</artifactId>
     <packaging>jar</packaging>
-    <name>ECOS Cognitive Engine :: API</name>
+    <name>ECOS AI Engine :: API</name>
 
     <dependencies>
         <!-- DataBridge Common API -->

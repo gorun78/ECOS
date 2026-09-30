@@ -427,12 +427,22 @@
         <module>services/buszhi</module>
         <module>services/dccheng</module>
         <module>services/aiming</module>
-        <!-- PMO-49 P2-A (path A): 移除历史 Sprint 1 骨架 services/{api-gateway, identity-service, ontology-service, agent-service}。
-             - api-gateway: M0 改造已废弃（library 由顶层 gateway 集成），孤儿 no import
-             - identity-service: 与 sysman/security-engine 职责重叠，代码可弃
-             - ontology-service: OntologyDslCompiler 未合并到 buszhi，暂保留目录，从 build 移除等 P2-B 迁入 buszhi
-             - agent-service: 保留目录待 P2-B 迁到 aiming，M0 改造已 clear 从 gateway classpath
-             4 个 modules 全部删除的是"去掉历史骨架从 reactor 卸载"，实际代码目录由 P2-B 处理
+        <!-- PMO-74 H11-T2: agent-service 归入 reactor，消除幽灵依赖（ai-engine-impl / aiming
+             显式依赖 agent-service，但此前模块未挂 reactor，全量构建实际解析 .m2 陈旧缓存 jar；
+             源码独立编译实测通过 mvn -o -f services/agent-service/pom.xml clean compile EXIT=0）。
+             任务清单 H11-T2 裁决口径「归 reactor 或源码并入 aiming」取前者，不动 7 部署 JAR 基线。 -->
+        <module>services/agent-service</module>
+        <!-- PMO-49 P2-A (path A) / PMO-74 Q3 batch A: Sprint-1 skeleton modules were unloaded
+             from the reactor; the three ghost directories are now physically archived under
+             ecos_backend/archive/legacy/services/{api-gateway, identity-service, ontology-service}
+             (moved, not deleted - restore path preserved per the Q3 ruling).
+             - api-gateway: superseded by the top-level gateway fat-JAR, zero imports
+             - identity-service: overlaps sysman + security-engine responsibilities
+             - ontology-service: was kept "pending OntologyDslCompiler merge into buszhi", but that
+               class does not exist anywhere in the tree (doc drift registered in PMO-74 section 9.6);
+               the directory is archived as-is, nothing to merge
+             - agent-service: NOT archived - PMO-74 H11-T2 reattached it to the reactor above
+             Gate: _win_tasks/check-legacy-modules.ps1 C3 enforces both directions.
         -->
         <!-- Legacy gateway (kept for backward compatibility during migration) -->
         <module>gateway</module>

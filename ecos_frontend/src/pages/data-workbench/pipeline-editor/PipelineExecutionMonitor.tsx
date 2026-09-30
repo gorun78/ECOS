@@ -43,10 +43,10 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
   // Poll execution status
   const fetchRunStatus = useCallback(async (rid: string) => {
     try {
-      const resp = await apiFetchData<{ data: RunInfo }>(
+      const resp = await apiFetchData<RunInfo & { data?: RunInfo }>(
         `/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}`
       );
-      const data = (resp as any)?.data || resp;
+      const data = resp?.data || resp;
       setRunInfo(data);
 
       // Check for completion

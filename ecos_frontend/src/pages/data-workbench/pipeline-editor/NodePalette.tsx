@@ -26,6 +26,7 @@ interface NodeTypeResponse {
   items?: NodeTypeEntry[];
   entries?: NodeTypeEntry[];
   nodeTypes?: NodeTypeEntry[];
+  data?: { items?: NodeTypeEntry[]; entries?: NodeTypeEntry[]; nodeTypes?: NodeTypeEntry[] };
 }
 
 interface NodePaletteProps {
@@ -50,13 +51,13 @@ const NodePalette: React.FC<NodePaletteProps> = ({
   React.useEffect(() => {
     let cancelled = false;
     apiFetchData<NodeTypeResponse>('/api/v1/pipeline/node-types')
-      .then((resp: any) => {
+      .then((resp) => {
         if (cancelled || !resp) return;
         const list = (
-          (resp as any)?.data?.items ??
-          (resp as any)?.items ??
-          (resp as any)?.entries ??
-          (resp as any)?.nodeTypes ??
+          resp?.data?.items ??
+          resp?.items ??
+          resp?.entries ??
+          resp?.nodeTypes ??
           []
         ) as NodeTypeEntry[];
         if (!Array.isArray(list) || list.length === 0) return;

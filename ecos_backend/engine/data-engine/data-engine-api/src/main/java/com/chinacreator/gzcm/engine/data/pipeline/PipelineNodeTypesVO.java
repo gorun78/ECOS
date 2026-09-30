@@ -43,10 +43,10 @@ public class PipelineNodeTypesVO {
         /** 执行器说明（如 JdbcConnector / UdfSandbox 等） */
         private String executor;
 
-        /** 版本（全版本/预留/仅flagship 等） */
+        /** 版本（全版本/预留/仅ultimate 等） */
         private String version;
 
-        /** 是否可用（false 表示当前档位禁用，如 SOURCE_CDC 仅 flagship） */
+        /** 是否可用（false 表示当前档位禁用，如 SOURCE_CDC 仅 ultimate） */
         private Boolean enabled;
 
         /** 禁用原因 i18n key（enabled=false 时） */

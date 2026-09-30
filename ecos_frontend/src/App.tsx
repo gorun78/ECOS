@@ -16,7 +16,8 @@ import { useTheme } from "./components/ThemeContext";
 import { useLanguage } from "./components/LanguageContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import NetworkErrorBanner from "./components/NetworkErrorBanner";
-import { apiTaskStats, notifyNetworkDown, notifyNetworkUp, type TaskStats } from "./api";
+import { apiHealth, notifyNetworkUp } from "./api";
+import { apiTaskStats, type TaskStats } from "./services/taskCenter";
 
 /**
  * Route path → i18n key (common.app.tab.{id}).
@@ -72,21 +73,6 @@ const TAB_LABEL_KEY: Record<string, string> = {
 /** Default tab label: return the raw route id for unknown views (keep prior behaviour). */
 const getTabLabel = (t: (k: string) => string, id: string): string =>
   t(TAB_LABEL_KEY[id] ?? `app.tab.${id}`);
-
-async function apiHealth(): Promise<string> {
-  try {
-    const r = await fetch("/api/health");
-    const d = await r.json();
-    return d.data?.status || d.status || "DOWN";
-  } catch (err: unknown) {
-    // G3: surface transport failures to the top NetworkErrorBanner.
-    // HTTP status responses (e.g. 401 carrying a numeric `status`) are
-    // auth/HTTP tokens, not network outages — only non-HTTP failures go up.
-    const st = err && typeof err === "object" ? (err as { status?: unknown }).status : undefined;
-    if (st === undefined) notifyNetworkDown(err);
-    return "DOWN";
-  }
-}
 
 interface Tab {
   id: string;

@@ -10,6 +10,8 @@ import DynamicIcon from '../../components/ontology/DynamicIcon';
 import { getDomainColorClasses } from './helpers';
 import type { ObjectType, OntologyDomain } from '../../types/ontology';
 
+type QuickNavCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'glossary';
+
 interface DomainManagerProps {
   domains: OntologyDomain[];
   objectTypes: ObjectType[];
@@ -17,7 +19,7 @@ interface DomainManagerProps {
   onSelectDomainFilter: (id: string | null) => void;
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objectTypes: ObjectType[]) => void;
-  onQuickNavigate: (category: any, id: string) => void;
+  onQuickNavigate: (category: QuickNavCategory, id: string) => void;
   onDeleteDomain: (domainId: string) => void;
 }
 

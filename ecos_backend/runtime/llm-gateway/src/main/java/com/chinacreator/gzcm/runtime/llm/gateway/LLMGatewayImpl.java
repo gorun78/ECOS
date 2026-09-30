@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
+import com.chinacreator.gzcm.runtime.llm.security.SecurityEngineBridge;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,6 +60,13 @@ public class LLMGatewayImpl implements LLMGateway {
     @Autowired(required = false)
     private LLMGatewayProperties llmGatewayProperties;
 
+    /**
+     * security-engine 桥（密钥解析 / ABAC 裁决 / 审计，PMO-74 N14 + 铁律 §2.4）。
+     * required=false：未装配视为 security 不可用 → 默认 DENY（不放行直连、不回退明文）。
+     */
+    @Autowired(required = false)
+    private SecurityEngineBridge securityEngineBridge;
+
     // ── Provider URL 解析 ──
 
     /**
@@ -104,8 +113,28 @@ public class LLMGatewayImpl implements LLMGateway {
             return ChatResponse.fail("Failed to serialize request: " + e.getMessage());
         }
 
-        // 从 ChatRequest 提取 apiKey
-        String apiKey = request.getApiKey() != null ? request.getApiKey() : "";
+        // ── H10-T1 (PMO-74 N14 / 铁律 §2.4)：密钥一律服务端经 security-engine 密钥服务解析 ──
+        // 调用方自报的明文 apiKey 不信任：出现即 warn + 忽略（默认 DENY，不回退明文）。
+        String caller = request.getCallerId() != null && !request.getCallerId().isBlank()
+                ? request.getCallerId() : "service:llm-gateway";
+        @SuppressWarnings("deprecation")
+        String clientSuppliedKey = request.getApiKey();
+        if (clientSuppliedKey != null && !clientSuppliedKey.isBlank()) {
+            log.warn("[llm-gateway] 忽略调用方自报明文 apiKey（PMO-74 N14 VG-7 越权入参，服务端不消费）: caller={}, model={}",
+                    caller, request.getModel());
+        }
+
+        // ABAC 裁决（security 不可用/未放行 → 默认 DENY）
+        if (!abacAllowLlmCall(caller, provider, request.getModel())) {
+            return ChatResponse.fail("LLM 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY，不降级放行）");
+        }
+
+        String apiKey = resolveProviderApiKey(request.getApiKeyRef(), caller,
+                provider + ":" + request.getModel());
+        if (apiKey == null) {
+            return ChatResponse.fail("LLM 调用被拒绝：未取得 security-engine 密钥服务下发的 provider 密钥"
+                    + "（默认 DENY — 不放行直连、不回退明文，详见 server 日志）");
+        }
 
         if (stream) {
             return callStreaming(baseUrl, apiKey, requestBodyJson);
@@ -183,7 +212,18 @@ public class LLMGatewayImpl implements LLMGateway {
             return EmbeddingResponse.fail("serialize fail: " + e.getMessage());
         }
         log.debug("LLM embed -> {} model={} provider={} n={}", baseUrl, model, provider, inputs.length);
-        return callEmbeddingNonStreaming(baseUrl, "", body, model);
+        // 密钥与 chat 同闸（PMO-74 N14）：只经 security-engine 密钥服务取，取不到默认 DENY
+        String embedCaller = request.getCallerId() != null && !request.getCallerId().isBlank()
+                ? request.getCallerId() : "service:llm-gateway";
+        if (!abacAllowLlmCall(embedCaller, provider, model)) {
+            return EmbeddingResponse.fail("embedding 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY）");
+        }
+        String embedApiKey = resolveProviderApiKey(request.getApiKeyRef(), embedCaller,
+                provider + ":" + model);
+        if (embedApiKey == null) {
+            return EmbeddingResponse.fail("embedding 调用被拒绝：未取得 security-engine 密钥（默认 DENY，不放行直连）");
+        }
+        return callEmbeddingNonStreaming(baseUrl, embedApiKey, body, model);
     }
 
     @Override
@@ -191,9 +231,25 @@ public class LLMGatewayImpl implements LLMGateway {
         String baseUrl = resolveBaseUrl(config);
         String modelsUrl = baseUrl + "/models";
 
+        // 健康探测同样只允许使用 security-engine 解析出的密钥（PMO-74 N14）；
+        // 取不到密钥 → 视为不可用（默认 DENY，绝不用调用方明文密钥或空 Bearer 试探）。
+        @SuppressWarnings("deprecation")
+        String legacyPlainKey = config.getApiKey();
+        if (legacyPlainKey != null && !legacyPlainKey.isBlank()) {
+            log.warn("[llm-gateway] isAvailable: 忽略调用方自报明文 apiKey（PMO-74 N14）: provider={}",
+                    config.getProvider());
+        }
+        String probeKey = resolveProviderApiKey(config.getApiKeyRef(), "service:llm-gateway-probe",
+                "probe:" + config.getProvider());
+        if (probeKey == null) {
+            providerStatusCache.put(config.getProvider() != null ? config.getProvider() : "unknown",
+                    Map.of("status", "denied_no_secret", "baseUrl", baseUrl));
+            return false;
+        }
+
         Request request = new Request.Builder()
                 .url(modelsUrl)
-                .header("Authorization", "Bearer " + (config.getApiKey() != null ? config.getApiKey() : ""))
+                .header("Authorization", "Bearer " + probeKey)
                 .header("Accept", "application/json")
                 .get()
                 .build();
@@ -228,6 +284,75 @@ public class LLMGatewayImpl implements LLMGateway {
     }
 
     // ── 私有方法 ──
+
+    /**
+     * H10-T1（PMO-74 N14 / 铁律 §2.4#6）— provider 密钥解析统一闸口。
+     *
+     * <p>解析链：调用方显式 {@code apiKeyRef} → 服务端配置
+     * {@code llm.gateway.default-api-key-ref}（两者均为<b>引用</b>，非明文）→
+     * security-engine 密钥服务（{@code SecurityEngineBridge} → ISecretService /
+     * IDataEncryptionService）。</p>
+     *
+     * <p>🔴 fail-closed：桥未装配 / security-engine 不可用 / 引用为空 / 解析失败 →
+     * 返回 null（调用方必须拒绝外发），并 {@code log.warn} + ecos.audit 留痕；
+     * <b>绝不回退到调用方自报明文密钥</b>。</p>
+     *
+     * @return 明文密钥（仅供当场拼 Authorization 头，不落日志）；null = 拒绝
+     */
+    private String resolveProviderApiKey(String explicitRef, String caller, String resourceDesc) {
+        if (securityEngineBridge == null) {
+            log.warn("[llm-gateway] SecurityEngineBridge 未装配 — security-engine 不可用，密钥无法取得，默认 DENY（不回退明文、不放行直连）: caller={}, resource={}",
+                    caller, resourceDesc);
+            return null;
+        }
+        String ref = explicitRef;
+        if ((ref == null || ref.isBlank()) && llmGatewayProperties != null) {
+            ref = llmGatewayProperties.getGateway().getDefaultApiKeyRef();
+        }
+        if (ref == null || ref.isBlank()) {
+            log.warn("[llm-gateway] 未配置 apiKeyRef（请求级与 llm.gateway.default-api-key-ref 均为空）— 默认 DENY，不回退明文: caller={}, resource={}",
+                    caller, resourceDesc);
+            securityEngineBridge.audit(caller, "LLM_APIKEY_DENY_NO_REF", resourceDesc, "DENIED");
+            return null;
+        }
+        String key = securityEngineBridge.resolveSecret(ref, caller);
+        if (key == null) {
+            securityEngineBridge.audit(caller, "LLM_APIKEY_DENY_RESOLUTION_FAILED",
+                    resourceDesc + " ref=" + SecurityEngineBridge.maskRef(ref), "DENIED");
+            return null;
+        }
+        securityEngineBridge.audit(caller, "LLM_APIKEY_RESOLVED",
+                resourceDesc + " ref=" + SecurityEngineBridge.maskRef(ref), "SUCCESS");
+        return key;
+    }
+
+    /**
+     * LLM 调用前 ABAC 裁决（铁律 §2.4#4）。security 不可用 / 明确拒绝 → false（默认 DENY）。
+     * 可通过 {@code llm.gateway.abac-eval-enabled=false} 降级关闭（仅裁决，密钥闸口不受此开关影响）。
+     */
+    private boolean abacAllowLlmCall(String caller, String provider, String model) {
+        boolean enabled = llmGatewayProperties == null
+                || llmGatewayProperties.getGateway().isAbacEvalEnabled();
+        if (!enabled) {
+            return true;
+        }
+        if (securityEngineBridge == null) {
+            log.warn("[llm-gateway] SecurityEngineBridge 未装配 — ABAC 裁决不可用，默认 DENY: caller={}", caller);
+            return false;
+        }
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("provider", provider);
+        attrs.put("model", model == null ? "" : model);
+        String tenantId = null;
+        try {
+            tenantId = TenantContextHolder.getTenantId();
+        } catch (Exception ignored) {
+            // 无租户上下文 → 由桥侧回退 default
+        }
+        boolean allow = securityEngineBridge.evaluate(caller, tenantId, "llm:chat", attrs);
+        securityEngineBridge.audit(caller, "LLM_CHAT_ABAC", provider + ":" + model, allow ? "ALLOW" : "DENY");
+        return allow;
+    }
 
     /**
      * 从 model 名称检测 provider

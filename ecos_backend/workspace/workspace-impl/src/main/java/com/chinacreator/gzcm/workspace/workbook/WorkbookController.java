@@ -81,7 +81,7 @@ public class WorkbookController {
             log.error("Workbook execute error", e);
             Map<String, Object> err = new LinkedHashMap<>();
             err.put("error", e.getMessage());
-            return ApiResponse.internalError("Execution failed: " + e.getMessage());
+            return ApiResponse.internalError("Execution failed");
         }
     }
 

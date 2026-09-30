@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Network } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { fetchEcosGraphJson } from '../../services/ontologyWorkbenchApi';
 
 interface KGNode {
   id: string; code?: string; name?: string; label?: string;
@@ -14,7 +15,7 @@ interface KGEdge {
   id?: string; source: string; target: string;
   relationshipType?: string; label?: string; code?: string; name?: string;
 }
-interface KGData { nodes: KGNode[]; edges: KGEdge[]; stats?: any; }
+interface KGData { nodes: KGNode[]; edges: KGEdge[]; stats?: unknown; }
 
 function layoutNodes(nodes: KGNode[]): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
@@ -44,13 +45,9 @@ export default function GlobalGraphView() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const t = localStorage.getItem('token') || '';
-    const headers: Record<string,string> = {};
-    if (t) headers['Authorization'] = 'Bearer ' + t;
-    fetch('/api/v1/knowledge/ecos-graph', { headers })
-      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((data: any) => setKgData(data?.data ?? data))
-      .catch((e: any) => setError(e.message))
+    fetchEcosGraphJson()
+      .then((data: unknown) => setKgData(((data as { data?: KGData })?.data ?? data) as KGData))
+      .catch((e: unknown) => setError((e as { message?: string } | undefined)?.message ?? ""))
       .finally(() => setLoading(false));
   }, []);
 

@@ -44,7 +44,7 @@ public class KnowledgeEvalController {
             return ApiResponse.success(evalService.runEval(req));
         } catch (Exception e) {
             log.error("知识检索质量评估失败: {}", e.getMessage(), e);
-            return ApiResponse.internalError("评估失败: " + e.getMessage());
+            return ApiResponse.internalError("评估失败");
         }
     }
 }

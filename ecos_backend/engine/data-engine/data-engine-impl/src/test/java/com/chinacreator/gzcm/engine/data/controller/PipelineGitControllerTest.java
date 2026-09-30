@@ -26,16 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * PipelineGitControllerTest — P2#3：DTO 反序列化 + 路径契约回归。
- *
- * <p>覆盖 6 个 POST/GET 端点中 5 个 POST 端点 + 1 个 GET 端点（listVersions）。
- * 通过 mock {@link PipelineGitService} 断言：
- * <ul>
- *   <li>DTO 字段正确透传（message/branch/author/localPath/username/password/path/branchName/taskId）</li>
- *   <li>HTTP 路径参数 {id} 透传正确</li>
- *   <li>VO 字段映射契约（taskId/branch/commitId/message 与 yamlUpdated/pipelineId/bus.gz 一致）</li>
- *   <li>异常路径：IllegalArgumentException → 400，服务异常 → 500</li>
- * </ul>
+ * PipelineGitControllerTest — H4-T1：repositoryId 入参契约 + localPath 废弃拒绝 + 路径契约回归。
  */
 @ExtendWith(MockitoExtension.class)
 class PipelineGitControllerTest {
@@ -53,8 +44,8 @@ class PipelineGitControllerTest {
     // ─────────────────────────── POST /tasks/{id}/git/commit ─────────────
 
     @Test
-    @DisplayName("POST /tasks/{id}/git/commit — DTO 反序列化 + path 透传 path {id}")
-    void commitDtauDeserializesAndPassesId() throws Exception {
+    @DisplayName("POST /tasks/{id}/git/commit — repositoryId 透传 + path 透传 {id}")
+    void commitRoutesRepositoryId() throws Exception {
         PipelineGitCommitResultVO sample = new PipelineGitCommitResultVO();
         sample.setTaskId("t-123");
         sample.setBranch("main");
@@ -66,8 +57,7 @@ class PipelineGitControllerTest {
         req.setMessage("feat(pipeline): new node");
         req.setBranch("main");
         req.setAuthor("ecos-user");
-        req.setUsername("u");
-        req.setPassword("p");
+        req.setRepositoryId("pipeline-repo-1");
 
         ApiResponse<PipelineGitCommitResultVO> resp = controller.commit("t-123", req);
 
@@ -81,6 +71,26 @@ class PipelineGitControllerTest {
         assertEquals("feat(pipeline): new node", routed.getMessage());
         assertEquals("main", routed.getBranch());
         assertEquals("ecos-user", routed.getAuthor());
+        assertEquals("pipeline-repo-1", routed.getRepositoryId());
+        assertNull(routed.getLocalPath());
+    }
+
+    @Test
+    @DisplayName("POST /tasks/{id}/git/commit — 仅传 localPath 返回 not_available（禁伪成功）")
+    void commitLocalPathOnlyReturnsNotAvailable() throws Exception {
+        PipelineGitCommitResultVO rejected = new PipelineGitCommitResultVO();
+        rejected.setTaskId("t-123");
+        rejected.setStatus("not_available");
+        rejected.setReason("localPath 入参已废弃：请改传 repositoryId");
+        when(gitService.commit(eq("t-123"), any(PipelineGitCommitRequest.class))).thenReturn(rejected);
+
+        PipelineGitCommitRequest req = new PipelineGitCommitRequest();
+        req.setLocalPath("C:/evil/path");
+
+        ApiResponse<PipelineGitCommitResultVO> resp = controller.commit("t-123", req);
+        assertTrue(resp.isSuccess());
+        assertEquals("not_available", resp.getData().getStatus());
+        assertNotNull(resp.getData().getReason());
     }
 
     @Test
@@ -96,15 +106,15 @@ class PipelineGitControllerTest {
     // ─────────────────────────── POST /tasks/{id}/git/pull ─────────────
 
     @Test
-    @DisplayName("POST /tasks/{id}/git/pull — localPath 字段透传到服务")
-    void pullDtoRoutesLocalPath() throws Exception {
+    @DisplayName("POST /tasks/{id}/git/pull — repositoryId 字段透传到服务")
+    void pullDtoRoutesRepositoryId() throws Exception {
         PipelineGitOperationResultVO sample = new PipelineGitOperationResultVO();
         sample.setTaskId("t-123");
         sample.setYamlUpdated(true);
         when(gitService.pull(eq("t-123"), any(PipelineGitPullRequest.class))).thenReturn(sample);
 
         PipelineGitPullRequest req = new PipelineGitPullRequest();
-        req.setLocalPath("C:/git-cache/t-123");
+        req.setRepositoryId("pipeline-repo-1");
 
         ApiResponse<PipelineGitOperationResultVO> resp = controller.pull("t-123", req);
 
@@ -113,25 +123,25 @@ class PipelineGitControllerTest {
         assertEquals(Boolean.TRUE, resp.getData().getYamlUpdated());
         ArgumentCaptor<PipelineGitPullRequest> cap = ArgumentCaptor.forClass(PipelineGitPullRequest.class);
         verify(gitService).pull(eq("t-123"), cap.capture());
-        assertEquals("C:/git-cache/t-123", cap.getValue().getLocalPath());
+        assertEquals("pipeline-repo-1", cap.getValue().getRepositoryId());
     }
 
     // ─────────────────────────── POST /git/load ────────────────────────
 
     @Test
-    @DisplayName("POST /git/load — path/branch/taskId 字段契约透传")
-    void loadFromGitDtoRoutesAllClientFields() throws Exception {
+    @DisplayName("POST /git/load — repositoryId/branch/taskId 字段契约透传")
+    void loadFromGitDtoRoutesClientFields() throws Exception {
         PipelineGitOperationResultVO sample = new PipelineGitOperationResultVO();
         sample.setTaskId("new-task");
         sample.setPipelineId("pipeline-77");
-        sample.setGitUrl("git@github.com:ecos/repo.git");
+        sample.setGitUrl("https://github.com/ecos/repo.git");
         when(gitService.loadFromGit(any(PipelineGitLoadRequest.class))).thenReturn(sample);
 
         PipelineGitLoadRequest req = new PipelineGitLoadRequest();
-        req.setPath("C:/git-cache/load-abc");
+        req.setRepositoryId("pipeline-repo-1");
         req.setBranch("dev");
         req.setTaskId("task-1");
-        req.setGitUrl("git@github.com:ecos/repo.git");
+        req.setGitUrl("https://github.com/ecos/repo.git");
         req.setPipelineId("pipeline-77");
 
         ApiResponse<PipelineGitOperationResultVO> resp = controller.loadFromGit(req);
@@ -140,7 +150,7 @@ class PipelineGitControllerTest {
         assertEquals("pipeline-77", resp.getData().getPipelineId());
         ArgumentCaptor<PipelineGitLoadRequest> cap = ArgumentCaptor.forClass(PipelineGitLoadRequest.class);
         verify(gitService).loadFromGit(cap.capture());
-        assertEquals("C:/git-cache/load-abc", cap.getValue().getPath());
+        assertEquals("pipeline-repo-1", cap.getValue().getRepositoryId());
         assertEquals("dev", cap.getValue().getBranch());
         assertEquals("task-1", cap.getValue().getTaskId());
     }
@@ -148,26 +158,34 @@ class PipelineGitControllerTest {
     // ─────────────────────────── GET /git/branches ───────────────────────
 
     @Test
-    @DisplayName("GET /git/branches?localPath= — 路径参数透传")
-    void listBranchesPassesLocalPathParam() throws Exception {
-        when(gitService.listBranches("C:/git-cache")).thenReturn(List.of("main", "dev"));
-        ApiResponse<List<String>> resp = controller.listBranches("C:/git-cache");
+    @DisplayName("GET /git/branches?repositoryId= — 新入参透传")
+    void listBranchesPassesRepositoryId() throws Exception {
+        when(gitService.listBranches("pipeline-repo-1")).thenReturn(List.of("main", "dev"));
+        ApiResponse<List<String>> resp = controller.listBranches(null, "pipeline-repo-1");
         assertTrue(resp.isSuccess());
         assertEquals(2, resp.getData().size());
+    }
+
+    @Test
+    @DisplayName("GET /git/branches?localPath= — 废弃入参单独传入走 400 指引")
+    void listBranchesLegacyLocalPathRejected() throws Exception {
+        when(gitService.listBranchesByLegacyLocalPath("C:/git-cache"))
+                .thenThrow(new IllegalArgumentException("localPath 入参已废弃，请改传 repositoryId"));
+        ApiResponse<List<String>> resp = controller.listBranches("C:/git-cache", null);
+        assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
     }
 
     // ─────────────────────────── POST /git/branch ───────────────────────
 
     @Test
-    @DisplayName("POST /git/branch — localPath/branchName/taskId 字段契约透传")
-    void switchBranchDtoRoutesAllClientFields() throws Exception {
+    @DisplayName("POST /git/branch — repositoryId/branchName/taskId 字段契约透传")
+    void switchBranchDtoRoutesClientFields() throws Exception {
         PipelineGitOperationResultVO sample = new PipelineGitOperationResultVO();
-        sample.setLocalPath("C:/git-cache");
         sample.setBranchName("dev");
         when(gitService.switchBranch(any(PipelineGitSwitchBranchRequest.class))).thenReturn(sample);
 
         PipelineGitSwitchBranchRequest req = new PipelineGitSwitchBranchRequest();
-        req.setLocalPath("C:/git-cache");
+        req.setRepositoryId("pipeline-repo-1");
         req.setBranchName("dev");
         req.setTaskId("task-1");
 
@@ -178,7 +196,7 @@ class PipelineGitControllerTest {
         ArgumentCaptor<PipelineGitSwitchBranchRequest> cap =
                 ArgumentCaptor.forClass(PipelineGitSwitchBranchRequest.class);
         verify(gitService).switchBranch(cap.capture());
-        assertEquals("C:/git-cache", cap.getValue().getLocalPath());
+        assertEquals("pipeline-repo-1", cap.getValue().getRepositoryId());
         assertEquals("dev", cap.getValue().getBranchName());
         assertEquals("task-1", cap.getValue().getTaskId());
     }

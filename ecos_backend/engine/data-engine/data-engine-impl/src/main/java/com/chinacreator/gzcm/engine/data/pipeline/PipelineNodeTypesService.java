@@ -42,7 +42,7 @@ public class PipelineNodeTypesService {
                         props("url", "string", "method", "string", "headers", "object",
                                 "body", "string", "pagination", "string"),
                         List.of("url")),
-                entry("SOURCE_CDC", "Source CDC", "未实现(仅旗舰版)", "仅flagship", "Radio",
+                entry("SOURCE_CDC", "Source CDC", "未实现(仅旗舰版)", "仅ultimate", "Radio",
                         props("datasourceId", "string", "topic", "string"),
                         List.of()),
                 // B6-1：近源层（MinIO）读取节点。必填字段随 zone 分支（STRUCTURED 需 table；

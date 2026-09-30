@@ -25,7 +25,7 @@ interface CatalogContextMenuProps {
 function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: string; resourceName: string; onClose: () => void }) {
   const { styles } = useTheme();
   const { locale } = useLanguage();
-  const [rows, setRows] = useState<Record<string, any>[]>([]);
+  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const pageSize = 25;

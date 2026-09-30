@@ -123,7 +123,7 @@ public class ClassificationController {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("assetId", assetId);
             error.put("error", e.getMessage());
-            return ApiResponse.internalError("自动分类执行异常: " + e.getMessage());
+            return ApiResponse.internalError("自动分类执行异常");
         }
     }
 

@@ -14,7 +14,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -44,13 +44,14 @@ spring:
       auto-offset-reset: earliest
 
 # PMO-59 P2b: 认知心智层配置
-# ① 事件总线上线 Kafka 路径 (runtime-event KafkaEventBusServiceImpl 激活; 内存 fallback 互斥让位):
+# ① 事件总线上线 Kafka 路径 (runtime-event KafkaEventBusServiceImpl 激活; PMO-74 H2-T7 裁决 T-C 双投递，本地分发与 Kafka 并存):
 #    强类型 Payload 经 EventBus 发 ecos.cognitive / ecos.audit; broker 不可达降级 WARN 不阻塞
 # ② 心智层补算周期 (runtime-task MentalScanTask 周期, Duration 语义, 默认 10min)
 ecos:
   event:
     kafka:
-      enabled: true
+      # PMO-74 H2-T7 裁决 T-C 双投递：跨进程走 Kafka，同 JVM 仍本地分发，broker 缺席不丢本进程事件
+      enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   cognitive:
     scan-interval: 10m
 
@@ -62,86 +63,25 @@ mybatis:
     cache-enabled: true
     lazy-loading-enabled: false
 
-# 数据湖 MinIO 初始参数（近源库；enterprise/flagship 档覆盖见 application-*.yml）
+# 数据湖 MinIO 初始参数（近源库；enterprise/ultimate 档覆盖见 application-*.yml）
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:}
   bucket: ${MINIO_BUCKET:ecos-datalake}
 
 # Authentication Configuration
 auth:
   enabled: true
-  whitelist:
-    paths:
-      - "/api/health"
-      - "/api/v1/auth/**"
-      - "/error"
-      - "/api/v1/ecos/**"
-      - "/api/v1/security/health"          # 仅健康检查放行
-      - "/api/v1/marketplace/**"
-      - "/api/v1/agent/**"
-      - "/api/v1/agent-loop/**"
-      - "/api/v1/agent-call/**"
-      - "/api/v1/agent-mesh/**"
-      - "/api/v1/knowledge/**"
-      - "/api/v1/glossary/**"
-      - "/api/v1/catalog/**"
-      - "/api/v1/oag/**"
-      - "/api/v1/system/**"
-      - "/api/v1/dict/**"
-      - "/api/v1/ontology/**"
-      - "/api/v1/task/**"
-      - "/api/v1/lineage/**"
-      - "/api/v1/mfa/**"
-      - "/api/v1/privacy/**"
-      - "/api/v1/world-model/**"
-      - "/api/v1/agent-runtime/**"
-      - "/api/v1/evolution/**"
-      - "/api/v1/pipeline/**"
-      - "/api/pipeline/**"
-      - "/api/v1/dq/**"
-      # ── PMO-48-A T2: DQ 裸路径白名单 (与 /api/v1/dq/** 双路径豁免) ──
-      - "/api/dq/**"
-      # PMO-48-B T7b: scores API 双路径
-      - "/api/v1/dq/scores/**"
-      - "/api/dq/scores/**"
-      - "/api/v1/query/**"
-      - "/api/v1/causal/**"
-      - "/api/v1/monitor/**"
-      - "/api/v1/twins/**"
-      - "/api/v1/pareto/**"
-      - "/api/v1/portal/**"
-      - "/api/v1/integration/**"
-      - "/api/v1/cognitive/**"
-      - "/api/v1/engine/**"
-      - "/api/v1/workspace/**"
-      - "/api/v1/guardrails/**"
-      - "/api/v1/aip/**"
-      - "/api/v1/agents/**"
-      - "/api/v1/cron-jobs/**"
-      - "/api/v1/skills/**"
-      - "/api/alerts/**"
-      - "/api/datalake/**"
-      - "/api/workbook/**"
-      # ── PMO-38 T5: 新增双路径 JWT 白名单 ──
-      # force-logout (sysman-impl, 需 PM_USER_UPDATE + 认证透传 userId)
-      - "/api/v1/system/users/**"
-      # knowledge-bases 列表
-      - "/api/v1/knowledge-bases"
-      - "/api/knowledge-bases"
-      # sysconfig reset
-      - "/api/v1/sysconfig/**"
-      - "/api/sysconfig/**"
-      - "/api/agent/tools/**"
-      - "/datanet/**"
-      - "/cases/**"
+  # PMO-74 H9-T5: auth.whitelist.paths 已删除 —— 唯一消费方 services/api-gateway/JwtAuthFilter
+  # 不在 reactor（根 pom L430~438 卸载，无模块依赖该 artifact），本清单僵尸化且比 SecurityConfig 更宽。
+  # 匿名端点的唯一事实源 = services/sysman/impl/sysman-impl 的 SecurityConfig permitAll（铁律 §1.2①）。
 
 # Neo4j Configuration
 neo4j:
   uri: bolt://localhost:7687
   username: neo4j
-  password: neo4j123
+  password: ${NEO4J_PASSWORD:}
   database: neo4j
 
 # LLM Configuration
@@ -191,11 +131,11 @@ jwt:
   private-key: ${JWT_PRIVATE_KEY:}  # 从环境变量注入，格式: PEM (含换行符用\n表示)
   public-key: |
     -----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowZc56deVTWoP3/J0csp
-    wIT60GM0qQbt1/SeEifcbImYr8B+ImvUMfO5mlba/h9ZCWJJdlsgX6qLq9TNKMCo
-    c8P3LDZ7jDikVOYHD40njdXHYu+nM5y3XHLDD3qNl8+qr7GfvCn6asXx6rOmO66V
-    UJ3h1zCzPnGbyfKfOmahnMA2l7WcCrzg1HwbSPopnaQrMPjPGLqezACSOv0289mK
-    iRAwSwfte0+Sf3YZcd4HbqNn4muSH5XY8+JKYAxwjZ+luw4wZFak502W7omVNie3
-    5EPhuY4zaMDG1n6+kz5BiB+7zbIuECUgsDdA5V7L/nAJwO10pwuHIDb45jWu47hn
-    BQIDAQAB
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvEI22S2DKpNWUkfxmxix
+    zetUGcNX0Q41eHuBqt4zeUmv5rPvsP41AjkF6NffpyGsUrICWYDuhNcLa/R95zFN
+    BH+4UKhQ1DbN8PZ6ongCHTIk9+u4SsvwrO4yzqt5pxIklc9h8P7hdsZk+gYYYGYb
+    /wiAVpPIp3ZlBQhUXo63udUdfRN337eS3WvF93eO4axNJUCGXe6Wn6SBWjB1kSIk
+    dG0Hp9x5kuUZM1G/v2CoOoQx0Az/IszAVGF9SCFwDnd6heyYLwquNkiUj+8NCIrC
+    9pHS3/Q9xhJ0/EnxTqQu7waAV8hIQXXH0ntbPjooI7QdN44HbMSPkRSF0ecKkdx3
+    4wIDAQAB
     -----END PUBLIC KEY-----

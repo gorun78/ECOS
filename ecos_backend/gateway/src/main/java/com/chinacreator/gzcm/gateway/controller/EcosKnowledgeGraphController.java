@@ -71,7 +71,7 @@ public class EcosKnowledgeGraphController {
             return ApiResponse.success(graph);
         } catch (Exception e) {
             log.error("Knowledge graph query failed", e);
-            return ApiResponse.internalError("知识图谱查询失败: " + e.getMessage());
+            return ApiResponse.internalError("知识图谱查询失败");
         }
     }
 
@@ -90,7 +90,7 @@ public class EcosKnowledgeGraphController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Knowledge graph sync failed", e);
-            return ApiResponse.internalError("同步失败: " + e.getMessage());
+            return ApiResponse.internalError("同步失败");
         }
     }
 

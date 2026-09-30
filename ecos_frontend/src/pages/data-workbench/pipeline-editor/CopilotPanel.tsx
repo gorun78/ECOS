@@ -60,7 +60,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
     setLoading(true);
 
     try {
-      const resp = await apiFetch<{ data: { reply: string } }>(
+      const resp = await apiFetch<{ data?: { reply?: string }; reply?: string }>(
         '/api/v1/engine/data/copilot/chat',
         {
           method: 'POST',
@@ -73,7 +73,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
           }),
         }
       );
-      const reply = (resp as any)?.data?.reply || (resp as any)?.reply;
+      const reply = resp?.data?.reply || resp?.reply;
       if (reply) {
         setMessages((prev) => [
           ...prev,

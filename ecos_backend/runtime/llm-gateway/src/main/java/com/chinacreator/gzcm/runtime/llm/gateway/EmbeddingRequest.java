@@ -27,6 +27,15 @@ public class EmbeddingRequest {
     /** 显式指定 provider（null/blank 时按 model 名自动检测，同 chat detectProvider） */
     private String provider;
 
+    /**
+     * provider 密钥<b>引用</b>（PMO-74 N14，与 {@link ChatRequest#getApiKeyRef()} 同语义）；
+     * null/blank 时服务端回退 {@code llm.gateway.default-api-key-ref}，两者皆空 → 默认 DENY。
+     */
+    private String apiKeyRef;
+
+    /** 调用方主体标识（审计主体 + 密钥访问者），如 {@code kb-engine:rag} */
+    private String callerId;
+
     /** 无参构造器 — 供 Jackson 反序列化与 setter 赋值 */
     public EmbeddingRequest() {
     }
@@ -48,4 +57,10 @@ public class EmbeddingRequest {
 
     public String getProvider() { return provider; }
     public void setProvider(String provider) { this.provider = provider; }
+
+    public String getApiKeyRef() { return apiKeyRef; }
+    public void setApiKeyRef(String apiKeyRef) { this.apiKeyRef = apiKeyRef; }
+
+    public String getCallerId() { return callerId; }
+    public void setCallerId(String callerId) { this.callerId = callerId; }
 }

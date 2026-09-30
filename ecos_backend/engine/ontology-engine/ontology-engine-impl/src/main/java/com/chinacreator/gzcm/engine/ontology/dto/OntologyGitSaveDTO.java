@@ -20,6 +20,22 @@ public class OntologyGitSaveDTO {
     /** 提交信息（commit 端点，可选，缺省 "commit ontology {id}"） */
     private String message;
 
-    /** Git 远程 URL（load 端点，可选） */
+    /**
+     * Git 远程 URL（历史 load 端点字段）。
+     * <p><b>安全废弃</b>：H4-T4 起服务端禁止依据客户端 gitUrl 执行 clone/pull（P0 红线），
+     * 该字段被忽略；仓库定位仅认 {@link #repositoryId}。为不破坏既有请求契约保留字段。
+     */
     private String url;
+
+    /** 服务端仓库逻辑标识（runtime 注册表 repositoryId）；commit/pull/load 定位仓库用。 */
+    private String repositoryId;
+
+    /** 资产类型（可选，缺省 ontology），构成 tag 首段。 */
+    private String assetType;
+
+    /** 版本号（可选，如 1.0.2），构成 tag 末段并命名归档文件。 */
+    private String versionNo;
+
+    /** 已序列化的版本内容（commit 用，通常为版本快照 JSON）。 */
+    private String content;
 }

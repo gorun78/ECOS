@@ -19,16 +19,11 @@
  * @license Apache-2.0
  */
 
+// 鉴权头单源定义见 services/auth.ts (H6-T1)
+import { authOnlyHeaders as authHeaders } from '../../services/auth';
+
 const DBG_BASE = '/api/v1/pipeline/debug/sessions';
 const LOG_BASE = '/api/v1/pipeline/debug/executions';
-
-function authHeaders(): Record<string, string> {
-  const token =
-    typeof localStorage !== 'undefined'
-      ? localStorage.getItem('token') || localStorage.getItem('accessToken') || ''
-      : '';
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 /** 步骤级快照 (debug 会话下保留 rows/sample/schema)。 */
 export interface NodeStepSnapshot {

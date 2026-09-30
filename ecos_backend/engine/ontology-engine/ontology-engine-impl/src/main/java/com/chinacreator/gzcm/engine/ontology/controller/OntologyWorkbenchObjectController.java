@@ -30,10 +30,12 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyWorkbenchObjectServ
  * {@code @RequestMapping} 级路径相同合法（方法路径 /objects/** 段不重叠,
  * 与既有 /entities /relationships /domains 段无冲突）。
  *
- * <p>三滤波器（架构铁律 §1.2）：前缀 /api/v1/ecos/ 无 VersionPrefixRewriteFilter
- * 改写条目（KEEP 直达）；SecurityConfig permitAll {@code /api/v1/ecos/**}、
- * ClearanceInterceptor 豁免 {@code /api/v1/ecos/ontologies} 前缀、
- * application.yml auth.whitelist {@code /api/v1/ecos/**} 均按通配覆盖，零注册改动。
+ * <p>三滤波器（架构铁律 §1.2，PMO-74 H9-T5c 按实测更正）：前缀 /api/v1/ecos/ 无
+ * VersionPrefixRewriteFilter 正向条目（KEEP 直达，成立）；但 permitAll/豁免三层
+ * <b>均不成立</b> —— SecurityConfig permitAll 经 H9-T1 收敛为 8 条（:31-35 明确把 ecos/git
+ * 归入 authenticated）、ClearanceInterceptor 的 ecosystem 前缀豁免经 H9-T2 移除、yml
+ * {@code auth.whitelist} 键经 H9-T5/T5b 删除。⇒ 零注册改动仍成立，但请求需 Bearer Token
+ * 且过 {@code /api/v1/ → L1} 准入等级校验。
  *
  * <p>T7 (2026-09-13)：强类型 {@code OntologyWorkbenchObjectSaveDTO /
  * OntologyWorkbenchObjectVO}（definition 字段嵌套动态结构豁免，同 T16-1 先例）。

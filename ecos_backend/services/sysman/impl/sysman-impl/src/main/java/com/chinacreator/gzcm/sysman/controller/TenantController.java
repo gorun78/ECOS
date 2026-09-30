@@ -75,7 +75,7 @@ public class TenantController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询租户列表失败", e);
-            return ApiResponse.internalError("查询租户列表失败: " + e.getMessage());
+            return ApiResponse.internalError("查询租户列表失败");
         }
     }
 
@@ -95,7 +95,7 @@ public class TenantController {
             return ApiResponse.success(rows.get(0));
         } catch (Exception e) {
             log.error("查询租户详情失败: id={}", id, e);
-            return ApiResponse.internalError("查询租户详情失败: " + e.getMessage());
+            return ApiResponse.internalError("查询租户详情失败");
         }
     }
 
@@ -134,7 +134,7 @@ public class TenantController {
             return ApiResponse.success("租户创建成功", result);
         } catch (Exception e) {
             log.error("创建租户失败", e);
-            return ApiResponse.internalError("创建租户失败: " + e.getMessage());
+            return ApiResponse.internalError("创建租户失败");
         }
     }
 
@@ -203,7 +203,7 @@ public class TenantController {
             return get(id);
         } catch (Exception e) {
             log.error("更新租户失败: id={}", id, e);
-            return ApiResponse.internalError("更新租户失败: " + e.getMessage());
+            return ApiResponse.internalError("更新租户失败");
         }
     }
 
@@ -220,7 +220,7 @@ public class TenantController {
             return ApiResponse.success("租户已删除", null);
         } catch (Exception e) {
             log.error("删除租户失败: id={}", id, e);
-            return ApiResponse.internalError("删除租户失败: " + e.getMessage());
+            return ApiResponse.internalError("删除租户失败");
         }
     }
 
@@ -261,7 +261,7 @@ public class TenantController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询租户配额失败: id={}", id, e);
-            return ApiResponse.internalError("查询租户配额失败: " + e.getMessage());
+            return ApiResponse.internalError("查询租户配额失败");
         }
     }
 
@@ -325,7 +325,7 @@ public class TenantController {
             return ApiResponse.success("配额已更新", updated);
         } catch (Exception e) {
             log.error("更新租户配额失败: id={}", id, e);
-            return ApiResponse.internalError("更新租户配额失败: " + e.getMessage());
+            return ApiResponse.internalError("更新租户配额失败");
         }
     }
 
@@ -345,7 +345,9 @@ public class TenantController {
 
             int days = 30;
             if (range.endsWith("d")) {
-                try { days = Integer.parseInt(range.replace("d", "")); } catch (NumberFormatException ignored) {}
+                try { days = Integer.parseInt(range.replace("d", "")); } catch (NumberFormatException ignored) {
+                    log.debug("用量区间 range 解析失败，回退默认 30 天: range={}", range);
+                }
             }
 
             LocalDate startDate = LocalDate.now().minusDays(days - 1);
@@ -373,7 +375,7 @@ public class TenantController {
             return ApiResponse.success(summary);
         } catch (Exception e) {
             log.error("查询用量失败: id={}", id, e);
-            return ApiResponse.internalError("查询用量失败: " + e.getMessage());
+            return ApiResponse.internalError("查询用量失败");
         }
     }
 
@@ -450,7 +452,7 @@ public class TenantController {
             return ApiResponse.success(invoice);
         } catch (Exception e) {
             log.error("生成账单失败: id={}", id, e);
-            return ApiResponse.internalError("生成账单失败: " + e.getMessage());
+            return ApiResponse.internalError("生成账单失败");
         }
     }
 }

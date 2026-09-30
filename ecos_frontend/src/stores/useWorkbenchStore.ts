@@ -43,6 +43,7 @@ import {
   deleteRelationship as apiDeleteRelationship,
 } from "../services/ontologyApi";
 import { extractDomainsFromKG } from "../adapters/domainAdapter";
+import { fetchDatanetResourcesAll, fetchDatanetPreview } from "../services/datanetMetadataApi";
 import { mapEntitiesToFlow } from "../adapters/flowAdapter";
 import { commit as gitCommit } from "../services/gitService";
 
@@ -704,11 +705,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       fetchDataResources: async () => {
         set({ dataResourcesLoading: true, error: null });
         try {
-          const resp = await fetch(
-            "/api/v1/datanet/metadata/resources/all"
-          );
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchDatanetResourcesAll();
           const resources: BulkResource[] =
             json.data || json || [];
           set({
@@ -772,11 +769,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         try {
           // 取第一个映射的资源做预览
           const resourceId = resourceIds[0];
-          const resp = await fetch(
-            `/api/v1/datanet/metadata/preview/${resourceId}?limit=50`
-          );
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
+          const json = await fetchDatanetPreview(resourceId, 50);
           const rows: Record<string, any>[] =
             json.data?.rows || json.rows || json.data || [];
           set({

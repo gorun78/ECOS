@@ -14,13 +14,13 @@ import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeDocIngestService;
+import com.chinacreator.gzcm.engine.kb.service.KnowledgeIngestQueryService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,8 +58,10 @@ public class KnowledgeIngestController {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final KnowledgeNodeMapper nodeMapper;
-    private final JdbcTemplate jdbcTemplate;
     private final KgSyncService kgSyncService;
+
+    /** graph_node 补字段更新的数据访问服务。 */
+    private final KnowledgeIngestQueryService queryService;
 
     /** 非结构化文档登记与解析编排（B5-1 / A3 过渡态）。 */
     private final KnowledgeDocIngestService docIngestService;
@@ -68,13 +70,13 @@ public class KnowledgeIngestController {
     private final KbEntityInstanceExtractionService instanceExtractionService;
 
     public KnowledgeIngestController(KnowledgeNodeMapper nodeMapper,
-                                     JdbcTemplate jdbcTemplate,
                                      KgSyncService kgSyncService,
+                                     KnowledgeIngestQueryService queryService,
                                      KnowledgeDocIngestService docIngestService,
                                      KbEntityInstanceExtractionService instanceExtractionService) {
         this.nodeMapper = nodeMapper;
-        this.jdbcTemplate = jdbcTemplate;
         this.kgSyncService = kgSyncService;
+        this.queryService = queryService;
         this.docIngestService = docIngestService;
         this.instanceExtractionService = instanceExtractionService;
     }
@@ -138,8 +140,8 @@ public class KnowledgeIngestController {
                 // 仅补缺失字段，禁空值覆盖有效值（后端规范 节 6 实体入库）
                 boolean patched = applyPatch(existing, req, now);
                 if (patched) {
-                    // update 现 mapper 无 update 方法 → 走 JdbcTemplate 直接 set
-                    persist(existing);
+                    // update 现 mapper 无 update 方法 → 经 queryService 直接 set
+                    queryService.updateGraphNode(existing);
                 }
                 log.info("Knowledge ingest (idempotent hit): entityId={}", entityId);
                 emitAudit("knowledge.ingest", "idempotent=true entityId=" + entityId);
@@ -281,16 +283,6 @@ public class KnowledgeIngestController {
             existing.setUpdatedAt(now);
         }
         return changed;
-    }
-
-    /** 直接 PG UPDATE 节点（nodeMapper 无 update 方法，绕行 JdbcTemplate）。 */
-    private void persist(KnowledgeNode n) {
-        jdbcTemplate.update(
-                "UPDATE ecos_knowledge.graph_node SET label = ?, node_type = ?, description = ?, " +
-                "properties = ?, domain = ?, updated_at = ? WHERE id = ?",
-                n.getLabel(), n.getNodeType(), n.getDescription(),
-                n.getPropertiesJson(), n.getDomain(),
-                n.getUpdatedAt(), n.getId());
     }
 
     private String serializeProperties(KnowledgeIngestRequest req) {

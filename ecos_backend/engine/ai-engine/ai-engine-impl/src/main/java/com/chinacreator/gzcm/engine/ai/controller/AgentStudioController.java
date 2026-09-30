@@ -85,7 +85,7 @@ public class AgentStudioController {
             }
         } catch (Exception e) {
             log.error("[AgentStudio] testAgent failed for id={}", id, e);
-            return ApiResponse.internalError("Agent 测试失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent 测试失败");
         }
     }
 
@@ -131,7 +131,7 @@ public class AgentStudioController {
             }
         } catch (Exception e) {
             log.error("[AgentStudio] compareAgents failed: {} vs {}", agentIdA, agentIdB, e);
-            return ApiResponse.internalError("Agent 对比失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent 对比失败");
         }
     }
 
@@ -155,7 +155,7 @@ public class AgentStudioController {
             return ApiResponse.success(exec.toMap());
         } catch (Exception e) {
             log.error("[AgentStudio] executePipeline failed for id={}", id, e);
-            return ApiResponse.internalError("流水线执行失败: " + e.getMessage());
+            return ApiResponse.internalError("流水线执行失败");
         }
     }
 
@@ -212,7 +212,7 @@ public class AgentStudioController {
             }
         } catch (Exception e) {
             log.error("[AgentStudio] orchestrate failed", e);
-            return ApiResponse.internalError("编排失败: " + e.getMessage());
+            return ApiResponse.internalError("编排失败");
         }
     }
 }

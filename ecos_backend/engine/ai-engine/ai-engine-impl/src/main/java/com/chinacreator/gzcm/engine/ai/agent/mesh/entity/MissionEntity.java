@@ -2,10 +2,15 @@ package com.chinacreator.gzcm.engine.ai.agent.mesh.entity;
 
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Mission实体 — 映射 ecos_mission (PG实际结构)
  */
 public class MissionEntity {
+
+    private static final Logger log = LoggerFactory.getLogger(MissionEntity.class);
 
     private String id;
     private String title;
@@ -64,7 +69,9 @@ public class MissionEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("outputResult")) return node.get("outputResult").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Mission result JSON 解析失败，outputResult 回退原始 result JSON: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return result;
     }
@@ -85,7 +92,9 @@ public class MissionEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("errorMessage")) return node.get("errorMessage").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Mission result JSON 解析失败，errorMessage 回退 null: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return null;
     }
@@ -106,7 +115,9 @@ public class MissionEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("startedAt")) return LocalDateTime.parse(node.get("startedAt").asText());
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Mission result JSON 解析失败，startedAt 回退 null: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return null;
     }
@@ -116,7 +127,9 @@ public class MissionEntity {
             var node = result != null ? (com.fasterxml.jackson.databind.node.ObjectNode) m.readTree(result) : m.createObjectNode();
             node.put("startedAt", t != null ? t.toString() : null);
             this.result = m.writeValueAsString(node);
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("Mission result JSON 写入失败，startedAt 未落盘（保留旧值）: id={} reason={}", id, e.getMessage());
+        }
     }
 
     public LocalDateTime getCompletedAt() { return finishedAt; }
@@ -128,7 +141,9 @@ public class MissionEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("durationMs")) return node.get("durationMs").asLong();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Mission result JSON 解析失败，durationMs 回退 null: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return null;
     }
@@ -138,7 +153,9 @@ public class MissionEntity {
             var node = result != null ? (com.fasterxml.jackson.databind.node.ObjectNode) m.readTree(result) : m.createObjectNode();
             node.put("durationMs", ms);
             this.result = m.writeValueAsString(node);
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("Mission result JSON 写入失败，durationMs 未落盘（保留旧值）: id={} reason={}", id, e.getMessage());
+        }
     }
 
     public LocalDateTime getUpdatedAt() { return finishedAt; }

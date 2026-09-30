@@ -2,15 +2,15 @@ package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.dto.SkySecurityPolicyUpsertDTO;
+import com.chinacreator.gzcm.sysman.service.SecurityPolicyQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Timestamp;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * PMO-60 v2.0 T4a — 安全策略 CRUD 控制器。
@@ -22,6 +22,10 @@ import java.util.*;
  * 鉴权：{@code SecurityConfig} 中该前缀不在 permitAll，走 {@code .anyRequest().authenticated()}（需 Bearer Token）。
  * 准入：{@code ClearanceInterceptor} 对该前缀豁免检查（path.startsWith("/api/v1/security")），仅要求认证。
  * <p>
+ * 数据访问：PMO-74 H9-T4 起 SQL 全部下沉 {@link SecurityPolicyQueryService}
+ * （Controller 不持有数据访问模板 — 硬规则）；本类只做入参校验、{@code ApiResponse}
+ * 包装与审计事件发布。
+ * <p>
  * 写操作审计：通过 {@code EventBusService}（可选注入）发送事件到
  * {@code KafkaTopics.AUDIT}（{@code ecos.audit}）topic。不可用时仅 WARN 日志，不阻塞主流程。
  */
@@ -30,59 +34,21 @@ import java.util.*;
 public class SecurityPolicyController {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityPolicyController.class);
-    private static final String TABLE = "ecos_security_policy";
 
-    private final JdbcTemplate jdbc;
+    private final SecurityPolicyQueryService policyService;
     private final ObjectProvider<Object> eventBusProvider;
 
     /**
      * 构造器注入。
      *
-     * @param jdbc             Spring 自动配置的 JdbcTemplate（sysman-boot application.yml 已含 datasource 配置）
+     * @param policyService    安全策略数据访问服务（SQL 已下沉，PMO-74 H9-T4）
      * @param eventBusProvider 事件总线可选注入（runtime-event 的 EventBusService），不可用时为 empty
      */
-    public SecurityPolicyController(JdbcTemplate jdbc,
+    public SecurityPolicyController(SecurityPolicyQueryService policyService,
                                     ObjectProvider<Object> eventBusProvider) {
-        this.jdbc = jdbc;
+        this.policyService = policyService;
         this.eventBusProvider = eventBusProvider;
     }
-
-    // ── RowMapper ──────────────────────────────────────────────
-
-    private final RowMapper<Map<String, Object>> ROW_MAPPER = (rs, rowNum) -> {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", rs.getString("id"));
-        row.put("name", rs.getString("name"));
-        row.put("domain", rs.getString("domain"));
-        String expr = rs.getString("policy_expr");
-        // B12: 列表/详情默认返摘要（前50字符），防 ABAC 策略原文泄露
-        row.put("policyExprSummary", expr != null && expr.length() > 50 ? expr.substring(0, 50) + "..." : expr);
-        row.put("priority", rs.getInt("priority"));
-        Timestamp ct = rs.getTimestamp("create_time");
-        row.put("createTime", ct != null ? ct.getTime() : null);
-        Timestamp ut = rs.getTimestamp("update_time");
-        row.put("updateTime", ut != null ? ut.getTime() : null);
-        row.put("createBy", rs.getString("create_by"));
-        return row;
-    };
-
-    /** 详情端点专用：含完整 policy_expr（受 security-engine ABAC 评估保护）。 */
-    private final RowMapper<Map<String, Object>> ROW_MAPPER_FULL = (rs, rowNum) -> {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", rs.getString("id"));
-        row.put("name", rs.getString("name"));
-        row.put("domain", rs.getString("domain"));
-        String expr = rs.getString("policy_expr");
-        row.put("policyExpr", expr);
-        row.put("policyExprSummary", expr != null && expr.length() > 50 ? expr.substring(0, 50) + "..." : expr);
-        row.put("priority", rs.getInt("priority"));
-        Timestamp ct = rs.getTimestamp("create_time");
-        row.put("createTime", ct != null ? ct.getTime() : null);
-        Timestamp ut = rs.getTimestamp("update_time");
-        row.put("updateTime", ut != null ? ut.getTime() : null);
-        row.put("createBy", rs.getString("create_by"));
-        return row;
-    };
 
     // ── GET / — 列表 ─────────────────────────────────────────────
 
@@ -94,11 +60,7 @@ public class SecurityPolicyController {
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list() {
         try {
-            String sql = "SELECT id, name, domain, policy_expr, priority, "
-                    + "create_time, update_time, create_by "
-                    + "FROM " + TABLE + " WHERE is_deleted = 0 ORDER BY priority DESC";
-            List<Map<String, Object>> result = jdbc.query(sql, ROW_MAPPER);
-            return ApiResponse.success(result);
+            return ApiResponse.success(policyService.listAll());
         } catch (Exception e) {
             log.error("查询安全策略列表失败", e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
@@ -116,14 +78,11 @@ public class SecurityPolicyController {
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> getById(@PathVariable String id) {
         try {
-            String sql = "SELECT id, name, domain, policy_expr, priority, "
-                    + "create_time, update_time, create_by "
-                    + "FROM " + TABLE + " WHERE id = ? AND is_deleted = 0";
-            List<Map<String, Object>> rows = jdbc.query(sql, ROW_MAPPER, id);
-            if (rows.isEmpty()) {
+            Map<String, Object> row = policyService.findSummaryById(id);
+            if (row == null) {
                 return ApiResponse.notFound("安全策略不存在: " + id);
             }
-            return ApiResponse.success(rows.get(0));
+            return ApiResponse.success(row);
         } catch (Exception e) {
             log.error("查询安全策略详情失败: id={}", id, e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
@@ -139,14 +98,11 @@ public class SecurityPolicyController {
             return ApiResponse.forbidden("需要 admin 或 security_auditor 角色才能查看策略表达式原文");
         }
         try {
-            String sql = "SELECT id, name, domain, policy_expr, priority, "
-                    + "create_time, update_time, create_by "
-                    + "FROM " + TABLE + " WHERE id = ? AND is_deleted = 0";
-            List<Map<String, Object>> rows = jdbc.query(sql, ROW_MAPPER_FULL, id);
-            if (rows.isEmpty()) {
+            Map<String, Object> row = policyService.findFullExprById(id);
+            if (row == null) {
                 return ApiResponse.notFound("安全策略不存在: " + id);
             }
-            return ApiResponse.success(rows.get(0));
+            return ApiResponse.success(row);
         } catch (Exception e) {
             log.error("查询策略表达式失败: id={}", id, e);
             return ApiResponse.internalError("查询失败: " + e.getMessage());
@@ -176,11 +132,7 @@ public class SecurityPolicyController {
         int priority = dto.getPriority() != null ? dto.getPriority() : 100;
 
         try {
-            String id = "sp_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-            String sql = "INSERT INTO " + TABLE
-                    + " (id, name, domain, policy_expr, priority, create_by, update_by, is_deleted, create_time, update_time)"
-                    + " VALUES (?, ?, ?, ?, ?, 'system', 'system', 0, NOW(), NOW())";
-            jdbc.update(sql, id, name, domain, policyExpr, priority);
+            String id = policyService.create(name, domain, policyExpr, priority);
             log.info("安全策略创建成功: id={}, name={}", id, name);
 
             // 审计事件 — 通过 EventBusService 发送到 Kafka（可选，不可用不阻塞）
@@ -208,9 +160,7 @@ public class SecurityPolicyController {
                                                    @RequestBody SkySecurityPolicyUpsertDTO dto) {
         // 校验记录存在
         try {
-            Integer count = jdbc.queryForObject(
-                    "SELECT COUNT(1) FROM " + TABLE + " WHERE id = ? AND is_deleted = 0",
-                    Integer.class, id);
+            Integer count = policyService.countById(id);
             if (count == null || count == 0) {
                 return ApiResponse.notFound("安全策略不存在: " + id);
             }
@@ -232,17 +182,7 @@ public class SecurityPolicyController {
         }
 
         try {
-            String sql = """
-                    UPDATE %s SET
-                        name = COALESCE(?, name),
-                        domain = COALESCE(?, domain),
-                        policy_expr = COALESCE(?, policy_expr),
-                        priority = COALESCE(?, priority),
-                        update_time = NOW(),
-                        update_by = 'system'
-                    WHERE id = ? AND is_deleted = 0
-                    """.formatted(TABLE);
-            int rows = jdbc.update(sql, name, domain, policyExpr, priority, id);
+            int rows = policyService.update(id, name, domain, policyExpr, priority);
             if (rows == 0) {
                 return ApiResponse.notFound("安全策略不存在或已删除: " + id);
             }
@@ -267,9 +207,7 @@ public class SecurityPolicyController {
     @DeleteMapping("/{id}")
     public ApiResponse<Map<String, Object>> delete(@PathVariable String id) {
         try {
-            int rows = jdbc.update(
-                    "UPDATE " + TABLE + " SET is_deleted = 1, update_time = NOW() WHERE id = ? AND is_deleted = 0",
-                    id);
+            int rows = policyService.logicalDelete(id);
             if (rows == 0) {
                 return ApiResponse.notFound("安全策略不存在或已删除: " + id);
             }
@@ -288,7 +226,7 @@ public class SecurityPolicyController {
     /**
      * 发布审计事件到 ecos.audit topic。
      * <p>
-     * 通过 ObjectProvider 可选注入 EventBusService（避免硬依赖 runtime-event / Kafka）。
+     * 通过 ObjectProvider 可选注入 EventBusService（避免编译期硬依赖 runtime-event / Kafka）。
      * 发送失败或不可用时仅 WARN 日志，不阻塞主流程（铁律 §2.4-5 审计不阻塞主流程）。
      *
      * @param eventType 事件类型（security_policy_create / update / delete）

@@ -141,9 +141,9 @@ export default function ObjectTypeView({
           setDatasetColumns(prev => ({ ...prev, [datasetId]: cols }));
         }
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         // 列定义拉取失败不阻断页面，但必须显式提示（左栏将显示 0 列，不得静默空白）
-        onToast?.('error', t('ow.msg.datasetColumnsFailed').replace('{error}', String(e?.message || e)));
+        onToast?.('error', t('ow.msg.datasetColumnsFailed').replace('{error}', String((e as { message?: string } | undefined)?.message || e)));
       });
     return () => { cancelled = true; };
   }, [baseDataset?.id, datasetColumns]);
@@ -182,8 +182,8 @@ export default function ObjectTypeView({
       }
       setMappingDirty(false);
       onToast?.('success', t('ow.msg.mappingSaved'));
-    } catch (err: any) {
-      onToast?.('error', t('ow.msg.mappingSaveFailed').replace('{error}', String(err?.message || err)));
+    } catch (err: unknown) {
+      onToast?.('error', t('ow.msg.mappingSaveFailed').replace('{error}', String((err as { message?: string } | undefined)?.message || err)));
     }
   };
 
@@ -193,9 +193,9 @@ export default function ObjectTypeView({
     try {
       const report = await validateEntityMappings(objectType.id);
       setLastValidation(report);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 校验端点失败（网络 / 租户 401）显式 toast，不静默吞错
-      onToast?.('error', t('ow.msg.mappingSaveFailed').replace('{error}', String(err?.message || err)));
+      onToast?.('error', t('ow.msg.mappingSaveFailed').replace('{error}', String((err as { message?: string } | undefined)?.message || err)));
     } finally {
       setValidating(false);
     }
@@ -233,7 +233,7 @@ export default function ObjectTypeView({
   };
 
   // ── Handlers ──
-  const handleMetaChange = (key: keyof ObjectType, value: any) => {
+  const handleMetaChange = (key: keyof ObjectType, value: unknown) => {
     setMetaDirty(true);
     onUpdate({ ...objectType, [key]: value });
   };
@@ -271,8 +271,8 @@ export default function ObjectTypeView({
       setMetaBaseline({ domainId: objectType.domainId });
       setMetaDirty(false);
       onToast?.('success', t('ow.msg.metaSaved').replace('{name}', objectType.displayName));
-    } catch (err: any) {
-      onToast?.('error', t('ow.msg.metaSaveFailed').replace('{error}', String(err?.message || err)));
+    } catch (err: unknown) {
+      onToast?.('error', t('ow.msg.metaSaveFailed').replace('{error}', String((err as { message?: string } | undefined)?.message || err)));
     } finally {
       setMetaSaving(false);
     }
@@ -359,7 +359,7 @@ export default function ObjectTypeView({
     });
   };
 
-  const handlePropertyFieldChange = (propId: string, field: keyof PropertyType, value: any) => {
+  const handlePropertyFieldChange = (propId: string, field: keyof PropertyType, value: unknown) => {
     onUpdate({
       ...objectType,
       properties: objectType.properties.map(p => p.id === propId ? { ...p, [field]: value } : p)

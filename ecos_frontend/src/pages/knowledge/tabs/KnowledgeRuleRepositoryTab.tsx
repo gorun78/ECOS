@@ -40,6 +40,9 @@ interface ChapterNode { name: string; clauses: ClauseNode[]; }
 interface ClauseNode { name: string; ruleIds: string[]; }
 interface RegulationNode { name: string; chapters: ChapterNode[]; ruleIds: string[]; }
 
+type RulesEnvelope = { list?: RuleItem[]; data?: RuleItem[] };
+type RulesResponse = RuleItem[] | RulesEnvelope;
+
 // ── Demo data ──────────────────────────────────────────────────
 
 const DEMO_RULES: RuleItem[] = [
@@ -71,9 +74,10 @@ export default function KnowledgeRuleRepositoryTab() {
 
   const loadRules = () => {
     setLoading(true);
-    apiFetchData('/api/v1/knowledge/rules?groupBy=regulation')
-      .then((data: any) => {
-        const list = data?.list || data?.data || data || [];
+    apiFetchData<RulesResponse>('/api/v1/knowledge/rules?groupBy=regulation')
+      .then((data) => {
+        const envelope = data as RulesEnvelope;
+        const list = envelope?.list || envelope?.data || data || [];
         setRules(Array.isArray(list) ? list : []);
       })
       .catch(() => { setRules(DEMO_RULES); })

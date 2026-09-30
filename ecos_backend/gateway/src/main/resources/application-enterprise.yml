@@ -13,7 +13,7 @@ ecos:
     provider: minio
     minio-endpoint: http://localhost:9000
     minio-access-key: ${MINIO_ACCESS_KEY:admin}
-    minio-secret-key: ${MINIO_SECRET_KEY:admin123}
+    minio-secret-key: ${MINIO_SECRET_KEY:}
   features:
     knowledge-graph: true
     causal-analysis: true

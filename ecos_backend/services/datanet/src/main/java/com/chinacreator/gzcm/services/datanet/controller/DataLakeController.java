@@ -67,8 +67,8 @@ public class DataLakeController {
             resp.put("data", results);
             return ApiResponse.success(resp);
         } catch (Exception e) {
-            log.error("DataLake query failed: {}", e.getMessage());
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            log.error("DataLake query failed", e);
+            return ApiResponse.internalError("查询失败");
         }
     }
 

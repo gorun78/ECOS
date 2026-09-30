@@ -4,6 +4,12 @@
  *
  * ChatPanel — OAG (Ontology-Augmented Generation) chat panel
  * PMO-14 T6-4: OAG 8-step progress bar + message metadata card + SSE streaming
+ *
+ * H6-T4 组件行数治理：OAG 进度条 / 元数据卡 / 流式气泡 / 线程面板 / 导出逻辑 /
+ * 类型声明已机械抽取至同目录兄弟文件（OagProgressBar.tsx、MessageMetadataCard.tsx、
+ * StreamingBubble.tsx、ChatThreadPanel.tsx、chatExport.ts、chatbotTypes.ts）。
+ * state 与 useEffect 顺序（滚动置底 → 线程同步 → OAG 复位 → SSE → 卸载清理 → 模拟推进）
+ * 保持在本组合根中不变。
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
@@ -13,293 +19,17 @@ import { useLanguage } from '../../../components/LanguageContext';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import OntologyContextPanel from './OntologyContextPanel';
+import OagProgressBar from './OagProgressBar';
+import MessageMetadataCard from './MessageMetadataCard';
+import StreamingBubble from './StreamingBubble';
+import ChatThreadPanel from './ChatThreadPanel';
+import { buildChatExport, downloadChatExport } from './chatExport';
+import type { ChatMessage, ChatThread, MessageMetadata, OagStepInfo } from './chatbotTypes';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
   return <Comp size={size} className={className} />;
 };
-
-// ── Thread Types (T7-1) ────────────────────────────────────────────
-
-interface ChatThread {
-  id: string;
-  name: string;
-  messages: ChatMessage[];
-  createdAt: string;
-}
-
-// ── OAG Progress Types ──────────────────────────────────────────────
-
-interface OagStepInfo {
-  step: number;
-  label: string;
-  icon: string;
-  status: 'pending' | 'active' | 'completed' | 'error';
-  detail?: string;
-}
-
-// ── ChatMessage (extended with optional metadata) ───────────────────
-
-interface ChatMessage {
-  id: string;
-  sender: 'user' | 'agent' | 'system';
-  content: string;
-  timestamp: string;
-  thinkingTrace?: string[];
-  actionProposal?: {
-    id?: string;
-    actionId: string;
-    actionName: string;
-    payload: Record<string, string>;
-    status: 'pending' | 'approved' | 'rejected';
-  };
-  metadata?: MessageMetadata;
-}
-
-// ── Message Metadata Types ──────────────────────────────────────────
-
-interface MessageMetadata {
-  inputTokens?: number;
-  outputTokens?: number;
-  latencyMs?: number;
-  confidence?: number;
-  modelName?: string;
-  guardrailStatus?: 'passed' | 'blocked' | 'warning';
-}
-
-// ── OAG Progress Bar Sub-component ──────────────────────────────────
-
-function OagProgressBar({
-  steps,
-  styles,
-}: {
-  steps: OagStepInfo[];
-  styles: Record<string, string>;
-}) {
-  const { t } = useLanguage();
-  const completed = steps.filter(s => s.status === 'completed').length;
-  const hasError = steps.some(s => s.status === 'error');
-  const total = steps.length;
-  const pct = Math.round((completed / total) * 100);
-
-  return (
-    <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-xl space-y-2 shadow-2xs`}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className={`font-extrabold text-[10px] ${styles.accentText} flex items-center gap-1.5`}>
-          <Icon name="Zap" size={11} className="animate-pulse" />
-          <span>{t('aiworkbench.chatbot.oagPipelineTitle')}</span>
-        </span>
-        <span className={`font-mono text-[9px] font-bold ${hasError ? 'text-rose-500' : 'text-emerald-500'}`}>
-          {hasError ? t('aiworkbench.chatbot.oagAbnormal') : t('aiworkbench.chatbot.oagStepFormat').replace('{completed}', String(completed)).replace('{total}', String(total)).replace('{pct}', String(pct))}
-        </span>
-      </div>
-
-      {/* Progress bar track */}
-      <div className={`w-full h-1.5 ${styles.inputBg} rounded-full overflow-hidden`}>
-        <div
-          className={`h-full rounded-full transition-all duration-500 ease-out ${
-            hasError ? 'bg-rose-500' : 'bg-gradient-to-r from-blue-500 to-emerald-500'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      {/* Step dots row */}
-      <div className="flex items-center gap-0.5">
-        {steps.map((step, idx) => (
-          <React.Fragment key={step.step}>
-            {idx > 0 && (
-              <div
-                className={`flex-1 h-0.5 rounded transition-colors duration-300 ${
-                  step.status === 'completed' || steps[idx - 1].status === 'completed'
-                    ? 'bg-emerald-400'
-                    : step.status === 'active'
-                    ? 'bg-blue-400 animate-pulse'
-                    : `${styles.cardBorder}`
-                }`}
-              />
-            )}
-            <div
-              title={`${step.step}. ${step.label}${step.detail ? ` — ${step.detail}` : ''}`}
-              className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold transition-all duration-300 shrink-0 ${
-                step.status === 'completed'
-                  ? 'bg-emerald-500 text-white'
-                  : step.status === 'active'
-                  ? 'bg-blue-500 text-white animate-pulse shadow-lg shadow-blue-500/40'
-                  : step.status === 'error'
-                  ? 'bg-rose-500 text-white'
-                  : `${styles.inputBg} ${styles.cardTextMuted} border ${styles.cardBorder}`
-              }`}
-            >
-              {step.status === 'completed' ? (
-                <Icon name="Check" size={9} />
-              ) : step.status === 'error' ? (
-                <Icon name="X" size={9} />
-              ) : step.status === 'active' ? (
-                <Icon name={step.icon} size={9} />
-              ) : (
-                <span className="text-[7px]">{step.step}</span>
-              )}
-            </div>
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* Current step detail */}
-      {(() => {
-        const activeStep = steps.find(s => s.status === 'active');
-        const errorStep = steps.find(s => s.status === 'error');
-        const target = errorStep || activeStep;
-        if (!target) return null;
-        return (
-          <div
-            className={`flex items-center gap-1.5 font-mono text-[9px] ${
-              errorStep ? 'text-rose-500' : styles.accentText
-            }`}
-          >
-            <Icon
-              name={target.icon}
-              size={10}
-              className={errorStep ? '' : 'animate-spin'}
-            />
-            <span>
-              {t('aiworkbench.chatbot.oagStepDetail').replace('{step}', String(target.step)).replace('{total}', String(total)).replace('{label}', target.label)}
-              {target.detail && (
-                <span className={styles.cardTextMuted}> — {target.detail}</span>
-              )}
-            </span>
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
-
-// ── Message Metadata Card Sub-component ─────────────────────────────
-
-function MessageMetadataCard({
-  metadata,
-  styles,
-}: {
-  metadata: MessageMetadata;
-  styles: Record<string, string>;
-}) {
-  const { t } = useLanguage();
-  if (!metadata || Object.keys(metadata).length === 0) return null;
-
-  return (
-    <div
-      className={`p-2.5 ${styles.cardBg}/80 border ${styles.cardBorder} rounded-lg space-y-1.5 font-mono text-[9px] transition-all`}
-    >
-      <div className={`flex items-center gap-1.5 ${styles.cardTextMuted} font-extrabold text-[9px] border-b ${styles.cardBorder} pb-1`}>
-        <Icon name="BarChart3" size={10} />
-        <span>{t('aiworkbench.chatbot.metadataTitle')}</span>
-      </div>
-      <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[9px]">
-        {metadata.inputTokens !== undefined && (
-          <div className="flex items-center gap-1">
-            <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.metadataInput')}</span>
-            <span className={`${styles.cardText} font-bold`}>{metadata.inputTokens.toLocaleString()} tok</span>
-          </div>
-        )}
-        {metadata.outputTokens !== undefined && (
-          <div className="flex items-center gap-1">
-            <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.metadataOutput')}</span>
-            <span className={`${styles.cardText} font-bold`}>{metadata.outputTokens.toLocaleString()} tok</span>
-          </div>
-        )}
-        {metadata.latencyMs !== undefined && (
-          <div className="flex items-center gap-1">
-            <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.metadataLatency')}</span>
-            <span className={`${styles.cardText} font-bold`}>{metadata.latencyMs}ms</span>
-          </div>
-        )}
-        {metadata.confidence !== undefined && (
-          <div className="flex items-center gap-1 col-span-1">
-            <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.metadataConfidence')}</span>
-            <span
-              className={`font-bold ${
-                metadata.confidence >= 0.9
-                  ? 'text-emerald-500'
-                  : metadata.confidence >= 0.7
-                  ? 'text-amber-500'
-                  : 'text-rose-500'
-              }`}
-            >
-              {(metadata.confidence * 100).toFixed(1)}%
-            </span>
-          </div>
-        )}
-        {metadata.modelName && (
-          <div className="flex items-center gap-1 col-span-1">
-            <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.metadataModel')}</span>
-            <span className={`${styles.cardText} font-bold`}>{metadata.modelName}</span>
-          </div>
-        )}
-        {metadata.guardrailStatus && (
-          <div className="flex items-center gap-1 col-span-1">
-            <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.metadataGuardrail')}</span>
-            <span
-              className={`font-bold ${
-                metadata.guardrailStatus === 'passed'
-                  ? 'text-emerald-500'
-                  : metadata.guardrailStatus === 'warning'
-                  ? 'text-amber-500'
-                  : 'text-rose-500'
-              }`}
-            >
-              {metadata.guardrailStatus === 'passed'
-                ? t('aiworkbench.chatbot.metadataPassed')
-                : metadata.guardrailStatus === 'warning'
-                ? t('aiworkbench.chatbot.metadataWarning')
-                : t('aiworkbench.chatbot.metadataBlocked')}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Streaming Message Bubble ────────────────────────────────────────
-
-function StreamingBubble({
-  content,
-  agentName,
-  agentAvatar,
-  styles,
-}: {
-  content: string;
-  agentName: string;
-  agentAvatar: string;
-  styles: Record<string, string>;
-}) {
-  const { t } = useLanguage();
-  return (
-    <div className="flex gap-2.5">
-      <span
-        className={`p-1.5 rounded-lg shrink-0 h-7 w-7 flex items-center justify-center font-bold text-white shadow-3xs ${styles.sidebarActiveBg}`}
-      >
-        <Icon name={agentAvatar} size={12} />
-      </span>
-      <div className="space-y-1.5 max-w-[85%]">
-        <div
-          className={`p-3 rounded-2xl ${styles.cardBg} ${styles.cardText} ${styles.cardBorder} border rounded-tl-none font-sans text-[11px] whitespace-pre-line shadow-3xs leading-normal`}
-        >
-          {content || (
-            <span className={`${styles.cardTextMuted} italic`}>
-              {t('aiworkbench.chatbot.streamingPlaceholder')}
-            </span>
-          )}
-          {content && (
-            <span className="inline-block w-2 h-3.5 bg-blue-500 ml-0.5 animate-pulse rounded-sm align-middle" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main ChatPanel Component ────────────────────────────────────────
 
@@ -653,77 +383,14 @@ export default function ChatPanel({
     setShowThreadPanel(false);
   }, [activeThreadId]);
 
-  // ── Export handler (T7-2) ───────────────────────────────────────
+  // ── Export handler (T7-2) — 组装/下载逻辑见 ./chatExport ────────
   const handleExport = useCallback((format: 'md' | 'json') => {
     const msgs = activeThread ? activeThread.messages : chatMessages;
     if (msgs.length === 0) {
       showToast?.('info', t('aiworkbench.chatbot.noMessages'));
       return;
     }
-    let content = '';
-    let filename = '';
-    let mimeType = '';
-
-    if (format === 'md') {
-      const lines: string[] = [
-        t('aiworkbench.chatbot.exportHeader'),
-        t('aiworkbench.chatbot.exportTime').replace('{time}', new Date().toLocaleString('zh-CN')),
-        t('aiworkbench.chatbot.exportAgent').replace('{name}', activeChatbot.name),
-        '',
-      ];
-      for (const msg of msgs) {
-        const role = msg.sender === 'user' ? t('aiworkbench.chatbot.exportRoleUser') : msg.sender === 'agent' ? t('aiworkbench.chatbot.exportRoleAgent') : t('aiworkbench.chatbot.exportRoleSystem');
-        lines.push(`### ${role} — ${msg.timestamp}`);
-        lines.push('');
-        lines.push(msg.content);
-        lines.push('');
-        if (msg.thinkingTrace && msg.thinkingTrace.length > 0) {
-          lines.push('<details>');
-          lines.push(`<summary>${t('aiworkbench.chatbot.exportThinking')}</summary>`);
-          lines.push('');
-          for (const tr of msg.thinkingTrace) {
-            lines.push(`- ${tr}`);
-          }
-          lines.push('');
-          lines.push('</details>');
-          lines.push('');
-        }
-        if (msg.metadata) {
-          lines.push('> **' + t('aiworkbench.chatbot.metadataTitle') + '**: ' + JSON.stringify(msg.metadata));
-          lines.push('');
-        }
-      }
-      content = '\uFEFF' + lines.join('\n');
-      filename = `chat-export-${activeChatbot.name}-${Date.now()}.md`;
-      mimeType = 'text/markdown;charset=utf-8';
-    } else {
-      const data = {
-        exportedAt: new Date().toISOString(),
-        agent: { id: activeChatbot.id, name: activeChatbot.name },
-        messages: msgs.map(m => ({
-          id: m.id,
-          sender: m.sender,
-          content: m.content,
-          timestamp: m.timestamp,
-          thinkingTrace: m.thinkingTrace,
-          actionProposal: m.actionProposal,
-          metadata: m.metadata,
-        })),
-      };
-      content = '\uFEFF' + JSON.stringify(data, null, 2);
-      filename = `chat-export-${activeChatbot.name}-${Date.now()}.json`;
-      mimeType = 'application/json;charset=utf-8';
-    }
-
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadChatExport(buildChatExport(format, msgs, activeChatbot, t));
     setExportDropdownOpen(false);
     showToast?.('success', t('aiworkbench.chatbot.exportSuccess').replace('{format}', format.toUpperCase()));
   }, [chatMessages, activeThread, threads, activeChatbot, showToast, t]);
@@ -821,96 +488,20 @@ export default function ChatPanel({
 
       {/* Thread panel sidebar (T7-1) */}
       {showThreadPanel && (
-        <div className={`border-b ${styles.cardBorder} ${styles.inputBg} p-3 space-y-2 shrink-0`}>
-          <div className="flex items-center justify-between">
-            <span className={`font-extrabold text-[10px] ${styles.cardText} flex items-center gap-1`}>
-              <Icon name="MessagesSquare" size={11} className={styles.accentText} />
-              <span>{t('aiworkbench.chatbot.threadPanelTitle').replace('{count}', String(threads.length))}</span>
-            </span>
-            <div className="flex items-center gap-1">
-              {showNewThreadInput ? (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); handleNewThread(); }}
-                  className="flex items-center gap-1"
-                >
-                  <input
-                    type="text"
-                    value={newThreadName}
-                    onChange={(e) => setNewThreadName(e.target.value)}
-                    placeholder={t('aiworkbench.chatbot.newThreadPlaceholder')}
-                    className={`w-24 p-0.5 text-[9px] ${styles.inputBg} border ${styles.cardBorder} rounded outline-none`}
-                    autoFocus
-                  />
-                  <button type="submit" className={`p-0.5 ${styles.accentText} cursor-pointer`}>
-                    <Icon name="Check" size={10} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowNewThreadInput(false); setNewThreadName(''); }}
-                    className={`p-0.5 ${styles.cardTextMuted} cursor-pointer`}
-                  >
-                    <Icon name="X" size={10} />
-                  </button>
-                </form>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowNewThreadInput(true)}
-                    className={`p-1 ${styles.accentText} hover:${styles.accentHover} rounded cursor-pointer text-[9px] font-bold`}
-                    title={t('aiworkbench.chatbot.newThread')}
-                  >
-                    <Icon name="Plus" size={10} />
-                  </button>
-                  <button
-                    onClick={handleSaveThread}
-                    className={`p-1 ${styles.cardTextMuted} hover:${styles.accentText} rounded cursor-pointer text-[9px] font-bold`}
-                    title={t('aiworkbench.chatbot.saveCurrentThread')}
-                    disabled={chatMessages.length === 0}
-                  >
-                    <Icon name="Save" size={10} />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          {/* Thread list */}
-          <div className="space-y-1 max-h-40 overflow-y-auto">
-            {threads.map(thread => (
-              <div
-                key={thread.id}
-                onClick={() => handleSwitchThread(thread.id)}
-                className={`p-1.5 rounded cursor-pointer transition-all flex items-center justify-between text-[10px] ${
-                  activeThreadId === thread.id
-                    ? `${styles.accentBg}/20 ${styles.accentText} font-bold`
-                    : thread.id === 'thread-1' && !activeThreadId
-                    ? `${styles.accentBg}/10 ${styles.cardText} font-bold`
-                    : `${styles.cardTextMuted} hover:${styles.inputBg}`
-                }`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <Icon
-                    name={thread.id === 'thread-1' ? 'Radio' : 'Bookmark'}
-                    size={9}
-                    className={activeThreadId === thread.id ? styles.accentText : styles.cardTextMuted}
-                  />
-                  <span className="truncate">{thread.name}</span>
-                  <span className={`text-[8px] ${styles.cardTextMuted} font-mono`}>
-                    {t('aiworkbench.chatbot.msgCount').replace('{count}', String(thread.messages.length))}
-                  </span>
-                </div>
-                {thread.id !== 'thread-1' && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteThread(thread.id); }}
-                    className={`p-0.5 ${styles.cardTextMuted} hover:text-rose-500 cursor-pointer`}
-                    title={t('aiworkbench.chatbot.deleteThread')}
-                  >
-                    <Icon name="Trash2" size={9} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <ChatThreadPanel
+          threads={threads}
+          activeThreadId={activeThreadId}
+          showNewThreadInput={showNewThreadInput}
+          newThreadName={newThreadName}
+          saveDisabled={chatMessages.length === 0}
+          setShowNewThreadInput={setShowNewThreadInput}
+          setNewThreadName={setNewThreadName}
+          onNewThread={handleNewThread}
+          onSaveThread={handleSaveThread}
+          onSwitchThread={handleSwitchThread}
+          onDeleteThread={handleDeleteThread}
+          styles={styles}
+        />
       )}
 
       {/* Sandbox context modifier */}

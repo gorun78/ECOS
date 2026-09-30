@@ -30,7 +30,7 @@ private static final Logger log = LoggerFactory.getLogger(MonitoringController.c
             return ApiResponse.success(data);
         } catch (Throwable e) {
             log.error("获取监控仪表盘数据失败", e);
-            return ApiResponse.internalError("获取仪表盘数据失败: " + e.getMessage());
+            return ApiResponse.internalError("获取仪表盘数据失败");
         }
     }
 
@@ -65,7 +65,7 @@ private static final Logger log = LoggerFactory.getLogger(MonitoringController.c
             return ApiResponse.success(data);
         } catch (Throwable e) {
             log.error("系统诊断失败", e);
-            return ApiResponse.internalError("诊断失败: " + e.getMessage());
+            return ApiResponse.internalError("诊断失败");
         }
     }
 

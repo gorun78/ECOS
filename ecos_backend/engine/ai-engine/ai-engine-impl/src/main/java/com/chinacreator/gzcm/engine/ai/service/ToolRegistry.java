@@ -588,7 +588,9 @@ public class ToolRegistry {
         if (val instanceof Number n) return n.intValue();
         if (val instanceof String s) {
             try { return Integer.parseInt(s); }
-            catch (NumberFormatException ignored) {}
+            catch (NumberFormatException ignored) {
+                log.debug("int 参数解析失败，回退默认值: key={} default={}", key, defaultVal);
+            }
         }
         return defaultVal;
     }

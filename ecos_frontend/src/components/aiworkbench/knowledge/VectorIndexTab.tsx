@@ -7,11 +7,21 @@ import React from 'react';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { ThemeStyles } from '../../../components/ThemeContext';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const Comp = (Icons[name as keyof typeof Icons] || Icons.HelpCircle) as LucideIcon;
   return <Comp size={size} className={className} />;
 };
+
+/** 向量分片条目 — 本文件消费的最小形状（本地类型；共享化留待后续单元） */
+interface VectorChunk {
+  source?: string;
+  title?: string;
+  chunkSize?: number;
+  text?: string;
+  vectorPreview?: string;
+}
 
 interface VectorIndexTabProps {
   styles: ThemeStyles;
@@ -25,7 +35,7 @@ interface VectorIndexTabProps {
   isSyncingAll: boolean;
   handleSyncAll: () => Promise<void>;
   syncLogs: string[];
-  vectorChunks: any[];
+  vectorChunks: VectorChunk[];
   pgvectorSql: string;
   milvusCode: string;
   persistenceTab: 'pgvector' | 'milvus';

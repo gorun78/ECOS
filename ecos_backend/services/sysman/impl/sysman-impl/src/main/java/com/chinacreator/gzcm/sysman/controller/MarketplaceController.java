@@ -78,7 +78,7 @@ public class MarketplaceController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询资产列表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -92,7 +92,7 @@ public class MarketplaceController {
             return ApiResponse.success(asset);
         } catch (Exception e) {
             log.error("查询资产失败, id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -118,7 +118,7 @@ public class MarketplaceController {
             return ApiResponse.success(asset);
         } catch (Exception e) {
             log.error("发布资产失败", e);
-            return ApiResponse.internalError("发布失败: " + e.getMessage());
+            return ApiResponse.internalError("发布失败");
         }
     }
 
@@ -153,7 +153,7 @@ public class MarketplaceController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("搜索资产失败, q={}", query, e);
-            return ApiResponse.internalError("搜索失败: " + e.getMessage());
+            return ApiResponse.internalError("搜索失败");
         }
     }
 
@@ -183,7 +183,7 @@ public class MarketplaceController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取仪表盘数据失败", e);
-            return ApiResponse.internalError("获取仪表盘失败: " + e.getMessage());
+            return ApiResponse.internalError("获取仪表盘失败");
         }
     }
 
@@ -208,7 +208,7 @@ public class MarketplaceController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("提交访问请求失败", e);
-            return ApiResponse.internalError("请求失败: " + e.getMessage());
+            return ApiResponse.internalError("请求失败");
         }
     }
 }

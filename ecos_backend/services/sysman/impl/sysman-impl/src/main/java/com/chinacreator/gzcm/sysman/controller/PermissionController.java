@@ -28,7 +28,7 @@ public class PermissionController {
             return ApiResponse.success(perms.stream().map(this::toMap).collect(Collectors.toList()));
         } catch (Exception e) {
             log.error("查询权限列表失败", e);
-            return ApiResponse.internalError("查询权限列表失败: " + e.getMessage());
+            return ApiResponse.internalError("查询权限列表失败");
         }
     }
 
@@ -40,7 +40,7 @@ public class PermissionController {
             return ApiResponse.success(toMap(p));
         } catch (Exception e) {
             log.error("查询权限详情失败", e);
-            return ApiResponse.internalError("查询权限详情失败: " + e.getMessage());
+            return ApiResponse.internalError("查询权限详情失败");
         }
     }
 
@@ -58,7 +58,7 @@ public class PermissionController {
             return ApiResponse.success(toMap(created));
         } catch (Exception e) {
             log.error("创建权限失败", e);
-            return ApiResponse.internalError("创建权限失败: " + e.getMessage());
+            return ApiResponse.internalError("创建权限失败");
         }
     }
 
@@ -77,7 +77,7 @@ public class PermissionController {
             return ApiResponse.success(toMap(updated));
         } catch (Exception e) {
             log.error("更新权限失败", e);
-            return ApiResponse.internalError("更新权限失败: " + e.getMessage());
+            return ApiResponse.internalError("更新权限失败");
         }
     }
 
@@ -88,7 +88,7 @@ public class PermissionController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("删除权限失败", e);
-            return ApiResponse.internalError("删除权限失败: " + e.getMessage());
+            return ApiResponse.internalError("删除权限失败");
         }
     }
 

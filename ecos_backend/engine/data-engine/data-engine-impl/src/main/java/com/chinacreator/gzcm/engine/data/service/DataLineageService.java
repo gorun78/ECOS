@@ -247,6 +247,7 @@ public class DataLineageService {
                 }
                 if (edges != null) allEdges.addAll(edges);
             } catch (Exception ignored) {
+                log.warn("血缘拓扑跳过该 pipeline，返回图可能不完整: pid={} reason={}", pid, ignored.getMessage());
             }
         }
 
@@ -261,6 +262,7 @@ public class DataLineageService {
                     }
                 }
             } catch (Exception ignored) {
+                log.warn("数据源层血缘节点查询失败，返回图缺少 datasource 节点: {}", ignored.getMessage());
             }
         }
 
@@ -633,13 +635,10 @@ public class DataLineageService {
             try {
                 jdbc.batchUpdate(sql, nodeBatch);
             } catch (Exception e) {
-                log.warn("persistParsed 批量写 nodes 失败，先尝试建表后重试: {}", e.getMessage());
-                tryCreateLineageTablesSafely();
-                try {
-                    jdbc.batchUpdate(sql, nodeBatch);
-                } catch (Exception retry) {
-                    log.warn("persistParsed 重读 nodes 仍失败（持久化降级，拓扑仍可返回）: {}", retry.getMessage());
-                }
+                // H8-T1（PMO-74.8 L1）：运行时隐式建表已清零——表结构唯一来源为
+                // 迁移脚本（V58/V155/V162）。写失败仅降级告警，不再内嵌 DDL 兜底。
+                log.warn("persistParsed 批量写 nodes 失败（持久化降级，拓扑仍可返回；"
+                        + "如为表缺失请执行 db/migration 迁移脚本）: {}", e.getMessage());
             }
         }
 
@@ -673,50 +672,9 @@ public class DataLineageService {
             try {
                 jdbc.batchUpdate(sql, edgeBatch);
             } catch (Exception e) {
-                log.warn("persistParsed 批量写 edges 失败，先尝试建表后重试: {}", e.getMessage());
-                tryCreateLineageTablesSafely();
-                try {
-                    jdbc.batchUpdate(sql, edgeBatch);
-                } catch (Exception retry) {
-                    log.warn("persistParsed 重读 edges 仍失败（持久化降级，拓扑仍可返回）: {}", retry.getMessage());
-                }
+                log.warn("persistParsed 批量写 edges 失败（持久化降级，拓扑仍可返回；"
+                        + "如为表缺失请执行 db/migration 迁移脚本）: {}", e.getMessage());
             }
-        }
-    }
-
-    /** 安全创建血缘持久化表（不阻塞）。表字段精简：只存必要字段，避免 schema 管理复杂度。 */
-    private void tryCreateLineageTablesSafely() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_lineage_node (
-                    id VARCHAR(128) PRIMARY KEY,
-                    node_type VARCHAR(32) NOT NULL,
-                    name VARCHAR(255) NOT NULL,
-                    schema_name VARCHAR(100),
-                    table_name VARCHAR(255),
-                    datasource_id VARCHAR(64),
-                    layer VARCHAR(32),
-                    pipeline_task_id VARCHAR(64),
-                    properties JSONB DEFAULT '{}'::jsonb,
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    updated_at TIMESTAMP DEFAULT NOW()
-                )
-                """);
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_data.ecos_data_lineage_edge (
-                    id VARCHAR(128) PRIMARY KEY,
-                    source_node_id VARCHAR(128) NOT NULL,
-                    target_node_id VARCHAR(128) NOT NULL,
-                    edge_type VARCHAR(64) NOT NULL,
-                    pipeline_task_id VARCHAR(64),
-                    transformation VARCHAR(500),
-                    properties JSONB DEFAULT '{}'::jsonb,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-                """);
-            log.info("rebuildAndPersist 补建血缘表完成");
-        } catch (Exception e) {
-            log.warn("tryCreateLineageTablesSafely 失败: {}", e.getMessage());
         }
     }
 
@@ -737,7 +695,7 @@ public class DataLineageService {
                 jdbc.execute("DELETE FROM ecos_data.ecos_data_lineage_node");
                 log.info("clearLineageData 完成");
             } catch (Exception e) {
-                log.warn("clearLineageData 失败（表可能不存在，将在重建时创建）: {}", e.getMessage());
+                log.warn("clearLineageData 失败（表可能不存在，请执行 db/migration 迁移脚本）: {}", e.getMessage());
             }
         }
     }

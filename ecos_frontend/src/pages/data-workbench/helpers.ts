@@ -1,4 +1,9 @@
 /* Shared helpers for data-workbench tabs */
+
+/** 从 catch 的 unknown 错误中取消息（fetch 抛出的均为 Error 实例） */
+export const getErrorMessage = (e: unknown): string =>
+  e instanceof Error ? e.message : '';
+
 export const getSourceIcon = (type: string) => {
   switch (type) {
     case 'postgresql': return 'Database';

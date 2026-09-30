@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.data.model.DataCategory;
 import com.chinacreator.gzcm.engine.data.CategoryService;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,23 +22,9 @@ import java.util.UUID;
  * 类名保持 {@code StubCategoryService} 以避免 Bean 名称冲突，但行为已从 stub 升级为真实实现。
  *
  * <h3>表结构</h3>
- * <pre>
- * CREATE TABLE IF NOT EXISTS ecos_data.td_data_category (
- *     category_id   VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
- *     category_name VARCHAR(200) NOT NULL,
- *     parent_id     VARCHAR(36),
- *     path          VARCHAR(500),
- *     level         INT DEFAULT 1,
- *     sort_order    INT DEFAULT 0,
- *     description   TEXT,
- *     status        VARCHAR(20) DEFAULT 'ACTIVE',
- *     tenant_id     VARCHAR(64),
- *     create_by     VARCHAR(64),
- *     create_time   TIMESTAMP DEFAULT NOW(),
- *     update_by     VARCHAR(64),
- *     update_time   TIMESTAMP DEFAULT NOW()
- * );
- * </pre>
+ * 目标表为 {@code ecos_data.td_data_category}（分类树），其建表脚本、索引与审计列
+ * 由 db/migration 单一来源维护（V58 初始列 + V162 补审计列/domain/version_no），
+ * 运行时不再内嵌建表语句。字段语义参见对应迁移脚本。
  *
  * @author DataBridge Datanet Team
  */
@@ -76,37 +61,8 @@ public class StubCategoryService implements CategoryService {
         this.jdbc = jdbc;
     }
 
-    @PostConstruct
-    public void init() {
-        ensureSchema();
-    }
-
-    /** 幂等建表（列与已有迁移 V58 保持一致，只加不删） */
-    private void ensureSchema() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_data.td_data_category (
-                    category_id   VARCHAR(36) PRIMARY KEY,
-                    category_name VARCHAR(200) NOT NULL,
-                    parent_id     VARCHAR(36),
-                    path          VARCHAR(500),
-                    level         INT DEFAULT 1,
-                    sort_order    INT DEFAULT 0,
-                    description   TEXT,
-                    status        VARCHAR(20) DEFAULT 'ACTIVE',
-                    tenant_id     VARCHAR(64),
-                    create_by     VARCHAR(64),
-                    create_time   TIMESTAMP DEFAULT NOW(),
-                    update_by     VARCHAR(64),
-                    update_time   TIMESTAMP DEFAULT NOW()
-                )
-                """);
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_category_parent ON ecos_data.td_data_category(parent_id)");
-            log.info("CategoryService table ready: {}", TABLE);
-        } catch (Exception e) {
-            log.warn("CategoryService table init warning: {}", e.getMessage());
-        }
-    }
+    // H8-T1: ecos_data.td_data_category 建表 DDL（含索引 idx_category_parent 与审计列）
+    // 收编至 db/migration（V58 + V162），运行时不再内嵌 DDL。
 
     // ===== CRUD =====
 

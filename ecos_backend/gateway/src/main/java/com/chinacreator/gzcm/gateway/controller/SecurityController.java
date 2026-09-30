@@ -74,9 +74,10 @@ public class SecurityController {
             auditLog("DATA_MASK", "SUCCESS",
                     "Masked value with " + maskType + ", engine=" + engine);
         } catch (Exception e) {
-            result.put("masked_value", "ERROR: " + e.getMessage());
+            log.error("数据遮蔽失败: maskType={}", maskType, e);
+            result.put("masked_value", "ERROR");
             result.put("engine", "Java-fallback-failed");
-            auditLog("DATA_MASK", "ERROR", "Mask failed: " + e.getMessage());
+            auditLog("DATA_MASK", "ERROR", "Mask failed");
         }
 
         return ApiResponse.success(result);
@@ -123,9 +124,10 @@ public class SecurityController {
             auditLog("POLICY_EVAL", allowed ? "GRANTED" : "DENIED",
                     "Expr: " + expression.substring(0, Math.min(80, expression.length())));
         } catch (Exception e) {
+            log.error("策略评估失败: expression={}", expression, e);
             result.put("success", false);
             result.put("allowed", false);
-            result.put("error", "Evaluation error: " + e.getMessage());
+            result.put("error", "Evaluation failed");
             result.put("engine", "Java-fallback-failed");
         }
 

@@ -2,10 +2,15 @@ package com.chinacreator.gzcm.engine.ai.agent.mesh.entity;
 
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Agent注册实体 — 映射 ecos_agent_registry (PG实际结构)
  */
 public class AgentRegistryEntity {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentRegistryEntity.class);
 
     private String id;
     private String name;
@@ -55,7 +60,9 @@ public class AgentRegistryEntity {
                 com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(metadata);
                 if (node.has("systemPrompt")) return node.get("systemPrompt").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Agent metadata JSON 解析失败，systemPrompt 回退 capability: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return capability != null ? capability : "";
     }
@@ -67,7 +74,9 @@ public class AgentRegistryEntity {
                 com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(metadata);
                 if (node.has("model")) return node.get("model").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Agent metadata JSON 解析失败，model 回退 deepseek-chat: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return "deepseek-chat";
     }
@@ -79,7 +88,9 @@ public class AgentRegistryEntity {
                 com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(metadata);
                 if (node.has("maxIterations")) return node.get("maxIterations").asInt();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Agent metadata JSON 解析失败，maxIterations 回退 10: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return 10;
     }
@@ -91,7 +102,9 @@ public class AgentRegistryEntity {
                 com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(metadata);
                 if (node.has("description")) return node.get("description").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("Agent metadata JSON 解析失败，description 回退 name: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return name;
     }

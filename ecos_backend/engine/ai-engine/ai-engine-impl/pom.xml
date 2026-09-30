@@ -11,10 +11,10 @@
 
     <artifactId>ai-engine-impl</artifactId>
     <packaging>jar</packaging>
-    <name>ECOS Cognitive Engine :: Impl</name>
+    <name>ECOS AI Engine :: Impl</name>
 
     <dependencies>
-        <!-- Cognitive Engine API -->
+        <!-- AI Engine API -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>ai-engine-api</artifactId>

@@ -61,8 +61,8 @@ const KIND_CHANGE_TYPE: Record<ProposalKind, 'CREATE' | 'UPDATE' | 'DELETE'> = {
 
 /** 变更集：基于「后端现存属性」与「本地草稿属性」的差集 */
 interface PropertyChangeSet {
-  added: Record<string, any>[];
-  updated: Record<string, any>[];
+  added: Record<string, unknown>[];
+  updated: Record<string, unknown>[];
   removed: string[];
 }
 
@@ -154,8 +154,8 @@ export default function ProposalPanel({
   const targetObjectType = selectedObjectType ?? objectTypes.find(ot => ot.id === formTargetType) ?? null;
 
   /** 本地草稿属性 → 后端属性请求体 */
-  const toPropertyBody = (p: PropertyType, withId = false): Record<string, any> => {
-    const body: Record<string, any> = {
+  const toPropertyBody = (p: PropertyType, withId = false): Record<string, unknown> => {
+    const body: Record<string, unknown> = {
       code: p.apiName || p.displayName,
       name: p.displayName,
       description: p.description || '',
@@ -242,7 +242,7 @@ export default function ProposalPanel({
     }
   };
 
-  const handleAction = async (id: string, action: () => Promise<any>, msgKey: string) => {
+  const handleAction = async (id: string, action: () => Promise<unknown>, msgKey: string) => {
     setActionLoading(id);
     try {
       await action();

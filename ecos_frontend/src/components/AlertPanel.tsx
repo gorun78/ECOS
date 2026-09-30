@@ -6,8 +6,14 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Zap, History, Trash2, Plus } from "lucide-react";
 import { useLanguage } from "../pages/../components/LanguageContext";
 import { useTheme } from "../pages/../components/ThemeContext";
-
-const API = "/api/alerts";
+import {
+  fetchAlertRules,
+  fetchAlertHistory,
+  alertTest,
+  alertAck,
+  alertCreateRule,
+  alertDeleteRule,
+} from "../services/alertsApi";
 
 interface AlertRule {
   id: number;
@@ -49,12 +55,10 @@ export default function AlertPanel() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [rRes, hRes] = await Promise.all([
-        fetch(`${API}/rules`),
-        fetch(`${API}/history?limit=20`),
+      const [rData, hData] = await Promise.all([
+        fetchAlertRules(),
+        fetchAlertHistory(20),
       ]);
-      const rData = await rRes.json();
-      const hData = await hRes.json();
       setRules(rData?.data || []);
       setHistory(hData?.data || []);
     } catch (e: any) {
@@ -119,11 +123,7 @@ export default function AlertPanel() {
     try {
       const body: any = { metricValue: testValue };
       if (ruleId) body.ruleId = ruleId;
-      await fetch(`${API}/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      await alertTest(body);
       fetchAll();
     } catch (e: any) {
       setError(e?.message || "Trigger failed");
@@ -132,22 +132,14 @@ export default function AlertPanel() {
 
   const ackAlert = async (id: number) => {
     try {
-      await fetch(`${API}/${id}/ack`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acknowledged_by: "admin" }),
-      });
+      await alertAck(id);
       fetchAll();
     } catch {}
   };
 
   const createRule = async () => {
     try {
-      await fetch(`${API}/rules`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRule),
-      });
+      await alertCreateRule(newRule);
       setShowNewRule(false);
       setNewRule({ name: "", metric: "", operator: "<", threshold: "80", level: "WARN" });
       fetchAll();
@@ -156,7 +148,7 @@ export default function AlertPanel() {
 
   const deleteRule = async (id: number) => {
     try {
-      await fetch(`${API}/rules/${id}`, { method: "DELETE" });
+      await alertDeleteRule(id);
       fetchAll();
     } catch {}
   };

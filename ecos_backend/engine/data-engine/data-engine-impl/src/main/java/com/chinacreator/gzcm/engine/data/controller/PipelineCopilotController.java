@@ -45,7 +45,7 @@ public class PipelineCopilotController {
             return ApiResponse.success("SQL 生成完成", copilotService.generateSql(prompt, schemaInfo));
         } catch (Exception e) {
             log.error("NL→SQL 失败", e);
-            return ApiResponse.internalError("NL→SQL 失败: " + e.getMessage());
+            return ApiResponse.internalError("NL→SQL 失败");
         }
     }
 
@@ -63,7 +63,7 @@ public class PipelineCopilotController {
             return ApiResponse.success("Pipeline 生成完成", copilotService.generatePipeline(description, availableSources));
         } catch (Exception e) {
             log.error("NL→Pipeline 失败", e);
-            return ApiResponse.internalError("NL→Pipeline 失败: " + e.getMessage());
+            return ApiResponse.internalError("NL→Pipeline 失败");
         }
     }
 
@@ -81,7 +81,7 @@ public class PipelineCopilotController {
             return ApiResponse.success("表达式建议生成完成", copilotService.suggestExpression(fieldName, context));
         } catch (Exception e) {
             log.error("表达式建议失败", e);
-            return ApiResponse.internalError("表达式建议失败: " + e.getMessage());
+            return ApiResponse.internalError("表达式建议失败");
         }
     }
 
@@ -99,7 +99,7 @@ public class PipelineCopilotController {
             return ApiResponse.success("UDF 生成完成", copilotService.generateUdf(description, language));
         } catch (Exception e) {
             log.error("NL→UDF 失败", e);
-            return ApiResponse.internalError("NL→UDF 失败: " + e.getMessage());
+            return ApiResponse.internalError("NL→UDF 失败");
         }
     }
 
@@ -117,7 +117,7 @@ public class PipelineCopilotController {
             return ApiResponse.success("诊断完成", copilotService.diagnose(runId, errorLog));
         } catch (Exception e) {
             log.error("错误诊断失败", e);
-            return ApiResponse.internalError("错误诊断失败: " + e.getMessage());
+            return ApiResponse.internalError("错误诊断失败");
         }
     }
 }

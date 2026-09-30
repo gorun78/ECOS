@@ -17,7 +17,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       minimum-idle: 5
@@ -30,9 +30,6 @@ spring:
 
   flyway:
     enabled: false
-  jpa:
-    hibernate:
-      ddl-auto: none
 
   # Neo4j — PMO-49 Q2: ont 域本体跨 causal 推理时 neo4j 可支持,
   # 骨架期服务先启动 health UP. 实际 neo4j 依赖 Phase 3 迁移后依需在
@@ -41,7 +38,7 @@ spring:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:neo4j123}
+      password: ${NEO4J_PASSWORD:}
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
@@ -53,6 +50,10 @@ mybatis:
 # PMO-49 D1: 收窄 MyBatis 类型别名扫包 — ontology 域 (金·I) + buszhi 域 (工作流)
 # + ADR-7 X-ECOS-* 头校验 + Neo4j 开关
 ecos:
+  event:
+    kafka:
+      # PMO-74 H2-T7 裁决 T-C 双投递：跨进程走 Kafka，同 JVM 仍本地分发，broker 缺席不丢本进程事件
+      enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.engine.ontology,com.chinacreator.gzcm.buszhi
   header-auth:

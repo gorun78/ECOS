@@ -10,7 +10,6 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyDataService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
 /**
@@ -69,11 +69,11 @@ public class OntologyDataController {
             new com.fasterxml.jackson.databind.ObjectMapper();
 
     private final OntologyService ontologyService;
-    private final JdbcTemplate jdbc;
+    private final OntologyDataService dataService;
 
-    public OntologyDataController(OntologyService ontologyService, JdbcTemplate jdbc) {
+    public OntologyDataController(OntologyService ontologyService, OntologyDataService dataService) {
         this.ontologyService = ontologyService;
-        this.jdbc = jdbc;
+        this.dataService = dataService;
     }
 
     // ═══════════════ 数据记录 CRUD ═══════════════════
@@ -97,35 +97,13 @@ public class OntologyDataController {
         int safePage = Math.max(1, page);
         int safeSize = Math.min(200, Math.max(1, size));
 
-        boolean hasFilter = filterType != null && !filterType.isBlank();
-        final String where = hasFilter
-                ? "WHERE ontology_id = ? AND is_deleted = 0"
-                : "WHERE is_deleted = 0";
-
         // 先查 total
-        Integer total = hasFilter
-                ? jdbc.queryForObject("SELECT COUNT(*) FROM public.ecos_ontology_data " + where, Integer.class, filterType)
-                : jdbc.queryForObject("SELECT COUNT(*) FROM public.ecos_ontology_data " + where, Integer.class);
+        Integer total = dataService.countRecords(filterType);
         int totalSafe = total != null ? total : 0;
 
         // 分页查数据行
         int offset = (safePage - 1) * safeSize;
-        List<Map<String, Object>> rows;
-        if (hasFilter) {
-            rows = jdbc.queryForList(
-                    "SELECT id, ontology_id, object_type, record_key, payload, status, " +
-                    "       create_time, update_time, create_by, update_by " +
-                    "FROM public.ecos_ontology_data " + where + " " +
-                    "ORDER BY create_time DESC LIMIT ? OFFSET ?",
-                    filterType, safeSize, offset);
-        } else {
-            rows = jdbc.queryForList(
-                    "SELECT id, ontology_id, object_type, record_key, payload, status, " +
-                    "       create_time, update_time, create_by, update_by " +
-                    "FROM public.ecos_ontology_data " + where + " " +
-                    "ORDER BY create_time DESC LIMIT ? OFFSET ?",
-                    safeSize, offset);
-        }
+        List<Map<String, Object>> rows = dataService.listRecords(filterType, safeSize, offset);
 
         List<Map<String, Object>> pageData = rows.stream()
                 .map(this::rowToRecord)
@@ -154,11 +132,7 @@ public class OntologyDataController {
      */
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> getData(@PathVariable String id) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, ontology_id, object_type, record_key, payload, status, " +
-                "       create_time, update_time, create_by, update_by " +
-                "FROM public.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
-                id);
+        List<Map<String, Object>> rows = dataService.findRecordById(id);
         if (rows.isEmpty()) {
             return ApiResponse.notFound("ONT-001: Data record '" + id + "' not found");
         }
@@ -207,12 +181,7 @@ public class OntologyDataController {
 
         String payloadJson = toPayloadJson(payloadMap);
 
-        int rows = jdbc.update(
-                "INSERT INTO public.ecos_ontology_data " +
-                "(id, ontology_id, object_type, record_key, payload, status, " +
-                " create_time, update_time, create_by, update_by, is_deleted) " +
-                "VALUES (?, ?, ?, ?, ?, 'ACTIVE', now(), now(), ?, ?, 0)",
-                id, objectTypeId, objectTypeName, recordKey, payloadJson, createdBy, createdBy);
+        int rows = dataService.insertRecord(id, objectTypeId, objectTypeName, recordKey, payloadJson, createdBy);
         log.info("Ontology data created: {} [objectType={}] rows={}", id, objectTypeId, rows);
 
         Map<String, Object> rec = new LinkedHashMap<>(payloadMap);
@@ -228,11 +197,7 @@ public class OntologyDataController {
     public ApiResponse<Map<String, Object>> updateData(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
-        List<Map<String, Object>> existingRows = jdbc.queryForList(
-                "SELECT id, ontology_id, object_type, record_key, payload, status, " +
-                "       create_time, update_time, create_by, update_by " +
-                "FROM public.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
-                id);
+        List<Map<String, Object>> existingRows = dataService.findRecordById(id);
         if (existingRows.isEmpty()) {
             return ApiResponse.notFound("ONT-001: Data record '" + id + "' not found");
         }
@@ -258,16 +223,7 @@ public class OntologyDataController {
         updated.put("createdAt", existing.get("createdAt"));
         updated.put("updatedAt", LocalDateTime.now().toString());
 
-        int rows = jdbc.update(
-                "UPDATE public.ecos_ontology_data SET " +
-                "  object_type = COALESCE(?, object_type), " +
-                "  create_by   = COALESCE(?, create_by), " +
-                "  update_by   = COALESCE(?, update_by), " +
-                "  payload     = ?, " +
-                "  update_time = now() " +
-                "WHERE id = ? AND is_deleted = 0",
-                newObjectName, newCreatedBy, "system",
-                toPayloadJson(updated), id);
+        int rows = dataService.updateRecord(id, newObjectName, newCreatedBy, toPayloadJson(updated));
         log.info("Ontology data updated: {} rows={}", id, rows);
         return ApiResponse.success(updated);
     }
@@ -279,9 +235,7 @@ public class OntologyDataController {
      */
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteData(@PathVariable String id) {
-        Integer cnt = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
-                Integer.class, id);
+        Integer cnt = dataService.countById(id);
         if (cnt == null || cnt == 0) {
             return ApiResponse.notFound("ONT-001: Data record '" + id + "' not found");
         }
@@ -304,10 +258,7 @@ public class OntologyDataController {
         if (objectTypeId == null || objectTypeId.isBlank()) {
             return ApiResponse.badRequest("ONT-002: 'objectTypeId' query param is required for bulk delete");
         }
-        Integer cnt = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.ecos_ontology_data " +
-                "WHERE ontology_id = ? AND is_deleted = 0",
-                Integer.class, objectTypeId);
+        Integer cnt = dataService.countByObjectType(objectTypeId);
         int count = cnt != null ? cnt : 0;
         log.info("Ontology data bulk delete noted (T17 收口): {} records for objectType={}", count, objectTypeId);
         return ApiResponse.success("Noted " + count + " records for objectType '" + objectTypeId + "' (T17 收口)");

@@ -75,7 +75,7 @@ public class AgentEvalController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to start evaluation", e);
-            return ApiResponse.internalError("启动评估失败: " + e.getMessage());
+            return ApiResponse.internalError("启动评估失败");
         }
     }
 
@@ -136,7 +136,7 @@ public class AgentEvalController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to list evaluations", e);
-            return ApiResponse.internalError("查询评估列表失败: " + e.getMessage());
+            return ApiResponse.internalError("查询评估列表失败");
         }
     }
 
@@ -226,7 +226,7 @@ public class AgentEvalController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to get eval report: id={}", id, e);
-            return ApiResponse.internalError("查询评估报告失败: " + e.getMessage());
+            return ApiResponse.internalError("查询评估报告失败");
         }
     }
 

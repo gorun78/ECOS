@@ -39,10 +39,10 @@ public class QueryHistoryController {
      * 删除指定历史记录。
      */
     @DeleteMapping("/history/{id}")
-    public ApiResponse<Map<String, Object>> delete(@PathVariable String id) {
+    public ApiResponse<QueryHistoryDeleteVO> delete(@PathVariable String id) {
         boolean ok = historyService.delete(id);
         if (ok) {
-            return ApiResponse.success(Map.of("deleted", true, "id", id));
+            return ApiResponse.success(new QueryHistoryDeleteVO(true, id));
         }
         return ApiResponse.error(404, "记录不存在: " + id);
     }

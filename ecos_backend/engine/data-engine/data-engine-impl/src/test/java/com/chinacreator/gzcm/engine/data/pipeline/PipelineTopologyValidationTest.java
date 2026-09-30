@@ -34,7 +34,7 @@ import static org.mockito.Mockito.when;
  *   <li>SOURCE_JDBC 缺 sql/datasourceId → ValidationException 引用字段名</li>
  *   <li>SOURCE_CSV 缺 filePath / SOURCE_REST 缺 url / TRANSFORM_SQL 缺 sql /
  *       OUTPUT_OBJECT 缺 targetTable</li>
- *   <li>SOURCE_CDC 节点类型执行前命中标准档（"仅 flagship 版本支持"），对应 T3 三版本兼容性</li>
+ *   <li>SOURCE_CDC 节点类型执行前命中标准档（"仅 ultimate 版本支持"），对应 T3 三版本兼容性</li>
  *   <li>单节点失败 → repository.updateExecutionStatus(FAILED, msg, 0L) 兜底会计</li>
  * </ul>
  *
@@ -176,7 +176,7 @@ class PipelineTopologyValidationTest {
     // ─── C. SOURCE_CDC 三版本兼容性守卫 ─────────────────
 
     @Test
-    @DisplayName("SOURCE_CDC — standard/enterprise 守卫，仅 ultimate 支持（flagship 文案）")
+    @DisplayName("SOURCE_CDC — standard/enterprise 守卫，仅 ultimate 支持")
     void sourceCdcUnsupportedInStandardOrEnterprise() {
         whenDef("p-cdc");
         PipelineNode n = node("n1", "SOURCE_CDC", "{}");
@@ -184,10 +184,10 @@ class PipelineTopologyValidationTest {
 
         PipelineExecution exec = service.executePipeline("p-cdc");
         assertEquals("FAILED", exec.getStatus());
-        // executeNode switch 命中 "SOURCE_CDC" 分支抛 BusinessException("仅 flagship 版本支持")
+        // executeNode switch 命中 "SOURCE_CDC" 分支抛 BusinessException("仅 ultimate 版本支持")
         assertTrue(exec.getErrorMessage() != null
-                        && (exec.getErrorMessage().contains("SOURCE_CDC") || exec.getErrorMessage().contains("flagship")),
-                "执行失败应把'flagship 专属'语义写进 errorMessage，实际：" + exec.getErrorMessage());
+                        && (exec.getErrorMessage().contains("SOURCE_CDC") || exec.getErrorMessage().contains("ultimate")),
+                "执行失败应把'ultimate 专属'语义写进 errorMessage，实际：" + exec.getErrorMessage());
     }
 
     // ─── D. 单节点失败兜底 failed 落库 ───────────────────
@@ -196,7 +196,7 @@ class PipelineTopologyValidationTest {
     @DisplayName("单节点失败 — repository.updateExecutionStatus 收到 FAILED + 0 行")
     void singleNodeFailureSetsFailedStatus() {
         whenDef("p-failed");
-        // SOURCE_CDC 走 executeNode 立即抛 BusinessException("仅 flagship")
+        // SOURCE_CDC 走 executeNode 立即抛 BusinessException("仅 ultimate")
         PipelineNode n = node("n1", "SOURCE_CDC", "{}");
         whenNodes(List.of(n));
 

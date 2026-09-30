@@ -115,8 +115,8 @@ export default function AutoDiscoverPanel({ domainCode, onClose, onEnterDesigner
     try {
       const list = await previewEntities(domainCode, { datasourceId: selectedSrcId });
       setCandidates(list || []); setStep(2);
-    } catch (err: any) {
-      setPrevError(err?.message || t('ontology.autoDiscover.loading'));
+    } catch (err: unknown) {
+      setPrevError((err as { message?: string } | undefined)?.message || t('ontology.autoDiscover.loading'));
     } finally { setPrevLoading(false); }
   }, [selectedSrcId, domainCode, t]);
 
@@ -135,8 +135,8 @@ export default function AutoDiscoverPanel({ domainCode, onClose, onEnterDesigner
     try {
       const res = await autoDiscover(domainCode, { datasourceId: selectedSrcId, resourceNames: names });
       setResult(res); setStep(3);
-    } catch (err: any) {
-      setGenError(err?.message || t('ontology.autoDiscover.generating'));
+    } catch (err: unknown) {
+      setGenError((err as { message?: string } | undefined)?.message || t('ontology.autoDiscover.generating'));
     } finally { setGenLoading(false); }
   }, [domainCode, selectedSrcId, selNames, t]);
 

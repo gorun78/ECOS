@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Copy, Sliders, FileCheck, Terminal, X, Check, ChevronRight } from 'lucide-react';
 import { createDqItem, fetchDatasets } from '../../api';
+import type { DataAsset } from '../../types';
+import { getErrorMessage } from './helpers';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 
+/** DQ 模板参数包：键为参数名，值仅可能是 number / string（见 TEMPLATES 与参数输入框） */
+type DqParamValue = string | number;
+type DqTemplateParams = Record<string, DqParamValue>;
+
 interface DqTemplate {
   id: string; nameZh: string; nameEn: string; type: string;
-  icon: React.ElementType; defaultParams: Record<string, any>;
+  icon: React.ElementType; defaultParams: DqTemplateParams;
   descriptionZh: string; descriptionEn: string;
 }
 const TEMPLATES: DqTemplate[] = [
@@ -27,14 +33,14 @@ const TEMPLATES: DqTemplate[] = [
     descriptionZh: '自定义检查SQL返回count', descriptionEn: 'Custom SQL returns count to check quality' },
 ];
 
-function buildExpr(tplId: string, params: Record<string, any>, fields: string[]): string {
+function buildExpr(tplId: string, params: DqTemplateParams, fields: string[]): string {
   const f = fields.join(', ') || '{field}';
   switch (tplId) {
     case 'tpl-null-rate': return `NULL_RATIO(${f}) > ${params.threshold}`;
     case 'tpl-dup-rate': return `DUPLICATE_RATIO(${f}) > ${params.threshold}`;
     case 'tpl-value-range': return `VALUE(${f}) NOT BETWEEN ${params.min} AND ${params.max}`;
     case 'tpl-format': return `REGEXP(${f}, '${params.regex}')`;
-    case 'tpl-custom-sql': return params.sql.replace(/\{table\}/g, fields[0] || '{table}');
+    case 'tpl-custom-sql': return (params.sql as string).replace(/\{table\}/g, fields[0] || '{table}');
     default: return '';
   }
 }
@@ -47,16 +53,16 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
   const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<DqTemplate | null>(null);
-  const [datasets, setDatasets] = useState<any[]>([]);
+  const [datasets, setDatasets] = useState<DataAsset[]>([]);
   const [table, setTable] = useState('');
   const [fields, setFields] = useState<string[]>([]);
-  const [params, setParams] = useState<Record<string, any>>({});
+  const [params, setParams] = useState<DqTemplateParams>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => { fetchDatasets().then(d => setDatasets(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
 
-  const cur = datasets.find((d: any) => d.name === table || d.id === table);
+  const cur = datasets.find((d) => d.name === table || d.id === table);
   const cols: { name: string; type: string }[] = cur?.schema || [];
 
   function selectTpl(item: DqTemplate) { setTpl(item); setParams({...item.defaultParams}); setTable(''); setFields([]); setError(''); setStep(1); }
@@ -75,7 +81,7 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
         description: locale === 'zh' ? tpl.descriptionZh : tpl.descriptionEn,
       });
       onApplied(); onClose();
-    } catch (e: any) { setError(e?.message || String(e)); }
+    } catch (e) { setError(getErrorMessage(e) || String(e)); }
     setSaving(false);
   }
 
@@ -122,7 +128,7 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
         <select className={`w-full border ${styles.inputBorder} ${styles.inputBg} rounded-lg px-3 py-2 text-xs outline-none focus:${styles.infoBorder}`}
           value={table} onChange={e => { setTable(e.target.value); setFields([]); }}>
           <option value="">{tl('-- 选择表 --','-- Select table --')}</option>
-          {datasets.map((d: any) => <option key={d.id||d.name} value={d.name||d.id}>{d.name||d.id}</option>)}
+          {datasets.map((d) => <option key={d.id||d.name} value={d.name||d.id}>{d.name||d.id}</option>)}
         </select>
       </div>
       {cols.length > 0 && (

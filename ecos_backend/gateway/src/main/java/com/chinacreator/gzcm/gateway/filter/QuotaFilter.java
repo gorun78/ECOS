@@ -220,7 +220,8 @@ public class QuotaFilter extends OncePerRequestFilter {
                     if (bytes > 1024 * 1024) { // 超过 1MB 视为存储操作
                         return "STORAGE_MB";
                     }
-                } catch (NumberFormatException ignored) {
+                } catch (NumberFormatException e) {
+                    log.debug("Content-Length 解析失败，按 API_CALLS 计量: value={}", contentLength);
                 }
             }
         }

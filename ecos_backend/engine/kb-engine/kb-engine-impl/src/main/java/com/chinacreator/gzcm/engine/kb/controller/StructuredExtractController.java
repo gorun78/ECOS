@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.kb.dto.StructuredExtractJobDetailVO;
 import com.chinacreator.gzcm.engine.kb.dto.StructuredExtractJobVO;
 import com.chinacreator.gzcm.engine.kb.dto.StructuredExtractRequest;
 import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
+import com.chinacreator.gzcm.engine.kb.service.StructuredExtractQueryService;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
@@ -21,7 +22,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -95,16 +95,16 @@ public class StructuredExtractController {
 
     private final KbEntityInstanceExtractionService extractionService;
 
-    private final JdbcTemplate jdbc;
+    private final StructuredExtractQueryService queryService;
 
     private final ITaskManagementService taskManagementService;
 
     public StructuredExtractController(KbEntityInstanceExtractionService extractionService,
-                                       JdbcTemplate jdbc,
+                                       StructuredExtractQueryService queryService,
                                        ITaskManagementService taskManagementService,
                                        @Value("${ecos.architecture.tier:standard}") String tier) {
         this.extractionService = extractionService;
-        this.jdbc = jdbc;
+        this.queryService = queryService;
         this.taskManagementService = taskManagementService;
         this.tier = tier;
     }
@@ -226,11 +226,7 @@ public class StructuredExtractController {
         int offset = (safePageNum - 1) * safePageSize;
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(
-                    "SELECT ontology_id, entity_code, resource_id, watermark, updated_at "
-                            + "FROM ecos_knowledge.kb_extract_watermark "
-                            + "ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-                    safePageSize, offset);
+            rows = queryService.listWatermarkRows(safePageSize, offset);
         } catch (DataAccessException e) {
             log.warn("E4 查询抽取水位失败（表未建或不可访问）: {}", e.getMessage());
             return ApiResponse.success(new ArrayList<>());
@@ -265,11 +261,7 @@ public class StructuredExtractController {
         StructuredExtractJobDetailVO vo = new StructuredExtractJobDetailVO();
         vo.setJobId(jobId);
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT status, op, report, error_message, created_at, finished_at "
-                            + "FROM ecos_knowledge.kg_sync_log WHERE job_id = ? "
-                            + "ORDER BY created_at DESC LIMIT 1",
-                    jobId);
+            List<Map<String, Object>> rows = queryService.findLatestSyncLogByJobId(jobId);
             if (rows.isEmpty()) {
                 vo.setStatus("NOT_FOUND");
                 vo.setDetail("kg_sync_log 中无此 jobId 记录（结构化抽取作业未回填 kg_sync_log，"
@@ -393,12 +385,7 @@ public class StructuredExtractController {
     /** 查 audit 表（jobId → 最近 100 行，created_at DESC）；查不到返回空列表，不抛异常。 */
     private List<Map<String, Object>> queryAudit(String jobId) {
         try {
-            return jdbc.queryForList(
-                    "SELECT id, job_id, task_id, tier, mode, status, duration_ms, "
-                            + "rows_total, rows_ok, rows_failed, mismatched, error_message, created_at "
-                            + "FROM ecos_knowledge.kb_extract_audit WHERE job_id = ? "
-                            + "ORDER BY created_at DESC LIMIT 100",
-                    jobId);
+            return queryService.findAuditRowsByJobId(jobId);
         } catch (DataAccessException e) {
             log.warn("T6 查询 audit 失败 jobId={}: {}", jobId, e.getMessage());
             return new ArrayList<>();

@@ -37,7 +37,7 @@ public class DictTableController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询数据字典表失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -55,7 +55,7 @@ public class DictTableController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询数据字典表详情失败: id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -82,7 +82,7 @@ public class DictTableController {
             return ApiResponse.success(tableToMap(created));
         } catch (Exception e) {
             log.error("创建数据字典表失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -111,7 +111,7 @@ public class DictTableController {
             return ApiResponse.success(tableToMap(updated));
         } catch (Exception e) {
             log.error("更新数据字典表失败: id={}", id, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -126,7 +126,7 @@ public class DictTableController {
             return ApiResponse.success(Map.of("success", true, "id", id));
         } catch (Exception e) {
             log.error("删除数据字典表失败: id={}", id, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -162,7 +162,7 @@ public class DictTableController {
             return ApiResponse.success(columnToMap(created));
         } catch (Exception e) {
             log.error("创建字段失败: tableId={}", tableId, e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -190,7 +190,7 @@ public class DictTableController {
             return ApiResponse.success(columnToMap(updated));
         } catch (Exception e) {
             log.error("更新字段失败: tableId={}, columnId={}", tableId, columnId, e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -202,7 +202,7 @@ public class DictTableController {
             return ApiResponse.success(Map.of("success", true, "columnId", columnId));
         } catch (Exception e) {
             log.error("删除字段失败: tableId={}, columnId={}", tableId, columnId, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -219,7 +219,7 @@ public class DictTableController {
             return ApiResponse.success(Map.of("success", true, "reordered", columnIds.size()));
         } catch (Exception e) {
             log.error("重排字段失败: tableId={}", tableId, e);
-            return ApiResponse.internalError("重排失败: " + e.getMessage());
+            return ApiResponse.internalError("重排失败");
         }
     }
 

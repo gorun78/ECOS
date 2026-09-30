@@ -12,7 +12,7 @@
 
     <artifactId>ai-engine-boot</artifactId>
     <packaging>jar</packaging>
-    <name>ECOS Cognitive Engine :: Boot</name>
+    <name>ECOS AI Engine :: Boot</name>
 
     <dependencies>
         <dependency>

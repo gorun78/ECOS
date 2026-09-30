@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,8 +48,8 @@ public class ColumnLevelSecurityServiceImpl {
         try {
             policies = jdbcTemplate.queryForList(sql, tableName, tableName, userId, userId);
         } catch (Exception e) {
-            log.error("查询CLS策略失败: table={}, userId={}", tableName, userId, e);
-            policies = Collections.emptyList();
+            log.warn("查询CLS策略失败，按 fail-closed 拒绝全部列: table={}, userId={}", tableName, userId, e);
+            return deniedResult(tableName, Collections.emptyList());
         }
 
         Set<String> visibleSet = new LinkedHashSet<>(allColumns != null ? allColumns : Collections.emptyList());
@@ -63,7 +64,8 @@ public class ColumnLevelSecurityServiceImpl {
                     List<String> vis = MAPPER.readValue(visibleJson, new TypeReference<List<String>>() {});
                     visibleSet.retainAll(vis);
                 } catch (JsonProcessingException e) {
-                    log.warn("解析visible_cols失败: {}", visibleJson);
+                    log.warn("解析visible_cols失败，按 fail-closed 拒绝全部列: {}", visibleJson, e);
+                    return deniedResult(tableName, Collections.emptyList());
                 }
             }
 
@@ -73,7 +75,8 @@ public class ColumnLevelSecurityServiceImpl {
                     visibleSet.removeAll(blk);
                     blockedSet.addAll(blk);
                 } catch (JsonProcessingException e) {
-                    log.warn("解析blocked_cols失败: {}", blockedJson);
+                    log.warn("解析blocked_cols失败，按 fail-closed 拒绝全部列: {}", blockedJson, e);
+                    return deniedResult(tableName, Collections.emptyList());
                 }
             }
         }
@@ -83,6 +86,16 @@ public class ColumnLevelSecurityServiceImpl {
         result.put("blockedColumns", new ArrayList<>(blockedSet));
         result.put("tableName", tableName);
         result.put("policies", policies.stream().map(m -> m.get("policy_name")).toList());
+        return result;
+    }
+
+    /** 安全路径解析失败时的拒绝载荷：可见列为空 = 一列都不返回（§2.4-2/6 默认 DENY）。 */
+    private Map<String, Object> deniedResult(String tableName, List<String> blocked) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("visibleColumns", new ArrayList<String>());
+        result.put("blockedColumns", new ArrayList<>(blocked));
+        result.put("tableName", tableName);
+        result.put("policies", Collections.emptyList());
         return result;
     }
 
@@ -114,7 +127,8 @@ public class ColumnLevelSecurityServiceImpl {
             List<String> visibleCols = (List<String>) body.get("visibleCols");
             visibleColsJson = MAPPER.writeValueAsString(visibleCols != null ? visibleCols : Collections.emptyList());
         } catch (JsonProcessingException e) {
-            visibleColsJson = "[]";
+            log.warn("CLS策略 visibleCols 序列化失败，拒绝创建", e);
+            throw new ValidationException("visibleCols 序列化失败，策略未创建");
         }
         String blockedColsJson;
         try {
@@ -122,7 +136,8 @@ public class ColumnLevelSecurityServiceImpl {
             List<String> blockedCols = (List<String>) body.get("blockedCols");
             blockedColsJson = blockedCols != null ? MAPPER.writeValueAsString(blockedCols) : null;
         } catch (JsonProcessingException e) {
-            blockedColsJson = null;
+            log.warn("CLS策略 blockedCols 序列化失败，拒绝创建", e);
+            throw new ValidationException("blockedCols 序列化失败，策略未创建");
         }
 
         jdbcTemplate.update(
@@ -155,14 +170,20 @@ public class ColumnLevelSecurityServiceImpl {
                 @SuppressWarnings("unchecked")
                 List<String> visibleCols = (List<String>) body.get("visibleCols");
                 visibleColsJson = MAPPER.writeValueAsString(visibleCols != null ? visibleCols : Collections.emptyList());
-            } catch (JsonProcessingException ignored) {}
+            } catch (JsonProcessingException e) {
+                log.warn("CLS策略 visibleCols 序列化失败，拒绝更新: id={}", id, e);
+                throw new ValidationException("visibleCols 序列化失败，策略未更新");
+            }
         }
         if (body.containsKey("blockedCols")) {
             try {
                 @SuppressWarnings("unchecked")
                 List<String> blockedCols = (List<String>) body.get("blockedCols");
                 blockedColsJson = blockedCols != null ? MAPPER.writeValueAsString(blockedCols) : null;
-            } catch (JsonProcessingException ignored) {}
+            } catch (JsonProcessingException e) {
+                log.warn("CLS策略 blockedCols 序列化失败，拒绝更新: id={}", id, e);
+                throw new ValidationException("blockedCols 序列化失败，策略未更新");
+            }
         }
 
         jdbcTemplate.update(

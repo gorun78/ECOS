@@ -88,9 +88,10 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
     try {
       await knowledgeApi.lifecycleTransition(asset.id, next);
       toast('success', tl('已转换状态: ', 'Transition: ') + `${asset.id} → ${next}`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       // 后端未就绪时本地审计记录
-      if (e?.message?.includes('404') || e?.message?.includes('405') || e?.message?.includes('401')) {
+      const msg = (e as { message?: string } | undefined)?.message ?? '';
+      if (msg.includes('404') || msg.includes('405') || msg.includes('401')) {
         console.info('PMO-56 stub — transition logged locally only');
       }
     }

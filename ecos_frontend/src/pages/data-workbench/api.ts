@@ -4,18 +4,14 @@
  * @license Apache-2.0
  */
 import type { DataConnection, DataSyncTask, DataPipeline, TableInfo, PipelineNode } from './types';
+// 鉴权头单源定义见 services/auth.ts (H6-T1)
+import { authOnlyHeaders as authHeaders } from '../../services/auth';
 
 // ─── API 端点常量 ──────────────────────────────────────────
 const DATANET_DS = '/datanet/datasource';           // DataSourceController
 const INTEGRATION  = '/api/integration/metadata';   // IntegrationMetadataController (connections + syncTasks)
 const PIPELINE_DEFS = '/api/v1/pipeline/definitions'; // PipelineController
 const LINEAGE_TOPOL = '/api/v1/engine/data/lineage/topology';
-
-// ─── Auth helper ────────────────────────────────────────
-function authHeaders(): Record<string, string> {
-  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('accessToken') || '') : '';
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { ...authHeaders() } });
@@ -27,6 +23,11 @@ async function get<T>(url: string): Promise<T> {
 
 /** 前端连接类型 → 后端规范类型名（本地文件的规范名为 FILESYSTEM，后端无 FS 类型） */
 const API_TYPE_ALIASES: Record<string, string> = { fs: 'FILESYSTEM' };
+
+/** metadataConfig 原始 JSONB 承载体（后端字段形态不定，消费端按键窄化） */
+type MetadataConfigMap = Record<string, unknown>;
+/** DataConnection.strategy 的窄化形态（trigger/countMethod 为受控字面量联合） */
+type MetadataSyncStrategy = NonNullable<DataConnection['strategy']>;
 
 /** 归一化连接类型为后端可识别的大写类型名 */
 function toApiType(type: string): string {
@@ -66,19 +67,19 @@ function mapDsToConn(e: Record<string, unknown>): DataConnection {
     // PMO-37: 解析 metadataConfig (JSONB string or object)
     ...(() => {
       try {
-        const raw = (e.metadataConfig as Record<string, any>) || (e.metadataConfig as string);
-        let mc: Record<string, any> = {};
+        const raw = (e.metadataConfig as MetadataConfigMap) || (e.metadataConfig as string);
+        let mc: MetadataConfigMap = {};
         if (typeof raw === 'string' && raw.length > 1) { try { mc = JSON.parse(raw); } catch { mc = {}; } }
         else if (raw && typeof raw === 'object') mc = raw;
-        let strategy;
+        let strategy: MetadataSyncStrategy | undefined;
         if (mc && (mc.trigger || mc.countMethod)) {
           strategy = {
-            trigger: (mc.trigger as string) || 'MANUAL',
-            countMethod: (mc.countMethod as string) || (mc.count_method as string) || 'OFF',
+            trigger: (mc.trigger as MetadataSyncStrategy['trigger']) || 'MANUAL',
+            countMethod: (mc.countMethod as MetadataSyncStrategy['countMethod']) || (mc.count_method as MetadataSyncStrategy['countMethod']) || 'OFF',
             scheduleCron: mc.scheduleCron as string,
           };
         }
-        return { metadataConfig: mc as Record<string, any>, ...(strategy ? { strategy } : {}) };
+        return { metadataConfig: mc, ...(strategy ? { strategy } : {}) };
       } catch { return {}; }
     })(),
   };
@@ -391,15 +392,33 @@ export async function executePipeline(id: string): Promise<{ executionId?: strin
 }
 
 /** Data Lineage — 查询持久化拓扑（全局表级/字段级血缘全景图） */
-export async function fetchLineageTopology(): Promise<{
-  nodes: { id: string; type: string; label: string; table?: string; pipeline_task_id?: string; pipeline_task_name?: string }[];
-  edges: { id: string; source: string; target: string; transform?: string; pipeline_task_id?: string; pipeline_task_name?: string }[];
+/** 后端 DataLineageService.getTopology 返回 Map（nodes/edges/total_nodes/total_edges/from_db） */
+export interface LineageTopologyNode {
+  id: string;
+  type: string;
+  label: string;
+  table?: string;
+  pipeline_task_id?: string;
+  pipeline_task_name?: string;
+}
+export interface LineageTopologyEdge {
+  id: string;
+  source: string;
+  target: string;
+  transform?: string;
+  pipeline_task_id?: string;
+  pipeline_task_name?: string;
+}
+export interface LineageTopology {
+  nodes: LineageTopologyNode[];
+  edges: LineageTopologyEdge[];
   total_nodes: number;
   total_edges: number;
   from_db?: boolean;
-}> {
+}
+export async function fetchLineageTopology(): Promise<LineageTopology> {
   try {
-    const data = await get<any>(LINEAGE_TOPOL);
+    const data = await get<Partial<LineageTopology>>(LINEAGE_TOPOL);
     return {
       nodes: Array.isArray(data?.nodes) ? data.nodes : [],
       edges: Array.isArray(data?.edges) ? data.edges : [],
@@ -414,6 +433,24 @@ export async function fetchLineageTopology(): Promise<{
 }
 
 /** Data Lineage — 影响度分析：从 startNode 做双向 N 层 BFS */
+/** 后端 DataLineageService.computeImpact 返回 Map，downstream/upstream 每项含 id/hop/label/riskScore */
+interface LineageImpactNodeRaw {
+  id?: string;
+  hop?: number;
+  label?: string;
+  riskScore?: number;
+}
+interface LineageImpactRaw {
+  startNode?: string;
+  canonicalStartNode?: string;
+  matched?: boolean;
+  depth?: number;
+  severity?: string;
+  totalRisk?: number;
+  branchCount?: number;
+  downstream?: LineageImpactNodeRaw[];
+  upstream?: LineageImpactNodeRaw[];
+}
 export async function fetchLineageImpact(
   startNode: string,
   depth = 3
@@ -437,21 +474,21 @@ export async function fetchLineageImpact(
     const res = await fetch(url, { headers: { ...authHeaders() } });
     if (!res.ok) return null;
     const json = await res.json();
-    const data: any = json?.data ?? json;
+    const data: LineageImpactRaw = json?.data ?? json;
     if (!data) return null;
-    const toArr = (v: unknown) => (Array.isArray(v) ? (v as any[]) : []);
+    const toArr = (v: unknown): LineageImpactNodeRaw[] => (Array.isArray(v) ? (v as LineageImpactNodeRaw[]) : []);
     return {
       startNode: data.startNode as string,
-      canonicalStartNode: (data.canonicalStartNode as string) || data.startNode,
+      canonicalStartNode: (data.canonicalStartNode as string) || data.startNode || '',
       matched: Boolean(data.matched),
       depth: Number(data.depth) || 1,
       severity: (data.severity as string) || 'NONE',
       totalRisk: Number(data.totalRisk) || 0,
-      downstream: toArr(data.downstream).map((n: any) => ({
+      downstream: toArr(data.downstream).map((n) => ({
         id: n.id as string, hop: Number(n.hop) || 1,
         label: n.label as string, riskScore: Number(n.riskScore) || 0,
       })),
-      upstream: toArr(data.upstream).map((n: any) => ({
+      upstream: toArr(data.upstream).map((n) => ({
         id: n.id as string, hop: Number(n.hop) || 1,
         label: n.label as string, riskScore: Number(n.riskScore) || 0,
       })),
@@ -862,6 +899,17 @@ export async function triggerCollectSync(datasourceId: string): Promise<{ taskId
 
 /** 查询当前数据源的活跃采集任务 → GET /api/v1/task/list?taskType=METADATA_COLLECT
  *  过滤出 parameters 中 datasourceId 匹配的任务，用于"在任务中心查看"功能 */
+/** 后端 TaskController.toTaskMap 返回 { taskId, taskName, taskType, category, description, priority, createTime, createdBy, parameters }；
+ *  status/progress/startedAt 由 status 映射补齐，列表项未必带，前端用默认值兜底 */
+interface TaskListItemRaw {
+  taskId?: string;
+  id?: string;
+  status?: string;
+  progress?: number;
+  startedAt?: string;
+  createdAt?: string;
+  parameters?: { datasourceId?: string; datasource_id?: string } & Record<string, unknown>;
+}
 export async function fetchActiveCollectTasks(datasourceId: string): Promise<{ taskId: string; status: string; progress: number; startTime?: string }[]> {
   try {
     const res = await fetch(`/api/v1/task/list?taskType=METADATA_COLLECT&offset=0&limit=20`, {
@@ -869,16 +917,16 @@ export async function fetchActiveCollectTasks(datasourceId: string): Promise<{ t
     });
     if (!res.ok) return [];
     const json = await res.json();
-    const list = json?.data?.data || json?.data || [];
+    const list = (json?.data?.data || json?.data || []) as TaskListItemRaw[];
     if (!Array.isArray(list)) return [];
     return list
-      .filter((t: any) => {
+      .filter((t) => {
         // 任务 parameters 中应包含 datasourceId
         const params = t?.parameters || {};
         const dsId = params.datasourceId || params.datasource_id || '';
         return dsId === datasourceId;
       })
-      .map((t: any) => ({
+      .map((t) => ({
         taskId: t.taskId || t.id || '',
         status: t.status || 'RUNNING',
         progress: t.progress ?? 0,
@@ -892,6 +940,18 @@ export async function fetchActiveCollectTasks(datasourceId: string): Promise<{ t
 
 /** 获取采集差异记录 → GET /api/v1/datanet/metadata/collect-diff/{id}
  *  返回最近 N 次采集的 diff 摘要（含 gitCommit / diffSummary / diffMarkdown） */
+/** 后端 MetadataController.collectDiff 返回 { code, message, data:{ diffs:[item] } }，
+ *  item 键: collectedAt/taskId/diffSummary/diffMarkdown/gitCommit/tablesTotal/tablesOk/tablesFailed */
+interface CollectDiffItemRaw {
+  collectedAt?: string;
+  taskId?: string;
+  diffSummary?: string;
+  diffMarkdown?: string;
+  gitCommit?: string;
+  tablesTotal?: number;
+  tablesOk?: number;
+  tablesFailed?: number;
+}
 export async function fetchCollectDiff(datasourceId: string, limit = 5): Promise<{
   collectedAt: string;
   taskId?: string;
@@ -907,9 +967,9 @@ export async function fetchCollectDiff(datasourceId: string, limit = 5): Promise
     });
     if (!res.ok) return [];
     const json = await res.json();
-    const list = json?.data?.diffs || [];
+    const list = (json?.data?.diffs || []) as CollectDiffItemRaw[];
     if (!Array.isArray(list)) return [];
-    return list.map((d: any) => ({
+    return list.map((d) => ({
       collectedAt: d.collectedAt,
       taskId: d.taskId,
       diffSummary: d.diffSummary,

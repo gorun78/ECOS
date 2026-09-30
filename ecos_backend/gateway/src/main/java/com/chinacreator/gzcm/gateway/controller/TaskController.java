@@ -5,6 +5,8 @@ import java.util.stream.Collectors;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.security.RequirePermission;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 @RestController
 @RequestMapping("/api/v1/task")
 public class TaskController {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskController.class);
 
     @Autowired
     private ITaskManagementService taskManagementService;
@@ -273,7 +277,8 @@ public class TaskController {
             Map<String, Object> stats = taskManagementService.getTaskStats();
             return ApiResponse.success(stats);
         } catch (Exception e) {
-            return ApiResponse.error(-1, "获取任务统计失败: " + e.getMessage());
+            log.error("任务统计查询失败", e);
+            return ApiResponse.error(-1, "获取任务统计失败");
         }
     }
 

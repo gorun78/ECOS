@@ -2,13 +2,14 @@ package com.chinacreator.gzcm.engine.cognitive2.service.mental;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,9 +51,9 @@ public class CognitiveInvalidationConsumer {
     private final ObjectMapper objectMapper;
     private final MentalEventPublisher eventPublisher;
 
-    /** 审计通道（铁律 §2.4#5）— 可选装配（required=false + null 兜底） */
+    /** 审计通道（铁律 §2.4#5）+ 事件订阅入口（PMO-74 H2-T4：真实消费通过 EventBusService.subscribe 装载）。 */
     @Autowired(required = false)
-    private com.chinacreator.gzcm.runtime.eventbus.EventBusService eventBusService;
+    private EventBusService eventBusService;
 
     public CognitiveInvalidationConsumer(JdbcTemplate jdbc,
                                          ObjectMapper objectMapper,
@@ -62,20 +63,49 @@ public class CognitiveInvalidationConsumer {
         this.eventPublisher = eventPublisher;
     }
 
-    /**
-     * Kafka Listener 入口 — topic=KafkaTopics.COGNITIVE, groupId=dccheng-cognitive-group。
-     * String 入参 + ObjectMapper 解析；eventType 非失效类静默跳过；
-     * 异常 catch WARN 不抛（单条坏消息不堵分区；连续失败由 DLQ 接管）。
-     */
-    @KafkaListener(topics = KafkaTopics.COGNITIVE, groupId = "dccheng-cognitive-group")
-    public void onCognitiveEvent(String json) {
-        if (json == null || json.isEmpty()) {
-            log.warn("CognitiveInvalidationConsumer: kafka payload null/empty, skip");
+    @PostConstruct
+    public void subscribeCognitiveTopic() {
+        if (eventBusService == null) {
+            log.warn("CognitiveInvalidationConsumer: EventBusService 未装配, ecos.cognitive 订阅未装载（内存/Kafka 模式均需 EventBusService）");
             return;
         }
         try {
-            Map<String, Object> payload = objectMapper.readValue(json, new TypeReference<LinkedHashMap<String, Object>>() {
-            });
+            eventBusService.subscribe(KafkaTopics.COGNITIVE, Map.class, this::onCognitiveEvent);
+            log.info("CognitiveInvalidationConsumer: subscribed topic={} via EventBusService (Kafka 模式仅内存镜像；跨 JVM 消费待 dbus 装载 KafkaListener)",
+                    KafkaTopics.COGNITIVE);
+        } catch (Exception e) {
+            log.warn("CognitiveInvalidationConsumer subscribe failed (ignored): {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * EventBus 消费入口 — 由 MemoryEventBus 同 JVM 路径直投 payload；
+     * Object 载荷：Map 直接使用；String 走 JSON 解析（Kafka 路径预留兼容位）。
+     * eventType 非失效类静默跳过；异常吞 WARN 不抛（不阻塞发布主流程）。
+     */
+    public void onCognitiveEvent(Object payloadObj) {
+        if (payloadObj == null) {
+            log.warn("CognitiveInvalidationConsumer: payload null, skip");
+            return;
+        }
+        try {
+            Map<String, Object> payload;
+            if (payloadObj instanceof Map<?, ?> m) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> casted = (Map<String, Object>) m;
+                payload = casted;
+            } else if (payloadObj instanceof String json) {
+                if (json.isEmpty()) {
+                    log.warn("CognitiveInvalidationConsumer: kafka payload empty, skip");
+                    return;
+                }
+                payload = objectMapper.readValue(json, new TypeReference<LinkedHashMap<String, Object>>() {
+                });
+            } else {
+                log.warn("CognitiveInvalidationConsumer: 未识别 payload 类型 {}, skip",
+                        payloadObj.getClass().getName());
+                return;
+            }
             if (!EVENT_TYPE_INVALIDATED.equals(String.valueOf(payload.get("eventType")))) {
                 return;
             }
@@ -83,7 +113,7 @@ public class CognitiveInvalidationConsumer {
         } catch (BusinessException e) {
             log.warn("CognitiveInvalidationConsumer business rejected (not rethrown): {}", e.getMessage());
         } catch (Exception e) {
-            log.warn("CognitiveInvalidationConsumer kafka consume failed (ignored, not blocking partition): err={}",
+            log.warn("CognitiveInvalidationConsumer consume failed (ignored, not blocking): err={}",
                 e.getMessage(), e);
         }
     }

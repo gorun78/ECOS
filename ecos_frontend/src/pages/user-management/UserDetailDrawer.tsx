@@ -1,236 +1,154 @@
 /**
- * UserDetailDrawer — 用户详情右侧抽屉
- * 4 区块: 基本信息 / 角色 / 安全Profile / 最近操作
+ * UserDetailDrawer — 用户详情右侧抽屉（从 UserManagement.tsx 抽取，逐字搬迁）
  * @license Apache-2.0
  */
 
 import React, { useState, useEffect } from "react";
-import { X, User, Shield, Key, Clock, Loader2 } from "lucide-react";
+import { X, Eye, Shield, KeyRound, LogOut } from "lucide-react";
+import { fetchUserRoles } from "../../api";
+import type { IamUser, IamRole } from "../../api";
 import { useLanguage } from "../../components/LanguageContext";
 import { useTheme } from "../../components/ThemeContext";
-import { fetchUserRoles, apiFetchData } from "../../api";
-import type { IamUser, IamRole } from "../../api";
 
-interface Props {
-  visible: boolean;
-  userId: string | null;
+type DrawerTab = "basic" | "roles" | "login";
+
+interface UserDetailDrawerProps {
+  user: IamUser;
+  allRoles: IamRole[];
+  orgMap: Record<string, string>;
+  onForceLogout: (userId: string) => void;
+  onResetPassword: (userId: string) => void;
   onClose: () => void;
 }
 
-interface AuditLogEntry {
-  logId?: string;
-  action?: string;
-  target?: string;
-  details?: string;
-  status?: string;
-  ipAddress?: string;
-  createdTime?: string;
-}
-
-export default function UserDetailDrawer({ visible, userId, onClose }: Props) {
-  const { locale, t } = useLanguage();
+export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout, onResetPassword, onClose }: UserDetailDrawerProps) {
+  const { locale } = useLanguage();
   const { styles } = useTheme();
   const isZh = locale === "zh";
-
-  const [user, setUser] = useState<IamUser | null>(null);
-  const [roleIds, setRoleIds] = useState<string[] | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [tab, setTab] = useState<DrawerTab>("basic");
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   useEffect(() => {
-    if (!visible || !userId) return;
-    setLoading(true);
-    setError("");
+    fetchUserRoles(user.userId)
+      .then(r => setUserRoles(r))
+      .catch(() => setUserRoles([]))
+      .finally(() => setRolesLoaded(true));
+  }, [user.userId]);
 
-    // Fetch user detail
-    apiFetchData<IamUser>(`/api/v1/users/${userId}`)
-      .then(setUser)
-      .catch((e) => {
-        setError(e.message || "Failed to load user");
-        setUser(null);
-      })
-      .finally(() => setLoading(false));
+  const roleNames = userRoles
+    .map(id => allRoles.find(r => r.roleId === id)?.roleName)
+    .filter(Boolean) as string[];
 
-    // Fetch roles
-    fetchUserRoles(userId)
-      .then(setRoleIds)
-      .catch(() => setRoleIds([]));
-
-    // Fetch audit logs
-    setLogsLoading(true);
-    apiFetchData<AuditLogEntry[]>(`/api/v1/audit/logs?userId=${userId}&pageSize=10`)
-      .then((data) => setAuditLogs(Array.isArray(data) ? data : []))
-      .catch(() => setAuditLogs([]))
-      .finally(() => setLogsLoading(false));
-  }, [visible, userId]);
-
-  if (!visible) return null;
-
-  // ── Compute strength ──────────────────────────────────
-  const loginFails = "(N/A)";
-  const lockStatus = user?.locked === "1" ? (isZh ? "已锁定" : "Locked") : (isZh ? "正常" : "Normal");
-
-  // ── Section Card ──────────────────────────────────────
-  const SectionCard: React.FC<{
-    icon: React.FC<{ size?: number }>;
-    title: string;
-    children: React.ReactNode;
-  }> = ({ icon: Icon, title, children }) => (
-    <div className={`mb-4 rounded-lg border p-4 ${styles.cardBorder}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="opacity-50"><Icon size={14} /></span>
-        <span className="text-xs font-semibold opacity-60 uppercase tracking-wider">{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-
-  // ── KV Row ───────────────────────────────────────────
-  const KV: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-    <div className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-gray-700/10 last:border-0">
-      <span className="text-[11px] opacity-45">{label}</span>
-      <span className="text-xs font-medium ml-4 text-right break-all">{value}</span>
-    </div>
-  );
+  const drawerTabs: { id: DrawerTab; label: string; icon: React.FC<any> }[] = [
+    { id: "basic", label: isZh ? "基本信息" : "Basic Info", icon: Eye },
+    { id: "roles", label: isZh ? "角色绑定" : "Roles", icon: Shield },
+    { id: "login", label: isZh ? "登录记录" : "Login", icon: KeyRound },
+  ];
 
   return (
     <>
-      {/* Overlay */}
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-
-      {/* Drawer */}
-      <div
-        className={`fixed right-0 top-0 h-full w-full max-w-[420px] z-50 shadow-2xl flex flex-col ${styles.cardBg} border-l ${styles.cardBorder}`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700/30 shrink-0">
+      <div className={`fixed right-0 top-0 h-full w-full max-w-[400px] z-50 shadow-2xl flex flex-col ${styles.cardBg} border-l ${styles.cardBorder}`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700/30">
           <div>
-            <h3 className={`text-sm font-semibold ${styles.cardText}`}>
-              {user?.username || t("user.detail.title")}
-            </h3>
-            <p className="text-xs opacity-40">{user?.realName || user?.email || "-"}</p>
+            <h3 className={`text-sm font-semibold ${styles.cardText}`}>{user.username}</h3>
+            <p className={`text-xs opacity-50`}>{user.realName || user.email || "-"}</p>
           </div>
-          <button onClick={onClose} className="opacity-50 hover:opacity-100 transition-opacity">
-            <X size={16} />
-          </button>
+          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <span className="animate-spin opacity-30 inline-block"><Loader2 size={24} /></span>
+        <div className={`flex gap-1 px-4 pt-3 border-b ${styles.appBorder}`}>
+          {drawerTabs.map(t => {
+            const Icon = t.icon;
+            return (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t transition-colors ${
+                  tab === t.id
+                    ? `${styles.accentBg} text-white`
+                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                }`}>
+                <Icon size={12} />{t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {tab === "basic" && (
+            <div className="space-y-3">
+              {[
+                [isZh ? "用户名" : "Username", user.username],
+                [isZh ? "真实姓名" : "Real Name", user.realName || "-"],
+                [isZh ? "邮箱" : "Email", user.email || "-"],
+                [isZh ? "手机" : "Phone", user.phone || "-"],
+                [isZh ? "组织" : "Organization", orgMap[user.orgId || ""] || (user as any).orgName || user.orgId || "-"],
+                [isZh ? "状态" : "Status", user.status === "ACTIVE" ? (isZh ? "正常" : "Active") : (isZh ? "锁定" : "Locked")],
+                [isZh ? "锁定" : "Locked", user.locked === "1" ? (isZh ? "是" : "Yes") : (isZh ? "否" : "No")],
+                [isZh ? "最后登录" : "Last Login", user.lastLoginTime || "-"],
+                [isZh ? "创建时间" : "Created", user.createdTime || "-"],
+              ].map(([label, value], i) => (
+                <div key={i} className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-gray-700/20 last:border-0">
+                  <span className="text-xs opacity-50">{label}</span>
+                  <span className="text-xs font-medium ml-4 text-right break-all">{value}</span>
+                </div>
+              ))}
             </div>
           )}
 
-          {error && !loading && (
-            <div className="p-4 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs text-center">
-              {error}
+          {tab === "roles" && (
+            <div>
+              {!rolesLoaded ? (
+                <div className="space-y-2 py-4">
+                  {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />)}
+                </div>
+              ) : roleNames.length === 0 ? (
+                <div className="text-center py-8 text-xs opacity-40">
+                  {isZh ? "未绑定任何角色" : "No roles assigned"}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {roleNames.map((name, i) => (
+                    <div key={i} className="px-3 py-2 rounded text-xs bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400">
+                      <Shield className="w-3 h-3 inline mr-1.5" />
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {user && !loading && (
-            <>
-              {/* 1. 基本信息 */}
-              <SectionCard icon={User} title={t("user.detail.basic")}>
-                <KV label={isZh ? "用户名" : "Username"} value={user.username} />
-                <KV label={isZh ? "姓名" : "Name"} value={user.realName || "-"} />
-                <KV label={isZh ? "邮箱" : "Email"} value={user.email || "-"} />
-                <KV label={isZh ? "手机" : "Phone"} value={user.phone || "-"} />
-                <KV
-                  label={isZh ? "状态" : "Status"}
-                  value={
-                    <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                        user.status === "ACTIVE"
-                          ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400"
-                          : "bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400"
-                      }`}
-                    >
-                      {user.status === "ACTIVE"
-                        ? isZh ? "活跃" : "Active"
-                        : isZh ? "禁用" : "Disabled"}
-                    </span>
-                  }
-                />
-                <KV
-                  label={isZh ? "创建时间" : "Created"}
-                  value={user.createdTime || "-"}
-                />
-              </SectionCard>
-
-              {/* 2. 角色 (badge形式) */}
-              <SectionCard icon={Shield} title={t("user.detail.roles")}>
-                {roleIds === null ? (
-                  <div className="flex gap-1">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    ))}
-                  </div>
-                ) : roleIds.length === 0 ? (
-                  <span className="text-xs opacity-30">{isZh ? "无角色" : "No roles"}</span>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {roleIds.map((rid, i) => (
-                      <span
-                        key={i}
-                        className="text-[11px] bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-full font-medium"
-                      >
-                        {rid}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
-
-              {/* 3. 安全Profile */}
-              <SectionCard icon={Key} title={t("user.detail.security")}>
-                <KV label={isZh ? "登录失败次数" : "Login Failures"} value={loginFails} />
-                <KV label={isZh ? "锁定状态" : "Lock Status"} value={lockStatus} />
-                <KV
-                  label={isZh ? "上次登录时间" : "Last Login"}
-                  value={user.lastLoginTime || "-"}
-                />
-                <KV
-                  label={isZh ? "登录IP" : "Login IP"}
-                  value={auditLogs.length > 0 ? auditLogs[0]?.ipAddress || "-" : "-"}
-                />
-              </SectionCard>
-
-              {/* 4. 最近操作 */}
-              <SectionCard icon={Clock} title={t("user.detail.recent")}>
-                {logsLoading ? (
-                  <div className="text-center py-4">
-                    <Loader2 size={16} className="animate-spin opacity-30 mx-auto" />
-                  </div>
-                ) : auditLogs.length === 0 ? (
-                  <span className="text-xs opacity-30">{isZh ? "暂无操作记录" : "No recent operations"}</span>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {auditLogs.map((log, i) => (
-                      <div
-                        key={log.logId || i}
-                        className={`p-2 rounded text-xs border ${styles.cardBorder}`}
-                      >
-                        <div className="flex justify-between items-start mb-0.5">
-                          <span className="font-medium opacity-70">{log.action || "-"}</span>
-                          <span className="text-[10px] opacity-35">{log.createdTime || ""}</span>
-                        </div>
-                        <div className="text-[11px] opacity-40 truncate">
-                          {log.target || log.details || "-"}
-                        </div>
-                        {log.ipAddress && (
-                          <div className="text-[10px] opacity-25 mt-0.5">IP: {log.ipAddress}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
-            </>
+          {tab === "login" && (
+            <div className="space-y-3">
+              <div className={`p-4 rounded-lg border ${styles.cardBorder} text-center`}>
+                <KeyRound className="w-8 h-8 opacity-20 mx-auto mb-2" />
+                <p className={`text-xs ${styles.cardTextMuted}`}>
+                  {isZh ? "登录记录功能已就绪" : "Login records ready"}
+                </p>
+                <p className="text-[10px] opacity-30 mt-1">
+                  {isZh ? "后端接口: GET /api/v1/users/{id}/login-history" : "Backend: GET /api/v1/users/{id}/login-history"}
+                </p>
+              </div>
+            </div>
           )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700/30 space-y-2">
+          <button
+            onClick={() => onForceLogout(user.userId)}
+            className="w-full px-3 py-2 rounded text-xs font-medium border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center justify-center gap-1.5"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {isZh ? "强制下线" : "Force Logout"}
+          </button>
+          <button
+            onClick={() => onResetPassword(user.userId)}
+            className="w-full px-3 py-2 rounded text-xs font-medium border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 flex items-center justify-center gap-1.5"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            {isZh ? "重置密码" : "Reset Password"}
+          </button>
         </div>
       </div>
     </>

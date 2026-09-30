@@ -43,7 +43,7 @@ public class RoleController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询角色列表失败", e);
-            return ApiResponse.internalError("查询角色列表失败: " + e.getMessage());
+            return ApiResponse.internalError("查询角色列表失败");
         }
     }
 
@@ -55,7 +55,7 @@ public class RoleController {
             return ApiResponse.success(toMap(role));
         } catch (Exception e) {
             log.error("查询角色详情失败", e);
-            return ApiResponse.internalError("查询角色详情失败: " + e.getMessage());
+            return ApiResponse.internalError("查询角色详情失败");
         }
     }
 
@@ -76,7 +76,7 @@ public class RoleController {
             return ApiResponse.success(toMap(created));
         } catch (Exception e) {
             log.error("创建角色失败", e);
-            return ApiResponse.internalError("创建角色失败: " + e.getMessage());
+            return ApiResponse.internalError("创建角色失败");
         }
     }
 
@@ -97,7 +97,7 @@ public class RoleController {
             return ApiResponse.success(toMap(updated));
         } catch (Exception e) {
             log.error("更新角色失败", e);
-            return ApiResponse.internalError("更新角色失败: " + e.getMessage());
+            return ApiResponse.internalError("更新角色失败");
         }
     }
 
@@ -109,7 +109,7 @@ public class RoleController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("删除角色失败", e);
-            return ApiResponse.internalError("删除角色失败: " + e.getMessage());
+            return ApiResponse.internalError("删除角色失败");
         }
     }
 
@@ -121,7 +121,7 @@ public class RoleController {
             return ApiResponse.success(permIds);
         } catch (Exception e) {
             log.error("查询角色权限失败", e);
-            return ApiResponse.internalError("查询角色权限失败: " + e.getMessage());
+            return ApiResponse.internalError("查询角色权限失败");
         }
     }
 
@@ -145,7 +145,7 @@ public class RoleController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("分配角色权限失败", e);
-            return ApiResponse.internalError("分配角色权限失败: " + e.getMessage());
+            return ApiResponse.internalError("分配角色权限失败");
         }
     }
 

@@ -2,10 +2,15 @@ package com.chinacreator.gzcm.engine.ai.agent.mesh.entity;
 
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * MissionTask实体 — 映射 ecos_mission_task (PG实际结构)
  */
 public class MissionTaskEntity {
+
+    private static final Logger log = LoggerFactory.getLogger(MissionTaskEntity.class);
 
     private String id;
     private String missionId;
@@ -58,7 +63,9 @@ public class MissionTaskEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("seq")) return node.get("seq").asInt();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("MissionTask result JSON 解析失败，seq 回退 0: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return 0;
     }
@@ -72,7 +79,9 @@ public class MissionTaskEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("summary")) return node.get("summary").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("MissionTask result JSON 解析失败，summary 回退原始 result JSON: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return result;
     }
@@ -93,7 +102,9 @@ public class MissionTaskEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("errorMessage")) return node.get("errorMessage").asText();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("MissionTask result JSON 解析失败，errorMessage 回退 null: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return null;
     }
@@ -107,7 +118,9 @@ public class MissionTaskEntity {
                 var m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(result);
                 if (node.has("durationMs")) return node.get("durationMs").asLong();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                log.debug("MissionTask result JSON 解析失败，durationMs 回退 null: id={} reason={}", id, ignored.getMessage());
+            }
         }
         return null;
     }

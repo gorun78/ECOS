@@ -42,7 +42,7 @@ public class UdfController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("注册 UDF 失败", e);
-            return ApiResponse.internalError("注册 UDF 失败: " + e.getMessage());
+            return ApiResponse.internalError("注册 UDF 失败");
         }
     }
 
@@ -57,7 +57,7 @@ public class UdfController {
             return ApiResponse.success(udfService.list(page, pageSize, category, language));
         } catch (Exception e) {
             log.error("列出 UDF 失败", e);
-            return ApiResponse.internalError("列出 UDF 失败: " + e.getMessage());
+            return ApiResponse.internalError("列出 UDF 失败");
         }
     }
 
@@ -70,7 +70,7 @@ public class UdfController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("获取 UDF 详情失败: id={}", id, e);
-            return ApiResponse.internalError("获取 UDF 详情失败: " + e.getMessage());
+            return ApiResponse.internalError("获取 UDF 详情失败");
         }
     }
 
@@ -84,7 +84,7 @@ public class UdfController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("更新 UDF 失败: id={}", id, e);
-            return ApiResponse.internalError("更新 UDF 失败: " + e.getMessage());
+            return ApiResponse.internalError("更新 UDF 失败");
         }
     }
 
@@ -98,7 +98,7 @@ public class UdfController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("删除 UDF 失败: id={}", id, e);
-            return ApiResponse.internalError("删除 UDF 失败: " + e.getMessage());
+            return ApiResponse.internalError("删除 UDF 失败");
         }
     }
 
@@ -112,7 +112,7 @@ public class UdfController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("测试 UDF 失败: id={}", id, e);
-            return ApiResponse.internalError("测试 UDF 失败: " + e.getMessage());
+            return ApiResponse.internalError("测试 UDF 失败");
         }
     }
 
@@ -132,7 +132,7 @@ public class UdfController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("SQL→UDF 转换失败", e);
-            return ApiResponse.internalError("SQL→UDF 转换失败: " + e.getMessage());
+            return ApiResponse.internalError("SQL→UDF 转换失败");
         }
     }
 }

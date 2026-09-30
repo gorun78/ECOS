@@ -6,8 +6,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Search, BookOpen, Plus, RefreshCw, Tag, Clock, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "../pages/../components/LanguageContext";
 import { useTheme } from "../pages/../components/ThemeContext";
-
-const API_BASE = "/cases";
+import {
+  fetchCaseLibrary,
+  searchCaseLibrary,
+  fetchCaseDetail,
+  recordCase as recordCaseApi,
+} from "../services/caseLibraryApi";
 
 interface CaseItem {
   id: number;
@@ -39,8 +43,7 @@ export default function CaseLibraryView() {
     setLoading(true);
     setError("");
     try {
-      const resp = await fetch(`${API_BASE}`);
-      const data = await resp.json();
+      const data = await fetchCaseLibrary();
       setCases(data?.data || []);
     } catch (e: any) {
       setError("加载失败: " + (e?.message || "Unknown"));
@@ -53,8 +56,7 @@ export default function CaseLibraryView() {
     if (!query.trim()) { fetchCases(); return; }
     setLoading(true);
     try {
-      const resp = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&k=10`);
-      const data = await resp.json();
+      const data = await searchCaseLibrary(query, 10);
       setCases(data?.data?.results || []);
     } catch (e: any) {
       setError("搜索失败: " + (e?.message || "Unknown"));
@@ -65,8 +67,7 @@ export default function CaseLibraryView() {
 
   const viewDetail = useCallback(async (id: number) => {
     try {
-      const resp = await fetch(`${API_BASE}/${id}`);
-      const data = await resp.json();
+      const data = await fetchCaseDetail(id);
       setDetail(data?.data || null);
     } catch {
       setDetail(null);
@@ -76,12 +77,7 @@ export default function CaseLibraryView() {
   const recordCase = useCallback(async () => {
     try {
       const tags = newForm.tags.split(/[,，]/).map(t => t.trim()).filter(Boolean);
-      const resp = await fetch(`${API_BASE}/record`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newForm, tags }),
-      });
-      await resp.json();
+      await recordCaseApi({ ...newForm, tags });
       setShowNew(false);
       setNewForm({ title: "", scenario: "", tags: "", source: "manual" });
       fetchCases();

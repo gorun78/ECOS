@@ -6,13 +6,20 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
+import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
+import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
+import com.chinacreator.gzcm.runtime.core.task.parser.ITaskParser;
+import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
+import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.neo4j.driver.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -41,22 +48,30 @@ public class KGWriterService {
     private static final int MAX_CONNECTION_POOL_SIZE = 10; // 仅用于 log 显示
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long RETRY_DELAY_MS = 1000;
+    private static final String TASK_TYPE_HEALTH_CHECK = "KG_NEO4J_HEALTH_CHECK";
 
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
+    private final ITaskManagementService taskManagementService;
+    private final TaskSchedulerService taskSchedulerService;
 
     /**
-     * Neo4j driver — nullable for standard edition
-     * M0 改造 (2026-09): 改用 @Autowired(required=false) 注入 runtime-access 统一 Driver.
+     * Neo4j 客户端 — nullable for standard edition
+     * M0 改造 (2026-09): 改用 @Autowired(required=false) 注入 runtime-access 统一 Neo4jClient.
      */
     @Autowired(required = false)
-    private volatile Driver neo4jDriver;
+    private volatile Neo4jClient neo4jClient;
 
     private volatile boolean neo4jAvailable = false;
 
-    public KGWriterService(KnowledgeNodeMapper nodeMapper, KnowledgeEdgeMapper edgeMapper) {
+    public KGWriterService(KnowledgeNodeMapper nodeMapper,
+                           KnowledgeEdgeMapper edgeMapper,
+                           ITaskManagementService taskManagementService,
+                           TaskSchedulerService taskSchedulerService) {
         this.nodeMapper = nodeMapper;
         this.edgeMapper = edgeMapper;
+        this.taskManagementService = taskManagementService;
+        this.taskSchedulerService = taskSchedulerService;
     }
 
     // ── Neo4j 生命周期 ──
@@ -68,15 +83,24 @@ public class KGWriterService {
      */
     @PostConstruct
     public void neo4jPoolInit() {
-        if (neo4jDriver == null) {
+        taskManagementService.registerParser(TASK_TYPE_HEALTH_CHECK, new Neo4jHealthCheckParser());
+        taskManagementService.registerExecutor(TASK_TYPE_HEALTH_CHECK, new Neo4jHealthCheckExecutor());
+        TaskDescription description = new TaskDescription();
+        description.setTaskName("kg-neo4j-health-check");
+        description.setTaskType(TASK_TYPE_HEALTH_CHECK);
+        description.setDescription("KG Neo4j driver 每 30s ping 一次（enterprise/ultimate 有效；standard 无 driver 时 no-op）");
+        description.setParameters(new HashMap<>());
+        taskSchedulerService.schedulePeriodicTask(description, 30_000L, 30_000L);
+
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
             neo4jAvailable = false;
-            log.warn("⚠️  KGWriterService init: Neo4j Driver 不可用 (standard 档 或 neo4j.uri 未配置), KG 写入走 PG fallback");
+            log.warn("⚠️  KGWriterService init: Neo4j 不可用 (standard 档 或 neo4j.uri 未配置), KG 写入走 PG fallback");
             return;
         }
         try {
             verifyConnectivity();
             neo4jAvailable = true;
-            log.info("✅ KGWriterService init: 使用 runtime-access 统一 Driver (pool≈{} connections)", MAX_CONNECTION_POOL_SIZE);
+            log.info("✅ KGWriterService init: 使用 runtime-access 统一 Neo4jClient (pool≈{} connections)", MAX_CONNECTION_POOL_SIZE);
         } catch (Exception e) {
             neo4jAvailable = false;
             log.warn("⚠️  KGWriterService init: Neo4j 连接验证失败, 走 PG fallback: {}", e.getMessage());
@@ -84,23 +108,19 @@ public class KGWriterService {
     }
 
     /**
-     * Neo4j 健康检查 — 每30秒 ping。
+     * Neo4j 健康检查 — runtime-task 周期任务每 30s ping。
      * MATCH (n) RETURN count(n) LIMIT 1
      */
-    @Scheduled(fixedRate = 30_000)
     public void neo4jHealthCheck() {
-        if (neo4jDriver == null) {
-            log.debug("Neo4j health check skipped — driver not initialized");
+        if (neo4jClient == null || !neo4jClient.isAvailable()) {
+            log.debug("Neo4j health check skipped — client not initialized");
             return;
         }
         try {
             executeWithRetry(() -> {
-                try (Session session = neo4jDriver.session()) {
-                    Result result = session.run("MATCH (n) RETURN count(n) AS cnt LIMIT 1");
-                    if (result.hasNext()) {
-                        long count = result.next().get("cnt").asLong();
-                        log.debug("Neo4j health OK — node count: {}", count);
-                    }
+                List<Map<String, Object>> rows = neo4jClient.run("MATCH (n) RETURN count(n) AS cnt LIMIT 1", Map.of());
+                if (!rows.isEmpty() && rows.get(0).get("cnt") instanceof Number cnt) {
+                    log.debug("Neo4j health OK — node count: {}", cnt.longValue());
                 }
                 return null;
             });
@@ -124,21 +144,15 @@ public class KGWriterService {
      * Neo4j 连接连通性验证。
      */
     public boolean verifyConnectivity() {
-        if (neo4jDriver == null) return false;
-        try {
-            neo4jDriver.verifyConnectivity();
-            return true;
-        } catch (Exception e) {
-            log.warn("Neo4j connectivity verification failed: {}", e.getMessage());
-            return false;
-        }
+        if (neo4jClient == null) return false;
+        return neo4jClient.verifyConnectivity();
     }
 
     /**
      * Neo4j 可用性查询。
      */
     public boolean isNeo4jAvailable() {
-        return neo4jAvailable && neo4jDriver != null;
+        return neo4jAvailable && neo4jClient != null && neo4jClient.isAvailable();
     }
 
     /**
@@ -147,10 +161,11 @@ public class KGWriterService {
     public long getNeo4jNodeCount() {
         if (!isNeo4jAvailable()) return -1;
         return executeWithRetry(() -> {
-            try (Session session = neo4jDriver.session()) {
-                Result result = session.run("MATCH (n) RETURN count(n) AS cnt");
-                return result.hasNext() ? result.next().get("cnt").asLong() : 0;
+            List<Map<String, Object>> rows = neo4jClient.run("MATCH (n) RETURN count(n) AS cnt", Map.of());
+            if (!rows.isEmpty() && rows.get(0).get("cnt") instanceof Number cnt) {
+                return cnt.longValue();
             }
+            return 0L;
         });
     }
 
@@ -399,6 +414,73 @@ public class KGWriterService {
         public String toString() {
             return String.format("BatchWriteResult{entities(new=%d, updated=%d), relations(created=%d, skipped=%d)}",
                     entitiesCreated, entitiesUpdated, relationsCreated, relationsSkipped);
+        }
+    }
+
+    private final class Neo4jHealthCheckParser implements ITaskParser {
+        @Override
+        public TaskExecutionPlan parse(TaskDescription taskDescription) throws TaskParseException {
+            validate(taskDescription);
+            TaskExecutionPlan plan = new TaskExecutionPlan();
+            plan.setTaskId(taskDescription.getTaskId());
+            TaskExecutionPlan.ExecutionStep step = new TaskExecutionPlan.ExecutionStep();
+            step.setStepId("step-1");
+            step.setStepName("Neo4j 健康检查");
+            step.setStepType(TASK_TYPE_HEALTH_CHECK);
+            step.setExecutor(TASK_TYPE_HEALTH_CHECK);
+            step.setConfig(taskDescription.getParameters() == null
+                    ? new HashMap<>() : new HashMap<>(taskDescription.getParameters()));
+            List<TaskExecutionPlan.ExecutionStep> steps = new ArrayList<>();
+            steps.add(step);
+            plan.setSteps(steps);
+            return plan;
+        }
+
+        @Override
+        public boolean supports(String taskType) {
+            return TASK_TYPE_HEALTH_CHECK.equalsIgnoreCase(taskType);
+        }
+
+        @Override
+        public void validate(TaskDescription taskDescription) throws TaskParseException {
+            if (taskDescription == null
+                    || taskDescription.getTaskId() == null
+                    || taskDescription.getTaskId().isEmpty()) {
+                throw new TaskParseException("neo4j health check task id is required");
+            }
+            if (!supports(taskDescription.getTaskType())) {
+                throw new TaskParseException("unsupported neo4j health check task type: "
+                        + taskDescription.getTaskType());
+            }
+        }
+    }
+
+    private final class Neo4jHealthCheckExecutor implements ITaskExecutor {
+        @Override
+        public String execute(TaskExecutionPlan executionPlan, ITaskStatusCallback statusCallback)
+                throws TaskExecutionException {
+            try {
+                neo4jHealthCheck();
+                return String.format("{\"taskType\":\"%s\",\"completedAt\":\"%s\"}",
+                        TASK_TYPE_HEALTH_CHECK, java.time.Instant.now().toString());
+            } catch (Exception ex) {
+                log.error("Neo4j 健康检查 runtime-task 执行失败: {}", ex.getMessage(), ex);
+                throw new TaskExecutionException("neo4j health check failed", ex);
+            }
+        }
+
+        @Override
+        public void cancel(String taskId) { }
+
+        @Override
+        public void pause(String taskId) { }
+
+        @Override
+        public void resume(String taskId) { }
+
+        @Override
+        public TaskStatus getStatus(String taskId) {
+            return null;
         }
     }
 }

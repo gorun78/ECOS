@@ -45,11 +45,13 @@ class KnowledgeGraphTraversalWriterTest {
 
     @Mock private KnowledgeNodeMapper nodeMapper;
     @Mock private KnowledgeEdgeMapper edgeMapper;
+    @Mock private com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService taskManagementService;
+    @Mock private com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService taskSchedulerService;
     private KGWriterService writer;
 
     @BeforeEach
     void setUp() {
-        writer = new KGWriterService(nodeMapper, edgeMapper);
+        writer = new KGWriterService(nodeMapper, edgeMapper, taskManagementService, taskSchedulerService);
     }
 
     // ── writeEntity: 新建 (1 doc → 1 Node) ──

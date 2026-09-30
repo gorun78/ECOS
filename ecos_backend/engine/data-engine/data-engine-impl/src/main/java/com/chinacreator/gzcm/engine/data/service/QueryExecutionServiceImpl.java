@@ -3,10 +3,12 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.engine.data.QueryExecutionService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
+import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +31,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
 
     private final JdbcTemplate jdbc;
     private final DataSourceService dataSourceService;
+    private final JdbcConnector jdbcConnector;
 
     private final ThreadPoolExecutor queryExecutor = new ThreadPoolExecutor(
             4, 10, 60L, TimeUnit.SECONDS,
@@ -38,9 +41,12 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
 
     private final Map<String, Future<?>> runningQueries = new ConcurrentHashMap<>();
 
-    public QueryExecutionServiceImpl(JdbcTemplate jdbc, DataSourceService dataSourceService) {
+    @Autowired
+    public QueryExecutionServiceImpl(JdbcTemplate jdbc, DataSourceService dataSourceService,
+                                     JdbcConnector jdbcConnector) {
         this.jdbc = jdbc;
         this.dataSourceService = dataSourceService;
+        this.jdbcConnector = jdbcConnector;
     }
 
     @Override
@@ -63,45 +69,24 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             resolvedSql = resolvedSql + " LIMIT 10000";
         }
 
-        Map<String, String> connConfig = parseConnectionConfig(ds.getConnectionConfig());
-
         long startMs = System.currentTimeMillis();
-        try (Connection conn = DriverManager.getConnection(
-                connConfig.get("jdbcUrl"),
-                connConfig.getOrDefault("username", ""),
-                connConfig.getOrDefault("password", ""));
-             Statement stmt = conn.createStatement()) {
-
-            stmt.setQueryTimeout(timeoutSeconds);
-            stmt.setMaxRows(maxRows);
-
-            ResultSet rs = stmt.executeQuery(resolvedSql);
-            ResultSetMetaData rsmd = rs.getMetaData();
-            int colCount = rsmd.getColumnCount();
+        try {
+            // H2-T6：建连与受保护查询一律经 runtime-access 的 JdbcConnector（数据库访问规范 IR 系列），
+            // 引擎侧只负责把 GuardedResult 组装成既有响应契约（columns/rows/rowCount/elapsedMs/historyId[/truncated]）。
+            JdbcConnector.GuardedResult guarded = jdbcConnector.executeQueryGuarded(
+                    ds.getConnectionConfig(), resolvedSql, maxRows, timeoutSeconds, 10000);
 
             List<Map<String, String>> columns = new ArrayList<>();
-            for (int i = 1; i <= colCount; i++) {
+            for (JdbcConnector.ColumnDescriptor cd : guarded.columns()) {
                 Map<String, String> col = new LinkedHashMap<>();
-                col.put("name", rsmd.getColumnName(i));
-                col.put("label", rsmd.getColumnLabel(i));
-                col.put("type", rsmd.getColumnTypeName(i));
+                col.put("name", cd.name());
+                col.put("label", cd.label());
+                col.put("type", cd.typeName());
                 columns.add(col);
             }
 
-            List<Map<String, Object>> rows = new ArrayList<>();
-            boolean truncated = false;
-            while (rs.next()) {
-                // 大表查询保护：结果行数上限10000
-                if (rows.size() >= 10000) {
-                    truncated = true;
-                    break;
-                }
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (int i = 1; i <= colCount; i++) {
-                    row.put(rsmd.getColumnLabel(i), rs.getObject(i));
-                }
-                rows.add(row);
-            }
+            List<Map<String, Object>> rows = guarded.rows();
+            boolean truncated = guarded.truncated();
 
             int elapsed = (int) (System.currentTimeMillis() - startMs);
             updateHistorySuccess(historyId, rows.size(), elapsed);
@@ -134,14 +119,13 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             throw new IllegalArgumentException("数据源不存在: " + datasourceId);
         }
 
+        // schema 覆盖项仍从连接配置 JSON 取（JdbcConnector 不暴露 schema 参数）
         Map<String, String> connConfig = parseConnectionConfig(ds.getConnectionConfig());
 
         List<Map<String, Object>> schemas = new ArrayList<>();
 
-        try (Connection conn = DriverManager.getConnection(
-                connConfig.get("jdbcUrl"),
-                connConfig.getOrDefault("username", ""),
-                connConfig.getOrDefault("password", ""))) {
+        // H2-T6：建连经 JdbcConnector；DatabaseMetaData 遍历（表/列树）留在引擎侧（合规形态）
+        try (Connection conn = jdbcConnector.openConnection(ds.getConnectionConfig())) {
 
             DatabaseMetaData meta = conn.getMetaData();
             String catalog = conn.getCatalog();
@@ -353,7 +337,8 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
         try {
             return mapper.readValue(connectionConfig, Map.class);
         } catch (Exception e) {
-            throw new IllegalArgumentException("连接配置 JSON 解析失败: " + connectionConfig, e);
+            // 同 H10-T4 口径：异常消息不回显 connectionConfig 原文（含 password），只留失败原因
+            throw new IllegalArgumentException("连接配置 JSON 解析失败: " + e.getMessage(), e);
         }
     }
 

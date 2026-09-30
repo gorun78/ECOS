@@ -172,7 +172,7 @@ public class DataEngineApplication {
 - 三滤波器: VersionPrefixRewriteFilter KEEP + SecurityConfig/ClearanceInterceptor 双路径（/api/v1/dq/** 与 /api/dq/**）+ application.yml auth.whitelist — T2 已交付
 - 安全集成: `DqSecurityService`（Bean: `ecosDqSecurityService`，对齐 PipelineSecurityService 先例）— 响应前 mask 脱敏敏感字段（phone/mobile/idcard/bank_card/amount 等）；读/写操作异步 `POST /api/security/audit/log`；security-engine 不可用时默认脱敏/默认 DENY
 - Bean 命名: `ecosDqGovernanceService`（Service 接口 `DqGovernanceService` 在 data-engine-api，不 implements 既有接口，防多 Bean 冲突）
-- 完整方案: `docs/3-data/数据质量管理方案.md` §2（6 维度）；指令: `docs/3-data/PMO-48-A-数据质量基础设施.md`
+- 完整方案：原 `docs/3-data/数据质量管理方案.md` §2（6 维度）与 `docs/3-data/PMO-48-A-数据质量基础设施.md` **已不在工作树**（v2.0 迁移后位于 `docs/40-实现/3-data-legacy/`，随 2026-09-28 v3.1 清理按批准删除）。溯源与恢复：`docs/迁移映射-2026-09-28.md` L276~280 + `git checkout HEAD -- <旧路径>`；现行有效口径以《数据湖存储分层规范》v2.0 DQ 条目 + 本文上方评分描述为准
 
 ## DQ 评分 SPI + Score API（PMO-48-B T8, 2026-09-10）
 
@@ -210,7 +210,7 @@ public class DataEngineApplication {
 - 服务: `data-engine-impl/.../quality/service/DqScoreServiceImpl.java`（@Service("ecosDqScoreService")+@Transactional，含 audit 安全卡）
 - 控制器: `data-engine-impl/.../quality/controller/DqScoreController.java`（@RequestMapping("/api/v1/dq/scores")）
 - VO: `data-engine-api/.../quality/model/{DqAssetScoreVO, DqScoreTrendVO, DqScoreSystemVO}.java`
-- 方案: `docs/3-data/PMO-48-数据质量管理方案.md` §4
+- 方案：原 `docs/3-data/PMO-48-数据质量管理方案.md` §4（已随 v3.1 清理删除，溯源见 `docs/迁移映射-2026-09-28.md`；评分六维权重与等级线现以本文档上文 + 《数据库访问规范》v1.2 为准）
 
 ### 铁律
 

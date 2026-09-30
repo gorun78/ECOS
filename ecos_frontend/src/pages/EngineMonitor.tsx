@@ -61,12 +61,8 @@ const ENGINE_META: Record<string, { label: string; labelZh: string; icon: React.
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token') || '';
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
+// 鉴权头单源定义见 services/auth.ts (H6-T1)
+import { authHeaders } from '../services/auth';
 
 async function apiFetch<T = any>(url: string): Promise<T> {
   const res = await fetch(url, { headers: authHeaders() });

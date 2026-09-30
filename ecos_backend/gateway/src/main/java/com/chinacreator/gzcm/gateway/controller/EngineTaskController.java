@@ -7,6 +7,8 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/engine")
 public class EngineTaskController {
+
+    private static final Logger log = LoggerFactory.getLogger(EngineTaskController.class);
 
     @Autowired
     private ITaskManagementService taskManagementService;
@@ -49,7 +53,8 @@ public class EngineTaskController {
                 "status", "SUBMITTED"
             ));
         } catch (Exception e) {
-            return ApiResponse.error(-1, "任务提交失败: " + e.getMessage());
+            log.error("引擎任务提交失败", e);
+            return ApiResponse.error(-1, "任务提交失败");
         }
     }
 
@@ -73,7 +78,8 @@ public class EngineTaskController {
             result.put("completedAt", status.getEndTime());
             return ApiResponse.success(result);
         } catch (Exception e) {
-            return ApiResponse.error(-1, "查询任务失败: " + e.getMessage());
+            log.error("引擎任务查询失败 taskId={}", taskId, e);
+            return ApiResponse.error(-1, "查询任务失败");
         }
     }
 
@@ -101,7 +107,8 @@ public class EngineTaskController {
                 .collect(Collectors.toList());
             return ApiResponse.success(result);
         } catch (Exception e) {
-            return ApiResponse.error(-1, "汇聚任务失败: " + e.getMessage());
+            log.error("引擎任务汇聚失败", e);
+            return ApiResponse.error(-1, "汇聚任务失败");
         }
     }
 }

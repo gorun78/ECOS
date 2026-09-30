@@ -110,7 +110,7 @@ public class UserController {
 			return ApiResponse.success(result);
 		} catch (Exception e) {
 			log.error("Failed to list users", e);
-			return ApiResponse.internalError("查询用户列表失败: " + e.getMessage());
+			return ApiResponse.internalError("查询用户列表失败（详情见服务端日志）");
 		}
 	}
 
@@ -122,7 +122,7 @@ public class UserController {
 			return ApiResponse.success(toMap(user));
 		} catch (Exception e) {
 			log.error("查询用户详情失败", e);
-			return ApiResponse.internalError("查询用户详情失败: " + e.getMessage());
+			return ApiResponse.internalError("查询用户详情失败（详情见服务端日志）");
 		}
 	}
 
@@ -184,7 +184,7 @@ public class UserController {
 			return ApiResponse.success(toMap(created));
 		} catch (Exception e) {
 			log.error("创建用户失败", e);
-			return ApiResponse.internalError("创建用户失败: " + e.getMessage());
+			return ApiResponse.internalError("创建用户失败（详情见服务端日志）");
 		}
 	}
 
@@ -207,7 +207,7 @@ public class UserController {
 			return ApiResponse.success(toMap(updated));
 		} catch (Exception e) {
 			log.error("更新用户失败", e);
-			return ApiResponse.internalError("更新用户失败: " + e.getMessage());
+			return ApiResponse.internalError("更新用户失败（详情见服务端日志）");
 		}
 	}
 
@@ -219,7 +219,7 @@ public class UserController {
 			return ApiResponse.success();
 		} catch (Exception e) {
 			log.error("删除用户失败", e);
-			return ApiResponse.internalError("删除用户失败: " + e.getMessage());
+			return ApiResponse.internalError("删除用户失败（详情见服务端日志）");
 		}
 	}
 
@@ -233,7 +233,7 @@ public class UserController {
 			return ApiResponse.success();
 		} catch (Exception e) {
 			log.error("重置密码失败", e);
-			return ApiResponse.internalError("重置密码失败: " + e.getMessage());
+			return ApiResponse.internalError("重置密码失败（详情见服务端日志）");
 		}
 	}
 
@@ -250,7 +250,7 @@ public class UserController {
 			return ApiResponse.success();
 		} catch (Exception e) {
 			log.error("修改用户状态失败", e);
-			return ApiResponse.internalError("修改用户状态失败: " + e.getMessage());
+			return ApiResponse.internalError("修改用户状态失败（详情见服务端日志）");
 		}
 	}
 
@@ -264,7 +264,7 @@ public class UserController {
 			return ApiResponse.success(roles);
 		} catch (Exception e) {
 			log.error("查询用户角色失败", e);
-			return ApiResponse.internalError("查询用户角色失败: " + e.getMessage());
+			return ApiResponse.internalError("查询用户角色失败（详情见服务端日志）");
 		}
 	}
 
@@ -285,7 +285,7 @@ public class UserController {
 			return ApiResponse.success();
 		} catch (Exception e) {
 			log.error("分配用户角色失败", e);
-			return ApiResponse.internalError("分配用户角色失败: " + e.getMessage());
+			return ApiResponse.internalError("分配用户角色失败（详情见服务端日志）");
 		}
 	}
 
@@ -320,7 +320,7 @@ public class UserController {
 			return ApiResponse.success(resp);
 		} catch (Exception e) {
 			log.error("[force-logout] 失败 id={}", id, e);
-			return ApiResponse.internalError("强制下线失败: " + e.getMessage());
+			return ApiResponse.internalError("强制下线失败（详情见服务端日志）");
 		}
 	}
 
@@ -342,7 +342,7 @@ public class UserController {
 			return ApiResponse.success(resp);
 		} catch (Exception e) {
 			log.error("[reset-password] 失败 id={}", id, e);
-			return ApiResponse.internalError("重置密码失败: " + e.getMessage());
+			return ApiResponse.internalError("重置密码失败（详情见服务端日志）");
 		}
 	}
 
@@ -386,7 +386,8 @@ public class UserController {
 					userService.createUser(acc, pwd, "admin");
 					created++;
 				} catch (Exception e) {
-					errors.add(tag + " (" + u.getUsername() + "): " + e.getMessage());
+					errors.add(tag + " (" + u.getUsername() + "): 创建失败（详情见服务端日志）");
+						log.warn("[batch-create] 单行创建失败 tag={} user={}", tag, u.getUsername(), e);
 					failed++;
 				}
 			}
@@ -397,7 +398,7 @@ public class UserController {
 			return ApiResponse.success(resp);
 		} catch (Exception e) {
 			log.error("[batch-create] 失败", e);
-			return ApiResponse.internalError("批量创建失败: " + e.getMessage());
+			return ApiResponse.internalError("批量创建失败（详情见服务端日志）");
 		}
 	}
 

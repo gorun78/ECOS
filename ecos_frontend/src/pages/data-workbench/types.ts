@@ -90,7 +90,7 @@ export interface DataConnection {
   tablesAvailable: TableInfo[];
   // PMO-37 元数据获取策略（存储于 td_datasource.metadata_config JSONB）
   strategy?: { trigger?: 'MANUAL' | 'ON_SAVE' | 'ON_SCHEDULE'; countMethod?: 'OFF' | 'ESTIMATE' | 'EXACT'; scheduleCron?: string };
-  metadataConfig?: Record<string, any>;
+  metadataConfig?: Record<string, unknown>;
 }
 
 export type ConnType =
@@ -170,7 +170,7 @@ export interface PipelineNode {
   right?: string;
   join?: { type: string; on: string[] };
   inputs?: string[];
-  config?: any;
+  config?: Record<string, unknown>;
 }
 
 export interface DataPipeline {

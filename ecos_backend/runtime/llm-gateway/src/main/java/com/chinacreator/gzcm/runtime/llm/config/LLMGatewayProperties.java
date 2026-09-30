@@ -65,11 +65,27 @@ public class LLMGatewayProperties {
         private int retryMaxAttempts = 3;
         /** 请求超时 */
         private Duration requestTimeout = Duration.ofSeconds(60);
+        /**
+         * 全局默认 provider 密钥<b>引用</b>（PMO-74 N14 / 铁律 §2.4）：
+         * 配置里只放引用（如 {@code secret:<secretId>} 或 {@code enc:<keyId>:<cipher>}），
+         * 真实密钥经 security-engine 密钥服务在服务端解析；<b>禁止</b>在此填明文密钥。
+         * 环境注入：{@code LLM_GATEWAY_DEFAULT_API_KEY_REF}。
+         */
+        private String defaultApiKeyRef;
+        /**
+         * LLM 调用前是否强制 security-engine ABAC 裁决（铁律 §2.4#4/#6，默认开启；
+         * security 不可用时默认 DENY，不降级放行）。
+         */
+        private boolean abacEvalEnabled = true;
 
         public int getRetryMaxAttempts() { return retryMaxAttempts; }
         public void setRetryMaxAttempts(int retryMaxAttempts) { this.retryMaxAttempts = retryMaxAttempts; }
         public Duration getRequestTimeout() { return requestTimeout; }
         public void setRequestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; }
+        public String getDefaultApiKeyRef() { return defaultApiKeyRef; }
+        public void setDefaultApiKeyRef(String defaultApiKeyRef) { this.defaultApiKeyRef = defaultApiKeyRef; }
+        public boolean isAbacEvalEnabled() { return abacEvalEnabled; }
+        public void setAbacEvalEnabled(boolean abacEvalEnabled) { this.abacEvalEnabled = abacEvalEnabled; }
     }
 
     /**

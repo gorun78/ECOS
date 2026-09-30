@@ -27,10 +27,11 @@ import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
  * GET    /api/v1/dq/alerts/levels      — 告警级别枚举（P0-P3 占位，静默返）
  * </pre>
  *
- * <p>三滤波器：本路径由既有 {@code /api/v1/dq/**} 通配覆盖（T2 已注册
- * VersionPrefixRewriteFilter KEEP + SecurityConfig permitAll + ClearanceInterceptor
- * 豁免双路径 + auth.whitelist），无需追加。反向 {@code /api/dq/alerts/**} 由
- * REVERSE_PREFIX_MAP 已覆盖。</p>
+ * <p>三滤波器（PMO-74 H9-T5c 按实测更正）：本路径<b>不需追加登记</b>，但<b>不是匿名豁免</b>——
+ * VersionPrefixRewriteFilter 正向表无 dq 条目（{@code /api/v1/dq/**} = KEEP），反向
+ * {@code /api/dq/ → /api/v1/dq/} 由 REVERSE_PREFIX_MAP 覆盖；SecurityConfig permitAll 仅 8 条
+ * （H9-T1 收敛，不含 dq）；yml {@code auth.whitelist} 已删除。故读写均需 Bearer Token，
+ * 并按 {@code PATH_RULES} 的 {@code /api/v1/ → L1} 过准入等级校验。</p>
  *
  * <p>安全卡（铁律 2.4 #5）：读/写操作由 {@code DqAlertServiceImpl} 统一异步
  * {@code DqSecurityService.auditRead/auditWrite}。</p>

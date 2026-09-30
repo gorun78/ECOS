@@ -7,14 +7,11 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/sys_man
     username: postgres
-    password: postgres
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
-  jpa:
-    hibernate:
-      ddl-auto: none
   flyway:
     enabled: false
   autoconfigure:
@@ -30,7 +27,7 @@ mybatis:
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:}
   bucket: ${MINIO_BUCKET:ecos-datalake}
 
 logging:

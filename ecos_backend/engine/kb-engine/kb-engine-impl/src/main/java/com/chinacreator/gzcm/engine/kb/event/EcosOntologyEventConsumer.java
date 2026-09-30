@@ -3,19 +3,17 @@ package com.chinacreator.gzcm.engine.kb.event;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.OntologyPublishedEvent;
 import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -64,6 +62,10 @@ public class EcosOntologyEventConsumer {
     private final RestTemplate restTemplate;
     private final String buszhiBase;
 
+    /** PMO-74 H2-T4 — Kafka 通道统一走 EventBusService.subscribe（铁律 §2.5）。 */
+    @Autowired(required = false)
+    private EventBusService eventBusService;
+
     public EcosOntologyEventConsumer(JdbcTemplate jdbc,
                                      @Lazy KgMapperService kgMapper,
                                      @Lazy RestTemplate restTemplate,
@@ -75,13 +77,27 @@ public class EcosOntologyEventConsumer {
         this.buszhiBase = buszhiBase;
     }
 
+    @PostConstruct
+    public void subscribeOntologyPublished() {
+        if (eventBusService == null) {
+            log.warn("EcosOntologyEventConsumer: EventBusService 未装配, ecos.ontology.published 订阅未装载（同 JVM @EventListener 路径仍可用）");
+            return;
+        }
+        try {
+            eventBusService.subscribe(KafkaTopics.ONTOLOGY_PUBLISHED, OntologyPublishedEvent.class,
+                    this::onBusPublished);
+            log.info("EcosOntologyEventConsumer: subscribed topic={} via EventBusService",
+                    KafkaTopics.ONTOLOGY_PUBLISHED);
+        } catch (Exception e) {
+            log.warn("EcosOntologyEventConsumer subscribe failed (ignored): {}", e.getMessage(), e);
+        }
+    }
+
     /**
      * Spring 事件消费入口（DCCheng 同 JVM 场景；buszhi 进程内同样可达）。
      *
-     * <p>PMO-50 T4 改造：原逻辑抽出为 {@link #runSync(String, String)} 共用；
-     * Kafka 路径 (见下方 {@code @KafkaListener}) 反序列化 JSON 后调同一个 runSync。
-     * payload 仍为 {@link OntologyPublishedEvent} (内存路径仅依赖 eventId/ontologyId/version/actor/codes，
-     * 不强制 toJson — 消费侧 fetchAndHashSchema 是按 ontologyId+version 反查的, 无需 codes)。
+     * <p>PMO-50 T4 改造：原逻辑抽出为 {@link #runSync(OntologyPublishedEvent)} 共用；
+     * Kafka/EventBus 路径 ({@link #onBusPublished(Object)}) 反序列化 payload 后调同一个 runSync。
      */
     @EventListener
     public void onOntologyPublished(OntologyPublishedEvent evt) {
@@ -92,76 +108,35 @@ public class EcosOntologyEventConsumer {
     }
 
     /**
-     * Kafka Listener 入口 — 仅当 {@code dbus.event.kafka.enabled=true} 且 classpath 有 spring-kafka
-     * 时由 Spring Kafka 装载。topic={@link KafkaTopics#ONTOLOGY_PUBLISHED}, groupId=dccheng-ontology-consumer。
-     *
-     * <p>条件化策略：
-     * <ul>
-     *   <li>本类的 {@code @KafkaListener} 不挂条件注解 — 条件校验放在独立 {@code @Configuration} 上
-     *       (Spring 方法级 {@code @ConditionalOn*} 不生效, 类级条件装配依赖 {@code @Configuration} bean)；</li>
-     *   <li>{@code @ConditionalOnClass(name=...)} 用字符串形式 — 仅当 spring-kafka 在 classpath 时才产 {@code
-     *       OntologyKafkaListenerRegister} bean；本类自身 class-load 由 component scan 驱动,
-     *       {@code @KafkaListener} 方法上的注解由 {@code KafkaAnnotationDrivenEventContainerRegistrar}
-     *       扫描 + 装载, 默认 {@code kafkaListenerContainerFactory} bean 由 Spring Kafka AutoConfiguration 产出。</li>
-     *   <li>{@code @ConditionalOnProperty(name="dbus.event.kafka.enabled", havingValue="true")}：
-     *       运维显式开; 默认 false 时独立 bean 不加载, 仅走上方 {@code @EventListener}。</li>
-     * </ul>
-     *
-     * <p>反序列化：{@code MAPPER.readValue(json, OntologyPublishedEvent.class)} —
-     * {@code OntologyPublishedEvent} 已带 {@code @JsonProperty} 注解, 字段映射 1:1;
-     * 解析失败 catch 记 WARN 不抛 (Kafka 防御侧连续 N 次失败走 DLT, 见 AGENTS.md DLQ 段)。
+     * EventBus 消费入口 — Object 载荷：OntologyPublishedEvent 直接使用；String 走 JSON 反序列化
+     * （Kafka 路径的 buszhi 侧 publish 会走 ObjectMapper.writeValueAsString 序列化）。
+     * 异常吞 WARN 不抛（不阻塞发布主流程）。
      */
-    @KafkaListener(
-            topics = KafkaTopics.ONTOLOGY_PUBLISHED,
-            groupId = "dccheng-ontology-consumer")
-    public void onKafkaPublished(String json) {
-        if (json == null || json.isEmpty()) {
-            log.warn("EcosOntologyEventConsumer: kafka payload null/empty, skip");
+    public void onBusPublished(Object payload) {
+        if (payload == null) {
+            log.warn("EcosOntologyEventConsumer: EventBus payload null, skip");
             return;
         }
         OntologyPublishedEvent evt;
         try {
-            evt = MAPPER.readValue(json, OntologyPublishedEvent.class);
+            if (payload instanceof OntologyPublishedEvent e) {
+                evt = e;
+            } else if (payload instanceof String json) {
+                if (json.isEmpty()) {
+                    log.warn("EcosOntologyEventConsumer: EventBus payload empty string, skip");
+                    return;
+                }
+                evt = MAPPER.readValue(json, OntologyPublishedEvent.class);
+            } else {
+                log.warn("EcosOntologyEventConsumer: 未识别 payload 类型 {}, skip",
+                        payload.getClass().getName());
+                return;
+            }
         } catch (Exception e) {
-            // 反序列化失败不抛 — 避免单条坏消息堵整个分区; 打 WARN + 堆栈, 后续连续失败由 DLQ 接管
-            log.warn("EcosOntologyEventConsumer kafka deserialize failed err={}",
-                    e.getMessage(), e);
+            log.warn("EcosOntologyEventConsumer deserialize failed err={}", e.getMessage(), e);
             return;
         }
         runSync(evt);
-    }
-
-    /**
-     * 独立 {@code @Configuration} bean — 由 {@code dbus.event.kafka.enabled=true} + classpath 有 spring-kafka
-     * 时产 {@link OntologyKafkaListenerRegister} 实例, 反过来本类的 {@code @KafkaListener} 方法才会注册到
-     * listener container (Spring 的 KafkaAnnotationDrivenEventContainerRegistrar 扫描 @KafkaListener bean 时
-     * 仅注册"已被扫描且当前存在对应 listener 容器 factory"的 bean — 默认工厂 Spring Kafka 自动提供)。
-     * <p>
-     * 设计说明：
-     * <ul>
-     *   <li>本类上的 {@code @KafkaListener} 方法在组件扫描阶段就被 {@code
-     *       KafkaAnnotationDrivenEventContainerRegistrar} 识别 (无论配置开关)，
-     *       若 {@code dbus.event.kafka.enabled=false} 时 factory bean 也注册但不会真正 connect (broker 不可达);</li>
-     *   <li>更稳妥的方式是让本 listener 方法走条件装配 — 这里通过"另一个独立 @Configuration bean 在
-     *       条件不满足时不加载 factory"间接控制 (Spring Kafka 在无 custom factory 时也不会装配);</li>
-     *   <li>生产路径：{@code dbus.event.kafka.enabled=true} → broker 可达 → listener 真正消费事件。</li>
-     * </ul>
-     */
-    @Configuration
-    @ConditionalOnClass(name = "org.springframework.kafka.core.KafkaTemplate")
-    @ConditionalOnProperty(name = "dbus.event.kafka.enabled", havingValue = "true")
-    static class OntologyKafkaListenerRegister {
-        /** 这是一个 marker bean, 存在即表示 "Kafka 模式下应装载 KafkaListener";
-         *  kb-engine-impl 与 dbus 侧都可用 (本类所在 module, 被 dbus-service component scan 包含)。
-         *  该 bean 无副作用, 仅占位决策 + health 观测 (actuator /beans 出现即代表已装载). */
-        @Bean
-        public String ontologyKafkaListenerEnabled() {
-            if (log.isInfoEnabled()) {
-                log.info("[EventBus][KAFKA] OntologyKafkaListenerRegister enabled - @KafkaListener branch armed, " +
-                        "topic={} groupId=dccheng-ontology-consumer", KafkaTopics.ONTOLOGY_PUBLISHED);
-            }
-            return "ontology-kafka-listener:enabled";
-        }
     }
 
     /**

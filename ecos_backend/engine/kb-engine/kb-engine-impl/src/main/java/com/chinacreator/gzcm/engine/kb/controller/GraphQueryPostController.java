@@ -6,10 +6,10 @@ import com.chinacreator.gzcm.engine.kb.dto.GraphPathQuery;
 import com.chinacreator.gzcm.engine.kb.dto.GraphSearchQuery;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
+import com.chinacreator.gzcm.engine.kb.service.GraphEdgeQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,12 +55,12 @@ public class GraphQueryPostController {
     static final int MAX_DEPTH = 16;
 
     private final KnowledgeNodeMapper nodeMapper;
-    private final JdbcTemplate jdbcTemplate;
+    private final GraphEdgeQueryService edgeQueryService;
 
     public GraphQueryPostController(KnowledgeNodeMapper nodeMapper,
-                                    JdbcTemplate jdbcTemplate) {
+                                    GraphEdgeQueryService edgeQueryService) {
         this.nodeMapper = nodeMapper;
-        this.jdbcTemplate = jdbcTemplate;
+        this.edgeQueryService = edgeQueryService;
     }
 
     // ── /search ──────────────────────────────────────────────────────
@@ -211,8 +211,7 @@ public class GraphQueryPostController {
     private Map<String, List<String>> loadAdjacency() {
         Map<String, List<String>> adj = new LinkedHashMap<>();
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT source_id, target_id FROM ecos_knowledge.graph_edge LIMIT " + MAX_EDGES);
+            List<Map<String, Object>> rows = edgeQueryService.loadAdjacencyEdges(MAX_EDGES);
             for (Map<String, Object> row : rows) {
                 String s = row.get("source_id") == null ? null : String.valueOf(row.get("source_id"));
                 String t = row.get("target_id") == null ? null : String.valueOf(row.get("target_id"));
@@ -229,7 +228,7 @@ public class GraphQueryPostController {
     }
 
     /**
-     * 批量查邻接度（IN 查询一次带出）。
+     * 批量查邻接度（IN 查询一次带出，SQL 见 {@link GraphEdgeQueryService}）。
      * 节点 id 不在边的节点不命中（调用方按 0 处理）。
      */
     private void countDegrees(List<KnowledgeNode> nodes, Map<String, Integer> outDeg, Map<String, Integer> inDeg) {
@@ -237,19 +236,14 @@ public class GraphQueryPostController {
             return;
         }
         try {
-            String placeholders = placeholders(nodes.size());
             Object[] ids = nodes.stream().map(KnowledgeNode::getId).toArray();
-            List<Map<String, Object>> outRows = jdbcTemplate.queryForList(
-                    "SELECT source_id AS node, COUNT(*) AS cnt FROM ecos_knowledge.graph_edge " +
-                    "WHERE source_id IN (" + placeholders + ") GROUP BY source_id", ids);
+            List<Map<String, Object>> outRows = edgeQueryService.countOutDegrees(ids);
             for (Map<String, Object> row : outRows) {
                 Object id = row.get("node");
                 Object cnt = row.get("cnt");
                 outDeg.put(Objects.toString(id, ""), ((Number) cnt).intValue());
             }
-            List<Map<String, Object>> inRows = jdbcTemplate.queryForList(
-                    "SELECT target_id AS node, COUNT(*) AS cnt FROM ecos_knowledge.graph_edge " +
-                    "WHERE target_id IN (" + placeholders + ") GROUP BY target_id", ids);
+            List<Map<String, Object>> inRows = edgeQueryService.countInDegrees(ids);
             for (Map<String, Object> row : inRows) {
                 Object id = row.get("node");
                 Object cnt = row.get("cnt");
@@ -263,16 +257,5 @@ public class GraphQueryPostController {
 
     private static int orZero(Integer v) {
         return v == null ? 0 : v;
-    }
-
-    private static String placeholders(int n) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < n; i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append('?');
-        }
-        return sb.toString();
     }
 }

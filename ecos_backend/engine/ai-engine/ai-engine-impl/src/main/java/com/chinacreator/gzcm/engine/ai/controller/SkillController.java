@@ -40,8 +40,8 @@ public class SkillController {
             String result = mcpClient.callTool("skills_list", args);
             return ApiResponse.success(result);
         } catch (Exception e) {
-            log.error("skills_list failed: {}", e.getMessage());
-            return ApiResponse.internalError("Skills list failed: " + e.getMessage());
+            log.error("skills_list failed", e);
+            return ApiResponse.internalError("Skills list failed");
         }
     }
 

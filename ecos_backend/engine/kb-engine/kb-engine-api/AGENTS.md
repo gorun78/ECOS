@@ -1,6 +1,6 @@
 # kb-engine-api — 知识库引擎·服务接口层
 
-> 子模块: kb-engine/api | 端口: 共享父模块 18086 | 依赖: Neo4j (enterprise/flagship)
+> 子模块: kb-engine/api | 端口: 共享父模块 18086 | 依赖: Neo4j (enterprise/ultimate)
 > 上层: 见 ../AGENTS.md（kb-engine 顶层）
 
 ## 本模块干什么

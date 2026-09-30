@@ -87,8 +87,8 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
 
       await store.createEntity(dto);
       onClose();
-    } catch (err: any) {
-      setError(err?.message || '创建实体失败');
+    } catch (err: unknown) {
+      setError((err as { message?: string } | undefined)?.message || '创建实体失败');
     } finally {
       setSubmitting(false);
     }

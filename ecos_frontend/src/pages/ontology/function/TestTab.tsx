@@ -27,12 +27,12 @@ interface TestTabProps {
   // ── 以下字段由父组件 FunctionTypeDetail 传入 ──
   // T9 起 TestTab 自管真实执行态（不再消费父级 mock 的 handleRunTest/testLogs/testResult），
   // 保留接口声明仅为不改动父组件而维持 JSX props 兼容。
-  testInputs: Record<string, any>;
-  setTestInputs: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  testInputs: Record<string, unknown>;
+  setTestInputs: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
   isTesting: boolean;
   handleRunTest: () => void;
   testLogs: string[];
-  testResult: any;
+  testResult: unknown;
 }
 
 /** 日志行语义（映射到主题感知语义色，避免硬编码 Tailwind 颜色） */
@@ -88,8 +88,8 @@ export default function TestTab({ func }: TestTabProps) {
       } else {
         addLog(t('ow.funcTest.captured'), 'ok');
       }
-    } catch (e: any) {
-      addLog(`${t('ow.funcTest.failed')}: ${String(e?.message || e)}`, 'warn');
+    } catch (e: unknown) {
+      addLog(`${t('ow.funcTest.failed')}: ${String((e as { message?: string } | undefined)?.message || e)}`, 'warn');
       showToastGlobal('error', t('ow.funcTest.toastFailed'));
     } finally {
       setIsTesting(false);

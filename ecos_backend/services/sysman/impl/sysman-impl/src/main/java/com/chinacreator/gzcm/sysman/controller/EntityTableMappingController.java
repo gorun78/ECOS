@@ -58,7 +58,7 @@ public class EntityTableMappingController {
             return ApiResponse.success(rows);
         } catch (Exception e) {
             log.error("查询实体表映射失败: entityCode={}", entityCode, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -127,7 +127,7 @@ public class EntityTableMappingController {
             return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建实体表映射失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -159,7 +159,7 @@ public class EntityTableMappingController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除实体表映射失败: id={}", id, e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -226,7 +226,7 @@ public class EntityTableMappingController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询可映射数据资源失败: entityCode={}", entityCode, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 }

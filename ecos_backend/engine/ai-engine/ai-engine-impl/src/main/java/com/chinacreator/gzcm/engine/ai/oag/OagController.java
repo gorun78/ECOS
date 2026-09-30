@@ -78,7 +78,7 @@ public class OagController {
 
         } catch (Exception e) {
             log.error("[OAG] 非流式对话失败", e);
-            return ApiResponse.internalError("OAG 管道失败: " + e.getMessage());
+            return ApiResponse.internalError("OAG 管道失败");
         }
     }
 
@@ -114,7 +114,7 @@ public class OagController {
 
         } catch (Exception e) {
             log.error("[OAG] 非流式对话(v2)失败", e);
-            return ApiResponse.internalError("OAG 管道失败: " + e.getMessage());
+            return ApiResponse.internalError("OAG 管道失败");
         }
     }
 

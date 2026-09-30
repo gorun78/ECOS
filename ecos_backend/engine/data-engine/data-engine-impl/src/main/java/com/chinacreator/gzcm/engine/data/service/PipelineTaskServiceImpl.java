@@ -9,7 +9,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.*;
 
@@ -32,88 +31,8 @@ public class PipelineTaskServiceImpl implements PipelineTaskService {
         this.executionEngine = executionEngine;
     }
 
-    @PostConstruct
-    public void init() {
-        ensureSchema();
-    }
-
-    private void ensureSchema() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_pipeline_task (
-                    id VARCHAR(36) PRIMARY KEY,
-                    name VARCHAR(200) NOT NULL,
-                    description TEXT,
-                    yaml_content TEXT NOT NULL,
-                    git_url VARCHAR(500),
-                    git_branch VARCHAR(100) DEFAULT 'main',
-                    git_commit_id VARCHAR(40),
-                    status VARCHAR(20) DEFAULT 'DRAFT',
-                    cron_expression VARCHAR(100),
-                    config_json JSONB DEFAULT '{}',
-                    enabled BOOLEAN DEFAULT true,
-                    created_by VARCHAR(100),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            try {
-                jdbc.execute("ALTER TABLE ecos_pipeline_task ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true");
-            } catch (Exception ignored) {}
-            try {
-                jdbc.execute("ALTER TABLE ecos_pipeline_task ADD COLUMN IF NOT EXISTS task_type VARCHAR(20) DEFAULT 'TRANSFORM'");
-            } catch (Exception ignored) {}
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_pipeline_step (
-                    id VARCHAR(36) PRIMARY KEY,
-                    task_id VARCHAR(36) NOT NULL,
-                    step_order INTEGER NOT NULL,
-                    node_id VARCHAR(100) NOT NULL,
-                    node_type VARCHAR(50) NOT NULL,
-                    config_json JSONB DEFAULT '{}',
-                    depends_on JSONB DEFAULT '[]',
-                    position_x FLOAT DEFAULT 0,
-                    position_y FLOAT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_pipeline_run (
-                    id VARCHAR(36) PRIMARY KEY,
-                    task_id VARCHAR(36) NOT NULL,
-                    status VARCHAR(20) DEFAULT 'QUEUED',
-                    triggered_by VARCHAR(50) DEFAULT 'manual',
-                    total_steps INTEGER DEFAULT 0,
-                    completed_steps INTEGER DEFAULT 0,
-                    started_at TIMESTAMP,
-                    finished_at TIMESTAMP,
-                    elapsed_ms INTEGER DEFAULT 0,
-                    error_msg TEXT,
-                    log_json JSONB DEFAULT '[]',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_pipeline_step_run (
-                    id VARCHAR(36) PRIMARY KEY,
-                    run_id VARCHAR(36) NOT NULL,
-                    step_id VARCHAR(36) NOT NULL,
-                    node_id VARCHAR(100) NOT NULL,
-                    status VARCHAR(20) DEFAULT 'QUEUED',
-                    rows_input INTEGER DEFAULT 0,
-                    rows_output INTEGER DEFAULT 0,
-                    started_at TIMESTAMP,
-                    finished_at TIMESTAMP,
-                    elapsed_ms INTEGER DEFAULT 0,
-                    error_msg TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """);
-            log.info("Pipeline Task 表已就绪");
-        } catch (Exception e) {
-            log.warn("Pipeline Task 表初始化异常: {}", e.getMessage());
-        }
-    }
+    // H8-T1: ecos_pipeline_task / ecos_pipeline_step / ecos_pipeline_run / ecos_pipeline_step_run
+    // 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL。
 
     // ── CRUD ──
 

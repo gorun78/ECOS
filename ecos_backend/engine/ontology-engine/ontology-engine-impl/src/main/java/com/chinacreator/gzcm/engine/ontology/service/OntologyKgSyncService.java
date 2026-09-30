@@ -17,11 +17,11 @@ import java.util.Map;
  * <p>从 ecos_ontology_entity / ecos_ontology_relationship 读取 Ontology 定义，
  * 把 entities/relationships 摘要通过 {@link KbEngineGraphSyncClient} 发给
  * kb-engine (POST /api/v1/kb/graph/sync), 由 kb-engine 内部走 runtime-access
- * 统一 Driver 落地 Neo4j (enterprise/flagship 档)。standard 档不需要 KG, @Profile
+ * 统一 Driver 落地 Neo4j (enterprise/ultimate 档)。standard 档不需要 KG, @Profile
  * 限定。</p>
  *
  * <p>Wave B-2 · T14 (来源: 肖国荣 / 日期: 2026-09-12 / 责任人: fullstack-implementer)
- * 改造: 原版本 import org.neo4j.driver.* + Driver.session() 直接写 Cypher
+ * <p>改造: 原版本直接持有 Neo4j Driver 并用 session() 写 Cypher
  * (违反架构铁律 §2.5: 基础设施 Driver 收敛 runtime-access, 引擎不 new Driver)。
  * T14 改为 delegate 到 KbEngineGraphSyncClient，本类不再持有 Driver 字段。</p>
  *
@@ -30,11 +30,11 @@ import java.util.Map;
  * (true = kb-engine 受理成功, false = 不可达/失败), 以 boolean 表达 "是否受理"
  * 这个核心语义, synced 计数交给 kb-engine 日志。</p>
  *
- * <p>只在 enterprise / flagship profile 下激活 (@Profile 守卫),
+ * <p>只在 enterprise / ultimate profile 下激活 (@Profile 守卫),
  * standard 档下本 bean 不加载。</p>
  */
 @Service
-@Profile({"enterprise", "flagship"})
+@Profile({"enterprise", "ultimate"})
 public class OntologyKgSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyKgSyncService.class);

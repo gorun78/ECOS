@@ -2,27 +2,34 @@ package com.chinacreator.gzcm.engine.data.scheduler;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.chinacreator.gzcm.engine.data.QualityService;
 import com.chinacreator.gzcm.engine.data.quality.DqScheduleService;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScheduleVO;
+import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
+import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
+import com.chinacreator.gzcm.runtime.core.task.parser.ITaskParser;
 import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import jakarta.annotation.PostConstruct;
 
 /**
  * DQ 定时巡检任务 — 每天8:00全量执行所有启用的质量规则。
  * <p>
- * 双重调度：runtime-task 注册（可见性/管理）+ Spring @Scheduled（实际执行）。
+ * 单一调度：runtime-task 注册 + cron 触发（H8-T3 收口，已移除 Spring @Scheduled 双轨）。
  * </p>
  *
  * @author ECOS Data Engine Team
@@ -35,31 +42,37 @@ public class DqScheduledTask {
     private static final String CRON_DAILY_8AM = "0 0 8 * * ?";
     private static final long TIMEOUT_SECONDS = 120;
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String TASK_TYPE = "DQ_SCAN";
 
     private final JdbcTemplate jdbc;
     private final QualityService qualityService;
     private final TaskSchedulerService taskScheduler;
+    private final ITaskManagementService taskManagementService;
     private final DqScheduleMapper scheduleMapper;
     private final DqScheduleService scheduleService;
 
     public DqScheduledTask(JdbcTemplate jdbc, QualityService qualityService,
                            TaskSchedulerService taskScheduler,
+                           ITaskManagementService taskManagementService,
                            DqScheduleMapper scheduleMapper,
                            DqScheduleService scheduleService) {
         this.jdbc = jdbc;
         this.qualityService = qualityService;
         this.taskScheduler = taskScheduler;
+        this.taskManagementService = taskManagementService;
         this.scheduleMapper = scheduleMapper;
         this.scheduleService = scheduleService;
     }
 
     @PostConstruct
     public void init() {
-        // 1. 注册到 runtime-task 全局调度（满足架构铁律2.3）
+        taskManagementService.registerParser(TASK_TYPE, new DqScanParser());
+        taskManagementService.registerExecutor(TASK_TYPE, new DqScanExecutor());
+
         TaskDescription desc = new TaskDescription();
         desc.setTaskId("dq-daily-scan");
         desc.setTaskName("DQ每日全量巡检");
-        desc.setTaskType("DQ_SCAN");
+        desc.setTaskType(TASK_TYPE);
         desc.setDescription("每天8:00全量执行所有启用的DQ规则，超时120s，结果写dq_evaluation_results");
         desc.setAsync(true);
         desc.setTimeout(120_000L);
@@ -70,11 +83,6 @@ public class DqScheduledTask {
         log.info("DQ定时巡检已注册到runtime-task: cron={}", CRON_DAILY_8AM);
     }
 
-    /**
-     * 每天8:00全量巡检所有启用的DQ规则。
-     * Spring @Scheduled 负责实际执行，runtime-task 负责可见性管理。
-     */
-    @Scheduled(cron = "0 0 8 * * ?")
     public void executeDailyScan() {
         log.info("DQ定时巡检开始");
         long startTime = System.currentTimeMillis();
@@ -161,6 +169,73 @@ public class DqScheduledTask {
             }
         } catch (Exception e) {
             log.warn("更新dq_last_run_time失败: {}", e.getMessage());
+        }
+    }
+
+    private final class DqScanParser implements ITaskParser {
+        @Override
+        public TaskExecutionPlan parse(TaskDescription taskDescription) throws TaskParseException {
+            validate(taskDescription);
+            TaskExecutionPlan plan = new TaskExecutionPlan();
+            plan.setTaskId(taskDescription.getTaskId());
+            TaskExecutionPlan.ExecutionStep step = new TaskExecutionPlan.ExecutionStep();
+            step.setStepId("step-1");
+            step.setStepName("DQ 每日巡检");
+            step.setStepType(TASK_TYPE);
+            step.setExecutor(TASK_TYPE);
+            step.setConfig(taskDescription.getParameters() == null
+                    ? new HashMap<>() : new HashMap<>(taskDescription.getParameters()));
+            List<TaskExecutionPlan.ExecutionStep> steps = new ArrayList<>();
+            steps.add(step);
+            plan.setSteps(steps);
+            return plan;
+        }
+
+        @Override
+        public boolean supports(String taskType) {
+            return TASK_TYPE.equalsIgnoreCase(taskType);
+        }
+
+        @Override
+        public void validate(TaskDescription taskDescription) throws TaskParseException {
+            if (taskDescription == null
+                    || taskDescription.getTaskId() == null
+                    || taskDescription.getTaskId().isEmpty()) {
+                throw new TaskParseException("DQ scan task id is required");
+            }
+            if (!supports(taskDescription.getTaskType())) {
+                throw new TaskParseException("unsupported DQ scan task type: "
+                        + taskDescription.getTaskType());
+            }
+        }
+    }
+
+    private final class DqScanExecutor implements ITaskExecutor {
+        @Override
+        public String execute(TaskExecutionPlan executionPlan, ITaskStatusCallback statusCallback)
+                throws TaskExecutionException {
+            try {
+                executeDailyScan();
+                return String.format("{\"taskType\":\"%s\",\"completedAt\":\"%s\"}",
+                        TASK_TYPE, java.time.Instant.now().toString());
+            } catch (Exception ex) {
+                log.error("DQ 巡检 runtime-task 执行失败: {}", ex.getMessage(), ex);
+                throw new TaskExecutionException("DQ scan failed", ex);
+            }
+        }
+
+        @Override
+        public void cancel(String taskId) { }
+
+        @Override
+        public void pause(String taskId) { }
+
+        @Override
+        public void resume(String taskId) { }
+
+        @Override
+        public TaskStatus getStatus(String taskId) {
+            return null;
         }
     }
 }

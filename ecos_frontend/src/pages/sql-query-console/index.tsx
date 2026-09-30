@@ -9,7 +9,8 @@ import { useTheme } from '../../components/ThemeContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import * as Icons from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-type AnyMonacoCodeEditor = any;
+/** Monaco 编辑器实例类型：取自 OnMount 回调参数，避免 monaco-editor 双份类型副本冲突 */
+type MonacoCodeEditor = Parameters<OnMount>[0];
 declare const editorNS: typeof import('monaco-editor').editor;
 
 import SchemaTree from './SchemaTree';
@@ -34,9 +35,17 @@ import type {
 } from './types';
 
 const Icon = ({ name, size = 16, className = '' }: { name: string; size?: number; className?: string }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const iconMap = Icons as unknown as Record<string, IconComponent>;
+  const Comp = iconMap[name] || iconMap.HelpCircle;
   return <Comp size={size} className={className} />;
 };
+
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+/** window 上的模板刷新钩子（由模板面板注册，可选） */
+interface WindowWithTemplateRefresh extends Window {
+  __templateRefresh?: (() => void) | null;
+}
 
 interface SQLQueryConsoleProps {
   showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
@@ -53,7 +62,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
 
   // ── SQL 编辑器 ──
   const [sql, setSql] = useState('SELECT 1');
-  const editorRef = useRef<AnyMonacoCodeEditor | null>(null);
+  const editorRef = useRef<MonacoCodeEditor | null>(null);
 
   // ── 查询结果 ──
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
@@ -109,8 +118,8 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
 
       // 后端返回 columns 为对象数组 [{name, label, type}]，rows 以 columnLabel 为键
       // 提取 label 作为列名，用于渲染和行数据取值
-      const rawCols: unknown[] = result.columns || [];
-      const colLabels: string[] = rawCols.map((c: any) =>
+      const rawCols = result.columns || [];
+      const colLabels: string[] = rawCols.map((c) =>
         typeof c === 'string' ? c : (c.label || c.name || '')
       );
       setColumns(colLabels as unknown as ColumnMeta[]);
@@ -129,8 +138,8 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       if (showToast) {
         showToast('success', `查询完成，返回 ${rowCount} 行 (${elapsedMs}ms)`);
       }
-    } catch (e: any) {
-      const msg = e?.message || '查询执行失败';
+    } catch (e: unknown) {
+      const msg = (e as { message?: string } | undefined)?.message || '查询执行失败';
       setErrorMessage(msg);
       setColumns([]);
       setRows([]);
@@ -232,7 +241,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       if (showToast) showToast('success', '模板保存成功');
       setShowSaveDialog(false);
       // 刷新模板列表
-      const refresh = (window as any).__templateRefresh;
+      const refresh = (window as WindowWithTemplateRefresh).__templateRefresh;
       if (refresh) refresh();
     } catch {
       if (showToast) showToast('error', '保存模板失败');

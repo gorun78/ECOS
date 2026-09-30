@@ -113,26 +113,5 @@ public class SkillRepository {
         return result != null ? result : 0L;
     }
 
-    /** 检查表是否存在，不存在则创建 */
-    public void ensureTable() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS ecos_skill (
-                    id              BIGSERIAL       PRIMARY KEY,
-                    name            VARCHAR(255)    NOT NULL,
-                    description     TEXT,
-                    version         VARCHAR(50)     DEFAULT '1.0.0',
-                    enabled         BOOLEAN         DEFAULT TRUE,
-                    category        VARCHAR(100),
-                    package_info    TEXT,
-                    created_by      VARCHAR(100),
-                    created_at      TIMESTAMP       DEFAULT NOW(),
-                    updated_at      TIMESTAMP       DEFAULT NOW()
-                )
-                """);
-            log.info("Table ecos_skill ensured");
-        } catch (Exception ex) {
-            log.warn("Failed to ensure table ecos_skill: {}", ex.getMessage());
-        }
-    }
+    // H8-T1: ecos_skill 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL。
 }

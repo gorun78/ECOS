@@ -53,7 +53,8 @@ public class PolicyEngineController {
         try {
             return ApiResponse.success(service.updatePolicy(name, content));
         } catch (Exception e) {
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            log.error("更新OPA策略失败", e);
+            return ApiResponse.internalError("更新失败");
         }
     }
 }

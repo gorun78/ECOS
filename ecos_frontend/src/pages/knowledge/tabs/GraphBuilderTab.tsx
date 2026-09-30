@@ -48,7 +48,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
     try {
       const list = await knowledgeApi.fetchGraphJobs();
       setJobs(list);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setJobs([]);
     } finally {
       setIsLoading(false);
@@ -62,8 +62,8 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
     try {
       const preview = await knowledgeApi.previewGraphBuild({ dryRun: true });
       setPreviewJob({ kind: 'build', preview });
-    } catch (e: any) {
-      toast('error', t('knowledge.graph_builder.dryrun_failed') + ' ' + (e?.message || ''));
+    } catch (e: unknown) {
+      toast('error', t('knowledge.graph_builder.dryrun_failed') + ' ' + ((e as { message?: string } | undefined)?.message || ''));
     } finally {
       setBuilding(false);
     }
@@ -74,8 +74,8 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
     try {
       await knowledgeApi.triggerGraphBuild({ type: 'FULL', source: 'integration' });
       toast('success', t('knowledge.graph_builder.triggered'));
-    } catch (e: any) {
-      toast('error', t('knowledge.graph_builder.trigger_failed') + ' ' + (e?.message || ''));
+    } catch (e: unknown) {
+      toast('error', t('knowledge.graph_builder.trigger_failed') + ' ' + ((e as { message?: string } | undefined)?.message || ''));
     } finally {
       setBuilding(false);
       loadJobs();
@@ -94,7 +94,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
   const openJobPreview = async (job: GraphBuildJob) => {
     try {
       const preview = await knowledgeApi.previewGraphJob(job.jobId);
-      setPreviewJob({ kind: 'job', jobId: job.jobId, preview: { create: preview.create, update: preview.update, skip: preview.skip, samples: preview.samples as any } });
+      setPreviewJob({ kind: 'job', jobId: job.jobId, preview: { create: preview.create, update: preview.update, skip: preview.skip, samples: preview.samples as unknown as Array<Record<string, unknown>> } });
     } catch {
       setPreviewJob({ kind: 'job', jobId: job.jobId, preview: { create: 0, update: 0, skip: 0 } });
     }
@@ -105,8 +105,8 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
       await knowledgeApi.rollbackGraphJob(job.jobId);
       toast('success', t('knowledge.graph_builder.rolled_back') + job.jobId);
       loadJobs();
-    } catch (e: any) {
-      toast('error', t('knowledge.graph_builder.rollback_failed') + ' ' + (e?.message || ''));
+    } catch (e: unknown) {
+      toast('error', t('knowledge.graph_builder.rollback_failed') + ' ' + ((e as { message?: string } | undefined)?.message || ''));
     }
   };
 

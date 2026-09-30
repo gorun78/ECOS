@@ -6,8 +6,8 @@
 
     <!-- PMO-50 A: 新增横切底座 runtime-event — Kafka 事件总线。
          跨模块事件通信统一走本模块 (铁律 §2.5 公共底座); KafkaTopics 契约保留在 common-api 不动。
-         Kafka 必须可降级: 默认走内存 SpringEventBus, 仅当生态 ecs.event.kafka.enabled=true
-         + spring.kafka.brokers 配置时才切 Kafka。 -->
+         Kafka 必须可降级: 默认走内存 SpringEventBus, 仅当生态 ecos.event.kafka.enabled=true
+         + spring.kafka.bootstrap-servers 配置时才切 Kafka。 -->
     <parent>
         <groupId>com.chinacreator.gzcm</groupId>
         <artifactId>runtime</artifactId>
@@ -44,6 +44,18 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- 测试 (PMO-74 H2-T8: 本模块此前零测试); 版本由 root pom dependencyManagement 锁定 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

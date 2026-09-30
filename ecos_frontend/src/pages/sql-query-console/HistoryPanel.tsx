@@ -14,8 +14,32 @@ interface HistoryPanelProps {
   onClose: () => void;
 }
 
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+/** 后端历史记录原始行（snake_case / camelCase 双形态，仅本文件消费） */
+interface RawQueryHistoryRow {
+  id?: string | number;
+  dataSourceId?: string | number;
+  datasource_id?: string | number;
+  sqlContent?: string;
+  sql_content?: string;
+  sql?: string;
+  status?: string;
+  rowsReturned?: number | string;
+  rows_returned?: number | string;
+  elapsedMs?: number | string;
+  elapsed_ms?: number | string;
+  startedAt?: string;
+  started_at?: string;
+  errorMessage?: string;
+  error_msg?: string;
+}
+
+type HistoryResponse = RawQueryHistoryRow[] | { data?: RawQueryHistoryRow[] } | null;
+
 const Icon = ({ name, size = 14 }: { name: string; size?: number }) => {
-  const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
+  const iconMap = Icons as unknown as Record<string, IconComponent>;
+  const Comp = iconMap[name] || iconMap.HelpCircle;
   return <Comp size={size} />;
 };
 
@@ -26,10 +50,11 @@ export default function HistoryPanel({ show, onLoadSql, onClose }: HistoryPanelP
 
   const load = () => {
     setLoading(true);
-    apiFetchData<any>('/api/v1/engine/data/query/history?page=1&pageSize=50')
-      .then((d: any) => {
-        const raw: any[] = Array.isArray(d?.data) ? (d as any).data : Array.isArray(d) ? (d as any[]) : [];
-        const normalized: QueryHistoryItem[] = raw.map((r: any) => ({
+    apiFetchData<HistoryResponse>('/api/v1/engine/data/query/history?page=1&pageSize=50')
+      .then((d) => {
+        const list = Array.isArray(d) ? d : d?.data;
+        const raw: RawQueryHistoryRow[] = Array.isArray(list) ? list : [];
+        const normalized: QueryHistoryItem[] = raw.map((r) => ({
           id: String(r.id ?? ''),
           datasourceId: String(r.dataSourceId ?? r.datasource_id ?? ''),
           sqlContent: String(r.sqlContent ?? r.sql_content ?? r.sql ?? ''),
@@ -41,7 +66,7 @@ export default function HistoryPanel({ show, onLoadSql, onClose }: HistoryPanelP
         }));
         setItems(normalized);
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         setItems([]);
         console.error('[HistoryPanel] 加载历史失败:', e);
       })

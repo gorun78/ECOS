@@ -16,15 +16,9 @@ import java.util.UUID;
  * <p>
  * 激活条件：Spring profile {@code standard}。
  *
- * <h3>建表 SQL</h3>
- * <pre>
- * CREATE TABLE IF NOT EXISTS ecos_files (
- *     id           VARCHAR(32) PRIMARY KEY,
- *     content      BYTEA,
- *     content_type VARCHAR(64),
- *     created_at   TIMESTAMP DEFAULT NOW()
- * );
- * </pre>
+ * <h3>目标表</h3>
+ * {@code ecos_files}（列：id / content BYTEA / content_type / created_at）。
+ * 该表建表脚本由 db/migration 单一来源维护，运行时不再内嵌建表语句（H8-T1）。
  */
 @Service
 @Profile("standard")

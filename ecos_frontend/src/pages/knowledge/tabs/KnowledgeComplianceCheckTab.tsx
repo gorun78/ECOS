@@ -138,8 +138,8 @@ export default function KnowledgeComplianceCheckTab() {
         }),
       });
       setResults(data);
-    } catch (e: any) {
-      setError(e?.message || (t("knowledge.knowledgecompliancechecktab.合规检查请求失败")));
+    } catch (e: unknown) {
+      setError((e as { message?: string } | undefined)?.message || (t("knowledge.knowledgecompliancechecktab.合规检查请求失败")));
     } finally {
       setIsChecking(false);
     }

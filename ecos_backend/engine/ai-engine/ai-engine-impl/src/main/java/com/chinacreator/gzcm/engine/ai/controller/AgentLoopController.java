@@ -111,7 +111,7 @@ public class AgentLoopController {
             }
         } catch (Exception e) {
             log.error("[AgentLoop] 非流式对话失败", e);
-            return ApiResponse.internalError("Agent 推理失败: " + e.getMessage());
+            return ApiResponse.internalError("Agent 推理失败");
         }
     }
 
@@ -216,7 +216,7 @@ public class AgentLoopController {
             } catch (Exception e) {
                 log.error("[AgentLoop] SSE 流式对话失败", e);
                 try {
-                    sendEvent(emitter, "error", Map.of("message", "Agent 推理失败: " + e.getMessage()));
+                    sendEvent(emitter, "error", Map.of("message", "Agent 推理失败"));
                 } catch (Exception ignored) {
                     // emitter may already be closed
                 }
@@ -269,7 +269,7 @@ public class AgentLoopController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("[AgentLoop] 创建会话失败", e);
-            return ApiResponse.internalError("创建会话失败: " + e.getMessage());
+            return ApiResponse.internalError("创建会话失败");
         }
     }
 
@@ -331,7 +331,7 @@ public class AgentLoopController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("[AgentLoop] 查询会话失败 id={}", id, e);
-            return ApiResponse.internalError("查询会话失败: " + e.getMessage());
+            return ApiResponse.internalError("查询会话失败");
         }
     }
 
@@ -414,7 +414,7 @@ public class AgentLoopController {
             }
         } catch (Exception e) {
             log.error("[AgentLoop] 会话内对话失败 sessionId={}", id, e);
-            return ApiResponse.internalError("会话内对话失败: " + e.getMessage());
+            return ApiResponse.internalError("会话内对话失败");
         }
     }
 

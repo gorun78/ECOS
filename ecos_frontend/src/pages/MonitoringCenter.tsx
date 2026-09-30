@@ -39,12 +39,8 @@ const ENGINES: EngineDef[] = [
   { id: "eng-ai",        label: "AI Engine",        labelZh: "AI引擎",  icon: Sparkles,  engine: "ai",        color: "text-rose-500",    apiBase: "/api/v1/engine/ai" },
 ];
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("token") || "";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
+// 鉴权头单源定义见 services/auth.ts (H6-T1)
+import { authHeaders } from '../services/auth';
 
 async function apiFetch<T>(url: string, id?: string): Promise<T | null> {
   try {

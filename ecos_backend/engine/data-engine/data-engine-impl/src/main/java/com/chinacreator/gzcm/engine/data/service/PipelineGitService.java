@@ -6,75 +6,131 @@ import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitLoadRequest;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitOperationResultVO;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitPullRequest;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitSwitchBranchRequest;
+import com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress;
+import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.GitService.GitException;
+import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
+import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.net.URI;
 import java.util.*;
 
 /**
  * Pipeline Git 版本管理服务。
  *
- * <p>P2#1: 本地仓库路径不再硬编码 /tmp/ecos-git —— 走
- * {@code @Value("${ecos.pipeline.git.local-path:${java.io.tmpdir}/ecos-git")"}，
- * Windows 下默认落到 %TMP%/ecos-git，生产可按档位覆盖。
- * P2#2: 查库 SQL 改为显式字段列表（禁 SELECT *）。
- * P2#3: 入参改强类型 DTO 重载、返回强类型 VO；Map 旧入口保留（API 只增不改），
- *       Controller 层已切换 DTO 入口。
+ * <p>H4-T1/T2 整改后口径：
+ * <ul>
+ *   <li>仓库定位只认 repositoryId（runtime 注册表优先，缺省落 sys_config 单源根路径），
+ *       仅传已废弃 localPath 的请求返回 200 + status=not_available + reason，拒绝执行（禁伪成功）</li>
+ *   <li>请求体不再接收 username/password，凭据由服务端经 security-engine 加密存储解析注入</li>
+ *   <li>gitUrl 必须通过允许域注册表（sys_config ecos.git.allowed_hosts）+ 内网/链路本地地址拒绝</li>
+ *   <li>仓库根路径单源 sys_config ecos_git_repo_root（{@link GitRepoRootResolver}），
+ *       默认 {user.home}/ecos-git-repos，pipeline 工作树落 {repoRoot}/pipeline/{id}</li>
+ * </ul>
  */
 @Service
 public class PipelineGitService {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineGitService.class);
+
+    public static final String STATUS_NOT_AVAILABLE = "not_available";
+    static final String KEY_ALLOWED_HOSTS = "ecos.git.allowed_hosts";
+    static final String KEY_GIT_USERNAME = "ecos.git.username";
+    static final String KEY_GIT_PASSWORD_ENC = "ecos.git.password_enc";
+    private static final String KEY_GIT_PASSWORD = "git_access_password";
+    private static final String LOCALPATH_DEPRECATED_REASON =
+            "localPath 入参已废弃：请改传 repositoryId（服务端经仓库注册表/sys_config 根路径解析实际路径）";
+
     private final GitService gitService;
     private final JdbcTemplate jdbc;
+    private final SysConfigService sysConfigService;
+    private final GitRepositoryService gitRepositoryService;
+    private final GitRepoRootResolver repoRootResolver;
+    private final ObjectProvider<SecurityCryptoEgress> cryptoEgressProvider;
 
-    /** git 本地仓库根路径（缺省 ${java.io.tmpdir}/ecos-git，跨平台有效） */
-    @Value("${ecos.pipeline.git.local-path:${java.io.tmpdir}/ecos-git}")
-    private String gitLocalRoot;
-
-    public PipelineGitService(GitService gitService, JdbcTemplate jdbc) {
+    public PipelineGitService(GitService gitService,
+                              JdbcTemplate jdbc,
+                              SysConfigService sysConfigService,
+                              GitRepositoryService gitRepositoryService,
+                              GitRepoRootResolver repoRootResolver,
+                              ObjectProvider<SecurityCryptoEgress> cryptoEgressProvider) {
         this.gitService = gitService;
         this.jdbc = jdbc;
+        this.sysConfigService = sysConfigService;
+        this.gitRepositoryService = gitRepositoryService;
+        this.repoRootResolver = repoRootResolver;
+        this.cryptoEgressProvider = cryptoEgressProvider;
     }
 
-    /** 仅测试注入用（@Value 字段反射注入等价物）。 */
-    public void injectGitLocalRootForTest(String path) {
-        this.gitLocalRoot = path;
+    /** 仓库定位结果：localPath 为 null 时表示未解析；status 非空表示拒绝执行。 */
+    public record LocalPathResolution(String localPath, String status, String reason) {
+        boolean unavailable() {
+            return status != null;
+        }
     }
 
-    /** P2#1 统一入口：commit / pull / versions 共用的 per-pipeline 本地仓库路径。 */
-    private String defaultLocalPath(String id) {
-        return gitLocalRoot + File.separator + id;
+    /**
+     * 解析仓库本地路径：repositoryId 优先（runtime 注册表 → sys_config 单源根路径兜底）；
+     * 仅传已废弃 localPath 时拒绝执行并返回指引。
+     */
+    public LocalPathResolution resolveLocalPath(String taskId, String repositoryId, String legacyLocalPath) {
+        if (repositoryId != null && !repositoryId.trim().isEmpty()) {
+            String repoId = repositoryId.trim();
+            try {
+                GitRepository registered = gitRepositoryService.getRepositoryById(repoId);
+                if (registered != null && registered.getLocalPath() != null && !registered.getLocalPath().isBlank()) {
+                    return new LocalPathResolution(registered.getLocalPath(), null, null);
+                }
+            } catch (GitRepositoryService.GitRepositoryException e) {
+                log.debug("仓库未在 runtime 注册表命中，按单源根路径解析: repoId={}", repoId);
+            }
+            return new LocalPathResolution(repoRootResolver.resolveRepoPath(repoId), null, null);
+        }
+        if (legacyLocalPath != null && !legacyLocalPath.trim().isEmpty()) {
+            return new LocalPathResolution(null, STATUS_NOT_AVAILABLE, LOCALPATH_DEPRECATED_REASON);
+        }
+        String fallback = (taskId != null && !taskId.isBlank())
+                ? repoRootResolver.resolveUnderRoot("pipeline", taskId)
+                : repoRootResolver.resolveRepoRoot();
+        return new LocalPathResolution(fallback, null, null);
     }
 
     // ==================== 1. commit ====================
 
-    /**
-     * 提交到 Git（Map 入参版，保留兼容；实际由 doCommit 走显式 SQL 字段）。
-     */
     public Map<String, Object> commit(String id, Map<String, Object> body) throws GitException {
         Map<String, Object> b = body != null ? body : Map.of();
-        String localPath = (String) b.getOrDefault("localPath", defaultLocalPath(id));
+        String repositoryId = (String) b.get("repositoryId");
+        String legacyLocalPath = (String) b.get("localPath");
         String message = (String) b.getOrDefault("message", "Update pipeline " + id);
-        String username = (String) b.get("username");
-        String password = (String) b.get("password");
 
-        PipelineGitCommitResultVO vo = doCommit(id, localPath, message, username, password);
+        PipelineGitCommitResultVO vo = commit(id, toCommitRequest(repositoryId, legacyLocalPath, message));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("taskId", vo.getTaskId());
         result.put("branch", vo.getBranch());
         result.put("commitId", vo.getCommitId());
         result.put("message", vo.getMessage());
+        if (vo.getStatus() != null) {
+            result.put("status", vo.getStatus());
+            result.put("reason", vo.getReason());
+        }
         return result;
     }
 
-    /** 提交到 Git（DTO 入参版，Controller 切换后默认调用，P2#3）。 */
+    private PipelineGitCommitRequest toCommitRequest(String repositoryId, String localPath, String message) {
+        PipelineGitCommitRequest req = new PipelineGitCommitRequest();
+        req.setRepositoryId(repositoryId);
+        req.setLocalPath(localPath);
+        req.setMessage(message);
+        return req;
+    }
+
     public PipelineGitCommitResultVO commit(String id, PipelineGitCommitRequest req) throws GitException {
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("commit id 不能为空");
@@ -82,14 +138,21 @@ public class PipelineGitService {
         if (req == null) {
             throw new IllegalArgumentException("commit 请求体不能为空");
         }
-        String localPath = req.getLocalPath() != null ? req.getLocalPath() : defaultLocalPath(id);
         String message = req.getMessage() != null ? req.getMessage() : "Update pipeline " + id;
-        return doCommit(id, localPath, message, req.getUsername(), req.getPassword());
+        LocalPathResolution resolution = resolveLocalPath(id, req.getRepositoryId(), req.getLocalPath());
+        PipelineGitCommitResultVO vo = new PipelineGitCommitResultVO();
+        vo.setTaskId(id);
+        vo.setMessage(message);
+        if (resolution.unavailable()) {
+            vo.setStatus(resolution.status());
+            vo.setReason(resolution.reason());
+            return vo;
+        }
+        return doCommit(id, resolution.localPath(), message, vo);
     }
 
-    /** 提交核心逻辑（DTO/Map 两入口共用；P2#2 显式字段列表，禁 SELECT *）。 */
     private PipelineGitCommitResultVO doCommit(String id, String localPath, String message,
-                                               String username, String password) throws GitException {
+                                               PipelineGitCommitResultVO vo) throws GitException {
         Map<String, Object> task = jdbc.queryForMap(
                 "SELECT id, git_url, git_branch, yaml_content FROM ecos_pipeline_task WHERE id = ?", id);
         String gitUrl = (String) task.get("git_url");
@@ -97,8 +160,10 @@ public class PipelineGitService {
         String yamlContent = (String) task.get("yaml_content");
 
         if (gitUrl != null && !gitUrl.isEmpty()) {
+            validateGitUrl(gitUrl);
+            String[] credentials = resolveGitCredentials();
             try {
-                gitService.clone(gitUrl, localPath, username, password);
+                gitService.clone(gitUrl, localPath, credentials[0], credentials[1]);
             } catch (GitException e) {
                 log.info("仓库可能已存在，尝试 pull: {}", e.getMessage());
                 gitService.pull(localPath, "origin", "main");
@@ -111,11 +176,11 @@ public class PipelineGitService {
         writePipelineYaml(localPath, id, yamlContent);
         gitService.commit(localPath, message, List.of("pipelines/" + id + "/pipeline.yaml"));
         if (gitUrl != null && !gitUrl.isEmpty()) {
-            gitService.push(localPath, username, password);
+            String[] credentials = resolveGitCredentials();
+            gitService.push(localPath, credentials[0], credentials[1]);
         }
 
         log.info("Pipeline 已提交到 Git: taskId={}", id);
-        PipelineGitCommitResultVO vo = new PipelineGitCommitResultVO();
         vo.setTaskId(id);
         vo.setBranch(gitBranch);
         vo.setMessage(message);
@@ -124,32 +189,42 @@ public class PipelineGitService {
 
     // ==================== 2. pull ====================
 
-    /** 从 Git 拉取（Map 入参版，保留兼容）。 */
     public Map<String, Object> pull(String id, Map<String, Object> body) throws GitException {
         Map<String, Object> b = body != null ? body : Map.of();
-        String localPath = (String) b.getOrDefault("localPath", defaultLocalPath(id));
+        PipelineGitPullRequest req = new PipelineGitPullRequest();
+        req.setRepositoryId((String) b.get("repositoryId"));
+        req.setLocalPath((String) b.get("localPath"));
 
-        PipelineGitOperationResultVO vo = doPull(id, localPath);
+        PipelineGitOperationResultVO vo = pull(id, req);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("taskId", vo.getTaskId());
         result.put("yamlUpdated", vo.getYamlUpdated());
+        if (vo.getStatus() != null) {
+            result.put("status", vo.getStatus());
+            result.put("reason", vo.getReason());
+        }
         return result;
     }
 
-    /** 从 Git 拉取（DTO 入参版，P2#3）。 */
     public PipelineGitOperationResultVO pull(String id, PipelineGitPullRequest req) throws GitException {
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("pull id 不能为空");
         }
-        String localPath = (req != null && req.getLocalPath() != null)
-                ? req.getLocalPath() : defaultLocalPath(id);
-        return doPull(id, localPath);
+        LocalPathResolution resolution = resolveLocalPath(
+                id, req != null ? req.getRepositoryId() : null, req != null ? req.getLocalPath() : null);
+        PipelineGitOperationResultVO vo = new PipelineGitOperationResultVO();
+        vo.setTaskId(id);
+        if (resolution.unavailable()) {
+            vo.setStatus(resolution.status());
+            vo.setReason(resolution.reason());
+            return vo;
+        }
+        return doPull(id, resolution.localPath(), vo);
     }
 
-    /** 拉取核心逻辑（P2#2 显式字段列表）。 */
-    private PipelineGitOperationResultVO doPull(String id, String localPath) throws GitException {
-        jdbc.queryForMap(
-                "SELECT id, yaml_content FROM ecos_pipeline_task WHERE id = ?", id);
+    private PipelineGitOperationResultVO doPull(String id, String localPath,
+                                                PipelineGitOperationResultVO vo) throws GitException {
+        jdbc.queryForMap("SELECT id, yaml_content FROM ecos_pipeline_task WHERE id = ?", id);
         gitService.pull(localPath, "origin", "main");
 
         String yamlContent = loadPipelineYaml(localPath, id);
@@ -158,7 +233,6 @@ public class PipelineGitService {
                 yamlContent, id);
 
         log.info("从 Git 拉取成功: taskId={}", id);
-        PipelineGitOperationResultVO vo = new PipelineGitOperationResultVO();
         vo.setTaskId(id);
         vo.setYamlUpdated(true);
         return vo;
@@ -166,51 +240,63 @@ public class PipelineGitService {
 
     // ==================== 3. loadFromGit ====================
 
-    /** 从 Git 加载（Map 入参版，保留兼容）。 */
     public Map<String, Object> loadFromGit(Map<String, Object> body) throws GitException {
         Map<String, Object> b = body != null ? body : Map.of();
-        String gitUrl = (String) b.get("gitUrl");
-        String pipelineId = (String) b.get("pipelineId");
-        String branch = (String) b.getOrDefault("branch", "main");
-        String username = (String) b.get("username");
-        String password = (String) b.get("password");
-        String localPath = (String) b.getOrDefault("localPath",
-                gitLocalRoot + File.separator + "load-" + UUID.randomUUID().toString().substring(0, 8));
-        String taskId = (String) b.get("taskId");
+        PipelineGitLoadRequest req = new PipelineGitLoadRequest();
+        req.setRepositoryId((String) b.get("repositoryId"));
+        req.setPath((String) b.get("localPath"));
+        req.setGitUrl((String) b.get("gitUrl"));
+        req.setPipelineId((String) b.get("pipelineId"));
+        req.setBranch((String) b.get("branch"));
+        req.setTaskId((String) b.get("taskId"));
 
-        PipelineGitOperationResultVO vo = doLoadFromGit(gitUrl, pipelineId, branch, username, password, localPath, taskId);
+        PipelineGitOperationResultVO vo = loadFromGit(req);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("taskId", vo.getTaskId());
         result.put("pipelineId", vo.getPipelineId());
         result.put("gitUrl", vo.getGitUrl());
+        if (vo.getStatus() != null) {
+            result.put("status", vo.getStatus());
+            result.put("reason", vo.getReason());
+        }
         return result;
     }
 
-    /** 从 Git 加载（DTO 入参版，P2#3）。 */
     public PipelineGitOperationResultVO loadFromGit(PipelineGitLoadRequest req) throws GitException {
         if (req == null) {
             throw new IllegalArgumentException("load 请求体不能为空");
         }
-        String localPath = req.getPath() != null ? req.getPath()
-                : gitLocalRoot + File.separator + "load-" + UUID.randomUUID().toString().substring(0, 8);
-        return doLoadFromGit(req.getGitUrl(), req.getPipelineId(),
-                req.getBranch(), null, null, localPath, req.getTaskId());
+        PipelineGitOperationResultVO vo = new PipelineGitOperationResultVO();
+        if ((req.getGitUrl() == null || req.getGitUrl().isEmpty())
+                && (req.getRepositoryId() == null || req.getRepositoryId().isBlank())
+                && (req.getPath() == null || req.getPath().isBlank())) {
+            throw new IllegalArgumentException("gitUrl 和 repositoryId 至少需要一项");
+        }
+        LocalPathResolution resolution = resolveLocalPath(req.getTaskId(), req.getRepositoryId(), req.getPath());
+        if (resolution.unavailable()) {
+            vo.setStatus(resolution.status());
+            vo.setReason(resolution.reason());
+            return vo;
+        }
+        String localPath = resolution.localPath();
+        if (req.getGitUrl() != null && !req.getGitUrl().isEmpty()) {
+            validateGitUrl(req.getGitUrl());
+        }
+        if (req.getRepositoryId() == null && (req.getTaskId() == null || req.getTaskId().isBlank())) {
+            localPath = repoRootResolver.resolveUnderRoot("pipeline",
+                    "load-" + UUID.randomUUID().toString().substring(0, 8));
+        }
+        return doLoadFromGit(req.getGitUrl(), req.getPipelineId(), req.getBranch(), localPath, req.getTaskId(), vo);
     }
 
     private PipelineGitOperationResultVO doLoadFromGit(String gitUrl, String pipelineId, String branch,
-                                                       String username, String password, String localPath,
-                                                       String taskId) throws GitException {
-        if (gitUrl == null && (localPath == null || localPath.isEmpty())) {
-            throw new IllegalArgumentException("gitUrl 和 localPath 至少需要一项");
-        }
-        if (pipelineId == null && taskId == null) {
-            throw new IllegalArgumentException("pipelineId 和 taskId 至少需要一项");
-        }
-
+                                                       String localPath, String taskId,
+                                                       PipelineGitOperationResultVO vo) throws GitException {
+        String[] credentials = resolveGitCredentials();
         if (gitUrl != null && !gitUrl.isEmpty()) {
-            gitService.clone(gitUrl, localPath, username, password);
+            gitService.clone(gitUrl, localPath, credentials[0], credentials[1]);
         }
-        if (branch != null && !branch.isEmpty() && !gitUrl.isEmpty()) {
+        if (branch != null && !branch.isEmpty() && gitUrl != null && !gitUrl.isEmpty()) {
             gitService.checkoutBranch(localPath, branch);
         }
         String pid = pipelineId != null ? pipelineId : taskId;
@@ -224,7 +310,6 @@ public class PipelineGitService {
                 newTaskId, "Git: " + pid, "从 Git 加载", yamlContent, gitUrl, effectiveBranch);
 
         log.info("从 Git 加载 Pipeline: gitUrl={}, pipelineId={}", gitUrl, pid);
-        PipelineGitOperationResultVO vo = new PipelineGitOperationResultVO();
         vo.setTaskId(newTaskId);
         vo.setPipelineId(pid);
         vo.setGitUrl(gitUrl);
@@ -233,7 +318,25 @@ public class PipelineGitService {
 
     // ==================== 4. listBranches ====================
 
-    public List<String> listBranches(String localPath) throws Exception {
+    public List<String> listBranches(String repositoryId) throws GitException {
+        LocalPathResolution resolution = resolveLocalPath(null, repositoryId, null);
+        if (resolution.unavailable() || resolution.localPath() == null) {
+            throw new IllegalArgumentException(repositoryId == null || repositoryId.isBlank()
+                    ? "repositoryId 不能为空（localPath 入参已废弃，请改传 repositoryId）"
+                    : resolution.reason());
+        }
+        return listBranchesAtLocalPath(resolution.localPath());
+    }
+
+    /** 仅传已废弃 localPath 的兼容入口：拒绝执行并给出指引（禁伪成功）。 */
+    public List<String> listBranchesByLegacyLocalPath(String legacyLocalPath) throws GitException {
+        if (legacyLocalPath != null && !legacyLocalPath.trim().isEmpty()) {
+            throw new IllegalArgumentException(LOCALPATH_DEPRECATED_REASON);
+        }
+        throw new IllegalArgumentException("repositoryId 不能为空（localPath 入参已废弃，请改传 repositoryId）");
+    }
+
+    private List<String> listBranchesAtLocalPath(String localPath) throws GitException {
         File gitDir = new File(localPath);
         if (!gitDir.exists()) {
             throw new IllegalArgumentException("本地仓库不存在: " + localPath);
@@ -242,61 +345,63 @@ public class PipelineGitService {
             return git.branchList().call().stream()
                 .map(ref -> ref.getName().replace("refs/heads/", ""))
                 .toList();
+        } catch (Exception e) {
+            throw new GitException("读取分支列表失败: " + localPath, e);
         }
     }
 
     // ==================== 5. switchBranch ====================
 
-    /** 切换分支（Map 入参版，保留兼容）。 */
-    public Map<String, Object> switchBranch(String localPath, String branchName, String taskId) throws GitException {
-        gitService.checkoutBranch(localPath, branchName);
-        if (taskId != null) {
-            jdbc.update(
-                "UPDATE ecos_pipeline_task SET git_branch = ?, updated_at = NOW() WHERE id = ?",
-                branchName, taskId);
-        }
-        log.info("Git 分支切换: {} → {}", localPath, branchName);
+    public Map<String, Object> switchBranch(String repositoryId, String branchName, String taskId) throws GitException {
+        PipelineGitOperationResultVO vo = switchBranch(
+                buildSwitchRequest(repositoryId, null, branchName, taskId));
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("localPath", localPath);
-        result.put("branchName", branchName);
+        result.put("taskId", vo.getTaskId());
+        result.put("branchName", vo.getBranchName());
+        if (vo.getStatus() != null) {
+            result.put("status", vo.getStatus());
+            result.put("reason", vo.getReason());
+        }
         return result;
     }
 
-    /** 切换分支（DTO 入参版，P2#3）。 */
+    private PipelineGitSwitchBranchRequest buildSwitchRequest(String repositoryId, String localPath,
+                                                              String branchName, String taskId) {
+        PipelineGitSwitchBranchRequest req = new PipelineGitSwitchBranchRequest();
+        req.setRepositoryId(repositoryId);
+        req.setLocalPath(localPath);
+        req.setBranchName(branchName);
+        req.setTaskId(taskId);
+        return req;
+    }
+
     public PipelineGitOperationResultVO switchBranch(PipelineGitSwitchBranchRequest req) throws GitException {
-        if (req == null || req.getLocalPath() == null || req.getBranchName() == null) {
-            throw new IllegalArgumentException("localPath 和 branchName 不能为空");
+        if (req == null || req.getBranchName() == null || req.getBranchName().isBlank()) {
+            throw new IllegalArgumentException("branchName 不能为空");
         }
-        gitService.checkoutBranch(req.getLocalPath(), req.getBranchName());
+        LocalPathResolution resolution = resolveLocalPath(req.getTaskId(), req.getRepositoryId(), req.getLocalPath());
+        PipelineGitOperationResultVO vo = new PipelineGitOperationResultVO();
+        vo.setTaskId(req.getTaskId());
+        if (resolution.unavailable()) {
+            vo.setStatus(resolution.status());
+            vo.setReason(resolution.reason());
+            return vo;
+        }
+        gitService.checkoutBranch(resolution.localPath(), req.getBranchName());
         if (req.getTaskId() != null) {
             jdbc.update(
                     "UPDATE ecos_pipeline_task SET git_branch = ?, updated_at = NOW() WHERE id = ?",
                     req.getBranchName(), req.getTaskId());
         }
-        log.info("Git 分支切换: {} → {}", req.getLocalPath(), req.getBranchName());
-        PipelineGitOperationResultVO vo = new PipelineGitOperationResultVO();
-        vo.setLocalPath(req.getLocalPath());
+        log.info("Git 分支切换: {} → {}", req.getRepositoryId(), req.getBranchName());
         vo.setBranchName(req.getBranchName());
         return vo;
     }
 
-    // ==================== 6. versions（P2#1 跨平台路径） ====================
+    // ==================== 6. versions ====================
 
-    /**
-     * Pipeline 定义的 Git 版本列表（最新在上）。
-     *
-     * <p>与 {@link #commit(String, Map)} 共用同一 git 工作树（{@link #defaultLocalPath(String)}）
-     * 和同一 per-pipeline 子目录（{@code pipelines/{id}/pipeline.yaml}）。
-     *
-     * <ul>
-     *   <li>git 仓库不存在 → 返回空列表（首次 commit 之前属正常态）</li>
-     *   <li>仓库存在但该 pipeline 子目录还没 commit 历史 → 返回空列表</li>
-     *   <li>仓库存在且有 commit 历史 → 返回 7 位 short SHA（最新在上）</li>
-     * </ul>
-     */
     public List<String> versions(String id) throws GitException {
-        // P2#1：与 commit() 同源 defaultLocalPath(id)，跨平台可配
-        File gitDir = new File(defaultLocalPath(id));
+        File gitDir = new File(repoRootResolver.resolveUnderRoot("pipeline", id));
 
         if (!gitDir.exists() || !new File(gitDir, ".git").exists()) {
             return new ArrayList<>();
@@ -319,9 +424,126 @@ public class PipelineGitService {
         }
     }
 
+    // ==================== 安全校验 / 凭据解析 ====================
+
+    /** gitUrl 允许域注册表校验：拒内网/回环/链路本地/元数据地址，且必须命中注册表白名单（缺省拒绝）。 */
+    void validateGitUrl(String gitUrl) {
+        String host = extractHost(gitUrl);
+        if (host == null || host.isBlank()) {
+            throw new IllegalArgumentException("非法 gitUrl（无法解析主机）: " + gitUrl);
+        }
+        String lower = host.toLowerCase(Locale.ROOT);
+        if (isBlockedHost(lower)) {
+            throw new IllegalArgumentException("gitUrl 指向内网/链路本地/元数据地址，已拒绝: " + host);
+        }
+        String registry = sysConfigService.getString(KEY_ALLOWED_HOSTS, "");
+        List<String> allowed = new ArrayList<>();
+        if (registry != null) {
+            for (String entry : registry.split(",")) {
+                if (!entry.trim().isEmpty()) {
+                    allowed.add(entry.trim().toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        if (allowed.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "gitUrl 允许域注册表（sys_config " + KEY_ALLOWED_HOSTS + "）未配置，缺省拒绝远程 Git 操作: " + host);
+        }
+        boolean matched = allowed.stream().anyMatch(a -> lower.equals(a) || lower.endsWith("." + a));
+        if (!matched) {
+            throw new IllegalArgumentException("gitUrl 主机不在允许域注册表内，已拒绝: " + host);
+        }
+    }
+
+    static String extractHost(String gitUrl) {
+        if (gitUrl == null || gitUrl.isBlank()) {
+            return null;
+        }
+        String url = gitUrl.trim();
+        if (url.toLowerCase(Locale.ROOT).startsWith("file://")) {
+            throw new IllegalArgumentException("禁止 file:// 协议的 gitUrl: " + gitUrl);
+        }
+        try {
+            URI uri = new URI(url);
+            if (uri.getHost() != null) {
+                return uri.getHost();
+            }
+            String scheme = uri.getScheme();
+            if (scheme != null) {
+                return null;
+            }
+        } catch (Exception ignored) {
+            // 非 URI 语法（scp 式 git@host:path），走下方兜底解析
+        }
+        if (url.startsWith("git@") || url.startsWith("ssh://")) {
+            String rest = url.startsWith("git@") ? url.substring(4) : URI.create(url).getHost();
+            if (url.startsWith("git@")) {
+                int colon = rest.indexOf(':');
+                int slash = rest.indexOf('/');
+                int end = colon >= 0 ? colon : (slash >= 0 ? slash : rest.length());
+                return rest.substring(0, end);
+            }
+            return rest;
+        }
+        return null;
+    }
+
+    static boolean isBlockedHost(String lowerHost) {
+        if (lowerHost.equals("localhost") || lowerHost.endsWith(".localhost")
+                || lowerHost.equals("metadata.google.internal") || lowerHost.equals("metadata")) {
+            return true;
+        }
+        if (lowerHost.equals("127.0.0.1") || lowerHost.startsWith("127.")) {
+            return true;
+        }
+        if (lowerHost.startsWith("169.254.")) {
+            return true;
+        }
+        if (lowerHost.startsWith("10.")) {
+            return true;
+        }
+        if (lowerHost.startsWith("192.168.")) {
+            return true;
+        }
+        if (lowerHost.startsWith("0.0.0.0")) {
+            return true;
+        }
+        if (lowerHost.startsWith("[") || lowerHost.contains(":")) {
+            String v6 = lowerHost.startsWith("[") ? lowerHost.substring(1, lowerHost.lastIndexOf(']')) : lowerHost;
+            if (v6.equals("::1") || v6.startsWith("fe80") || v6.startsWith("fc") || v6.startsWith("fd")) {
+                return true;
+            }
+        }
+        if (lowerHost.matches("^172\\.(1[6-9]|2\\d|3[01])\\..*")) {
+            return true;
+        }
+        return false;
+    }
+
+    /** 凭据单源注入：sys_config ecos.git.username + ecos.git.password_enc（AES 密文，经 security-engine 解密）。 */
+    String[] resolveGitCredentials() {
+        String username = sysConfigService.getString(KEY_GIT_USERNAME, "");
+        String passwordEnc = sysConfigService.getString(KEY_GIT_PASSWORD_ENC, "");
+        if (username == null || username.isBlank() || passwordEnc == null || passwordEnc.isBlank()) {
+            return new String[]{null, null};
+        }
+        SecurityCryptoEgress cryptoEgress = cryptoEgressProvider.getIfAvailable();
+        if (cryptoEgress == null || !cryptoEgress.available()) {
+            log.warn("runtime 安全加解密出口不可用，Git 凭据解密跳过（按匿名访问处理）");
+            return new String[]{null, null};
+        }
+        try {
+            return new String[]{username, cryptoEgress.decrypt(passwordEnc, KEY_GIT_PASSWORD)};
+        } catch (Exception e) {
+            log.warn("Git 凭据解密失败，按匿名访问处理: {}", e.getMessage());
+            return new String[]{null, null};
+        }
+    }
+
     // ==================== 私有 util ====================
 
     private void writePipelineYaml(String localPath, String pipelineId, String yamlContent) throws GitException {
+        GitRepoRootResolver.requireSafeSegment(pipelineId);
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(localPath, "pipelines", pipelineId);
             java.nio.file.Files.createDirectories(dir);
@@ -334,6 +556,9 @@ public class PipelineGitService {
     }
 
     private String loadPipelineYaml(String localPath, String pipelineId) throws GitException {
+        if (pipelineId != null) {
+            GitRepoRootResolver.requireSafeSegment(pipelineId);
+        }
         try {
             return java.nio.file.Files.readString(
                 java.nio.file.Paths.get(localPath, "pipelines", pipelineId, "pipeline.yaml"));

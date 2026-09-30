@@ -5,11 +5,12 @@
 
 import React from 'react';
 import { Eye, GitMerge, Trash2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 function DynamicIcon({ name, size = 14, className }: { name: string; size?: number; className?: string }) {
-  const IconComponent = (LucideIcons as any)[name] || LucideIcons.HelpCircle;
+  const IconComponent = (LucideIcons[name as keyof typeof LucideIcons] || LucideIcons.HelpCircle) as LucideIcon;
   return <IconComponent size={size} className={className} />;
 }
 
@@ -39,14 +40,14 @@ export default function LinkTypeView({
 
   const selectedDataset = datasets.find(d => d.id === linkType.mapping.datasetId) || datasets[0];
 
-  const handleFieldChange = (key: keyof LinkType, value: any) => {
+  const handleFieldChange = (key: keyof LinkType, value: unknown) => {
     onUpdate({
       ...linkType,
       [key]: value
     });
   };
 
-  const handleMappingFieldChange = (key: string, value: any) => {
+  const handleMappingFieldChange = (key: string, value: unknown) => {
     onUpdate({
       ...linkType,
       mapping: {
@@ -198,7 +199,7 @@ export default function LinkTypeView({
                 <label className={`text-xs ${styles.cardTextMuted} font-medium`}>{t('ow.label.cardinality')}</label>
                 <select
                   value={linkType.cardinality}
-                  onChange={e => handleFieldChange('cardinality', e.target.value as any)}
+                  onChange={e => handleFieldChange('cardinality', e.target.value as LinkType['cardinality'])}
                   className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:outline-hidden`}
                 >
                   <option value="1:1">{t('ow.link.cardinality11')}</option>
@@ -227,7 +228,7 @@ export default function LinkTypeView({
                 <label className={`text-xs ${styles.cardTextMuted} font-medium`}>{t('ow.label.mappingStrategy')}</label>
                 <select
                   value={linkType.mapping.type}
-                  onChange={e => handleMappingFieldChange('type', e.target.value as any)}
+                  onChange={e => handleMappingFieldChange('type', e.target.value as LinkType['mapping']['type'])}
                   className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.cardBg} focus:outline-hidden`}
                 >
                   <option value="foreign_key">{t('ow.link.foreignKeyMapping')}</option>

@@ -259,7 +259,7 @@ class CausalReasonerServiceTest {
     }
 
     @Test
-    @DisplayName("T-08-1-7: estimateCausalEffect KG 无路 → 走 fallback diagnose, 返 0.5 (avg 置信兜底)")
+    @DisplayName("T-08-1-7: estimateCausalEffect KG 无路 → 走 fallback diagnose, 返 0.4 (KG 未覆盖降级节点置信)")
     void estimateCausalEffectFallsBackToDiagnose() {
         Map<String, Object> pathResult = new LinkedHashMap<>();
         pathResult.put("length", -1);
@@ -288,10 +288,10 @@ class CausalReasonerServiceTest {
 
         double effect = service.estimateCausalEffect("a", "c");
 
-        // fallback diag: chain=[root(conf=1.0)] avg=1.0 → effect=1.0
-        // ruleBasedExpansion 桩是 doNothing → 不追加 RULE 节点，根节点 confidence=1.0 → 1.0
-        assertEquals(1.0, effect, 0.001,
-                "fallback 单根节点(conf=1.0) → avg 1.0 → effect=1.0");
+        // fallback diag: KG 未覆盖 → CausalReasonerServiceImpl 造单一降级节点 (conf=0.4, source="metric")
+        // ruleBasedExpansion 桩是 doNothing → 不追加 RULE 节点，故 avg = 0.4
+        assertEquals(0.4, effect, 0.001,
+                "fallback 单降级节点(conf=0.4) → avg 0.4 → effect=0.4");
     }
 
     // ── 工具 ────────────────────────────────────────────────

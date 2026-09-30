@@ -33,6 +33,24 @@ public interface KnowledgeNodeMapper {
     long count();
 
     /**
+     * 知识接入幂等 upsert 的 UPDATE 分支（PMO-74 H9-T4：从 {@code KnowledgeIngestController}
+     * 内联的数据访问模板下沉至此）。
+     *
+     * <p>列集合与 WHERE 条件与下沉前逐字段一致：仅更新 {@code label / node_type /
+     * description / properties / domain / updated_at}，不动 {@code created_at} 与
+     * B3-2 实例抽取专用的 {@code ontology_id / ontology_version / source_resource_id /
+     * source_pk}。可空列标 {@code jdbcType=VARCHAR}（与 {@link #insert} 同风格，
+     * 避免驱动无法推断 NULL 类型）。
+     *
+     * @param node 已在内存中完成"仅补缺失字段"patch 的节点（id 必填）
+     * @return 受影响行数（0 表示 id 不存在）
+     */
+    @Update("UPDATE ecos_knowledge.graph_node SET label = #{label}, node_type = #{nodeType, jdbcType=VARCHAR}, "
+            + "description = #{description, jdbcType=VARCHAR}, properties = #{propertiesJson, jdbcType=VARCHAR}, "
+            + "domain = #{domain, jdbcType=VARCHAR}, updated_at = #{updatedAt} WHERE id = #{id}")
+    int updateIngestFields(KnowledgeNode node);
+
+    /**
      * F10: 批量查 graph_node 存在性（参数化 IN，返回命中的 id 列表）。
      *
      * @param ids 知识资产 ID 集合（≤ 100）

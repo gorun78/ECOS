@@ -31,13 +31,13 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
   const [newParamName, setNewParamName] = useState('');
   const [newParamType, setNewParamType] = useState<string>('string');
   const [newParamObjType, setNewParamObjType] = useState(objectTypes[0]?.id || '');
-  const [testInputs, setTestInputs] = useState<Record<string, any>>({});
+  const [testInputs, setTestInputs] = useState<Record<string, unknown>>({});
   const [isTesting, setIsTesting] = useState(false);
   const [testLogs, setTestLogs] = useState<string[]>([]);
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<unknown>(null);
 
   useEffect(() => {
-    const inputs: Record<string, any> = {};
+    const inputs: Record<string, unknown> = {};
     func.parameters.forEach(p => {
       if (p.dataType === 'ObjectType' || p.dataType === 'ObjectTypeSet') {
         inputs[p.name] = (objectTypes.find(ot => ot.id === p.objectTypeId) || objectTypes[0])?.id || '';
@@ -50,7 +50,7 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
     setTestInputs(inputs);
   }, [func.parameters, objectTypes]);
 
-  const handleFieldChange = (key: keyof FunctionType, value: any) => {
+  const handleFieldChange = (key: keyof FunctionType, value: unknown) => {
     onUpdate({ ...func, [key]: value });
   };
 
@@ -70,7 +70,7 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
     onUpdate({ ...func, parameters: func.parameters.filter(p => p.name !== name) });
   };
 
-  const handleParamFieldChange = (name: string, field: keyof FunctionParameter, value: any) => {
+  const handleParamFieldChange = (name: string, field: keyof FunctionParameter, value: unknown) => {
     onUpdate({ ...func, parameters: func.parameters.map(p => p.name === name ? { ...p, [field]: value } : p) });
   };
 
@@ -98,7 +98,7 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
     addLog(`[ECOS Runner] 📥 注入运行实参：{ ${inputsStr} }`, 1300);
     addLog(`[ECOS Runner] 📡 自动连线 Ontology 本地实例服务并执行动态逻辑...`, 1600);
     setTimeout(() => {
-      let output: any = null;
+      let output: unknown = null;
       if (func.returnType === 'boolean') output = true;
       else if (func.returnType === 'integer' || func.returnType === 'decimal') output = 120;
       else if (func.returnType === 'ObjectTypeSet') output = { count: 2, type: func.returnObjectTypeId || 'aircraft', ids: ['ac_n101ua', 'ac_n204dl'], message: `Mock ObjectSet containing 2 instances of ${func.returnObjectTypeId}` };

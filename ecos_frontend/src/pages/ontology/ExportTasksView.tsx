@@ -58,7 +58,7 @@ export default function ExportTasksView({ visible, refreshSignal, onToast }: Exp
         String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
       );
       setTasks(sorted);
-    } catch (e: any) {
+    } catch (e: unknown) {
       onToast('error', t('ow.exportTask.loadError'));
     } finally {
       setLoading(false);
@@ -106,7 +106,7 @@ export default function ExportTasksView({ visible, refreshSignal, onToast }: Exp
     try {
       const name = await downloadExportTask(task.id, task.format);
       onToast('success', t('ow.exportTask.downloadSuccess').replace('{name}', name));
-    } catch (e: any) {
+    } catch (e: unknown) {
       onToast('error', t('ow.exportTask.downloadError'));
     } finally {
       setBusyIds(prev => {
@@ -124,7 +124,7 @@ export default function ExportTasksView({ visible, refreshSignal, onToast }: Exp
       await deleteExportTask(task.id);
       setTasks(prev => prev.filter(x => x.id !== task.id));
       onToast('success', t('ow.exportTask.deleteSuccess'));
-    } catch (e: any) {
+    } catch (e: unknown) {
       onToast('error', t('ow.exportTask.deleteError'));
     } finally {
       setBusyIds(prev => {

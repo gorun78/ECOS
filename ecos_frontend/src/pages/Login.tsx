@@ -15,6 +15,7 @@ import {
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import { authLogin, setAuthGracePeriod } from "../api";
+import { fetchAuthMeWithToken } from "../services/auth";
 
 export default function Login() {
   const { t } = useLanguage();
@@ -68,10 +69,7 @@ export default function Login() {
 
       // Fetch and persist userId for security profile API
       try {
-        const meResp = await fetch("/api/v1/auth/me", {
-          headers: { Authorization: `Bearer ${data.accessToken}` },
-        });
-        const meJson = await meResp.json();
+        const meJson = (await fetchAuthMeWithToken(data.accessToken)) as { data?: { userId?: string } };
         if (meJson?.data?.userId) {
           localStorage.setItem("ecos_user_id", meJson.data.userId);
         }

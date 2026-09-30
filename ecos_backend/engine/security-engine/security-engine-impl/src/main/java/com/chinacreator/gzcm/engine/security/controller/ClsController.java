@@ -36,7 +36,7 @@ public class ClsController {
             return ApiResponse.success(clsService.getColumns(tableName, userId, allColumns));
         } catch (Exception e) {
             log.error("CLS列权限查询失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -59,7 +59,7 @@ public class ClsController {
             return ApiResponse.success(clsService.createPolicy(body));
         } catch (Exception e) {
             log.error("创建CLS策略失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 

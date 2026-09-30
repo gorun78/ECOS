@@ -47,7 +47,7 @@ public class ConfigController {
             return ApiResponse.success(result);
         } catch (Throwable e) {
             log.error("查询配置失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -60,7 +60,7 @@ public class ConfigController {
             return c == null ? ApiResponse.notFound("配置不存在") : ApiResponse.success(c);
         } catch (Throwable e) {
             log.error("查询配置失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -73,7 +73,7 @@ public class ConfigController {
             return ApiResponse.success(configService.createConfig(config));
         } catch (Throwable e) {
             log.error("创建配置失败", e);
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
@@ -85,7 +85,7 @@ public class ConfigController {
             return ApiResponse.success(configService.updateConfig(id, config));
         } catch (Throwable e) {
             log.error("更新配置失败", e);
-            return ApiResponse.internalError("更新失败: " + e.getMessage());
+            return ApiResponse.internalError("更新失败");
         }
     }
 
@@ -98,7 +98,7 @@ public class ConfigController {
             return ApiResponse.success(Map.of("success", true));
         } catch (Throwable e) {
             log.error("删除配置失败", e);
-            return ApiResponse.internalError("删除失败: " + e.getMessage());
+            return ApiResponse.internalError("删除失败");
         }
     }
 
@@ -110,7 +110,7 @@ public class ConfigController {
             return ApiResponse.success(versionService.listVersions(id));
         } catch (Throwable e) {
             log.error("查询版本历史失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 }

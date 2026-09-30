@@ -90,7 +90,7 @@ public class ObjectRelationshipController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to create relationship for {}/{}: {}", entityCode, id, e.getMessage());
-            return ApiResponse.internalError("关系创建失败: " + e.getMessage());
+            return ApiResponse.internalError("关系创建失败");
         }
     }
 
@@ -127,7 +127,7 @@ public class ObjectRelationshipController {
             return ApiResponse.success(graph);
         } catch (Exception e) {
             log.error("Failed to build graph for {}/{}: {}", entityCode, id, e.getMessage());
-            return ApiResponse.internalError("图谱生成失败: " + e.getMessage());
+            return ApiResponse.internalError("图谱生成失败");
         }
     }
 }

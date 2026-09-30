@@ -4,8 +4,12 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { Plus, List, Loader2 } from 'lucide-react';
 import type { DataConnection, DataPipeline, DataSyncTask } from '../types';
+import type { PipelineData } from '../pipeline-editor/types';
+import type { PbOutput } from '../hooks/useDataWorkbench';
+import type { SetStateAction } from 'react';
 import PipelineFlowEditor from '../PipelineFlowEditor';
 import { getPipelineDefinition } from '../api';
+import { getErrorMessage } from '../helpers';
 
 interface PipelineBuilderTabProps {
   connections: DataConnection[];
@@ -14,8 +18,8 @@ interface PipelineBuilderTabProps {
   computeEngine: 'doris' | 'memory';
   setComputeEngine: (v: 'doris' | 'memory') => void;
   showToast: (type: string, message: string) => void;
-  pipelineBuilderOutput: any;
-  setPipelineBuilderOutput: (v: any) => void;
+  pipelineBuilderOutput: PbOutput | null;
+  setPipelineBuilderOutput: (v: SetStateAction<PbOutput | null>) => void;
   editingPipelineId: string | null;
   setEditingPipelineId: (v: string | null) => void;
   triggerSync: (taskId: string) => void;
@@ -150,7 +154,7 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
           computeEngine={computeEngine}
           onEngineChange={setComputeEngine}
           showToast={showToast}
-          onSave={async (pipeline: any) => {
+          onSave={async (pipeline: PipelineData) => {
             try {
               const { createPipeline, updatePipeline } = await import('../api');
               // PMO-3J T3: forward the full { name, nodes, edges } graph so the
@@ -169,9 +173,12 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
                 showToast('success', t('dw.pipeline.created', { name: pipeline.name }));
               }
               // Refresh the list so the new/updated pipeline appears.
-              setPipelineBuilderOutput((prev: any) => ({ ...prev, refreshTick: (prev?.refreshTick || 0) + 1 }));
-            } catch (e: any) {
-              showToast('error', t('dw.pipeline.saveFailed', { error: e.message }));
+              setPipelineBuilderOutput((prev) => ({
+                ...(prev ?? { datasetPath: '', columns: [], rowCount: 0, lastCompiled: '', expressionsCount: 0 }),
+                refreshTick: (prev?.refreshTick || 0) + 1,
+              }));
+            } catch (e) {
+              showToast('error', t('dw.pipeline.saveFailed', { error: getErrorMessage(e) }));
             }
           }}
           onExecute={async (pipelineId: string) => {
@@ -179,8 +186,8 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
               const { executePipeline } = await import('../api');
               const result = await executePipeline(pipelineId);
               showToast('success', result?.status === 'success' ? t('dw.pipeline.executeSuccess') : t('dw.pipeline.executeTriggered'));
-            } catch (e: any) {
-              showToast('error', t('dw.pipeline.executeFailed', { error: e.message }));
+            } catch (e) {
+              showToast('error', t('dw.pipeline.executeFailed', { error: getErrorMessage(e) }));
             }
           }}
         />

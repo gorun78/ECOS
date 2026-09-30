@@ -315,6 +315,8 @@ public class SecurityEngineClient {
                 return auth.getName();
             }
         } catch (Exception ignored) {
+            // fail-safe：退化为 anonymous 走最小权限，而非伪造真实主体
+            log.debug("SecurityEngineClient: 读取 SecurityContext 失败，主体退化为 anonymous: {}", ignored.getMessage());
         }
         return "anonymous";
     }

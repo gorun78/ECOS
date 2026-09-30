@@ -119,14 +119,14 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
       // Trigger entity linking after approval
       try { await apiFetch('/v1/kb/entity/link', { method: 'POST', body: JSON.stringify({extractionId}) }); } catch {}
       setDone(true);
-    } catch(e: any) { console.warn('Approve failed:', e); }
+    } catch(e: unknown) { console.warn('Approve failed:', e); }
     finally { setSubmitting(false); }
   }, [extractionId, selectedEntities, selectedRelations, selectedRules]);
 
   const handleReject = useCallback(async () => {
     setSubmitting(true);
     try { await apiFetch(`/v1/kb/extraction/${extractionId}/reject`, { method: 'POST' }); setDone(true); }
-    catch(e: any) { console.warn('Reject failed:', e); }
+    catch(e: unknown) { console.warn('Reject failed:', e); }
     finally { setSubmitting(false); }
   }, [extractionId]);
 

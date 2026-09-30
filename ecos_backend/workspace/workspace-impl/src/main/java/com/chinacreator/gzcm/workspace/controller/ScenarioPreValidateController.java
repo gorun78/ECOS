@@ -47,37 +47,26 @@ public class ScenarioPreValidateController {
     }
 
     @PostMapping("/{id}/pre-validate")
-    public ApiResponse<List<Map<String, Object>>> preValidate(@PathVariable("id") String scenarioId) {
-        List<Map<String, Object>> checks = new ArrayList<>();
+    public ApiResponse<List<PreValidateCheckVO>> preValidate(@PathVariable("id") String scenarioId) {
+        List<PreValidateCheckVO> checks = new ArrayList<>();
         checks.add(checkMind(scenarioId));
         checks.add(checkSandboxCoverage(scenarioId));
         checks.add(checkResources(scenarioId));
-
-        boolean allPass = checks.stream().allMatch(c -> Boolean.TRUE.equals(c.get("pass")));
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("scenarioId", scenarioId);
-        summary.put("allPass", allPass);
-        summary.put("checks", checks);
         return ApiResponse.success(checks);
     }
 
-    private Map<String, Object> checkMind(String scenarioId) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", "mind");
+    private PreValidateCheckVO checkMind(String scenarioId) {
         ScenarioMindVO active = mindService.getActiveMind(scenarioId);
         boolean pass = active != null;
-        result.put("pass", pass);
-        result.put("detail", pass ? "active_mind present (id=" + active.getId() + ")"
-               : "no active mind for scenario");
-        return result;
+        return new PreValidateCheckVO("mind", pass,
+                pass ? "active_mind present (id=" + active.getId() + ")"
+                     : "no active mind for scenario");
     }
 
-    private Map<String, Object> checkSandboxCoverage(String scenarioId) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", "sandbox_coverage");
-        SandboxLayoutVO layout = sandboxLayoutService.getLayout(scenarioId);
+    private PreValidateCheckVO checkSandboxCoverage(String scenarioId) {
         boolean pass = false;
         String detail = "no sandbox layout found";
+        SandboxLayoutVO layout = sandboxLayoutService.getLayout(scenarioId);
         if (layout != null && layout.getLayout() != null) {
             @SuppressWarnings("unchecked")
             Map<String, Object> layoutMap = (Map<String, Object>) layout.getLayout();
@@ -98,17 +87,12 @@ public class ScenarioPreValidateController {
             pass = missing.isEmpty();
             detail = pass ? "all 6 categories present" : "missing: " + String.join(", ", missing);
         }
-        result.put("pass", pass);
-        result.put("detail", detail);
-        return result;
+        return new PreValidateCheckVO("sandbox_coverage", pass, detail);
     }
 
-    private Map<String, Object> checkResources(String scenarioId) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", "bindings_exist");
+    private PreValidateCheckVO checkResources(String scenarioId) {
         // 简化：检查 binding 记录非空即可（具体 6 类 resource reachability 由 Options Controller 联查保障）
-        result.put("pass", true);
-        result.put("detail", "bindings check delegated to /available/* endpoints (deferred reachability check)");
-        return result;
+        return new PreValidateCheckVO("bindings_exist", true,
+                "bindings check delegated to /available/* endpoints (deferred reachability check)");
     }
 }

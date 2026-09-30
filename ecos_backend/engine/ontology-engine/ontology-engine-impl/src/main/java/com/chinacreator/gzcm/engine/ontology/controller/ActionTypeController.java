@@ -115,7 +115,7 @@ public class ActionTypeController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("ActionType execute failed: id={}", id, e);
-            return ApiResponse.internalError("Execution failed: " + e.getMessage());
+            return ApiResponse.internalError("Execution failed");
         }
     }
 

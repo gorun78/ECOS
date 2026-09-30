@@ -25,11 +25,7 @@ public class DbBlacklistStore implements BlacklistStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbBlacklistStore.class);
 
-    private static final String CREATE_TABLE_SQL =
-        "CREATE TABLE IF NOT EXISTS sys_token_blacklist (" +
-        "  token TEXT PRIMARY KEY," +
-        "  expire_at BIGINT NOT NULL" +
-        ")";
+    // H8-T1: sys_token_blacklist 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL。
 
     private static final String INSERT_SQL =
         "INSERT INTO sys_token_blacklist (token, expire_at) VALUES (?, ?) " +
@@ -50,12 +46,11 @@ public class DbBlacklistStore implements BlacklistStore {
     @PostConstruct
     public void init() {
         try {
-            jdbcTemplate.execute(CREATE_TABLE_SQL);
-            // 清理已过期项
+            // 表由 db/migration（V162）维护；此处仅清理已过期项（DML，非 DDL）
             jdbcTemplate.update(CLEAN_EXPIRED_SQL, System.currentTimeMillis());
-            log.info("DbBlacklistStore 初始化完成，sys_token_blacklist 表已就绪");
+            log.info("DbBlacklistStore 初始化完成，已清理 sys_token_blacklist 过期项");
         } catch (Exception e) {
-            log.warn("DbBlacklistStore 初始化失败（表创建/清理），降级为纯内存模式: {}", e.getMessage());
+            log.warn("DbBlacklistStore 初始化失败（表缺失/清理），降级为纯内存模式: {}", e.getMessage());
         }
     }
 

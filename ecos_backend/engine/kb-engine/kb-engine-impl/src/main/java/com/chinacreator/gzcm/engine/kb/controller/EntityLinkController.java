@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.kb.dto.EntityLinkRequestDTO;
+import com.chinacreator.gzcm.engine.kb.dto.EntityLinkResultVO;
 import com.chinacreator.gzcm.engine.kb.service.EntityLinkerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,20 +30,34 @@ public class EntityLinkController {
 
     /**
      * 手动触发实体链接 — 输入实体名+类型，返回本体映射结果。
+     *
+     * <p>PMO-74 H11-T4：出入参由 {@code Map<String,Object>} 收口为
+     * {@link EntityLinkRequestDTO} / {@link EntityLinkResultVO}（wire JSON 键名不变）。</p>
      */
     @PostMapping("/entity/link")
-    public ApiResponse<Map<String, Object>> linkEntity(@RequestBody Map<String, Object> request) {
+    public ApiResponse<EntityLinkResultVO> linkEntity(@RequestBody EntityLinkRequestDTO request) {
         try {
-            String entityName = (String) request.get("entityName");
-            String entityType = (String) request.getOrDefault("entityType", "unknown");
+            String entityName = request.getEntityName();
+            String entityType = request.getEntityType() != null ? request.getEntityType() : "unknown";
             if (entityName == null || entityName.isBlank()) {
                 return ApiResponse.badRequest("entityName is required");
             }
             Map<String, Object> result = entityLinkerService.linkEntity(entityName, entityType);
-            return ApiResponse.success(result);
+            EntityLinkResultVO vo = new EntityLinkResultVO();
+            vo.setEntityName(asString(result.get("entityName")));
+            vo.setEntityType(asString(result.get("entityType")));
+            vo.setOntologyPath(asString(result.get("ontologyPath")));
+            Object conf = result.get("confidence");
+            vo.setConfidence(conf instanceof Number n ? n.doubleValue() : null);
+            vo.setMessage(asString(result.get("message")));
+            return ApiResponse.success(vo);
         } catch (Exception e) {
             log.error("实体链接失败: {}", e.getMessage(), e);
             return ApiResponse.badRequest("链接失败: " + e.getMessage());
         }
+    }
+
+    private static String asString(Object v) {
+        return v == null ? null : String.valueOf(v);
     }
 }

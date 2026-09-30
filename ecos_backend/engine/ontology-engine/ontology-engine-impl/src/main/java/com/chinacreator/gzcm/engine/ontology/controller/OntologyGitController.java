@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitResultVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitSaveDTO;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,7 +36,8 @@ import java.util.Map;
 public class OntologyGitController {
 
     /** Controller 层 Map → VO 转换用的 Jackson Mapper（static 单例，零开销）。 */
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private final OntologyGitService gitService;
 
@@ -69,8 +71,11 @@ public class OntologyGitController {
     // ═══════════════ 内部转换（强类型 ↔ service 旧 Map 契约）═══════════════
 
     /**
-     * DTO → service 旧 Map 入参（仅透传 service 消费的 message/url 两键；
-     * 缺省时 service 走 getOrDefault 默认值路径，与既有行为等价）。
+     * DTO → service 旧 Map 入参：透传 commit 归档所需的强类型键
+     * （repositoryId 服务端仓库定位 / assetType / versionNo / content 版本快照内容 / message）。
+     *
+     * <p>安全（P0 红线）：客户端 {@code url} 不再作为 clone 依据透传；仓库仅由服务端
+     * {@code repositoryId} 注册表定位。{@code url} 字段保留仅为兼容既有请求契约。
      */
     private Map<String, Object> toBody(OntologyGitSaveDTO dto) {
         Map<String, Object> body = new LinkedHashMap<>();
@@ -78,8 +83,17 @@ public class OntologyGitController {
             if (dto.getMessage() != null) {
                 body.put("message", dto.getMessage());
             }
-            if (dto.getUrl() != null) {
-                body.put("url", dto.getUrl());
+            if (dto.getRepositoryId() != null) {
+                body.put("repositoryId", dto.getRepositoryId());
+            }
+            if (dto.getAssetType() != null) {
+                body.put("assetType", dto.getAssetType());
+            }
+            if (dto.getVersionNo() != null) {
+                body.put("versionNo", dto.getVersionNo());
+            }
+            if (dto.getContent() != null) {
+                body.put("content", dto.getContent());
             }
         }
         return body;

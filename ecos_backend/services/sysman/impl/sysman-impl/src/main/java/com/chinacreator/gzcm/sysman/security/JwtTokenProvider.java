@@ -191,7 +191,9 @@ public class JwtTokenProvider {
      * 否则直接视作纯 Base64 编码的 DER 字节进行解码。
      */
     private byte[] decodePemOrBase64(String input, Pattern pemPattern) {
-        Matcher matcher = pemPattern.matcher(input);
+        // start-backend.ps1 以字面量 "\n" 传递 PEM 换行（环境变量无法承载真实换行），先还原为真实换行
+        String normalized = input.replace("\\r\n", "\n").replace("\\n", "\n").replace("\\r", "\n");
+        Matcher matcher = pemPattern.matcher(normalized);
         if (matcher.find()) {
             // PEM 格式：提取头部/尾部之间的 Base64 内容
             String base64Body = matcher.group(1)
@@ -199,7 +201,7 @@ public class JwtTokenProvider {
             return Base64.getDecoder().decode(base64Body);
         }
         // 纯 Base64（可能包含换行）
-        String clean = input.replaceAll("\\s", "");
+        String clean = normalized.replaceAll("\\s", "");
         return Base64.getDecoder().decode(clean);
     }
 }

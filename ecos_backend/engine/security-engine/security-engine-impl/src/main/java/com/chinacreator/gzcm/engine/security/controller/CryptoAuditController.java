@@ -43,7 +43,7 @@ public class CryptoAuditController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("记录加密审计失败", e);
-            return ApiResponse.internalError("记录失败: " + e.getMessage());
+            return ApiResponse.internalError("记录失败");
         }
     }
 
@@ -63,7 +63,7 @@ public class CryptoAuditController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询加密审计日志失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -75,7 +75,7 @@ public class CryptoAuditController {
             return ApiResponse.success(entry);
         } catch (Exception e) {
             log.error("查询加密审计详情失败", e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return ApiResponse.internalError("查询失败");
         }
     }
 
@@ -86,7 +86,7 @@ public class CryptoAuditController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("链验证失败", e);
-            return ApiResponse.internalError("验证失败: " + e.getMessage());
+            return ApiResponse.internalError("验证失败");
         }
     }
 }

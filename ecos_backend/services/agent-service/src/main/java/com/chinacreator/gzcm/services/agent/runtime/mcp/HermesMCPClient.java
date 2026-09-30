@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -15,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Hermes MCP Client — stdio-based JSON-RPC bridge to ECOS Hermes MCP Server.
  *
- * Talks to Python process: python3 /engine/ecos-mcp-server.py
+ * Talks to Python process: python3 tools/ecos-mcp-server.py
  * Protocol: MCP JSON-RPC 2.0, one JSON object per line over stdin/stdout.
  */
 @Component("ecosHermesMCPClient")
@@ -24,7 +25,7 @@ public class HermesMCPClient implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(HermesMCPClient.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private final String pythonPath = "python3";
+    private final String pythonPath;
     private final String serverScript;
     private Process process;
     private BufferedWriter writer;
@@ -33,8 +34,11 @@ public class HermesMCPClient implements Closeable {
     private volatile boolean initialized = false;
     private boolean available = false;
 
-    public HermesMCPClient() {
-        this.serverScript = "/home/guorongxiao/ECOS/ecos_backend/engine/ecos-mcp-server.py";
+    public HermesMCPClient(
+            @Value("${ecos.mcp.python:python3}") String pythonPath,
+            @Value("${ecos.mcp.server-script:tools/ecos-mcp-server.py}") String serverScript) {
+        this.pythonPath = pythonPath;
+        this.serverScript = serverScript;
     }
 
     /** Lazy init — only starts MCP server on first tool call. */
@@ -134,7 +138,12 @@ public class HermesMCPClient implements Closeable {
     public synchronized void close() {
         if (process != null) {
             process.destroy();
-            try { process.waitFor(); } catch (InterruptedException ignored) {}
+            try {
+                process.waitFor();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                log.warn("MCP 子进程退出等待被中断，强制继续关闭: {}", ie.getMessage());
+            }
             process = null;
         }
     }

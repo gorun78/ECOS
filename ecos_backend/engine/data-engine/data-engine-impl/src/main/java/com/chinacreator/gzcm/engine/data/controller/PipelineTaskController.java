@@ -45,7 +45,7 @@ public class PipelineTaskController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("创建任务失败", e);
-            return ApiResponse.internalError("创建任务失败: " + e.getMessage());
+            return ApiResponse.internalError("创建任务失败");
         }
     }
 
@@ -58,7 +58,7 @@ public class PipelineTaskController {
             return ApiResponse.success(taskService.listTasks(page, pageSize));
         } catch (Exception e) {
             log.error("列出任务失败", e);
-            return ApiResponse.internalError("列出任务失败: " + e.getMessage());
+            return ApiResponse.internalError("列出任务失败");
         }
     }
 
@@ -71,7 +71,7 @@ public class PipelineTaskController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("获取任务详情失败: id={}", id, e);
-            return ApiResponse.internalError("获取任务详情失败: " + e.getMessage());
+            return ApiResponse.internalError("获取任务详情失败");
         }
     }
 
@@ -85,7 +85,7 @@ public class PipelineTaskController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("更新任务失败: id={}", id, e);
-            return ApiResponse.internalError("更新任务失败: " + e.getMessage());
+            return ApiResponse.internalError("更新任务失败");
         }
     }
 
@@ -99,7 +99,7 @@ public class PipelineTaskController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("删除任务失败: id={}", id, e);
-            return ApiResponse.internalError("删除任务失败: " + e.getMessage());
+            return ApiResponse.internalError("删除任务失败");
         }
     }
 
@@ -113,7 +113,7 @@ public class PipelineTaskController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("触发执行失败: id={}", id, e);
-            return ApiResponse.internalError("触发执行失败: " + e.getMessage());
+            return ApiResponse.internalError("触发执行失败");
         }
     }
 
@@ -128,7 +128,7 @@ public class PipelineTaskController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("取消执行失败: runId={}", runId, e);
-            return ApiResponse.internalError("取消执行失败: " + e.getMessage());
+            return ApiResponse.internalError("取消执行失败");
         }
     }
 
@@ -139,7 +139,7 @@ public class PipelineTaskController {
             return ApiResponse.success(taskService.getRuns(id));
         } catch (Exception e) {
             log.error("获取执行历史失败: taskId={}", id, e);
-            return ApiResponse.internalError("获取执行历史失败: " + e.getMessage());
+            return ApiResponse.internalError("获取执行历史失败");
         }
     }
 
@@ -152,7 +152,7 @@ public class PipelineTaskController {
             return ApiResponse.notFound(e.getMessage());
         } catch (Exception e) {
             log.error("获取执行详情失败: runId={}", runId, e);
-            return ApiResponse.internalError("获取执行详情失败: " + e.getMessage());
+            return ApiResponse.internalError("获取执行详情失败");
         }
     }
 
@@ -163,7 +163,7 @@ public class PipelineTaskController {
             return ApiResponse.success(taskService.getRunSteps(runId));
         } catch (Exception e) {
             log.error("获取执行步骤失败: runId={}", runId, e);
-            return ApiResponse.internalError("获取执行步骤失败: " + e.getMessage());
+            return ApiResponse.internalError("获取执行步骤失败");
         }
     }
 }

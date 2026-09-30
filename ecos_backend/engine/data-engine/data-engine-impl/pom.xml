@@ -32,18 +32,26 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- PMO-49: security-engine crypto (IDataEncryptionService / IKeyManagementService)
-             for datasource password encryption (dataSourcePwd key → td_datasource.password_enc) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- PMO-74 H3-T-ARCH 补漏：裁决 C 把编译期直依改为 runtime-core 反射出口后，加解密实现类
+             仍必须出现在各部署 JAR 的运行时 classpath，否则 SecurityCryptoEgress 解析不到
+             IDataEncryptionService，数据源密码静默降级为明文落库（fail-soft，编译与单测均不可见）。
+             HEAD 版本依赖为 compile scope；datanet / buszhi / workspace-service / data-engine-boot
+             均以 compile scope 直依本模块，故经此传递获得该类。
+             实测（BOOT-INF/lib 计数）：删除后 datanet jar = 349 条 / security-engine 0 条；
+             改回 runtime scope 后 = 351 条 / 2 条（control: gateway 直依 = 2 条）。
+             runtime scope 不进编译 classpath，故 engine-impl 之间无代码依赖，
+             ArchUnit shouldNotDependOnOtherEngines 保持 0 违例。 -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>security-engine-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-
-                <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>runtime-core</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <scope>runtime</scope>
         </dependency>
 <!-- DataNet API + Impl (for existing service implementations) -->
 

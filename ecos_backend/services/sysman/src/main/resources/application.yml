@@ -17,7 +17,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       minimum-idle: 5
@@ -30,9 +30,6 @@ spring:
 
   flyway:
     enabled: false
-  jpa:
-    hibernate:
-      ddl-auto: none
 
   # Neo4j (standard 档 standard 无 Neo4j, 但 classpath 有 driver 会自动探测)
   # PMO-49 Q2: 补凭据给 Neo4jReactiveHealthIndicator (避免 health DOWN 因 auth scheme none)
@@ -41,7 +38,7 @@ spring:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:neo4j123}
+      password: ${NEO4J_PASSWORD:}
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
@@ -59,7 +56,8 @@ ecos:
   header-auth:
     enabled: false
 
-# 认证配置 (与 gateway 同款: whitelist 已在 gateway, 本 service 侧 SecurityConfig 独立声明)
+# 认证配置 (PMO-74 H9-T5c 更正: gateway 侧 auth.whitelist 块已删除, "同款"前提不成立;
+# 本 auth.enabled 全仓无存活 Java 消费方 —— H9-T5b 实测, 是否删除待 T5e 裁决)
 auth:
   enabled: true
 
@@ -78,13 +76,13 @@ jwt:
   private-key: ${JWT_PRIVATE_KEY:}
   public-key: |
     -----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowZc56deVTWoP3/J0csp
-    wIT60GM0qQbt1/SeEifcbImYr8B+ImvUMfO5mlba/h9ZCWJJdlsgX6qLq9TNKMCo
-    c8P3LDZ7jDikVOYHD40njdXHYu+nM5y3XHLDD3qNl8+qr7GfvCn6asXx6rOmO66V
-    UJ3h1zCzPnGbyfKfOmahnMA2l7WcCrzg1HwbSPopnaQrMPjPGLqezACSOv0289mK
-    iRAwSwfte0+Sf3YZcd4HbqNn4muSH5XY8+JKYAxwjZ+luw4wZFak502W7omVNie3
-    5EPhuY4zaMDG1n6+kz5BiB+7zbIuECUgsDdA5V7L/nAJwO10pwuHIDb45jWu47hn
-    BQIDAQAB
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvEI22S2DKpNWUkfxmxix
+    zetUGcNX0Q41eHuBqt4zeUmv5rPvsP41AjkF6NffpyGsUrICWYDuhNcLa/R95zFN
+    BH+4UKhQ1DbN8PZ6ongCHTIk9+u4SsvwrO4yzqt5pxIklc9h8P7hdsZk+gYYYGYb
+    /wiAVpPIp3ZlBQhUXo63udUdfRN337eS3WvF93eO4axNJUCGXe6Wn6SBWjB1kSIk
+    dG0Hp9x5kuUZM1G/v2CoOoQx0Az/IszAVGF9SCFwDnd6heyYLwquNkiUj+8NCIrC
+    9pHS3/Q9xhJ0/EnxTqQu7waAV8hIQXXH0ntbPjooI7QdN44HbMSPkRSF0ecKkdx3
+    4wIDAQAB
     -----END PUBLIC KEY-----
 
 management:

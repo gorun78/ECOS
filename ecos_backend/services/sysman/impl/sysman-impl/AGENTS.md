@@ -15,7 +15,7 @@ curl -s "http://localhost:8080/api/v1/system/tenants" -H "Authorization: Bearer 
 ```
 
 ## 接 DB 表
-`sysman_user` / `sysman_role` / `sysman_dict` / `ecos_tenant` (V37 统一租户) / `ecos_sys_config` (V13 + V40 enhance); 异常统一 `GlobalExceptionHandler` (sysman-boot), 返回 `ApiResponse` 标准体。
+`TD_USER` / `TD_ROLE` / `sys_dict` / `sys_config` / `ecos_tenant` (实测表名，2026-09-28 逐表 grep 本模块 src/main 核对：TD_USER 64 / TD_ROLE 30 / sys_dict 8 / sys_config 30 / ecos_tenant 39 命中；旧写法 `sysman_user`/`sysman_role`/`sysman_dict`/`ecos_sys_config` 命中均 0，作废); DDL 溯源：`ecos_tenant` = V37__ecos_tenant_unified.sql，`sys_config` = V13__ecos_sys_config.sql（文件名带 `ecos_` 前缀、建表名为 `sys_config`）; 异常统一 `GlobalExceptionHandler` (sysman-boot), 返回 `ApiResponse` 标准体。
 
 ## 别接 (调谁, 已核)
 - 安全裁决不在此出: 登录锁定/审计链/ABAC 全打 security-engine REST (铁律 2.4), sysman 只做 IAM 账户/角色 CRUD 与查询

@@ -150,7 +150,7 @@ public class NLQController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("NLQ 查询失败", e);
-            return ApiResponse.internalError("查询执行失败: " + e.getMessage());
+            return ApiResponse.internalError("查询执行失败");
         }
     }
 

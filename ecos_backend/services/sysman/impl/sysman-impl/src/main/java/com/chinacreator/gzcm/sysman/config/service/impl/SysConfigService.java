@@ -38,35 +38,12 @@ public class SysConfigService {
 
     @PostConstruct
     public void init() {
-        ensureSchema();
+        // H8-T1: sys_config 扩展列（config_group/description/config_type/config_label/
+        // sort_order/edition/status）及 ecos_pipeline_function / ecos_pipeline_udf 建表 DDL
+        // 收编至 db/migration（V162），运行时不再内嵌 DDL；仅保留默认配置种子与缓存刷新。
         ensureDefaultConfigs();
         refreshCache();
         log.info("SysConfigService 初始化完成，已加载 {} 条配置", cache.estimatedSize());
-    }
-
-    /** 确保 sys_config 表有新字段 (config_group, description, config_type) */
-    private void ensureSchema() {
-        try {
-            jdbcTemplate.execute("ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS config_group VARCHAR(50) DEFAULT 'general'");
-            jdbcTemplate.execute("ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS description TEXT");
-            jdbcTemplate.execute("ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS config_type VARCHAR(20) DEFAULT 'string'");
-            // Pipeline 2.0 tables
-            jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS ecos_pipeline_function (" +
-                "  id VARCHAR(36) PRIMARY KEY, name VARCHAR(100) NOT NULL UNIQUE," +
-                "  category VARCHAR(50) NOT NULL, signature TEXT, return_type VARCHAR(50)," +
-                "  description TEXT, example TEXT, is_builtin BOOLEAN DEFAULT true," +
-                "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-            jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS ecos_pipeline_udf (" +
-                "  id VARCHAR(36) PRIMARY KEY, name VARCHAR(200) NOT NULL UNIQUE," +
-                "  category VARCHAR(50), language VARCHAR(20) DEFAULT 'python'," +
-                "  signature TEXT, source_code TEXT NOT NULL, compiled_path VARCHAR(500)," +
-                "  version INTEGER DEFAULT 1, author VARCHAR(100), is_shared BOOLEAN DEFAULT false," +
-                "  description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP)");
-        } catch (Exception e) {
-            log.error("扩展 sys_config 表结构失败: {}", e.getMessage());
-        }
     }
 
     /** 确保数据引擎默认配置已入库 (ON CONFLICT 语义) */

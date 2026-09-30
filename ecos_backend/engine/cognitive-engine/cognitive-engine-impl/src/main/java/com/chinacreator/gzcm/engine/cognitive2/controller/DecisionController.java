@@ -48,7 +48,7 @@ public class DecisionController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to record decision", e);
-            return ApiResponse.internalError("Failed to record decision: " + e.getMessage());
+            return ApiResponse.internalError("Failed to record decision");
         }
     }
 
@@ -73,7 +73,7 @@ public class DecisionController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to add causal relationship", e);
-            return ApiResponse.internalError("Failed to link: " + e.getMessage());
+            return ApiResponse.internalError("Failed to link");
         }
     }
 
@@ -91,7 +91,7 @@ public class DecisionController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to find similar decisions", e);
-            return ApiResponse.internalError("Failed to find similar: " + e.getMessage());
+            return ApiResponse.internalError("Failed to find similar");
         }
     }
 
@@ -107,7 +107,7 @@ public class DecisionController {
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("Failed to trace decision chain", e);
-            return ApiResponse.internalError("Failed to trace chain: " + e.getMessage());
+            return ApiResponse.internalError("Failed to trace chain");
         }
     }
 
@@ -119,7 +119,7 @@ public class DecisionController {
             return ApiResponse.success(impact);
         } catch (Exception e) {
             log.error("Failed to analyze impact", e);
-            return ApiResponse.internalError("Failed to analyze impact: " + e.getMessage());
+            return ApiResponse.internalError("Failed to analyze impact");
         }
     }
 
@@ -131,7 +131,7 @@ public class DecisionController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to check decision rules", e);
-            return ApiResponse.internalError("Failed to check rules: " + e.getMessage());
+            return ApiResponse.internalError("Failed to check rules");
         }
     }
 

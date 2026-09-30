@@ -92,7 +92,7 @@ public class ObjectStateMachineController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("Transition execution failed for {}/{}: {}", entityCode, id, e.getMessage());
-            return ApiResponse.internalError("状态转换失败: " + e.getMessage());
+            return ApiResponse.internalError("状态转换失败");
         }
     }
 
@@ -137,7 +137,7 @@ public class ObjectStateMachineController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("Failed to get state machine for {}: {}", entityCode, e.getMessage());
-            return ApiResponse.internalError("获取状态机定义失败: " + e.getMessage());
+            return ApiResponse.internalError("获取状态机定义失败");
         }
     }
 
@@ -154,7 +154,7 @@ public class ObjectStateMachineController {
             return ApiResponse.success(engine.createDefinition(body));
         } catch (Exception e) {
             log.error("Failed to create state machine def: {}", e.getMessage());
-            return ApiResponse.internalError("创建失败: " + e.getMessage());
+            return ApiResponse.internalError("创建失败");
         }
     }
 
