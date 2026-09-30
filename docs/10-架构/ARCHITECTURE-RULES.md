@@ -265,7 +265,9 @@ enterprise  → PG + Neo4j (因果链>3层启用图谱)
 ultimate    → PG + Neo4j + Doris (单表>100万行启用列存)
 ```
 
-**不加新Maven模块(基线13)、不加新Docker容器(基线已定)**
+**不加新Maven模块(基线 = **7 部署 JAR + 48 reactor 构建模块**；原「13」表述系不可枚举口径，2026-09-28 Q5 裁决作废。部署 JAR 7 = gateway + services/{sysman,datanet,buszhi,aiming,dccheng} + workspace/workspace-service；reactor 构建模块 48 = 根 pom 11 条 `<module>` 递归解析实测)、不加新Docker容器(基线已定)**
+
+> Q5 实测命令（2026-09-28）：`find ecos_backend -name pom.xml -not -path "*/target/*" | wc -l` = **53**（= 48 reactor + 根聚合 1 + 未挂聚合遗留幽灵 4，见 `ecos_backend/pom.xml:430-434` PMO-49 注记）；解析根 `pom.xml` `<modules>` 顶层条目 = **11**，递归展开 = **48**；另 6 个 `engine/*-boot` + `sysman-boot` 为 dev 调试启动器，不计入部署 JAR。
 
 ### 0.5 三工作台职责边界铁律（🔴 2026-09-19 新增）
 
@@ -529,7 +531,7 @@ runtime 是「器」（横切底座），提供全局基础设施能力，各引
 - **控制域Schema归属（5+1，v1.8）**：引擎控制数据仅独立 `ecos_data`/`ecos_ontology`/`ecos_knowledge`/`ecos_ai`/`ecos_cognitive` 五个；其余控制数据统一主控制 schema（现基线 `public`，迁移目标 `ecos_control`）。红线细则见《数据库访问规范》v1.1 §二附（ST07~ST09）
 - **多库兼容目标（v1.8）**：控制域以 PG 为当前唯一已认证库，新代码必须可兼容 MySQL/Oracle/MSSQL/达梦/人大金仓（MC01~MC06）；OLAP（Doris∨ClickHouse）与向量/pgvector 属业务域专用承载，控制域禁入
 
-### 3.2 Neo4j (enterprise/flagship)
+### 3.2 Neo4j (enterprise/ultimate)（原 flagship 别名已弃用，2026-09-28 PMO-74 H5）
 
 - cognitive-engine的因果链>3层场景使用
 - **Cypher只读+超时10s+结果上限1000节点**
@@ -692,7 +694,7 @@ V4浏览器E2E必查三项：页面渲染无ErrorBoundary、console无error、ne
 | `env -i`清空环境后显式设置HOME/PATH/JAVA_HOME | Hermes重定向HOME致UNC路径双写bug |
 | Maven用WSL原生路径`~/.m2`，不用`/mnt/d/` | Windows文件系统性能差+路径问题 |
 | `~/start-gateway.sh`启动Gateway | 内置`unset HOME`绕bug |
-| `lsof -ti:8080 | xargs kill -9`清端口 | 不用`fuser -k`(可能误杀Docker代理) |
+| `lsof -ti:8080 \| xargs kill -9`清端口 | 不用`fuser -k`(可能误杀Docker代理) |
 | Git SSH过Clash代理: `nc -X 5 -x 127.0.0.1:7897` | WSL GitHub直连被墙 |
 
 Windows 现行环境规则见 §5.1 #13/#14 与根目录 `agents.md`（_win_tasks/ 4 入口脚本 + Get-NetTCPConnection 清端口 + Windows Docker Desktop）。

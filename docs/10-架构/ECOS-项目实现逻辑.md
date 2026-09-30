@@ -65,7 +65,7 @@ enterprise  → PG + Neo4j（因果链 >3 层启用图谱）
 ultimate    → PG + Neo4j + Doris（单表 >100 万行启用列存）
 ```
 
-**约束**：不加新 Maven 模块（基线 13），不加新 Docker 容器。
+**约束**：不加新 Maven 模块（基线 = 7 部署 JAR + 48 reactor 构建模块，2026-09-28 Q5 裁决更正原「13」），不加新 Docker 容器。
 
 ### 1.5 微服务 v2 架构（PMO-49，2026-09-11）
 
@@ -312,7 +312,7 @@ D（事实）→ I（语义/本体）→ K（知识）→ C（情境+证据+模�
 ### 5.6 Wave 3.1 收口关键决策
 
 - 多租户 RLS：`tenant_id VARCHAR(32)` + 二级索引，`OntologyDomainRepository` 全部 CRUD 改 RLS-aware
-- Neo4j 同步：`@Autowired(required=false) Driver` + `@Profile({"enterprise","flagship"})`，NPE 防护（driver null → disabled + reason 返回）
+- Neo4j 同步：`@Autowired(required=false) Driver` + `@Profile({"enterprise","ultimate"})`（原 flagship 别名已弃用，2026-09-28 PMO-74 H5），NPE 防护（driver null → disabled + reason 返回）
 - **0 自建 Driver**（grep 验证通过）
 
 ---
@@ -625,7 +625,7 @@ ecos_knowledge.graph_node / graph_edge  (K 层知识图谱实例)
 | # | 禁止 | 原因 |
 |:--|:--|:--|
 | 1 | 不直接 import 其他 engine-impl | 铁律 2.1，跨引擎走 REST |
-| 2 | 不新增 Maven 模块 | 铁律 0.4（基线 13） |
+| 2 | 不新增 Maven 模块 | 铁律 0.4（基线 = 7 部署 JAR + 48 reactor 构建模块，2026-09-28 Q5 裁决；原「基线 13」作废） |
 | 3 | 不新开 Docker 容器 | 铁律 0.4 |
 | 4 | 不 `new Driver`（PG/Neo4j/MinIO/Git/DuckDB） | 铁律 2.5 #1，收敛 runtime-access |
 | 5 | 不直接调 LLM Provider API | 铁律 2.5 #2，走 llm-gateway |

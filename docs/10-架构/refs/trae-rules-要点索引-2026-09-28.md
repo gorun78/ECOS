@@ -42,7 +42,7 @@
 - 命名铁律：ge/zhi/cheng/ming 只可用于服务层转化，禁用于引擎层对象管理模块；对象代码与转化逻辑不得混在同一模块。
 - 引擎 api/impl/boot 三模块；boot 仅独立调试（非生产入口），与 service 同端口互斥需 `--server.port` 错开。
 - 服务端口仅内网可达（ADR-7），直连 18081~18090 默认 DENY。
-- 三档发布（§0.4）：standard=PG / enterprise=+Neo4j（因果链>3层）/ ultimate=+Doris（单表>100万行）；不加新 Maven 模块（基线 13）、不加新 Docker 容器。
+- 三档发布（§0.4）：standard=PG / enterprise=+Neo4j（因果链>3层）/ ultimate=+Doris（单表>100万行）；不加新 Maven 模块（基线 = 7 部署 JAR + 48 reactor 构建模块，2026-09-28 Q5 裁决；原「基线 13」作废）、不加新 Docker 容器。
 
 ### 2.3 横切收敛铁律（§2.4 安全 / §2.5 runtime）
 - 安全八条：RLS 行过滤、CLS 列过滤、脱敏、OPA ABAC 裁决、写操作发 Kafka `ecos.audit`、security 不可用**默认 DENY**、禁引擎内重复实现安全、task card 涉密必列加密/解密/脱敏集成项（grep 命中 0 = FAIL）。

@@ -30,8 +30,8 @@ ECOS 微服务 v2 下存在 **7 个可部署 JAR**（gateway + 5 service + works
 
 ### 2.2 开发直连（显式开关，默认关闭）
 
-- 开发态允许 BFF 对个别慢/调试路由**直连 service 端口**，但必须由**显式环境变量开关**控制：`BFF_DIRECT_SERVICE=true`。
-- **默认 `BFF_DIRECT_SERVICE=false`** —— 即开发态默认也走 gateway，与生产一致；只有确认要调试某独立 service 时才置 true。
+- 开发态允许 BFF 对个别慢/调试路由**直连 service 端口**，但必须由**显式环境变量开关**控制：`ECOS_LOCAL_DIRECT_SERVICE_PROXY=true`（PMO-B 实际落地名；本文 v1.0 原写作 `BFF_DIRECT_SERVICE`，与 `server.ts` 实装不符，v1.1 更正）。
+- **默认 `ECOS_LOCAL_DIRECT_SERVICE_PROXY=false`** —— 即开发态默认也走 gateway，与生产一致；只有确认要调试某独立 service 时才置 true。
 - 开关打开时，BFF 仍记录 `[BFF] direct-service` 日志标记，便于排查。
 
 ### 2.3 例外审批
@@ -66,3 +66,4 @@ ECOS 微服务 v2 下存在 **7 个可部署 JAR**（gateway + 5 service + works
 | 日期 | 版本 | 变更 | 责任人 |
 |:--|:--|:--|:--|
 | 2026-09-26 | v1.0 | 初版 Accepted，固化 gateway-only external access | PMO-A |
+| 2026-09-28 | v1.1 | §2.2/§2.4 开关名更正为实装名 `ECOS_LOCAL_DIRECT_SERVICE_PROXY`（PMO-B 落地）；§4 关联补 ADR-14（确定性计算落点） | AI Agent（需求检视 Q10 自执行修正） |
