@@ -1,8 +1,9 @@
 # ECOS 后端模块清单
 
 > 来源: PMO-C | 日期: 2026-09-27 | 责任人: AI Agent
-> 版本: v1.0
+> 版本: v1.1
 > 依据: 《ECOS 架构铁律》v1.6 §0.1 部署拓扑 + §0.3 引擎层 + §0.3.1 业务服务层
+> 【2026-09-30 校订 v1.1】依据实测同步四处：① `services/agent-service` 已经 PMO-74 H11-T2 挂回根 reactor（`ecos_backend/pom.xml:434`，注释见 `:430-432`），本册原「永久 Archived」表述已过时（二 节行与"无对应目录"结论句已各加校订标记）；② 铁律依据版本已由 v1.6 升至 **v2.0**（v1.6 保留为原始依据版本，不回改）；③ 模块总数实测口径：`find ecos_backend -name pom.xml -not -path '*/target/*'` = **53**，排除 `archive/` 后 = **50**（含根聚合）；④ runtime 子模块实为 **7** 个（`runtime/pom.xml:20-26`），原列的 `common-security` 实测不存在，漏列 `runtime-core`/`runtime-event`。
 
 ---
 
@@ -25,6 +26,7 @@
 | **dccheng** | `services/dccheng` | 可运行 JAR | ✅ :18086 | kb-team | 永久 |
 | **aiming** | `services/aiming` | 可运行 JAR | ✅ :18084 | ai-team+cog-team | 永久 |
 | **workspace** | `workspace` | POM 聚合 (impl+service) | ✅ :18090 | app-team | 永久 |
+| **agent-service** | `services/agent-service` | 可构建模块（入 reactor） | ❌ 不独立部署（随 ai-engine/aiming 链路使用） | ai-team | 【2026-09-30 校订】PMO-74 H11-T2 挂回 reactor（`pom.xml:434`），消除幽灵依赖（此前 ai-engine-impl/aiming 依赖它但 reactor 未挂，全量构建实际解析 `.m2` 陈旧缓存 JAR） |
 
 ### 运行模块（独立 JAR 部署）
 
@@ -42,7 +44,7 @@
 
 | 模块 | 作用 |
 |:--|:--|
-| runtime (6 子: runtime-access / runtime-task / runtime-monitor / llm-gateway / common-api / common-security) | 横切底座 |
+| runtime (6 子: runtime-access / runtime-task / runtime-monitor / llm-gateway / common-api / common-security) | 横切底座 【2026-09-30 校订】实为 **7 子**：`runtime/pom.xml:20-26` 声明 common-api / runtime-core / runtime-monitor / runtime-task / llm-gateway / runtime-access / runtime-event；`common-security` 实测**不存在**（全仓 pom.xml 与 java 源码 0 命中）；缺失的两项是 **runtime-core** 与 **runtime-event**，多出的是不存在的 common-security。历史文本按 R9 保留不回改。 |
 | engine/*-engine-api | 对外 REST 契约 |
 | engine/*-engine-impl | 引擎业务实现 |
 | engine/*-engine-boot | 引擎启动器（@SpringBootApplication） |
@@ -57,12 +59,14 @@
 |:--|:--|:--|:--|
 | `services/sysman/impl/sysman-boot` (旧) | 4-sub-module 遗留 | 已并入 `services/sysman/impl` | N/A（已不存在） |
 | `engine/*/boot` 独立可部署 JAR | PMO-49/V1.4 前单体 8 JAR 态 | 已废，改由 gateway fat jar 内嵌 | 已完成 |
-| `agent-service` | 旧独立 agent 微服务 | **不存在于 reactor**；功能已并入 ai-engine/agent-service submodule | 永久 Archived |
+| `agent-service` | 旧独立 agent 微服务 | **不存在于 reactor**；功能已并入 ai-engine/agent-service submodule | 永久 Archived 【2026-09-30 校订】本行已过时 — 该模块经 PMO-74 H11-T2 挂回根 reactor（`pom.xml:434`，目录实存 `services/agent-service/pom.xml`），详见一 节与册头校订说明；历史文本按 R9 保留不回改 |
 | `ontology-service` | 旧独立本体服务 | **不存在于 reactor**；功能已并入 ontology-engine | 永久 Archived |
 | `identity-service` | 旧独立身份服务 | **不存在于 reactor**；功能已并入 sysman/security-engine | 永久 Archived |
 | `api-gateway` | 旧独立网关 | **不存在于 reactor**；已由 `gateway` 替换（CMD rewrite `/api/v1/*` → `/api/*`） | 永久 Archived |
 
 > ⚠️ 以上 4 个 legacy 名称在 `ecos_backend/` 下**无对应目录**（已物理清理），仅出现在 docker-compose 历史 references 和文档中。
+>
+> 【2026-09-30 校订】本句对 4 个名称中的 **3 个**成立（`ontology-service`/`identity-service`/`api-gateway` 实测目录不存在，仅存于 `archive/legacy/services-ghost/`）；`agent-service` 已不属此列 — 实测 `ecos_backend/services/agent-service/pom.xml` 存在且在根 reactor 内。历史文本按 R9 保留不回改。
 > 如未来再现同名目录，CI（Task C3）将阻断构建。
 
 ---
@@ -80,6 +84,8 @@ common (runtime + common-api + common-security)
 
 runtime ← （被 engine/services 依赖，不反向依赖）
 ```
+
+> 【2026-09-30 校订】上图 `common (runtime + common-api + common-security)` 中的 **common-security 实测不存在**（全仓 pom.xml 与 java 源码 0 命中）；横切底座实为 runtime 的 7 个子模块（含 common-api），见「Library 模块」表校订。图体按 R9 保留不回改。
 
 **禁止**：
 - workspace → services/engine 的 Maven 依赖
