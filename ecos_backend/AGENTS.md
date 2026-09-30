@@ -2,20 +2,22 @@
 
 > Java 17 + Spring Boot 3.2.2 + MyBatis + PostgreSQL | Maven multi-module | **微服务 v2 (7 独立 JAR)**
 > 代码路径 (Windows): `D:\workspace\javaprojects\ECOS\ecos_backend\` (2026-09-09 起)
-> 架构宪法: `.trae/rules/架构铁律.md` v1.3 (2026-09-11) + `docs/21-runtime/legacy-plans/current-plan.md` v1.4 + 附录 A 目标结构
-> 数据库规范: `.trae/rules/数据库访问规范.md` v1.0 (2026-09-22, IR/DR/EN/ST 共 23 条红线)
+> 架构宪法: `.trae/rules/架构铁律.md` v2.0 (2026-09-28) + `docs/40-实现/legacy-plans/current-plan.md` v1.4（历史目标结构，Phase 8 批次再对齐）+ 铁律 附录 A
+> 数据库规范: `.trae/rules/数据库访问规范.md` v1.2 (2026-09-28, IR/DR/EN/ST/MC 共 30 条红线 + ST03-A 列级加密豁免登记)
+> 数据湖规范: `.trae/rules/数据湖存储分层规范.md` v2.0 (数据域二分 + 五层 + 知识层双形态 + 版本×分层矩阵)
+> 需求基线: `docs/20-需求/PRD-00-ECOS平台需求规格说明书-2026-09-28.md`（84 项 REQ）+ `docs/20-需求/需求检视报告-2026-09-28.md` §十二（Q1~Q14 用户裁决，约束性输入）
 
 ## 产品定位
 
 **ECOS** = 企业级认知操作系统。核心链路：**数据治理 → 知识图谱 → 大模型 Agent 落地**。
 
-一套代码三套发布（Maven Profile 控制）：
+一套代码三套发布（**生效机制 = yml `spring.profiles.active`；Maven profile 仅用于依赖裁剪** — 铁律 v2.0 §3.1 / Q5 裁决）：
 
 | 版本 | 数据库 | 适用 |
 |------|--------|------|
-| standard (默认) | PostgreSQL | 中小企业 |
+| standard (默认) | PostgreSQL | 中小企业；图谱形态由 PG 表承载，**不得实启 Neo4j**（ST02） |
 | enterprise | PostgreSQL + Neo4j | 中型企业，因果链 >3 层启用图谱 |
-| ultimate/flagship | PostgreSQL + Neo4j + Doris | 大型企业，单表 >100 万行启用列存 |
+| ultimate | PostgreSQL + Neo4j + Doris ∨ ClickHouse（`dw.olap.engine` 二选一） | 大型企业，单表 >100 万行启用列存 |
 
 ## Architecture (v2 微服务态)
 
@@ -55,6 +57,7 @@ ecos_backend/
 │   ├── runtime-access/      基础设施 Driver 统一封装
 │   ├── runtime-monitor/     监控
 │   ├── runtime-task/        任务调度
+│   ├── runtime-event/       Kafka 事件总线 (PMO-50 新增, 可降级内存 fallback)
 │   └── llm-gateway/         LLM 统一网关
 ├── engine/                    (六引擎不变, api/impl/boot 三模块)
 ├── services/                  (v2 5 microservice)
@@ -118,31 +121,36 @@ workspace → (REST) → services/* → (Maven dep) → engine-impl → engine-a
 & "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipTests
 
 # 单 service 构建 (仅依赖)
-mvn -f pom.xml -pl services/sysman -am install -DskipTests
+& "D:\JavaProjects\env\apache-maven-3.9.11\bin\mvn.cmd" -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml -pl services/sysman -am install -DskipTests
 
-# 启动 gateway (monolith)
-powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\start-gateway.ps1
-
-# 启动 service (需设 $env:JWT_PRIVATE_KEY)
-& java -jar services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar --spring.profiles.active=standard
+# 启动 gateway（唯一 Spring Boot 启动器；_win_tasks 无 start-gateway.ps1，此名系历史遗留）
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\ECOS\_win_tasks\start-backend.ps1 -Modules gateway -Profile enterprise
 ```
 
-`_win_tasks/` 脚本 (禁止随意增, 架构铁律 §5.1#14):
+**根目录 `_win_tasks/` 脚本清单**（位于仓库根 `ECOS/_win_tasks/`，非 `ecos_backend/_win_tasks/`——后者已移出仓库，不得再引用；只增不改，禁止为新任务临时创建 — 铁律 §5.1#14。当前实存 8 个脚本文件）:
 | 脚本 | 用途 |
 |------|------|
-| `start-gateway.ps1` | 后端 gateway 启动 (JWT + DEEPSEEK + infra check) |
-| `fe_win.bat` | 前端 dev 启动 |
-| `gateway_run.bat` | mvn spring-boot:run 方式启动 (开发调试) |
-| `backend_resume.cmd` | 后端 stop/resume |
+| `preflight.ps1` | 启停前环境体检：工具链路径、JWT pem、DEEPSEEK key、docker 容器、端口占用、JAR 是否已构建（`-SkipDocker -SkipJars` 可跳过） |
+| `start-backend.ps1` | 启动 v2 JAR（`-Modules` 13 选 N：7 个 v2 服务 + 6 个 `*-boot` 调试引擎，boot 端口自动 +1000）；自动注入 JWT_PRIVATE_KEY + DEEPSEEK_API_KEY，清端口冲突，日志在 `_win_tasks/logs/` |
+| `stop-backend.ps1` | 按 ECOS 端口白名单（8080/18081-18086/18090/19xxx）杀监听进程；`-WithFrontend` 附带 3000 |
+| `start-frontend.ps1` | 前端 dev 启动（缺 node_modules 先 npm install；`-Build` 走生产构建） |
+| `check-legacy-modules.ps1` | 校验 v1 遗留模块引用是否残留 |
+| `db-migration-lint.ps1` | SQL 迁移脚本 lint（schema 只加不删；实跑 15 项检查，基线 0 FAIL / 8 WARN，IR01/ST03/ST06/R9 属人工审查，脚本头部已声明） |
+| `docs-migration.ps1` / `.sh` | docs 五类目录迁移辅助 |
+
+> 旧名 `fe_win.bat` / `gateway_run.bat` / `backend_resume.cmd` / `start-gateway.ps1` 均已不存在（WSL 时代脚本归档 `_legacy_wsl/`）。
 
 ## Database
 
 - **PostgreSQL 16**，库 `sys_man`，本地 `postgres/postgres`
 - **MyBatis**（Hibernate/JPA auto-config 已排除）
-- **Flyway 已禁用** (`spring.flyway.enabled: false`)，迁移脚本历史在 gateway
+- **Flyway 已禁用** (`spring.flyway.enabled: false`)；迁移脚本单源目录 = `gateway/src/main/resources/db/migration/`（铁律 v2.0 §3.1，Q7 裁决；禁分域另立目录）
 - Mapper XMLs: `classpath*:mapper/*.xml`
-- **Schema 切分 (Phase 4 预备)**：已建 5 业务 schema (`ecos_sysman` / `ecos_datanet` / `ecos_buszhi` / `ecos_dccheng` / `ecos_aiming`) — 各 service yml 的 `currentSchema` 待 Phase 4-2 切流
-- 数据迁移脚本: `ecos-docker/scripts/phase4_schema_init.{sql,sh}`
+- **Schema 归属（ST07 权威口径，取代"Phase 4-2 按 service 切流"旧路线）**：控制域只有 **5 引擎 schema**（`ecos_data`/`ecos_ontology`/`ecos_knowledge`/`ecos_ai`/`ecos_cognitive`）+ **主控制 schema**（现 `public`，目标 `ecos_control`）；业务域五层数据落 `ecos_dw`（+ MinIO / Doris∨ClickHouse）。
+  - 存量 `ecos_sysman`/`ecos_datanet`/`ecos_buszhi`/`ecos_dccheng`/`ecos_aiming`/`ecos_security`/`ecos_infra`/`ecos_dq` = **knownLegacy**：**只停写、不迁不删**（R9）；新表一律按 ST07 落 5 引擎或主控制 schema。
+  - 空壳 schema（零表）`ecos_aiming`/`ecos_buszhi`/`ecos_datanet`/`ecos_dccheng` 为按服务命名分库的历史残留，**处置=不再写入**（DROP 属 R9 禁项）。
+  - 依据：`docs/40-实现/数据库现状盘点与schema归属映射-2026-09-28.md`（665 表 / 16 schema 实测）
+- ~~数据迁移脚本: `ecos-docker/scripts/phase4_schema_init.{sql,sh}`~~（**文件不存在**，该路线已按 ST07 作废；`ecos-docker/scripts/` 实存仅 `oag-e2e-smoke.ps1` / `start-aiming.ps1`）
 
 ## 环境 (Windows)
 
@@ -158,7 +166,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 
 1. **workspace → services → engine → common 单向依赖**
 2. **Controller 只调本 service 的 Service**，跨 service 走 REST (Kafka 走 `KafkaTopics` 常量)
-3. **不新增 Maven module**（v2 基线 = 已 fixed 7 service，仅例外：新引擎/新横切底座需 PMO 审批）
+3. **不新增 Maven module**（基线 = **7 个部署 JAR + 49 个根 reactor 构建模块**，2026-09-28 Q5 裁决口径、同日 H11-T2 后由 48 增至 49；枚举措见根 `AGENTS.md`「工程结构」与 `pom.xml`；仅例外：新引擎/新横切底座需 PMO 审批）
 4. **不新增 Docker container**（compose image 基线已 fixed）
 5. **Controller 禁止直用 JdbcTemplate** — 必过 Service
 6. **服务端口仅内网可达** (ADR-7) — gateway/nginx 是唯一对外入口
@@ -171,10 +179,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 - **workspace 场景层**: ✅ :18090 UP, 封装 Twin/Alert/Task/EngineTask/EcosKnowledgeGraph (P3-C 迁入)
 - **PG Schema 预备**: ✅ 5 schema 建库验证
 - **Phase 推荐下线单档**: standard (PG only) — 默认 profile
-- **目标结构附录 A 对齐**: ⏸ Phase 8 Sprint 独立 Sprint 做 (3 个 Sprint 分级) — 不动代码保持可运行, 文档先对齐 (v1.1 铁律 + 本 AGENTS)
+- **目标结构附录 A 对齐**: ⏸ Phase 8 Sprint 独立 Sprint 做 (3 个 Sprint 分级) — 不动代码保持可运行, 文档先对齐 (架构铁律 v2.0 + 本 AGENTS)
 
 ## Key Cross-Cutting
 
-- **文件额外说明**: `sysman/sysman-boot/` 保留作 library，被 `engine/security-engine-impl` + `engine/ontology-engine-impl` POM 依赖，**不删除**
+- **文件额外说明**: `services/sysman/impl/sysman-boot/`（P8-C 后路径，原顶层 `sysman/sysman-boot/`）保留作 library，被 `engine/security-engine-impl` + `engine/ontology-engine-impl` POM 依赖，**不删除**
 - **`services/agent-service`** 保留作 aiming 双容器隔离被 AimingServiceApplication `excludeFilters` 引用，**不删除**
 - **`service/{ge,zhi,cheng,ming}`** 是四转化 API 文档占位 (每个只有 `AGENTS.md` 不含 `pom.xml`)，**不删除**，全局 API 目标见 `ecos_backend/docs/four-transformations/`
