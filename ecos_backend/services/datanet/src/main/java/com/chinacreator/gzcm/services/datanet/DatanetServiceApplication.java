@@ -44,14 +44,23 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 主封装引擎 — data-engine (土·D)
         "com.chinacreator.gzcm.engine.data",
         // 横切底座 (runtime-core 通用 mybatis/mapper/Jackson / runtime-access Driver 封装 / runtime-task 全局调度)
-        "com.chinacreator.gzcm.runtime"
+        "com.chinacreator.gzcm.runtime",
+        // data-engine GitRepoRootResolver 依赖 sysman 域 SysConfigService (唯一注入 JdbcTemplate,
+        // DataSource 自动配置即可满足) — 只补扫该实现包，并排除同包另外两个 sysman 域服务，
+        // 避免连带拖入 ConfigDao/GitService/ISystemVariableService 等 datanet 不可满足的依赖
+        "com.chinacreator.gzcm.sysman.config.service.impl"
 }, excludeFilters = {
         // PMO-49 P3-A 修正：datanet 不跨领域扫 sysman 安全域 (security 域 JwtProvider/JWT filter bean 独立启动 JWT DI 现实无运行时 JWT 注入).
         // 跨域 controller 治理：DataEngineConfigController 依赖 sysman 域 SysConfigService 具体类, 属 sysman 而非 data 职责.
         // 独立 datanet 启动下 exclude 该孤 controller, /api/v1/data-engine/config/* 暂下 (P5/6 sysman REST 补).
         // 不影响 P3-A 迁迁的 DqDashboard/Git/DataLake 三大 controller.
         @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
-                value = com.chinacreator.gzcm.engine.data.controller.DataEngineConfigController.class)
+                value = com.chinacreator.gzcm.engine.data.controller.DataEngineConfigController.class),
+        // sysman.config.service.impl 定向扫描的配套排除（理由见上方 basePackages 注释）
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
+                com.chinacreator.gzcm.sysman.config.service.impl.ConfigServiceImpl.class,
+                com.chinacreator.gzcm.sysman.config.service.impl.ConfigHotUpdateService.class
+        })
 })
 @MapperScan({
         // data-engine 主 mapper (repository / quality / datasource / pipeline)
