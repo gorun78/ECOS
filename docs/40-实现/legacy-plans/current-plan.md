@@ -145,7 +145,7 @@
 - `ecos.edition` 控制 capability switch
 - 构建时 Maven profile 选依赖集
 - 三套 docker-compose：`docker-compose.standard.yml` / `docker-compose.enterprise.yml` / `docker-compose.ultimate.yml`
-- 📌 术语统一：旗舰档命名统一为 `ultimate`（对齐铁律 §0.4），原 `flagship` 命名（compose 文件/配置）在 Phase 6 全量更名
+- 📌 术语统一：旗舰档命名统一为 `ultimate`（对齐铁律 §0.4），原 `flagship` 命名（compose 文件/配置）全量更名**已于 2026-09-28 PMO-74 H5 执行完毕，原 flagship 别名已弃用**
 
 ### ADR-7: 服务间信任与认证模式
 
@@ -501,7 +501,7 @@ gateway 清理 (最后移除已迁出的 @ComponentScan 范围)
 |---------|------|--------|
 | 0.1 | ECOS 是**单体应用** | ECOS 是**微服务架构：API 网关 + 5 个业务服务**。六引擎作为独立可运行引擎被业务 service 封装 |
 | 0.3 | 引擎=api/impl/boot。boot 仅开发用 | 引擎=api/impl/boot（boot 保留用于独立启动调试，**非生产入口**）。生产由所属 service 模块加载引擎；service 与引擎 boot 同端口，本机互斥运行 |
-| 0.4 | 三档位 standard/enterprise/ultimate | 术语确认（非破除）：旗舰档统一命名 `ultimate`，compose/配置中 `flagship` 更名对齐；档位机制不变 |
+| 0.4 | 三档位 standard/enterprise/ultimate | 术语确认（非破除）：旗舰档统一命名 `ultimate`，compose/配置中 `flagship` 更名对齐（已于 2026-09-28 PMO-74 H5 执行，原 flagship 别名已弃用）；档位机制不变 |
 | 1.2 | 三滤波器（VersionPrefixRewriteFilter/SecurityConfig/ClearanceInterceptor） | 职责重分布：VersionPrefixRewriteFilter 仍在 gateway；SecurityConfig/ClearanceInterceptor 留在 sysman；各 service 新增 `HeaderAuthInterceptor`（仅信任网关注入的 `X-ECOS-*` 头）。**"新增 Controller 必过三滤波器"语义不变，校验点适配** |
 | 2.4-5 | 审计异步调 `POST /api/v1/security/audit/log` | 改为发 Kafka `ecos.audit`，sysman 消费落库（ADR-8）；REST 审计端点过渡期保留 |
 | 3.1 | Flyway 已禁用，不启用 | **维持禁令**（非破除，显式确认）：Phase 4 采用手工迁移脚本 + 评审记录 |

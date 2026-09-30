@@ -22,7 +22,7 @@
 | SOURCE_JDBC | `PipelineTopologyValidationTest.sourceJdbcMissingSql` (FAILED) + `sourceJdbcMissingDatasourceId` | `PipelineTransformSqlRoutingTest` 无直接 JDBC 测试 (需 mock ConnectorFactory) | ✅ (验证入口校验) |
 | SOURCE_CSV | `PipelineTopologyValidationTest.sourceCsvMissingFilePath` (FAILED) | — | ✅ |
 | SOURCE_REST | `PipelineTopologyValidationTest.sourceRestMissingUrl` (FAILED) | — | ✅ |
-| SOURCE_CDC | `PipelineTopologyValidationTest.sourceCdcUnsupportedInStandardOrEnterprise` ✓ | `PipelineDebugService.executeNode` 测试未创建但代码一致 (flagship 守卫) | ✅ |
+| SOURCE_CDC | `PipelineTopologyValidationTest.sourceCdcUnsupportedInStandardOrEnterprise` ✓ | `PipelineDebugService.executeNode` 测试未创建但代码一致 (ultimate 守卫；原 flagship 别名已弃用，2026-09-28 PMO-74 H5) | ✅ |
 | TRANSFORM_SQL | `PipelineTransformSqlRoutingTest` **4 用例**: SELECT→queryForList, CTE→queryForList, UPDATE→update, debug链 SELECT→queryForList | 同左 (case D 直接测 DebugService) | ✅ **最强覆盖** |
 | TRANSFORM_UDF | **缺** — 无聚焦 UDF 执行测试 (UdfSandbox 是 `com.chinacreator.gzcm.engine.data.service` 包, 有独立单元测试?) | 调试链无 UDF 分支 (P1-1) | ⚠️ 缺 (P2) |
 | JOIN | **缺** — 无执行 JOIN 的专注测试 (joinFrames/memoryJoin 是 static, 可单测 memoryJoin 逻辑) | 调试链无 JOIN 分支 | ⚠️ 缺 (P2) |
@@ -62,7 +62,7 @@
 
 | 检查 | 实现 | 判定 |
 |:--|:--|:--:|
-| SOURCE_CDC standard/enterprise → "仅 flagship" | `PipelineTopologyValidationTest.sourceCdcUnsupportedInStandardOrEnterprise` + `PipelineExecutionService.executeNode` 硬编码 throw | ✅ |
+| SOURCE_CDC standard/enterprise → "仅 ultimate"（原 flagship 别名已弃用，2026-09-28 PMO-74 H5） | `PipelineTopologyValidationTest.sourceCdcUnsupportedInStandardOrEnterprise` + `PipelineExecutionService.executeNode` 硬编码 throw | ✅ |
 | Doris/Neo4j 行为差异测试 | **缺** — 无 `@DisabledOnJre` 或 profile-aware 测试 | ⚠️ 缺 (P2) |
 | Pipeline 执行不依赖 Neo4j/Doris (全版本) | 隐式: 单测 mock 不触 PG → 等价 standard 档 | ✅ (隐式) |
 

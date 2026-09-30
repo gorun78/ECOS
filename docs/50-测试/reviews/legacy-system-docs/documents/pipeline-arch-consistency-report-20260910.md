@@ -38,7 +38,7 @@
 | SOURCE_JDBC | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | SOURCE_CSV | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | SOURCE_REST | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SOURCE_CDC | ✅ | ✅ | ✅ (flagship 守卫) | ✅ (flagship 守卫) | ✅ | ✅ |
+| SOURCE_CDC | ✅ | ✅ | ✅ (ultimate 守卫；原 flagship 别名已弃用，2026-09-28 PMO-74 H5) | ✅ (ultimate 守卫) | ✅ | ✅ |
 | TRANSFORM_SQL | ✅ | ✅ | ✅ (SELECT/SHOW/DESCRIBE/WITH → queryForList; DML → update) | ✅ (Wave 5b 修复后对齐) | ✅ | ✅ |
 | TRANSFORM_UDF | ✅ | ✅ | ✅ | ❌ **缺** | ✅ | ⚠️ |
 | JOIN | ✅ | ✅ | ✅ | ❌ **缺** | ✅ | ⚠️ |
@@ -62,7 +62,7 @@
 | P2-01 §七 规则 | 后端实现 | 前端实现 | 判定 |
 |:--|:--|:--|:--|
 | ① 必填校验: name 非空; 至少 1 节点; nodeId/type 非空 | `PipelineServiceImpl.validateSaveDto`: name 非空 ✓; `isCreate && nodes.isEmpty` ✓; `nodeId` 非空 ✓; `type` 非空（`VALID_NODE_TYPES.contains`）✓ | `pipelineValidation.ts runPreFlightCheck`: canvasEmpty ✓; `checkRequiredConfigs` 按 nodeType 必填字段 ✓ | ✅ |
-| ② 数据类型校验: type ∈ 枚举全集 | `PipelineServiceImpl.validateSaveDto`: `VALID_NODE_TYPES.contains(node.getType())` → P2-01 §4.1 9 类 ✓ | `NodePalette` 渲染 PipelineNodeType 8 类（不含 SOURCE_CDC 可选项）; P2-01 标注 CDC 仅 flagship ✓ | ✅ |
+| ② 数据类型校验: type ∈ 枚举全集 | `PipelineServiceImpl.validateSaveDto`: `VALID_NODE_TYPES.contains(node.getType())` → P2-01 §4.1 9 类 ✓ | `NodePalette` 渲染 PipelineNodeType 8 类（不含 SOURCE_CDC 可选项）; P2-01 标注 CDC 仅 ultimate ✓（原 flagship 别名已弃用，2026-09-28 PMO-74 H5） | ✅ |
 | ③ 节点 id 唯一性: 同一定义内 nodeId 不可重复 | `PipelineServiceImpl.validateSaveDto`: `seenNodeIds.add(nodeId)` 检测重复 ✓ | 前端无显式重复检查（画布 ReactFlow 天然唯一 node id）| ✅ (后端兜底) |
 | ④ 拓扑可达性 / 环检测: Kahn 排序 | `PipelineExecutionService.topologicalSort`: Kahn → 未排出全部 → BusinessException("循环依赖") ✓; `PipelineDebugService.topologicalSort`: 同构（但有 P1-2 bug）| `pipelineValidation.ts findCycleNodes`: Kahn 同构 ✓ | ✅ (调试链 bug 见 P1-2) |
 | ⑤ 可达性校验: 孤立节点告警 | **后端无显式检查**（执行时孤立节点无法被拓扑序触及，会静默跳过） | `pipelineValidation.ts findOrphanedNodes`: 正向 BFS from SOURCE + 反向 BFS to SINK ✓ | ⚠️ 后端缺 |
