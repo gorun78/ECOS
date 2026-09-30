@@ -46,6 +46,12 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
+        <!-- 详细设计-00 W13: DLQ 消费者持久化 (ecos_runtime_event_dlq), JdbcTemplate 直连 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
+
         <!-- 测试 (PMO-74 H2-T8: 本模块此前零测试); 版本由 root pom dependencyManagement 锁定 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

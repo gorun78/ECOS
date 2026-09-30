@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.runtime.core.alert.service.impl;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -11,20 +12,36 @@ import java.util.stream.Collectors;
 import com.chinacreator.gzcm.runtime.core.alert.AlertRecord;
 import com.chinacreator.gzcm.runtime.core.alert.AlertRule;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
+import com.chinacreator.gzcm.runtime.core.alert.persist.AlertRepository;
 
 /**
  * 告警服务实现
  * 提供告警规则管理和告警记录功能
- * 
+ *
+ * <p>详细设计-00 F00-09 (W07)：进程内 {@link ConcurrentMap} 降为<b>可失效重建的进程内缓存</b>，
+ * 记录触发时若容器内存在 {@link AlertRepository}（gateway / 各 service 有数据源栈）则同步落
+ * 控制域 {@code ecos_runtime_alert_rule/_record}，使 ack/close/升级跨进程可见。</p>
+ *
  * @author CDRC Runtime Team
  */
 public class AlertServiceImpl implements IAlertService {
 
-    // 内存存储：ruleId -> AlertRule
+    // 进程内缓存：ruleId -> AlertRule（可失效重建，非权威）
     private final ConcurrentMap<String, AlertRule> rules = new ConcurrentHashMap<>();
-    
-    // 内存存储：alertId -> AlertRecord
+
+    // 进程内缓存：alertId -> AlertRecord（可失效重建，非权威）
     private final ConcurrentMap<String, AlertRecord> records = new ConcurrentHashMap<>();
+
+    // 详细设计-00 W07：可选持久化通道（无 JdbcTemplate 的容器 = 纯内存缓存态，行为不回退）
+    private final AlertRepository repository;
+
+    public AlertServiceImpl() {
+        this(null);
+    }
+
+    public AlertServiceImpl(AlertRepository repository) {
+        this.repository = repository;
+    }
 
     @Override
     public String createAlertRule(AlertRule rule) throws IAlertService.AlertException {
@@ -38,6 +55,17 @@ public class AlertServiceImpl implements IAlertService {
             throw new IAlertService.AlertException("Alert rule with ID " + rule.getRuleId() + " already exists");
         }
         rules.put(rule.getRuleId(), rule);
+        if (repository != null) {
+            try {
+                repository.insertRule(rule.getRuleId(), nullSafe(rule.getMetricType()),
+                        nullSafe(rule.getAlertLevel()).isEmpty() ? "P3" : nullSafe(rule.getAlertLevel()),
+                        rule.getThreshold() == null ? null : java.math.BigDecimal.valueOf(rule.getThreshold()),
+                        rule.getDuration(), null, "1".equals(rule.getEnabled()) ? 1 : 0,
+                        "log", null);
+            } catch (Exception ignore) {
+                // 持久化失败不阻断规则管理（缓存态仍可用）
+            }
+        }
         return rule.getRuleId();
     }
 
@@ -88,18 +116,18 @@ public class AlertServiceImpl implements IAlertService {
         if (ruleId == null) {
             throw new IAlertService.AlertException("Rule ID cannot be null");
         }
-        
+
         // 检查规则是否存在
         AlertRule rule = rules.get(ruleId);
         if (rule == null) {
             throw new IAlertService.AlertException("Alert rule with ID " + ruleId + " not found");
         }
-        
+
         // 检查规则是否启用
         if (!"1".equals(rule.getEnabled())) {
             return; // 规则未启用，不触发告警
         }
-        
+
         AlertRecord record = new AlertRecord();
         record.setAlertId(UUID.randomUUID().toString());
         record.setRuleId(ruleId);
@@ -112,13 +140,28 @@ public class AlertServiceImpl implements IAlertService {
         record.setAlertLevel(rule.getAlertLevel() != null ? rule.getAlertLevel() : "P3");
         record.setAlertTime(new java.sql.Timestamp(System.currentTimeMillis()));
         records.put(record.getAlertId(), record);
+
+        // 详细设计-00 W07：同步落库（跨进程权威），失败仅告警不阻断
+        if (repository != null) {
+            try {
+                Map<String, Object> detail = new java.util.LinkedHashMap<>();
+                detail.put("nodeId", nodeId);
+                detail.put("taskId", taskId);
+                detail.put("alertType", nullSafe(record.getAlertType()));
+                detail.put("message", nullSafe(message));
+                repository.insertRecord(record.getRuleId(), nullSafe(record.getAlertLevel()),
+                        nullSafe(message), detail, "runtime-core", null, null);
+            } catch (Exception ex) {
+                // 持久化失败不阻断告警触发（缓存态仍保留）
+            }
+        }
     }
 
     @Override
     public List<AlertRecord> queryAlertRecords(String ruleId, String alertStatus, String alertLevel, Integer page,
             Integer size) throws IAlertService.AlertException {
         List<AlertRecord> allRecords = new ArrayList<>(records.values());
-        
+
         // 过滤
         List<AlertRecord> filtered = allRecords.stream()
             .filter(r -> {
@@ -134,7 +177,7 @@ public class AlertServiceImpl implements IAlertService {
                 return true;
             })
             .collect(Collectors.toList());
-        
+
         // 分页
         if (page != null && size != null && page > 0 && size > 0) {
             int start = (page - 1) * size;
@@ -144,7 +187,7 @@ public class AlertServiceImpl implements IAlertService {
             }
             return new ArrayList<>();
         }
-        
+
         return filtered;
     }
 
@@ -153,16 +196,41 @@ public class AlertServiceImpl implements IAlertService {
         if (alertId == null) {
             throw new IAlertService.AlertException("Alert ID cannot be null");
         }
-        
+
         AlertRecord record = records.get(alertId);
         if (record == null) {
             throw new IAlertService.AlertException("Alert record with ID " + alertId + " not found");
         }
-        
+
         record.setAlertStatus("RESOLVED");
         record.setResolveBy(resolveBy);
         record.setResolveNote(resolveNote);
         record.setResolveTime(new java.sql.Timestamp(System.currentTimeMillis()));
+
+        if (repository != null) {
+            try {
+                repository.ackRecord(alertId, resolveBy, resolveNote);
+                repository.closeRecord(alertId);
+            } catch (Exception ignore) {
+                // 忽略
+            }
+        }
+    }
+
+    private static String nullSafe(String s) { return s == null ? "" : s; }
+
+    /**
+     * 告警异常
+     */
+    class AlertException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public AlertException(String message) {
+            super(message);
+        }
+
+        public AlertException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }
-

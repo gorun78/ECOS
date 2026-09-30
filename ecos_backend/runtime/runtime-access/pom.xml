@@ -53,6 +53,12 @@
             <version>2.9.2</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- PMO-45: JDBC driver deps — placed in profile `jdbc-drivers` below.
              Activate with: mvn -Pjdbc-drivers ...
              These are optional=true so even when active they are NOT propagated to consumers.

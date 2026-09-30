@@ -107,23 +107,9 @@
             <artifactId>buszhi-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <!-- 阶段5吸收: portal→workspace, market→workspace, worldmodel→buszhi, cognitive→dccheng
-             源代码已复制到目标模块, 以下为旧JAR兼容依赖(构建时跳过, 运行时从.m2取) -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>portal-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>market-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>worldmodel-impl</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
+        <!-- PMO-09 (2026-09-14): 移除 portal-impl/market-impl/worldmodel-impl 幽灵依赖。
+             三者已在阶段 5 被 workspace/buszhi 吸收，gateway 源码无任何对应 import；
+             原注释 "旧JAR兼容依赖 (构建时跳过, 运行时从.m2取)" 在空 .m2 环境会直接解析失败。 -->
         <!-- M0 改造 (2026-09-01): 删除 cognitive-impl 依赖。
              这是 pre-existing C1 模块源码已删, 仅存 .m2 stale JAR; ai-engine 的 CognitiveService/
              CognitiveController 已 stub (引用 0), gateway excludeFilters 已 exclude;
@@ -246,6 +232,19 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- 详细设计-00 门禁测试：MockHttpServletRequest/Response (TrustHeaderStrip/TraceId/...) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 详细设计-00 EditionProfileGuardTest：读取三档 profile yml -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
             <scope>test</scope>
         </dependency>
         <!-- A+4: infrastructure access (git/minio/logging/i18n/alert migrated from runtime-core) -->
