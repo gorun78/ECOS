@@ -76,11 +76,15 @@ import com.chinacreator.gzcm.sysman.controller.SysConfigController;
         //  - DiagnosticAgentController 与 AgentChatController 同路由 POST /api/v1/agent/chat
         //  - CognitiveController (ai) 与 cognitive2 版本同路由 cognitive/health
         //  - CognitiveService 引用已删 Class (CausalReasoner 等), 启动 UnsatisfiedDependency
+        //  - CognitiveEngineOpenHealthController 与 AiEngineStatusController 同占
+        //    GET /api/v1/engine/cognitive/health — 镜像 gateway PMO-57 T5 裁定 (GatewayApplication:113-119):
+        //    保 ai 副本 (整类 5 端点)，排 cognitive 新副本 (0 行为变化，standalone :18089 不受影响)
         // 保留: AgentChatController + cognitive2 版本 (与 gateway 取舍一致)
         @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
                 DiagnosticAgentController.class,
                 CognitiveController.class,
-                CognitiveService.class
+                CognitiveService.class,
+                com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineOpenHealthController.class
         }),
         // R2 (PMO-60 T0b): ai-engine 的 cognitive stub controller 与 cognitive2 真实现同频冲突 —
         // 同前缀 /api/v1/cognitive/config: GET / 与 PUT / 双向撞车 (cognitive2 CognitiveConfigController 完整实现优先)
