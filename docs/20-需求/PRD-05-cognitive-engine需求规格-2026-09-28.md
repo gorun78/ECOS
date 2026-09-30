@@ -1,10 +1,10 @@
 # PRD-05 cognitive-engine 需求规格（分册 05）
 
 > 来源: 肖国荣 | 日期: 2026-09-28 | 责任人: AI Agent
-> 版本: v1.0
+> 版本: v1.2（**v1.2（2026-09-29 批量批准定版）**：需求检视报告 **§十四** 按各表「本设计推荐」列批准 R-1~R-72 ⇒ 本册 §六 **REQ-COG-06~09 转正式需求并计入已批准基线**（随 **R-42** 与 **R-14 组**）。**"已批准"仅指需求文本生效**：验收测试类未建者一律记"未执行"；`ecos_cognitive` 落位与 R-13/R-14 相关的**存量归位只定性不擅迁**，DDL 只落**迁移脚本文件**、实跑库需逐项再授权（报告 §14.4）。v1.1（2026-09-29 接续 W-Agent 制品，时点标注"草案、待裁决"已被 §十四 取代）：新增 §六 REQ-COG-06~09 承接需求；§1.1 E1 数据源表名按已结案裁决 **Q11 / ADR-8** 更正，禁用 `kb_mind_registry` 误名）
 > 上游: [PRD-00 总纲](PRD-00-ECOS平台需求规格说明书-2026-09-28.md) · [PRD-01 平台级](PRD-01-平台级与横切需求规格-2026-09-28.md)
 > 契约上游: `docs/40-实现/features/20260917-scenario-workbench/BUSINESS_SCENARIO_SERVICE_DOC.md` + `BUSINESS_SCENARIO_COGNITION_DOC.md`（在途 PMO-66，本册为其需求侧细化，不替代其契约地位）
-> 覆盖: REQ-COG-01~05
+> 覆盖: REQ-COG-01~05（已列）+ **REQ-COG-06~09（v1.1 立，2026-09-29 §十四 **已批准**）**
 > 模块: `ecos_backend/engine/cognitive-engine`（run in aiming:18084）
 
 ---
@@ -26,7 +26,7 @@
 ```
 - 场景无 Mind → `data: []`（200，不是 404）；
 - Mind 行存在但 `is_active=0` → 不返回该 Mind；
-- 数据源：`kb_mind_registry` JOIN 场景 Mind 绑定（绑定表名以 Pg 实查为准，PRD-01 DB-03 预检）。
+- 数据源（v1.1 更正，按 **Q11 / ADR-8 §5**）：Mind 注册表真身**不存在**——全库无名字含 `mind` 的表、`mind_id` 列 0 个（ARCH_SPEC **C98** / 详细设计-05 **X-19**）；`kb_mind_registry` 与 `kb_cognitive_*` 均为 PRD 误名，**禁止在任何新文档中继续使用**。本项契约以详细设计-05 §Cg-2 新建的 `cognitive_mind` + `cognitive_scenario_mind` 为目标载体（表未建 → E1 在 QA 前必须 `to_regclass` 预检并判"未执行"，禁写 200 空数组蒙过）。
 
 **E2 `GET .../cognition/operation-eval?mind={mindId}`**
 
@@ -218,7 +218,83 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
 
 ---
 
-## 六、追溯与依赖
+## 六、W-Agent 承接需求（REQ-COG-06~09，v1.1 立，**2026-09-29 §十四 已批准**）
+
+> **来源**：附件第二册 §16.2（对象归属总表）/§17.x（Cognitive Model 契约与发布门禁）、第三册 §A.3、第一册 §5~§6；登记动因见 [W-Agent 落地检视报告 §七 逐字计划](./W-Agent详细设计落地检视报告-2026-09-29.md) 与 [PRD-10 §六 挂靠表](./PRD-10-W%20Agent赋能DIK-C需求规格-2026-09-29.md)。
+> **裁决状态**：本四项**已批准**（2026-09-29 需求检视报告 §十四 14.1，随 **R-42 ①** 规则文字更正与 **R-14 ①** 契约属主），落位与表名以本册"真身"列为基准；**执行边界**：新表 DDL 按批准口径落**迁移脚本文件**（不实跑库），`ecos_cognitive` 归位按 **R-13 ①** 先做 `{schema}.` 限定新写、**存量只定性不擅迁**；对外路径按 **R-14 ①** 冻结不变、内部 Service 以 subject 参数化，改业务 Java 代码需逐项再授权（报告 §14.4）。
+> **边界**：C 层对象的**定义与落盘主权属 cognitive-engine**，W Agent 只消费、只引用版本，不得在 `ecos_ai.ecos_wagent_*` 复制 C 对象（ADR-16/17）；本节与 §五 REQ-COG-05 守护项同时生效，冲突时以 §五（铁律）为准。
+
+### 6.1 REQ-COG-06 C 类 11 对象补齐与命名对齐（P0，守护 + 补齐型，随 R-42）
+
+附件第二册 :1007 冻结 C 层 11 类对象。逐项与 ECOS **实测真身**对齐（只加不改，禁按附件名新建重复表）：
+
+| 附件对象（C 11 类） | ECOS 实测真身（`information_schema` 只读查得） | 处置（推荐项） |
+|---|---|---|
+| evidence / hypothesis / belief | `public.ecos_cognitive_evidence`(`V127`) / `_hypothesis`(`V128`) / `_belief`(`V129`) | ✅ 已有，**正名以此为准**；`kb_cognitive_*` 误名按 Q11/ADR-8 §5 永久禁用 |
+| cognitive_model_instance | `public.ecos_cognitive_model`(`V124`) 是模型**资产**（ADR-8 口径），**不是运行实例** | ⚠️ 资产与实例不得共用一表：实例属运行态，是否落盘随 R-42 裁；未裁前只在响应内以 `modelId + version + runId` 引用表达 |
+| context/situation | 无载体（全库无 `situation` 表） | §五 REQ-COG-05 已判"Context 不建表"→ 情境属**请求态**；若 R-42 要求可回放快照，落 §6.4 业务域快照而非 cognitive 表 |
+| reasoning_trace | 无载体 | 随 R-42：推荐**不落 cognitive 表**，以 `run_id` 关联审计流（ST06 Kafka `ecos.audit`）承载；附件 `cog_` 前缀 DDL 形态不采纳（MC01/DR01/ST07） |
+| prediction | 无 cognitive 侧独立表 | 确定性预测**产物**按 **ADR-14** 落业务域 `ecos_dw`（见 §6.4），cognitive 侧只保留引用 |
+| scenario | 双源并存：`public.ecos_world_scenarios` 与 `ecos_cognitive.ecos_wm_scenario` | ⚠️ 双载体先定性后处置（存量只定性不擅自迁移）；`ecos_cognitive.*` 内的 `ecos_wm_*`/`ecos_biz_*`/`ecos_goal_tracking` 属"业务域数据落引擎控制 schema"的 ST07 疑点，登记不改，随 R-42 一并裁 |
+| causal_result | 邻近物为 `public.ecos_decision_causal_link`，语义不等价 | 不冒充；如需因果结果载体随 R-42 单独立项 |
+| pattern_match | 无载体 | 同 reasoning_trace 处置路径 |
+| decision_basis | `public.ecos_decision` / `ecos_decision_approval` / `ecos_decision_policy` / `ecos_decision_precedent` / `ecos_decision_exception` / `ecos_decision_causal_link`，另 `ecos_decision_case` 在 `public` 与 `ecos_ai` **双侧同名并存** | 归 C 层（见 §6.3）；`ecos_decision_case` 镜像对须先定性（谁是写权威），禁在两处同时开写口 |
+
+**规格**：
+1. 11 类对象必须有一张**对象目录**（代码内枚举 + 契约文档表，单源），每类映射到"唯一物理载体"或"引用态（无表）"，二选一，不得两态并存；
+2. 新文档/新代码出现 `kb_cognitive_*`、`kb_mind_registry`、`cog_`/`agt_`/`aim_` 裸前缀建表 → 评审红线（Q11 / ADR-8 §5 / 数据库访问规范 DR01+ST07）；
+3. cognitive 域表数量白名单（ARCH-07）随本项扩表时必须同批改，并补 `ecos_cognitive_run_invalidation`（否则 CI 误拦，见需求检视报告 Q11 结案口径）；
+4. 附件 §16.6"对象类型白名单"与 PRD-04 REQ-KB-06 的 K 12 类白名单**互斥且同源校验**：同一类型名不得同时出现在 K 与 C 白名单。
+
+**验收**（可执行标识）：
+- `mvn -Dtest=CognitiveObjectCatalogTest#everyCClassHasExactlyOneCarrierOrNone`（11 类逐项断言）；
+- `mvn -Dtest=CognitiveObjectCatalogTest#bannedMisnomersAbsentFromCodeAndDocs`（regex 扫 `kb_cognitive_`、`kb_mind_registry`、`cog_[a-z_]+ (`）；
+- `mvn -Dtest=KCBoundaryWhitelistTest#cAndKTypeSetsAreDisjoint`（与 PRD-04 REQ-KB-06 同源对拍）；
+- 界面侧（场景工作台卡片）→ `pw wagent-cognitive-cards.spec.ts`：**P-3 Playwright 工程未建成前一律记"未执行"**（铁律 v2.0:14）。
+
+### 6.2 REQ-COG-07 Cognitive Model Registry：CM-01~07 × 版本不可变 × 四类发布门禁（P0，随 R-42）
+
+**规格**：
+1. 模型类型枚举冻结为 **CM-01 规则推理 / CM-02 统计推断 / CM-03 预测 / CM-04 因果 / CM-05 情景·反事实 / CM-06 案例推理 / CM-07 LLM 假设·语义推理**（附件第二册 :1056-1062）；新增枚举先改契约再入码；
+2. **CM-07 的数值禁令**（与 §五"禁止 LLM 直接承担推理职责"同源，此处升级为可测断言）：金额、比率、概率**只准**来自 CM-01~05 或 data-engine 事实；CM-07 只能产出 hypothesis，且必须附 `evidence_refs / confidence / model_ref / source`，**不得**写入 `ecos_cognitive_belief.probability` 或任何预测结果列；
+3. **版本不可变**：`ecos_cognitive_model` 已发布版本（`version_no` DR07 形态）行内容与哈希入 immutable 态后禁止 UPDATE；变更只能新建版本行并 `supersedes` 指向旧版；
+4. **四类发布门禁**（附件第三册 §15.1 引第二册 §17.7）：`contract` / `regression` / `backtest` / `calibration` 全通过才可 `PUBLISHED`；任一缺项 → 状态停留 `DRAFT` 且发布端点返回带错误码的 4xx（不是静默成功）；
+5. 注册表落控制域 cognitive 侧（`ecos_cognitive` 族），**不建** `ecos_ai.ecos_wagent_cognitive_model` 副本（ADR-17）；Agent 侧只经 REST 读（ST09）。
+
+**验收**：
+- `mvn -Dtest=CognitiveModelRegistryTest#publishedVersionRowIsImmutable`（发布后 UPDATE 必败）；
+- `mvn -Dtest=CognitiveModelRegistryTest#publishRequiresAllFourGates`（四门禁 4×缺项组合参数化）；
+- `mvn -Dtest=Cm07NumericGuardTest#llmTypeCannotWriteProbabilityOrAmount`（CM-07 写 probability/amount → 拒绝并返错误码）；
+- `mvn -Dtest=CognitiveModelRegistryTest#modelTypeRejectsUnknownEnum`。
+
+### 6.3 REQ-COG-08 Decision Basis 归属与镜像定性（P1，随 R-42）
+
+**规格**：
+1. `ecos_decision*` 表族（V103/V151 起，实测 7 张 + `ecos_agent` 域 1 张）**定性为 C 层 Decision Basis**（附件第二册 §16.2 :983），属认知域资产，**不改表、不改既有 API**（只增不改）；
+2. **写权威单源**：`ecos_decision_case` 当前 `public` 与 `ecos_ai` 同名并存 ⇒ 必须先实测两侧行数与读写调用点判定权威，另一侧只停写不 DROP（存量只定性）；判据与处置登记入 ARCH_SPEC 追溯表，实测前本项记"待复核"，**禁止据推断改代码**；
+3. Decision Basis 对 W Agent **只读**：Agent 侧引用决策依据只准带 `decisionId + version + hash`，不得回写、不得经 kb/ai 侧代理写（PRD-04 REQ-KB-04 同向）；
+4. 快照/证据引用列若为 JSON 形态，必须 `TEXT` 且不参与 WHERE/JOIN/索引（**MC02**）。
+
+**验收**：`mvn -Dtest=DecisionBasisOwnershipTest#decisionCaseHasSingleWritableCarrier` + `#agentPathCannotWriteDecisionBasis`（只读端点集合断言，无写路由）。
+
+### 6.4 REQ-COG-09 确定性计算产物落 `ecos_dw`（P0，随 ADR-14，R-14 组已结案口径的承接）
+
+**规格**（本项**不是新裁决**，而是把 ADR-14 的 Accepted 决策承接为 cognitive 侧可测义务）：
+1. 计算主体 = cognitive-engine 的确定性组件（`DeterministicForecastCalculator` 暂名），与 `ScenarioSimulatorServiceImpl`（What-if 探索）、`CausalReasonerService`（事后解释）**三者职责互斥、不得互相回退**；
+2. 产物（run / result / result_detail / backtest_metric）**落业务域 `ecos_dw`（APPLICATION 层）**；DDL 由 data-engine 持有、迁移入单源目录；cognitive **经 data-engine 写通道 REST 提交**，禁止直连 `ecos_dw`、禁止在 `ecos_cognitive`/`ecos_knowledge` 建金额结果表（ST08）；
+3. 幂等六要素：同 `forecastRunId + caliberId@version + asOfTime + 输入快照 + 公式版本 + 证据引用` 重跑必须同明细；输入快照 JSON 列 `TEXT`、不建索引（MC02）；
+4. **LLM 不参与数值**：区间来自 PRD-04 REQ-KB-08 已发布画像版本；无来源数值判 FAIL；
+5. `caliberId`/公式主权 = ontology（ADR-14 §2.4），cognitive 只引用版本不复制定义。
+
+**验收**：
+- `mvn -Dtest=DeterministicForecastArtifactTest#resultsLandInEcosDwNotEngineSchema`（DDL 只读形态断言，库侧仅 SELECT/catalog）；
+- `mvn -Dtest=DeterministicForecastArtifactTest#rerunWithSameSixFactorsIsByteIdentical`；
+- `mvn -Dtest=DeterministicForecastArtifactTest#snapshotJsonColumnsAreTextAndUnindexed`（MC02）；
+- `mvn -Dtest=ModuleDependencyArchTest#cognitiveDoesNotWriteEcosDwDirectly`（禁止绕 data-engine 写通道）。
+
+---
+
+## 七、追溯与依赖
 
 | REQ | 依赖 | 被依赖 | 批次 |
 |---|---|---|---|
@@ -227,5 +303,11 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
 | COG-03 | FC-02 情景运行 | 演练 4 | 场景批次 B（M2） |
 | COG-04 | COG-01 | — | PMO-66 同批 |
 | COG-05 | ARCH-07 | 全部 cognitive 变更 | 持续守护 |
+| COG-06 | Q11/ADR-8 正名（已结案）、PRD-04 KB-06 同源白名单 | PRD-10 WAG-17、COG-07 | **已批准（随 R-42 · §十四）** |
+| COG-07 | COG-06 目录、附件第二册 §17.7 门禁定义 | PRD-10 WAG-05/14、PRD-07 SEC-07 | **已批准（随 R-42 · §十四）** |
+| COG-08 | COG-06、`ecos_decision_case` 双侧实测定权威 | PRD-10 WAG-19/20（回流引用） | **已批准（随 R-42 · §十四）** |
+| COG-09 | ADR-14（Accepted）、PRD-04 KB-08 画像版本、PRD-02 DATA 写通道 | PRD-09 FC-02/03、PRD-05 COG-02/03 | 场景批次 A（**不待裁决**，仅随本册登记） |
+
+<!-- PRD-05-cognitive-engine需求规格 / 2026-09-29 / v1.2（§六 REQ-COG-06~09 已批准 R-42/R-14 组，凭证 = 需求检视报告 §十四 2026-09-29） -->
 
 <!-- PRD-05-cognitive-engine需求规格 / 2026-09-28 / v1.0 -->

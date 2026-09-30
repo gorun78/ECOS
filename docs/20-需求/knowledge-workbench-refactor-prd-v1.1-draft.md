@@ -61,7 +61,7 @@
 |:--|:--:|:--|
 | 侧栏按钮数 | 6 | 视觉审查 |
 | 页面文件数（`pages/knowledge/pages/*.tsx`）| 6 | `ls` 计数 |
-| 后端 endpoint 数 | **121**（119 既有 + `GET /nav/modules` + `GET /assets/status`）| `grep -rE '@(Get|Post|Put|Delete|Request)Mapping' controller/*.java \| wc -l` |
+| 后端 endpoint 数 | **121**（119 既有 + `GET /nav/modules` + `GET /assets/status`）| `grep -rE '@(Get\|Post\|Put\|Delete\|Request)Mapping' controller/*.java \| wc -l` |
 | F6 md 导入 endpoint | `POST /api/v1/knowledge/docs/ingest` + `Content-Type: text/markdown`（复用 `KnowledgeIngestController` A3 链路）| 抓包验证 |
 | GovernPage.tsx 主文件 | **≤ 800 行**（铁律 §4.6），超出部分拆 `pages/knowledge/components/govern/` 子组件 | `wc -l` |
 | `mvn install -Penterprise -pl engine/kb-engine/kb-engine-impl -am -DskipTests` | SUCCESS | CI |

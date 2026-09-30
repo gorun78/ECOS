@@ -1,7 +1,7 @@
 # PRD-02 data-engine 需求规格（分册 02）
 
 > 来源: 肖国荣 | 日期: 2026-09-28 | 责任人: AI Agent
-> 版本: v1.0
+> 版本: v1.1（**v1.1（2026-09-29 批量批准定版）**：凭证 = [需求检视报告 §十四](需求检视报告-2026-09-28.md)。本册按 **Q1 b（MC01 严格 + 扩白名单）** 与报告 **G2-1**（DDL 模板系统性违 MC01/MC02）更正 §1.2 五表草案：`DEFAULT gen_random_uuid()` ×4 → 应用侧生成 UUID（DDL 无默认值），快照表 4 个 `JSONB` 列 → `TEXT`（MC02 受控 JSON 只准 TEXT，`_json` 后缀 DR04 不变）。**另随 R-1b ②**：DQ 归数据引擎，`ecos_dq` 承认并入 `ecos_data`（ST07 修订见数据库访问规范 v1.2）；随 **R-2 a**：`ecos_pipeline_definition` 为唯一可执行模型，YAML 模型转只读归档后迁移删除；随 **R-3 ②+禁静默**：legacy 兜底保留至 `V166` 完成、UI 必须显式标注"旧模型数据"。**"已批准"仅指需求文本生效**：DDL 只落**迁移脚本文件**不实跑库，改业务 Java 代码需逐项再授权（报告 §14.4）；未创建的测试类一律记"未执行"）
 > 上游: [PRD-00 总纲](PRD-00-ECOS平台需求规格说明书-2026-09-28.md) · [PRD-01 平台级](PRD-01-平台级与横切需求规格-2026-09-28.md)（DDL/精度/边界全局裁定）
 > 覆盖: REQ-DATA-01~08
 > 模块: `ecos_backend/engine/data-engine`（datanet:18082）
@@ -22,7 +22,7 @@
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_biz_project_attribution (
-    id                VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                VARCHAR(36) PRIMARY KEY,           -- MC01: 应用侧生成 UUID，DDL 禁 gen_random_uuid()
     project_id        VARCHAR(36) NOT NULL,
     contract_id       VARCHAR(36) NOT NULL,
     department_id     VARCHAR(36) NOT NULL,
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_bpa_project ON ecos_biz_project_attribution(proje
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_biz_stage_fact (
-    id               VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    id               VARCHAR(36) PRIMARY KEY,          -- MC01: 应用侧生成 UUID，DDL 禁 gen_random_uuid()
     project_id       VARCHAR(36) NOT NULL,
     department_id    VARCHAR(36) NOT NULL,
     period           VARCHAR(7)  NOT NULL,
@@ -69,7 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_bsf_period ON ecos_biz_stage_fact(period);
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_biz_resource_fact (
-    id             VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    id             VARCHAR(36) PRIMARY KEY,            -- MC01: 应用侧生成 UUID，DDL 禁 gen_random_uuid()
     project_id     VARCHAR(36) NOT NULL,
     department_id  VARCHAR(36) NOT NULL,
     period         VARCHAR(7)  NOT NULL,
@@ -90,7 +90,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_brf_key ON ecos_biz_resource_fact(project
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_biz_cost_fact (
-    id               VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    id               VARCHAR(36) PRIMARY KEY,          -- MC01: 应用侧生成 UUID，DDL 禁 gen_random_uuid()
     project_id       VARCHAR(36),                   -- NULL=待分摊池
     department_id    VARCHAR(36) NOT NULL,
     period           VARCHAR(7)  NOT NULL,
@@ -115,10 +115,10 @@ CREATE TABLE IF NOT EXISTS ecos_forecast_input_snapshot (
     forecast_run_id  VARCHAR(36) NOT NULL,
     as_of_time       TIMESTAMP NOT NULL,
     scope_hash       VARCHAR(64) NOT NULL,          -- sha256(项目集+部门集+期间+情景)
-    fact_refs_json   JSONB NOT NULL,                -- {stageFactIds:[],resourceFactIds:[],costFactIds:[],attributionIds:[],actionOutcomeIds:[]}
-    metric_versions_json  JSONB NOT NULL,           -- {metricCode: version}
-    profile_versions_json JSONB NOT NULL,           -- {profileId: version}
-    assumption_versions_json JSONB NOT NULL,        -- {assumptionId: version}
+    fact_refs_json   TEXT NOT NULL,                -- MC02: 受控 JSON 只准 TEXT（{stageFactIds:[],resourceFactIds:[],costFactIds:[],attributionIds:[],actionOutcomeIds:[]}）
+    metric_versions_json  TEXT NOT NULL,           -- MC02: TEXT（{metricCode: version}）
+    profile_versions_json TEXT NOT NULL,           -- MC02: TEXT（{profileId: version}）
+    assumption_versions_json TEXT NOT NULL,        -- MC02: TEXT（{assumptionId: version}）
     caliber_id       VARCHAR(36) NOT NULL,
     caliber_version  VARCHAR(20) NOT NULL,
     checksum         VARCHAR(64) NOT NULL,          -- 全内容 sha256，重跑校验
@@ -291,4 +291,4 @@ if (!target.startsWith(root)) { throw new ValidationException("illegal archive p
 | DATA-07 | runtime-access DuckDB | — | PMO-73 G5 |
 | DATA-08 | TRANSFORM_DOC_PARSE 生产可用 | — | PMO-73 G5 |
 
-<!-- PRD-02-data-engine需求规格 / 2026-09-28 / v1.0 -->
+<!-- PRD-02-data-engine需求规格 / 2026-09-28 / v1.1（2026-09-29 随需求检视报告 §十四 批量批准定版） -->

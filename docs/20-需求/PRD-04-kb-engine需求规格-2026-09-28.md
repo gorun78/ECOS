@@ -1,9 +1,9 @@
 # PRD-04 kb-engine 需求规格（分册 04）
 
 > 来源: 肖国荣 | 日期: 2026-09-28 | 责任人: AI Agent
-> 版本: v1.0
+> 版本: v1.2（**v1.2（2026-09-29 批量批准定版）**：需求检视报告 **§十四** 按各表「本设计推荐」列批准 R-1~R-72 ⇒ 本册 §六 **REQ-KB-06~09 转正式需求并计入已批准基线**（随 R-8／R-12／R-40／R-46，原写 "R-08" 统一为 **R-8**）。另按 **Q1 b／报告 G2-1** 更正 §2.2/§3.1 DDL 草案：主键 DEFAULT gen_random_uuid() ×2 → 应用侧生成 UUID（MC01，DDL 无默认值）、JSONB ×2（group_dims_json / dim_scope_json）→ TEXT（MC02 受控 JSON 只准 TEXT）。**"已批准"仅指需求文本生效**：验收测试类未建者一律记"未执行"（铁律 :14／Q13）；相关 DDL 只落**迁移脚本文件**、不实跑库，改业务代码需逐项再授权（报告 §14.4）。v1.1（2026-09-29 接续 W-Agent 制品，时点标注"草案、待裁决"已被 §十四 取代）：新增 §六 REQ-KB-06~09 承接需求；§四 守护对象表名按已结案裁决 **Q11 / ADR-8 §5** 更正为物理真身；原 §六 追溯表顺延为 §七）
 > 上游: [PRD-00 总纲](PRD-00-ECOS平台需求规格说明书-2026-09-28.md) · [PRD-01 平台级](PRD-01-平台级与横切需求规格-2026-09-28.md)
-> 覆盖: REQ-KB-01~05
+> 覆盖: REQ-KB-01~05（已列）+ **REQ-KB-06~09（v1.1 立，2026-09-29 §十四 **已批准**）**
 > 模块: `ecos_backend/engine/kb-engine`（dccheng:18086）
 
 ---
@@ -54,10 +54,10 @@
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_kb_profile (
-    id               VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    id               VARCHAR(36) PRIMARY KEY,          -- MC01: 应用侧生成 UUID，DDL 禁 gen_random_uuid()
     profile_key      VARCHAR(255) NOT NULL,        -- 规范化维度键：metric|k1=v1|k2=v2（排序后拼接）
     metric_code      VARCHAR(64) NOT NULL,         -- 对齐 PRD-03 指标编码（如 M_REALIZATION_RATE）
-    group_dims_json  JSONB NOT NULL,               -- {"project_type":"交付类","department_id":"d01","stage":"ACCEPTANCE"}
+    group_dims_json  TEXT NOT NULL,               -- MC02: 受控 JSON 只准 TEXT（{"project_type":"交付类","department_id":"d01","stage":"ACCEPTANCE"}）
     window_from      VARCHAR(7) NOT NULL,          -- 观察窗口起 YYYY-MM
     window_to        VARCHAR(7) NOT NULL,
     sample_count     INTEGER NOT NULL,
@@ -117,11 +117,11 @@ CREATE INDEX IF NOT EXISTS idx_kbp_metric_status ON ecos_kb_profile(metric_code,
 
 ```sql
 CREATE TABLE IF NOT EXISTS ecos_kb_assumption (
-    id               VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    id               VARCHAR(36) PRIMARY KEY,          -- MC01: 应用侧生成 UUID，DDL 禁 gen_random_uuid()
     assumption_key   VARCHAR(255) NOT NULL,        -- scenarioType|metric|dims 规范化键
     scenario_type    VARCHAR(32) NOT NULL,         -- BASE/CONSERVATIVE/AGGRESSIVE/自定义情景编码
     metric_code      VARCHAR(64) NOT NULL,
-    dim_scope_json   JSONB NOT NULL DEFAULT '{}',  -- 适用范围 {"project_id":"p1","periods":["2027-07","2027-08","2027-09"]}
+    dim_scope_json   TEXT NOT NULL DEFAULT '{}',  -- MC02: 受控 JSON 只准 TEXT（适用范围 {"project_id":"p1","periods":["2027-07","2027-08","2027-09"]}）
     value_type       VARCHAR(10) NOT NULL,         -- RATE/AMOUNT/DAYS
     value            NUMERIC(18,4) NOT NULL,       -- RATE 时存小数（-0.10 = 下降10个百分点须用 delta 语义，见 3.2-2）
     value_semantic   VARCHAR(20) NOT NULL DEFAULT 'ABSOLUTE',  -- ABSOLUTE 绝对值 / DELTA 相对基准增量
@@ -155,7 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_kba_scenario_status ON ecos_kb_assumption(scenari
 | `/api/v1/knowledge/assumptions` | POST/GET | 创建（DRAFT）/查询 |
 | `/api/v1/knowledge/assumptions/{id}/submit` | POST | 提交审批 |
 | `/api/v1/knowledge/assumptions/{id}/approve` | POST | 审批（approved_by 落库，发审计事件） |
-| `/api/v1/knowledge/assumptions/resolve` | GET | ?scenarioType=&metric=&dims=&period= → 匹配 ACTIVE 假设（dim_scope 包含匹配，精确优先于宽泛） |
+| `/api/v1/knowledge/assumptions/resolve` | GET | ?scenarioType=&metric=&dims=&period= → 匹配 ACTIVE 假设（`dim_scope_json` 包含匹配，精确优先于宽泛）**【2026-09-30 G2 传播】**原字面 `dim_scope` 已按 DR04 定名为 `dim_scope_json`（V177 落地脚本 + 卷04 §E.2 同步） |
 
 ### 3.4 验收标准
 
@@ -169,7 +169,7 @@ CREATE INDEX IF NOT EXISTS idx_kba_scenario_status ON ecos_kb_assumption(scenari
 ## 四、REQ-KB-04 场景认知契约守护（P0，守护型）
 
 **规格**（契约本体在 PRD-05 COG-01，本册定义 kb 侧守护义务）：
-1. `kb_cognitive_hypothesis` / `kb_cognitive_belief` / `kb_mind_registry` 对场景侧（workspace/business 服务）**只读开放**；kb 不提供写代理端点给场景侧；
+1. 守护对象（v1.1 按 **Q11 / ADR-8 §5** 更正：三个 `kb_*` 名字均为 PRD 误名、禁止再使用，见 ARCH_SPEC **C94** / 详细设计-04 **K-49**）= 心智状态三表真身 `public.ecos_cognitive_hypothesis`（`V128`）/ `public.ecos_cognitive_belief`（`V129`）/ `public.ecos_cognitive_evidence`（`V127`），对场景侧（workspace/business 服务）**只读开放**；`kb_mind_registry` **物理不存在**（全库无 `%mind%` 表 = ARCH_SPEC **C98** / 详细设计-05 **X-19**），Mind 载体以详细设计-05 §Cg-2 新建的 `cognitive_mind` + `cognitive_scenario_mind` 为目标，未建表前本项判「未执行」而非「通过」；kb 不提供写代理端点给场景侧；
 2. hypothesis.status 枚举冻结：`PROPOSED/EVIDENCED/BELIEVED/REFUTED`（新枚举值必须先改契约文档 BUSINESS_SCENARIO_COGNITION_DOC §3.2 再入码）；
 3. cognitive 域不反向写 business 表（ARCH 规则 + 评审）；
 4. 表存在性预检：QA 开测前跑 `to_regclass` 三表检查（PRD-01 DB-03 脚本），V127~V129 迁移未跑到本环境时先补迁移再测。
@@ -189,7 +189,55 @@ CREATE INDEX IF NOT EXISTS idx_kba_scenario_status ON ecos_kb_assumption(scenari
 
 ---
 
-## 六、追溯与依赖
+## 六、W-Agent 承接需求（REQ-KB-06~09，v1.1 立，**2026-09-29 §十四 已批准**）
+
+> 来源：《ECOS W Agent 详细设计》附件一册 §5/§6（K 层对象与回流）、三册 §5（Candidate 治理）；检视结论见 `W-Agent详细设计落地检视报告-2026-09-29.md` **WC-12/WC-13/WC-08**，裁决 **R-40 / R-46**。
+> **编号更正（重要）**：PRD-10 §六 与 ARCH_SPEC 曾把这四项写作 `REQ-KNO-06~09`，与本册既有前缀 `REQ-KB-`（PRD-00 附录 C / ARCH_SPEC §十三 矩阵同用 `REQ-KB`）冲突 ⇒ **定版为 REQ-KB-06~09，`REQ-KNO` 前缀作废不得使用**（避免同一族出现两个前缀的第三套口径）。
+> **边界**：本四项属 **K 层（水·dccheng/kb-engine）对象自身**，W Agent 只消费不定义（PRD-10 §六 同口径，防双主责）。
+
+### 6.1 REQ-KB-06 K 类型白名单与 C 类型写入拒绝（P0，守护型，随 R-46）
+
+**规格**：
+1. kb-engine 写入面**只接受 K 层类型**（附件一册 §5 的 12 类为**候选集**，是否全数采纳随 **R-46**；本册不预设 12 类已批准）；
+2. 认知层（C）对象类型经 kb 写通道提交时**必须拒绝**并返回明确错误码，不得静默落 K 层表（防止 C 类对象寄生在 `ecos_knowledge`，与 REQ-COG-06 的 C-11 对象补齐互为正面/反面）；
+3. 类型集为**封闭枚举 + 防膨胀钩子**：新增类型必须先改本册与 PRD-05 的对象清单再入码（钩子归属随 **R-46**）；
+4. 禁在 Agent 控制面（`ecos_ai.ecos_wagent_*`）复制 K 类定义（ADR-16 / ADR-17 §2.2）。
+
+**验收**：`KTypeWhitelistGuardTest#rejectsCognitiveObjectTypeOnKbWritePath`（C 类提交 → 拒绝且 0 行落库）+ `#unknownTypeRequiresContractChangeFirst`（未登记类型 FAIL）。
+
+### 6.2 REQ-KB-07 知识回流候选（origin + Evidence 门槛）（P1，随 R-40/R-46）
+
+**规格**：
+1. 由 W Agent 运行产生的"应回填 K 层"的内容，**只能以 Candidate 形态**进入既有唯一正发路径（Candidate→Review→Approve→**Publish 接 Git commit+tag**，**ADR-18**），kb 侧**不得**存在绕过 Candidate 的直写端点；
+2. 每条候选必须携带 `origin`（来源 Run/Step 与模型版本）与 **Evidence 引用集合**；无证据或证据不可解析者判 FAIL（禁"AI 文本即知识"）；
+3. 候选正文**不入 DB**（只存 Git ref + 元数据，铁律 :549 / ADR-18 §2.3）；
+4. 四眼原则：提交人 ≠ 审批人；security 不可用默认 **DENY**。
+
+**验收**：`KbBackflowCandidateTest#candidateRequiresResolvableEvidenceAndOrigin` + `#publishWritesGitRefNotBody` + `CandidateFourEyesTest#approverMustDifferFromSubmitter`。
+
+### 6.3 REQ-KB-08 画像（Profile）规格化（P0，新能力细化，随 R-08/R-46）
+
+**规格**（把 REQ-KB-02 的画像从"有产出"升级为"可判定"）：
+1. 画像版本必须显式记录四要素：**样本量 `min_sample`、分位数集（P10/P50/P90）、统计窗口、缺失率**；缺一不得置为可引用版本；
+2. 画像的**区间**是 ADR-14 确定性计算（`环节额 = 合同基数 × 归属比例 × 实现率`）的唯一区间来源，cognitive 只引用版本不自造区间；
+3. 画像数值列（含比率/分位数）属受控数值：金额类按 `NUMERIC(18,2)` 且**逐列登记 ST03-A 豁免登记表**，文档不得以"明文即可"替代登记表条目；
+4. 画像为 **SEMANTIC 数值知识**（PRD-00 附录 C 同口径），不落 A3 非结构化载体。
+
+**验收**：`ProfileSpecTest#quantilesRequireSampleWindowAndMissingRate` + `#forecastIntervalReadsOnlyPublishedProfileVersion`。
+
+### 6.4 REQ-KB-09 `kb_extract_candidate` 收编与停写（P1，随 R-40/R-12）
+
+**规格**：
+1. 实测现状（ARCH_SPEC **C229/C230**、ADR-18 §1.2）：`ecos_knowledge.kb_extract_candidate`（`V140:21`）PK 为 `id BIGSERIAL`，**违 MC01**，且与 `agent_approval` / `ecos_decision_approval` / `ecos_workflow_approval` 构成四套重复候选/审批载体；
+2. 处置：**只定性 + 停写 + 不 DROP**（存量动作待 **R-12/R-40** 裁决）；W Agent 候选统一落 `ecos_ai.ecos_wagent_candidate`（合规形态见 ADR-17 §2.3）；
+3. 迁移期允许**只读**旧表（历史候选可查），禁止新增写入；切换完成判据 = 代码侧对旧表的 INSERT/UPDATE 引用为 0；
+4. 若 R-40 反向裁"以 `kb_extract_candidate` 为唯一载体"，则本项作废、改由 ADR-18 §2.2 的表形态在该表上重述（**不改列、只加列**）。
+
+**验收**：`CandidateUnificationTest#kbExtractCandidateHasNoWritePathAfterCutover`（源码扫描 INSERT/UPDATE 引用 = 0）。
+
+---
+
+## 七、追溯与依赖
 
 | REQ | 依赖 | 被依赖 | 批次 |
 |---|---|---|---|
@@ -198,5 +246,9 @@ CREATE INDEX IF NOT EXISTS idx_kba_scenario_status ON ecos_kb_assumption(scenari
 | KB-03 | 同上 | PRD-09 FC-02/情景、PRD-05 COG-02 | 场景批次 A |
 | KB-04 | PMO-66 E1–E4 交付 | 场景工作台 | PMO-66 收口后 |
 | KB-05 | — | — | **PMO-73 G3** |
+| **KB-06** | R-46（类型集与钩子归属） | PRD-05 COG-06（C-11 对象）、PRD-10 WAG-17 | **已批准（§十四）** |
+| **KB-07** | ADR-18 候选单源 + security ABAC（:530） | PRD-10 WAG-19/20（Candidate 正发路径） | **已批准（随 R-40 · §十四）** |
+| **KB-08** | REQ-KB-02 画像表、R-08（画像落点与写通道） | ADR-14 确定性计算（PRD-05/09） | 场景批次 A |
+| **KB-09** | R-12/R-40（存量处置） | ADR-18 §1.2 四套载体收敛 | **已批准（§十四）** |
 
-<!-- PRD-04-kb-engine需求规格 / 2026-09-28 / v1.0 -->
+<!-- PRD-04-kb-engine需求规格 / 2026-09-28 / v1.2（2026-09-29 随需求检视报告 §十四 批量批准定版） -->
