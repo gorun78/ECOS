@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 详细设计-00 W08: traceId 贯穿日志。pattern 中 [%X{traceId:-}] 读 MDC
+     （由 gateway RequestContextFilter / 各 service HeaderAuthInterceptor 注入），全链路不断链。 -->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>[%X{traceId:-NOID}] %-5level[%thread] %logger{40} : %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <logger name="com.chinacreator.gzcm" level="DEBUG"/>
+    <logger name="org.springframework" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

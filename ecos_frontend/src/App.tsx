@@ -69,6 +69,8 @@ const TAB_LABEL_KEY: Record<string, string> = {
   "engine-tasks": "app.tab.engine_tasks",
   telemetry: "app.tab.telemetry",
   tokens: "app.tab.tokens",
+  "gateway-diagnostics": "app.tab.gateway_diagnostics",
+  "alerts-center": "app.tab.alerts_center",
 };
 /** Default tab label: return the raw route id for unknown views (keep prior behaviour). */
 const getTabLabel = (t: (k: string) => string, id: string): string =>
