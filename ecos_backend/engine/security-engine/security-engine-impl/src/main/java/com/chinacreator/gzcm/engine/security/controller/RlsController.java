@@ -68,6 +68,26 @@ public class RlsController {
         return ApiResponse.success(updated);
     }
 
+    /**
+     * 详细设计-01 D.5.2 {@code upsertRlsPolicy}：携 {@code predicateTemplate}+{@code bindings[]}，
+     * 经 {@link com.chinacreator.gzcm.engine.security.rls.RlsPredicateValidator} 白名单校验，非法模板 400
+     * （ECOS-SEC-410）。落 V164 新列，source_kind='parameterized'。
+     */
+    @PutMapping("/policies")
+    public ApiResponse<?> upsertPolicy(@RequestBody Map<String, Object> body) {
+        try {
+            return ApiResponse.success(rlsService.upsertPolicy(body));
+        } catch (com.chinacreator.gzcm.engine.security.rls.RlsPredicateValidator.TemplateRejectedException e) {
+            // 400 ECOS-SEC-410：谓词模板含非白名单字面量/关键字
+            return ApiResponse.badRequest("非法谓词模板（ECOS-SEC-410）: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        } catch (Exception e) {
+            log.error("upsert 参数化 RLS 策略失败", e);
+            return ApiResponse.internalError("upsert 失败");
+        }
+    }
+
     @DeleteMapping("/policies/{id}")
     public ApiResponse<?> deletePolicy(@PathVariable String id) {
         boolean deleted = rlsService.deletePolicy(id);

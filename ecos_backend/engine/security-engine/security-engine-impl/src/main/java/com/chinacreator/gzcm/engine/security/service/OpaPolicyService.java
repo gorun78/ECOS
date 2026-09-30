@@ -29,15 +29,16 @@ public class OpaPolicyService {
 
     private final String opaUrl;
     private final Path policyDir;
-    private final boolean failClose;  // P1-1: OPA 不可用时 true=默认拒绝, false=降级评估
+    // 详细设计-01 W35（P0）：opa.fail-close 配置项移除，fail-close 硬编码为 true 常量。
+    // 任何"可配成 fail-open"的路径都违反铁律 §2.4-8 默认 DENY —— OPA 不可用一律拒绝。
+    private static final boolean FAIL_CLOSE = true;
 
     public OpaPolicyService(
             @Value("${opa.url:http://localhost:8181}") String opaUrl,
-            @Value("${opa.policy-dir:/opt/ecos/opa-policies}") String policyDir,
-            @Value("${opa.fail-close:true}") boolean failClose) {
+            @Value("${opa.policy-dir:/opt/ecos/opa-policies}") String policyDir) {
         this.opaUrl = opaUrl;
-        this.policyDir = Path.of(policyDir).toAbsolutePath().normalize();
-        this.failClose = failClose;
+        // W36：跨平台策略目录解析（ECOS_OPA_POLICY_DIR > 显式配置 > classpath 解包）
+        this.policyDir = OpaPolicyDirResolver.resolve(policyDir);
     }
 
     public Map<String, Object> getStatus() {
@@ -74,53 +75,81 @@ public class OpaPolicyService {
                     .build();
             var resp = http.send(req, HttpResponse.BodyHandlers.ofString());
 
+            boolean allow = resp.body().contains("\"result\":true");
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("policy", policy);
-            result.put("allow", resp.body().contains("\"result\":true"));
+            result.put("allow", allow);
             result.put("opaStatus", resp.statusCode());
             result.put("source", "opa");
+            // C.2.5 ③：裁决结果携带 obligations（deniedReason/maskHints/watermark/rateLimitKey）。
+            // OPA 业务数据源尚未接入时返回空义务集；结构先落，接口契约保持可演进。
+            result.put("obligations", parseObligations(resp.body()));
+            result.put("policyRef", "ecos." + policy);
+            // C.2.5 ④：裁决落审计线索（input 摘要，不落原文避免敏感外泄）
+            result.put("inputDigest", sha256Hex(safeJson(input)));
             return result;
         } catch (Exception e) {
-            log.warn("OPA 不可用, 降级处理: policy={}, error={}", policy, e.getMessage());
-            // P1-1: OPA 降级策略 — fail-close（默认拒绝）或 fail-open（默认放行）
+            log.warn("OPA 不可用, fail-close → DENY: policy={}, error={}", policy, e.getMessage());
+            // W35（M0/P0）：fail-close 常量化 —— OPA 不可用一律拒绝，无 fail-open 分支。
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("policy", policy);
             result.put("source", "fallback");
             result.put("opaError", e.getMessage());
-            if (failClose) {
-                // fail-close: OPA 不可用时默认拒绝（安全优先）
-                result.put("allow", false);
-                result.put("fallback", "DENY_OPA_DOWN");
-                log.warn("OPA 不可用, fail-close → DENY: policy={}", policy);
-            } else {
-                // fail-open: OPA 不可用时基于简单 RBAC 降级评估
-                boolean fallbackAllow = evaluateFallback(policy, input);
-                result.put("allow", fallbackAllow);
-                result.put("fallback", fallbackAllow ? "ALLOW_FALLBACK" : "DENY_FALLBACK");
-                log.warn("OPA 不可用, fail-open → {}: policy={}", fallbackAllow ? "ALLOW" : "DENY", policy);
-            }
+            result.put("allow", false);
+            result.put("fallback", "DENY_OPA_DOWN");
+            result.put("eccode", "ECOS-SEC-502");
+            result.put("obligations", List.of(
+                    Map.of("obligation", "DENIED", "deniedReason", "OPA_UNAVAILABLE_FAIL_CLOSED")));
+            result.put("inputDigest", sha256Hex(safeJson(input)));
+            log.warn("OPA fail-close → DENY: policy={}", policy);
             return result;
         }
     }
 
     /**
-     * P1-1: OPA 不可用时的简单降级评估 — 基于输入中的 role 字段做基本 RBAC
+     * C.2.5 ③：从 OPA 响应解析 obligations。
+     * <p>OPA 返回 {@code {"result": {...}}}；obligations 若能识别取 {@code result.obligations}
+     * （对象数组），否则返回空集（fail-safe，不放大权限）。任何解析失败都归空。</p>
      */
-    private boolean evaluateFallback(String policy, Map<String, Object> input) {
-        Object role = input.get("role");
-        Object action = input.get("action");
-        if (role == null) return false;
-        String roleStr = role.toString();
-        // 超级管理员始终放行
-        if ("ROLE_SUPER_ADMIN".equalsIgnoreCase(roleStr) || "admin".equalsIgnoreCase(roleStr)) {
-            return true;
+    private List<Map<String, Object>> parseObligations(String opaBody) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            Map<String, Object> root = MAPPER.readValue(opaBody,
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            Object result = root.get("result");
+            if (result instanceof Map<?, ?> r && r.get("obligations") instanceof List<?> l) {
+                for (Object o : l) {
+                    if (o instanceof Map<?, ?> om) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> mm = (Map<String, Object>) om;
+                        out.add(mm);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // 解析失败 → 空义务集
         }
-        // 读操作放行，写操作拒绝（最小权限原则）
-        if (action != null) {
-            String actionStr = action.toString().toLowerCase();
-            return actionStr.equals("read") || actionStr.equals("list") || actionStr.equals("get");
+        return out;
+    }
+
+    private static String safeJson(Object o) {
+        try {
+            return o == null ? "" : MAPPER.writeValueAsString(o);
+        } catch (Exception e) {
+            return String.valueOf(o);
         }
-        return false;
+    }
+
+    private static String sha256Hex(String s) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest((s == null ? "" : s).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public List<String> listPolicies() {

@@ -52,9 +52,18 @@ public class EcosTrustHeaderFilter extends OncePerRequestFilter {
     public static final String ATTR_INJECTED_USER   = "ECOS_INJECTED_USER";
     public static final String ATTR_INJECTED_TENANT = "ECOS_INJECTED_TENANT";
 
+    /** 信任头：不可由客户端伪造、不由 service 直接消费。剥离后重注入（W02 修复 F-6）。 */
     private static final String[] TRUST_HEADERS = {
             "X-ECOS-USER", "X-ECOS-ROLE", "X-ECOS-TENANT", "X-ECOS-DOMAIN", "X-ECOS-SERVICE"
     };
+
+    /**
+     * 详细设计-01 W40：机构上下文只从服务端（TD_USER.ORG_ID）解析，客户端伪造的
+     * {@code X-Org-Id} / {@code ?orgId=} 参数一律剥离。剥离头单独成组与 X-ECOS-* 并存，
+     * 便于日志/审计追溯（{@code stripped.X-Org-Id}）。
+     */
+    private static final String[] ORG_OVERRIDABLE_HEADERS = { "X-Org-Id" };
+    private static final String[] ORG_OVERRIDABLE_PARAMS   = { "orgId" };
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -84,30 +93,56 @@ public class EcosTrustHeaderFilter extends OncePerRequestFilter {
                 src.setAttribute("stripped." + h, v);
             }
         }
+        // W40：剥离客户端可伪造的机构头/参数，留观测串（service 端 org 只从 TD_USER 服务端解析）
+        for (String h : ORG_OVERRIDABLE_HEADERS) {
+            String v = src.getHeader(h);
+            if (v != null) {
+                src.setAttribute("stripped." + h, v);
+            }
+        }
+        for (String p : ORG_OVERRIDABLE_PARAMS) {
+            String v = src.getParameter(p);
+            if (v != null) {
+                src.setAttribute("stripped.param." + p, v);
+            }
+        }
         return new TrustStripRequestWrapper(src);
     }
 
     private static final class TrustStripRequestWrapper extends HttpServletRequestWrapper {
         TrustStripRequestWrapper(HttpServletRequest req) { super(req); }
 
+        private boolean isStripped(String name) {
+            if (name != null) {
+                for (String h : TRUST_HEADERS) if (h.equalsIgnoreCase(name)) return true;
+                for (String h : ORG_OVERRIDABLE_HEADERS) if (h.equalsIgnoreCase(name)) return true;
+            }
+            return false;
+        }
+
+        private boolean isStrippedParam(String name) {
+            if (name != null) {
+                for (String p : ORG_OVERRIDABLE_PARAMS) if (p.equals(name)) return true;
+            }
+            return false;
+        }
+
         @Override
         public String getHeader(String name) {
-            if (name != null) {
-                for (String h : TRUST_HEADERS) {
-                    if (h.equalsIgnoreCase(name)) return null;
-                }
-            }
+            if (isStripped(name)) return null;
             return super.getHeader(name);
         }
 
         @Override
         public Enumeration<String> getHeaders(String name) {
-            if (name != null) {
-                for (String h : TRUST_HEADERS) {
-                    if (h.equalsIgnoreCase(name)) return Collections.emptyEnumeration();
-                }
-            }
+            if (isStripped(name)) return Collections.emptyEnumeration();
             return super.getHeaders(name);
+        }
+
+        @Override
+        public String getParameter(String name) {
+            if (isStrippedParam(name)) return null;
+            return super.getParameter(name);
         }
     }
 

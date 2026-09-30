@@ -178,6 +178,133 @@ CREATE INDEX idx_security_alert_type ON ecos_alert_history(alert_type);
 CREATE INDEX idx_security_alert_sev  ON ecos_alert_history(severity);
 CREATE INDEX idx_security_alert_time ON ecos_alert_history(created_at DESC);
 
+-- ============================================================================
+-- 详细设计-01 §6.2 / W38 (F01-12, M0): RLS/CLS 策略表 + 敏感数据目录 + 密钥治理表
+-- 多库等价镜像。PG 侧单源见 gateway/db/migration/V164__security_rls_cls_policy_ddl_backfill.sql
+-- 与 V165__security_crypto_key_governance.sql。本镜像承接 ST07/MC 多库兼容路径
+-- （"无脚本即无多库兼容" S-11 闭环）。列形态与 PG 现网真实形态一致（IR03 只加不删）。
+-- 说明: PG 侧 ecos_security_asset 的部分唯一索引 WHERE is_deleted=0 在 MySQL 无等价，
+--       一律用普通 UNIQUE(tenant_id,asset_key)；软删互斥判定由应用侧承接（偏差已登记）。
+-- ============================================================================
+
+-- ============================================
+-- Table: ecos_rls_policy
+-- Description: 行级安全（RLS）策略表（现网形态镜像 + 参数化谓词列）
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_rls_policy (
+    id                 VARCHAR(64)  PRIMARY KEY COMMENT '策略ID',
+    policy_name        VARCHAR(128) NOT NULL COMMENT '策略名',
+    table_name         VARCHAR(128) NOT NULL COMMENT '目标表',
+    filter_expr        VARCHAR(512) NOT NULL COMMENT '过滤表达式(legacy), 目标态走 predicate_template',
+    role_id            VARCHAR(64)  COMMENT '作用角色',
+    user_id            VARCHAR(64)  COMMENT '作用用户',
+    priority           INT          DEFAULT 0 COMMENT '优先级',
+    enabled            TINYINT(1)   DEFAULT 1 COMMENT '是否启用',
+    description        TEXT COMMENT '描述',
+    created_by         VARCHAR(64)  COMMENT '创建人(legacy)',
+    created_at         DATETIME     DEFAULT NOW() COMMENT '创建时间(legacy)',
+    updated_at         DATETIME     DEFAULT NOW() COMMENT '更新时间(legacy)',
+    resource_id        VARCHAR(64)  COMMENT '资源ID',
+    predicate_template VARCHAR(1000) COMMENT '参数化谓词模板(白名单占位)',
+    bindings_json      TEXT COMMENT '参数绑定(JSON)',
+    source_kind        VARCHAR(32)  NOT NULL DEFAULT 'legacy_text' COMMENT 'legacy_text|parameterized',
+    create_time        DATETIME COMMENT '规范创建时间(DR06)',
+    update_time        DATETIME COMMENT '规范更新时间(DR06)',
+    create_by          VARCHAR(100) COMMENT '规范创建人(DR06)',
+    update_by          VARCHAR(100) COMMENT '规范更新人(DR06)',
+    version_no         VARCHAR(20)  NOT NULL DEFAULT '1' COMMENT '版本号(DR07)',
+    is_deleted         SMALLINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除(DR05)',
+    domain             VARCHAR(50)  NOT NULL DEFAULT 'default' COMMENT '域名(DR08)'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='行级安全策略表';
+
+CREATE INDEX idx_rls_policy_table ON ecos_rls_policy (table_name, enabled, priority);
+
+-- ============================================
+-- Table: ecos_cls_policy
+-- Description: 列级安全（CLS）策略表（现网形态镜像 + mode/scope 范围模型列）
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_cls_policy (
+    id                   VARCHAR(64)  PRIMARY KEY COMMENT '策略ID',
+    policy_name          VARCHAR(128) NOT NULL COMMENT '策略名',
+    table_name           VARCHAR(128) NOT NULL COMMENT '目标表',
+    visible_cols         TEXT         NOT NULL COMMENT '可见列(JSON数组文本)',
+    blocked_cols         TEXT COMMENT '屏蔽列',
+    role_id              VARCHAR(64) COMMENT '作用角色',
+    user_id              VARCHAR(64) COMMENT '作用用户',
+    priority             INT DEFAULT 0 COMMENT '优先级',
+    enabled              TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    description          TEXT COMMENT '描述',
+    created_by           VARCHAR(64) COMMENT '创建人(legacy)',
+    created_at           DATETIME DEFAULT NOW() COMMENT '创建时间(legacy)',
+    updated_at           DATETIME DEFAULT NOW() COMMENT '更新时间(legacy)',
+    resource_id          VARCHAR(64) COMMENT '资源ID',
+    column_name          VARCHAR(128) COMMENT '目标列(NULL=整表默认)',
+    mode                 VARCHAR(16)  NOT NULL DEFAULT 'deny' COMMENT 'allow|deny',
+    allowed_columns_json TEXT COMMENT '允许列(JSON)',
+    scope_type           VARCHAR(16)  NOT NULL DEFAULT 'ROLE' COMMENT 'USER|ROLE|GLOBAL',
+    scope_id             VARCHAR(64) COMMENT '作用对象ID',
+    create_time          DATETIME COMMENT '规范创建时间(DR06)',
+    update_time          DATETIME COMMENT '规范更新时间(DR06)',
+    create_by            VARCHAR(100) COMMENT '规范创建人(DR06)',
+    update_by            VARCHAR(100) COMMENT '规范更新人(DR06)',
+    version_no           VARCHAR(20)  NOT NULL DEFAULT '1' COMMENT '版本号(DR07)',
+    is_deleted           SMALLINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除(DR05)',
+    domain               VARCHAR(50)  NOT NULL DEFAULT 'default' COMMENT '域名(DR08)'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='列级安全策略表';
+
+CREATE INDEX idx_cls_policy_table ON ecos_cls_policy (table_name, scope_type, enabled);
+
+-- ============================================
+-- Table: ecos_security_asset
+-- Description: 敏感数据目录（表/列/级别/防护组合/豁免引用），REQ-SEC-01 §1.1 六类对象落库
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_security_asset (
+    id             VARCHAR(36)  PRIMARY KEY COMMENT 'ID(应用侧UUID, MC01)',
+    asset_key      VARCHAR(192) NOT NULL COMMENT 'schema.table.column 或 schema.table',
+    kind           VARCHAR(16)  NOT NULL COMMENT 'COLUMN|TABLE',
+    sensitivity    VARCHAR(8)   NOT NULL COMMENT 'S0|S1|S2|S3|S4',
+    guard_combo    VARCHAR(64)  NOT NULL COMMENT '防护组合(固定token: rls+cls+mask)',
+    exemption_ref  VARCHAR(64) COMMENT 'ST03-A豁免登记表条目号(无外键)',
+    owner_role     VARCHAR(64) COMMENT '责任角色',
+    description    VARCHAR(500) COMMENT '描述',
+    version_no     VARCHAR(20)  NOT NULL COMMENT '版本号(DR07)',
+    is_deleted     SMALLINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除(DR05)',
+    domain         VARCHAR(50)  NOT NULL DEFAULT 'default' COMMENT '域名(DR08)',
+    tenant_id      VARCHAR(36) COMMENT '租户ID',
+    create_time    DATETIME     NOT NULL DEFAULT NOW() COMMENT '创建时间(DR06)',
+    update_time    DATETIME     NOT NULL DEFAULT NOW() COMMENT '更新时间(DR06)',
+    create_by      VARCHAR(100) COMMENT '创建人(DR06)',
+    update_by      VARCHAR(100) COMMENT '更新人(DR06)'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='敏感数据目录表';
+
+-- 跨库等价：PG 侧为部分唯一索引 WHERE is_deleted=0；MySQL 无部分索引，改用普通唯一，软删互斥由应用侧判定
+CREATE UNIQUE INDEX uniq_sec_asset_key ON ecos_security_asset (tenant_id, asset_key);
+
+-- ============================================
+-- Table: ecos_security_crypto_key
+-- Description: 加密密钥治理表（仅存引用名，禁存密钥材料 R7）；替代 knownLegacy td_crypto_key 写入
+-- ============================================
+CREATE TABLE IF NOT EXISTS ecos_security_crypto_key (
+    id             VARCHAR(36)  PRIMARY KEY COMMENT 'ID(应用侧UUID, MC01)',
+    key_id         VARCHAR(64)  NOT NULL COMMENT '密钥标识',
+    algorithm      VARCHAR(32)  NOT NULL COMMENT '算法(唯一允许AES-256-GCM, W37)',
+    key_version    SMALLINT     NOT NULL COMMENT '密钥版本',
+    status         VARCHAR(16)  NOT NULL DEFAULT 'active' COMMENT 'active|retired|destroyed',
+    master_key_ref VARCHAR(128) NOT NULL COMMENT '主钥引用名(env/KMS key id, 禁存材料)',
+    rotate_at      DATETIME COMMENT '轮换时间',
+    retired_at     DATETIME COMMENT '停用时间',
+    create_time    DATETIME     NOT NULL DEFAULT NOW() COMMENT '创建时间(DR06)',
+    update_time    DATETIME     NOT NULL DEFAULT NOW() COMMENT '更新时间(DR06)',
+    create_by      VARCHAR(100) COMMENT '创建人(DR06)',
+    update_by      VARCHAR(100) COMMENT '更新人(DR06)',
+    version_no     VARCHAR(20)  NOT NULL COMMENT '版本号(DR07)',
+    is_deleted     SMALLINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除(DR05)',
+    domain         VARCHAR(50)  NOT NULL DEFAULT 'default' COMMENT '域名(DR08)',
+    tenant_id      VARCHAR(36) COMMENT '租户ID'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='加密密钥治理表';
+
+CREATE UNIQUE INDEX uniq_crypto_key_ver ON ecos_security_crypto_key (key_id, key_version);
+
 -- ============================================
 -- Foreign Keys (cross-domain)
 -- ============================================

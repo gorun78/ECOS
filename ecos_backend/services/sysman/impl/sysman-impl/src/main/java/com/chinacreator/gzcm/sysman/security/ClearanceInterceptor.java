@@ -41,11 +41,22 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** 可选注入 EventBusService（避免编译期硬依赖 runtime-event / Kafka；不可用时跳过审计）。 */
+    private final org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider;
+
     /** ThreadLocal 保存当前请求，供辅助方法获取 orgId/tenantId */
     private final ThreadLocal<HttpServletRequest> currentRequest = new ThreadLocal<>();
 
+    public ClearanceInterceptor(JdbcTemplate jdbc,
+                                org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider) {
+        this.jdbc = jdbc;
+        this.eventBusProvider = eventBusProvider;
+    }
+
+    /** 兼容构造器（无事件总线）：超管旁路审计仅落日志。保留供既有单测与非注入装配使用。 */
     public ClearanceInterceptor(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        this.eventBusProvider = null;
     }
 
     @Override
@@ -89,14 +100,23 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // ── 1.5 P0-1 (Wave-4.1): super-admin 旁路 — 跨租户遥测视角, 不受 clearance 级别限制 ──
-        // C1 平台 cookies: 单 admin 凭 admin123 看 tenant-a, 这种遥测在 QA / 验收场景需要
-        // 在 clearance 之前绕过 (roll back / 报漏 仍需审计日志, super-admin 操作左侧 audit 雎 follow 类似 position)
+        // ── 1.5 P0-1 (Wave-4.1) + 卷01 W40：super-admin 旁路 —— 通过强审计上报后放行 ──
+        // 卷01 F01-08：超管旁路保留但须每次留痕（保留跨租户遥测视角业务语义，同时关闭"无审计旁路"的越权面）。
+        // 审计事件走 runtime-event EventBusService 发布到 ecos.audit（可选注入，不可用仅 WARN 不阻断）。
         try {
-            var auth = ((org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication()));
+            var auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
             if (auth != null && auth.getAuthorities().stream()
                     .anyMatch(a -> "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()))) {
+                String operator = auth.getPrincipal() == null ? "unknown" : String.valueOf(auth.getPrincipal());
+                StringBuilder roles = new StringBuilder();
+                for (var ga : auth.getAuthorities()) {
+                    if (roles.length() > 0) roles.append(',');
+                    roles.append(ga.getAuthority());
+                }
+                publishSuperAdminBypassAudit(operator, roles.toString(), path, requiredLevel);
+                log.warn("super-admin 旁路准入校验: operator={}, roles={}, path={}, requiredL={}",
+                        operator, roles, path, requiredLevel);
                 return true;
             }
         } catch (Exception e) {
@@ -222,15 +242,9 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     }
 
     private String getCurrentOrgId(String userId) {
-        // 尝试从请求属性获取
-        HttpServletRequest req = currentRequest.get();
-        if (req != null) {
-            String orgId = req.getHeader("X-Org-Id");
-            if (orgId != null && !orgId.isBlank()) return orgId;
-            orgId = req.getParameter("orgId");
-            if (orgId != null && !orgId.isBlank()) return orgId;
-        }
-        // 回退到从用户表查询 org_id
+        // 详细设计-01 W40：机构上下文只从服务端解析（TD_USER.ORG_ID），
+        // 不再信任客户端 X-Org-Id 头 / orgId 参数（水平越权面）。客户端头已在
+        // gateway EcosTrustHeaderFilter 剥离；此处兜底彻底移除客户端来源，双重保险。
         if (userId != null) {
             try {
                 List<Map<String, Object>> rows = jdbc.queryForList(
@@ -244,6 +258,36 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             }
         }
         return null;
+    }
+
+    // ── 超管旁路强审计（详细设计-01 W40 / F01-08）────────────────────
+    // 保留旁路业务能力，但每次旁路必须留痕到 ecos.audit（可选注入 EventBusService，
+    // 不可用仅 WARN 不阻断；反射调用避免编译期硬依赖 runtime-event，同 SecurityPolicyController 口径）。
+
+    private void publishSuperAdminBypassAudit(String operator, String roles, String path, int requiredLevel) {
+        try {
+            Object eventBus = eventBusProvider == null ? null : eventBusProvider.getIfAvailable();
+            if (eventBus == null) {
+                log.debug("[audit] EventBusService 不可用，超管旁路留痕仅走日志: operator={}, path={}", operator, path);
+                return;
+            }
+            Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("eventType", "super_admin_bypass");
+            payload.put("action", "clearance.bypass.superAdmin");
+            payload.put("userId", operator);
+            payload.put("username", operator);
+            payload.put("resource", path);
+            payload.put("result", "BYPASSED");
+            payload.put("roles", roles);
+            payload.put("requiredLevel", requiredLevel);
+            payload.put("source", "sysman-clearance-interceptor");
+            payload.put("timestamp", System.currentTimeMillis());
+            eventBus.getClass().getMethod("publish", String.class, Object.class)
+                    .invoke(eventBus, "ecos.audit", payload);
+        } catch (Exception e) {
+            log.warn("[audit] 超管旁路审计发布失败（不阻断旁路）: operator={}, path={}, {}",
+                    operator, path, e.getMessage());
+        }
     }
 
     // ── 查询方法（带租户过滤）───────────────────────────

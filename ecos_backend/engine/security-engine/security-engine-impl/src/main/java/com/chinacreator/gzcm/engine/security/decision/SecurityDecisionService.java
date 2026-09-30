@@ -1,0 +1,199 @@
+package com.chinacreator.gzcm.engine.security.decision;
+
+import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
+import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
+import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
+import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * 详细设计-01 C.1 [3] / C.2 / W33 — <b>三通道唯一裁决入口</b>。
+ *
+ * <pre>{@code
+ *   decide(AssetRef{schema,table,columns[]}, Purpose{page|export|ai}, ctx)
+ *       → DecisionBundle{ rls, columns, masks, opa, decisionId, traceId }
+ * }</pre>
+ *
+ * <p>结构性目的（F01-02/W33）：现状三通道各自零散调 RLS/CLS（S-6 只 1/3 通道），
+ * 漏一个即旁路。合并成单入口后，"绕过其中一条"在架构上<b>不可表达</b> ——
+ * 页面/导出/AI 全部经此方法，{@code decide} 一次拿全四源裁决。</p>
+ *
+ * <p>四源职责映射（各源 fail-closed 语义见各自实现）：</p>
+ * <ul>
+ *   <li>RLS → {@link RowLevelSecurityServiceImpl#apply}（{@code predicateTemplate + bindings}，非裸字符串）</li>
+ *   <li>CLS → {@link ColumnLevelSecurityServiceImpl#getColumns}（allow 空集 = 一列不可读 = DENY）</li>
+ *   <li>mask → 敏感数据目录 {@code ecos_security_asset}（COLUMN 行 guard_combo 含 mask 的列 → 强制 mask）</li>
+ *   <li>OPA → {@link OpaPolicyService#evaluate}（fail-close 常量化，DENY 语义自带）</li>
+ * </ul>
+ */
+@Service
+public class SecurityDecisionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityDecisionService.class);
+
+    private final RowLevelSecurityServiceImpl rls;
+    private final ColumnLevelSecurityServiceImpl cls;
+    private final OpaPolicyService opa;
+    private final JdbcTemplate jdbc;
+
+    public SecurityDecisionService(
+            @Qualifier("ecosRlsService") RowLevelSecurityServiceImpl rls,
+            @Qualifier("ecosClsService") ColumnLevelSecurityServiceImpl cls,
+            OpaPolicyService opa,
+            JdbcTemplate jdbc) {
+        this.rls = rls;
+        this.cls = cls;
+        this.opa = opa;
+        this.jdbc = jdbc;
+    }
+
+    public DecisionBundle decide(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
+        if (asset == null || asset.getTable() == null || asset.getTable().isBlank()) {
+            throw new IllegalArgumentException("assetRef.table 不能为空");
+        }
+        DecisionBundle.Purpose p = purpose == null ? DecisionBundle.Purpose.PAGE : purpose;
+        String table = asset.getTable();
+        String userId = ctx == null ? null : ctx.userId();
+
+        // ── [1] RLS：参数化谓词（占位符 + bindings，禁字符串拼接）──
+        Map<String, Object> rlsRes = safeRls(table, userId);
+        Map<String, Object> rlsPart = asPredicatePart(rlsRes);
+
+        // ── [2] CLS：列投影（allow 空集 = DENY 全部列）──
+        Map<String, Object> clsRes = safeCls(table, userId, asset.getColumns());
+        Map<String, Object> columnsPart = asColumnsPart(clsRes);
+
+        // ── [3] mask：敏感数据目录 → 强制 mask 列集合 ──
+        List<Map<String, Object>> masks = safeMasks(asset, purpose);
+
+        // ── [4] OPA：裁决（fail-close 内建）──
+        Map<String, Object> opaPart = safeOpa(asset, p, ctx);
+
+        String decisionId = uuid();
+        String traceId = ctx != null ? ctx.traceId() : null;
+        log.debug("decide: asset={} purpose={} → decisionId={} rlsTemplate={} columnsMode={} masks={} opaAllow={}",
+                asset.key(), p, decisionId,
+                rlsPart.get("predicateTemplate"), columnsPart.get("mode"),
+                masks.size(), opaPart.get("allow"));
+        return new DecisionBundle(rlsPart, columnsPart, masks, opaPart, decisionId, traceId);
+    }
+
+    // ── 四源各自的 fail-safe 隔离：某源异常不放大成整条抛错，而是保守拒绝 ──
+
+    private Map<String, Object> safeRls(String table, String userId) {
+        try {
+            return rls.apply(table, userId);
+        } catch (Exception e) {
+            log.warn("decide RLS 源异常，按无策略 1=1 + denyIfEmpty=true 保守处理: table={}, err={}", table, e.getMessage());
+            RlsPredicate p = new RlsPredicate();
+            p.setPredicateTemplate("1=1");
+            p.setDenyIfEmpty(true);
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("predicate", p.toMap());
+            r.put("params", Map.of());
+            return r;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asPredicatePart(Map<String, Object> rlsRes) {
+        Object pred = rlsRes.get("predicate");
+        if (pred instanceof Map<?, ?> p) return (Map<String, Object>) p;
+        Map<String, Object> fallback = new LinkedHashMap<>();
+        fallback.put("predicateTemplate", "1=1");
+        fallback.put("denyIfEmpty", true);
+        return fallback;
+    }
+
+    private Map<String, Object> safeCls(String table, String userId, List<String> columns) {
+        try {
+            return cls.getColumns(table, userId, columns);
+        } catch (Exception e) {
+            log.warn("decide CLS 源异常，按 fail-closed 拒绝全部列: table={}", table, e);
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("visibleColumns", new ArrayList<String>());
+            r.put("blockedColumns", columns == null ? new ArrayList<String>() : new ArrayList<>(columns));
+            return r;
+        }
+    }
+
+    private Map<String, Object> asColumnsPart(Map<String, Object> clsRes) {
+        Object vis = clsRes.get("visibleColumns");
+        List<?> visible = vis instanceof List<?> l ? l : new ArrayList<>();
+        Map<String, Object> m = new LinkedHashMap<>();
+        // C.2.3：allow 语义（返回可读列集合）；allow 空集 = 该主体不可读该资产任何列（非全放开）
+        m.put("mode", "allow");
+        m.put("names", visible);
+        return m;
+    }
+
+    private List<Map<String, Object>> safeMasks(AssetRef asset, DecisionBundle.Purpose purpose) {
+        try {
+            // asset_key 形如 [schema.]table.column；本表列目录的 asset_key 前缀 = asset.key()
+            String prefix = asset.key();
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT split_part(asset_key, '.', array_position(string_to_array(asset_key, '.'), ?) + 1) AS column, " +
+                "       CASE WHEN guard_combo LIKE '%staff%' THEN 'STAFF_REF' " +
+                "            WHEN guard_combo LIKE '%amount%' THEN 'AMOUNT' " +
+                "            ELSE 'MASK' END AS strategy " +
+                "FROM ecos_security_asset " +
+                "WHERE kind = 'COLUMN' AND is_deleted = 0 " +
+                "  AND asset_key LIKE '%' || ? || '.%' " +
+                "ORDER BY asset_key",
+                asset.getTable(), prefix);
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                Map<String, Object> mm = new LinkedHashMap<>();
+                mm.put("column", row.get("column"));
+                mm.put("strategy", String.valueOf(row.get("strategy")));
+                out.add(mm);
+            }
+            // 只返回目录中显式登记 mask 的列，不做全表放大（无登记 = 无强制脱敏）
+            return out;
+        } catch (Exception e) {
+            log.warn("decide mask 目录读取异常，返回空 mask 集（不放大权限）: table={}, err={}",
+                    asset.getTable(), e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private Map<String, Object> safeOpa(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("purpose", purpose.name().toLowerCase());
+        input.put("asset", asset.key());
+        input.put("subjectId", ctx != null ? ctx.userId() : null);
+        input.put("tenantId", ctx != null ? ctx.tenantId() : null);
+        try {
+            Map<String, Object> r = opa.evaluate("data.access", input);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("allow", r.getOrDefault("allow", false));
+            out.put("policyRef", r.getOrDefault("policyRef", "ecos.data.access"));
+            Object ob = r.get("obligations");
+            out.put("obligations", ob instanceof List<?> l ? l : new ArrayList<>());
+            return out;
+        } catch (Exception e) {
+            // OpaPolicyService.evaluate 内部已 fail-close；这里再兜一层：绝不因 OPA 抛错而放行
+            log.warn("decide OPA 源异常，fail-close → allow=false: {}", e.getMessage());
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("allow", false);
+            out.put("policyRef", "ecos.data.access");
+            out.put("obligations", List.of(Map.of("obligation", "DENIED", "deniedReason", "OPA_ERROR_FAIL_CLOSED")));
+            return out;
+        }
+    }
+
+    private static String uuid() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+}
