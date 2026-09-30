@@ -25,7 +25,7 @@
 | Source | `SOURCE_JDBC` | `JdbcConnector` | `datasourceId, sql` | 全版本 |
 | Source | `SOURCE_CSV` | `CsvConnector` | `filePath` | 全版本 |
 | Source | `SOURCE_REST` | `RestApiConnector` | `url` | 全版本 |
-| Source | `SOURCE_CDC` | 未实现 | — | **仅 ultimate（flagship）**，standard/enterprise 执行时抛 `BusinessException("SOURCE_CDC 仅旗舰版支持")` |
+| Source | `SOURCE_CDC` | 未实现 | — | **仅 ultimate**（原 flagship 别名已弃用，2026-09-28 PMO-74 H5），standard/enterprise 执行时抛 `BusinessException("SOURCE_CDC 仅旗舰版支持")` |
 | Transform | `TRANSFORM_SQL` | 系统 JdbcTemplate（系统库内允许） | `sql` | 全版本 |
 | Transform | `TRANSFORM_UDF` | UdfSandbox（内存白名单） | `udfId` | 全版本 |
 | Join | `JOIN` | 内存合并（按 `joinKeys`） | `joinKeys`（建议） | 全版本 |
@@ -143,7 +143,7 @@ POST /api/v1/pipeline/debug/sessions
 |---------|----|---------|----------|------|
 | `standard` (default) | PG only | common, runtime, sysman, workspace, services/*, gateway | ~8 min (增量) | **BUILD SUCCESS** |
 | `enterprise` | PG + Neo4j | 同上 (+ Neo4j driver `neo4j-java-driver`) + redis flag | ~8 min | **BUILD SUCCESS** |
-| `ultimate` (flagship) | PG + Neo4j + Doris + Doris DB 调度 | 同上 (+ Doris driver/mysql-connector) + redis flag | ~10 min | **BUILD SUCCESS** |
+| `ultimate`（原 flagship 别名已弃用，2026-09-28 PMO-74 H5） | PG + Neo4j + Doris + Doris DB 调度 | 同上 (+ Doris driver/mysql-connector) + redis flag | ~10 min | **BUILD SUCCESS** |
 
 > 三大 profile 共 13 个 Maven 模块（不增不减，架构铁律 §0.4「一套代码三套发布」），pipeline 全部代码无条件进入，按 feature flag 分支。
 
@@ -190,6 +190,13 @@ POST /api/v1/pipeline/debug/sessions
 ---
 
 ## 5. 冒烟脚本（`ecos-tests/data-workbench-pipeline-smoke.mjs`）
+
+> **【2026-09-30 校订 — 本节所列脚本已删除，按原文执行必失败】**
+> 依 `docs/20-需求/需求检视报告-2026-09-28.md` §十二 补记裁决（E2E = Playwright 全量工程化，3 个 `.mjs` 迁移后删除、**不留双轨**），本节文件已被替换：
+> - `data-workbench-pipeline-smoke.mjs` → `ecos-tests/tests/api/pipeline-contract.spec.ts`（A~I）+ `ecos-tests/tests/e2e/pipeline-workbench.spec.ts`（J~L，并按真实实现重定位）
+> - 跑法改为：`cd ecos-tests && cp .env.example .env`（填本机 dev 凭据，`.env` 已 gitignore）→ `npx playwright test`；首跑与复跑凭证见报告 §14.6.2（当前口径 **10 passed / 1 failed**，红项 = 管道 execute 因 OPA 零策略 fail-closed）
+> - 下文步骤 2 的 `_win_tasks/start-gateway.ps1` **实测不存在**，现行入口为 `_win_tasks/start-backend.ps1 -Modules gateway,…`；步骤 B 的"`node-types` → 9 类"实测已扩为 **12 类**（单源 = `PipelineNodeTypesCatalog.java:19~28` + `PipelineControllerTest.java:187`）。
+> 本节其余内容保留作 Wave 4-T2 的历史记录，不改写（R9 只增不改）。
 
 跑法：
 ```bash
