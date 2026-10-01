@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.engine.ontology.client.DataNetResourceClient;
+import com.chinacreator.gzcm.engine.ontology.dao.AutoDiscoverDao;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverMappingVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyAutoDiscoverResultVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -20,8 +20,8 @@ import java.util.stream.Collectors;
  * <p>T13 改造: 原 {@code getResourceFields} 用 JdbcTemplate 直查 data-engine 的数据资源
  * / 数据字段两张元数据表 (跨引擎指定, 违反铁律 §0.3.1 微服务边界),
  * 改为 delegate 到 {@link DataNetResourceClient} 走 datanet service REST。
- * 本类仍保留 JdbcTemplate 用于查询本体自己的表 (ecos_ontology_entity / ecos_domain /
- * ecos_ontology_property / ecos_entity_table_mapping), 属本引擎合理范围。</p>
+ * 本引擎自有表的读写经 {@link AutoDiscoverDao}（ecos_ontology_entity / ecos_domain /
+ * ecos_ontology_property / ecos_entity_table_mapping），属本引擎合理范围。</p>
  *
  * <p>PMO-B7 T1 (D11) 加固: 取数源统一收敛为 DW(CURATED) 层资源清单
  * （{@link DataNetResourceClient#listResourcesByLayer(String)}）+
@@ -37,11 +37,11 @@ public class AutoDiscoverService {
     /** 取数源分层：DW 层（本体工作台仅允许只读 DW 层，见 §0.5 边界铁律）。 */
     private static final String DW_LAYER = "CURATED";
 
-    private final JdbcTemplate jdbc;
+    private final AutoDiscoverDao autoDiscoverDao;
     private final DataNetResourceClient dataNetClient;
 
-    public AutoDiscoverService(JdbcTemplate jdbc, DataNetResourceClient dataNetClient) {
-        this.jdbc = jdbc;
+    public AutoDiscoverService(AutoDiscoverDao autoDiscoverDao, DataNetResourceClient dataNetClient) {
+        this.autoDiscoverDao = autoDiscoverDao;
         this.dataNetClient = dataNetClient;
     }
 
@@ -174,16 +174,7 @@ public class AutoDiscoverService {
      * 查询实体表映射（不分页，按 domain 可选过滤，按创建时间倒序）。
      */
     public List<Map<String, Object>> listMappings(String domainCode) {
-        String sql;
-        Object[] params;
-        if (domainCode != null && !domainCode.isBlank()) {
-            sql = "SELECT * FROM ecos_entity_table_mapping WHERE domain_code=? ORDER BY created_at DESC";
-            params = new Object[]{domainCode};
-        } else {
-            sql = "SELECT * FROM ecos_entity_table_mapping ORDER BY created_at DESC";
-            params = new Object[]{};
-        }
-        return jdbc.queryForList(sql, params);
+        return autoDiscoverDao.listMappings(domainCode);
     }
 
     /**
@@ -244,20 +235,11 @@ public class AutoDiscoverService {
         String id = UUID.randomUUID().toString().replace("-", "").substring(0, 32);
         String ontologyId = findOrCreateOntology(domainCode);
 
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?)",
-                Integer.class, entityCode, domainCode);
-        if (count != null && count > 0) {
+        Map<String, Object> existing = autoDiscoverDao.createOntologyEntity(entityCode, domainCode, id, ontologyId, tableName);
+        if (existing != null) {
             log.info("Entity {} already exists in domain {}", entityCode, domainCode);
-            return jdbc.queryForMap(
-                    "SELECT id, code, name FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?)",
-                    entityCode, domainCode);
+            return existing;
         }
-
-        jdbc.update(
-                "INSERT INTO ecos_ontology_entity (id, ontology_id, code, name, entity_type, description, domain_id, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, 'MASTER', ?, (SELECT id FROM ecos_domain WHERE code=?), NOW(), NOW())",
-                id, ontologyId, entityCode, tableName, "Auto-discovered from " + tableName, domainCode);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", id);
@@ -267,18 +249,13 @@ public class AutoDiscoverService {
     }
 
     private String findOrCreateOntology(String domainCode) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT o.id FROM ecos_ontology o WHERE o.code=?", domainCode.toLowerCase());
-        if (!rows.isEmpty()) {
-            return (String) rows.get(0).get("id");
+        String existing = autoDiscoverDao.findOntologyId(domainCode);
+        if (existing != null) {
+            return existing;
         }
 
         String oid = UUID.randomUUID().toString().replace("-", "").substring(0, 32);
-        jdbc.update(
-                "INSERT INTO ecos_ontology (id, code, name, version, status, description) " +
-                "VALUES (?, ?, ?, '1.0', 'DRAFT', ?)",
-                oid, domainCode.toLowerCase(), domainCode + " Ontology",
-                "Auto-created for domain " + domainCode);
+        autoDiscoverDao.insertOntology(oid, domainCode);
         return oid;
     }
 
@@ -287,16 +264,10 @@ public class AutoDiscoverService {
         String ontologyType = mapSqlType(dataType);
         String propId = UUID.randomUUID().toString().replace("-", "").substring(0, 32);
 
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_ontology_property WHERE code=? AND entity_id=" +
-                "(SELECT id FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?))",
-                Integer.class, propCode, entityCode, domainCode);
+        Integer count = autoDiscoverDao.countEntityProperty(propCode, entityCode, domainCode);
         if (count != null && count > 0) return;
 
-        jdbc.update(
-                "INSERT INTO ecos_ontology_property (id, code, name, property_type, entity_id, searchable_flag, required_flag, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, (SELECT id FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?)), 1, 0, NOW(), NOW())",
-                propId, propCode, fieldName, ontologyType, entityCode, domainCode);
+        autoDiscoverDao.insertEntityProperty(propId, propCode, fieldName, ontologyType, entityCode, domainCode);
     }
 
     private Map<String, Object> createMapping(String entityCode, String resourceName, String domainCode,
@@ -315,13 +286,10 @@ public class AutoDiscoverService {
 
         String fieldMappingsJson = toJsonString(fmList);
 
-        jdbc.update(
-                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW()) " +
-                "ON CONFLICT (entity_code, datasource_id, resource_name) DO UPDATE SET field_mappings=?::jsonb, updated_at=NOW()",
-                id, entityCode, entityName, domainCode, datasourceId, resourceName, schema, fieldMappingsJson, fieldMappingsJson);
+        autoDiscoverDao.upsertMapping(id, entityCode, entityName, domainCode, datasourceId, resourceName, schema,
+                fieldMappingsJson);
 
-        return jdbc.queryForMap("SELECT * FROM ecos_entity_table_mapping WHERE id=?", id);
+        return autoDiscoverDao.findMappingById(id);
     }
 
     private String toEntityCode(String tableName) {

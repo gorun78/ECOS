@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.engine.ontology.client.KbEngineGraphSyncClient;
+import com.chinacreator.gzcm.engine.ontology.dao.OntologyKgSyncDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -39,11 +39,11 @@ public class OntologyKgSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyKgSyncService.class);
 
-    private final JdbcTemplate jdbc;
+    private final OntologyKgSyncDao kgSyncDao;
     private final KbEngineGraphSyncClient kgClient;
 
-    public OntologyKgSyncService(JdbcTemplate jdbc, KbEngineGraphSyncClient kgClient) {
-        this.jdbc = jdbc;
+    public OntologyKgSyncService(OntologyKgSyncDao kgSyncDao, KbEngineGraphSyncClient kgClient) {
+        this.kgSyncDao = kgSyncDao;
         this.kgClient = kgClient;
     }
 
@@ -67,9 +67,8 @@ public class OntologyKgSyncService {
      * @return true = kb-engine 受理成功, false = 不可达/失败
      */
     public boolean syncOntologyToKnowledgeGraph() {
-        // ── 1. 读实体 code 摘要 (本体自有表, JdbcTemplate 合理) ──
-        List<Map<String, Object>> entities = jdbc.queryForList(
-            "SELECT code FROM ecos_ontology_entity");
+        // ── 1. 读实体 code 摘要 (本体自有表) ──
+        List<Map<String, Object>> entities = kgSyncDao.findEntityCodes();
 
         List<Map<String, Object>> entitySummaries = new java.util.ArrayList<>();
         for (Map<String, Object> e : entities) {
@@ -84,8 +83,7 @@ public class OntologyKgSyncService {
         }
 
         // ── 2. 读关系 id 摘要 ──
-        List<Map<String, Object>> relRows = jdbc.queryForList(
-            "SELECT r.id FROM ecos_ontology_relationship r");
+        List<Map<String, Object>> relRows = kgSyncDao.findRelationshipIds();
         List<Map<String, Object>> relationshipSummaries = new java.util.ArrayList<>();
         for (Map<String, Object> r : relRows) {
             Object id = r.get("id");

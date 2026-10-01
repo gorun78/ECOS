@@ -31,6 +31,15 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- B3-a 数据访问收口（R2-B3 / §2.5 #1）：ontology.dao.* 继承
+             com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport，
+             与 B1 data-engine-impl 同款 ground-truth pattern —— 显式直依 runtime-core -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
