@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.services.agent.runtime.toolrouter;
 
+import com.chinacreator.gzcm.services.agent.dao.AgentToolDefinitionDao;
 import com.chinacreator.gzcm.services.agent.runtime.model.ToolDefinition;
 import com.chinacreator.gzcm.services.agent.runtime.model.ToolType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -18,11 +18,11 @@ public class ToolRouterServiceImpl implements ToolRouterService {
     private static final Logger log = LoggerFactory.getLogger(ToolRouterServiceImpl.class);
 
     private final List<ToolExecutor> toolExecutors;
-    private final JdbcTemplate jdbcTemplate;
+    private final AgentToolDefinitionDao toolDefinitionDao;
 
-    public ToolRouterServiceImpl(List<ToolExecutor> toolExecutors, JdbcTemplate jdbcTemplate) {
+    public ToolRouterServiceImpl(List<ToolExecutor> toolExecutors, AgentToolDefinitionDao toolDefinitionDao) {
         this.toolExecutors = toolExecutors;
-        this.jdbcTemplate = jdbcTemplate;
+        this.toolDefinitionDao = toolDefinitionDao;
     }
 
     @Override
@@ -50,18 +50,7 @@ public class ToolRouterServiceImpl implements ToolRouterService {
     public List<ToolDefinition> getAvailableTools(String agentId) {
         log.info("Getting available tools for agent: {}", agentId);
         try {
-            return jdbcTemplate.query(
-                "SELECT code, name, tool_type, endpoint_url, status FROM ecos_ai.ecos_tool_definition WHERE status = 'ACTIVE'",
-                (rs, rowNum) -> {
-                    ToolDefinition def = new ToolDefinition();
-                    def.setCode(rs.getString("code"));
-                    def.setName(rs.getString("name"));
-                    def.setType(ToolType.valueOf(rs.getString("tool_type")));
-                    def.setEndpoint(rs.getString("endpoint_url"));
-                    def.setStatus(rs.getString("status"));
-                    return def;
-                }
-            );
+            return toolDefinitionDao.listActiveTools();
         } catch (Exception e) {
             log.warn("Failed to load tools from DB, falling back to enum-based list: {}", e.getMessage());
             List<ToolDefinition> tools = new ArrayList<>();

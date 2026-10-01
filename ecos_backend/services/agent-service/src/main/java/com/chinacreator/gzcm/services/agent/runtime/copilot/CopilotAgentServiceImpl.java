@@ -8,7 +8,6 @@ import com.chinacreator.gzcm.services.agent.runtime.planner.PlannerService;
 import com.chinacreator.gzcm.services.agent.runtime.toolrouter.ToolRouterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,18 +24,15 @@ public class CopilotAgentServiceImpl implements ICopilotAgentService {
     private final PlannerService plannerService;
     private final ExecutorService executorService;
     private final MemoryService memoryService;
-    private final JdbcTemplate jdbcTemplate;
 
     public CopilotAgentServiceImpl(ToolRouterService toolRouterService,
                                     PlannerService plannerService,
                                     ExecutorService executorService,
-                                    MemoryService memoryService,
-                                    JdbcTemplate jdbcTemplate) {
+                                    MemoryService memoryService) {
         this.toolRouterService = toolRouterService;
         this.plannerService = plannerService;
         this.executorService = executorService;
         this.memoryService = memoryService;
-        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override

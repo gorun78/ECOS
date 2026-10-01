@@ -1,12 +1,12 @@
 package com.chinacreator.gzcm.services.agent.runtime.evolution;
 
+import com.chinacreator.gzcm.services.agent.dao.AgentEvolutionDao;
 import com.chinacreator.gzcm.services.agent.runtime.executor.ExecutorService;
 import com.chinacreator.gzcm.services.agent.runtime.model.ExecutionResult;
 import com.chinacreator.gzcm.services.agent.runtime.model.ExecutionTask;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,12 +30,12 @@ public class EvolutionOrchestrator {
         "DEPLOYMENT", "agent-scenario"
     );
 
-    private final JdbcTemplate jdbcTemplate;
+    private final AgentEvolutionDao evolutionDao;
     private final ExecutorService executorService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public EvolutionOrchestrator(JdbcTemplate jdbcTemplate, ExecutorService executorService) {
-        this.jdbcTemplate = jdbcTemplate;
+    public EvolutionOrchestrator(AgentEvolutionDao evolutionDao, ExecutorService executorService) {
+        this.evolutionDao = evolutionDao;
         this.executorService = executorService;
     }
 
@@ -49,10 +49,7 @@ public class EvolutionOrchestrator {
 
             try {
                 String contextJson = objectMapper.writeValueAsString(context);
-                jdbcTemplate.update(
-                    "INSERT INTO ecos_ai.ecos_evolution_log (id, mission_id, stage, agent_id, input_context, status, started_at) VALUES (?,?,?,?,?::jsonb,'STARTED',NOW())",
-                    logId, missionId, stage, agentId, contextJson
-                );
+                evolutionDao.insertEvolutionLog(logId, missionId, stage, agentId, contextJson);
             } catch (Exception e) {
                 log.warn("Failed to insert evolution log for stage {}: {}", stage, e.getMessage());
                 continue;
@@ -65,15 +62,13 @@ public class EvolutionOrchestrator {
                 task.setAgentId(agentId);
                 ExecutionResult result = executorService.execute(task);
 
-                jdbcTemplate.update(
-                    "UPDATE ecos_ai.ecos_evolution_log SET status='COMPLETED', output_result=?::jsonb, completed_at=NOW() WHERE id=?",
+                evolutionDao.markEvolutionCompleted(
                     result.getOutput() != null ? result.getOutput() : "{}", logId
                 );
             } catch (Exception e) {
                 log.error("Evolution stage {} failed: {}", stage, e.getMessage());
                 try {
-                    jdbcTemplate.update(
-                        "UPDATE ecos_ai.ecos_evolution_log SET status='FAILED', output_result=?::jsonb, completed_at=NOW() WHERE id=?",
+                    evolutionDao.markEvolutionFailed(
                         "{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}", logId
                     );
                 } catch (Exception ex) {
@@ -86,9 +81,6 @@ public class EvolutionOrchestrator {
     }
 
     public List<Map<String, Object>> getEvolutionLog(String missionId) {
-        return jdbcTemplate.queryForList(
-            "SELECT id, mission_id, stage, agent_id, status, started_at, completed_at FROM ecos_ai.ecos_evolution_log WHERE mission_id = ? ORDER BY started_at",
-            missionId
-        );
+        return evolutionDao.listEvolutionLog(missionId);
     }
 }
