@@ -36,11 +36,14 @@ import static org.junit.jupiter.api.Assertions.fail;
  *       （缺文件不能黑盒失败；一旦后续真写 {@code public.sql}，重新启用该用例即可）。</li>
  * </ol>
  *
- * <p>surefire 工作目录 = {@code gateway/}，仓库根 = {@code ../../../}。
+ * <p>Surefire CWD 可能因调用方式漂移（例如 {@code -rf} 中途续跑、CI 路径切换）。
+ * 因此从 CWD 向上探测同时含 {@code ecos_backend/} 与 {@code ecos-docker/} 的目录作为仓库根。
  */
 class PublicSqlRegressionTest {
 
-    private static final String REPO_ROOT = "../../../";  // surefire cwd = ecos_backend/gateway/
+    /** V200（commit cda0810d）DDL 单源落位：docs/50-db_script/02-flyway-migration/gateway/。 */
+    private static final String DDL_SINGLE_SOURCE_DIR =
+            "docs/50-db_script/02-flyway-migration/gateway";
 
     /** 5KB 安全下限（真实 DDL 是几十 KB）。 */
     private static final long MIN_PUBLIC_SQL_BYTES = 5 * 1024L;
@@ -52,9 +55,16 @@ class PublicSqlRegressionTest {
             Pattern.compile(".*\\*\\.sql\\s*$");
 
     private static Path repoRoot() {
-        Path root = Paths.get(REPO_ROOT).toAbsolutePath().normalize();
-        assertTrue(Files.isDirectory(root), "仓库根未找到: " + root);
-        return root;
+        Path cur = Paths.get("").toAbsolutePath().normalize();
+        for (int i = 0; i < 8 && cur != null; i++) {
+            if (Files.isDirectory(cur.resolve("ecos_backend"))
+                    && Files.isDirectory(cur.resolve("ecos-docker"))) {
+                return cur;
+            }
+            cur = cur.getParent();
+        }
+        fail("未定位 ECOS 仓库根（未找到同时含 ecos_backend/ 与 ecos-docker/ 的目录）");
+        return null;
     }
 
     /** 1. .gitignore 不得含 "public.sql" 或 "*.sql" 类排除模式（否则 DDL 存量脱版）。 */
@@ -78,18 +88,19 @@ class PublicSqlRegressionTest {
                 ".gitignore 禁止排除 public.sql / *.sql（DDL 脱版 → 基线不可重放）: " + offenders);
     }
 
-    /** 2. ecos-sql/{postgresql,mysql} 实际 DDL 源枚举且最大 PG DDL &gt; 5KB。 */
+    /**
+     * 2. V200 起（commit cda0810d）DDL 单源 = {@code docs/50-db_script/02-flyway-migration/gateway/}。
+     *    断言：目录存在；.sql 文件数 &gt; 0；最大文件 &gt; 5KB（真实 DDL 数十 KB）。
+     */
     @Test
-    @DisplayName("ecos-sql/{postgresql,mysql} DDL 源齐备 + PG 最大 ddd &gt; 5KB")
+    @DisplayName("DDL 单源目录齐备 + 最大文件 &gt; 5KB（V200 单源落位 docs/50-db_script）")
     void sqlDdlSourcesPresentAndSaneSize() throws IOException {
-        Path pg = repoRoot().resolve("ecos-sql/postgresql");
-        Path my = repoRoot().resolve("ecos-sql/mysql");
-        assertTrue(Files.isDirectory(pg), "ecos-sql/postgresql/ 缺失: " + pg);
-        assertTrue(Files.isDirectory(my), "ecos-sql/mysql/ 缺失: " + my);
+        Path ddl = repoRoot().resolve(DDL_SINGLE_SOURCE_DIR);
+        assertTrue(Files.isDirectory(ddl), "DDL 单源目录缺失 (V200 归档落位): " + ddl);
 
         long[] maxHolder = {0L};
         List<String> pgFiles = new ArrayList<>();
-        try (Stream<Path> stream = Files.list(pg)) {
+        try (Stream<Path> stream = Files.list(ddl)) {
             stream.filter(Files::isRegularFile)
                   .filter(p -> p.toString().endsWith(".sql"))
                   .forEach(p -> {
@@ -103,11 +114,11 @@ class PublicSqlRegressionTest {
                   });
         }
         long max = maxHolder[0];
-        // 物理落点实测（2026-10-21 grep）：00_init_database.sql (1288B)
-        //  + 01..08_ecos_*.sql；其中 04_ecos_ontology.sql ~ 23.8KB 为最大，远超 5KB。
+        assertTrue(!pgFiles.isEmpty(),
+                "DDL 单源目录无 .sql 文件: " + ddl);
         assertTrue(max > MIN_PUBLIC_SQL_BYTES,
-                "PG DDL 最大文件应 &gt; 5KB (sane floor): current max = " + max
-                        + "B; files=" + pgFiles);
+                "DDL 单源最大文件应 &gt; 5KB (sane floor): current max = " + max
+                        + "B; fileCount=" + pgFiles.size());
     }
 
     /**

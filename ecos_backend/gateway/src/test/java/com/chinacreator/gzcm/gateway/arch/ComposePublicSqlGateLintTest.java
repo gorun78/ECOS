@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * W53 / C42 源码门禁（详细设计-02 §7.1 W53 落点 F02-13）— {@code docker-compose*.yml}
@@ -36,20 +37,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       3a 是活门控：若脚本落地却无 OPA enforcement 声明则 FAIL。</li>
  * </ol>
  *
- * <p>surefire 工作目录 = {@code gateway/}，仓库根为 {@code ../../../}。
+ * <p>Surefire CWD 可能因调用方式漂移（例如 {@code -rf} 中途续跑、CI 路径切换）。
+ * 因此本类不再依赖固定相对层级，改为从 CWD 向上探测同时含
+ * {@code ecos_backend/} 与 {@code ecos-docker/} 的目录作为仓库根。
  */
 class ComposePublicSqlGateLintTest {
-
-    private static final String REPO_ROOT = "../../../";  // surefire cwd = ecos_backend/gateway/
 
     /** OPA / enforcement 路径或端点标记（大小写不敏感）。 */
     private static final Pattern OPA_ENFORCEMENT =
             Pattern.compile("opa|/v1/(data|authorize)|enforcement|:8181", Pattern.CASE_INSENSITIVE);
 
     private static Path repoRoot() {
-        Path root = Paths.get(REPO_ROOT).toAbsolutePath().normalize();
-        assertTrue(Files.isDirectory(root), "仓库根未找到: " + root);
-        return root;
+        Path cur = Paths.get("").toAbsolutePath().normalize();
+        for (int i = 0; i < 8 && cur != null; i++) {
+            if (Files.isDirectory(cur.resolve("ecos_backend"))
+                    && Files.isDirectory(cur.resolve("ecos-docker"))) {
+                return cur;
+            }
+            cur = cur.getParent();
+        }
+        fail("未定位 ECOS 仓库根（未找到同时含 ecos_backend/ 与 ecos-docker/ 的目录）");
+        return null;
     }
 
     /** gate: dataengine-web/datanet-web/mcp-sse 容器禁挂载机器路径。 */

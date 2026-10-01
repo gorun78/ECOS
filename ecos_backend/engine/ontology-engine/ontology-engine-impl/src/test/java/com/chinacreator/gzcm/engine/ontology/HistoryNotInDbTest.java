@@ -30,8 +30,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 class HistoryNotInDbTest {
 
+    // 2026-10-02 校订 (见 commit cda0810d V200 Schema 彻底治理 — DDL 单源归档)：
+    //   V200 之前 DDL 单源在 ecos_backend/gateway/src/main/resources/db/migration/，
+    //   V200 起 DDL 单源迁至 docs/50-db_script/02-flyway-migration/gateway/，
+    //   本测试指向的新路径与生产单源对齐。
     private static final String MIGRATION_DIR =
-            "ecos_backend/gateway/src/main/resources/db/migration";
+            "docs/50-db_script/02-flyway-migration/gateway";
 
     @Test
     void noNewHistoryTablesCreatedForOntologyVersion() throws IOException {

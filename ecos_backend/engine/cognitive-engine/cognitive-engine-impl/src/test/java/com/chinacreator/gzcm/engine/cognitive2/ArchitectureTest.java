@@ -64,7 +64,17 @@ public class ArchitectureTest {
             .should().haveSimpleNameStartingWith("I")
             .orShould().haveSimpleNameStartingWith("Knowledge")  // kb-engine legacy
             .orShould().haveSimpleNameStartingWith("Causal")     // cognitive-engine legacy
-            .orShould().haveSimpleNameStartingWith("Engine");    // IEngine variants
+            .orShould().haveSimpleNameStartingWith("Engine")     // IEngine variants
+            // 2026-10-02 详细设计-04（commit b617c8bc）新增的两个非 I 前缀契约：
+            //   - CognitivePipelineStore：认知管线持久化端口，其 impl 是 JdbcTemplate 承载的
+            //     CognitivePipelineRepository（R2 数据访问收口产物）；此处仅作为解耦端口，
+            //     命名沿 "…Store" 而非 "IService…" 是历史接口文件里的既有命名。
+            //   - MentalEvent：Cognitive 事件契约（PMO-59 P2b / ADR-9，topic `ecos.cognitive`），
+            //     承载 COGNITIVE_HYPOTHESIS_INVALIDATED / BELIEF_UPDATED / EVIDENCE_REGISTERED
+            //     三类心智层事件；是事件 DTO 而非服务门面，故不套 I 前缀。
+            // 精确白名单（haveSimpleName）而非前缀，避免放宽 "..service.. 下所有 Cognitive*/Mental*"。
+            .orShould().haveSimpleName("CognitivePipelineStore")
+            .orShould().haveSimpleName("MentalEvent");
         rule.allowEmptyShould(true).check(classes);
     }
 

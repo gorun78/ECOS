@@ -122,8 +122,11 @@ class RouteManifestParityTest {
 
         // (3) lint 用同一条 Map.entry 解析正则 —— 两表算子同源（23 条由 AGENTS.md 基线，
         //     本测试上方 test 以 filter 解析结果 = 23 独立断言）
-        assertTrue(lint.contains("Map.entry"),
-                "route-rewrite-lint.ps1 应用 Map.entry 解析器与 filter 一致");
+        //     脚本内以 regex 字面量出现为 `Map\.entry`（PowerShell [regex] 语法），
+        //     或梳妆代码中直接引用为 `Map.entry`，二者等价。
+        boolean usesMapEntry = lint.contains("Map.entry") || lint.contains("Map\\.entry");
+        assertTrue(usesMapEntry,
+                "route-rewrite-lint.ps1 应用 Map.entry 解析器与 filter 一致（字面或 regex 转义形态均可）");
 
         // (4) filter 三张表与 lint 三块名闭合：Filter 中每一张 block 都存在
         String filterSrc = read(root.resolve(FILTER_REL));
