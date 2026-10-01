@@ -34,6 +34,13 @@ public class CognitiveMentalConfig {
      *
      * <p>PMO-59 P4a：装配时一并注入 {@link JdbcTemplate}，使告警落库 {@code ecos_warn_log}（V131），
      * 关闭 P2b「告警内存态，进程重启即失」残留风险；JdbcTemplate 缺失时退化为纯内存态（仅 WARN，不阻断启动）。</p>
+     *
+     * <p><b>架构铁律 §2.5 / IR06 收口豁免（R2 残余复扫定性）</b>：本类是 {@code @Configuration}
+     * Bean 工厂，注入的 JdbcTemplate 仅作唯一回传路径交给公共底座实现
+     * {@code WarnLogServiceImpl}（其自有语句在 runtime-monitor 底座层执行）；
+     * 本类自身<b>不执行任何业务 SQL</b>，属"框架装配模板"而非业务数据访问，
+     * 故不为其强制建 DAO（过度收口反模式），也不扩大 DataAccessArchTest
+     * 的守门范围（守门类名不含 {@code Config}，包范围不含 {@code ..config..}）。</p>
      */
     @Bean
     @ConditionalOnMissingBean(IWarnLogService.class)
