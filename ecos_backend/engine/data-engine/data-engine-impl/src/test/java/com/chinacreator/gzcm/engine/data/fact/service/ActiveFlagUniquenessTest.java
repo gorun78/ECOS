@@ -39,7 +39,8 @@ import org.junit.jupiter.api.Test;
 @DisplayName("F02-06-3 业务事实五表 is_active 组合唯一索引 + Mapper 列清单守卫")
 class ActiveFlagUniquenessTest {
 
-    private static final String V167_REL = "ecos_backend/gateway/src/main/resources/db/migration/V167__biz_fact_model.sql";
+    // V200 治理后 DDL 单源目录（数据库访问规范 v1.4 §八），仓库根相对
+    private static final String V167_REL = "docs/50-db_script/02-flyway-migration/gateway/V167__biz_fact_model.sql";
 
     // 四张业务事实表（forecast 白名单除外）
     private static final String[] FACT_TABLES = {

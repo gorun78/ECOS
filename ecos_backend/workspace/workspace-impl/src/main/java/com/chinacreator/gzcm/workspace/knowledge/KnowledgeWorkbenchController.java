@@ -10,6 +10,7 @@ import com.chinacreator.gzcm.workspace.knowledge.service.KnowledgeHealthAggregat
 import com.chinacreator.gzcm.workspace.knowledge.service.KnowledgeStatsAggregator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,12 @@ import java.util.Map;
 
 /**
  * 知识工作台聚合 Controller — E-A#1/#2/#3 产物。
+ *
+ * <p><b>迁移意图（F04-01，2026-10-01 起）</b>：本类端点正式归属迁移至
+ * {@code /api/v1/scenarios/knowledge/**} 场景路径族。为遵守「API 只增不改」，
+ * 旧的路由前缀 {@code /api/v1/knowledge/**} 以第二路径形式整体保留至下一 Wave，
+ * 期间所有 handler 打上 {@code @Deprecated} 并回写 {@code Deprecation: true} 响应头，
+ * 引导调用方切换到场景路径。各行 {@code catch(Exception)} 降级行为保持不变。
  *
  * <p>WM 基石三端点（前端 15 Tab 对齐 knowledgeApi.ts，统一走 apiFetchData）：
  * <ul>
@@ -37,7 +44,7 @@ import java.util.Map;
  * @since PMO-55 批次 E-A
  */
 @RestController
-@RequestMapping("/api/v1/knowledge")
+@RequestMapping({"/api/v1/knowledge", "/api/v1/scenarios/knowledge"})
 @Tag(name = "Knowledge Workbench (Workspace)")
 public class KnowledgeWorkbenchController {
 
@@ -55,10 +62,16 @@ public class KnowledgeWorkbenchController {
         this.configAggregator = configAggregator;
     }
 
+    /**
+     * 知识工作台健康检查聚合 — 6 引擎 (kb/ai/security/data/ontology/cognitive) + PG 主库 + 向量库。
+     * <p>工作台旧路径，2026-10-01 起迁移至 /api/v1/scenarios/knowledge/**；旧路径保留至下一 Wave。
+     */
+    @Deprecated
     @Operation(summary = "知识工作台健康检查聚合",
             description = "6 引擎 (kb/ai/security/data/ontology/cognitive) + PG 主库 + 向量库")
     @GetMapping("/health")
-    public ApiResponse<KnowledgeHealthVO> health() {
+    public ApiResponse<KnowledgeHealthVO> health(HttpServletResponse resp) {
+        resp.setHeader("Deprecation", "true");
         try {
             return ApiResponse.success(healthAggregator.aggregate());
         } catch (Exception ex) {
@@ -67,9 +80,15 @@ public class KnowledgeWorkbenchController {
         }
     }
 
+    /**
+     * 知识工作台数据量统计 — 13 字段 + lastUpdatedAt（PG 只读）。
+     * <p>工作台旧路径，2026-10-01 起迁移至 /api/v1/scenarios/knowledge/**；旧路径保留至下一 Wave。
+     */
+    @Deprecated
     @Operation(summary = "知识工作台数据量统计", description = "13 字段 + lastUpdatedAt（PG 只读）")
     @GetMapping("/stats")
-    public ApiResponse<KnowledgeStatsVO> stats() {
+    public ApiResponse<KnowledgeStatsVO> stats(HttpServletResponse resp) {
+        resp.setHeader("Deprecation", "true");
         try {
             return ApiResponse.success(statsAggregator.aggregate());
         } catch (Exception ex) {
@@ -78,11 +97,18 @@ public class KnowledgeWorkbenchController {
         }
     }
 
+    /**
+     * 读引擎配置（scope 分发）。
+     * <p>工作台旧路径，2026-10-01 起迁移至 /api/v1/scenarios/knowledge/**；旧路径保留至下一 Wave。
+     */
+    @Deprecated
     @Operation(summary = "读引擎配置（scope 分发）",
             description = "scope=knowledge 转 :18086/settings / scope=cognitive 转 :18084/cognitive/config / scope=all 并行 + 本地 sys_config")
     @GetMapping("/engine-config")
     public ApiResponse<KnowledgeEngineConfigVO> readEngineConfig(
+            HttpServletResponse resp,
             @RequestParam(value = "scope", defaultValue = "all") String scope) {
+        resp.setHeader("Deprecation", "true");
         try {
             return ApiResponse.success(configAggregator.read(scope));
         } catch (BusinessException bex) {
@@ -130,10 +156,18 @@ public class KnowledgeWorkbenchController {
         }
     }
 
+    /**
+     * 写引擎配置（scope 分发 PUT）。
+     * <p>工作台旧路径，2026-10-01 起迁移至 /api/v1/scenarios/knowledge/**；旧路径保留至下一 Wave。
+     */
+    @Deprecated
     @Operation(summary = "写引擎配置（scope 分发 PUT）",
             description = "scope 必填 knowledge/cognitive；items 为 key→value")
     @PutMapping("/engine-config")
-    public ApiResponse<Map<String, Object>> writeEngineConfig(@RequestBody EngineConfigUpdateReq req) {
+    public ApiResponse<Map<String, Object>> writeEngineConfig(
+            HttpServletResponse resp,
+            @RequestBody EngineConfigUpdateReq req) {
+        resp.setHeader("Deprecation", "true");
         if (req == null || req.getScope() == null || req.getScope().isBlank()) {
             return ApiResponse.badRequest("scope required: knowledge | cognitive");
         }

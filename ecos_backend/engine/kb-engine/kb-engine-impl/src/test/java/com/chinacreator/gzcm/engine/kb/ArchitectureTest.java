@@ -62,11 +62,13 @@ public class ArchitectureTest {
             .resideInAPackage("..service..")
             .and().areInterfaces()
             .should().haveSimpleNameStartingWith("I")
+            .orShould().haveSimpleNameStartingWith("Kb")       // kb-engine 前缀（KbAssumptionStore/KbProfileStore/KbProfileService$CuratedFactSource 等）
             .orShould().haveSimpleNameStartingWith("Knowledge")  // kb-engine legacy
             .orShould().haveSimpleNameStartingWith("Causal")     // cognitive-engine legacy
             .orShould().haveSimpleNameStartingWith("Engine")    // IEngine variants
             .orShould().haveSimpleNameStartingWith("Neo4j")    // KGWriterService$Neo4jOperation legacy
-            .orShould().haveSimpleNameStartingWith("Mask");     // DataMaskingService$MaskFunction legacy
+            .orShould().haveSimpleNameStartingWith("Mask")     // DataMaskingService$MaskFunction legacy
+            .orShould().haveSimpleNameStartingWith("Curated"); // KbProfileService$CuratedFactSource 嵌套协作端口
         rule.allowEmptyShould(true).check(classes);
     }
 
@@ -93,10 +95,17 @@ public class ArchitectureTest {
 
     @Test
     void shouldNotDependOnOtherEngines() {
+        // F04-18：kb 契约隔离 — 锁定 engine.ontology import 依赖
+        // （kb-engine-api 用 kb-local ExtractedSubGraph 替身，不再 import ontology 类）
         ArchRule rule = noClasses().that()
             .resideInAPackage("com.chinacreator.gzcm.engine.kb..")
             .should().dependOnClassesThat()
-            .resideInAnyPackage("com.chinacreator.gzcm.engine.data..", "com.chinacreator.gzcm.engine.cognitive2..", "com.chinacreator.gzcm.engine.ai..", "com.chinacreator.gzcm.engine.security..");
+            .resideInAnyPackage(
+                "com.chinacreator.gzcm.engine.data..",
+                "com.chinacreator.gzcm.engine.cognitive2..",
+                "com.chinacreator.gzcm.engine.ai..",
+                "com.chinacreator.gzcm.engine.security..",
+                "com.chinacreator.gzcm.engine.ontology..");
         rule.check(classes);
     }
 }

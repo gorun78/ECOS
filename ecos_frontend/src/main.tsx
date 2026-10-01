@@ -165,6 +165,9 @@ createRoot(document.getElementById('root')!).render(
                     </Suspense>
                 } />
                 <Route path="world_model" element={<WorldModelViewer />} />
+                {/* B.0 信息架构归一：`#/knowledge` 是 6 平铺页主入口；
+                    `#/knowledge_view` 保留（Deprecation），行为不变，待后续 Wave 合并删除。 */}
+                <Route path="knowledge" element={<KnowledgeView />} />
                 <Route path="knowledge_view" element={<KnowledgeView />} />
                 {/* W · 智能层 */}
                 <Route path="agent_studio" element={<Navigate to="/ai-workbench" replace />} />

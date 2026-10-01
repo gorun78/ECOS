@@ -92,7 +92,7 @@ class ServiceCatalogGrepArchTest {
         // _win_tasks 位于仓库根（gateway/../../_win_tasks）
         assertTrue(Files.isDirectory(winTasks), "_win_tasks 未找到: " + winTasks);
 
-        int curlCount = 0;
+        int[] curlCount = {0};
         Set<String> setContentTargets = new LinkedHashSet<>();
         try (Stream<Path> walk = Files.list(winTasks)) {
             walk.filter(Files::isRegularFile)
@@ -103,7 +103,7 @@ class ServiceCatalogGrepArchTest {
                            String lower = line.toLowerCase(Locale.ROOT);
                            // 粗粒度 \bcurl\b 词边界
                            if (lower.matches(".*\\bcurl\\b.*")) {
-                               curlCount++;
+                               curlCount[0]++;
                            }
                            if (lower.contains("set-content")) {
                                setContentTargets.add(p.getFileName() + " :: " + line.trim());
@@ -115,7 +115,7 @@ class ServiceCatalogGrepArchTest {
                });
         }
         // informational：curl 计数把数量打到 stdout，不设上限（开发探测合法）
-        System.out.println("[ServiceCatalogGrepArchTest] _win_tasks curl 命中行数 = " + curlCount);
+        System.out.println("[ServiceCatalogGrepArchTest] _win_tasks curl 命中行数 = " + curlCount[0]);
         System.out.println("[ServiceCatalogGrepArchTest] Set-Content 目标（人工 review 基线）:");
         setContentTargets.stream().sorted().forEach(t -> System.out.println("    " + t));
 

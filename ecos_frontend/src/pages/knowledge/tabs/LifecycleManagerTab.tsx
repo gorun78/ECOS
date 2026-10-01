@@ -32,7 +32,7 @@ const AUDIT_STORAGE_KEY = 'kb_lifecycle_audit';
 
 function loadAudit(): LifecycleAuditEntry[] {
   try {
-    const raw = localStorage.getItem(AUDIT_STORAGE_KEY);
+    const raw = sessionStorage.getItem(AUDIT_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as LifecycleAuditEntry[];
     return Array.isArray(parsed) ? parsed.slice(0, 100) : [];
@@ -42,7 +42,7 @@ function loadAudit(): LifecycleAuditEntry[] {
 function pushAuditLocal(entry: LifecycleAuditEntry) {
   const list = loadAudit();
   list.unshift(entry);
-  localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(list.slice(0, 100)));
+  sessionStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(list.slice(0, 100)));
 }
 
 export default function LifecycleManagerTab({ showToast }: TabProps) {

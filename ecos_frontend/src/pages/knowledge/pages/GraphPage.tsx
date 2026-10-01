@@ -15,14 +15,23 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowRight, GitBranch, Info, Loader2, Minimize2, Network,
-  Search, Tag, X,
+  AlertTriangle,
+  ArrowRight,
+  GitBranch,
+  Info,
+  Loader2,
+  Minimize2,
+  Network,
+  RefreshCw,
+  Search,
+  Tag,
+  X,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
-import { knowledgeApi } from '../services/knowledgeApi';
+import { knowledgeApi, KbApiError } from '../services/knowledgeApi';
 import { fetchNavDomains, fetchNavCategories, type NavCategoryVO } from '../../../services/knowledgeNavApi';
-import GraphCanvas from '../../../components/GraphCanvas';
+import GraphCanvasXflow from './GraphCanvasXflow';
 
 /** 兼容 GraphCanvas 协议（节点/边） */
 interface GraphNode {
@@ -83,6 +92,9 @@ export default function GraphPage() {
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
   const expansionChildrenRef = useRef<Map<string, Set<string>>>(new Map());
 
+  // F04-03 错误态分治：KbApiError → 显式错误态（而非静默/空态）
+  const [graphError, setGraphError] = useState<{ code?: string; message: string } | null>(null);
+
   const loadNavDomains = useCallback(async () => {
     try {
       const list = await fetchNavDomains();
@@ -104,12 +116,20 @@ export default function GraphPage() {
   useEffect(() => { void loadNavDomains(); }, [loadNavDomains]);
   useEffect(() => { void loadNavCategories(navDomain); }, [navDomain, loadNavCategories]);
 
-  /** 加载图（categoryIds 后端下沉 — 12a20d6 已落地） */
+  /**
+   * 加载图（categoryIds 后端下沉 — 12a20d6；K-55 limit 保护；F04-03 错误态分治）
+   */
   const loadGraph = useCallback(async (domain?: string, categoryIds?: string[]) => {
     setLoading(true);
+    setGraphError(null);
     try {
       // PRD F5 关键：categoryIds 透传，前端不做二次过滤
-      const data = await knowledgeApi.fetchGraph(domain, categoryIds && categoryIds.length > 0 ? categoryIds : undefined) as unknown as {
+      // K-55：传入 limit（缺省 200，供后端截断）
+      const data = await knowledgeApi.fetchGraph(
+        domain,
+        categoryIds && categoryIds.length > 0 ? categoryIds : undefined,
+        200,
+      ) as unknown as {
         nodes?: GraphNode[];
         edges?: GraphEdge[];
         links?: GraphEdge[];
@@ -122,9 +142,11 @@ export default function GraphPage() {
       setPathNodes(new Set());
       setPathEdges(new Set());
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // 静默失败，保留上次数据
-      void msg;
+      if (e instanceof KbApiError && (e.status >= 500 || (e.code && e.code.startsWith('ECOS-KB-')))) {
+        // 显式错误态（D.5：5xx / ECOS-KB-*）；保留已有数据不清空
+        setGraphError({ code: e.code, message: e.message });
+      }
+      // 其余（4xx / 网络 / 空态）静默，保留上次数据
     } finally {
       setLoading(false);
     }
@@ -262,16 +284,6 @@ export default function GraphPage() {
   };
 
   const detailDisplayNode = nodeDetail || (selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null) || null;
-
-  // adapt for GraphCanvas
-  const canvasNodes = nodes.map((n) => ({
-    id: n.id,
-    type: n.type || 'default',
-    label: n.label,
-    properties: n.properties,
-    rows: n.row || '',
-  }));
-  const canvasLinks = edges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
 
   /** 5 类颜色派生（PRD F5） */
   const nodeColorClass = useCallback((type: string): string => {
@@ -520,25 +532,62 @@ export default function GraphPage() {
               {t('knowledge.graph.loadingGraph')}
             </div>
           )}
+          {/* F04-03 错误态分治：KbApiError（5xx / ECOS-KB-*）→ 显式故障 + retry */}
+          {graphError && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(90%,520px)] rounded-md border shadow-md p-3 space-y-2"
+                 style={{ background: styles.dangerBg, borderColor: styles.dangerBorder, color: styles.dangerText }}>
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">{t('knowledge.common.error')}</span>
+                {graphError.code && <span className="font-mono text-[10px]">{graphError.code}</span>}
+              </div>
+              <p className="text-[10px] opacity-80 break-all">{graphError.message}</p>
+              <button
+                type="button"
+                onClick={() => void loadGraph(navDomain === 'default' ? undefined : navDomain,
+                      selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined)}
+                className="px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
+                style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}
+              >
+                <RefreshCw className="w-3 h-3" /> {t('knowledge.common.retry')}
+              </button>
+            </div>
+          )}
           {nodes.length === 0 && !loading ? (
             <div className="h-full flex items-center justify-center text-xs" style={{ color: styles.muted }}>
-              <div className="text-center space-y-2">
+              <div className="text-center space-y-2 p-4">
                 <Network className="w-8 h-8 mx-auto opacity-40" />
-                <p>{t('knowledge.graph.emptyHint')}</p>
+                {edges.length > 0 ? (
+                  <p>{t('knowledge.graph.emptyHint')}</p>
+                ) : (
+                  /* 仅节点，无关系 → 给对账入口（PRD B.5） */
+                  <div className="space-y-2">
+                    <p>{t('knowledge.graph.emptyHint')}</p>
+                    <button
+                      type="button"
+                      onClick={() => void loadGraph(navDomain === 'default' ? undefined : navDomain,
+                            selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined)}
+                      className="px-3 py-1.5 rounded-md text-[11px] font-bold cursor-pointer inline-flex items-center gap-1.5 border"
+                      style={{ borderColor: styles.cardBorder, color: styles.cardText, background: styles.sidebarBg }}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> {t('knowledge.graph.reconcile')}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
-            <GraphCanvas
-              nodes={canvasNodes}
-              links={canvasLinks}
+            <GraphCanvasXflow
+              nodes={nodes}
+              edges={edges}
               selectedNodeId={selectedNodeId}
               focusNodeId={focusNodeId}
-              onSelectNode={handleSelectNode}
-              onDoubleClickNode={(id) => void handleExpandNeighbors(id)}
-              onCollapseNode={handleCollapse}
               pathNodeIds={pathNodes}
               pathEdgeIds={pathEdges}
               expandedNodeIds={expandedNodeIds}
+              onSelectNode={handleSelectNode}
+              onDoubleClickNode={(id) => void handleExpandNeighbors(id)}
+              onCollapseNode={handleCollapse}
               interactive
             />
           )}

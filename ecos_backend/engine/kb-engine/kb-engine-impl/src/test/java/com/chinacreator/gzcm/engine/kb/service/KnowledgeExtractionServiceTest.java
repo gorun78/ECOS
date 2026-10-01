@@ -55,7 +55,7 @@ class KnowledgeExtractionServiceTest {
     void setUp() {
         DocumentParseService parser =
                 new DocumentParseService(new MinerUHttpParser());
-        service = new KnowledgeExtractionService(jdbc, ruleMapper, kgWriter, parser, entityLinker);
+        service = new KnowledgeExtractionService(jdbc, ruleMapper, kgWriter, parser, entityLinker, null, new org.springframework.web.client.RestTemplate());
     }
 
     // ── approve 主流程 ──

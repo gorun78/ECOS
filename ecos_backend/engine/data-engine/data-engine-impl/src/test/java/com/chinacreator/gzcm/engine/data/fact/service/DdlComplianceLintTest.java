@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
 class DdlComplianceLintTest {
 
     private static final String MIGRATION_REL =
-            "ecos_backend/gateway/src/main/resources/db/migration";
+            "docs/50-db_script/02-flyway-migration/gateway";
 
     /** 红线语针登记（Javadoc spot-check 用 needle；含基线证据项 NUMERIC(p,s)/TIMESTAMPTZ）。 */
     private static final String[] NEEDLES = {

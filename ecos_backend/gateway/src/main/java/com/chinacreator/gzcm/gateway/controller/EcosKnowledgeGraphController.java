@@ -14,9 +14,16 @@ import java.util.*;
  * POST   /api/v1/ecos/knowledge-graph/sync      — 从本体实体+关系同步到Neo4j
  * GET    /api/v1/ecos/knowledge-graph            — 查询图谱快照
  * </pre>
+ *
+ * @deprecated 2026-09-30：本类为 gateway fat-JAR 聚合期的 dead-twin 副本。图谱能力已由
+ * kb-engine {@code GraphSyncController} 唯一承载（:18086 /api/v1/kb/graph/sync）。
+ * 本类仅为 gateway fat-JAR 聚合期双反射用，整类已在 {@code GatewayApplication.java:87}
+ * 的 {@code @ComponentScan} excludeFilters 中排除，不参与请求分派；保留类体仅为
+ * 迁移期编译/引用兼容，禁止新增 handler。
  */
 @RestController
 @RequestMapping("/api/v1/ecos/knowledge-graph")
+@Deprecated
 public class EcosKnowledgeGraphController {
 
     private static final Logger log = LoggerFactory.getLogger(EcosKnowledgeGraphController.class);

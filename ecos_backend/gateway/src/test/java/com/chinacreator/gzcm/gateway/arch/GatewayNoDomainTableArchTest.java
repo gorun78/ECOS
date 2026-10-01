@@ -73,7 +73,7 @@ class GatewayNoDomainTableArchTest {
 
         Set<String> tokens = new LinkedHashSet<>();
         List<String> byFile = new ArrayList<>();
-        int fileChecked = 0;
+        int[] fileChecked = {0};
 
         try (Stream<Path> walk = Files.walk(root)) {
             walk.filter(Files::isRegularFile)
@@ -81,7 +81,7 @@ class GatewayNoDomainTableArchTest {
                 .filter(p -> !p.toString().contains("target"))
                 .forEach(p -> {
                     try {
-                        fileChecked++;
+                        fileChecked[0]++;
                         List<String> lines = Files.readAllLines(p);
                         int fileHits = 0;
                         Set<String> fileToks = new LinkedHashSet<>();
@@ -104,7 +104,7 @@ class GatewayNoDomainTableArchTest {
                 });
         }
 
-        assertTrue(fileChecked > 0, "gateway src/main 未扫到任何 .java 文件（路径错？）");
+        assertTrue(fileChecked[0] > 0, "gateway src/main 未扫到任何 .java 文件（路径错？）");
         assertTrue(tokens.isEmpty(),
                 "gateway 禁查数据域/knownLegacy 服务表 schema 限定引用（W56/T-DAT-01/IR01）。"
                         + " baseline=0, actual tokens=" + tokens

@@ -664,4 +664,163 @@ public class ModuleDependencyArchTest {
         System.out.println("[ModuleDependencyArch] field-injection baseline entries: " + out.size());
         return out;
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // F04-18 kb 契约加固（2026-10-30 water·K batch）
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** 定位 kb 源码根（kb-engine-impl/src/main + kb-engine-api/src/main）。 */
+    private static List<Path> kbSourceRoots() {
+        List<Path> out = new ArrayList<>();
+        Path cwd = Paths.get("").toAbsolutePath();
+        Path backendRoot = null;
+        Path cur = cwd;
+        while (cur != null) {
+            if (Files.exists(cur.resolve("pom.xml")) && Files.exists(cur.resolve("gateway"))) {
+                backendRoot = cur;
+                break;
+            }
+            cur = cur.getParent();
+        }
+        if (backendRoot == null) {
+            return out;
+        }
+        Path impl = backendRoot.resolve("engine/kb-engine/kb-engine-impl/src/main").normalize();
+        Path api = backendRoot.resolve("engine/kb-engine/kb-engine-api/src/main").normalize();
+        if (Files.isDirectory(impl)) out.add(impl);
+        if (Files.isDirectory(api)) out.add(api);
+        return out;
+    }
+
+    /**
+     * F04-18 · kb 契约隔离 · ArchUnit 字节码规则：
+     * kb-engine-impl + kb-engine-api 的<b>所有</b>类不得依赖
+     * {@code com.chinacreator.gzcm.engine.ontology..}（跨引擎耦合）。
+     * kb 侧须自持领域对象（{@code engine.kb.model.ExtractedSubGraph}）替代。
+     */
+    @Test
+    void kbMustNotDependOnOntologyInternals() {
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("com.chinacreator.gzcm.engine.kb..")
+            .should().dependOnClassesThat()
+            .resideInAPackage("com.chinacreator.gzcm.engine.ontology..")
+            .because("F04-18 kb 契约隔离：kb 不引入 engine.ontology.* 内部类，" +
+                    "以 kb-local ExtractedSubGraph 替代；运行时 retriever/rewriter 也禁止反向耦合。")
+            .allowEmptyShould(true);
+        rule.check(allClasses);
+    }
+
+    /**
+     * F04-14 / F04-18 附加门禁：kb-engine 业务包禁止<b>自建执行器</b> —
+     * 字节码断言 kb 侧不得依赖 {@code java.util.concurrent.Executors}、
+     * {@code java.util.concurrent.ExecutorService}、
+     * {@code java.util.concurrent.CompletableFuture}。
+     * 统一出口 = {@code runtime-task} 的 {@code ITaskManagementService}。
+     */
+    @Test
+    void kbMustNotCreateOwnExecutors() {
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("com.chinacreator.gzcm.engine.kb..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage(
+                    "java.util.concurrent.Executors",
+                    "java.util.concurrent.ExecutorService",
+                    "java.util.concurrent.CompletableFuture")
+            .because("F04-14：kb 不自建执行器/任务池，统一走 runtime-task 的 ITaskManagementService")
+            .allowEmptyShould(true);
+        rule.check(allClasses);
+    }
+
+    /**
+     * F04-13 附加门禁：kb 源码不得直连 LLM REST — 文本扫描 {@code api/v1/llm}
+     * 字面量。LLM 唯一入口 = {@code runtime.llm.gateway.LLMGateway}。
+     * 允许注释层的文字性 mention（限定为 {@code <b>字符串字面量</b> or {@code import} 出现），
+     * 简化实现为「不含该字符串，或仅出现在 Javadoc/&lt;code&gt; 标签内」，
+     * 当前 F04-13 完成态下应为 0 命中。
+     */
+    @Test
+    void kbMustNotCallLlmEndpointDirectly() {
+        List<Path> roots = kbSourceRoots();
+        if (roots.isEmpty()) {
+            System.out.println("[kbMustNotCallLlmEndpointDirectly] SKIP — kb 源码根未找到（未构建）");
+            return;
+        }
+        List<String> offenders = scanForLiteral(roots, "api/v1/llm", true);
+        org.junit.jupiter.api.Assertions.assertTrue(offenders.isEmpty(),
+                "F04-13 kb 禁直连 LLM REST：kb MAIN 源码含 \"api/v1/llm\" 字面量（非注释）：\n"
+                        + offenders.stream().limit(20).reduce("", (a, b) -> a + "\n" + b)
+                        + (offenders.size() > 20 ? "\n... (+" + (offenders.size() - 20) + " more)" : ""));
+    }
+
+    /**
+     * F04-15 附加门禁：kb 源码不得反射审计 Kafka send — 文本扫描 {@code getMethod("send"}。
+     * 收敛：审计事件一律经 {@code runtime-event} 的 {@code EventBusService}，
+     * 禁止业务侧自建 KafkaTemplate 反射；命中该字面量即视为绕过 base 通道回滚。
+     */
+    @Test
+    void kbMustNotReflectivelyInvokeSend() {
+        List<Path> roots = kbSourceRoots();
+        if (roots.isEmpty()) {
+            System.out.println("[kbMustNotReflectivelyInvokeSend] SKIP — kb 源码根未找到（未构建）");
+            return;
+        }
+        List<String> offenders = scanForLiteral(roots, "getMethod(\"send\"", true);
+        org.junit.jupiter.api.Assertions.assertTrue(offenders.isEmpty(),
+                "F04-15 kb 禁反射 Kafka send：kb MAIN 源码含 getMethod(\"send\")（非注释）：\n"
+                        + offenders.stream().limit(20).reduce("", (a, b) -> a + "\n" + b)
+                        + (offenders.size() > 20 ? "\n... (+" + (offenders.size() - 20) + " more)" : ""));
+    }
+
+    /**
+     * 扫描给定根下所有 .java 命中 literal。
+     *
+     * @param skipCommentLines 是否跳过纯注释行（Javadoc 星号前缀 / 单行 // 前缀 /
+     *                         成对的块注释符）。F04-13/15 门禁传 true —— 允许 Javadoc
+     *                         内的历史性（"@F04-13 从 /api/v1/llm/* 收敛到 LLMGateway"）提及，
+     *                         但拒绝代码/字符串/constant 处的真实直连。
+     * @param literal          要命中的字面量
+     */
+    private static List<String> scanForLiteral(List<Path> roots, String literal, boolean skipCommentLines) {
+        List<String> found = new ArrayList<>();
+        for (Path root : roots) {
+            try (java.util.stream.Stream<Path> walk = java.nio.file.Files.walk(root)) {
+                walk.filter(Files::isRegularFile).filter(p -> p.toString().endsWith(".java"))
+                     .forEach(p -> {
+                         try {
+                             List<String> lines = java.nio.file.Files.readAllLines(p, StandardCharsets.UTF_8);
+                             boolean inBlockComment = false;
+                             for (int i = 1; i <= lines.size(); i++) {
+                                 String line = lines.get(i - 1);
+                                 String trimmed = line.strip();
+                                 if (skipCommentLines) {
+                                     if (!inBlockComment && trimmed.startsWith("/*")) {
+                                         if (!(trimmed.contains("*/"))) {
+                                             inBlockComment = true;
+                                         }
+                                         continue;
+                                     }
+                                     if (inBlockComment) {
+                                         if (trimmed.contains("*/")) {
+                                             inBlockComment = false;
+                                         }
+                                         continue;
+                                     }
+                                     if (trimmed.startsWith("*") || trimmed.startsWith("//")) {
+                                         continue;
+                                     }
+                                 }
+                                 if (line.contains(literal)) {
+                                     found.add(root.relativize(p) + ":" + i + " | " + line.trim());
+                                 }
+                             }
+                         } catch (IOException ex) {
+                             // 单文件读失败不上抛
+                         }
+                     });
+            } catch (IOException e) {
+                // 根目录不可读 — 视为无内容
+            }
+        }
+        return found;
+    }
 }

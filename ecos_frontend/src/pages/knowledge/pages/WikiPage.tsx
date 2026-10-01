@@ -18,13 +18,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BookOpen, FileText, Folder, FolderTree, Loader2, Tag, Upload,
+  AlertTriangle, BookOpen, FileText, Folder, FolderTree, Loader2, Tag, Upload,
   MessageSquare, Network, ListChecks, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
-import { fetchNavProducts, type NavProductItemVO } from '../../../services/knowledgeNavApi';
-import { knowledgeApi } from '../services/knowledgeApi';
+import { type NavProductItemVO } from '../../../services/knowledgeNavApi';
+import { knowledgeApi, KbApiError } from '../services/knowledgeApi';
 
 /** 5 固定「知识空间」一级节点 — i18n key 1:1 对应（domain → i18n key） */
 const WIKI_SPACES = [
@@ -142,7 +142,7 @@ export default function WikiPage() {
   // 左栏 tree 状态
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set(['product', 'technical']));
   // 当前 space 下的信息（按 domain 聚合的 5 类文档）
-  interface SpaceDocs { loading: boolean; docs: WikiDocRow[]; error?: string; }
+  interface SpaceDocs { loading: boolean; docs: WikiDocRow[]; error?: string; errorCode?: string; }
   const [spaceStatus, setSpaceStatus] = useState<Record<string, SpaceDocs>>({});
 
   // 选中文档
@@ -160,8 +160,9 @@ export default function WikiPage() {
   const loadSpace = useCallback(async (space: typeof WIKI_SPACES[number]) => {
     setSpaceStatus((prev) => ({ ...prev, [space.id]: { loading: true, docs: prev[space.id]?.docs || [] } }));
     try {
-      // 走 nav/products 按 domain 过滤，top 100
-      const res = await fetchNavProducts({ domain: space.domain, pageNum: 1, pageSize: 100 });
+      // F04-03：走 kbFetchNavProducts（kbFetchData）→ 5xx / ECOS-KB-050「nav 表不存在」
+      // 抛 KbApiError → 显式故障态（禁止「暂无数据」空态，B.5 wiki 主流程）。
+      const res = await knowledgeApi.kbFetchNavProducts({ domain: space.domain, pageNum: 1, pageSize: 100 });
       const vlist: NavProductItemVO[] = res?.list || [];
       const docs: WikiDocRow[] = vlist
         .filter((item) => (item.title || '').length > 0)
@@ -207,8 +208,10 @@ export default function WikiPage() {
         });
       setSpaceStatus((prev) => ({ ...prev, [space.id]: { loading: false, docs } }));
     } catch (e) {
+      // F04-03 错误态分治：KbApiError（5xx / ECOS-KB-*）→ 显式故障 attr
       const msg = e instanceof Error ? e.message : String(e);
-      setSpaceStatus((prev) => ({ ...prev, [space.id]: { loading: false, docs: [], error: msg } }));
+      const code = e instanceof KbApiError ? e.code : undefined;
+      setSpaceStatus((prev) => ({ ...prev, [space.id]: { loading: false, docs: [], error: msg, errorCode: code } }));
     }
   }, [t]);
 
@@ -378,9 +381,22 @@ export default function WikiPage() {
                     {isExpanded && (
                       <div className="ml-4 pl-2 border-l space-y-0.5 py-1" style={{ borderColor: styles.inputBorder }}>
                         {st?.docs.length === 0 && (
-                          <div className="px-2 py-1 text-[10px]" style={{ color: styles.muted }}>
-                            {st?.error ? t('knowledge.wiki.space_load_error') : t('knowledge.wiki.space_empty')}
-                          </div>
+                          st?.errorCode ? (
+                            /* F04-03 显式故障态：KbApiError（5xx / ECOS-KB-050 nav 表缺失）
+                               —— 禁止用「暂无数据」空态替代（PRD B.5 wiki） */
+                            <div className="px-2 py-1.5 rounded flex items-start gap-1.5"
+                                 style={{ background: styles.dangerBg, color: styles.dangerText }}>
+                              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                              <div className="min-w-0 leading-snug">
+                                <span className="text-[10px] font-bold">{t('knowledge.wiki.unavailable')}</span>
+                                <span className="text-[9px] font-mono ml-1">{st.errorCode}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="px-2 py-1 text-[10px]" style={{ color: styles.muted }}>
+                              {st?.error ? t('knowledge.wiki.space_load_error') : t('knowledge.wiki.space_empty')}
+                            </div>
+                          )
                         )}
                         {st?.docs.slice(0, 50).map((d) => (
                           <button

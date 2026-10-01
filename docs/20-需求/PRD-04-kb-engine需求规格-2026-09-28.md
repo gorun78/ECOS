@@ -71,17 +71,29 @@ CREATE TABLE IF NOT EXISTS ecos_kb_profile (
     stats_method     VARCHAR(32) NOT NULL DEFAULT 'T_APPROX',
     confidence_level VARCHAR(10) NOT NULL,         -- HIGH/MEDIUM/LOW（规则见 2.3-3）
     degrade_from     VARCHAR(36),                  -- 退化来源画像 id（NULL=本维度组样本充足）
+    degrade_path_json TEXT,                        -- MC02: 受控 JSON 只准 TEXT（退化链 [{"level":1,"dims":"…","n":12},…]，供 resolve 返回完整退化链）
     applicable_condition VARCHAR(500),             -- 适用条件说明（人读）
     profile_version  VARCHAR(20) NOT NULL,         -- 语义化版本，同 profile_key 单调递增
     status           VARCHAR(20) NOT NULL DEFAULT 'DRAFT',  -- DRAFT/PUBLISHED/SUPERSEDED
     approved_by      VARCHAR(100),
-    -- 审计 5 字段 + version_no + domain
+    -- 基线列（P-1 回写，逐列合规，DR06~DR08 + MC01；数值统计量列 .profile_version 版本/审批语义留 K 层，数值事实落 ecos_dw.ecos_kb_profile_stats 见 §4.3 P-5）：
+    create_time      TIMESTAMP NOT NULL DEFAULT NOW(),   -- DR06
+    update_time      TIMESTAMP NOT NULL DEFAULT NOW(),   -- DR06
+    create_by        VARCHAR(100),                          -- 真实 actor（禁 'current-user' 常量）
+    update_by        VARCHAR(100),                          -- 真实 actor
+    version_no       INTEGER NOT NULL DEFAULT 1,           -- DR08 乐观锁
+    is_deleted       SMALLINT NOT NULL DEFAULT 0,          -- 逻辑删除
+    domain           VARCHAR(64),                            -- DR07 域
+    trace_id         VARCHAR(64),                            -- 全链 traceId
+    task_id          VARCHAR(36)                             -- 关联 runtime-task 任务（生成端点 taskId 回传）
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_kbp_key_ver ON ecos_kb_profile(profile_key, profile_version);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_kbp_key_ver ON ecos_kb_profile(profile_key, profile_version, is_deleted);  -- 唯一索引纳入 is_deleted（P-1）
 CREATE INDEX IF NOT EXISTS idx_kbp_metric_status ON ecos_kb_profile(metric_code, status);
 ```
 
 > 归属说明：画像属 K 层知识资产，表落 kb 管辖（`ecos_kb_` 前缀），**不违反** "cognitive 不新增业务事实表"（画像非业务事实，是知识制品）。
+>
+> **P-1 回写（详细设计-04 §7.1 / W111-114 → C93）**：DDL 已修正为主键 `VARCHAR(36)` 应用侧生成 UUID（`DDL 禁 DEFAULT gen_random_uuid()`，MC01）、`group_dims_json`/`degrade_path_json` 为 `TEXT`（MC02 受控 JSON 只准 TEXT）、补基线列 `create_time/update_time/create_by/update_by/version_no/is_deleted/domain/trace_id/task_id`（DR06~DR08）、唯一索引纳入 `is_deleted`。数值统计量列（`p10/p50/p90/mean_value/ci_low/ci_high`）依 R-9 ① 登记为说明行（见 数据库访问规范 ST03-A 登记表，2026-10-01）。本 DDL 为 E.2 `V176` 的规范形态。
 
 ### 2.3 生成规则
 
@@ -97,7 +109,9 @@ CREATE INDEX IF NOT EXISTS idx_kbp_metric_status ON ecos_kb_profile(metric_code,
 
 | 端点 | 方法 | 说明 |
 |---|---|---|
-| `/api/v1/knowledge/profiles/generate` | POST | body={metricCodes[], dims, windowFrom, windowTo}；走 `ITaskManagementService.submitTask+executeTask`（铁律 §1.6，禁自建调度）；响应 {taskId, status:"SUBMITTED"} |
+| `/api/v1/knowledge/profiles/generate` | POST | body={metricCodes[], dims, windowFrom, windowTo}；**必走 `ITaskManagementService.submitTask+executeTask`（铁律 §2.5-3），禁本地线程**（禁自建 `Executors`/`@Scheduled`/`CompletableFuture.runAsync`），否则 reject；runtime-task 不可用时 **响应 `503 / ECOS-KB-021`**（fail-closed，不静默降级、不返回 2xx 假任务）；正常响应 {taskId, status:"SUBMITTED"} |
+
+> **P-3 回写（详细设计-04 §7.1 / K-38/K-39 → C85）**：画像生成端点明确要求——响应 `503 / ECOS-KB-021` 语义（runtime-task 不可用）；禁本地线程；必走 `ITaskManagementService.submitTask+executeTask`（铁律 §2.5-3）。对应分册 04 F04-14 调度收口与 F04-06 画像生成。
 | `/api/v1/knowledge/profiles` | GET | 查询：metric/dims/status/version 过滤，分页 |
 | `/api/v1/knowledge/profiles/{id}/publish` | POST | 审批发布（权限：知识管理员） |
 | `/api/v1/knowledge/profiles/resolve` | GET | **消费端点**：?metric=&dims=（JSON）&atVersion= → 返回最匹配画像（含退化链说明）；预测运行快照冻结用 |
@@ -176,6 +190,13 @@ CREATE INDEX IF NOT EXISTS idx_kba_scenario_status ON ecos_kb_assumption(scenari
 
 **验收**：`ScenarioCognitionIntegrationTest` 四组用例（空场景/多 Mind/无 Mind/503）通过（依赖 E1–E4 交付，测试落 PMO-66 收口后）。
 
+> **P-2 补记（2026-09-30 勘误 / 需求侧保留契约名）**：以上"守护对象"文档契约名 → 物理真身映射固定为：
+> - `kb_cognitive_hypothesis` ⇒ `public.ecos_cognitive_hypothesis`（`V127`）
+> - `kb_cognitive_belief` ⇒ `public.ecos_cognitive_belief`（`V128`）
+> - `kb_mind_registry` ⇒ **无物理真身**：文档名，物理承载为 kb 内置心智注册表（`ecos_ai.ecos_mind_registry` 或 C 层注册表），命名冲突暂按文档名守护
+>
+> 上述 PRD 侧需求语义保持"按契约名守护"的消费语义不变（不改物理库名、不改写前提）；物理真身归属见 ARCH_SPEC **C94** / 详细设计-04 **K-49** / 分册 05 **X-19**；Mind 载体以分册 05 §Cg-2 新建的 `cognitive_mind` + `cognitive_scenario_mind` 为目标，未建表前本项判「未执行」。
+
 ---
 
 ## 五、REQ-KB-05 dry-run 真口径守护（P1，守护型）
@@ -251,4 +272,19 @@ CREATE INDEX IF NOT EXISTS idx_kba_scenario_status ON ecos_kb_assumption(scenari
 | **KB-08** | REQ-KB-02 画像表、R-08（画像落点与写通道） | ADR-14 确定性计算（PRD-05/09） | 场景批次 A |
 | **KB-09** | R-12/R-40（存量处置） | ADR-18 §1.2 四套载体收敛 | **已批准（§十四）** |
 
-<!-- PRD-04-kb-engine需求规格 / 2026-09-28 / v1.2（2026-09-29 随需求检视报告 §十四 批量批准定版） -->
+## 八、执行说明（详细设计-04 §7.1 P-6~P-11 回写，涉及代码侧落地由其他 Agent 承接）
+
+> 本章节为需求侧回写**文档级**说明，对应详细设计-04 §7.1 PRD/规则回写清单中的 P-6~P-11。**代码侧落地（含 P-8/P-9 涉及的 dccheng application.yml 修改）不在本次任务范围**——见 §7.1 各条对应 F04-# 交付项。
+
+| # | 回写内容 | 说明 | 对应分册/裁决 |
+|:--|:--|:--|:--|
+| P-6 | `kb-engine-impl pom.xml` 现声明的 `sysman-impl` 死依赖（`:83`）与 `spring-kafka`（`:91`）已按事件底座单源结论处置；`@KafkaListener` **只允许在 `EcosOntologyEventConsumer` 真实监听**（其他位置一律禁用） | 代码侧 pom 处置由 runtime-event 收口，kb 侧仅保留 `EcosOntologyEventConsumer` 一处合法 listener；`sysman-impl` 死依赖与 `spring-kafka` 依赖按事件底座单源结论处置 | 详细设计-04 K-4/K-5；F04-15 |
+| P-7 | "dccheng 制品是否需与 cognitive 同 JVM" → **否**：`ComponentScan` 不含 cognitive2；`DcchengServiceApplication` 类注释 line 20-23 的旧口径（"需与 cognitive 同 JVM"）已由 `DcchengServiceApplication` 更正 | 前后端双轨与 ADR-15 一致；kb 侧不使用 cognitive 类 | 详细设计-04 K-3 |
+| P-8 | `dccheng/application.yml:48` `mapper-locations: classpath*:mapper/*.xml` 但 XML **零命中**（纯 MyBatis 注解制），删无效配置 | **涉及 dccheng application.yml 代码文件，本次任务不动代码，落地由另一 Agent 凭 §十四 授权处理** | 详细设计-04 实测 |
+| P-9 | `dccheng/application.yml:74` `llm-gateway-base: ${ECOS_RAG_LLM_BASE:}` 空默认值 → 改为 `ECOS_KB-030` 显式降级（禁空串静默调用 LLM） | **涉及 dccheng application.yml 代码文件，本次任务不动代码，落地由另一 Agent 凭 §十四 授权处理** | 详细设计-04 K-35；F04-13 |
+| P-10 | `ModuleDependencyArchTest.java:413-415` 注释"天然合规 无需豁免"属结构性盲区（反射绕过不被类型引用检测覆盖） | 已在详细设计-04 **F04-18** 补 **C71 同型 kb 反射规则**（`kbMustNotReflectivelyInvokeSend`），与分册 03 C71 的 ArchUnit 盲区同源同修法 | 详细设计-04 K-51；F04-18 / C95 |
+| P-11 | 前端 `typesAndConstants.ts` 状态/类型枚举**三处手写副本漂移**问题 → **已由 OpenAPI 生成类型替代**（F04-17 交付），保留现有值兼容性不留双轨 | 前端类型单源由 P-5（OpenAPI 契约）承载（同 ARCH_SPEC C259 前置件） | 详细设计-04 K-64 / W114 → C96；F04-17 |
+
+> **代码变更授权边界**：P-8/P-9 目标文件为 `ecos_backend/services/dccheng/src/main/resources/application.yml`（*.yml），本次"文档回写"任务**不动**该文件；若后续 Agent 落地 P-8/P-9，须同步引用本说明与 F04-13/F04-18 的落点。
+
+<!-- PRD-04-kb-engine需求规格 / 2026-09-28 / v1.2（2026-09-29 随需求检视报告 §十四 批量批准定版；P-1~P-11 文档回写 by 详细设计-04 §7.1，2026-10-01） -->

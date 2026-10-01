@@ -18,7 +18,7 @@ import java.util.Map;
  * @group WIKI
  */
 @RestController
-@RequestMapping("/api/v1/knowledge/entity-link")
+@RequestMapping({"/api/v1/knowledge/entity-link", "/api/v1/knowledge/graph/entity-link"})
 public class EntityLinkController {
 
     private static final Logger log = LoggerFactory.getLogger(EntityLinkController.class);
@@ -34,7 +34,7 @@ public class EntityLinkController {
      * <p>PMO-74 H11-T4：出入参由 {@code Map<String,Object>} 收口为
      * {@link EntityLinkRequestDTO} / {@link EntityLinkResultVO}（wire JSON 键名不变）。</p>
      */
-    @PostMapping("/entity/link")
+    @PostMapping("link")
     public ApiResponse<EntityLinkResultVO> linkEntity(@RequestBody EntityLinkRequestDTO request) {
         try {
             String entityName = request.getEntityName();

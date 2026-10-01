@@ -85,11 +85,12 @@ public class EntityLinkerService {
                 nodeMapper.insert(entityNode);
             } catch (Exception ignored) { /* 幂等 */ }
 
-            // 写入MAPS_TO边（通过jdbc/neo4j）
+            // TODO(W107): MAPS_TO edge write — pending V175 association table
+            // (当前仅登记实体节点，尚无 Neo4j 边写入路径，不伪造实现)
             result.put("ontologyPath", path);
             result.put("confidence", bestScore);
             result.put("mappedToId", best.getId());
-            log.info("实体链接成功: {} → {} (confidence={:.2f})", entityName, path, bestScore);
+            log.info("实体链接成功: {} → {} (confidence={})", entityName, path, String.format("%.2f", bestScore));
         } catch (Exception e) {
             log.warn("写入Neo4j MAPS_TO失败: {}", e.getMessage());
             result.put("ontologyPath", path);

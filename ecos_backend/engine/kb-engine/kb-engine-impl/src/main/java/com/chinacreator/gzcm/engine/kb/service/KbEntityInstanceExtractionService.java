@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
+import com.chinacreator.gzcm.engine.kb.support.C3AttributeCompletenessValidator;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -101,13 +102,22 @@ public class KbEntityInstanceExtractionService {
     /** 列定义缓存（resourceId → 字段列表），避免循环查库。 */
     private final Map<String, List<Map<String, Object>>> fieldsCache = new LinkedHashMap<>();
 
+    /** C3 实体属性缓存（ontologyId:entityCode → 属性定义集合），实体级重复命中免 REST。 */
+    private final Map<String, Set<C3AttributeCompletenessValidator.PropertyDef>> entityPropertiesCache =
+            new LinkedHashMap<>();
+
+    /** C3 属性完整性校验开关（REQ-KB-01 / F04-05）：{@code true} 默认开；关闭时报告标 {@code c3Skipped=true}（禁静默关闭）。 */
+    private final boolean c3Enabled;
+
     public KbEntityInstanceExtractionService(
             JdbcTemplate jdbc,
             RestTemplate restTemplate,
-            @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride) {
+            @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride,
+            @Value("${ecos.kb.extract.c3_enabled:true}") boolean c3Enabled) {
         this.jdbc = jdbc;
         this.restTemplate = restTemplate;
         this.datanetBaseUrlOverride = datanetBaseUrlOverride;
+        this.c3Enabled = c3Enabled;
     }
 
     /**
@@ -176,6 +186,10 @@ public class KbEntityInstanceExtractionService {
         report.setMode(incremental ? MODE_INCREMENTAL : MODE_FULL);
         report.setDryRun(dryRun);
         report.setOntologyId((ontologyId == null || ontologyId.isBlank()) ? "ALL" : ontologyId.trim());
+        // REQ-KB-01 / F04-05：C3 显式关闭时必标 c3Skipped（禁静默关闭）
+        if (!c3Enabled) {
+            report.setC3Skipped(true);
+        }
 
         // 0. 抽取范围：kb 自有快照表提供 ontologyId + version（版本对齐基准，D9）
         List<OntologySnapshot> snapshots = readSnapshots(ontologyId);
@@ -214,7 +228,10 @@ public class KbEntityInstanceExtractionService {
         }
         // 4. 实例边统一落库（C2 收口 + 端点存在性校验）
         flushEdges(pendingEdges, report, dryRun);
-        report.setNextWatermark(lastWatermark);
+        // dry-run 不推进/回填水位线（不落持久化水位，报告也不回填，避免误导"下次从 wm-3 续读"）
+        if (!dryRun) {
+            report.setNextWatermark(lastWatermark);
+        }
         report.setDurationMs(System.currentTimeMillis() - startedAt);
         log.info("实例抽取完成: mode={} dryRun={} scope={} jobId={} ontologies={} entities={} "
                         + "nodesCreated={} nodesUpdated={} edges={} skipped={} invalid={} costMs={}",
@@ -310,6 +327,24 @@ public class KbEntityInstanceExtractionService {
             pkColumn = fieldRefs.get(0).dwColumn();
         }
 
+        // C3 属性完整性判据（REQ-KB-01 / F04-05）：实体级取一次属性定义 + 引用集合，R1 引用级校验只记一次，
+        // R2/R3 逐行判。失败处理全 WARN，不阻断写入；R3 命中的引用在属性 JSON 中置 null。
+        Set<C3AttributeCompletenessValidator.PropertyDef> entityProps = c3Enabled
+                ? loadEntityProperties(snap.ontologyId(), entityCode, refToCode, report)
+                : Set.of();
+        List<C3AttributeCompletenessValidator.MappingRef> c3Refs = new ArrayList<>(fieldRefs.size());
+        for (FieldRef fr : fieldRefs) {
+            if (!fr.ontologyRef().isEmpty()) {
+                c3Refs.add(new C3AttributeCompletenessValidator.MappingRef(fr.dwColumn(), fr.ontologyRef()));
+            }
+        }
+        if (c3Enabled && !c3Refs.isEmpty()) {
+            for (C3AttributeCompletenessValidator.Issue issue
+                    : C3AttributeCompletenessValidator.checkUnknownAttrs(entityCode, entityProps, Set.of(), c3Refs)) {
+                report.addIssue(entityCode, issue.code(), issue.message());
+            }
+        }
+
         // 规范 node_type = 实体 code（ref 可能是 id 或 code，统一到 code）
         String nodeType = truncate(refToCode.getOrDefault(entityCode, entityCode), SHORT_COLUMN_MAX);
         String domain = truncate(text(mapping.get("sourceType")), SHORT_COLUMN_MAX);
@@ -347,14 +382,25 @@ public class KbEntityInstanceExtractionService {
                 }
                 rowsRead++;
                 String nodeId = buildNodeId(snap.ontologyId(), nodeType, pkValue);
+                // C3 行级校验（R2 必填缺失 / R3 类型不符）：全 WARN 入报告；R3 命中引用置 null（仅真执行改写入值）
+                Set<String> nullifiedRefs = Set.of();
+                if (c3Enabled && !c3Refs.isEmpty()) {
+                    C3AttributeCompletenessValidator.RowResult rowResult =
+                            C3AttributeCompletenessValidator.checkRow(entityCode, entityProps, c3Refs, row);
+                    for (C3AttributeCompletenessValidator.Issue issue : rowResult.issues()) {
+                        report.addIssue(entityCode, issue.code(), issue.message());
+                    }
+                    nullifiedRefs = rowResult.nullifiedRefs();
+                }
                 if (dryRun) {
-                    // dry-run：用预查存在性集合判 created/updated（与真执行同口径）
+                    // dry-run：用预查存在性集合判 created/updated（与真执行同口径），不落库、不改属性
                     if (existingForDryRun.contains(nodeId)) {
                         report.setNodeUpdated(report.getNodeUpdated() + 1);
                     } else {
                         report.setNodeCreated(report.getNodeCreated() + 1);
                     }
-                } else if (upsertNode(nodeId, pkValue, nodeType, description, domain, row, fieldRefs, snap, resourceId)) {
+                } else if (upsertNode(nodeId, pkValue, nodeType, description, domain, row, fieldRefs,
+                        nullifiedRefs, snap, resourceId)) {
                     report.setNodeCreated(report.getNodeCreated() + 1);
                 } else {
                     report.setNodeUpdated(report.getNodeUpdated() + 1);
@@ -505,8 +551,8 @@ public class KbEntityInstanceExtractionService {
      */
     private boolean upsertNode(String nodeId, String pkValue, String nodeType, String description,
                                String domain, Map<String, Object> row, List<FieldRef> fieldRefs,
-                               OntologySnapshot snap, String resourceId) {
-        String propertiesJson = buildPropertiesJson(row, fieldRefs);
+                               Set<String> nullifiedRefs, OntologySnapshot snap, String resourceId) {
+        String propertiesJson = buildPropertiesJson(row, fieldRefs, nullifiedRefs);
         try {
             // RETURNING (xmax = 0)：PG 惯用法，区分 INSERT（true）与 ON CONFLICT UPDATE（false）
             List<Boolean> inserted = jdbc.queryForList(
@@ -679,6 +725,54 @@ public class KbEntityInstanceExtractionService {
         return aliases;
     }
 
+    /**
+     * 拉取本体某实体的属性定义集合（C3 R1/R2/R3 判据），按 {@code ontologyId:entityCode} 缓存命中免 REST。
+     *
+     * <p>经本体属性端点 {@code GET /ecos/ontologies/{oid}/entities/{entityId}/properties}；
+     * 端点不可用或无属性时返回空集合（R1/R2/R3 因"无已知属性"自然放行，不静默吞也不阻断）。
+     *
+     * @param entityCode 实体规范 code（映射侧 entityCode 经别名表转换后）
+     * @return 属性定义集合（code/required/type）；无判据时为空集合
+     */
+    @SuppressWarnings("unchecked")
+    private Set<C3AttributeCompletenessValidator.PropertyDef> loadEntityProperties(
+            String ontologyId, String entityCode, Map<String, String> refToCode,
+            EntityInstanceExtractionReportVO report) {
+        String cacheKey = ontologyId + ":" + entityCode.toUpperCase(Locale.ROOT);
+        Set<C3AttributeCompletenessValidator.PropertyDef> cached = entityPropertiesCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        Set<C3AttributeCompletenessValidator.PropertyDef> props = new LinkedHashSet<>();
+        String canonical = refToCode.getOrDefault(entityCode, entityCode);
+        String url = ontologyBase() + "/ecos/ontologies/" + encode(ontologyId)
+                + "/entities/" + encode(canonical) + "/properties";
+        try {
+            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
+            Object data = body == null ? null : body.get("data");
+            if (data instanceof List<?> list) {
+                for (Object element : list) {
+                    if (!(element instanceof Map<?, ?> p) || p.get("code") == null) {
+                        continue;
+                    }
+                    String code = text(p.get("code"));
+                    if (code.isEmpty()) {
+                        continue;
+                    }
+                    boolean required = text(p.get("requiredFlag")).equals("1")
+                            || "true".equalsIgnoreCase(text(p.get("required")));
+                    String type = text(p.get("propertyType"));
+                    props.add(new C3AttributeCompletenessValidator.PropertyDef(code, required, type));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("本体属性端点不可用 ({}): {}", url, e.getMessage());
+            report.addIssue(ontologyId, "C3_PROPERTIES_UNAVAILABLE", e.getMessage());
+        }
+        entityPropertiesCache.put(cacheKey, props);
+        return props;
+    }
+
     /** 拉本体关系定义（C2 判据），源/目标实体 id 经别名表转规范 code。失败返回空列表。 */
     @SuppressWarnings("unchecked")
     private List<RelationDef> loadRelationDefs(String ontologyId, Map<String, String> refToCode,
@@ -843,12 +937,20 @@ public class KbEntityInstanceExtractionService {
         return refs;
     }
 
-    /** 组装节点属性 JSON（本体侧引用 → 行值；写库时显式 {@code ?::jsonb} 转换）。 */
-    private String buildPropertiesJson(Map<String, Object> row, List<FieldRef> fieldRefs) {
+    /** 组装节点属性 JSON（本体侧引用 → 行值；R3 类型不符命中引用置 null；写库时显式 {@code ?::jsonb} 转换）。 */
+    private String buildPropertiesJson(Map<String, Object> row, List<FieldRef> fieldRefs,
+                                       Set<String> nullifiedRefs) {
         Map<String, Object> properties = new LinkedHashMap<>();
         for (FieldRef ref : fieldRefs) {
             if (!ref.ontologyRef().isEmpty()) {
-                properties.put(ref.ontologyRef(), row.get(ref.dwColumn()));
+                Object value;
+                if (nullifiedRefs != null && nullifiedRefs.contains(ref.ontologyRef())) {
+                    // C3 R3 命中：类型不符，该属性置 null（不写入实体语义内容）
+                    value = null;
+                } else {
+                    value = row.get(ref.dwColumn());
+                }
+                properties.put(ref.ontologyRef(), value);
             }
         }
         try {

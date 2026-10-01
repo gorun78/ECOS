@@ -11,13 +11,9 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -31,22 +27,26 @@ public class KnowledgeArticleController {
 
     /** F10: 批量状态查询 ID 上限 */
     private static final int MAX_ASSET_IDS = 100;
-    /** F10: 单侧批查超时（毫秒） */
-    private static final long BATCH_QUERY_TIMEOUT_MS = 5000;
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeArticleController.class);
 
-    @Autowired
-    private KnowledgeRetrievalService knowledgeRetrievalService;
+    private final KnowledgeRetrievalService knowledgeRetrievalService;
+    private final KnowledgeNodeMapper nodeMapper;
+    private final KnowledgeEmbeddingMapper embeddingMapper;
+    private final PgVectorSupport pgVectorSupport;
 
-    @Autowired
-    private KnowledgeNodeMapper nodeMapper;
-
-    @Autowired
-    private KnowledgeEmbeddingMapper embeddingMapper;
-
-    @Autowired
-    private PgVectorSupport pgVectorSupport;
+    /**
+     * F04-14：构造函数注入（禁 @Autowired 字段注入）；双引擎批查改为同步串行调用。
+     */
+    public KnowledgeArticleController(KnowledgeRetrievalService knowledgeRetrievalService,
+                                      KnowledgeNodeMapper nodeMapper,
+                                      KnowledgeEmbeddingMapper embeddingMapper,
+                                      PgVectorSupport pgVectorSupport) {
+        this.knowledgeRetrievalService = knowledgeRetrievalService;
+        this.nodeMapper = nodeMapper;
+        this.embeddingMapper = embeddingMapper;
+        this.pgVectorSupport = pgVectorSupport;
+    }
 
     @GetMapping("/{articleId}")
     public ApiResponse<KnowledgeArticle> getArticle(@PathVariable String articleId) {
@@ -69,10 +69,15 @@ public class KnowledgeArticleController {
     /**
      * F10: 批量查询知识资产的图谱/向量双写状态。
      *
-     * <p>双引擎并行批查（{@code CompletableFuture.allOf}，各侧 ≤ 30ms）：
+     * <p>F04-14 调度/并发收敛：原 {@code CompletableFuture.supplyAsync × 2 + allOf}
+     * 双引擎并行批查改为<b>同步串行</b>调用。两侧 {@code batchExists} 均为单条
+     * {@code SELECT ... WHERE id IN (...)} 批查，单次耗时远低于并行收益，串行执行
+     * 消除自建线程池依赖；任一侧失败即整体报 {@code 批查失败}（与原
+     * {@code allOf.get()} 抛 ExecutionException 行为一致）。</p>
+     *
      * <ol>
      *   <li>{@code KnowledgeNodeMapper.batchExists(ids)} → graph 状态</li>
-     *   <li>{@code KnowledgeEmbeddingMapper.batchExists(ids)} → vector 状态（pgvector 可用时查）</li>
+     *   <li>{@code KnowledgeEmbeddingMapper.batchExists(ids)} → vector 状态（pgvector 可用时查，否则空集）</li>
      * </ol>
      *
      * @param ids 逗号分隔的文章 ID（去重 + trim，空/blank 忽略，≤ 100）
@@ -98,26 +103,16 @@ public class KnowledgeArticleController {
         }
         List<String> idList = new ArrayList<>(idSet);
 
-        // 双引擎并行批查
-        CompletableFuture<Set<String>> graphFuture = CompletableFuture.supplyAsync(() ->
-                new HashSet<>(nodeMapper.batchExists(idList)));
-        CompletableFuture<Set<String>> vectorFuture = CompletableFuture.supplyAsync(() -> {
-            if (!pgVectorSupport.isAvailable()) {
-                return Collections.<String>emptySet();
-            }
-            return new HashSet<>(embeddingMapper.batchExists(idList));
-        });
-
+        // F04-14：同步串行批查（原 CompletableFuture 并行已去除）
         Set<String> graphIds;
         Set<String> vectorIds;
         try {
-            CompletableFuture.allOf(graphFuture, vectorFuture)
-                    .get(BATCH_QUERY_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            graphIds = graphFuture.get();
-            vectorIds = vectorFuture.get();
-        } catch (TimeoutException e) {
-            log.warn("F10 asset status 批查超时（{}ms）", BATCH_QUERY_TIMEOUT_MS, e);
-            throw new ValidationException("批查超时，请稍后重试");
+            graphIds = new HashSet<>(nodeMapper.batchExists(idList));
+            if (pgVectorSupport.isAvailable()) {
+                vectorIds = new HashSet<>(embeddingMapper.batchExists(idList));
+            } else {
+                vectorIds = Collections.emptySet();
+            }
         } catch (Exception e) {
             log.error("F10 asset status 批查失败: {}", e.getMessage(), e);
             throw new ValidationException("批查失败: " + e.getMessage());

@@ -32,8 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("F02-08 / W45：V166 dq_rule legacy 迁移字段映射逐列断言")
 class DqLegacyMigrationParityTest {
 
+    // V200 治理后 DDL 单源目录（数据库访问规范 v1.4 §八），仓库根相对
     private static final Path MIGRATION_V166 = Path.of(
-            "gateway/src/main/resources/db/migration/V166__dq_rule_legacy_migration.sql");
+            "docs/50-db_script/02-flyway-migration/gateway/V166__dq_rule_legacy_migration.sql");
 
     @Test
     @DisplayName("V166 含 INSERT INTO 治理表 SELECT FROM legacy 源的批量迁移（≥1 条）")
@@ -91,9 +92,9 @@ class DqLegacyMigrationParityTest {
     // ─────────── helpers ───────────
 
     private static String readMigration() throws IOException {
-        Path f = repoRoot().resolve("ecos_backend").resolve(MIGRATION_V166);
-        assertTrue(Files.isRegularFile(f), "V166 缺文件: " + f);
-        return Files.readString(f, StandardCharsets.UTF_8);
+        Path canonical = repoRoot().resolve(MIGRATION_V166);
+        assertTrue(Files.isRegularFile(canonical), "V166 缺文件: " + canonical);
+        return Files.readString(canonical, StandardCharsets.UTF_8);
     }
 
     /** 从 user.dir 上溯仓库根（含 .git）；兜底回溯找含 ecos_backend/ 的目录。 */

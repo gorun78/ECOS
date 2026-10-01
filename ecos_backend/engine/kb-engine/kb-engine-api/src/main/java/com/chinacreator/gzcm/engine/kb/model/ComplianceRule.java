@@ -1,13 +1,14 @@
 package com.chinacreator.gzcm.engine.kb.model;
 
-import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRule;
-
 /**
  * 合规规则 — 扩展ExpertRule，增加状态管理、前件事实列表、版本追踪。
  *
  * 与 ExpertRule 的关系：
  *   ExpertRule 是通用"专家规则"基类（条件/动作/优先级）
  *   ComplianceRule 增加合规特化字段（审批人、生效日期、关联抽取规则源）
+ *
+ * <p>F04-18：fromExtractedRule 使用 kb 本地 {@code ExtractedSubGraph.ExtractedRule}
+ * （与 ontology 侧同字段镜像，不跨引擎 import）。</p>
  */
 public class ComplianceRule extends ExpertRule {
 
@@ -32,7 +33,7 @@ public class ComplianceRule extends ExpertRule {
     }
 
     /** 从提取结果创建（待审核态） */
-    public static ComplianceRule fromExtractedRule(ExtractedRule er) {
+    public static ComplianceRule fromExtractedRule(ExtractedSubGraph.ExtractedRule er) {
         ComplianceRule r = new ComplianceRule();
         r.setName(er.getName());
         r.setDomain(er.getDomain());

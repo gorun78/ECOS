@@ -87,7 +87,7 @@ class PublicSqlRegressionTest {
         assertTrue(Files.isDirectory(pg), "ecos-sql/postgresql/ 缺失: " + pg);
         assertTrue(Files.isDirectory(my), "ecos-sql/mysql/ 缺失: " + my);
 
-        long max = 0L;
+        long[] maxHolder = {0L};
         List<String> pgFiles = new ArrayList<>();
         try (Stream<Path> stream = Files.list(pg)) {
             stream.filter(Files::isRegularFile)
@@ -95,13 +95,14 @@ class PublicSqlRegressionTest {
                   .forEach(p -> {
                       try {
                           long sz = Files.size(p);
-                          if (sz > max) max = sz;
+                          if (sz > maxHolder[0]) maxHolder[0] = sz;
                           pgFiles.add(p.getFileName() + " (" + sz + "B)");
                       } catch (IOException e) {
                           fail("读取大小失败: " + p + " -> " + e.getMessage());
                       }
                   });
         }
+        long max = maxHolder[0];
         // 物理落点实测（2026-10-21 grep）：00_init_database.sql (1288B)
         //  + 01..08_ecos_*.sql；其中 04_ecos_ontology.sql ~ 23.8KB 为最大，远超 5KB。
         assertTrue(max > MIN_PUBLIC_SQL_BYTES,

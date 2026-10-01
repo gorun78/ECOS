@@ -22,7 +22,7 @@ export default defineConfig(() => {
         '/api/v1/agent-mesh':    { target: 'http://localhost:18084', changeOrigin: true },
         '/api/v1/agent':         { target: 'http://localhost:18084', changeOrigin: true },
         '/api/v1/agent-call':    { target: 'http://localhost:18084', changeOrigin: true },
-        '/api/v1/knowledge':     { target: 'http://localhost:18084', changeOrigin: true },
+        '/api/v1/knowledge':     { target: 'http://localhost:18086', changeOrigin: true }, // 仅 dev; 生产 BFF→gateway→kb (:8080 分派, dccheng jar :18086)
         '/api/v1/security':      { target: 'http://localhost:18081', changeOrigin: true },
         '/api/v1/audit':         { target: 'http://localhost:18081', changeOrigin: true },
         '/api/v1/abac':          { target: 'http://localhost:18081', changeOrigin: true },

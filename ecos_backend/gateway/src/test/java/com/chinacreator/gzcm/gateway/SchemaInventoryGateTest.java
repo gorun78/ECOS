@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SchemaInventoryGateTest {
 
     private static final Path MIGRATION_DIR_REL =
-            Paths.get("ecos_backend/gateway/src/main/resources/db/migration");
+            Paths.get("docs/50-db_script/02-flyway-migration/gateway");
     private static final String CARRIER_TABLE = "td_data_resource";
 
     private static Path repoRoot() throws IOException {
@@ -115,7 +115,7 @@ class SchemaInventoryGateTest {
         Class<?> svcClass = Class.forName("com.chinacreator.gzcm.engine.data.service.DataLayerService");
         boolean foundRegistrationSeam = false;
         for (Method m : svcClass.getDeclaredMethods()) {
-            if (!m.isPublic()) continue;
+            if (!java.lang.reflect.Modifier.isPublic(m.getModifiers())) continue;
             int n = m.getParameterCount();
             String name = m.getName().toLowerCase();
             boolean nameMatch = name.contains("carrier")

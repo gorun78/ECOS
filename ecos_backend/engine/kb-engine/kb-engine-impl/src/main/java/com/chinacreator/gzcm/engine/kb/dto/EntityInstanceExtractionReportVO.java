@@ -81,6 +81,9 @@ public class EntityInstanceExtractionReportVO {
     /** 结构化告警/失败明细（上限保护，避免报告无界膨胀） */
     private List<IssueVO> issues = new ArrayList<>();
 
+    /** C3 校验被显式关闭时置 true（禁静默关闭 — REQ-KB-01 契约）。 */
+    private boolean c3Skipped;
+
     /** 追加一条结构化告警明细（上限 50 条）。 */
     public void addIssue(String entityCode, String code, String message) {
         if (issues.size() < 50) {

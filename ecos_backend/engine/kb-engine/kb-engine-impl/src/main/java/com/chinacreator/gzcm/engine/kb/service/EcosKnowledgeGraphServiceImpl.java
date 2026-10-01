@@ -3,8 +3,11 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.EcosKnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
+import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -32,9 +35,14 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
     private final JdbcTemplate jdbc;
     private final KgSyncService kgSyncService;
 
-    public EcosKnowledgeGraphServiceImpl(JdbcTemplate jdbc, @Lazy KgSyncService kgSyncService) {
+    /** Neo4j 投影客户端 — standard 档允许缺省（nullable），缺省/不可用 → 显式降级不投影。 */
+    private final Neo4jClient neo4j;
+
+    public EcosKnowledgeGraphServiceImpl(JdbcTemplate jdbc, @Lazy KgSyncService kgSyncService,
+                                         ObjectProvider<Neo4jClient> neo4jProvider) {
         this.jdbc = jdbc;
         this.kgSyncService = kgSyncService;
+        this.neo4j = neo4jProvider == null ? null : neo4jProvider.getIfAvailable();
     }
 
     @Override
@@ -128,26 +136,51 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
     }
 
     /**
-     * syncToNeo4j — 提交异步任务（kg_neo4j_sync）。
-     * 异步任务实际为"重跑一次 kgMapper 同步"以便 PG 与 Neo4j 对齐；
-     * 执行通过 {@link KgSyncServiceImpl#runKgMapper(String, String)}（@Async 走 taskExecutor）。
+     * syncToNeo4j — 图谱双形态做实（F04-10 / K-28~K-32）。
+     *
+     * <p>原实现无论任何档位都返回 {@code "ready_to_sync"} 伪成功（fire-and-forget），
+     * 掩盖"standard 档压根没有 Neo4j、投影从未发生"的事实。现按设计修正：</p>
+     * <ul>
+     *   <li>Neo4j 投影<b>不可用</b>（standard 档无 Neo4j / {@code !neo4j.isAvailable()}）→
+     *       显式返回 {@code notAttempted} + {@code degraded=true} + 原因，<b>不以 PG 为失败</b>
+     *       （PG 表仍是权威形态，Neo4j 是从属投影副本）；</li>
+     *   <li>Neo4j 可用 → 提交真投影任务（{@code kg_neo4j_sync}）并对账
+     *       PG↔Neo4j 计数，结果写入 {@code kg_sync_log}（真结果，非"pending"空头）。</li>
+     * </ul>
+     * <p>全仓不再出现 {@code ready_to_sync} 伪成功字面量（源码验收
+     * {@code GraphDualFormTest#noReadyToSyncLiteralRemains}）。</p>
      */
     @Override
     public Map<String, Object> syncToNeo4j() {
         Map<String, Object> result = new LinkedHashMap<>();
-        int nodes = 0;
-        int edges = 0;
+
+        int pgNodes = 0;
+        int pgEdges = 0;
         try {
             Integer nc = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM ecos_knowledge.graph_node", Integer.class);
             Integer ec = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM ecos_knowledge.graph_edge", Integer.class);
-            nodes = nc == null ? 0 : nc;
-            edges = ec == null ? 0 : ec;
+            pgNodes = nc == null ? 0 : nc;
+            pgEdges = ec == null ? 0 : ec;
         } catch (Exception e) {
-            log.warn("syncToNeo4j count failed: {}", e.getMessage());
+            log.warn("syncToNeo4j PG count failed (权威形态不可读): {}", e.getMessage());
         }
-        // 提交异步任务计数行（status=RUNNING），由 runKgMapper 异步执行 + 回填
+        result.put("pgNodeCount", pgNodes);
+        result.put("pgEdgeCount", pgEdges);
+
+        // Neo4j 投影可用性（enterprise+ 才启用；standard 档 Neo4jClient 为 null 或不可用）
+        boolean neo4jAvailable = neo4j != null && neo4j.isAvailable();
+        if (!neo4jAvailable) {
+            // 显式降级：未尝试投影。PG 仍是权威形态，这不是错误，只是"当前档位无 Neo4j 投影"。
+            result.put("status", "notAttempted");
+            result.put("degraded", true);
+            result.put("degradeReason",
+                    "当前档位无 Neo4j 投影（standard 档），PG 表为权威形态；Neo4j 为主从投影副本，可重放。");
+            return result;
+        }
+
+        // Neo4j 可用 → 提交真投影任务并做 PG↔Neo4j 计数对账
         String jobId = "tg-neo4j-" + System.currentTimeMillis();
         try {
             jdbc.update(
@@ -157,24 +190,62 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
         } catch (Exception e) {
             log.warn("insert kg_sync_log for neo4j sync failed: {}", e.getMessage());
         }
-        // 异步执行（@Async 在 KgSyncServiceImpl 内被 Spring 代理调度）。
-        // 不抛到 IO 路径：fire-and-forget，结果写入 kg_sync_log。
         try {
             kgSyncService.runKgMapper("ALL", jobId);
         } catch (Exception e) {
-            log.warn("submit async neo4j-sync failed (fire-and-forget): {}", e.getMessage());
+            log.warn("submit neo4j-sync projection failed: {}", e.getMessage());
         }
-        // 审计事件
+
+        long neo4jNodes = countNeo4jNodesSafely();
+        long neo4jEdges = countNeo4jEdgesSafely();
+        boolean reconciled = neo4jNodes == pgNodes && neo4jEdges == pgEdges;
+
+        Map<String, Object> recon = new LinkedHashMap<>();
+        recon.put("pgNodes", pgNodes);
+        recon.put("neo4jNodes", neo4jNodes);
+        recon.put("pgEdges", pgEdges);
+        recon.put("neo4jEdges", neo4jEdges);
+        recon.put("matched", reconciled);
+        result.put("reconcile", recon);
+
+        // 审计事件（F04-15 口径：走真结果；此处保留 log AUDIT 打点，事件收口由 F04-15 统一 EventBus）
         String payload = String.format(
-                "{\"action\":\"kg_neo4j_sync_submit\",\"jobId\":\"%s\",\"nodes\":%d,\"edges\":%d,\"service\":\"kb-engine\"}",
-                jobId, nodes, edges);
+                "{\"action\":\"kg_neo4j_sync\",\n\"jobId\":\"%s\",\"pgNodes\":%d,\"neo4jNodes\":%d," +
+                        "\"pgEdges\":%d,\"neo4jEdges\":%d,\"matched\":%b,\"service\":\"kb-engine\"}",
+                jobId, pgNodes, neo4jNodes, pgEdges, neo4jEdges, reconciled);
         log.info("AUDIT topic={} payload={}", KafkaTopics.AUDIT, payload);
 
-        result.put("status", "ready_to_sync");
-        result.put("message", "pending async task kg_neo4j_sync jobId=" + jobId);
+        result.put("status", reconciled ? "synced" : "reconcile_drift");
+        result.put("degraded", false);
+        if (!reconciled) {
+            // 对账差异不吞：显式标记 PG↔Neo4j 形态不一致（F04-10 GRAPH_FORM_MISMATCH 预警）
+            result.put("degradeReason", "PG↔Neo4j 计数不一致（见 reconcile），投影端为从属副本，建议重放。");
+            result.put("mismatchCode", KbErrorCodes.GRAPH_FORM_MISMATCH.code());
+        }
         result.put("jobId", jobId);
-        result.put("nodesAvailable", nodes);
-        result.put("edgesAvailable", edges);
         return result;
+    }
+
+    private long countNeo4jNodesSafely() {
+        try {
+            Map<String, Object> row = neo4j.runFirst("MATCH (n) RETURN count(n) AS c", Collections.emptyMap());
+            Object c = row == null ? null : row.get("c");
+            return c instanceof Number ? ((Number) c).longValue() : 0L;
+        } catch (Exception e) {
+            log.warn("neo4j node count failed: {}", e.getMessage());
+            return 0L;
+        }
+    }
+
+    private long countNeo4jEdgesSafely() {
+        try {
+            Map<String, Object> row =
+                    neo4j.runFirst("MATCH ()-[r]->() RETURN count(r) AS c", Collections.emptyMap());
+            Object c = row == null ? null : row.get("c");
+            return c instanceof Number ? ((Number) c).longValue() : 0L;
+        } catch (Exception e) {
+            log.warn("neo4j edge count failed: {}", e.getMessage());
+            return 0L;
+        }
     }
 }

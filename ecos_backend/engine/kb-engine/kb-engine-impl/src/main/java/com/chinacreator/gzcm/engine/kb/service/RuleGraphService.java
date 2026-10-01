@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
-import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph;
-import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
-import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
+import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph;
+import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph.ExtractedEntity;
+import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph.ExtractedRelation;
 import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,8 +42,9 @@ public class RuleGraphService {
 
     // ── Neo4j 连接 (统一收敛 runtime-access) ──
     // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
-    // 保留 cognitive.neo4j.switch-on-write 配置开关 (业务级: 是否启用 Neo4j 写入).
-    @Value("${cognitive.neo4j.switch-on-write:}")
+    // F04-10: Neo4j 写入开关改用本域前缀配置键 ecos.kb.graph.neo4j.switch-on-write
+    //         (纠正 K-32 "借 cognitive.* 键"，本域配置须带 ecos.kb.* 前缀)。
+    @Value("${ecos.kb.graph.neo4j.switch-on-write:}")
     private String neo4jSwitchOnWrite;
 
     @Autowired(required = false)

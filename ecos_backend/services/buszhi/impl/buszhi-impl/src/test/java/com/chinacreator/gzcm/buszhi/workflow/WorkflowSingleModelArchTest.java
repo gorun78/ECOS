@@ -48,6 +48,9 @@ class WorkflowSingleModelArchTest {
         if (Files.isDirectory(wfTest)) {
             scanDir(wfTest, violations);
         }
+        // 自排除：本守卫的断言文案里就写着三条违例字面量（?::jsonb / DELETE FROM / SELECT *），
+        // stripComments 特意保留字符串字面量以便扫描真实 SQL，因此守卫自身必须排除，否则会自我命中。
+        violations.removeIf(v -> v.contains("WorkflowSingleModelArchTest.java"));
 
         assertTrue(violations.isEmpty(),
             "W86/MC 单模型违例（含 ?::jsonb / 物理 DELETE FROM ecos_workflow / SELECT * FROM ecos_workflow）：\n"

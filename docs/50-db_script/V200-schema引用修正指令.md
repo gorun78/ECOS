@@ -139,6 +139,57 @@ String sql = "SELECT ... FROM " + schema + ".ecos_ontology_data WHERE ...";
 | **B5 — 服务层** | sysman-impl + buszhi-impl + datanet | **21 + 8 + 3 = 32** | T+6~7 周 | runtime-core | B0；与已有 CD-1~CD-3 收敛合并 | sysman 21 文件本次同时消化 CD-1~CD-3 存量；buszhi 的 `Workflow*Repository` 7 文件是本批主体（分片清晰、可拆 4 规则/2 任务）；datanet 3 文件为最小批次，可作收官样板 |
 | **B6 — workspace + gateway** | workspace-impl + gateway | **14 + 11 = 25** | T+7~8 周 | runtime-core | B0~B5 全部完成 | workspace `Object*Service` 系 5 文件拆分出 DAO；gateway 11 文件（`QuotaFilter` / `TelemetryService` / `MonitorService` 等）与 runtime-core `AlertRepository` 相关类合并扫描，防止 gateway 直连 DB 与 runtime 冲突；收口后 gateway fat-jar 内的 DB 访问全部源于 runtime-core Bean |
 
+---
+
+## 〇·补二  B-数据域完整性专项（独立于 R1/R2/R3 的横向核查项）
+
+> 触发：ECOS 定位是强数据平台，控制域/业务域二分是架构根基。2026-10-01 用 `sys_man` 实库 + data-engine 源码交叉核查，发现两处**比 schema 更名更优先于 R3 的隐性偏差**。本专项与 B0~B6 正交，不占 R1/R2/R3 编号，独立验收。
+> 说明：此前初稿曾把本专项描述为"业务域写通道未打通"，经源码复核**修正**——写入通道在代码侧已完备（见下），真正缺口是「DB 落地执行」与「schema 命名语义」两处。
+
+### 核查事实（sys_man 实测 + 源码，2026-10-01）
+
+**事实 1 — 控制域名号与业务域名号错位**
+
+`sys_man` 实测各 schema 表数：`ecos_control 49 / ecos_data 36 / ecos_ai 33 / ecos_ontology 28 / ecos_knowledge 26 / ecos_cognitive 20 / ecos_infra 6 / ecos_dw 3`。
+
+- `ecos_data`（36 表：`ecos_pipeline_*` / `td_data_*` / `ecos_dq_*` / `td_catalog_*`）装的是**数据引擎自身控制面**（管道 DAG 定义、质量规则、数据源元数据）——按《数据湖存储分层规范 §〇》这些**本就属控制域**，落控制域**位置正确**。
+- 但 schema 名叫 `ecos_data`，极易被读者/PMO/新人误读为"数据域"；真正的**业务域数据湖**是 `ecos_dw`，却在实测中只有 3 张 `demo_*` 表（`demo_customer/invoice/supplier`，共 9 行 seed）。
+- 后果：B1（data-engine，本次最大批 39 文件）里绝大多数文件读写的是**控制面**而非业务域，若命名不澄清，"强数据平台"的域划分在代码里对用户不可见。
+
+**事实 2 — 业务域写入通道设计完备，但 DDL 未在本机落地**
+
+代码侧 `data-engine-impl` 的写通道**完整存在**（非空洞）：
+- `writechannel/DwWriteChannelService.java` — 业务域写编排，含管控（`ECOS-DATA-053/054` 错误码）
+- `writechannel/DwSchemaQualifier.java` — MC06 schema 配置化解析（`@Value ${dw.business-schema:ecos_dw}`），**本身就是 §R3 口径的合规样板**
+- `writechannel/OlapEngineResolver.java` — OLAP 仅承 CURATED/APPLICATION，控制域禁入湖（MC04）
+- `fact/FactType.java` + `fact/dao/{Attribution,Stage,Resource,Cost,ForecastSnapshot}FactMapper.java` — 业务事实五表，目标 `ecos_dw`
+- `BusinessDomainWriteArchTest` / `NonOlapControlWriteGuardTest` / `IdempotentWriteReplayTest` — ArchUnit 守门已建
+
+但 `sys_man` 实库 `ecos_dw.` 下 **5 张 fact 表（`ecos_biz_project_attribution` / `ecos_biz_stage_fact` / `ecos_biz_resource_fact` / `ecos_biz_cost_fact` / `ecos_forecast_input_snapshot`）全部 `RELATION DOES NOT EXIST`**，而它们的 DDL 实实在在于 `docs/50-db_script/02-flyway-migration/gateway/V167__biz_fact_model.sql`。
+
+根因：本仓 Flyway 禁用（`spring.flyway.enabled: false`），迁移脚本靠人工执行，**V167 尚未在本机 `sys_man` 跑过**。这是「设计已落地到 DDL 文件、执行侧未跟」的差距——属执行缺口，非设计缺陷。
+
+### 三项处置
+
+| 项 | 动作 | 归属 | 优先级 | 依赖 |
+|----|------|------|-------|------|
+| **B-D1 — 执行 V167 落地业务域 fact 表** | 在 `sys_man` 上手工执行 `V167__biz_fact_model.sql`（含索引），跑通 `fact/dao/*FactMapper` 的 smoke 用例；把「5 张 fact 表可创可读写」登记为 B1 出口验收的**前置** | data-engine owner | 高（B1 前） | 无 |
+| **B-D2 — 业务域最小真实闭环** | 造一条 demo 源 → RAW(MinIO) → CURATED(`ecos_dw.*fact`) 的真数据流，让五层各至少一张非 demo 表带真实行数。验收：`SELECT count(*) FROM ecos_dw.ecos_biz_stage_fact > 0` 且数据源可经 data-engine `fetchDwDatasets()` 前端读到 | data-engine + kb | 中 | B-D1 |
+| **B-D3 — `ecos_data` 语义澄清（二选一，PMO 裁决）** | **方案 A（推荐，V200 后成本最低）**：`ALTER SCHEMA ecos_data RENAME TO ecos_datactl`，把"数据域"名号完整让给 `ecos_dw`；同步改 `MyBatisConfig` 的 `typeAliasesPackage` 与所有 `@Value`/`search_path` 引用。**方案 B**：不改名，在《数据库访问规范》ST07 表 + 本文 §一 加显式注脚"`ecos_data` = 数据引擎控制面，非业务域"，并强制 R3 阶段所有 SQL 前缀 schema 限定（禁裸表名） | DB/规范 owner | 中 | 无（可与 B-D1 并行） |
+
+### 与 B 批次的关系
+
+- B-D1 **先于 B1**（否则 B1 收口 39 文件时，写通道目标表尚不存在，测试无凭据）。
+- B-D2 建议作为 **B1 的出口验收增项**（不是独立周排在 B1 之后，而是"数据引擎收口时必须证明控制域产出能写真进 `ecos_dw`"）。
+- B-D3 与 B1~B6 时间正交，**独立排期**，但应在 R3（schema 配置化全量）之前定案——否则 R3 时 `ecos_data` 的语义已经是"事实"。
+
+### 判定线
+
+- **通过**：`sys_man.` 内 `ecos_dw` 含 5 张 fact 表 + ≥1 张真实数据表；`ecos_data` 的域归属在文档与（改名后）schema 名上一致；data-engine 的 `BusinessDomainWriteArchTest` 全绿。
+- **未通过**：fact 表仍缺、或 `ecos_data`/`ecos_dw` 归属在规范文本中仍自相矛盾——此时"强数据平台"的域二分只在 PPT 层成立，代码层不冒号。
+
+---
+
 ### 每批标准动作（模板）
 
 1. **建整改分支**：`refactor/data-access/B{N}-<module>-<topic>`，基线 `release/v2.1-alpha`。
@@ -189,6 +240,8 @@ String sql = "SELECT ... FROM " + schema + ".ecos_ontology_data WHERE ...";
 | B6 | VG-7 | 待启动 |
 
 > R3（schema 配置化全量）独立排期，预计 B1~B6 完成后启动，需先落地 `ecos.db.engine-schema.*` 配置骨架（当前仅 CaliberService / OntologyProposalService 2 处有 `@Value` 用法可作基线）。
+>
+> **另见 §〇·补二 B-数据域完整性专项**：强数据平台的控制域/业务域二分存在「`ecos_data` 名实错位 + `ecos_dw` 5 张 fact 表 DDL 未在本机落地」两处横向偏差，与 R1/R2/R3 正交，其中 **B-D1（执行 V167 落 fact 表）须先于 B1**，否则 B1 收口时写通道无目标表可测。
 
 ---
 

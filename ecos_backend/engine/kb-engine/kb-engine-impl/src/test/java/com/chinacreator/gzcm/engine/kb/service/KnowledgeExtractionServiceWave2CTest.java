@@ -40,7 +40,7 @@ class KnowledgeExtractionServiceWave2CTest {
         mockEntityLinker = org.mockito.Mockito.mock(EntityLinkerService.class);
 
         service = new KnowledgeExtractionService(
-            mockJdbc, mockRuleMapper, mockKgWriter, mockDocParser, mockEntityLinker);
+            mockJdbc, mockRuleMapper, mockKgWriter, mockDocParser, mockEntityLinker, null, new org.springframework.web.client.RestTemplate());
     }
 
     // ── UT-6: reject 带 reason → 数据库写入 rejected_reason ──

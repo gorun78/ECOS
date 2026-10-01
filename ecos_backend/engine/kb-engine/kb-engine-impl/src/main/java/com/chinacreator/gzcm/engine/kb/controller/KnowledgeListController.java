@@ -24,7 +24,7 @@ import java.util.*;
  * @group WIKI
  */
 @RestController
-@RequestMapping("/api/v1/knowledge-bases")
+@RequestMapping({"/api/v1/knowledge-bases", "/api/knowledge-bases"})
 public class KnowledgeListController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeListController.class);

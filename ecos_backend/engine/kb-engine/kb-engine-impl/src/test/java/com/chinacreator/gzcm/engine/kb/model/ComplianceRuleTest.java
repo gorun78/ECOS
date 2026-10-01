@@ -128,7 +128,8 @@ class ComplianceRuleTest {
     @Test
     @DisplayName("fromExtractedRule: 抽取规则转 ComplianceRule 进入 IN_REVIEW 状态 (IR)")
     void fromExtractedRuleEntersInReviewState() {
-        var er = new com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRule();
+        // F04-18：改回 kb 本地 ExtractedSubGraph.ExtractedRule（不再 import ontology 类型）
+        var er = new ExtractedSubGraph.ExtractedRule();
         er.setName("r-ex");
         er.setDomain("supply");
         er.setCondition("#c>10");
@@ -148,7 +149,7 @@ class ComplianceRuleTest {
     @Test
     @DisplayName("fromExtractedRule: null conflict — er=null 仍返回 DRAFT? (语义: 工厂要 either-name 才能转 IN_REVIEW)")
     void fromExtractedRuleKeepsRequiredFieldsOnIr() {
-        var er = new com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRule();
+        var er = new ExtractedSubGraph.ExtractedRule();
         er.setName("r-null");
         er.setDomain(null); // 不强制 null, 业务上 supply 是 hint
         ComplianceRule r = ComplianceRule.fromExtractedRule(er);

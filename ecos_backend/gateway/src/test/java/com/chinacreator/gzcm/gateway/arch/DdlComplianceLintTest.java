@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 class DdlComplianceLintTest {
 
     private static final String MIGRATION_REL =
-            "ecos_backend/gateway/src/main/resources/db/migration";
+            "docs/50-db_script/02-flyway-migration/gateway";
 
     /**
      * 数据域 E.2/E.5 与 F02 入驻本批次的单源 DDL 脚本（设计 doc E.5 版本清单 + F02-03/-05/-11）。

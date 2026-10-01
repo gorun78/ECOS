@@ -172,6 +172,9 @@ public class ApiResponse<T> implements Serializable {
     public String getTraceId() { return traceId; }
     public void setTraceId(String traceId) { this.traceId = traceId; }
 
+    public String getErrorCode() { return errorCode; }
+    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
+
     // ── 便捷方法 ────────────────────────────────────
 
     public boolean isSuccess() {

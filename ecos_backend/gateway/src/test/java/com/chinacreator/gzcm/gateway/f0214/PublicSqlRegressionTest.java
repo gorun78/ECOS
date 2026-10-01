@@ -72,7 +72,7 @@ class PublicSqlRegressionTest {
             }
         }
         assertFalse(excludesPublic,
-                "public.sql 若被 .gitignore 排除则视为"未 git 跟踪"，与 W57 评审前提冲突：需从忽略表删除");
+                "public.sql 若被 .gitignore 排除则视为「未 git 跟踪」，与 W57 评审前提冲突：需从忽略表删除");
     }
 
     @Test

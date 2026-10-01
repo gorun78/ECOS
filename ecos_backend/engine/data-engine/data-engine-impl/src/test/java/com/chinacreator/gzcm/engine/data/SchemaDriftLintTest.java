@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 class SchemaDriftLintTest {
 
     private static final String MIGRATION_REL =
-            "ecos_backend/gateway/src/main/resources/db/migration";
+            "docs/50-db_script/02-flyway-migration/gateway";
 
     /** 每张「已声明」表须出现在至少一个 V*.sql 单源脚本里。 */
     private static final List<String> EXPECTED_TABLES = List.of(

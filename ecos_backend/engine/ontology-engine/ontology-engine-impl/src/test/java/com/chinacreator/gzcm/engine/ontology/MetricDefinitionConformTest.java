@@ -26,8 +26,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 class MetricDefinitionConformTest {
 
+    // V200 治理后 DDL 单源目录（数据库访问规范 v1.4 §八），仓库根相对
     private static final String DDL_FILE =
-            "ecos_backend/gateway/src/main/resources/db/migration/V168.1__metric_definition_conform.sql";
+            "docs/50-db_script/02-flyway-migration/gateway/V168.1__metric_definition_conform.sql";
 
     @Test
     void v168_1FileExists() {

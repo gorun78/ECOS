@@ -82,7 +82,7 @@ public class KnowledgeSettingsController {
      * <p>路径即为最终裸路径（/api/v1/knowledge/extract/... 不做 v1 重写，
      * 与 {@code ExtractionController} 落点一致），业务数据端点默认 DENY，不写 permitAll。</p>
      */
-    @GetMapping("/api/v1/knowledge/extract/upload-enabled")
+    @GetMapping("/extract/upload-enabled")
     public ApiResponse<ExtractUploadGateVO> uploadEnabled() {
         boolean allowed = parseBoolTrue(settingsService.getSetting(KEY_ALLOW_DIRECT_UPLOAD));
         ExtractUploadGateVO vo = new ExtractUploadGateVO();

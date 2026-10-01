@@ -133,6 +133,10 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
         List<Map<String, Object>> sources = new ArrayList<>();
 
+        // F04-11：向量形态降级须显式标记（湖规"降级须显式标记"，K-33）——
+        // 任一降级路径命中即置兜底原因，最终写入响应 vectorDegraded/降级原因/影响，禁止静默。
+        String degradeReason = null;
+
         if (queryText != null && !queryText.isBlank()) {
             if (pgVectorAvailable) {
                 // B4: 真实向量检索 — 嵌入走 llm-gateway（QueryEmbeddingHelper），
@@ -142,6 +146,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                 if (queryVector == null) {
                     log.warn("RAG 降级关键词检索：嵌入向量获取失败/为空（model={}, gatewayBase='{}', query='{}'）",
                             embeddingModel, llmGatewayBase, queryText);
+                    degradeReason = "嵌入向量获取失败/为空，回退关键词检索（JSONB 命中）";
                 } else {
                     try {
                         // PMO-B T1: navFilter 时多取 5x 余量再按 navigation 收窄（避免误截断）
@@ -199,6 +204,9 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                         log.warn("RAG 降级关键词检索：向量检索异常（query='{}'）: {}", queryText, e.getMessage(), e);
                     }
                     if (!vectorSuccess) {
+                        if (degradeReason == null) {
+                            degradeReason = "向量检索无命中，回退关键词检索（JSONB 命中）";
+                        }
                         log.warn("RAG 降级关键词检索：向量检索无命中（query='{}'）", queryText);
                     }
                 }
@@ -207,6 +215,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                     }
             } else {
                 log.warn("RAG 降级关键词检索：pgvector 扩展不可用（镜像需内置 pgvector，query='{}'）", queryText);
+                degradeReason = "pgvector 扩展不可用，回退关键词检索（JSONB 命中）";
                 sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths, effectTags);
             }
         }
@@ -216,6 +225,15 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         result.put("sourcesCount", sources.size());
         result.put("totalTokens", sources.size());
         result.put("latencyMs", latencyMs);
+
+        // F04-11：向量形态降级显式标记入响应（UI 据此显示降级徽标；禁静默）。
+        boolean vectorDegraded = degradeReason != null;
+        result.put("vectorDegraded", vectorDegraded);
+        result.put("vectorDegradedReason", degradeReason);
+        if (vectorDegraded) {
+            result.put("vectorDegradedImpact",
+                    "本次检索以 JSONB/关键词命中代替向量（HNSW）余弦相似度，召回精度下降；建议确认 pgvector 扩展与向量回填。");
+        }
 
         // PMO-50 T1: 拼 answer 字段（前端直接展示首段；topK>1 拼接分段）
         StringBuilder answerBuf = new StringBuilder();

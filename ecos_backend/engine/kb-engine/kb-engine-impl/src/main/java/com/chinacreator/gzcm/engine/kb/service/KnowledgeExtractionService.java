@@ -5,11 +5,17 @@ import com.chinacreator.gzcm.engine.kb.dto.ExtractFileVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
+import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph.ExtractedEntity;
+import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph.ExtractedRelation;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
-import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
-import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseResult;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
+import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
+import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
+import com.chinacreator.gzcm.runtime.core.task.parser.ITaskParser;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,9 +39,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 /**
@@ -52,8 +58,16 @@ import java.util.stream.Collectors;
  *
  * <p>kb 不直接调 LLM，通过 ai-engine Agent Loop API 执行抽取。</p>
  *
+ * <p>F04-14 调度/并发收敛：
+ * <ul>
+ *   <li>async 后台解析/抽取走 {@link ITaskManagementService#submitTask} (KB_EXTRACT_RUN)；</li>
+ *   <li>同步 AI 抽取调用去掉自建 {@code Executors.newSingleThreadExecutor} 包裹，
+ *       直接同步 {@link RestTemplate#postForObject}（RestTemplate 有自身 connect/read 超时）；</li>
+ *   <li>approve 阶段的 audit 侧信道由 {@code CompletableFuture.runAsync} 改为同步日志（本身是纯 log，无阻塞）。</li>
+ * </ul>
+ *
  * @author ECOS KB Engine Team
- * @since 2026-08-08, 2026-09-02 (Wave-2C 审批闭环)
+ * @since 2026-08-08, 2026-09-02 (Wave-2C 审批闭环), F04-14
  */
 @Service
 public class KnowledgeExtractionService {
@@ -65,9 +79,13 @@ public class KnowledgeExtractionService {
     private static final String AGENT_LOOP_URL = "http://localhost:8080/api/v1/agent-loop/chat";
     /** 本体变更提案端点 — kb→ontology 跨引擎（与 AGENT_LOOP_URL 同款同 JVM 走网关 8080 约定） */
     private static final String ONTOLOGY_PROPOSAL_URL = "http://localhost:8080/api/v1/ontology/proposals";
+    /** F04-12: 抽取临时缓冲 TTL — tmpdir 仅缓冲，滞留超时文件启动时清理（终存一律 MinIO RAW 层，K-37）。 */
+    private static final int UPLOAD_TTL_HOURS = 24;
     private static final int PARSE_TIMEOUT_SEC = 120;
-    private static final int LLM_TIMEOUT_SEC = 60;
+    /** F04-14：AI 抽取同步 HTTP 调用的语义上限（RestTemplate 内建超时为准；此常量保留仅作日志参考） */
+    static final int LLM_TIMEOUT_SEC = 60;
     private static final int MAX_RETRY = 1;
+    private static final String TASK_TYPE_EXTRACT_RUN = "KB_EXTRACT_RUN";
 
     /** 05 文档 §四: 3 类抽取 systemPrompt (entity/link/rule) */
     private static final String EXTRACTION_SYSTEM_PROMPT =
@@ -80,24 +98,34 @@ public class KnowledgeExtractionService {
         "}";
 
     private final JdbcTemplate jdbc;
+    /**
+     * F04-13：从 {@link com.chinacreator.gzcm.engine.kb.config.KbEngineRestConfig} 注入
+     * 共享 RestTemplate — 消除本 service 内 {@code new RestTemplate()} 站点。
+     * 用途：跨引擎 REST 调用（ai-engine Agent Loop / ontology proposal），非 LLM 直连。
+     */
     private final RestTemplate restTemplate;
     private final ComplianceRuleMapper ruleMapper;
     private final KGWriterService kgWriter;
     /** 文档解析公共能力（runtime-access，B6-2 上移；kb 复用不再自建） */
     private final DocumentParseService documentParserService;
     private final EntityLinkerService entityLinkerService;
+    /** F04-14：统一调度底座（KB_EXTRACT_RUN 异步/同步派发；禁自建 Executor） */
+    private final ITaskManagementService taskManagement;
 
     public KnowledgeExtractionService(JdbcTemplate jdbc,
                                       ComplianceRuleMapper ruleMapper,
                                       KGWriterService kgWriter,
                                       DocumentParseService documentParserService,
-                                      EntityLinkerService entityLinkerService) {
+                                      EntityLinkerService entityLinkerService,
+                                      ITaskManagementService taskManagement,
+                                      RestTemplate restTemplate) {
         this.jdbc = jdbc;
         this.ruleMapper = ruleMapper;
         this.kgWriter = kgWriter;
         this.documentParserService = documentParserService;
         this.entityLinkerService = entityLinkerService;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplate;
+        this.taskManagement = taskManagement;
     }
 
     @PostConstruct
@@ -109,7 +137,54 @@ public class KnowledgeExtractionService {
         } catch (IOException e) {
             log.warn("上传目录创建失败，后续上传将不可用: dir={} reason={}", UPLOAD_DIR, e.getMessage());
         }
+        // F04-12: tmpdir 仅作抽取临时缓冲，启动时清理滞留超过 TTL 的缓冲文件（终存走 MinIO RAW 层）
+        cleanExpiredUploadBuffer();
+        // F04-14：KB_EXTRACT_RUN 任务注册（parser+executor）— 干掉自建 Executors
+        if (taskManagement != null) {
+            taskManagement.registerParser(TASK_TYPE_EXTRACT_RUN, new ExtractRunTaskParser());
+            taskManagement.registerExecutor(TASK_TYPE_EXTRACT_RUN, new ExtractRunTaskExecutor());
+        }
         log.info("KnowledgeExtractionService initialized");
+    }
+
+    /**
+     * F04-12：清理抽取临时缓冲（{@code java.io.tmpdir + /ecos-extractions}）中滞留超过 TTL 的文件。
+     *
+     * <p>tmpdir 仅是抽取解析的<b>临时缓冲</b>，文档终存一律经 MinIO RAW 层
+     * （{@code KnowledgeDocIngestService} 合规链）；滞留文件要么是被中断的任务遗脏，
+     * 要么是长期未推进的死缓冲，故按 TTL（默认 24h）清扫。</p>
+     *
+     * @return 本次清扫的文件数（包级可见，供 {@code DocCarrierConvergenceTest} 断言）
+     */
+    int cleanExpiredUploadBuffer() {
+        Path dir = Paths.get(UPLOAD_DIR);
+        long maxAgeMs = TimeUnit.HOURS.toMillis(UPLOAD_TTL_HOURS);
+        if (!Files.isDirectory(dir)) {
+            return 0;
+        }
+        int cleaned = 0;
+        try (java.util.stream.Stream<Path> files = Files.list(dir)) {
+            List<Path> victims = files.filter(Files::isRegularFile).filter(p -> {
+                try {
+                    long age = System.currentTimeMillis() - Files.getLastModifiedTime(p).toMillis();
+                    if (age >= maxAgeMs) {
+                        log.info("命中过期抽取缓冲文件（TTL {}h）: {}", UPLOAD_TTL_HOURS, p.getFileName());
+                        return true;
+                    }
+                } catch (IOException ioe) {
+                    // stat 失败按未过期处理，不清
+                }
+                return false;
+            }).toList();
+            for (Path p : victims) {
+                if (Files.deleteIfExists(p)) {
+                    cleaned++;
+                }
+            }
+        } catch (IOException e) {
+            log.warn("清理过期抽取缓冲失败: dir={} reason={}", UPLOAD_DIR, e.getMessage());
+        }
+        return cleaned;
     }
 
     // ── 上传 ─────────────────────────────────────────
@@ -124,8 +199,29 @@ public class KnowledgeExtractionService {
             id, file.getOriginalFilename(), target.toString()
         );
 
-        // 异步启动解析
-        Executors.newSingleThreadExecutor().submit(() -> parseAndExtract(id, target));
+        // F04-14：走 runtime-task KB_EXTRACT_RUN 异步派发（禁自建 single-thread-executor）
+        if (taskManagement != null) {
+            TaskDescription desc = new TaskDescription();
+            desc.setTaskId("kberun-" + UUID.randomUUID());
+            desc.setTaskName("kb_extract_run:" + id);
+            desc.setTaskType(TASK_TYPE_EXTRACT_RUN);
+            desc.setDescription("extraction async parse+llm-extract");
+            desc.setAsync(true);
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("extractionId", id);
+            params.put("filePath", target.toString());
+            desc.setParameters(params);
+            try {
+                String taskId = taskManagement.submitTask(desc);
+                log.info("KB_EXTRACT_RUN submitted: taskId={} extractionId={}", taskId, id);
+            } catch (Exception e) {
+                // 兜底：submitTask 失败不能拖垮上传（file 已入库），把状态推进到 PENDING 失败
+                log.error("KB_EXTRACT_RUN submitTask 失败（上传保持 UPLOADED，前端可重试）: id={} reason={}",
+                        id, e.getMessage(), e);
+            }
+        } else {
+            log.warn("ITaskManagementService 未装配，KB_EXTRACT_RUN 未派发（extractionId={}）— 交由运维补齐底座", id);
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("extractionId", id);
@@ -222,50 +318,43 @@ public class KnowledgeExtractionService {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<String> future = executor.submit(() ->
-            restTemplate.postForObject(AGENT_LOOP_URL, request, String.class));
+        // F04-14：去掉 Executors.newSingleThreadExecutor + Future.get(timeout) 自建并发封装。
+        // RestTemplate 自身有 connect/read 超时；外层 parseAndExtract 已在 runtime-task
+        // KB_EXTRACT_RUN 线程内执行，无需再嵌套新线程。
+        String response = restTemplate.postForObject(AGENT_LOOP_URL, request, String.class);
 
-        try {
-            String response = future.get(LLM_TIMEOUT_SEC, TimeUnit.SECONDS);
-            if (response == null || response.isEmpty()) return Collections.emptyMap();
+        if (response == null || response.isEmpty()) return Collections.emptyMap();
 
-            Map<String, Object> apiResp = mapper.readValue(response, new TypeReference<Map<String, Object>>() {});
-            Boolean topSuccess = (Boolean) apiResp.get("success");
-            if (topSuccess != null && !topSuccess) {
-                String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
-                throw new RuntimeException("Agent调用失败: " + msg);
+        Map<String, Object> apiResp = mapper.readValue(response, new TypeReference<Map<String, Object>>() {});
+        Boolean topSuccess = (Boolean) apiResp.get("success");
+        if (topSuccess != null && !topSuccess) {
+            String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
+            throw new RuntimeException("Agent调用失败: " + msg);
+        }
+        Object data = apiResp.get("data");
+        if (data instanceof Map) {
+            Map<?, ?> dataMap = (Map<?, ?>) data;
+            Boolean dataSuccess = (Boolean) dataMap.get("success");
+            if (dataSuccess != null && !dataSuccess) {
+                Object errObj = dataMap.get("errorMsg");
+                throw new RuntimeException("Agent推理失败: " + (errObj != null ? errObj : "未知"));
             }
-            Object data = apiResp.get("data");
-            if (data instanceof Map) {
-                Map<?, ?> dataMap = (Map<?, ?>) data;
-                Boolean dataSuccess = (Boolean) dataMap.get("success");
-                if (dataSuccess != null && !dataSuccess) {
-                    Object errObj = dataMap.get("errorMsg");
-                    throw new RuntimeException("Agent推理失败: " + (errObj != null ? errObj : "未知"));
-                }
-                Object content = dataMap.get("content");
-                if (content != null) {
-                    try {
-                        return mapper.readValue(content.toString(), new TypeReference<Map<String, Object>>() {});
-                    } catch (Exception e) {
-                        String jsonStr = content.toString();
-                        int start = jsonStr.indexOf('{');
-                        int end = jsonStr.lastIndexOf('}');
-                        if (start >= 0 && end > start) {
-                            return mapper.readValue(jsonStr.substring(start, end + 1),
-                                    new TypeReference<Map<String, Object>>() {});
-                        }
+            Object content = dataMap.get("content");
+            if (content != null) {
+                try {
+                    return mapper.readValue(content.toString(), new TypeReference<Map<String, Object>>() {});
+                } catch (Exception e) {
+                    String jsonStr = content.toString();
+                    int start = jsonStr.indexOf('{');
+                    int end = jsonStr.lastIndexOf('}');
+                    if (start >= 0 && end > start) {
+                        return mapper.readValue(jsonStr.substring(start, end + 1),
+                                new TypeReference<Map<String, Object>>() {});
                     }
                 }
             }
-            return Collections.emptyMap();
-        } catch (TimeoutException e) {
-            future.cancel(true);
-            throw new RuntimeException("LLM抽取超时(" + LLM_TIMEOUT_SEC + "s)");
-        } finally {
-            executor.shutdownNow();
         }
+        return Collections.emptyMap();
     }
 
     // ── 审核闭环 (Wave-2C PMO-24 补全) ───────────────
@@ -719,24 +808,93 @@ public class KnowledgeExtractionService {
         log.error("抽取失败 id={}: {}", id, errorMsg);
     }
 
-    /** 异步审计日志 (05 文档 §六: 不阻塞主流程) */
+    /** 审计日志 (05 文档 §六: 不阻塞主流程)。
+     * F04-14：原 {@code CompletableFuture.runAsync} 已去除——此处本为纯 log，无 IO，同步写即可。 */
     private void auditAsync(String extractionId, String action, int rules, int entities, int links) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                Map<String, Object> audit = new LinkedHashMap<>();
-                audit.put("entityType", "extraction");
-                audit.put("sourceType", "KB");
-                audit.put("activity", action);
-                audit.put("entityId", extractionId);
-                audit.put("rules", rules);
-                audit.put("entities", entities);
-                audit.put("links", links);
-                audit.put("timestamp", LocalDateTime.now().format(DT_FMT));
-                // 实际场景: POST /api/v1/security/audit/log
-                log.info("[AUDIT] extraction {}.{}: rules={} entities={} links={}", action, extractionId, rules, entities, links);
-            } catch (Exception e) {
-                log.warn("审计日志写入失败(不影响主流程): {}", e.getMessage());
+        try {
+            log.info("[AUDIT] extraction {}.{}: rules={} entities={} links={}", action, extractionId, rules, entities, links);
+        } catch (Exception e) {
+            log.warn("审计日志写入失败(不影响主流程): {}", e.getMessage());
+        }
+    }
+
+    // ── F04-14：KB_EXTRACT_RUN runtime-task 内嵌 parser / executor ──
+    //
+    // 设计：parser 只做参数校验（extractionId 必填，taskType 匹配）；
+    // executor 读 parameters.extractionId + filePath，回落到本 service 的 parseAndExtract。
+    // 这样上传 endpoint 只需 submitTask 一次，runtime-task 承担派发 + 线程池 + 重试。
+
+    private final class ExtractRunTaskParser implements ITaskParser {
+        @Override
+        public TaskExecutionPlan parse(TaskDescription taskDescription) throws TaskParseException {
+            validate(taskDescription);
+            TaskExecutionPlan plan = new TaskExecutionPlan();
+            plan.setTaskId(taskDescription.getTaskId());
+            TaskExecutionPlan.ExecutionStep step = new TaskExecutionPlan.ExecutionStep();
+            step.setStepId("kb-extract-run-step");
+            step.setStepName("KB 抽取：parse + AI-extract");
+            step.setStepType(TASK_TYPE_EXTRACT_RUN);
+            step.setExecutor(TASK_TYPE_EXTRACT_RUN);
+            step.setConfig(taskDescription.getParameters() == null
+                    ? new HashMap<>() : new HashMap<>(taskDescription.getParameters()));
+            List<TaskExecutionPlan.ExecutionStep> steps = new ArrayList<>();
+            steps.add(step);
+            plan.setSteps(steps);
+            return plan;
+        }
+
+        @Override
+        public boolean supports(String taskType) {
+            return TASK_TYPE_EXTRACT_RUN.equalsIgnoreCase(taskType);
+        }
+
+        @Override
+        public void validate(TaskDescription taskDescription) throws TaskParseException {
+            if (taskDescription == null || taskDescription.getTaskId() == null
+                    || taskDescription.getTaskId().isEmpty()) {
+                throw new TaskParseException("KB_EXTRACT_RUN: taskId is required");
             }
-        });
+            if (!supports(taskDescription.getTaskType())) {
+                throw new TaskParseException("unsupported taskType: " + taskDescription.getTaskType());
+            }
+            Map<String, Object> params = taskDescription.getParameters();
+            if (params == null || params.get("extractionId") == null) {
+                throw new TaskParseException("parameters.extractionId 必填 (KB_EXTRACT_RUN)");
+            }
+            if (params.get("filePath") == null) {
+                throw new TaskParseException("parameters.filePath 必填 (KB_EXTRACT_RUN)");
+            }
+        }
+    }
+
+    private final class ExtractRunTaskExecutor implements ITaskExecutor {
+        @Override
+        public String execute(TaskExecutionPlan executionPlan, ITaskStatusCallback statusCallback)
+                throws TaskExecutionException {
+            try {
+                String extractionId = String.valueOf(executionPlan.getSteps().get(0)
+                        .getConfig().get("extractionId"));
+                String filePath = String.valueOf(executionPlan.getSteps().get(0)
+                        .getConfig().get("filePath"));
+                Path p = Paths.get(filePath);
+                parseAndExtract(extractionId, p);
+                return String.format("{\"taskType\":\"%s\",\"extractionId\":\"%s\",\"completedAt\":\"%s\"}",
+                        TASK_TYPE_EXTRACT_RUN, extractionId, LocalDateTime.now().format(DT_FMT));
+            } catch (Exception ex) {
+                log.error("KB_EXTRACT_RUN 执行失败: {}", ex.getMessage(), ex);
+                throw new TaskExecutionException("kb_extract_run failed", ex);
+            }
+        }
+
+        @Override
+        public void cancel(String taskId) { }
+        @Override
+        public void pause(String taskId) { }
+        @Override
+        public void resume(String taskId) { }
+        @Override
+        public com.chinacreator.gzcm.runtime.core.task.model.TaskStatus getStatus(String taskId) {
+            return null;
+        }
     }
 }

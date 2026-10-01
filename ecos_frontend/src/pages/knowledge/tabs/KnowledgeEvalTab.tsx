@@ -29,7 +29,7 @@ const REPORTS_STORAGE_KEY = 'kb_eval_reports';
 
 function loadSeeds(): EvalSeedQuery[] {
   try {
-    const raw = localStorage.getItem(SEEDS_STORAGE_KEY);
+    const raw = sessionStorage.getItem(SEEDS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as EvalSeedQuery[];
     return Array.isArray(parsed) ? parsed : [];
@@ -37,12 +37,12 @@ function loadSeeds(): EvalSeedQuery[] {
 }
 
 function saveSeeds(seeds: EvalSeedQuery[]) {
-  try { localStorage.setItem(SEEDS_STORAGE_KEY, JSON.stringify(seeds.slice(0, 500))); } catch { /* ignore */ }
+  try { sessionStorage.setItem(SEEDS_STORAGE_KEY, JSON.stringify(seeds.slice(0, 500))); } catch { /* ignore */ }
 }
 
 function loadReports(): EvalReport[] {
   try {
-    const raw = localStorage.getItem(REPORTS_STORAGE_KEY);
+    const raw = sessionStorage.getItem(REPORTS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as EvalReport[];
     return Array.isArray(parsed) ? parsed.slice(0, 50) : [];
@@ -50,7 +50,7 @@ function loadReports(): EvalReport[] {
 }
 
 function saveReports(reports: EvalReport[]) {
-  try { localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports.slice(0, 50))); } catch { /* ignore */ }
+  try { sessionStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports.slice(0, 50))); } catch { /* ignore */ }
 }
 
 // 简单的本地 Recall@5 / MRR@5 / NDCG@5 —— 用 RAG search 作为召回 top-K

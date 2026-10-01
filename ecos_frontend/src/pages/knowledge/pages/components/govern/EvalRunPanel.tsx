@@ -29,7 +29,7 @@ const REPORTS_STORAGE_KEY = 'kb_eval_reports';
 
 function loadReports(): EvalReport[] {
   try {
-    const raw = localStorage.getItem(REPORTS_STORAGE_KEY);
+    const raw = sessionStorage.getItem(REPORTS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as EvalReport[];
     return Array.isArray(parsed) ? parsed.slice(0, 50) : [];
@@ -40,7 +40,7 @@ function loadReports(): EvalReport[] {
 
 function saveReports(reports: EvalReport[]): void {
   try {
-    localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports.slice(0, 50)));
+    sessionStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports.slice(0, 50)));
   } catch { /* ignore */ }
 }
 

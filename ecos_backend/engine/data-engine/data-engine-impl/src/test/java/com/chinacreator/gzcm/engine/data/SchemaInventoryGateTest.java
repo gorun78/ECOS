@@ -58,7 +58,7 @@ class SchemaInventoryGateTest {
     }
 
     private static final Path MIGRATION_DIR = Path.of(
-            "gateway/src/main/resources/db/migration");
+            "docs/50-db_script/02-flyway-migration/gateway");
     private static final Pattern CREATE_SCHEMA = Pattern.compile(
             "CREATE\\s+SCHEMA\\s+(IF\\s+NOT\\s+EXISTS\\s+)?([A-Za-z_][\\w]*)",
             Pattern.CASE_INSENSITIVE);
@@ -66,7 +66,7 @@ class SchemaInventoryGateTest {
     @Test
     @DisplayName("db/migration/*.sql 里所有 CREATE SCHEMA 都在白名单内")
     void allCreateSchemaInWhitelist() throws IOException {
-        Path dir = repoRoot().resolve("ecos_backend").resolve(MIGRATION_DIR);
+        Path dir = repoRoot().resolve(MIGRATION_DIR);
         assertTrue(Files.isDirectory(dir), "迁移目录缺: " + dir);
         // schema → 首次出现的文件（便于断言信息）
         Map<String, String> found = new LinkedHashMap<>();
@@ -102,7 +102,7 @@ class SchemaInventoryGateTest {
     @Test
     @DisplayName("ST07 5 个引擎 schema 至少有一个在迁移里被显式建立（非空门）")
     void st07EngineSchemasAreReferenced() throws IOException {
-        Path dir = repoRoot().resolve("ecos_backend").resolve(MIGRATION_DIR);
+        Path dir = repoRoot().resolve(MIGRATION_DIR);
         Set<String> created = new LinkedHashSet<>();
         try (Stream<Path> walk = Files.walk(dir)) {
             for (Path f : walk.filter(Files::isRegularFile)
