@@ -25,9 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <pre>
  *   放行（documented, 已知存量 → W56 清偿）：
- *     gateway/.../service/MonitorService#countOpenDqIssues  监控大盘读 /api/v1/monitor/* 依赖
- *     → 已登记 shift 到 M2（走 datanet /api/v1/dq/health/selfcheck 聚合），本文件在测试侧
- *       KNOWN_PREEXISTING 白名单只等 M2 剔除；新增任何其它 gateway 数据域直查 → FAIL。
+ *     gateway 监控大盘读 /api/v1/monitor/* 的 DQ 直查，R2-B6b 后由
+ *     MonitorService.countOpenDqIssues 收口落到 MonitorDao.countOpenDqIssues
+ *     （data-access 下沉 JdbcTemplateDaoSupport 派生 DAO，架构铁律 §2.5 / IR06），
+ *     → 已登记 shift 到 M2（走 datanet /api/v1/dq/health/selfcheck 聚合），白名单
+ *       只等 M2 剔除；新增任何其它 gateway 数据域直查 → FAIL。
  * </pre>
  *
  * <p>TenantAwareJdbcTemplate 的 TENANT_TABLES 集合里以 "ecos_dq_rule" 字符串常量登记
@@ -45,7 +47,7 @@ class GatewayNoDomainTableArchTest {
             Pattern.CASE_INSENSITIVE);
     /** 已知存量白名单（M2 剔除 ≤ M2 之后不动）：reference reason 内嵌在文件名中。 */
     private static final List<String> KNOWN_PREEXISTING = List.of(
-            "MonitorService.java"  // countOpenDqIssues 监控大盘聚合读；W56 订正 = 改走 datanet /api/v1/dq 契约
+            "MonitorDao.java"  // countOpenDqIssues 监控大盘聚合读（R2-B6b 由 MonitorService 收口落到 DAO）；W56 订正 = 改走 datanet /api/v1/dq 契约
     );
 
     @Test

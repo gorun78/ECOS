@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.gateway.telemetry;
 
+import com.chinacreator.gzcm.gateway.dao.SpanDao;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -10,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import static io.opentelemetry.semconv.ServiceAttributes.SERVICE_NAME;
@@ -23,16 +23,19 @@ import static io.opentelemetry.semconv.ServiceAttributes.SERVICE_NAME;
  *   <li>创建 SdkTracerProvider 并配置 PostgresSpanExporter</li>
  *   <li>注册为 GlobalOpenTelemetry，供 TelemetryInterceptor 使用</li>
  * </ul>
+ *
+ * <p>B6b 数据访问收口（架构铁律 §2.5 / IR06）：本类不再直接持 JdbcTemplate，
+ * 改为注入 {@link SpanDao} 传给 {@link PostgresSpanExporter}（写入经 DAO 收口）。</p>
  */
 @Component
 public class OpenTelemetryInitializer {
 
     private static final Logger log = LoggerFactory.getLogger(OpenTelemetryInitializer.class);
 
-    private final JdbcTemplate jdbc;
+    private final SpanDao spanDao;
 
-    public OpenTelemetryInitializer(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public OpenTelemetryInitializer(SpanDao spanDao) {
+        this.spanDao = spanDao;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -44,8 +47,8 @@ public class OpenTelemetryInitializer {
                     .put("service.version", "P3-5")
                     .build();
 
-            // 2. 创建 PostgresSpanExporter
-            PostgresSpanExporter exporter = new PostgresSpanExporter(jdbc);
+            // 2. 创建 PostgresSpanExporter（B6b：写入经 SpanDao 收口）
+            PostgresSpanExporter exporter = new PostgresSpanExporter(spanDao);
 
             // 3. 创建 SdkTracerProvider
             SdkTracerProvider tracerProvider = SdkTracerProvider.builder()

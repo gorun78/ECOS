@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.gateway.filter;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.gateway.dao.QuotaDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -13,12 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +50,7 @@ public class QuotaFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(QuotaFilter.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final QuotaDao quotaDao;
 
     /**
      * 配额查询本地缓存 — 缓存每日限额，避免每次请求都查DB。
@@ -62,8 +61,8 @@ public class QuotaFilter extends OncePerRequestFilter {
             .maximumSize(1000)
             .build();
 
-    public QuotaFilter(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public QuotaFilter(QuotaDao quotaDao) {
+        this.quotaDao = quotaDao;
     }
 
     @Override
@@ -109,9 +108,7 @@ public class QuotaFilter extends OncePerRequestFilter {
                 dailyLimit = cachedLimit;
             } else {
                 // P2-17: 查询该租户对应类型的日配额
-                List<Map<String, Object>> quotas = jdbc.queryForList(
-                    "SELECT daily_limit FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?",
-                    tenantId, quotaTypeLabel);
+                List<Map<String, Object>> quotas = quotaDao.findDailyLimit(tenantId, quotaTypeLabel);
                 if (quotas.isEmpty()) {
                     // 未配置该类型配额 → 只检查 API_CALLS 作为兜底，其他类型放过
                     if (!"API_CALLS".equals(quotaTypeLabel)) {
@@ -146,25 +143,15 @@ public class QuotaFilter extends OncePerRequestFilter {
                 }
             }
 
-            // ── B5 竞态修复: PostgreSQL 原子 UPSERT + RETURNING ──
-            String atomicSql =
-                "INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) " +
-                "VALUES (?, ?::date, ?, ?, NOW()) " +
-                "ON CONFLICT (tenant_id, usage_date, quota_type) " +
-                "DO UPDATE SET used_count = ecos_tenant_usage.used_count + ?, updated_at = NOW() " +
-                "WHERE ecos_tenant_usage.used_count < ? " +
-                "RETURNING used_count";
-
+            // ── B5 竞态修复: PostgreSQL 原子 UPSERT + RETURNING（收口 QuotaDao）──
             // 执行原子操作并获取新的计数值
-            List<Long> result = jdbc.query(atomicSql,
-                (ResultSet rs, int rowNum) -> rs.getLong("used_count"),
-                tenantId, today, quotaTypeLabel, usageIncrement, usageIncrement, dailyLimit);
+            List<Long> result = quotaDao.atomicIncrementUsage(
+                tenantId, today, quotaTypeLabel, usageIncrement, dailyLimit);
 
             long newCount;
             if (result.isEmpty()) {
                 // 原子操作被 WHERE 子句阻止（已超限），查询当前值
-                List<Map<String, Object>> usages = jdbc.queryForList(
-                    "SELECT used_count FROM ecos_tenant_usage WHERE tenant_id = ? AND usage_date = ?::date AND quota_type = ?",
+                List<Map<String, Object>> usages = quotaDao.findUsageCount(
                     tenantId, today, quotaTypeLabel);
                 newCount = usages.isEmpty() ? dailyLimit : ((Number) usages.get(0).get("used_count")).longValue();
 

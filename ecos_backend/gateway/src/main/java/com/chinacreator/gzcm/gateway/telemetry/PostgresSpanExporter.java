@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.gateway.telemetry;
 
+import com.chinacreator.gzcm.gateway.dao.SpanDao;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.common.CompletableResultCode;
@@ -7,7 +8,6 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -18,15 +18,18 @@ import java.util.Collection;
  * <p>
  * 替代原来 TelemetryInterceptor 中直接 JDBC 写库的方式，
  * 改为通过标准 OTel SpanExporter 接口异步写入。
+ *
+ * <p>B6b 数据访问收口（架构铁律 §2.5 / IR06）：裸 SQL 下沉至 {@link SpanDao}；
+ * 本 Exporter 保留 OTel {@code SpanData → 列} 的字段归一化（持 OTel 语义），经 DAO 落库。</p>
  */
 public class PostgresSpanExporter implements SpanExporter {
 
     private static final Logger log = LoggerFactory.getLogger(PostgresSpanExporter.class);
 
-    private final JdbcTemplate jdbc;
+    private final SpanDao spanDao;
 
-    public PostgresSpanExporter(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public PostgresSpanExporter(SpanDao spanDao) {
+        this.spanDao = spanDao;
     }
 
     @Override
@@ -71,12 +74,7 @@ public class PostgresSpanExporter implements SpanExporter {
             statusLabel = httpStatus != null && httpStatus < 400 ? "OK" : "ERROR";
         }
 
-        jdbc.update(
-                "INSERT INTO ecos_spans (span_id, trace_id, parent_span_id, operation_name, " +
-                "service_name, http_method, http_path, http_status, " +
-                "start_time, end_time, duration_ms, status, created_at) " +
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) " +
-                "ON CONFLICT (span_id) DO NOTHING",
+        spanDao.insertSpan(
                 spanId, traceId,
                 parentSpanId.isEmpty() ? null : parentSpanId,
                 operationName,

@@ -1,14 +1,11 @@
 package com.chinacreator.gzcm.gateway.twin;
 
+import com.chinacreator.gzcm.gateway.dao.DeviceTelemetryDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,17 +41,18 @@ public class DigitalTwinService {
 
     /**
      * A8: JDBC 异步持久化 — 单线程 Executor 避免遥测写入阻塞主线程。
-     * 使用 private constructor 注入 JdbcTemplate（可选依赖，没有则不持久化）。
+     * 经 私有的 {@link DeviceTelemetryDao}（B6b 收口）落库，DAO 的 JdbcTemplate 可选
+     * （A8 语义：{@code dao.optional()} 为 false 时不持久化）。
      */
-    private final JdbcTemplate jdbc;
+    private final DeviceTelemetryDao telemetryDao;
     private final ExecutorService persistenceExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "telemetry-persist");
         t.setDaemon(true);
         return t;
     });
 
-    public DigitalTwinService(@Autowired(required = false) JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public DigitalTwinService(DeviceTelemetryDao telemetryDao) {
+        this.telemetryDao = telemetryDao;
         registerDevice("sensor-temp-01", "温度传感器", "temperature", "°C", 20.0, 45.0);
         registerDevice("sensor-pressure-01", "压力传感器", "pressure", "MPa", 0.2, 2.0);
         registerDevice("sensor-vibration-01", "振动传感器", "vibration", "mm/s", 0.0, 12.0);
@@ -140,13 +138,11 @@ public class DigitalTwinService {
             }
         }
 
-        // ── A8: 异步双写 JDBC 持久化 ──
-        if (jdbc != null) {
+        // ── A8: 异步双写 JDBC 持久化（B6b 收口 DeviceTelemetryDao）──
+        if (telemetryDao != null && telemetryDao.optional()) {
             persistenceExecutor.submit(() -> {
                 try {
-                    jdbc.update(
-                        "INSERT INTO ecos_device_telemetry (device_id, value, recorded_at) VALUES (?, ?, ?)",
-                        deviceId, value, Timestamp.from(Instant.now()));
+                    telemetryDao.insertTelemetry(deviceId, value);
                 } catch (Exception e) {
                     log.warn("Failed to persist telemetry for {}: {}", deviceId, e.getMessage());
                 }
