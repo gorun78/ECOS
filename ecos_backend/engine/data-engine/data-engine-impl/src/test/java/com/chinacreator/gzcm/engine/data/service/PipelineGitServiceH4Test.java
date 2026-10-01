@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.engine.data.dao.PipelineGitDao;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitPullRequest;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitOperationResultVO;
 import com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -27,7 +27,7 @@ class PipelineGitServiceH4Test {
     @Mock
     private GitService gitService;
     @Mock
-    private JdbcTemplate jdbc;
+    private PipelineGitDao gitDao;
     @Mock
     private SysConfigService sysConfigService;
     @Mock
@@ -41,7 +41,7 @@ class PipelineGitServiceH4Test {
 
     @BeforeEach
     void setUp() {
-        service = new PipelineGitService(gitService, jdbc, sysConfigService,
+        service = new PipelineGitService(gitService, gitDao, sysConfigService,
                 gitRepositoryService, repoRootResolver, cryptoEgressProvider);
     }
 

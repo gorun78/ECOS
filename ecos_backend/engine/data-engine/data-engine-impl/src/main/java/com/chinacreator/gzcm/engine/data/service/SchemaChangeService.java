@@ -1,9 +1,8 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.engine.data.dao.SchemaChangeDao;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -11,15 +10,16 @@ import java.util.Map;
  * Schema 变更检测 Service 层。
  * <p>
  * 查询 schema_changes 表，支持按 acknowledged 过滤和确认操作。
+ * 实际 JDBC 访问由 {@link SchemaChangeDao} 承担。
  * </p>
  */
 @Service
 public class SchemaChangeService {
 
-    private final JdbcTemplate jdbc;
+    private final SchemaChangeDao schemaChangeDao;
 
-    public SchemaChangeService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SchemaChangeService(SchemaChangeDao schemaChangeDao) {
+        this.schemaChangeDao = schemaChangeDao;
     }
 
     /**
@@ -28,15 +28,7 @@ public class SchemaChangeService {
      * @param acknowledged 是否已确认
      */
     public List<Map<String, Object>> listChanges(boolean acknowledged) {
-        String sql = """
-            SELECT id, datasource_id, table_name, change_type,
-                   detail_json, detected_at, acknowledged
-            FROM schema_changes
-            WHERE acknowledged = ?
-            ORDER BY detected_at DESC
-            """;
-
-        return jdbc.queryForList(sql, acknowledged);
+        return schemaChangeDao.listChanges(acknowledged);
     }
 
     /**
@@ -46,9 +38,6 @@ public class SchemaChangeService {
      * @return 受影响行数
      */
     public int acknowledge(Long id) {
-        return jdbc.update(
-            "UPDATE schema_changes SET acknowledged = TRUE WHERE id = ? AND acknowledged = FALSE",
-            id
-        );
+        return schemaChangeDao.acknowledge(id);
     }
 }

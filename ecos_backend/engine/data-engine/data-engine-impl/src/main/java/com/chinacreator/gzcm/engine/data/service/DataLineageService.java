@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.engine.data.dao.DataLineageDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -37,7 +37,7 @@ public class DataLineageService {
     /** MAX_ACTIVE_DEFINITIONS_SCAFFOLD：增量重建单页大小（防单事务超大 backlog）。 */
     private static final int REBUILD_PAGE_SIZE = 50;
 
-    private final JdbcTemplate jdbc;
+    private final DataLineageDao lineageDao;
     private final com.chinacreator.gzcm.engine.data.lineage.dao.EcosDataLineageMapper lineageMapper;
     private final com.chinacreator.gzcm.engine.data.lineage.LineageDerivationService lineageDerivation;
     private final SqlLineageParser parser = new SqlLineageParser();
@@ -52,10 +52,10 @@ public class DataLineageService {
 
     private final com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
 
-    public DataLineageService(JdbcTemplate jdbc,
+    public DataLineageService(DataLineageDao lineageDao,
                               com.chinacreator.gzcm.engine.data.lineage.dao.EcosDataLineageMapper lineageMapper,
                               com.chinacreator.gzcm.engine.data.lineage.LineageDerivationService lineageDerivation) {
-        this.jdbc = jdbc;
+        this.lineageDao = lineageDao;
         this.lineageMapper = lineageMapper;
         this.lineageDerivation = lineageDerivation;
     }
@@ -186,16 +186,14 @@ public class DataLineageService {
     // ── 已有方法 (保留不变) ──
 
     public Map<String, Object> getPipelineLineage(String taskId) {
-        Map<String, Object> task = jdbc.queryForMap(
-            "SELECT yaml_content FROM ecos_pipeline_task WHERE id = ?", taskId);
+        Map<String, Object> task = lineageDao.getTaskYamlContent(taskId);
         String yaml = (String) task.get("yaml_content");
         return parseYamlLineage(yaml);
     }
 
     public List<Map<String, Object>> listNodes() {
         try {
-            return jdbc.queryForList(
-                "SELECT id, name, node_type as type, datasource_id, schema_name, table_name, layer FROM ecos_data.ecos_data_lineage_node ORDER BY name");
+            return lineageDao.listLineageNodes();
         } catch (Exception e) {
             return List.of();
         }
@@ -203,8 +201,7 @@ public class DataLineageService {
 
     public List<Map<String, Object>> listEdges() {
         try {
-            return jdbc.queryForList(
-                "SELECT id, source_node_id as source_id, target_node_id as target_id, edge_type, pipeline_task_id as pipeline_id FROM ecos_data.ecos_data_lineage_edge ORDER BY source_node_id");
+            return lineageDao.listLineageEdges();
         } catch (Exception e) {
             return List.of();
         }
@@ -217,8 +214,7 @@ public class DataLineageService {
 
         for (String pid : pipelineIds) {
             try {
-                Map<String, Object> task = jdbc.queryForMap(
-                    "SELECT name, yaml_content FROM ecos_pipeline_task WHERE id = ?", pid);
+                Map<String, Object> task = lineageDao.getTaskNameAndYaml(pid);
                 Map<String, Object> lineage = parseYamlLineage((String) task.get("yaml_content"));
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) lineage.get("nodes");
@@ -239,8 +235,7 @@ public class DataLineageService {
 
         if (includeDb || includeTables) {
             try {
-                List<Map<String, Object>> dbNodes = jdbc.queryForList(
-                    "SELECT DISTINCT datasource_id as id, 'datasource' as type, datasource_id as datasource FROM ecos_data.ecos_data_lineage_node WHERE datasource_id IS NOT NULL LIMIT 10");
+                List<Map<String, Object>> dbNodes = lineageDao.listDataSourceTopologyNodes();
                 for (Map<String, Object> n : dbNodes) {
                     if (seenNodeIds.add((String) n.get("id"))) {
                         n.put("label", n.get("id"));
@@ -354,14 +349,7 @@ public class DataLineageService {
             // F02-11 / W64: LIMIT 改参数化（?），禁字符串拼接（IR05）。
             List<Map<String, Object>> tasks;
             try {
-                if (taskLimit > 0) {
-                    tasks = jdbc.queryForList(
-                        "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC LIMIT ?",
-                        taskLimit);
-                } else {
-                    tasks = jdbc.queryForList(
-                        "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC");
-                }
+                tasks = lineageDao.listTasksWithYaml(taskLimit);
             } catch (Exception e) {
                 log.warn("rebuildAndPersist 查询 tasks 失败: {}", e.getMessage());
                 tasks = List.of();
@@ -503,8 +491,7 @@ public class DataLineageService {
     /** 扫描 ecs_pipeline_definition（ACTIVE + DRAFT，排除 ARCHIVED）。 */
     private List<Map<String, Object>> scanDefinitions() {
         try {
-            return jdbc.queryForList(
-                "SELECT id, name, definition::text AS definition FROM ecos_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY updated_at DESC");
+            return lineageDao.listActiveDefinitions();
         } catch (Exception e) {
             log.warn("rebuildAndPersist 查询 definitions 失败（表可能不同步）: {}", e.getMessage());
             return List.of();
@@ -538,8 +525,7 @@ public class DataLineageService {
      */
     private List<Map<String, Object>> scanNodesFromTable(String definitionId) {
         try {
-            List<Map<String, Object>> all = jdbc.queryForList(
-                "SELECT node_id, type, config::text AS config FROM ecos_pipeline_node WHERE definition_id = ?", definitionId);
+            List<Map<String, Object>> all = lineageDao.listNodeTableByDefinition(definitionId);
             List<Map<String, Object>> withSql = new ArrayList<>();
             for (Map<String, Object> row : all) {
                 String cfgRaw = (String) row.get("config");
@@ -617,11 +603,8 @@ public class DataLineageService {
             nodeMap.put(id, node);
         }
         if (!nodeBatch.isEmpty()) {
-            String sql = "INSERT INTO ecos_data.ecos_data_lineage_node " +
-                         "(id, node_type, name, table_name, pipeline_task_id, properties, created_at, updated_at) " +
-                         "VALUES (?,?,?,?,?, ?::jsonb, NOW(), NOW()) ON CONFLICT (id) DO NOTHING";
             try {
-                jdbc.batchUpdate(sql, nodeBatch);
+                lineageDao.batchInsertLineageNodes(nodeBatch);
             } catch (Exception e) {
                 // H8-T1（PMO-74.8 L1）：运行时隐式建表已清零——表结构唯一来源为
                 // 迁移脚本（V58/V155/V162）。写失败仅降级告警，不再内嵌 DDL 兜底。
@@ -653,12 +636,8 @@ public class DataLineageService {
             edgeList.add(en);
         }
         if (!edgeBatch.isEmpty()) {
-            String sql = "INSERT INTO ecos_data.ecos_data_lineage_edge " +
-                         "(id, source_node_id, target_node_id, edge_type, pipeline_task_id, transformation, properties, created_at) " +
-                         "VALUES (?,?,?,?,?,?, jsonb_set('{}'::jsonb, '{task_name}', to_jsonb(?::text)), NOW()) " +
-                         "ON CONFLICT (id) DO NOTHING";
             try {
-                jdbc.batchUpdate(sql, edgeBatch);
+                lineageDao.batchInsertLineageEdges(edgeBatch);
             } catch (Exception e) {
                 log.warn("persistParsed 批量写 edges 失败（持久化降级，拓扑仍可返回；"
                         + "如为表缺失请执行 db/migration 迁移脚本）: {}", e.getMessage());
@@ -679,8 +658,7 @@ public class DataLineageService {
     public void clearLineageData() {
         synchronized (rebuildLock) {
             try {
-                jdbc.execute("DELETE FROM ecos_data.ecos_data_lineage_edge");
-                jdbc.execute("DELETE FROM ecos_data.ecos_data_lineage_node");
+                lineageDao.clearLineageTables();
                 log.info("clearLineageData 完成");
             } catch (Exception e) {
                 log.warn("clearLineageData 失败（表可能不存在，请执行 db/migration 迁移脚本）: {}", e.getMessage());
@@ -692,13 +670,8 @@ public class DataLineageService {
     public Map<String, Object> getTopologyFromDb(String datasourceId) {
         try {
             // V155 已补 pipeline_task_id 列，直接读
-            String nodeSql = "SELECT id AS id, node_type AS type, name AS label, table_name AS table, " +
-                    "COALESCE(pipeline_task_id, properties->>'task') AS pipeline_task_id " +
-                    "FROM ecos_data.ecos_data_lineage_node ORDER BY created_at DESC";
-            List<Map<String, Object>> nodes = jdbc.queryForList(nodeSql);
-            String edgeSql = "SELECT id, source_node_id AS source, target_node_id AS target, edge_type AS transform, pipeline_task_id " +
-                    "FROM ecos_data.ecos_data_lineage_edge";
-            List<Map<String, Object>> edges = jdbc.queryForList(edgeSql);
+            List<Map<String, Object>> nodes = lineageDao.listTopologyNodes();
+            List<Map<String, Object>> edges = lineageDao.listTopologyEdges();
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("nodes", nodes);
             result.put("edges", edges);

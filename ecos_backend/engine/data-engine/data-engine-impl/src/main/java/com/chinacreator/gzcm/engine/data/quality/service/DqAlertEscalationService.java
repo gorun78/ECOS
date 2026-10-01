@@ -11,9 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.engine.data.quality.dao.DqAlertEscalationDao;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
 
 /**
@@ -56,16 +56,16 @@ public class DqAlertEscalationService {
     public static final long P1_ACK_SLA_MINUTES = 15L;
 
     private final ObjectProvider<IAlertService> alertServiceProvider;
-    private final ObjectProvider<JdbcTemplate> jdbcProvider;
     private final ObjectProvider<DqSecurityService> securityService;
+    private final DqAlertEscalationDao alertEscalationDao;
 
     @Autowired
     public DqAlertEscalationService(ObjectProvider<IAlertService> alertServiceProvider,
-                                    ObjectProvider<JdbcTemplate> jdbcProvider,
-                                    ObjectProvider<DqSecurityService> securityService) {
+                                    ObjectProvider<DqSecurityService> securityService,
+                                    DqAlertEscalationDao alertEscalationDao) {
         this.alertServiceProvider = alertServiceProvider;
-        this.jdbcProvider = jdbcProvider;
         this.securityService = securityService;
+        this.alertEscalationDao = alertEscalationDao;
     }
 
     /**
@@ -82,13 +82,8 @@ public class DqAlertEscalationService {
      * 核心扫描（可注入 LocalDateTime 便于单测推进时钟）。见 {@link #executeEscalationScan(Instant)}。
      */
     public int executeEscalationScan(LocalDateTime now) {
-        JdbcTemplate jdbc = jdbcProvider.getIfAvailable();
-        if (jdbc == null) {
-            log.warn("DqAlertEscalation JdbcTemplate 不可用，跳过本轮扫描");
-            return 0;
-        }
-        int p2Escalated = escalateLevel(jdbc, now, "P2", "P1", P2_ACK_SLA_MINUTES);
-        int p1Escalated = escalateLevel(jdbc, now, "P1", "P0", P1_ACK_SLA_MINUTES);
+        int p2Escalated = escalateLevel(now, "P2", "P1", P2_ACK_SLA_MINUTES);
+        int p1Escalated = escalateLevel(now, "P1", "P0", P1_ACK_SLA_MINUTES);
         return p2Escalated + p1Escalated;
     }
 
@@ -100,19 +95,13 @@ public class DqAlertEscalationService {
      *
      * @return 本级别成功升级的告警数
      */
-    int escalateLevel(JdbcTemplate jdbc, LocalDateTime now,
+    int escalateLevel(LocalDateTime now,
                       String fromLevel, String toLevel, long slaMinutes) {
         LocalDateTime deadline = now.minusMinutes(slaMinutes);
         Timestamp deadlineTs = Timestamp.valueOf(deadline);
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(
-                    "SELECT id, rule_id AS ruleId, alert_level AS alertLevel,"
-                    + " asset_id AS assetId, rule_name AS ruleName, message, created_at AS createdAt"
-                    + " FROM ecos_dq.dq_alert_record"
-                    + " WHERE alert_level = ? AND status IN ('PENDING','NOTIFIED') AND ack_at IS NULL"
-                    + "   AND created_at < ?",
-                    fromLevel, deadlineTs);
+            rows = alertEscalationDao.findUnacknowledged(fromLevel, deadlineTs);
         } catch (RuntimeException e) {
             log.error("DqAlertEscalation fetch {} candidates failed: {}", fromLevel, e.getMessage(), e);
             return 0;
@@ -123,7 +112,7 @@ public class DqAlertEscalationService {
         int escalated = 0;
         for (Map<String, Object> row : rows) {
             try {
-                if (escalateOne(jdbc, row, fromLevel, toLevel)) {
+                if (escalateOne(row, fromLevel, toLevel)) {
                     escalated++;
                 }
             } catch (RuntimeException e) {
@@ -139,7 +128,7 @@ public class DqAlertEscalationService {
      * 单告警升级：UPDATE 乐观锁写 escalated_to + status='ESCALATED' → runtime 推送 → 审计。
      * 全失败（n=0 / DB 异常）返回 false 不计数。
      */
-    private boolean escalateOne(JdbcTemplate jdbc, Map<String, Object> row,
+    private boolean escalateOne(Map<String, Object> row,
                                 String fromLevel, String toLevel) {
         String alertId = asString(row.get("id"));
         String ruleId = asString(row.get("ruleId"));
@@ -160,11 +149,7 @@ public class DqAlertEscalationService {
 
         int rows;
         try {
-            rows = jdbc.update(
-                    "UPDATE ecos_dq.dq_alert_record"
-                    + " SET alert_level = ?, escalated_to = ?, status = 'ESCALATED', last_notify_at = NOW()"
-                    + " WHERE id = ? AND status IN ('PENDING','NOTIFIED')",
-                    toLevel, toLevel, alertId);
+            rows = alertEscalationDao.markEscalated(toLevel, alertId);
             if (rows == 0) {
                 log.warn("DqAlertEscalation update no-op（并发已 ack/resolve）: alertId={}", alertId);
                 return false;

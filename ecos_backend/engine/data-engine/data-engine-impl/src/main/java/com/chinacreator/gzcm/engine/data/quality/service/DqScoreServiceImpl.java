@@ -10,13 +10,12 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.data.quality.DqScoreService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqScoreDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAssetScoreVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScoreSystemVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScoreTrendVO;
@@ -68,14 +67,14 @@ public class DqScoreServiceImpl implements DqScoreService {
 
     private final DqScoreEngine engine;
     private final DqSecurityService securityService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqScoreDao scoreDao;
 
     public DqScoreServiceImpl(DqScoreEngine engine,
                               DqSecurityService securityService,
-                              ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                              DqScoreDao scoreDao) {
         this.engine = engine;
         this.securityService = securityService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.scoreDao = scoreDao;
     }
 
     // ==================== 1. recomputeForAsset（写端点） ====================
@@ -83,11 +82,10 @@ public class DqScoreServiceImpl implements DqScoreService {
     @Override
     @Transactional
     public DqAssetScoreVO recomputeForAsset(String assetType, String assetId) {
-        JdbcTemplate jdbc = jdbc();
         String prefix = auditPrefix(assetType, assetId);
         try {
             // 1. 取该资产相关 ACTIVE 规则（限 TABLE 维度，target_kind='TABLE'）
-            List<Map<String, Object>> rules = loadRulesForAsset(jdbc, assetType, assetId);
+            List<Map<String, Object>> rules = loadRulesForAsset(assetType, assetId);
             if (rules.isEmpty()) {
                 log.info("DqScore recompute: no ACTIVE rules for {} {}, skipped", assetType, assetId);
                 // 审计写失败（默认 DENY 不阻塞主流程，但记录 reason）
@@ -95,15 +93,12 @@ public class DqScoreServiceImpl implements DqScoreService {
                 return null;
             }
             // 2. 取配对 dq_rule_check（最近 1h）
-            Map<String, Map<String, Object>> checkByRule = loadRecentChecks(jdbc, rules);
+            Map<String, Map<String, Object>> checkByRule = loadRecentChecks(rules);
             // 3. 按维度聚合（一个维度可能有多个规则 → 用 max pass_rate 作为该维代表）
             Map<DqDimension, AggDim> byDim = aggregateByDimension(rules, checkByRule, assetType, assetId);
             // 4. 写 snapshot（每维度 1 行）
             for (Map.Entry<DqDimension, AggDim> entry : byDim.entrySet()) {
-                jdbc.update(
-                        "INSERT INTO ecos_dq.dq_score_snapshot" +
-                        " (dimension, scope_type, scope_id, score_value, weight, sample_size, distinct_rule_count, evaluated_at, metadata)" +
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?::jsonb)",
+                scoreDao.insertSnapshot(
                         entry.getKey().name(),
                         assetType,
                         assetId,
@@ -116,16 +111,7 @@ public class DqScoreServiceImpl implements DqScoreService {
             // 5. 写 asset UPSERT（rolledScore + rolled_up_scores + last_evaluated_at）
             double rolled = weightedOverall(byDim);
             String rolledUpJson = serializeRolledUp(byDim);
-            jdbc.update(
-                    "INSERT INTO ecos_dq.dq_score_asset" +
-                    " (asset_type, asset_id, overall_score, rolled_up_scores, last_evaluated_at, is_deleted)" +
-                    " VALUES (?, ?, ?, ?, NOW(), FALSE)" +
-                    " ON CONFLICT (asset_type, asset_id) DO UPDATE" +
-                    " SET overall_score = EXCLUDED.overall_score," +
-                    "     rolled_up_scores = EXCLUDED.rolled_up_scores," +
-                    "     last_evaluated_at = EXCLUDED.last_evaluated_at," +
-                    "     is_deleted = FALSE",
-                    assetType, assetId, rolled, rolledUpJson);
+            scoreDao.upsertAssetScore(assetType, assetId, rolled, rolledUpJson);
 
             log.info("DqScore recomputed: {} {}, rules={}, rolled={}, grade={}",
                     assetType, assetId, rules.size(), rolled, DqDimension.FRESHNESS.gradeOf(rolled));
@@ -142,13 +128,7 @@ public class DqScoreServiceImpl implements DqScoreService {
     /** 查资产当前评分（dq_score_asset 最新一条）。 */
     @Override
     public DqAssetScoreVO getAssetScore(String assetType, String assetId) {
-        JdbcTemplate jdbc = jdbc();
-        List<DqAssetScoreVO> rows = jdbc.query(
-                "SELECT asset_type AS assetType, asset_id AS assetId, overall_score AS rolledScore," +
-                " rolled_up_scores, last_evaluated_at AS lastEvaluatedAt" +
-                " FROM ecos_dq.dq_score_asset WHERE asset_type = ? AND asset_id = ? AND is_deleted = FALSE",
-                (rs, i) -> mapAssetScore(rs),
-                assetType, assetId);
+        List<DqAssetScoreVO> rows = scoreDao.findAssetScore(assetType, assetId, (rs, i) -> mapAssetScore(rs));
         DqAssetScoreVO vo = rows.isEmpty() ? null : rows.get(0);
         securityService.auditRead("DQ_SCORE_GET", auditPrefix(assetType, assetId));
         return vo;
@@ -159,20 +139,7 @@ public class DqScoreServiceImpl implements DqScoreService {
     @Override
     public List<DqScoreTrendVO> trend(String assetType, String assetId, int days) {
         int d = days <= 0 ? 30 : Math.min(days, TREND_DAYS_CAP);
-        JdbcTemplate jdbc = jdbc();
-        List<DqScoreTrendVO> rows = jdbc.query(
-                "SELECT CAST(evaluated_at AS DATE) AS day," +
-                " dimension, AVG(score_value) AS score_value, COUNT(*) AS hits" +
-                " FROM ecos_dq.dq_score_snapshot" +
-                " WHERE scope_type = ? AND scope_id = ?" +
-                "   AND evaluated_at >= NOW() - (? || ' days')::interval" +
-                " GROUP BY 1, 2 ORDER BY 1 DESC, 2",
-                (rs, i) -> new DqScoreTrendVO(
-                        rs.getDate("day") != null ? rs.getDate("day").toLocalDate() : LocalDate.now(),
-                        rs.getString("dimension"),
-                        rs.getDouble("score_value"),
-                        rs.getInt("hits")),
-                assetType, assetId, d);
+        List<DqScoreTrendVO> rows = scoreDao.trend(assetType, assetId, d);
         securityService.auditRead("DQ_SCORE_TREND", auditPrefix(assetType, assetId));
         return rows;
     }
@@ -181,12 +148,7 @@ public class DqScoreServiceImpl implements DqScoreService {
 
     @Override
     public List<DqAssetScoreVO> byGrade(String grade) {
-        JdbcTemplate jdbc = jdbc();
-        List<DqAssetScoreVO> all = jdbc.query(
-                "SELECT asset_type AS assetType, asset_id AS assetId, overall_score AS rolledScore," +
-                " rolled_up_scores, last_evaluated_at AS lastEvaluatedAt" +
-                " FROM ecos_dq.dq_score_asset WHERE is_deleted = FALSE ORDER BY overall_score ASC",
-                (rs, i) -> mapAssetScore(rs));
+        List<DqAssetScoreVO> all = scoreDao.listAllAssetScores((rs, i) -> mapAssetScore(rs));
         List<DqAssetScoreVO> result = new ArrayList<>();
         String wanted = grade == null ? "" : grade.trim().toUpperCase();
         for (DqAssetScoreVO vo : all) {
@@ -204,27 +166,14 @@ public class DqScoreServiceImpl implements DqScoreService {
 
     @Override
     public DqScoreSystemVO systemScore() {
-        JdbcTemplate jdbc = jdbc();
         DqScoreSystemVO vo = new DqScoreSystemVO();
-        Double avg = jdbc.queryForObject(
-                "SELECT AVG(overall_score) FROM ecos_dq.dq_score_asset WHERE is_deleted = FALSE", Double.class);
-        Integer cnt = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_dq.dq_score_asset WHERE is_deleted = FALSE", Integer.class);
+        Double avg = scoreDao.avgOverallScore();
+        Integer cnt = scoreDao.countAssetScores();
         vo.setOverallScore(avg != null ? avg : 0.0D);
         vo.setCount(cnt != null ? cnt : 0);
         vo.setGrade(DqScoreSystemVO.gradeOf(vo.getOverallScore()));
 
-        jdbc.query(
-                "SELECT dimension, AVG(score_value) AS avg_score" +
-                " FROM ecos_dq.dq_score_snapshot" +
-                " WHERE evaluated_at >= NOW() - interval '1 day'" +
-                " GROUP BY dimension",
-                rs -> {
-                    String dim = rs.getString("dimension");
-                    Double v = rs.getDouble("avg_score");
-                    vo.getPerDimension().put(dim, v);
-                    return null;
-                });
+        scoreDao.perDimensionScores((dim, v) -> vo.getPerDimension().put(dim, v));
         securityService.auditRead("DQ_SCORE_SYSTEM", "batch");
         return vo;
     }
@@ -238,45 +187,21 @@ public class DqScoreServiceImpl implements DqScoreService {
 
     // ==================== 私有工具 ====================
 
-    private JdbcTemplate jdbc() {
-        JdbcTemplate tpl = jdbcTemplateProvider.getIfAvailable();
-        if (tpl == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行 DQ 评分查询");
-        }
-        return tpl;
-    }
-
     /** 审计资源前缀（dq_score_asset:{type}:{id}，铁律 2.4 #5 必须 resource 字段）。 */
     private static String auditPrefix(String assetType, String assetId) {
         return assetType + ":" + assetId;
     }
 
     /** 查活跃规则：target_kind='TABLE' AND target_id=assetId（DATASOURCE 留 interface 待 Phase 3）。 */
-    private List<Map<String, Object>> loadRulesForAsset(JdbcTemplate jdbc, String assetType, String assetId) {
+    private List<Map<String, Object>> loadRulesForAsset(String assetType, String assetId) {
         if (!"TABLE".equalsIgnoreCase(assetType)) {
             return List.of();
         }
-        return jdbc.query(
-                "SELECT id, rule_type AS ruleType, target_field AS targetField," +
-                " parameters::text AS parametersJson, domain, severity" +
-                " FROM ecos_dq.dq_rule" +
-                " WHERE target_kind = 'TABLE' AND target_id = ?" +
-                "   AND status = 'ACTIVE' AND is_deleted = FALSE",
-                (rs, i) -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", rs.getString("id"));
-                    m.put("ruleType", rs.getString("ruleType"));
-                    m.put("targetField", rs.getString("targetField"));
-                    m.put("parametersJson", rs.getString("parametersJson"));
-                    m.put("domain", rs.getString("domain"));
-                    m.put("severity", rs.getString("severity"));
-                    return m;
-                },
-                assetId);
+        return scoreDao.loadRulesForAsset(assetId);
     }
 
     /** 查最近 1h 的 dq_rule_check 行（executed_at >= NOW() - interval '1 hour'）。 */
-    private Map<String, Map<String, Object>> loadRecentChecks(JdbcTemplate jdbc, List<Map<String, Object>> rules) {
+    private Map<String, Map<String, Object>> loadRecentChecks(List<Map<String, Object>> rules) {
         Map<String, Map<String, Object>> byRule = new LinkedHashMap<>();
         if (rules.isEmpty()) {
             return byRule;
@@ -287,26 +212,7 @@ public class DqScoreServiceImpl implements DqScoreService {
         }
         // 防注入：in (?) 占位
         String inClause = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
-        jdbc.query(
-                "SELECT rule_id AS ruleId, passed, total_rows AS totalRows, failed_rows AS failedRows," +
-                " pass_rate AS passRate, executed_at AS executedAt" +
-                " FROM ecos_dq.dq_rule_check" +
-                " WHERE rule_id IN (" + inClause + ")" +
-                "   AND executed_at >= NOW() - " + RECENT_CHECK_ONE_HOUR,
-                (rs, i) -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("passed", rs.getBoolean("passed"));
-                    long t = rs.getLong("totalRows");
-                    m.put("totalRows", t);
-                    long f = rs.getLong("failedRows");
-                    m.put("failedRows", f);
-                    m.put("passRate", rs.getDouble("passRate"));
-                    Timestamp execTs = rs.getTimestamp("executedAt");
-                    m.put("executedAt", execTs != null ? execTs.toLocalDateTime() : null);
-                    byRule.put(rs.getString("ruleId"), m);
-                    return null;
-                },
-                ids.toArray());
+        scoreDao.loadRecentChecks(inClause, RECENT_CHECK_ONE_HOUR, byRule::put, ids.toArray());
         return byRule;
     }
 

@@ -7,8 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -28,16 +26,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.client.RestTemplate;
 
 import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqAutoRepairService;
 import com.chinacreator.gzcm.engine.data.quality.DqWorkOrderService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqAlertDao;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqKnowledgeSinkDao;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqRcaDao;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqReportDao;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqKnowledgeEntryVO;
@@ -96,9 +96,6 @@ class DqPhase4E2eIT {
     private DqKnowledgeSinkService knowledgeSinkService;
 
     @Mock
-    private JdbcTemplate jdbcTemplate;
-
-    @Mock
     private DqRuleMapper ruleMapper;
 
     @Mock
@@ -109,6 +106,18 @@ class DqPhase4E2eIT {
 
     @Mock
     private IAlertService runtimeAlertService;
+
+    @Mock
+    private DqAlertDao alertDao;
+
+    @Mock
+    private DqRcaDao rcaDao;
+
+    @Mock
+    private DqKnowledgeSinkDao knowledgeSinkDao;
+
+    @Mock
+    private DqReportDao reportDao;
 
     /** Fixture 2 searchSimilar 行桩行模板（按 size 裁剪） */
     private List<Map<String, Object>> scanRows = new ArrayList<>();
@@ -124,14 +133,13 @@ class DqPhase4E2eIT {
     @Test
     @DisplayName("Fixture 1 规则通过 → 评分快照 → 报告生成：DAILY 报告 VO 含 6 维 / LLM stub；HTML < 200KB 不上传 MinIO")
     void fixture1_generateDaily_returnsDailyVo_andSkipsMinio() {
-        // 1) mock 4 个 JdbcTemplate 聚合查询（fat SQL 数据行），让 DqReportServiceImpl 取数成功
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(), any()))
+        // 1) DqReportDao 桩：聚合数据行（fat SQL 数据行）
+        when(reportDao.countRuleChecks(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(42);
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
+        when(reportDao.countAlerts(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(3);
-        when(jdbcTemplate.queryForObject(anyString(), eq(Double.class)))
-                .thenReturn(0.87);
-        // queryForList(String, Object...) — 六维快照行
+        when(reportDao.avgScore()).thenReturn(0.87);
+        // 六维快照行：dimension + score_value
         final String scoreSql = "SELECT dimension, score_value FROM ecos_dq.dq_score_snapshot";
         List<Map<String, Object>> dimScores = List.of(
                 Map.of("dimension", "COMPLETENESS", "score_value", "0.92"),
@@ -140,13 +148,15 @@ class DqPhase4E2eIT {
                 Map.of("dimension", "FRESHNESS", "score_value", "0.55"),
                 Map.of("dimension", "UNIQUENESS", "score_value", "0.95"),
                 Map.of("dimension", "VALIDITY", "score_value", "0.90"));
-        doReturn(dimScores)
-                .when(jdbcTemplate)
-                .queryForList((String) anyString(), (Object[]) org.mockito.ArgumentMatchers.<Object>any());
+        when(reportDao.latestDimScores(org.mockito.ArgumentMatchers.any())).thenReturn(dimScores);
 
-        // 写 dq_report 成功
-        when(jdbcTemplate.update(anyString(), any(Object.class), any(), any(), any(), any(),
-                any(Object.class), any(), any(), any(), any(), any(), any()))
+        // 写 dq_report 成功（DqReportDao.insertReport 返回 int）
+        when(reportDao.insertReport(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyDouble()))
                 .thenReturn(1);
 
         DqReportServiceImpl reportSvc = newReportSvc();
@@ -199,29 +209,21 @@ class DqPhase4E2eIT {
         rule.setTargetKind("FIELD");
         when(ruleMapper.findById("rule-c1")).thenReturn(rule);
 
-        // Jdbc 桩：check 行空；判重空；findDedupAlertId 空；工单查找空；update 成功
-        // 默认：queryForList(String, Object...) 返回空列表
-        doAnswer(inv -> new ArrayList<Map<String, Object>>())
-                .when(jdbcTemplate)
-                .queryForList((String) anyString(), (Object[]) org.mockito.ArgumentMatchers.<Object>any());
-        // readWorkOrder 命中（RCA 阶段调）— 走 queryForList(String, Object...) 变体，
-        // argument 中 workOrderId 命中 anyString()（与 dispatch 用的 queryForList(String, Class, Object...) 重载隔离）
-        doAnswer(inv -> new ArrayList<>(List.of(Map.of(
-                "ruleId", "rule-c1",
-                "assetId", "sysman.customer",
-                "severity", "CRITICAL",
-                "description", "customer.email 大量 NULL 行，pass_rate=0.55"))))
-                .when(jdbcTemplate)
-                .queryForList(
-                        org.mockito.ArgumentMatchers.argThat(s ->
-                                s != null && s.contains("dq_work_order")),
-                        anyString());
+        // AlertDao 桩：readCheckRow 空（走 fallback）、findDedupAlertIds 空、findExistingWorkOrderIds 空
+        when(alertDao.readCheckRow("check-001")).thenReturn(new ArrayList<>());
+        when(alertDao.findDedupAlertIds(anyString(), anyString())).thenReturn(new ArrayList<>());
+        when(alertDao.findExistingWorkOrderIds(anyString())).thenReturn(new ArrayList<>());
+        // RCA 读工单命中
+        when(rcaDao.findWorkOrder("wo-f2-001")).thenReturn(
+                new ArrayList<>(List.of(Map.of(
+                        "ruleId", "rule-c1",
+                        "assetId", "sysman.customer",
+                        "severity", "CRITICAL",
+                        "description", "customer.email 大量 NULL 行，pass_rate=0.55"))));
         // RAG 上下文：errorMessage 非空 → DqRcaServiceImpl.searchSimilarSafe 完成 searchSimilar 调用
         // → 命中 mock → similar.size()=0 → confidence=0.4（BASE，再加 hit bonus cap 0.95）
         when(knowledgeSinkService.searchSimilar(anyString(), eq(3)))
                 .thenReturn(new PageResult<>(new ArrayList<>(), 0L, 1, 3));
-        when(jdbcTemplate.update(anyString(), any(Object.class), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any())).thenReturn(1);
 
         // 工单创建返回新 ID
         when(workOrderService.createWorkOrder(any(DqAlertVO.class), any(DqRuleVO.class)))
@@ -252,7 +254,7 @@ class DqPhase4E2eIT {
         DqRcaServiceImpl rcaSvc = new DqRcaServiceImpl(
                 restTemplateMock,
                 knowledgeSinkService,
-                jdbcTemplateProvider());
+                rcaDao);
 
         DqRcaRequest req = new DqRcaRequest();
         req.setWorkOrderId("wo-f2-001");
@@ -281,9 +283,9 @@ class DqPhase4E2eIT {
     @Test
     @DisplayName("Fixture 3 报告 DB 持久化 → 知识 RAG 检索：ingestFromAlert 写 dq_knowledge_entry；searchSimilar top ≤ 3 且 embedding 非空")
     void fixture3_ingestAlert_persistAndSearchSimilar() {
-        // 组装 DqKnowledgeSinkServiceImpl，复用 jdbcTemplate mock
+        // 组装 DqKnowledgeSinkServiceImpl，复用 knowledgeSinkDao mock
         DqKnowledgeSinkServiceImpl sinkSvc = new DqKnowledgeSinkServiceImpl(
-                securityService, ruleMapper, jdbcTemplateProvider());
+                securityService, ruleMapper, knowledgeSinkDao);
 
         DqAlertVO alert = new DqAlertVO();
         alert.setId("alert-f3-001");
@@ -294,15 +296,12 @@ class DqPhase4E2eIT {
         alert.setAssetName("sysman.customer:email");
         alert.setMessage("[DQ P1] not-null-customer-email 检查未通过 (FIELD:sysman.customer:email)");
         alert.setPayload(Map.of("passRate", 0.55, "failedRows", 90L));
-        // 1 行 INSERT 成功
-        when(jdbcTemplate.update(anyString(), any(Object.class), any(), any(), any(), any(),
-                any(), any(), any(), any())).thenReturn(1);
 
         sinkSvc.ingestFromAlert("alert-f3-001", alert);
 
-        // 1 次 INSERT dq_knowledge_entry + 1 次 audit
-        verify(jdbcTemplate, times(1)).update(anyString(), any(Object.class), any(), any(),
-                any(), any(), any(), any(), any(), any());
+        // 1 次 INSERT dq_knowledge_entry（走 DqKnowledgeSinkDao.insertEntry）+ 1 次 audit
+        verify(knowledgeSinkDao, times(1)).insertEntry(anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
         verify(securityService, times(1))
                 .auditWrite(eq("DQ_KB_INGEST_ALERT"), eq("alert-f3-001"), eq("SUCCESS"));
 
@@ -331,27 +330,24 @@ class DqPhase4E2eIT {
         e3.put("scoreHint", 0.55);
         scanRows.add(e3);
 
-        // jdbc.query(String, RowMapper, Object...) 行映射：返回预设 VOs（按 limit*5 扫描）
-        doAnswer(inv -> {
-            List<DqKnowledgeEntryVO> vos = new ArrayList<>();
-            for (Map<String, Object> m : scanRows) {
-                DqKnowledgeEntryVO v = new DqKnowledgeEntryVO();
-                v.setId(str(m.get("id")));
-                v.setSourceType(str(m.get("sourceType")));
-                v.setSourceId(str(m.get("sourceId")));
-                v.setCategory(str(m.get("category")));
-                v.setTitle(str(m.get("title")));
-                v.setSummary(str(m.get("summary")));
-                v.setContentMd(str(m.get("contentMd")));
-                v.setEntityJson(str(m.get("entityJson")));
-                v.setEmbeddingJson(str(m.get("embeddingJson")));
-                Object sh = m.get("scoreHint");
-                v.setScoreHint(sh instanceof Number n ? n.doubleValue() : null);
-                vos.add(v);
-            }
-            return vos;
-        }).when(jdbcTemplate).query(
-                (String) anyString(), (RowMapper<DqKnowledgeEntryVO>) any(), (Object[]) any());
+        // scanKnowledgeEntries 桩：3 行 embedding 齐全
+        List<DqKnowledgeEntryVO> entryVos = new ArrayList<>();
+        for (Map<String, Object> m : scanRows) {
+            DqKnowledgeEntryVO v = new DqKnowledgeEntryVO();
+            v.setId(str(m.get("id")));
+            v.setSourceType(str(m.get("sourceType")));
+            v.setSourceId(str(m.get("sourceId")));
+            v.setCategory(str(m.get("category")));
+            v.setTitle(str(m.get("title")));
+            v.setSummary(str(m.get("summary")));
+            v.setContentMd(str(m.get("contentMd")));
+            v.setEntityJson(str(m.get("entityJson")));
+            v.setEmbeddingJson(str(m.get("embeddingJson")));
+            entryVos.add(v);
+        }
+        when(knowledgeSinkDao.scanKnowledgeEntries(
+                (RowMapper<DqKnowledgeEntryVO>) any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(entryVos);
 
         PageResult<DqKnowledgeEntryVO> page = sinkSvc.searchSimilar(
                 "数据质量告警 P1 not-null-customer-email", 3);
@@ -371,32 +367,8 @@ class DqPhase4E2eIT {
     // 私有工厂
     // ────────────────────────────────────────────────────────────────────
 
-    /** 同一测试内多次创建服务共享同一 provider mock（避免重复 verify 累积） */
-    private LruProvider<JdbcTemplate> jdbcProviderLru = new LruProvider<>();
-
-    private ObjectProvider<JdbcTemplate> jdbcTemplateProvider() {
-        return jdbcProviderLru.ensure(jdbcTemplate);
-    }
-
-    /** ObjectProvider 桩缓存：同一测试内复用同一 mock 实例 */
-    @SuppressWarnings("unchecked")
-    private static class LruProvider<T> {
-        private T target;
-        private ObjectProvider<T> provider;
-
-        @SuppressWarnings("unchecked")
-        ObjectProvider<T> ensure(T target) {
-            if (provider == null || this.target != target) {
-                this.target = target;
-                this.provider = mock(ObjectProvider.class);
-                when(this.provider.getIfAvailable()).thenReturn(target);
-            }
-            return this.provider;
-        }
-    }
-
     private DqReportServiceImpl newReportSvc() {
-        return new DqReportServiceImpl(securityService, minioReportStorage, jdbcTemplateProvider());
+        return new DqReportServiceImpl(securityService, minioReportStorage, reportDao);
     }
 
     @SuppressWarnings("unchecked")
@@ -407,7 +379,7 @@ class DqPhase4E2eIT {
         when(sinkProvider.getIfAvailable()).thenReturn(knowledgeSinkService);
         return new DqAlertServiceImpl(
                 ruleMapper, securityService, workOrderService, autoRepairService,
-                alertProvider, jdbcTemplateProvider(), sinkProvider);
+                alertProvider, sinkProvider, alertDao);
     }
 
     private static String str(Object o) {

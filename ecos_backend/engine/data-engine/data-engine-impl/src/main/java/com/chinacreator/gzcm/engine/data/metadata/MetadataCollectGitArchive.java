@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.metadata;
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.engine.data.service.GitRepoRootResolver;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -36,7 +37,7 @@ import java.util.stream.Collectors;
  * @since 2026-09-07
  */
 @Component
-public class MetadataCollectGitArchive {
+public class MetadataCollectGitArchive extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataCollectGitArchive.class);
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -52,14 +53,13 @@ public class MetadataCollectGitArchive {
     private static final List<String> COMPARE_FIELDS = List.of("type", "sourcePath", "description", "fieldCount", "rowCount");
 
     private final GitService gitService;
-    private final JdbcTemplate jdbc;
     /** 仓库根路径单源解析（sys_config ecos_git_repo_root，含 path-traversal 校验） */
     private final GitRepoRootResolver repoRootResolver;
 
     public MetadataCollectGitArchive(GitService gitService, JdbcTemplate jdbc,
                                      GitRepoRootResolver repoRootResolver) {
         this.gitService = gitService;
-        this.jdbc = jdbc;
+        this.jdbcTemplate = jdbc;
         this.repoRootResolver = repoRootResolver;
     }
 
@@ -149,7 +149,7 @@ public class MetadataCollectGitArchive {
      */
     private int resolveHistoryLimit() {
         try {
-            String val = jdbc.queryForObject(
+            String val = jdbcTemplate.queryForObject(
                     "SELECT config_value FROM sys_config WHERE config_key = 'dw.metadata.history_versions'",
                     String.class);
             if (val == null || val.trim().isEmpty()) {

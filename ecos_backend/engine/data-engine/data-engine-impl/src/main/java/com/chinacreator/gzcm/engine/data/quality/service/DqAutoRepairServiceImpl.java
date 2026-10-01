@@ -1,6 +1,5 @@
 package com.chinacreator.gzcm.engine.data.quality.service;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -10,8 +9,6 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.engine.data.DataSourceService;
@@ -20,6 +17,7 @@ import com.chinacreator.gzcm.engine.data.pipeline.PipelineExecution;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineExecutionService;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineRepository;
 import com.chinacreator.gzcm.engine.data.quality.DqAutoRepairService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqAutoRepairDao;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -72,7 +70,7 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
     private final PipelineRepository pipelineRepository;
     private final DataSourceService dataSourceService;
     private final IDataSourceService iDataSourceService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqAutoRepairDao autoRepairDao;
 
     public DqAutoRepairServiceImpl(DqRuleMapper ruleMapper,
                                     DqSecurityService securityService,
@@ -80,14 +78,14 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
                                     PipelineRepository pipelineRepository,
                                     DataSourceService dataSourceService,
                                     IDataSourceService iDataSourceService,
-                                    ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                                    DqAutoRepairDao autoRepairDao) {
         this.ruleMapper = ruleMapper;
         this.securityService = securityService;
         this.pipelineExecutionService = pipelineExecutionService;
         this.pipelineRepository = pipelineRepository;
         this.dataSourceService = dataSourceService;
         this.iDataSourceService = iDataSourceService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.autoRepairDao = autoRepairDao;
     }
 
     // ==================== 主入口 ====================
@@ -98,8 +96,7 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
             log.warn("DqAutoRepair: workOrderId 为空，跳过");
             return;
         }
-        JdbcTemplate jdbc = requireJdbc();
-        DqWorkOrderRow wo = readWorkOrder(jdbc, workOrderId);
+        DqWorkOrderRow wo = readWorkOrder(workOrderId);
         if (wo == null) {
             log.warn("DqAutoRepair 工单不存在: workOrderId={}", workOrderId);
             securityService.auditWrite("DQ_AUTO_REPAIR", workOrderId, "WORK_ORDER_NOT_FOUND");
@@ -110,7 +107,7 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
         if (!"AUTO_REPAIR".equalsIgnoreCase(wo.handlingMode)) {
             log.info("DqAutoRepair 跳过: workOrderId={} handlingMode={}（非 AUTO_REPAIR 不自动修复）",
                     workOrderId, wo.handlingMode);
-            writeRepairLog(workOrderId, jdbc, Map.of("skip", "NOT_AUTO_REPAIR",
+            writeRepairLog(workOrderId, Map.of("skip", "NOT_AUTO_REPAIR",
                     "handlingMode", wo.handlingMode == null ? "" : wo.handlingMode), "FAILED");
             securityService.auditWrite("DQ_AUTO_REPAIR", workOrderId, "SKIP_NOT_AUTO_REPAIR");
             return;
@@ -121,7 +118,7 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
         if (alertType == null || alertType.isBlank() || !AUTO_REPAIR_WHITELIST.contains(alertType)) {
             log.info("DqAutoRepair 降级: workOrderId={} alertType={} 不在白名单，转 MANUAL",
                     workOrderId, alertType);
-            degradeToManual(jdbc, workOrderId, "ALERT_TYPE_NOT_IN_WHITELIST:" + alertType);
+            degradeToManual(workOrderId, "ALERT_TYPE_NOT_IN_WHITELIST:" + alertType);
             securityService.auditWrite("DQ_AUTO_REPAIR", workOrderId, "DEGRADED_NOT_WHITELISTED");
             return;
         }
@@ -144,14 +141,11 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
         }
 
         // ④ 回写工单字段（repair_action=scenario 码，repair_status=元 / repair_log=JSON）
-        writeRepairLog(workOrderId, jdbc, repairLog, status);
+        writeRepairLog(workOrderId, repairLog, status);
         if ("SUCCESS".equals(status)) {
             // 重试阶段把 retry_count 也自增（代表总尝试次数，供 T13 状态机参考）
             try {
-                jdbc.update(
-                        "UPDATE ecos_dq.dq_work_order SET retry_count = retry_count + 1,"
-                        + " updated_at = NOW() WHERE id = ?",
-                        workOrderId);
+                autoRepairDao.incrementRetryCount(workOrderId);
             } catch (RuntimeException e) {
                 log.warn("DqAutoRepair retry_count 自增失败: workOrderId={}, error={}",
                         workOrderId, e.getMessage());
@@ -159,7 +153,7 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
             // 成功后重跑关联 ACTIVE 规则（规则检查已触发本告警，重跑验证是否已恢复）
             maybeRecheckRuleAfterRepair(wo, status, actionToLog);
         } else if ("DEGRADED".equals(status)) {
-            degradeToManual(jdbc, workOrderId, "AUTO_REPAIR_DEGRADED");
+            degradeToManual(workOrderId, "AUTO_REPAIR_DEGRADED");
         }
         securityService.auditWrite("DQ_AUTO_REPAIR", workOrderId, status);
         log.info("DqAutoRepair 完成: workOrderId={}, alertType={}, status={}",
@@ -269,15 +263,10 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
     // ==================== 回写 / 降级 / 重校验 ====================
 
     /** 回写 repair_status / repair_action（scenario） / repair_log / retry_count / updated_at。 */
-    private void writeRepairLog(String workOrderId, JdbcTemplate jdbc,
-                                Map<String, Object> repairLog, String status) {
+    private void writeRepairLog(String workOrderId, Map<String, Object> repairLog, String status) {
         try {
             String json = serialize(repairLog);
-            jdbc.update(
-                    "UPDATE ecos_dq.dq_work_order SET repair_status = ?,"
-                    + " repair_action = COALESCE(repair_action, ?),"
-                    + " repair_log = ?::jsonb, updated_at = NOW() WHERE id = ?",
-                    status, scenarioOf(status), json, workOrderId);
+            autoRepairDao.writeRepairLog(status, scenarioOf(status), json, workOrderId);
         } catch (RuntimeException e) {
             log.warn("DqAutoRepair 回写 repair_log 失败: workOrderId={}, error={}",
                     workOrderId, e.getMessage());
@@ -285,13 +274,9 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
     }
 
     /** non-success 终态（DEGRADED/NOT_WHITELIST）→ 工单 handling_mode 转 MANUAL。 */
-    private void degradeToManual(JdbcTemplate jdbc, String workOrderId, String reason) {
+    private void degradeToManual(String workOrderId, String reason) {
         try {
-            jdbc.update(
-                    "UPDATE ecos_dq.dq_work_order SET handling_mode = 'MANUAL',"
-                    + " repair_status = COALESCE(repair_status, 'DEGRADED'), updated_at = NOW()"
-                    + " WHERE id = ?",
-                    workOrderId);
+            autoRepairDao.degradeToManual(workOrderId);
             log.info("DqAutoRepair 工单转 MANUAL: workOrderId={}, reason={}", workOrderId, reason);
         } catch (RuntimeException e) {
             log.warn("DqAutoRepair 转 MANUAL 失败: workOrderId={}, error={}",
@@ -320,13 +305,9 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
     // ==================== 私有工具 ====================
 
     /** 工单行轻载（不反序列化 JSONB，仅本类需要的 6 字段）。 */
-    private DqWorkOrderRow readWorkOrder(JdbcTemplate jdbc, String workOrderId) {
+    private DqWorkOrderRow readWorkOrder(String workOrderId) {
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT id, alert_id AS alertId, rule_id AS ruleId, status, severity,"
-                    + " handling_mode AS handlingMode, repair_action AS repairAction, retry_count AS retryCount"
-                    + " FROM ecos_dq.dq_work_order WHERE id = ? AND is_deleted = FALSE",
-                    workOrderId);
+            List<Map<String, Object>> rows = autoRepairDao.findWorkOrder(workOrderId);
             if (rows.isEmpty()) {
                 return null;
             }
@@ -349,7 +330,7 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
 
     /**
      * 解析 datasourceId：由 dq_rule.target_id 来（DATASOURCE 域规则的 scopeId 即 ds id）。
-     * <p>扩大兼容性：target_id 空时回退 {@code ecos_dq.dq_alert_record.asset_id}（仅当长度
+     * <p>扩大兼容性：target_id 空时回退 {@code ecos_data.dq_alert_record.asset_id}（仅当长度
      * 合理时视为 datasourceId），均无则 null → DEGRADED。</p>
      */
     private String resolveDatasourceId(DqWorkOrderRow wo) {
@@ -360,12 +341,9 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
             }
         }
         // Fall back: alert.asset_id（DATASOURCE 域时即 datasourceId；长度合理性不作强判）
-        JdbcTemplate jdbc = requireJdbc();
         if (wo.alertId != null) {
             try {
-                List<String> rows = jdbc.queryForList(
-                        "SELECT asset_id FROM ecos_dq.dq_alert_record WHERE id = ?",
-                        String.class, wo.alertId);
+                List<String> rows = autoRepairDao.findAssetIdByAlert(wo.alertId);
                 if (!rows.isEmpty() && rows.get(0) != null && !rows.get(0).isBlank()) {
                     return rows.get(0);
                 }
@@ -421,15 +399,6 @@ public class DqAutoRepairServiceImpl implements DqAutoRepairService {
         } catch (Exception e) {
             return "{}";
         }
-    }
-
-    private JdbcTemplate requireJdbc() {
-        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
-        if (jdbc == null) {
-            throw new com.chinacreator.gzcm.common.exception.BusinessException(
-                    "JdbcTemplate 不可用，无法执行 DQ 自动修复");
-        }
-        return jdbc;
     }
 
     /** 工单行（轻载结构：仅 tryRepair 用到的字段）。 */

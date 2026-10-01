@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 限流行映射 — 对应 {@code ecos_dq.dq_throttle}（PMO-48-C T11 内部映射，不落 api 契约）。
+ * DQ 限流行映射 — 对应 {@code ecos_data.dq_throttle}（PMO-48-C T11 内部映射，不落 api 契约）。
  *
  * @author PMO-48-C T11
  */

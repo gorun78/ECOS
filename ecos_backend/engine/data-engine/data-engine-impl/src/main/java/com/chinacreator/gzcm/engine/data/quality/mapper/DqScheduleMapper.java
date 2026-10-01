@@ -12,9 +12,9 @@ import org.apache.ibatis.annotations.Update;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScheduleVO;
 
 /**
- * DQ 监控调度 MyBatis Mapper — 读写 {@code ecos_dq.dq_schedule} / {@code ecos_dq.dq_throttle}（PMO-48-C T11）。
+ * DQ 监控调度 MyBatis Mapper — 读写 {@code ecos_data.dq_schedule} / {@code ecos_data.dq_throttle}（PMO-48-C T11）。
  *
- * <p>跨 schema 查询显式 {@code ecos_dq.} 前缀（同 DqRuleMapper 先例）；
+ * <p>跨 schema 查询显式 {@code ecos_data.} 前缀（同 DqRuleMapper 先例）；
  * {@code rule_ids} JSONB 列读出为原始 JSON 字符串，由 Service 层反序列化。</p>
  *
  * @author PMO-48-C T11
@@ -34,7 +34,7 @@ public interface DqScheduleMapper {
      *
      * @return 启用计划列表（is_deleted=FALSE AND enabled=TRUE）
      */
-    @Select("SELECT " + COLUMNS + " FROM ecos_dq.dq_schedule "
+    @Select("SELECT " + COLUMNS + " FROM ecos_data.dq_schedule "
             + "WHERE enabled = TRUE AND is_deleted = FALSE ORDER BY created_at DESC")
     List<DqScheduleVO> listEnabled();
 
@@ -43,7 +43,7 @@ public interface DqScheduleMapper {
      *
      * @return 计划列表（排除已逻辑删除）
      */
-    @Select("SELECT " + COLUMNS + " FROM ecos_dq.dq_schedule "
+    @Select("SELECT " + COLUMNS + " FROM ecos_data.dq_schedule "
             + "WHERE is_deleted = FALSE ORDER BY created_at DESC")
     List<DqScheduleVO> listAll();
 
@@ -53,7 +53,7 @@ public interface DqScheduleMapper {
      * @param id 调度 ID
      * @return 计划 VO；不存在返回 null
      */
-    @Select("SELECT " + COLUMNS + " FROM ecos_dq.dq_schedule WHERE id = #{id} AND is_deleted = FALSE")
+    @Select("SELECT " + COLUMNS + " FROM ecos_data.dq_schedule WHERE id = #{id} AND is_deleted = FALSE")
     DqScheduleVO findById(@Param("id") String id);
 
     /**
@@ -62,7 +62,7 @@ public interface DqScheduleMapper {
      * @param id 调度 ID
      * @return 计划 VO；不存在或已删除返回 null
      */
-    @Select("SELECT " + COLUMNS + " FROM ecos_dq.dq_schedule WHERE id = #{id} AND is_deleted = FALSE")
+    @Select("SELECT " + COLUMNS + " FROM ecos_data.dq_schedule WHERE id = #{id} AND is_deleted = FALSE")
     DqScheduleVO findByIdForRun(@Param("id") String id);
 
     /**
@@ -73,7 +73,7 @@ public interface DqScheduleMapper {
      * @param createdBy 创建人
      * @return 影响行数
      */
-    @Insert("INSERT INTO ecos_dq.dq_schedule"
+    @Insert("INSERT INTO ecos_data.dq_schedule"
             + " (id, name, trigger_type, cron_expression, event_type, rule_ids, scope_type, scope_id, enabled,"
             + "  max_runtime_seconds, created_by)"
             + " VALUES (#{id}, #{vo.name}, #{vo.triggerType}, #{vo.cronExpression}, #{vo.eventType},"
@@ -88,7 +88,7 @@ public interface DqScheduleMapper {
      * @param vo 完整计划属性
      * @return 影响行数
      */
-    @Update("UPDATE ecos_dq.dq_schedule SET"
+    @Update("UPDATE ecos_data.dq_schedule SET"
             + " name = #{vo.name},"
             + " trigger_type = #{vo.triggerType},"
             + " cron_expression = #{vo.cronExpression},"
@@ -107,7 +107,7 @@ public interface DqScheduleMapper {
      * @param id 调度 ID
      * @return 影响行数
      */
-    @Update("UPDATE ecos_dq.dq_schedule SET is_deleted = TRUE, updated_at = NOW() WHERE id = #{id}")
+    @Update("UPDATE ecos_data.dq_schedule SET is_deleted = TRUE, updated_at = NOW() WHERE id = #{id}")
     int logicDelete(@Param("id") String id);
 
     /**
@@ -128,7 +128,7 @@ public interface DqScheduleMapper {
      */
     @Select("SELECT scope_type AS scopeType, scope_id AS scopeId, max_checks_per_day AS maxPerDay,"
             + " current_count AS currentCount, reset_at AS resetAt"
-            + " FROM ecos_dq.dq_throttle WHERE scope_type = #{scopeType} AND scope_id = #{scopeId}")
+            + " FROM ecos_data.dq_throttle WHERE scope_type = #{scopeType} AND scope_id = #{scopeId}")
     DqThrottleRow findThrottle(@Param("scopeType") String scopeType, @Param("scopeId") String scopeId);
 
     /**
@@ -141,7 +141,7 @@ public interface DqScheduleMapper {
      * @param maxPerDay  每日上限（无配置行时按此初始化，默认 100）
      * @return 影响行数
      */
-    @Insert("INSERT INTO ecos_dq.dq_throttle"
+    @Insert("INSERT INTO ecos_data.dq_throttle"
             + " (id, scope_type, scope_id, max_checks_per_day, current_count, reset_at, updated_at)"
             + " VALUES (#{id}, #{scopeType}, #{scopeId}, #{maxPerDay}, 1, NOW(), NOW())"
             + " ON CONFLICT (scope_type, scope_id) DO UPDATE SET"

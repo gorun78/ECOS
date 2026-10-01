@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.dao.UdfDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 
 /**
  * UDF 服务实现 — 用户自定义函数管理 + SQL→UDF 转换。
+ * <p>原始 SQL 由 {@link UdfDao} 执行。</p>
  *
  * @author ECOS Pipeline 2.0 Team
  */
@@ -20,10 +21,10 @@ public class UdfServiceImpl implements UdfService {
 
     private static final Logger log = LoggerFactory.getLogger(UdfServiceImpl.class);
 
-    private final JdbcTemplate jdbc;
+    private final UdfDao udfDao;
 
-    public UdfServiceImpl(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public UdfServiceImpl(UdfDao udfDao) {
+        this.udfDao = udfDao;
     }
 
     // H8-T1: ecos_pipeline_udf 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL
@@ -37,17 +38,7 @@ public class UdfServiceImpl implements UdfService {
         if (name == null || name.isEmpty()) throw new IllegalArgumentException("name 不能为空");
         if (sourceCode == null || sourceCode.isEmpty()) throw new IllegalArgumentException("source_code 不能为空");
 
-        jdbc.update(
-            "INSERT INTO ecos_pipeline_udf (id, name, category, language, signature, source_code, author, is_shared, description) " +
-            "VALUES (?, ?, ?, ?, ?::text, ?, ?, ?, ?)",
-            id, name,
-            body.getOrDefault("category", "transform"),
-            body.getOrDefault("language", "python"),
-            body.getOrDefault("signature", "[]"),
-            sourceCode,
-            body.getOrDefault("author", "system"),
-            body.getOrDefault("is_shared", false),
-            body.getOrDefault("description", ""));
+        udfDao.insert(id, body);
 
         log.info("注册 UDF: {} (id={})", name, id);
         return getById(id);
@@ -56,14 +47,7 @@ public class UdfServiceImpl implements UdfService {
     @Override
     public Map<String, Object> update(String id, Map<String, Object> body) {
         getById(id);
-        jdbc.update(
-            "UPDATE ecos_pipeline_udf SET name = COALESCE(?, name), category = COALESCE(?, category), " +
-            "language = COALESCE(?, language), signature = COALESCE(?::text, signature), " +
-            "source_code = COALESCE(?, source_code), description = COALESCE(?, description), " +
-            "is_shared = COALESCE(?, is_shared), version = version + 1, updated_at = NOW() WHERE id = ?",
-            body.get("name"), body.get("category"), body.get("language"),
-            body.get("signature"), body.get("source_code"), body.get("description"),
-            body.get("is_shared"), id);
+        udfDao.update(id, body);
         log.info("更新 UDF: id={}", id);
         return getById(id);
     }
@@ -71,47 +55,20 @@ public class UdfServiceImpl implements UdfService {
     @Override
     public void delete(String id) {
         getById(id);
-        jdbc.update("DELETE FROM ecos_pipeline_udf WHERE id = ?", id);
+        udfDao.delete(id);
         log.info("删除 UDF: id={}", id);
     }
 
     @Override
     public Map<String, Object> getById(String id) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT * FROM ecos_pipeline_udf WHERE id = ?", id);
-        if (rows.isEmpty()) throw new IllegalArgumentException("UDF 不存在: " + id);
-        return rows.get(0);
+        Map<String, Object> row = udfDao.getByIdRow(id);
+        if (row == null) throw new IllegalArgumentException("UDF 不存在: " + id);
+        return row;
     }
 
     @Override
     public Map<String, Object> list(int page, int pageSize, String category, String language) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ecos_pipeline_udf WHERE 1=1");
-        List<Object> params = new ArrayList<>();
-
-        if (category != null && !category.isEmpty()) {
-            sql.append(" AND category = ?");
-            params.add(category);
-        }
-        if (language != null && !language.isEmpty()) {
-            sql.append(" AND language = ?");
-            params.add(language);
-        }
-
-        int total = jdbc.queryForObject("SELECT COUNT(*)" + sql.substring(sql.indexOf("FROM") - 1), Integer.class, params.toArray());
-        int offset = Math.max(0, page - 1) * pageSize;
-
-        sql.append(" ORDER BY updated_at DESC LIMIT ? OFFSET ?");
-        params.add(pageSize);
-        params.add(offset);
-
-        List<Map<String, Object>> list = jdbc.queryForList(sql.toString(), params.toArray());
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", total);
-        result.put("page", page);
-        result.put("pageSize", pageSize);
-        result.put("list", list);
-        return result;
+        return udfDao.list(page, pageSize, category, language);
     }
 
     @Override
@@ -204,9 +161,9 @@ public class UdfServiceImpl implements UdfService {
         return """
             // Auto-generated UDF from SQL
             // SQL: %s
-            
+
             import com.chinacreator.gzcm.engine.data.transform.TransformStep;
-            
+
             public class %sTransform implements TransformStep {
                 @Override
                 public DataFrame apply(DataFrame input) {

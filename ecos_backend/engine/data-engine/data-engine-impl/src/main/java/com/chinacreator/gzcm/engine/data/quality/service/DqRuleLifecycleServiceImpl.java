@@ -9,14 +9,13 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.quality.DqRuleLifecycleService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqRuleLifecycleDao;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleDTO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
@@ -115,17 +114,11 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         String targetKind = dto.getTargetKind() != null ? dto.getTargetKind() : "TABLE";
         String parameters = dto.getParameters() != null ? dto.getParameters() : "{}";
 
-        jdbc().update(
-                "INSERT INTO ecos_dq.dq_rule (id, rule_name, rule_code, category, domain, rule_type," +
-                " severity, target_kind, target_id, target_table, target_field, target_pipeline_id," +
-                " parameters, status, version, approved_by, source_type, source_ref," +
-                " description, created_by, updated_by, created_at, updated_at, is_deleted)" +
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'DRAFT', 1, ?,?,?,?, ?,?,?,NOW(),NOW(),FALSE)",
-                ruleId, ruleName, ruleCode, category, dto.getDomain(), ruleType,
+        ruleLifecycleDao.insertRule(ruleId, ruleName, ruleCode, category, dto.getDomain(), ruleType,
                 severity, targetKind, dto.getTargetId(), dto.getTargetTable(),
                 dto.getTargetField(), dto.getTargetPipelineId(), parameters,
                 dto.getApprovedBy(), dto.getSourceType(), dto.getSourceRef(),
-                dto.getDescription(), operator, operator);
+                dto.getDescription(), operator);
 
         securityService.auditWrite("DQ_RULE_CREATE", ruleId, "SUCCESS");
         log.info("DQ rule created (DRAFT): id={}, ruleCode={}, operator={}", ruleId, ruleCode, operator);
@@ -158,12 +151,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         String sourceType = dto.getSourceType() != null ? dto.getSourceType() : existing.getSourceType();
         String sourceRef = dto.getSourceRef() != null ? dto.getSourceRef() : existing.getSourceRef();
 
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET rule_name=?, rule_code=?, category=?, domain=?," +
-                " rule_type=?, severity=?, target_kind=?, target_id=?, target_table=?," +
-                " target_field=?, target_pipeline_id=?, parameters=?, description=?," +
-                " source_type=?, source_ref=?, updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND is_deleted=FALSE AND status='DRAFT'",
+        int affected = ruleLifecycleDao.updateDraft(
                 ruleName, ruleCode, category, domain, ruleType, severity,
                 targetKind, targetId, targetTable, targetField, targetPipelineId,
                 parameters, description, sourceType, sourceRef, operator, ruleId);
@@ -189,10 +177,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
             return result;
         }
 
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET is_deleted=TRUE, deleted_at=NOW(), updated_at=NOW()" +
-                " WHERE id=? AND is_deleted=FALSE",
-                ruleId);
+        int affected = ruleLifecycleDao.softDelete(ruleId);
         if (affected == 0) {
             result.setAlreadyDeleted(true);
             return result;
@@ -209,10 +194,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     public String submit(String ruleId, String submitter) {
         DqRuleVO rule = loadAndAssertExists(ruleId);
         assertTransition(rule.getStatus(), "IN_REVIEW", ruleId);
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET status='IN_REVIEW', updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND status=? AND is_deleted=FALSE",
-                submitter, ruleId, rule.getStatus());
+        int affected = ruleLifecycleDao.submitReview(submitter, ruleId, rule.getStatus());
         if (affected == 0) {
             throw new BusinessException("规则 " + ruleId + " 并发状态变更失败，请重试");
         }
@@ -233,15 +215,8 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         String versionId = UUID.randomUUID().toString().replace("-", "");
 
         // 写版本快照 + 状态变更（同事务）
-        jdbc().update(
-                "INSERT INTO ecos_dq.dq_rule_version (id, rule_id, version_number, snapshot, changed_by, change_note)" +
-                " VALUES (?,?,?::jsonb,?, '审批通过')",
-                versionId, ruleId, newVersion, snapshotJson, approver);
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET status='ACTIVE', version=?, approved_by=?," +
-                " approved_at=NOW(), applied_at=NOW(), updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND status='IN_REVIEW'",
-                newVersion, approver, approver, ruleId);
+        ruleLifecycleDao.insertVersionSnapshot(versionId, ruleId, newVersion, snapshotJson, approver);
+        int affected = ruleLifecycleDao.approve(ruleId, newVersion, approver);
         if (affected == 0) {
             throw new BusinessException("规则 " + ruleId + " 并发审批失败，请重试");
         }
@@ -255,10 +230,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     public String reject(String ruleId, String rejector, String reason) {
         DqRuleVO rule = loadAndAssertExists(ruleId);
         assertTransition(rule.getStatus(), "REJECTED", ruleId);
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET status='REJECTED', updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND status='IN_REVIEW' AND is_deleted=FALSE",
-                rejector, ruleId);
+        int affected = ruleLifecycleDao.reject(rejector, ruleId);
         if (affected == 0) {
             throw new BusinessException("规则 " + ruleId + " 驳回失败：状态已变更，请重试");
         }
@@ -272,10 +244,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     public String deprecate(String ruleId, String operator) {
         DqRuleVO rule = loadAndAssertExists(ruleId);
         assertTransition(rule.getStatus(), "DEPRECATED", ruleId);
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET status='DEPRECATED', updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND status=? AND is_deleted=FALSE",
-                operator, ruleId, rule.getStatus());
+        int affected = ruleLifecycleDao.deprecate(operator, ruleId, rule.getStatus());
         if (affected == 0) {
             throw new BusinessException("规则 " + ruleId + " 废止失败：状态已变更，请重试");
         }
@@ -289,10 +258,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     public String supersede(String ruleId, String operator, String reason) {
         DqRuleVO rule = loadAndAssertExists(ruleId);
         assertTransition(rule.getStatus(), "SUPERSEDED", ruleId);
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET status='SUPERSEDED', updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND status=? AND is_deleted=FALSE",
-                operator, ruleId, rule.getStatus());
+        int affected = ruleLifecycleDao.supersede(operator, ruleId, rule.getStatus());
         if (affected == 0) {
             throw new BusinessException("规则 " + ruleId + " 替代失败：状态已变更，请重试");
         }
@@ -306,10 +272,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     public String disable(String ruleId, String operator) {
         DqRuleVO rule = loadAndAssertExists(ruleId);
         assertTransition(rule.getStatus(), "DISABLED", ruleId);
-        int affected = jdbc().update(
-                "UPDATE ecos_dq.dq_rule SET status='DISABLED', updated_by=?, updated_at=NOW()" +
-                " WHERE id=? AND status='ACTIVE' AND is_deleted=FALSE",
-                operator, ruleId);
+        int affected = ruleLifecycleDao.disable(operator, ruleId);
         if (affected == 0) {
             throw new BusinessException("规则 " + ruleId + " 停用失败：状态已变更，请重试");
         }
@@ -341,15 +304,6 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
 
     // ==================== 私有工具方法 ====================
 
-    /** JdbcTemplate 获取（ObjectProvider 防空）。 */
-    private JdbcTemplate jdbc() {
-        JdbcTemplate tpl = jdbcTemplateProvider.getIfAvailable();
-        if (tpl == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行数据库操作");
-        }
-        return tpl;
-    }
-
     /** 加载规则（不锁定行），不存在抛 NotFoundException。 */
     private DqRuleVO loadAndAssertExists(String ruleId) {
         return doLoad(ruleId, false);
@@ -364,10 +318,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         if (ruleId == null || ruleId.isBlank()) {
             throw new BusinessException("规则 ID 不能为空");
         }
-        String sql = "SELECT " + DqRuleMapper.COLUMNS + " FROM ecos_dq.dq_rule" +
-                " WHERE id = ? AND is_deleted = FALSE" +
-                (forUpdate ? " FOR UPDATE" : "");
-        List<DqRuleVO> rows = jdbc().query(sql, (rs, rowNum) -> {
+        List<DqRuleVO> rows = ruleLifecycleDao.findRule(ruleId, forUpdate, (rs, rowNum) -> {
             DqRuleVO vo = new DqRuleVO();
             vo.setId(rs.getString("id"));
             vo.setRuleName(rs.getString("rule_name"));
@@ -399,7 +350,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
             java.sql.Timestamp updatedAt = rs.getTimestamp("updated_at");
             vo.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
             return vo;
-        }, ruleId);
+        });
         if (rows.isEmpty()) {
             securityService.auditRead("DQ_RULE_DETAIL", ruleId);
             throw new NotFoundException("DQ 规则 " + ruleId + " 不存在或已删除");
@@ -410,9 +361,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     /** 检查规则是否已逻辑删除（幂等保护用）。 */
     private Boolean isAlreadyDeleted(String ruleId) {
         try {
-            List<Integer> results = jdbc().queryForList(
-                    "SELECT is_deleted::int FROM ecos_dq.dq_rule WHERE id = ? AND is_deleted = TRUE",
-                    Integer.class, ruleId);
+            List<Integer> results = ruleLifecycleDao.findDeletedFlag(ruleId);
             return !results.isEmpty();
         } catch (Exception e) {
             return false;
@@ -448,13 +397,13 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
 
     private final DqRuleMapper ruleMapper;
     private final DqSecurityService securityService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqRuleLifecycleDao ruleLifecycleDao;
 
     public DqRuleLifecycleServiceImpl(DqRuleMapper ruleMapper,
                                        DqSecurityService securityService,
-                                       ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                                       DqRuleLifecycleDao ruleLifecycleDao) {
         this.ruleMapper = ruleMapper;
         this.securityService = securityService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.ruleLifecycleDao = ruleLifecycleDao;
     }
 }

@@ -14,14 +14,13 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.quality.DqReportService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqReportDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqReportQuery;
 import com.chinacreator.gzcm.engine.data.quality.model.DqReportVO;
 import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
@@ -36,7 +35,7 @@ import com.chinacreator.gzcm.engine.data.quality.service.DqSecurityService;
  *       — 读 {@code dq_rule_check} + {@code dq_alert_record} + {@code dq_score_asset} +
  *       {@code dq_score_snapshot}（6 维分），
  *       加载 HTML 模板 {@code templates/dq_report_base.html} 并注入实体数据渲染，
- *       写 {@code ecos_dq.dq_report} 行。</li>
+ *       写 {@code ecos_data.dq_report} 行。</li>
  *   <li>{@link #listReports} — 分页过滤（reportType / scope）。</li>
  *   <li>{@link #getReportHtml} — 查单条 + async audit。</li>
  *   <li>{@link #getReportPdf} — 本 Task 不实现（501）。</li>
@@ -51,7 +50,7 @@ import com.chinacreator.gzcm.engine.data.quality.service.DqSecurityService;
  *
  * <p>安全卡（铁律 2.4 #5）：生成 / 下载打异步审计
  * （{@code DQ_REPORT_GENERATE} / {@code DQ_REPORT_READ}）。
- * SQL 列扫描仅限 {@code ecos_dq.dq_report / dq_rule_check / dq_alert_record /
+ * SQL 列扫描仅限 {@code ecos_data.dq_report / dq_rule_check / dq_alert_record /
  * dq_score_asset / dq_score_snapshot}（不跨引擎 — 铁律 2.4 数据层边界）。</p>
  *
  * <p>MinIO 调用点：{@code MinioReportStorage#putReport} 已注入，
@@ -95,17 +94,17 @@ public class DqReportServiceImpl implements DqReportService {
 
     private final DqSecurityService securityService;
     private final MinioReportStorage reportStorage;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqReportDao reportDao;
 
     /** HTML 模板缓存（ClassPath 只读，第一次读后置入 volatile） */
     private volatile String htmlTemplate;
 
     public DqReportServiceImpl(DqSecurityService securityService,
                                MinioReportStorage reportStorage,
-                               ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                               DqReportDao reportDao) {
         this.securityService = securityService;
         this.reportStorage = reportStorage;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.reportDao = reportDao;
     }
 
     // ==================== 1. 三种报告生成 ====================
@@ -132,7 +131,6 @@ public class DqReportServiceImpl implements DqReportService {
         DqReportQuery q = (query != null) ? query : new DqReportQuery();
         int pageNum = (q.getPageNum() != null && q.getPageNum() > 0) ? q.getPageNum() : 1;
         int pageSize = (q.getPageSize() != null && q.getPageSize() > 0) ? Math.min(q.getPageSize(), 200) : 20;
-        JdbcTemplate jdbc = jdbc();
 
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> params = new ArrayList<>();
@@ -145,19 +143,13 @@ public class DqReportServiceImpl implements DqReportService {
             params.add(q.getScope());
         }
 
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_dq.dq_report" + where, Long.class, params.toArray());
+        Long total = reportDao.countReports(where.toString(), params.toArray());
         long safeTotal = total == null ? 0L : total;
 
         List<Object> pageParams = new ArrayList<>(params);
         pageParams.add(pageSize);
         pageParams.add((pageNum - 1) * pageSize);
-        List<DqReportVO> rows = jdbc.query(
-                "SELECT id, report_type, scope, start_date, end_date, pdf_object_key," +
-                "       llm_summary, row_count, alert_count, avg_score, created_by, created_at" +
-                "  FROM ecos_dq.dq_report" + where +
-                " ORDER BY end_date DESC, created_at DESC LIMIT ? OFFSET ?",
-                this::mapRowBrief, pageParams.toArray());
+        List<DqReportVO> rows = reportDao.listReports(where.toString(), this::mapRowBrief, pageParams.toArray());
 
         // 审计：列表读
         securityService.auditRead(ACTION_READ, null);
@@ -175,13 +167,7 @@ public class DqReportServiceImpl implements DqReportService {
         if (id == null || id.isBlank()) {
             throw new BusinessException("报告 ID 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        List<DqReportVO> rows = jdbc.query(
-                "SELECT id, report_type, scope, start_date, end_date, payload_html," +
-                "       pdf_object_key, llm_summary, row_count, alert_count, avg_score," +
-                "       created_by, created_at" +
-                "  FROM ecos_dq.dq_report WHERE id = ?",
-                this::mapRowFull, id);
+        List<DqReportVO> rows = reportDao.findReport(id, this::mapRowFull);
         if (rows.isEmpty()) {
             throw new NotFoundException("DQ 报告 " + id + " 不存在");
         }
@@ -199,14 +185,6 @@ public class DqReportServiceImpl implements DqReportService {
 
     // ==================== 3. 私有工具 ====================
 
-    private JdbcTemplate jdbc() {
-        JdbcTemplate tpl = jdbcTemplateProvider.getIfAvailable();
-        if (tpl == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行 DQ 报告查询");
-        }
-        return tpl;
-    }
-
     /**
      * 统一生成入口（3 种周期共用）。
      *
@@ -215,17 +193,16 @@ public class DqReportServiceImpl implements DqReportService {
      * @param lookbackDays 回看天数（DAILY=1 / WEEKLY=7 / MONTHLY=31）
      */
     private DqReportVO doGenerate(String reportType, String scope, int lookbackDays) {
-        JdbcTemplate jdbc = jdbc();
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusDays(lookbackDays - 1L);
         LocalDateTime startTs = start.atStartOfDay();
         LocalDateTime endTs = end.plusDays(1).atStartOfDay(); // [start, end+1) 左闭右开
 
         // Step 1: 聚合数据（不跨引擎，不重 SQL）
-        int rowCount = countRuleChecks(jdbc, startTs, endTs);
-        int alertCount = countAlerts(jdbc, startTs, endTs);
-        Double avgScore = avgScore(jdbc);
-        Map<String, Double> scoreByDim = latestDimScores(jdbc, endTs);
+        int rowCount = countRuleChecks(startTs, endTs);
+        int alertCount = countAlerts(startTs, endTs);
+        Double avgScore = avgScore();
+        Map<String, Double> scoreByDim = latestDimScores(endTs);
         double health = avgScore != null ? avgScore : 0.0;
 
         // Step 2: LLM 摘要 stub
@@ -252,12 +229,7 @@ public class DqReportServiceImpl implements DqReportService {
 
         // Step 5: 落 dq_report（HTML 内嵌 TEXT，不写 MinIO）
         String id = UUID.randomUUID().toString();
-        jdbc.update(
-                "INSERT INTO ecos_dq.dq_report" +
-                " (id, report_type, scope, start_date, end_date, payload_html," +
-                "  pdf_object_key, llm_summary, row_count, alert_count, avg_score, created_by, created_at)" +
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'system', NOW())",
-                id, reportType, scope,
+        reportDao.insertReport(id, reportType, scope,
                 java.sql.Date.valueOf(start), java.sql.Date.valueOf(end), html,
                 objectKey, llmSummary, rowCount, alertCount, health);
 
@@ -305,12 +277,9 @@ public class DqReportServiceImpl implements DqReportService {
     }
 
     /** 规则检查行数 — SUM(total_rows)（不在范围就 0） */
-    private int countRuleChecks(JdbcTemplate jdbc, LocalDateTime startTs, LocalDateTime endTs) {
+    private int countRuleChecks(LocalDateTime startTs, LocalDateTime endTs) {
         try {
-            Integer n = jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(total_rows), 0) FROM ecos_dq.dq_rule_check" +
-                    " WHERE executed_at >= ? AND executed_at < ?",
-                    Integer.class, startTs, endTs);
+            Integer n = reportDao.countRuleChecks(startTs, endTs);
             return n == null ? 0 : n;
         } catch (Exception e) {
             log.warn("DqReport countRuleChecks failed: {}", e.getMessage());
@@ -319,12 +288,9 @@ public class DqReportServiceImpl implements DqReportService {
     }
 
     /** 告警数 */
-    private int countAlerts(JdbcTemplate jdbc, LocalDateTime startTs, LocalDateTime endTs) {
+    private int countAlerts(LocalDateTime startTs, LocalDateTime endTs) {
         try {
-            Integer n = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_dq.dq_alert_record" +
-                    " WHERE created_at >= ? AND created_at < ?",
-                    Integer.class, startTs, endTs);
+            Integer n = reportDao.countAlerts(startTs, endTs);
             return n == null ? 0 : n;
         } catch (Exception e) {
             log.warn("DqReport countAlerts failed: {}", e.getMessage());
@@ -333,10 +299,9 @@ public class DqReportServiceImpl implements DqReportService {
     }
 
     /** 系统平均分 */
-    private Double avgScore(JdbcTemplate jdbc) {
+    private Double avgScore() {
         try {
-            Double d = jdbc.queryForObject(
-                    "SELECT AVG(rolled_score) FROM ecos_dq.dq_score_asset", Double.class);
+            Double d = reportDao.avgScore();
             return d;
         } catch (Exception e) {
             log.warn("DqReport avgScore failed: {}", e.getMessage());
@@ -351,16 +316,10 @@ public class DqReportServiceImpl implements DqReportService {
      * 系统级维度（scope_type 空值→任意 TYPE）便于报告。
      * 找不到数据时返空 Map，模板内显示 N/A 行。</p>
      */
-    private Map<String, Double> latestDimScores(JdbcTemplate jdbc, LocalDateTime endTs) {
+    private Map<String, Double> latestDimScores(LocalDateTime endTs) {
         Map<String, Double> map = new LinkedHashMap<>();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT s.dimension, s.score_value FROM ecos_dq.dq_score_snapshot s" +
-                    " WHERE (s.dimension, s.evaluated_at) IN (" +
-                    "   SELECT dimension, MAX(evaluated_at) FROM ecos_dq.dq_score_snapshot" +
-                    "     WHERE evaluated_at <= ? GROUP BY dimension" +
-                    " );",
-                    endTs);
+            List<Map<String, Object>> rows = reportDao.latestDimScores(endTs);
             for (Map<String, Object> r : rows) {
                 Object dimObj = r.get("dimension");
                 Object scoreObj = r.get("score_value");

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
+import com.chinacreator.gzcm.engine.data.dao.DataLayerDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class LayerCarrierPresenceTest {
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         repository = mock(DataResourceRepository.class);
-        service = new DataLayerService(jdbc, repository);
+        service = new DataLayerService(mock(DataLayerDao.class), repository);
     }
 
     @SuppressWarnings("unchecked")

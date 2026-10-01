@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
@@ -12,17 +12,15 @@ import java.util.*;
 /**
  * Pipeline Repository — 基于 JdbcTemplate 的 CRUD 操作。
  *
+ * <p>B1 收口：继承 runtime-core {@link JdbcTemplateDaoSupport}，不再私持
+ * {@code JdbcTemplate} 字段；所有数据访问均经 runtime 数据访问底座。
+ *
  * @author DataBridge Datanet Team
  */
 @Repository
-public class PipelineRepository {
+public class PipelineRepository extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineRepository.class);
-    private final JdbcTemplate jdbc;
-
-    public PipelineRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     // H8-T1: ecos_pipeline_node.depends_on 列由 db/migration 单一来源维护（V25_1 已含
     // CREATE + ALTER ADD COLUMN IF NOT EXISTS），运行时不再内嵌 DDL。
@@ -34,7 +32,7 @@ public class PipelineRepository {
         String definitionJson = buildDefinitionJson(def);
         String sql = "INSERT INTO ecos_pipeline_definition (id, name, description, definition, status, created_at, updated_at) " +
                 "VALUES (?, ?, ?, ?::jsonb, ?, NOW(), NOW())";
-        jdbc.update(sql, id, def.getName(), def.getDescription(),
+        jdbcTemplate.update(sql, id, def.getName(), def.getDescription(),
                 definitionJson,
                 def.getStatus() != null ? def.getStatus() : "DRAFT");
         return findDefinitionById(id);
@@ -65,7 +63,7 @@ public class PipelineRepository {
         params.add(id);
 
         String sql = "UPDATE ecos_pipeline_definition SET " + set + " WHERE id = ?";
-        jdbc.update(sql, params.toArray());
+        jdbcTemplate.update(sql, params.toArray());
         return findDefinitionById(id);
     }
 
@@ -82,7 +80,7 @@ public class PipelineRepository {
             root.put("schedule", schedule);
             String json = om.writeValueAsString(root);
             String sql = "UPDATE ecos_pipeline_definition SET definition = ?::jsonb, updated_at = NOW() WHERE id = ?";
-            jdbc.update(sql, json, id);
+            jdbcTemplate.update(sql, json, id);
         } catch (Exception e) {
             log.warn("Failed to update schedule for definition {}: {}", id, e.getMessage());
         }
@@ -90,13 +88,13 @@ public class PipelineRepository {
 
     public void deleteDefinition(String id) {
         String sql = "UPDATE ecos_pipeline_definition SET status = 'ARCHIVED', updated_at = NOW() WHERE id = ?";
-        jdbc.update(sql, id);
+        jdbcTemplate.update(sql, id);
     }
 
     public PipelineDefinition findDefinitionById(String id) {
         String sql = "SELECT id, name, description, definition, status, created_at, updated_at " +
                 "FROM ecos_pipeline_definition WHERE id = ?";
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, id);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, id);
         if (rows.isEmpty()) return null;
         return mapToDefinition(rows.get(0));
     }
@@ -104,7 +102,7 @@ public class PipelineRepository {
     public List<PipelineDefinition> findAllDefinitions() {
         String sql = "SELECT id, name, description, definition, status, created_at, updated_at " +
                 "FROM ecos_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY created_at DESC";
-        List<Map<String, Object>> rows = jdbc.queryForList(sql);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
         List<PipelineDefinition> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             result.add(mapToDefinition(row));
@@ -114,7 +112,7 @@ public class PipelineRepository {
 
     public boolean definitionExists(String id) {
         String sql = "SELECT COUNT(*) FROM ecos_pipeline_definition WHERE id = ?";
-        Integer count = jdbc.queryForObject(sql, Integer.class, id);
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
         return count != null && count > 0;
     }
 
@@ -124,25 +122,25 @@ public class PipelineRepository {
         String id = node.getId() != null ? node.getId() : UUID.randomUUID().toString().replace("-", "");
         String sql = "INSERT INTO ecos_pipeline_node (id, definition_id, node_id, type, config, depends_on, position_x, position_y, created_at, updated_at) " +
                 "VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, NOW(), NOW())";
-        jdbc.update(sql, id, node.getDefinitionId(), node.getNodeId(), node.getType(),
+        jdbcTemplate.update(sql, id, node.getDefinitionId(), node.getNodeId(), node.getType(),
                 node.getConfig(), node.getDependsOn() != null ? node.getDependsOn() : "[]",
                 node.getPositionX(), node.getPositionY());
     }
 
     public void deleteNodesByDefinitionId(String definitionId) {
         String sql = "DELETE FROM ecos_pipeline_node WHERE definition_id = ?";
-        jdbc.update(sql, definitionId);
+        jdbcTemplate.update(sql, definitionId);
     }
 
     public void updateNodeDependsOn(String definitionId, String nodeId, String dependsOnJson) {
         String sql = "UPDATE ecos_pipeline_node SET depends_on = ?::jsonb WHERE definition_id = ? AND node_id = ?";
-        jdbc.update(sql, dependsOnJson, definitionId, nodeId);
+        jdbcTemplate.update(sql, dependsOnJson, definitionId, nodeId);
     }
 
     public List<PipelineNode> findNodesByDefinitionId(String definitionId) {
         String sql = "SELECT id, definition_id, node_id, type, config, depends_on, position_x, position_y, created_at, updated_at " +
                 "FROM ecos_pipeline_node WHERE definition_id = ? ORDER BY created_at";
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, definitionId);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, definitionId);
         List<PipelineNode> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             result.add(mapToNode(row));
@@ -155,7 +153,7 @@ public class PipelineRepository {
     public PipelineExecution insertExecution(PipelineExecution exec) {
         String id = exec.getId() != null ? exec.getId() : UUID.randomUUID().toString().replace("-", "");
         String sql = "INSERT INTO ecos_pipeline_execution (id, pipeline_id, status, started_at) VALUES (?, ?, ?, NOW())";
-        jdbc.update(sql, id, exec.getDefinitionId(),
+        jdbcTemplate.update(sql, id, exec.getDefinitionId(),
                 exec.getStatus() != null ? exec.getStatus() : "PENDING");
         return findExecutionById(id);
     }
@@ -173,13 +171,13 @@ public class PipelineRepository {
         sql += " WHERE id = ?";
         params.add(id);
 
-        jdbc.update(sql, params.toArray());
+        jdbcTemplate.update(sql, params.toArray());
     }
 
     public PipelineExecution findExecutionById(String id) {
         String sql = "SELECT id, pipeline_id, status, started_at, finished_at, error_message, rows_processed " +
                 "FROM ecos_pipeline_execution WHERE id = ?";
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, id);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, id);
         if (rows.isEmpty()) return null;
         return mapToExecution(rows.get(0));
     }
@@ -197,7 +195,7 @@ public class PipelineRepository {
         String sql = "SELECT id, pipeline_id, status, started_at, finished_at, error_message, rows_processed " +
                 "FROM ecos_pipeline_execution WHERE pipeline_id = ? " +
                 "ORDER BY started_at DESC, created_at DESC LIMIT ? OFFSET ?";
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, definitionId, pageSize, offset);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, definitionId, pageSize, offset);
         List<PipelineExecution> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             result.add(mapToExecution(row));
@@ -210,7 +208,7 @@ public class PipelineRepository {
      */
     public long countExecutionsByDefinitionId(String definitionId) {
         String sql = "SELECT COUNT(*) FROM ecos_pipeline_execution WHERE pipeline_id = ?";
-        Integer count = jdbc.queryForObject(sql, Integer.class, definitionId);
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, definitionId);
         return count != null ? count : 0L;
     }
 

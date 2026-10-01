@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.dao.PipelineDebugDao;
+import com.chinacreator.gzcm.engine.data.dao.PipelineExecutionDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
@@ -9,7 +11,6 @@ import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,8 @@ class PipelineTransformSqlRoutingTest {
 
     private PipelineRepository repository;
     private ConnectorFactory connectorFactory;
-    private JdbcTemplate jdbc;
+    private PipelineExecutionDao executionDao;
+    private PipelineDebugDao debugDao;
     private DataSourceService dataSourceService;
     private UdfService udfService;
     private PipelineExecutionService service;
@@ -51,11 +53,12 @@ class PipelineTransformSqlRoutingTest {
     void setUp() {
         this.repository = mock(PipelineRepository.class);
         this.connectorFactory = mock(ConnectorFactory.class);
-        this.jdbc = mock(JdbcTemplate.class);
+        this.executionDao = mock(PipelineExecutionDao.class);
+        this.debugDao = mock(PipelineDebugDao.class);
         this.dataSourceService = mock(DataSourceService.class);
         this.udfService = mock(UdfService.class);
         this.service = new PipelineExecutionService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService,
+                repository, connectorFactory, executionDao, dataSourceService, udfService,
                 mock(MinioStorageService.class),
                 mock(com.chinacreator.gzcm.engine.data.service.DataLakeResourceService.class));
     }
@@ -68,16 +71,16 @@ class PipelineTransformSqlRoutingTest {
         whenDef("p-select");
         PipelineNode n = node("n1", "TRANSFORM_SQL", "{\"sql\":\"SELECT 1 AS transform_marker\"}");
         whenNodes(List.of(n));
-        when(jdbc.queryForList(anyString())).thenReturn(List.of(Map.of("transform_marker", 1L)));
+        when(executionDao.transformQuery(anyString())).thenReturn(List.of(Map.of("transform_marker", 1L)));
 
         PipelineExecution exec = service.executePipeline("p-select");
 
         assertEquals("COMPLETED", exec.getStatus(),
                 "SELECT 型 TRANSFORM_SQL 走 queryForList 应成功，实际 status=" + exec.getStatus()
                         + " / error=" + exec.getErrorMessage());
-        verify(jdbc, times(1)).queryForList("SELECT 1 AS transform_marker");
+        verify(executionDao, times(1)).transformQuery("SELECT 1 AS transform_marker");
         // SELECT 路径不应调 update
-        verify(jdbc, never()).update(anyString());
+        verify(executionDao, never()).transformUpdate(anyString());
     }
 
     @Test
@@ -87,12 +90,12 @@ class PipelineTransformSqlRoutingTest {
         whenDef("p-cte");
         PipelineNode n = node("n1", "TRANSFORM_SQL", "{\"sql\":\"" + cteSql + "\"}");
         whenNodes(List.of(n));
-        when(jdbc.queryForList(anyString())).thenReturn(List.of(Map.of("id", 1L)));
+        when(executionDao.transformQuery(anyString())).thenReturn(List.of(Map.of("id", 1L)));
 
         PipelineExecution exec = service.executePipeline("p-cte");
 
         assertEquals("COMPLETED", exec.getStatus());
-        verify(jdbc).queryForList(cteSql);
+        verify(executionDao).transformQuery(cteSql);
     }
 
     // ─── B. DML 仍走 update（行为保持） ─────────────────────────
@@ -104,12 +107,12 @@ class PipelineTransformSqlRoutingTest {
         whenDef("p-upd");
         PipelineNode n = node("n1", "TRANSFORM_SQL", "{\"sql\":\"" + updSql + "\"}");
         whenNodes(List.of(n));
-        when(jdbc.update(anyString())).thenReturn(3);
+        when(executionDao.transformUpdate(anyString())).thenReturn(3L);
 
         PipelineExecution exec = service.executePipeline("p-upd");
 
         assertEquals("COMPLETED", exec.getStatus());
-        verify(jdbc).update(updSql);
+        verify(executionDao).transformUpdate(updSql);
     }
 
     // ─── C. PipelineDebugService — 修复前 p1-tr 抛 "PreparedStatementCallback" 的场景 ─────────
@@ -118,7 +121,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService#execTransformSqlCapture — SELECT 走 queryForList（不调 update）")
     void debugServiceTransformSqlSelectRoutesToQueryForList() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                repository, connectorFactory, debugDao, dataSourceService, udfService, service,
                 mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
                 mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
 
@@ -142,14 +145,14 @@ class PipelineTransformSqlRoutingTest {
         rec.setDefinitionId("adhoc-x");
         when(repository.insertExecution(org.mockito.ArgumentMatchers.any(PipelineExecution.class)))
                 .thenReturn(rec);
-        when(jdbc.queryForList(anyString())).thenReturn(List.of(Map.of("transform_marker", 1L)));
+        when(debugDao.queryForListRaw(anyString())).thenReturn(List.of(Map.of("transform_marker", 1L)));
 
         dbg.step(created.getSessionId());
 
         // 关键回归点：SELECT 必走 queryForList（修复前用 jdbc.update 会抛 SQLException）
-        verify(jdbc).queryForList(argThat((String s) -> s.startsWith("SELECT 1")));
+        verify(debugDao).queryForListRaw(argThat((String s) -> s.startsWith("SELECT 1")));
         // update 不应被调（仅 SELECT 路径下）
-        verify(jdbc, never()).update(anyString());
+        verify(debugDao, never()).updateRaw(anyString());
     }
 
     // ─── D. TRANSFORM_UDF 节点路由（P1#1） ─────────────────────────
@@ -158,7 +161,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService TRANSFORM_UDF — 执行器 switch 已补 TRANSFORM_UDF 分支")
     void debugServiceUdfTransformRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                repository, connectorFactory, debugDao, dataSourceService, udfService, service,
                 mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
                 mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         // mock UDF 数据
@@ -199,7 +202,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService JOIN — 执行器 switch 已补 JOIN 分支")
     void debugServiceJoinRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                repository, connectorFactory, debugDao, dataSourceService, udfService, service,
                 mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
                 mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         PipelineDebugStartDTO dto = new PipelineDebugStartDTO();
@@ -238,7 +241,7 @@ class PipelineTransformSqlRoutingTest {
     @DisplayName("PipelineDebugService SINK — 执行器 switch 已补 SINK 分支")
     void debugServiceSinkRoutes() throws Exception {
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                repository, connectorFactory, debugDao, dataSourceService, udfService, service,
                 mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
                 mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         // mock 数据源
@@ -295,7 +298,7 @@ class PipelineTransformSqlRoutingTest {
         // 3 节点 DAG: s → t → e
         // 输入顺序故意打乱: e(依赖t), t(依赖s), s(无依赖)
         PipelineDebugService dbg = new PipelineDebugService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService, service,
+                repository, connectorFactory, debugDao, dataSourceService, udfService, service,
                 mock(com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.class),
                 mock(com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService.class));
         // 通过 createSession 触发 topologicalSort

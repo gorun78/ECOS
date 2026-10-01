@@ -1,11 +1,10 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.engine.data.dao.MetadataRowCountDao;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
@@ -27,7 +26,7 @@ public class MetadataRowCountService {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataRowCountService.class);
 
-    private final JdbcTemplate jdbc;
+    private final MetadataRowCountDao metadataRowCountDao;
     private final JdbcConnector jdbcConnector;
 
     /** 外部数据源 JDBC 连接串前缀（仅 PG 支持 ESTIMATE） */
@@ -40,8 +39,8 @@ public class MetadataRowCountService {
     private static final long NO_ROW_SENTINEL = Long.MIN_VALUE;
 
     @Autowired
-    public MetadataRowCountService(JdbcTemplate jdbc, JdbcConnector jdbcConnector) {
-        this.jdbc = jdbc;
+    public MetadataRowCountService(MetadataRowCountDao metadataRowCountDao, JdbcConnector jdbcConnector) {
+        this.metadataRowCountDao = metadataRowCountDao;
         this.jdbcConnector = jdbcConnector;
     }
 
@@ -146,37 +145,23 @@ public class MetadataRowCountService {
     public void auditLog(String datasourceId, String countMethod, int total, int ok, int failed,
                           String failedTables, String status, String detail, String taskId,
                           long elapsedMs) {
-        jdbc.update(
-            "INSERT INTO td_metadata_collect_log " +
-            "(datasource_id, count_method, tables_total, tables_ok, tables_failed, failed_tables, " +
-            " status, detail, task_id, elapsed_ms) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            datasourceId, countMethod, total, ok, failed,
-            failedTables != null && failedTables.length() > 2000 ? failedTables.substring(0, 2000) : failedTables,
-            status, detail, taskId, elapsedMs
-        );
+        metadataRowCountDao.auditLog(datasourceId, countMethod, total, ok, failed,
+            failedTables, status, detail, taskId, elapsedMs);
     }
 
     /** 更新数据源采集时间 */
     public void updateLastCollectTime(String datasourceId) {
-        jdbc.update("UPDATE td_datasource SET last_collect_time = NOW() WHERE datasource_id = ?",
-                datasourceId);
+        metadataRowCountDao.updateLastCollectTime(datasourceId);
     }
 
     /** 查某数据源最近一次采集时间 */
     public Timestamp getLastCollectTime(String datasourceId) {
-        List<Timestamp> list = jdbc.query(
-            "SELECT last_collect_time FROM td_datasource WHERE datasource_id = ?",
-            (rs, i) -> rs.getTimestamp(1), datasourceId);
-        return list.isEmpty() ? null : list.get(0);
+        return metadataRowCountDao.getLastCollectTime(datasourceId);
     }
 
     /** 查采集审计日志（最近 N 条） */
     public List<java.util.Map<String, Object>> recentLogs(String datasourceId, int limit) {
-        return jdbc.queryForList(
-            "SELECT id, datasource_id, count_method, tables_total, tables_ok, tables_failed, " +
-            "status, task_id, elapsed_ms, create_time FROM td_metadata_collect_log " +
-            "WHERE datasource_id = ? ORDER BY create_time DESC LIMIT ?",
-            datasourceId, Math.min(limit, 50));
+        return metadataRowCountDao.recentLogs(datasourceId, limit);
     }
 
     /**
@@ -191,10 +176,7 @@ public class MetadataRowCountService {
      * @return 结果行列表（{@code created_at} 倒序）
      */
     public List<java.util.Map<String, Object>> recentCollectResults(String datasourceId, int limit) {
-        return jdbc.queryForList(
-            "SELECT result, created_at, task_id FROM td_metadata_collect_log " +
-            "WHERE datasource_id = ? AND result IS NOT NULL ORDER BY created_at DESC LIMIT ?",
-            datasourceId, Math.max(1, limit));
+        return metadataRowCountDao.recentCollectResults(datasourceId, limit);
     }
 
     /**
@@ -210,14 +192,6 @@ public class MetadataRowCountService {
      * @return result JSON 原文；无记录返回 {@code null}
      */
     public String latestCollectResultJsonWithCommit(String datasourceId, Timestamp collectedBefore) {
-        List<java.util.Map<String, Object>> logs = jdbc.queryForList(
-            "SELECT result FROM td_metadata_collect_log " +
-            "WHERE datasource_id = ? AND created_at <= ? AND result LIKE '%gitCommit%' " +
-            "ORDER BY created_at DESC LIMIT 1",
-            datasourceId, collectedBefore);
-        if (logs.isEmpty()) {
-            return null;
-        }
-        return (String) logs.get(0).get("result");
+        return metadataRowCountDao.latestCollectResultJsonWithCommit(datasourceId, collectedBefore);
     }
 }

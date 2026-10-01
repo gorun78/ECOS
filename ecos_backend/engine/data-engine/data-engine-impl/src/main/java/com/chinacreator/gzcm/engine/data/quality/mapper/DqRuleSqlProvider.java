@@ -17,7 +17,7 @@ public final class DqRuleSqlProvider {
      */
     public String listByFilter(DqRuleQuery q, Integer limit, Integer offset) {
         return "SELECT " + DqRuleMapper.COLUMNS
-                + " FROM ecos_dq.dq_rule"
+                + " FROM ecos_data.dq_rule"
                 + whereClause(q)
                 + " ORDER BY updated_at DESC"
                 + " LIMIT " + sanitize(limit)
@@ -28,7 +28,7 @@ public final class DqRuleSqlProvider {
      * 计数 SQL：与列表同 WHERE。
      */
     public String countByFilter(DqRuleQuery q) {
-        return "SELECT COUNT(*) FROM ecos_dq.dq_rule" + whereClause(q);
+        return "SELECT COUNT(*) FROM ecos_data.dq_rule" + whereClause(q);
     }
 
     /**

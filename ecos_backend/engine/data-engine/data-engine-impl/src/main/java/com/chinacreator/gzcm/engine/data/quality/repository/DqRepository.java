@@ -6,7 +6,6 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -17,23 +16,19 @@ import java.sql.Statement;
 
 import com.chinacreator.gzcm.engine.data.quality.entity.DqRuleEntity;
 import com.chinacreator.gzcm.engine.data.quality.entity.DqIssueEntity;
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 
 /**
  * JdbcTemplate 仓库 — 数据质量规则 & 问题持久化 CRUD
  * <p>
  * 遵循 AgentRepository / WorkflowRepository 模式。
+ * B1 收口：继承 runtime-core {@link JdbcTemplateDaoSupport}，去掉私持 JdbcTemplate 字段。
  * </p>
  */
 @Repository
-public class DqRepository {
+public class DqRepository extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(DqRepository.class);
-
-    private final JdbcTemplate jdbc;
-
-    public DqRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     // ═══════════════════ Rule RowMapper ═══════════════════════
 
@@ -74,12 +69,12 @@ public class DqRepository {
 
     public List<DqRuleEntity> findAllRules() {
         String sql = "SELECT * FROM ecos_dq_rule_v2 ORDER BY updated_at DESC";
-        return jdbc.query(sql, RULE_MAPPER);
+        return jdbcTemplate.query(sql, RULE_MAPPER);
     }
 
     public Optional<DqRuleEntity> findRuleById(Long id) {
         String sql = "SELECT * FROM ecos_dq_rule_v2 WHERE id = ?";
-        List<DqRuleEntity> list = jdbc.query(sql, RULE_MAPPER, id);
+        List<DqRuleEntity> list = jdbcTemplate.query(sql, RULE_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
@@ -89,7 +84,7 @@ public class DqRepository {
             VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
             """;
         KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbc.update(connection -> {
+        jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, entity.getName());
             ps.setString(2, entity.getDescription());
@@ -117,27 +112,27 @@ public class DqRepository {
                 updated_at = NOW()
             WHERE id = ?
             """;
-        return jdbc.update(sql, name, description, ruleType, configJson, severity, enabled, id);
+        return jdbcTemplate.update(sql, name, description, ruleType, configJson, severity, enabled, id);
     }
 
     public int deleteRuleById(Long id) {
-        return jdbc.update("DELETE FROM ecos_dq_rule_v2 WHERE id = ?", id);
+        return jdbcTemplate.update("DELETE FROM ecos_dq_rule_v2 WHERE id = ?", id);
     }
 
     public long countRules() {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_dq_rule_v2", Long.class);
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_dq_rule_v2", Long.class);
     }
 
     // ═══════════════════ Issue CRUD ═══════════════════════════
 
     public List<DqIssueEntity> findAllIssues() {
         String sql = "SELECT id, rule_id, entity_id as asset_id, description, status, severity, detected_at as created_at, resolved_at FROM ecos_dq_issue ORDER BY detected_at DESC";
-        return jdbc.query(sql, ISSUE_MAPPER);
+        return jdbcTemplate.query(sql, ISSUE_MAPPER);
     }
 
     public Optional<DqIssueEntity> findIssueById(Long id) {
         String sql = "SELECT id, rule_id, entity_id as asset_id, description, status, severity, detected_at as created_at, resolved_at FROM ecos_dq_issue WHERE id = ?";
-        List<DqIssueEntity> list = jdbc.query(sql, ISSUE_MAPPER, id);
+        List<DqIssueEntity> list = jdbcTemplate.query(sql, ISSUE_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
@@ -153,7 +148,7 @@ public class DqRepository {
             INSERT INTO ecos_dq_issue (id, rule_id, entity_id, description, status, severity, detected_at, resolved_at)
             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
             """;
-        Integer updated = jdbc.update(connection -> {
+        Integer updated = jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setString(1, entity.getId());
             ps.setString(2, entity.getRuleId());
@@ -184,20 +179,20 @@ public class DqRepository {
                 resolved_at = CASE WHEN ?::text IN ('resolved', 'closed') THEN NOW() ELSE resolved_at END
             WHERE id = ?
             """;
-        return jdbc.update(sql, description, status, severity, status, id);
+        return jdbcTemplate.update(sql, description, status, severity, status, id);
     }
 
     public int resolveIssue(Long id, String resolution) {
         String sql = "UPDATE ecos_dq_issue SET status = 'resolved', resolved_at = NOW() WHERE id = ? AND status = 'open'";
-        return jdbc.update(sql, id);
+        return jdbcTemplate.update(sql, id);
     }
 
     public int deleteIssueById(Long id) {
-        return jdbc.update("DELETE FROM ecos_dq_issue WHERE id = ?", id);
+        return jdbcTemplate.update("DELETE FROM ecos_dq_issue WHERE id = ?", id);
     }
 
     public long countIssues() {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_dq_issue", Long.class);
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_dq_issue", Long.class);
     }
 
     /**
@@ -205,7 +200,7 @@ public class DqRepository {
      */
     public long countIssuesByStatus(String status) {
         String sql = "SELECT COUNT(*) FROM ecos_dq_issue WHERE status = ?";
-        return jdbc.queryForObject(sql, Long.class, status);
+        return jdbcTemplate.queryForObject(sql, Long.class, status);
     }
 
     /**
@@ -213,7 +208,7 @@ public class DqRepository {
      */
     public double avgPassRate() {
         String sql = "SELECT COALESCE(AVG(CAST(config_json::jsonb->>'passRate' AS NUMERIC)), 0) FROM ecos_dq_rule_v2";
-        Double result = jdbc.queryForObject(sql, Double.class);
+        Double result = jdbcTemplate.queryForObject(sql, Double.class);
         return result != null ? result : 0.0;
     }
 
@@ -225,7 +220,7 @@ public class DqRepository {
     public Map<String, Long> countIssuesBySeverity() {
         String sql = "SELECT severity, COUNT(*) as cnt FROM ecos_dq_issue GROUP BY severity ORDER BY severity";
         Map<String, Long> result = new java.util.LinkedHashMap<>();
-        jdbc.query(sql, (rs) -> {
+        jdbcTemplate.query(sql, (rs) -> {
             result.put(rs.getString("severity"), rs.getLong("cnt"));
         });
         return result;
@@ -236,7 +231,7 @@ public class DqRepository {
      */
     public List<Map<String, Object>> findRecentIssues(int limit) {
         String sql = "SELECT id, rule_id, entity_id as asset_id, entity_type, description, status, severity, detected_at as created_at FROM ecos_dq_issue ORDER BY status = 'open' DESC, detected_at DESC LIMIT ?";
-        return jdbc.query(sql, (rs, rowNum) -> {
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> issue = new java.util.LinkedHashMap<>();
             issue.put("id", rs.getLong("id"));
             issue.put("ruleId", rs.getString("rule_id"));
@@ -256,7 +251,7 @@ public class DqRepository {
     public Map<String, Long> countRulesByType() {
         String sql = "SELECT rule_type, COUNT(*) as cnt FROM ecos_dq_rule_v2 GROUP BY rule_type ORDER BY rule_type";
         Map<String, Long> result = new java.util.LinkedHashMap<>();
-        jdbc.query(sql, (rs) -> {
+        jdbcTemplate.query(sql, (rs) -> {
             result.put(rs.getString("rule_type"), rs.getLong("cnt"));
         });
         return result;

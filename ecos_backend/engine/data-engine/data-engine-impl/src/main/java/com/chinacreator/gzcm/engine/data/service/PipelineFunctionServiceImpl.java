@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.engine.data.PipelineFunctionService;
+import com.chinacreator.gzcm.engine.data.dao.PipelineFunctionDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -21,10 +21,10 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
     private static final Logger log = LoggerFactory.getLogger(PipelineFunctionServiceImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final PipelineFunctionDao functionDao;
 
-    public PipelineFunctionServiceImpl(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public PipelineFunctionServiceImpl(PipelineFunctionDao functionDao) {
+        this.functionDao = functionDao;
     }
 
     @PostConstruct
@@ -35,7 +35,7 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
 
     private void seedBuiltinFunctions() {
         try {
-            int count = jdbc.queryForObject("SELECT COUNT(*) FROM ecos_pipeline_function WHERE is_builtin = true", Integer.class);
+            int count = functionDao.countBuiltin();
             if (count >= 120) {
                 log.info("PB 函数种子数据已存在 ({} 条)，跳过初始化", count);
                 return;
@@ -45,12 +45,7 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
             int inserted = 0;
             for (Object[] fn : ALL_FUNCTIONS) {
                 try {
-                    jdbc.update(
-                        "INSERT INTO ecos_pipeline_function (id, name, category, signature, return_type, description, example) " +
-                        "VALUES (?, ?, ?, ?::text, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET " +
-                        "category = EXCLUDED.category, signature = EXCLUDED.signature, example = EXCLUDED.example",
-                        fn[0], fn[1], fn[2], fn[3], fn[4], fn[5], fn[6]
-                    );
+                    functionDao.upsertBuiltinFunction(fn[0], fn[1], fn[2], fn[3], fn[4], fn[5], fn[6]);
                     inserted++;
                 } catch (Exception e) {
                     log.warn("函数 {} 插入失败: {}", fn[1], e.getMessage());
@@ -79,13 +74,13 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
 
         int offset = Math.max(0, page - 1) * pageSize;
         String countSql = sql.toString().replace("SELECT *", "SELECT COUNT(*)");
-        int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
+        int total = functionDao.queryCount(countSql, params.toArray());
 
         sql.append(" LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(offset);
 
-        List<Map<String, Object>> list = jdbc.queryForList(sql.toString(), params.toArray());
+        List<Map<String, Object>> list = functionDao.list(sql.toString(), params.toArray());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total);
         result.put("page", page);
@@ -96,22 +91,18 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
 
     @Override
     public List<Map<String, Object>> listByCategory(String category) {
-        return jdbc.queryForList(
-            "SELECT * FROM ecos_pipeline_function WHERE category = ? ORDER BY name", category);
+        return functionDao.byCategory(category);
     }
 
     @Override
     public List<Map<String, Object>> search(String query) {
         String like = "%" + query + "%";
-        return jdbc.queryForList(
-            "SELECT * FROM ecos_pipeline_function WHERE name ILIKE ? OR description ILIKE ? ORDER BY category, name",
-            like, like);
+        return functionDao.search(like);
     }
 
     @Override
     public Map<String, Object> getById(String id) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT * FROM ecos_pipeline_function WHERE id = ?", id);
+        List<Map<String, Object>> rows = functionDao.byId(id);
         if (rows.isEmpty()) {
             throw new IllegalArgumentException("函数不存在: " + id);
         }
@@ -120,8 +111,7 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
 
     @Override
     public List<Map<String, Object>> getCategories() {
-        return jdbc.queryForList(
-            "SELECT category, COUNT(*) as count FROM ecos_pipeline_function GROUP BY category ORDER BY category");
+        return functionDao.categories();
     }
 
     @Override
@@ -130,9 +120,7 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
         String name = (String) body.get("name");
         if (name == null || name.isEmpty()) throw new IllegalArgumentException("name 不能为空");
 
-        jdbc.update(
-            "INSERT INTO ecos_pipeline_function (id, name, category, signature, return_type, description, example, is_builtin) " +
-            "VALUES (?, ?, ?, ?::text, ?, ?, ?, false)",
+        functionDao.insertCustom(
             id, name,
             body.getOrDefault("category", "custom"),
             body.getOrDefault("signature", "[]").toString(),
@@ -147,12 +135,10 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
     @Override
     public Map<String, Object> update(String id, Map<String, Object> body) {
         getById(id); // 校验存在
-        jdbc.update(
-            "UPDATE ecos_pipeline_function SET name = COALESCE(?, name), category = COALESCE(?, category), " +
-            "signature = COALESCE(?::text, signature), return_type = COALESCE(?, return_type), " +
-            "description = COALESCE(?, description), example = COALESCE(?, example) WHERE id = ?",
+        functionDao.patch(
+            id,
             body.get("name"), body.get("category"), body.get("signature"),
-            body.get("return_type"), body.get("description"), body.get("example"), id);
+            body.get("return_type"), body.get("description"), body.get("example"));
         log.info("更新函数: id={}", id);
         return getById(id);
     }
@@ -163,7 +149,7 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
         if (Boolean.TRUE.equals(fn.get("is_builtin"))) {
             throw new IllegalArgumentException("内置函数不可删除");
         }
-        jdbc.update("DELETE FROM ecos_pipeline_function WHERE id = ?", id);
+        functionDao.remove(id);
         log.info("删除函数: id={}", id);
     }
 

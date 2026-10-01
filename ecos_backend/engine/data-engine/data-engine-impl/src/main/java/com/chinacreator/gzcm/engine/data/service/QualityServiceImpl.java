@@ -2,12 +2,12 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.engine.data.QualityService;
+import com.chinacreator.gzcm.engine.data.dao.QualityDao;
 import com.chinacreator.gzcm.engine.data.quality.QualityResult;
 import com.chinacreator.gzcm.engine.data.quality.QualityRule;
 import com.chinacreator.gzcm.engine.data.quality.spi.QualityRuleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import org.springframework.web.client.RestTemplate;
@@ -18,12 +18,12 @@ import java.util.regex.Pattern;
 public class QualityServiceImpl implements QualityService, QualityRuleProvider {
 
     private static final Logger log = LoggerFactory.getLogger(QualityServiceImpl.class);
-    private final JdbcTemplate jdbc;
+    private final QualityDao qualityDao;
     private final ConnectorFactory connectorFactory;
     private final RestTemplate restTemplate;
 
-    public QualityServiceImpl(JdbcTemplate jdbc, ConnectorFactory connectorFactory) {
-        this.jdbc = jdbc;
+    public QualityServiceImpl(QualityDao qualityDao, ConnectorFactory connectorFactory) {
+        this.qualityDao = qualityDao;
         this.connectorFactory = connectorFactory;
         this.restTemplate = new RestTemplate();
     }
@@ -42,15 +42,13 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
             throw new IllegalArgumentException("rule_name, rule_type, target 不能为空");
         }
 
-        jdbc.update(
-            "INSERT INTO ecos_quality_rule (rule_id, rule_name, rule_type, target, dataset_id, parameters, severity, enabled, description) " +
-            "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)",
+        qualityDao.insertRule(
             ruleId, ruleName, ruleType, target,
             body.getOrDefault("dataset_id", null),
             body.containsKey("parameters") ? toJson(body.get("parameters")) : "{}",
-            body.getOrDefault("severity", "WARN"),
+            (String) body.getOrDefault("severity", "WARN"),
             body.getOrDefault("enabled", true),
-            body.getOrDefault("description", ""));
+            (String) body.getOrDefault("description", ""));
 
         log.info("创建质量规则: {} ({})", ruleName, ruleId);
         return getRule(ruleId);
@@ -59,12 +57,7 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
     @Override
     public Map<String, Object> updateRule(String ruleId, Map<String, Object> body) {
         getRule(ruleId);
-        jdbc.update(
-            "UPDATE ecos_quality_rule SET rule_name = COALESCE(?, rule_name), " +
-            "rule_type = COALESCE(?, rule_type), target = COALESCE(?, target), " +
-            "dataset_id = COALESCE(?, dataset_id), parameters = COALESCE(?::jsonb, parameters), " +
-            "severity = COALESCE(?, severity), enabled = COALESCE(?, enabled), " +
-            "description = COALESCE(?, description), updated_at = NOW() WHERE rule_id = ?",
+        qualityDao.updateRule(
             body.get("rule_name"), body.get("rule_type"), body.get("target"),
             body.get("dataset_id"), body.containsKey("parameters") ? toJson(body.get("parameters")) : null,
             body.get("severity"), body.get("enabled"), body.get("description"), ruleId);
@@ -75,42 +68,24 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
     @Override
     public void deleteRule(String ruleId) {
         getRule(ruleId);
-        jdbc.update("DELETE FROM ecos_quality_evaluation WHERE rule_id = ?", ruleId);
-        jdbc.update("DELETE FROM ecos_quality_rule WHERE rule_id = ?", ruleId);
+        qualityDao.deleteEvaluationByRule(ruleId);
+        qualityDao.deleteRule(ruleId);
         log.info("删除质量规则: {}", ruleId);
     }
 
     @Override
     public Map<String, Object> getRule(String ruleId) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT * FROM ecos_quality_rule WHERE rule_id = ?", ruleId);
+        List<Map<String, Object>> rows = qualityDao.getRule(ruleId);
         if (rows.isEmpty()) throw new IllegalArgumentException("质量规则不存在: " + ruleId);
         return rows.get(0);
     }
 
     @Override
     public Map<String, Object> listRules(String datasetId, String ruleType, int page, int pageSize) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ecos_quality_rule WHERE 1=1");
-        List<Object> params = new ArrayList<>();
-
-        if (datasetId != null && !datasetId.isEmpty()) {
-            sql.append(" AND dataset_id = ?");
-            params.add(datasetId);
-        }
-        if (ruleType != null && !ruleType.isEmpty()) {
-            sql.append(" AND rule_type = ?");
-            params.add(ruleType);
-        }
-
-        String countSql = "SELECT COUNT(*) " + sql.substring(sql.indexOf("FROM") - 1);
-        int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
+        int total = qualityDao.countRules(datasetId, ruleType);
 
         int offset = Math.max(0, page - 1) * pageSize;
-        sql.append(" ORDER BY updated_at DESC LIMIT ? OFFSET ?");
-        params.add(pageSize);
-        params.add(offset);
-
-        List<Map<String, Object>> list = jdbc.queryForList(sql.toString(), params.toArray());
+        List<Map<String, Object>> list = qualityDao.listRuleRows(datasetId, ruleType, pageSize, offset);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total);
@@ -180,23 +155,10 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
 
     @Override
     public Map<String, Object> getEvaluationHistory(String datasetId, int page, int pageSize) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ecos_quality_evaluation WHERE 1=1");
-        List<Object> params = new ArrayList<>();
-
-        if (datasetId != null && !datasetId.isEmpty()) {
-            sql.append(" AND dataset_id = ?");
-            params.add(datasetId);
-        }
-
-        String countSql = "SELECT COUNT(*) " + sql.substring(sql.indexOf("FROM") - 1);
-        int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
+        int total = qualityDao.countEvaluations(datasetId);
 
         int offset = Math.max(0, page - 1) * pageSize;
-        sql.append(" ORDER BY evaluated_at DESC LIMIT ? OFFSET ?");
-        params.add(pageSize);
-        params.add(offset);
-
-        List<Map<String, Object>> list = jdbc.queryForList(sql.toString(), params.toArray());
+        List<Map<String, Object>> list = qualityDao.listEvaluationRows(datasetId, pageSize, offset);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total);
@@ -208,9 +170,7 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
 
     @Override
     public List<QualityRule> getRulesFor(String datasetId) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT * FROM ecos_quality_rule WHERE dataset_id = ? AND enabled = true ORDER BY rule_type",
-            datasetId);
+        List<Map<String, Object>> rows = qualityDao.getRulesFor(datasetId);
         List<QualityRule> rules = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             rules.add(mapToRule(row));
@@ -369,8 +329,7 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
             return List.of();
         }
         try {
-            Map<String, Object> ds = jdbc.queryForMap(
-                "SELECT connection_config, datasource_type FROM td_datasource WHERE id = ?", datasourceId);
+            Map<String, Object> ds = qualityDao.getDatasourceConfig(datasourceId);
             String connectionConfig = (String) ds.get("connection_config");
             String dsType = (String) ds.get("datasource_type");
 
@@ -393,10 +352,7 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
 
     private Map<String, Object> saveEvaluation(QualityResult qr, String datasetId, int sampleSize) {
         String evalId = UUID.randomUUID().toString();
-        jdbc.update(
-            "INSERT INTO ecos_quality_evaluation (id, dataset_id, rule_id, passed, total_rows, failed_rows, " +
-            "pass_rate, sample_size, sample_failures, severity, message) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)",
+        qualityDao.insertEvaluation(
             evalId, datasetId, qr.getRuleId(), qr.isPassed(),
             qr.getTotalRows(), qr.getFailedRows(), qr.getPassRate(),
             sampleSize, toJson(qr.getSampleFailures()),
@@ -455,8 +411,7 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
         long startTime = System.currentTimeMillis();
         log.info("=== 全量 DQ 巡检开始 ===");
 
-        List<Map<String, Object>> enabledRules = jdbc.queryForList(
-            "SELECT * FROM ecos_quality_rule WHERE enabled = true ORDER BY rule_type, rule_id");
+        List<Map<String, Object>> enabledRules = qualityDao.listEnabledRules();
 
         if (enabledRules.isEmpty()) {
             log.info("无已启用的 DQ 规则");
@@ -577,11 +532,7 @@ public class QualityServiceImpl implements QualityService, QualityRuleProvider {
     private String resolveDatasourceFromDataset(String datasetId) {
         if (datasetId == null || datasetId.isEmpty()) return null;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT datasource_id FROM ecos_pipeline WHERE dataset_id = ? LIMIT 1", datasetId);
-            if (!rows.isEmpty()) {
-                return (String) rows.get(0).get("datasource_id");
-            }
+            return qualityDao.resolveDatasourceFromDataset(datasetId);
         } catch (Exception e) {
             log.debug("解析 datasourceId 失败: {}", e.getMessage());
         }

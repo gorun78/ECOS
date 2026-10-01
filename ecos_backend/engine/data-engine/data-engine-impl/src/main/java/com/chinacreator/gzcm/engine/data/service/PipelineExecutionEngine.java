@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
+import com.chinacreator.gzcm.engine.data.dao.PipelineRunDao;
 import com.chinacreator.gzcm.engine.data.model.DataLayer;
 import com.chinacreator.gzcm.engine.data.transform.TransformChain;
 import com.chinacreator.gzcm.engine.data.transform.TransformStep;
@@ -11,7 +12,6 @@ import com.chinacreator.gzcm.engine.data.transform.step.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
@@ -36,24 +36,25 @@ public class PipelineExecutionEngine {
     private static final Logger log = LoggerFactory.getLogger(PipelineExecutionEngine.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
     private final ConnectorFactory connectorFactory;
     private final DataLineageService lineageService;
     private final PipelineFailureHandler failureHandler;
     private final PipelineValidator validator;
     private final PipelineProvenanceRecorder provenanceRecorder;
+    private final PipelineRunDao runDao;
 
-    public PipelineExecutionEngine(JdbcTemplate jdbc, ConnectorFactory connectorFactory,
+    public PipelineExecutionEngine(ConnectorFactory connectorFactory,
                                    DataLineageService lineageService,
                                    PipelineFailureHandler failureHandler,
                                    PipelineValidator validator,
-                                   PipelineProvenanceRecorder provenanceRecorder) {
-        this.jdbc = jdbc;
+                                   PipelineProvenanceRecorder provenanceRecorder,
+                                   PipelineRunDao runDao) {
         this.connectorFactory = connectorFactory;
         this.lineageService = lineageService;
         this.failureHandler = failureHandler;
         this.validator = validator;
         this.provenanceRecorder = provenanceRecorder;
+        this.runDao = runDao;
     }
 
     public void execute(String runId) {
@@ -61,20 +62,16 @@ public class PipelineExecutionEngine {
         log.info("Pipeline 执行开始: runId={}", runId);
 
         try {
-            jdbc.update(
-                "UPDATE ecos_pipeline_run SET status = 'RUNNING', started_at = ? WHERE id = ?",
-                Timestamp.from(start), runId);
+            runDao.markRunRunning(runId, Timestamp.from(start));
 
             Map<String, Object> run = getRun(runId);
             String taskId = (String) run.get("task_id");
 
-            Map<String, Object> task = jdbc.queryForMap(
-                "SELECT id, name, yaml_content, config_json::text as config_json, status FROM ecos_pipeline_task WHERE id = ?", taskId);
+            Map<String, Object> task = runDao.findTask(taskId);
             String yamlContent = safeToString(task.get("yaml_content"));
             String executionMode = safeToString(task.getOrDefault("config_json", "{}"));
 
-            List<Map<String, Object>> steps = jdbc.queryForList(
-                "SELECT id, task_id, step_order, node_id, node_type, config_json::text as config_json, depends_on::text as depends_on FROM ecos_pipeline_step WHERE task_id = ? ORDER BY step_order", taskId);
+            List<Map<String, Object>> steps = runDao.findStepsByTask(taskId);
 
             // PMO-36 T3: 管线验证
             List<String> errors;
@@ -86,14 +83,12 @@ public class PipelineExecutionEngine {
             }
             if (!errors.isEmpty()) {
                 String errMsg = "Pipeline validation failed: " + String.join("; ", errors);
-                jdbc.update("UPDATE ecos_pipeline_run SET status = 'FAILED', error_msg = ? WHERE id = ?",
-                    truncate(errMsg, 1000), runId);
+                runDao.markRunFailed(runId, truncate(errMsg, 1000));
                 log.error("Pipeline 验证失败: runId={}, errors={}", runId, errors);
                 return;
             }
 
-            List<Map<String, Object>> stepRuns = jdbc.queryForList(
-                "SELECT id, run_id, step_id, node_id, status, rows_input, rows_output, started_at, finished_at, elapsed_ms, error_msg, created_at FROM ecos_pipeline_step_run WHERE run_id = ? ORDER BY created_at", runId);
+            List<Map<String, Object>> stepRuns = runDao.findStepRuns(runId);
 
             DataFrame currentData = null;
             int completed = 0;
@@ -110,9 +105,7 @@ public class PipelineExecutionEngine {
                 String configJson = stepConfig != null ? safeToString(stepConfig.get("config_json")) : null;
 
                 Instant stepStart = Instant.now();
-                jdbc.update(
-                    "UPDATE ecos_pipeline_step_run SET status = 'RUNNING', started_at = ? WHERE id = ?",
-                    Timestamp.from(stepStart), stepRunId);
+                runDao.markStepRunRunning(stepRunId, Timestamp.from(stepStart));
 
                 // PMO-36 T1: 失败处理（重试 + 降级）
                 final String fNodeType = nodeType;
@@ -129,12 +122,11 @@ public class PipelineExecutionEngine {
                     StepOutput output = (StepOutput) handlerResult.data;
                     currentData = output != null ? output.dataFrame : currentData;
                     int rowsOutput = currentData != null ? currentData.size() : 0;
-                    jdbc.update(
-                        "UPDATE ecos_pipeline_step_run SET status = 'SUCCEEDED', finished_at = NOW(), elapsed_ms = ?, rows_input = ?, rows_output = ? WHERE id = ?",
-                        stepMs, output != null ? output.rowsInput : 0, rowsOutput, stepRunId);
+                    runDao.markStepRunSucceeded(stepRunId, stepMs,
+                        output != null ? output.rowsInput : 0, rowsOutput);
 
                     completed++;
-                    jdbc.update("UPDATE ecos_pipeline_run SET completed_steps = ? WHERE id = ?", completed, runId);
+                    runDao.bumpRunCompletedSteps(runId, completed);
 
                     // PMO-36 T4: 执行级溯源
                     provenanceRecorder.recordStep(stepRunId, taskId, nodeType, "SUCCEEDED", stepMs);
@@ -143,9 +135,8 @@ public class PipelineExecutionEngine {
                         stepRunId, nodeType, output != null ? output.rowsInput : 0, rowsOutput, stepMs, handlerResult.attempts);
                 } else {
                     // 降级处理
-                    jdbc.update(
-                        "UPDATE ecos_pipeline_step_run SET status = 'FAILED', finished_at = NOW(), elapsed_ms = ?, error_msg = ?, retry_count = ? WHERE id = ?",
-                        stepMs, truncate(handlerResult.errorMsg, 500), handlerResult.attempts, stepRunId);
+                    runDao.markStepRunFailed(stepRunId, stepMs,
+                        truncate(handlerResult.errorMsg, 500), handlerResult.attempts);
 
                     provenanceRecorder.recordStep(stepRunId, taskId, nodeType, "FAILED", stepMs);
 
@@ -161,11 +152,8 @@ public class PipelineExecutionEngine {
             }
 
             long elapsed = Instant.now().toEpochMilli() - start.toEpochMilli();
-            jdbc.update(
-                "UPDATE ecos_pipeline_run SET status = 'SUCCEEDED', finished_at = NOW(), elapsed_ms = ?, completed_steps = ? WHERE id = ?",
-                elapsed, completed, runId);
-            jdbc.update(
-                "UPDATE ecos_pipeline_task SET status = 'SUCCEEDED' WHERE id = ?", taskId);
+            runDao.markRunSucceeded(runId, elapsed, completed);
+            runDao.markTaskSucceeded(taskId);
 
             log.info("Pipeline 执行成功: runId={}, totalSteps={}, elapsed={}ms", runId, completed, elapsed);
 
@@ -184,9 +172,7 @@ public class PipelineExecutionEngine {
             String errorDetail = truncate(sw.toString(), 1000);
             log.error("Pipeline 执行失败: runId={}, error={}", runId, errorDetail, e);
             try {
-                jdbc.update(
-                    "UPDATE ecos_pipeline_run SET status = 'FAILED', finished_at = NOW(), elapsed_ms = ?, error_msg = ? WHERE id = ?",
-                    elapsed, errorDetail, runId);
+                runDao.finalizeRunFailed(runId, elapsed, errorDetail);
             } catch (Exception ignored) {
                 log.error("无法写入 FAILED 终态，run 记录可能一直停留在非终态: runId={} reason={}", runId, ignored.getMessage(), ignored);
             }
@@ -240,8 +226,7 @@ public class PipelineExecutionEngine {
 
         if (datasourceId != null) {
             try {
-                Map<String, Object> ds = jdbc.queryForMap(
-                    "SELECT connection_config FROM td_datasource WHERE id = ?", datasourceId);
+                Map<String, Object> ds = runDao.findDatasourceConfig(datasourceId);
                 String connectionConfig = (String) ds.get("connection_config");
 
                 var connector = connectorFactory.getConnector(connectorType);
@@ -284,14 +269,12 @@ public class PipelineExecutionEngine {
                 default:
                     return;
             }
-            List<Map<String, Object>> sinkRows = jdbc.queryForList(
-                "SELECT config_json::text as config_json FROM ecos_pipeline_step WHERE task_id = " +
-                "(SELECT task_id FROM ecos_pipeline_run WHERE id = ?) AND node_type = 'sink'", runId);
+            List<Map<String, Object>> sinkRows = runDao.findSinkStepConfigs(runId);
             for (Map<String, Object> sinkRow : sinkRows) {
                 Map<String, Object> sinkConfig = parseConfig(safeToString(sinkRow.get("config_json")));
                 String tableName = (String) sinkConfig.get("table_name");
                 if (tableName != null) {
-                    jdbc.update("UPDATE td_data_resource SET layer = ? WHERE source_path = ?", layer, tableName);
+                    runDao.updateResourceLayer(layer, tableName);
                 }
             }
             log.info("Pipeline 资源分层更新: runId={}, pipelineType={}, layer={}", runId, pipelineType, layer);
@@ -484,7 +467,7 @@ public class PipelineExecutionEngine {
         }
 
         try {
-            // 真写入：用 JdbcTemplate batchUpdate 写入目标表
+            // 真写入：经 runDao.batchWrite 批量写入目标表
             List<Map<String, Object>> rows = inputData.getRows();
             if (rows == null || rows.isEmpty()) {
                 log.info("SINK 步骤: 无行数据");
@@ -522,7 +505,7 @@ public class PipelineExecutionEngine {
                 batchArgs.add(args);
             }
 
-            int[] results = jdbc.batchUpdate(sql, batchArgs);
+            int[] results = runDao.batchWrite(sql, batchArgs);
             int written = 0;
             for (int r : results) {
                 if (r >= 0) written += r;
@@ -553,10 +536,7 @@ public class PipelineExecutionEngine {
     }
 
     private Map<String, Object> getRun(String runId) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, task_id, status, total_steps, completed_steps, triggered_by, " +
-            "log_json::text as log_json, started_at, finished_at, elapsed_ms, error_msg, created_at " +
-            "FROM ecos_pipeline_run WHERE id = ?", runId);
+        List<Map<String, Object>> rows = runDao.findRun(runId);
         if (rows.isEmpty()) throw new IllegalArgumentException("执行记录不存在: " + runId);
         return rows.get(0);
     }

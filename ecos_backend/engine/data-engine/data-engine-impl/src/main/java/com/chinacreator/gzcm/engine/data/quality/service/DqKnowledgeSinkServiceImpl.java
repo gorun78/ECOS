@@ -17,14 +17,12 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqKnowledgeSinkDao;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqKnowledgeEntryVO;
@@ -41,7 +39,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * <ol>
  *   <li>源表读实体（dq_rule / dq_alert_record / dq_work_order），拼 content + entityJson</li>
  *   <li>算哈希向量：MD5(content) → 32 字节 → 逐字节 32 次重复 → 1024 维 float[]（pgvector 未装降级）</li>
- *   <li>写 {@code ecos_dq.dq_knowledge_entry}（source_type / source_id / category / embedding JSON）</li>
+ *   <li>写 {@code ecos_data.dq_knowledge_entry}（source_type / source_id / category / embedding JSON）</li>
  *   <li>异步 audit（{@code DQ_KB_INGEST_*}）— 铁律 2.4 #5</li>
  * </ol>
  *
@@ -72,14 +70,14 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
 
     private final DqSecurityService securityService;
     private final DqRuleMapper ruleMapper;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqKnowledgeSinkDao knowledgeSinkDao;
 
     public DqKnowledgeSinkServiceImpl(DqSecurityService securityService,
                                        DqRuleMapper ruleMapper,
-                                       ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                                       DqKnowledgeSinkDao knowledgeSinkDao) {
         this.securityService = securityService;
         this.ruleMapper = ruleMapper;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.knowledgeSinkDao = knowledgeSinkDao;
     }
 
     // ==================== 1. 三个沉淀入口（@Async fire-and-forget） ====================
@@ -91,14 +89,13 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
             return;
         }
         try {
-            JdbcTemplate jdbc = requireJdbc();
             DqRuleVO rule = safeFindRule(ruleId);
             String title = buildRuleTitle(rule);
             String content = buildRuleContent(rule);
             String summary = buildRuleSummary(rule);
             String entityJson = buildRuleEntityJson(rule);
             String embedding = toEmbeddingJson(content);
-            insertEntry(jdbc, "RULE", ruleId, "rule-def", title, summary, content, entityJson, embedding);
+            insertEntry("RULE", ruleId, "rule-def", title, summary, content, entityJson, embedding);
             securityService.auditWrite("DQ_KB_INGEST_RULE", ruleId, "SUCCESS");
             log.info("DqKnowledgeSink rule 沉淀: ruleId={}, title={}", ruleId, title);
         } catch (RuntimeException e) {
@@ -114,13 +111,12 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
             return;
         }
         try {
-            JdbcTemplate jdbc = requireJdbc();
             String title = buildAlertTitle(alert);
             String content = buildAlertContent(alert);
             String summary = alert.getMessage() != null ? alert.getMessage() : title;
             String entityJson = buildAlertEntityJson(alert);
             String embedding = toEmbeddingJson(content);
-            insertEntry(jdbc, "ALERT", alertId, "alert", title, summary, content, entityJson, embedding);
+            insertEntry("ALERT", alertId, "alert", title, summary, content, entityJson, embedding);
             securityService.auditWrite("DQ_KB_INGEST_ALERT", alertId, "SUCCESS");
             log.info("DqKnowledgeSink alert 沉淀: alertId={}, level={}, title={}", alertId, alert.getAlertLevel(), title);
         } catch (RuntimeException e) {
@@ -136,14 +132,13 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
             return;
         }
         try {
-            JdbcTemplate jdbc = requireJdbc();
             String title = buildWorkOrderTitle(order);
             String content = buildWorkOrderContent(order);
             String summary = order.getResolutionNote() != null ? order.getResolutionNote() : order.getTitle();
             String entityJson = buildWorkOrderEntityJson(order);
             String embedding = toEmbeddingJson(content);
             String category = resolveWorkOrderCategory(order);
-            insertEntry(jdbc, "WORK_ORDER", workOrderId, category, title, summary, content, entityJson, embedding);
+            insertEntry("WORK_ORDER", workOrderId, category, title, summary, content, entityJson, embedding);
             securityService.auditWrite("DQ_KB_INGEST_WORK_ORDER", workOrderId, "SUCCESS");
             log.info("DqKnowledgeSink workOrder 沉淀: workOrderId={}, category={}, title={}",
                     workOrderId, category, title);
@@ -162,7 +157,6 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
         if (query == null || query.isBlank()) {
             return new PageResult<>(new ArrayList<>(), 0L, 1, limit);
         }
-        JdbcTemplate jdbc = requireJdbc();
 
         // 1. 算查询向量的字符二元组集合
         Set<String> queryBigrams = charBigrams(query.toLowerCase());
@@ -170,12 +164,7 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
         // 2. 全表扫描（LIMIT 兜底，本地数据有限）
         List<DqKnowledgeEntryVO> rows;
         try {
-            rows = jdbc.query(
-                    "SELECT id, source_type AS sourceType, source_id AS sourceId, category, title, summary,"
-                    + " content_md AS contentMd, entity_json::text AS entityJson, embedding AS embeddingJson,"
-                    + " score_hint AS scoreHint, created_at AS createdAt"
-                    + " FROM ecos_dq.dq_knowledge_entry ORDER BY created_at DESC LIMIT ?",
-                    (rs, i) -> mapEntryRow(rs), limit * 5);
+            rows = knowledgeSinkDao.scanKnowledgeEntries((rs, i) -> mapEntryRow(rs), limit * 5);
         } catch (DataAccessException e) {
             log.warn("DqKnowledgeSink searchSimilar 扫描失败: error={}", e.getMessage());
             return new PageResult<>(new ArrayList<>(), 0L, 1, limit);
@@ -350,14 +339,10 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
 
     // ==================== 4. 落库 + 行映射 ====================
 
-    private void insertEntry(JdbcTemplate jdbc, String sourceType, String sourceId, String category,
+    private void insertEntry(String sourceType, String sourceId, String category,
                              String title, String summary, String content, String entityJson, String embedding) {
         String id = UUID.randomUUID().toString();
-        jdbc.update(
-                "INSERT INTO ecos_dq.dq_knowledge_entry"
-                + " (id, source_type, source_id, category, title, summary, content_md, entity_json, embedding, created_at)"
-                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, NOW())",
-                id, sourceType, sourceId, category,
+        knowledgeSinkDao.insertEntry(id, sourceType, sourceId, category,
                 truncate191(title != null ? title : "(untitled)"), summary, content,
                 entityJson != null ? entityJson : "{}", embedding);
     }
@@ -493,13 +478,5 @@ public class DqKnowledgeSinkServiceImpl implements DqKnowledgeSinkService {
             return "";
         }
         return s.length() > 191 ? s.substring(0, 191) : s;
-    }
-
-    private JdbcTemplate requireJdbc() {
-        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
-        if (jdbc == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行 DQ 知识沉淀");
-        }
-        return jdbc;
     }
 }

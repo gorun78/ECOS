@@ -1,8 +1,5 @@
 package com.chinacreator.gzcm.engine.data.quality.service;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,8 +13,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +22,7 @@ import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqRcaService;
 import com.chinacreator.gzcm.engine.data.quality.DqWorkOrderService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqWorkOrderDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRcaRequest;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRcaResult;
@@ -120,34 +116,20 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
     private static final Map<String, Integer> SEVERITY_WEIGHTS = Map.of(
             "CRITICAL", 4, "HIGH", 3, "MEDIUM", 2, "LOW", 1);
 
-    /** SELECT 列清单（短别名 mapVo 据此映射；rca_result 强制 ::text 防 JSONB 不解）。 */
-    private static final String WO_COLUMNS =
-            "id, order_no AS orderNo, alert_id AS alertId, rule_id AS ruleId," +
-            " asset_id AS assetId, title, description, status, handling_mode AS handlingMode," +
-            " severity, assigned_to AS assignedTo, assigned_at AS assignedAt," +
-            " repair_action AS repairAction, repair_status AS repairStatus, repair_log AS repairLog," +
-            " verified_by AS verifiedBy, verified_at AS verifiedAt, verify_pass AS verifyPass," +
-            " verify_note AS verifyNote, resolved_by AS resolvedBy, resolved_at AS resolvedAt," +
-            " resolution_note AS resolutionNote," +
-            " rca_result::text AS rcaResult, rca_confidence AS rcaConfidence," +
-            " rca_analyzed_at AS rcaAnalyzedAt," +
-            " retry_count AS retryCount, created_at AS createdAt, updated_at AS updatedAt," +
-            " closed_at AS closedAt";
-
     private final DqSecurityService securityService;
     private final DqRcaService rcaService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     /** T16 知识沉淀可选注入（close 后 fire-and-forget；缺失时不阻断启动） */
     private final DqKnowledgeSinkService knowledgeSinkService;
+    private final DqWorkOrderDao workOrderDao;
 
     public DqWorkOrderServiceImpl(DqSecurityService securityService,
                                   DqRcaService rcaService,
-                                  ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-                                  ObjectProvider<DqKnowledgeSinkService> knowledgeSinkProvider) {
+                                  ObjectProvider<DqKnowledgeSinkService> knowledgeSinkProvider,
+                                  DqWorkOrderDao workOrderDao) {
         this.securityService = securityService;
         this.rcaService = rcaService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.knowledgeSinkService = knowledgeSinkProvider.getIfAvailable();
+        this.workOrderDao = workOrderDao;
     }
 
     // ==================== 1. T12: create / list / get ====================
@@ -164,8 +146,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (rule == null || rule.getId() == null || rule.getId().isBlank()) {
             throw new BusinessException("rule 与 rule.id 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        String orderNo = generateOrderNo(jdbc);
+        String orderNo = generateOrderNo();
         String severity = rule.getSeverity() == null ? "MEDIUM" : rule.getSeverity();
         String handlingMode = resolveHandlingMode(rule);
         String status = STATUS_PENDING; // T13 状态机：初始 PENDING
@@ -176,13 +157,8 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         String description = alert.getMessage() != null ? alert.getMessage() : "";
         String id = UUID.randomUUID().toString();
 
-        jdbc.update(
-                "INSERT INTO ecos_dq.dq_work_order" +
-                " (id, order_no, alert_id, rule_id, asset_id, title, description, status, handling_mode, severity," +
-                "  retry_count, created_at, updated_at, is_deleted)" +
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW(), FALSE)",
-                id, orderNo, alert.getId(), rule.getId(), assetId, title, description,
-                status, handlingMode, severity);
+        workOrderDao.insertWorkOrder(id, orderNo, alert.getId(), rule.getId(), assetId, title,
+                description, status, handlingMode, severity);
 
         log.info("DqWorkOrder created: id={}, orderNo={}, severity={}, mode={}, status={}",
                 id, orderNo, severity, handlingMode, status);
@@ -197,7 +173,6 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (pageSize > 200) {
             throw new BusinessException("工单列表 pageSize 上限 200");
         }
-        JdbcTemplate jdbc = jdbc();
         // 动态 WHERE（全字段可空 → 不过滤；? 占位防注入）
         List<String> where = new ArrayList<>();
         List<Object> args = new ArrayList<>();
@@ -231,18 +206,12 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
             }
         }
         String whereSql = " WHERE " + String.join(" AND ", where);
-        Long totalObj = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_dq.dq_work_order" + whereSql, Long.class,
-                args.toArray());
+        Long totalObj = workOrderDao.countWorkOrders(whereSql, args.toArray());
         long total = totalObj != null ? totalObj : 0L;
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(pageSize);
         pageArgs.add((pageNum - 1) * pageSize);
-        List<DqWorkOrderVO> page = jdbc.query(
-                "SELECT " + WO_COLUMNS + " FROM ecos_dq.dq_work_order" + whereSql +
-                " ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
-                ROW_MAPPER,
-                pageArgs.toArray());
+        List<DqWorkOrderVO> page = workOrderDao.listWorkOrders(whereSql, pageArgs.toArray());
         return new PageResult<>(page, total, pageNum, pageSize);
     }
 
@@ -251,12 +220,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(id) == null) {
             return null;
         }
-        JdbcTemplate jdbc = jdbc();
-        List<DqWorkOrderVO> rows = jdbc.query(
-                "SELECT " + WO_COLUMNS +
-                " FROM ecos_dq.dq_work_order WHERE id = ? AND is_deleted = FALSE",
-                ROW_MAPPER,
-                id.trim());
+        List<DqWorkOrderVO> rows = workOrderDao.findWorkOrder(id.trim());
         DqWorkOrderVO vo = rows.isEmpty() ? null : rows.get(0);
         securityService.auditRead("DQ_WO_DETAIL", id.trim());
         return vo;
@@ -273,15 +237,9 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(assignedTo) == null) {
             throw new BusinessException("assignedTo 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         checkTransition(cur.getStatus(), STATUS_ASSIGNED);
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order" +
-                " SET status = ?, assigned_to = ?, assigned_at = NOW()," +
-                "     handling_mode = ?, updated_at = NOW()" +
-                " WHERE id = ? AND status = ?",
-                STATUS_ASSIGNED, assignedTo.trim(),
+        workOrderDao.assign(assignedTo.trim(),
                 cur.getHandlingMode() != null ? cur.getHandlingMode() : "MANUAL",
                 workOrderId.trim(), cur.getStatus());
         log.info("DqWorkOrder assigned: id={}, by={}, to={}", workOrderId, assigner, assignedTo);
@@ -294,13 +252,9 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         checkTransition(cur.getStatus(), STATUS_IN_WORK);
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order SET status = ?, updated_at = NOW()" +
-                " WHERE id = ? AND status = ?",
-                STATUS_IN_WORK, workOrderId.trim(), cur.getStatus());
+        workOrderDao.startWork(workOrderId.trim(), cur.getStatus());
         log.info("DqWorkOrder started: id={}, operator={}", workOrderId, operator);
         securityService.auditWrite("DQ_WO_START", workOrderId.trim(), "SUCCESS");
         // T13 自动 RCA：severity ∈ {CRITICAL, HIGH}（P0/P1）异步触发，失败不阻塞 IN_WORK
@@ -315,15 +269,9 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         checkTransition(cur.getStatus(), STATUS_RESOLVED);
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order" +
-                " SET status = ?, resolved_by = ?, resolved_at = NOW()," +
-                "     resolution_note = ?, updated_at = NOW()" +
-                " WHERE id = ? AND status = ?",
-                STATUS_RESOLVED,
+        workOrderDao.resolve(
                 resolvedBy != null ? resolvedBy.trim() : "system",
                 resolutionNote, workOrderId.trim(), cur.getStatus());
         log.info("DqWorkOrder resolved: id={}, by={}", workOrderId, resolvedBy);
@@ -336,8 +284,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         String target = pass ? STATUS_VERIFIED : STATUS_IN_WORK; // verify fail 回 IN_WORK
         checkTransition(cur.getStatus(), target);
         int retry = cur.getRetryCount() != null ? cur.getRetryCount() : 0;
@@ -351,13 +298,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
                 handlingMode = "MANUAL";
             }
         }
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order" +
-                " SET status = ?, verified_by = ?, verified_at = NOW()," +
-                "     verify_pass = ?, verify_note = ?," +
-                "     retry_count = ?, handling_mode = ?," +
-                "     updated_at = NOW()" +
-                " WHERE id = ? AND status = ?",
+        workOrderDao.verify(
                 target, verifiedBy != null ? verifiedBy.trim() : "system",
                 pass, note, retry, handlingMode,
                 workOrderId.trim(), cur.getStatus());
@@ -371,13 +312,9 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         checkTransition(cur.getStatus(), STATUS_CLOSED);
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order SET status = ?, closed_at = NOW(), updated_at = NOW()" +
-                " WHERE id = ? AND status = ?",
-                STATUS_CLOSED, workOrderId.trim(), cur.getStatus());
+        workOrderDao.close(workOrderId.trim(), cur.getStatus());
         log.info("DqWorkOrder closed: id={}, closer={}", workOrderId, closer);
         securityService.auditWrite("DQ_WO_CLOSE", workOrderId.trim(), "SUCCESS");
         // PMO-48-D T16: close 成功后 fire-and-forget 知识沉淀（异步 @Async，不阻塞主流程）
@@ -390,17 +327,10 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         checkTransition(cur.getStatus(), STATUS_REJECTED);
         // 备注推到 description（DB 无 reject_note 列 — 铁律 3.1 不破坏 schema）
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order" +
-                " SET status = ?," +
-                "     description = COALESCE(description, '') || ?," +
-                "     updated_at = NOW()" +
-                " WHERE id = ? AND status = ?",
-                STATUS_REJECTED,
+        workOrderDao.reject(
                 "\n[REJECTED by " + (rejector != null ? rejector : "system") + "]: "
                         + (reason != null ? reason : "(no reason)"),
                 workOrderId.trim(), cur.getStatus());
@@ -416,8 +346,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         // 1. 状态必须 PENDING（其它状态提前返回不抛）
         if (!STATUS_PENDING.equalsIgnoreCase(cur.getStatus())) {
             log.debug("DqWorkOrder escalateUnack skipped (not PENDING): id={}, status={}",
@@ -449,10 +378,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
                     workOrderId, sev);
             return false;
         }
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order SET severity = ?, updated_at = NOW()" +
-                " WHERE id = ? AND status = ? AND is_deleted = FALSE",
-                newSev, workOrderId.trim(), STATUS_PENDING);
+        workOrderDao.escalateSeverity(newSev, workOrderId.trim());
         log.info("DqWorkOrder escalated: id={}, {} → {} ({}min unacknowledged)",
                 workOrderId, sev, newSev, minutes);
         securityService.auditWrite("DQ_WO_ESCALATE", workOrderId.trim(), "SUCCESS");
@@ -466,8 +392,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         if (clean(workOrderId) == null) {
             throw new BusinessException("workOrderId 不能为空");
         }
-        JdbcTemplate jdbc = jdbc();
-        DqWorkOrderVO cur = requireCurrent(jdbc, workOrderId.trim());
+        DqWorkOrderVO cur = requireCurrent(workOrderId.trim());
         // 构造 RCA 请求（ruleId / assetId 来自工单，workOrderId 留痕审计）
         DqRcaRequest req = DqRcaRequest.builder()
                 .failedRuleId(cur.getRuleId())
@@ -495,12 +420,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         // 写 rca_result JSONB + rca_confidence + rca_analyzed_at（任何状态都允许）
         String resultJson = toJson(result);
         Double conf = result.getConfidence() != null ? result.getConfidence() : 0.0D;
-        jdbc.update(
-                "UPDATE ecos_dq.dq_work_order" +
-                " SET rca_result = ?::jsonb, rca_confidence = ?, rca_analyzed_at = NOW()," +
-                "     updated_at = NOW()" +
-                " WHERE id = ? AND is_deleted = FALSE",
-                resultJson, conf, workOrderId.trim());
+        workOrderDao.writeRcaResult(resultJson, conf, workOrderId.trim());
         log.info("DqWorkOrder RCA done: id={}, confidence={}, rootCause={}",
                 workOrderId, conf, result.getRootCause());
         securityService.auditWrite("DQ_WO_RUN_RCA", workOrderId.trim(), "SUCCESS");
@@ -532,12 +452,7 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
                     id, e.getMessage(), e);
             // 写 rca_confidence=0 兜底（不阻塞工单）
             try {
-                JdbcTemplate jdbc = jdbc();
-                jdbc.update(
-                        "UPDATE ecos_dq.dq_work_order SET rca_confidence = 0," +
-                        "  rca_analyzed_at = NOW(), updated_at = NOW()" +
-                        "  WHERE id = ? AND is_deleted = FALSE",
-                        id);
+                workOrderDao.resetRcaConfidence(id);
             } catch (RuntimeException e2) {
                 log.warn("DqWorkOrder autoRCA 标记 confidence=0 再次失败（不阻塞）: id={}, error={}",
                         id, e2.getMessage());
@@ -567,56 +482,20 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
     public List<Map<String, Object>> riskRanking(String grade, int limit) {
         int safeLimit = Math.max(1, Math.min(limit <= 0 ? 10 : limit, 100));
         String g = clean(grade) == null ? null : grade.trim().toUpperCase();
-        JdbcTemplate jdbc = jdbc();
         // severity 优先级（CRITICAL>HIGH>MEDIUM>LOW 映射 CASE → 4/3/2/1）
         // + retry_count DESC + created_at DESC（同级同 retry 取最新先）
         String sevClause = (g == null)
                 ? "(w.severity IS NOT NULL)"
                 : "w.severity = ?";
-        String sql =
-                "SELECT w.id AS id, w.order_no AS orderNo, w.severity AS severity," +
-                "       w.status AS status, w.asset_id AS assetId, w.rule_id AS ruleId," +
-                "       CASE w.severity WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3" +
-                "            WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 1 ELSE 0 END AS weight," +
-                "       w.retry_count AS retryCount, w.created_at AS createdAt," +
-                "       w.rca_confidence AS rcaConfidence, w.title AS title" +
-                "  FROM ecos_dq.dq_work_order w" +
-                " WHERE w.is_deleted = FALSE AND " + sevClause +
-                " ORDER BY weight DESC, w.retry_count DESC, w.created_at DESC" +
-                " LIMIT ?";
         List<Object> args = new ArrayList<>();
         if (g != null) {
             args.add(g);
         }
         args.add(safeLimit);
-        return jdbc.query(sql, (rs, rowNum) -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", rs.getString("id"));
-            m.put("orderNo", rs.getString("orderNo"));
-            m.put("severity", rs.getString("severity"));
-            m.put("status", rs.getString("status"));
-            m.put("assetId", rs.getString("assetId"));
-            m.put("ruleId", rs.getString("ruleId"));
-            m.put("weight", rs.getInt("weight"));
-            m.put("retryCount", rs.getInt("retryCount"));
-            Timestamp ts = rs.getTimestamp("createdAt");
-            m.put("createdAt", ts != null ? ts.toLocalDateTime() : null);
-            Double conf = rs.getDouble("rcaConfidence");
-            m.put("rcaConfidence", rs.wasNull() ? null : conf);
-            m.put("title", rs.getString("title"));
-            return m;
-        }, args.toArray());
+        return workOrderDao.riskRanking(sevClause, args.toArray());
     }
 
     // ==================== 私有工具 ====================
-
-    /** 行 → VO 映射器（JdbcTemplate RowMapper，复用 T12 风格，集中此处避免重复 lambda）。 */
-    private static final RowMapper<DqWorkOrderVO> ROW_MAPPER = new RowMapper<>() {
-        @Override
-        public DqWorkOrderVO mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return mapVo(rs);
-        }
-    };
 
     /** 状态转换白名单校验 — current 必须在 TRANSITIONS 表内且 target 在 allowed 集合。 */
     private static void checkTransition(String current, String target) {
@@ -633,85 +512,20 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
     }
 
     /** 取工单当前行（不存在 / 已删除 → NotFoundException）。 */
-    private DqWorkOrderVO requireCurrent(JdbcTemplate jdbc, String id) {
-        List<DqWorkOrderVO> rows = jdbc.query(
-                "SELECT " + WO_COLUMNS +
-                " FROM ecos_dq.dq_work_order WHERE id = ? AND is_deleted = FALSE",
-                ROW_MAPPER, id);
+    private DqWorkOrderVO requireCurrent(String id) {
+        List<DqWorkOrderVO> rows = workOrderDao.findWorkOrder(id);
         if (rows.isEmpty()) {
             throw new NotFoundException("DQ 工单 " + id + " 不存在或已删除");
         }
         return rows.get(0);
     }
 
-    /** 取 JdbcTemplate bean（ObjectProvider 软依赖；不可用抛 BusinessException）。 */
-    private JdbcTemplate jdbc() {
-        JdbcTemplate tpl = jdbcTemplateProvider.getIfAvailable();
-        if (tpl == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行 DQ 工单操作");
-        }
-        return tpl;
-    }
-
-    /** 行 → VO（驼峰列直读；verify_pass 用 wasNull 判空；rca_confidence 同样）。 */
-    static DqWorkOrderVO mapVo(ResultSet rs) {
-        try {
-            DqWorkOrderVO vo = new DqWorkOrderVO();
-            vo.setId(rs.getString("id"));
-            vo.setOrderNo(rs.getString("orderNo"));
-            vo.setAlertId(rs.getString("alertId"));
-            vo.setRuleId(rs.getString("ruleId"));
-            vo.setAssetId(rs.getString("assetId"));
-            vo.setTitle(rs.getString("title"));
-            vo.setDescription(rs.getString("description"));
-            vo.setStatus(rs.getString("status"));
-            vo.setHandlingMode(rs.getString("handlingMode"));
-            vo.setSeverity(rs.getString("severity"));
-            vo.setAssignedTo(rs.getString("assignedTo"));
-            Timestamp ats = rs.getTimestamp("assignedAt");
-            vo.setAssignedAt(ats != null ? ats.toLocalDateTime() : null);
-            vo.setRepairAction(rs.getString("repairAction"));
-            vo.setRepairStatus(rs.getString("repairStatus"));
-            vo.setRepairLog(rs.getString("repairLog"));
-            vo.setVerifiedBy(rs.getString("verifiedBy"));
-            Timestamp vat = rs.getTimestamp("verifiedAt");
-            vo.setVerifiedAt(vat != null ? vat.toLocalDateTime() : null);
-            vo.setVerifyPass(rs.getBoolean("verifyPass") && !rs.wasNull());
-            vo.setVerifyNote(rs.getString("verifyNote"));
-            vo.setResolvedBy(rs.getString("resolvedBy"));
-            Timestamp rat = rs.getTimestamp("resolvedAt");
-            vo.setResolvedAt(rat != null ? rat.toLocalDateTime() : null);
-            vo.setResolutionNote(rs.getString("resolutionNote"));
-            // T13 RCA 字段
-            vo.setRcaResult(rs.getString("rcaResult"));
-            double rc = rs.getDouble("rcaConfidence");
-            vo.setRcaConfidence(rs.wasNull() ? null : rc);
-            Timestamp crct = rs.getTimestamp("rcaAnalyzedAt");
-            vo.setRcaAnalyzedAt(crct != null ? crct.toLocalDateTime() : null);
-            int rc2 = rs.getInt("retryCount");
-            vo.setRetryCount(rc2);
-            Timestamp ct = rs.getTimestamp("createdAt");
-            vo.setCreatedAt(ct != null ? ct.toLocalDateTime() : null);
-            Timestamp ut = rs.getTimestamp("updatedAt");
-            vo.setUpdatedAt(ut != null ? ut.toLocalDateTime() : null);
-            Timestamp clt = rs.getTimestamp("closedAt");
-            vo.setClosedAt(clt != null ? clt.toLocalDateTime() : null);
-            return vo;
-        } catch (java.sql.SQLException e) {
-            // RowMapper 契约允许抛 SQLException；此处包装为 BusinessException 保留友好语义
-            throw new BusinessException("读取 DQ 工单行失败: " + e.getMessage());
-        }
-    }
-
     /** 生成可读工单号 WO-yyyyMMdd-NNN（同日期已有则 +1；空表 / 无匹配从 1 起）。 */
-    private String generateOrderNo(JdbcTemplate jdbc) {
+    private String generateOrderNo() {
         String date = LocalDate.now().toString().replace("-", "");
         String prefix = "WO-" + date + "-";
         // PG: 取当日已用最大 3+ 位序号 + 1；空表时返回 1
-        Integer maxSeq = jdbc.queryForObject(
-                "SELECT COALESCE(MAX(CAST(SUBSTRING(order_no FROM 'WO-\\d{8}-(\\d{3,})$') AS INTEGER)) + 1, 1)" +
-                "  FROM ecos_dq.dq_work_order WHERE order_no LIKE ? || '%'",
-                Integer.class, prefix);
+        Integer maxSeq = workOrderDao.nextOrderSeq(prefix);
         int seq = maxSeq != null ? maxSeq : 1;
         return prefix + String.format("%03d", seq);
     }

@@ -23,7 +23,7 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVersionVO;
 import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
 
 /**
- * DQ 治理服务实现 — 读取 {@code ecos_dq.dq_rule}（MyBatis），响应前落安全卡：
+ * DQ 治理服务实现 — 读取 {@code ecos_data.dq_rule}（MyBatis），响应前落安全卡：
  * <ol>
  *   <li>脱敏（铁律 2.4 #3）：rules 逐条对 parameters 中敏感键 mask；detail 额外对
  *       target_field 维度 + 版本 snapshot 做 mask；单值兜底走 security-engine
