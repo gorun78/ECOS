@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.workspace.knowledge.service;
 
 import com.chinacreator.gzcm.workspace.knowledge.dto.KnowledgeStatsVO;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -42,10 +42,10 @@ public class KnowledgeStatsAggregator {
                     "COALESCE((SELECT MAX(TO_TIMESTAMP(updated_at / 1000.0)) FROM sys_compliance_rule), TIMESTAMP '1970-01-01 00:00:00+08')" +
                     ")";
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
 
-    public KnowledgeStatsAggregator(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public KnowledgeStatsAggregator(WorkspaceDataDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -87,8 +87,7 @@ public class KnowledgeStatsAggregator {
      */
     private Integer embeddingDim() {
         try {
-            Integer val = jdbc.queryForObject(
-                    "SELECT vector_dims(MAX(embedding_vec)) FROM ecos_knowledge.knowledge_embedding", Integer.class);
+            Integer val = dao.vectorDims();
             return val;
         } catch (Exception ex) {
             log.warn("knowledge stats embedding_dim fallback null: {}", shortMsg(ex));
@@ -107,7 +106,7 @@ public class KnowledgeStatsAggregator {
 
     private Long count(String sql) {
         try {
-            Long val = jdbc.queryForObject(sql, Long.class);
+            Long val = dao.knowledgeCount(sql);
             return val == null ? 0L : val;
         } catch (Exception ex) {
             log.warn("knowledge stats count fallback 0: {} ({})", sql, shortMsg(ex));
@@ -125,7 +124,7 @@ public class KnowledgeStatsAggregator {
     private String maxTimestamp(String sql) {
         try {
             final Object[] row = {null};
-            jdbc.query(sql, rs -> {
+            dao.consumeRow(sql, rs -> {
                 try {
                     row[0] = rs.getObject(1);
                 } catch (Exception e) {

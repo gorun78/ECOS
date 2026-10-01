@@ -2,10 +2,10 @@ package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -30,14 +30,14 @@ public class ScenarioRunService {
     private static final Set<String> ALLOWED_RUN_TYPES =
         Set.of("DIAGNOSE", "FORECAST", "SIMULATE", "STRATEGY", "SAFEGUARD");
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;
     private final DcchengClient dcchengClient;
     private final ScenarioService scenarioService;
 
-    public ScenarioRunService(JdbcTemplate jdbc, ObjectMapper objectMapper,
+    public ScenarioRunService(WorkspaceDataDao dao, ObjectMapper objectMapper,
                               DcchengClient dcchengClient, ScenarioService scenarioService) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.objectMapper = objectMapper;
         this.dcchengClient = dcchengClient;
         this.scenarioService = scenarioService;
@@ -153,15 +153,11 @@ public class ScenarioRunService {
         }
 
         String status = degraded ? "SUCCEEDED_DEGRADED" : "SUCCEEDED";
-        jdbc.update(
-            "INSERT INTO ecos_scenario_run " +
-            "(id, scenario_id, run_type, status, metric, deviation, " +
-            " diagnosis_result, forecast_result, simulation_result, strategy_result, degraded, create_by, update_by) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?)",
+        dao.insertRun(
             runId, scenarioId, String.join(",", runTypes), status, metric,
             deviation == 0 ? null : BigDecimal.valueOf(deviation),
             toJson(diagnosis), toJson(forecast), toJson(simulation), toJson(strategy),
-            degraded, operator, operator);
+            degraded, operator);
 
         // 回写场景指标
         if (actualSafety != null || !metricsMerge.isEmpty()) {
@@ -188,11 +184,7 @@ public class ScenarioRunService {
         if (limit <= 0 || limit > 100) {
             limit = 20;
         }
-        return jdbc.queryForList(
-            "SELECT id, scenario_id, run_type, status, metric, deviation, degraded, " +
-            "       diagnosis_result, forecast_result, simulation_result, strategy_result, create_time " +
-            "FROM ecos_scenario_run WHERE scenario_id = ? AND is_deleted = 0 ORDER BY create_time DESC LIMIT ?",
-            scenarioId, limit);
+        return dao.listRunHistory(scenarioId, limit);
     }
 
     // ── 私有辅助 ──

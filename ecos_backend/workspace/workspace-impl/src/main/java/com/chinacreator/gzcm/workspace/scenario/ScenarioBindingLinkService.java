@@ -2,9 +2,9 @@ package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -35,41 +35,22 @@ public class ScenarioBindingLinkService {
 
     private static final int MAX_LINKS_PER_SCENARIO = 12;
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
 
-    public ScenarioBindingLinkService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ScenarioBindingLinkService(WorkspaceDataDao dao) {
+        this.dao = dao;
     }
 
     // ── 查询 ──────────────────────────────────────────────
 
     public List<ScenarioBindingLinkVO> listLinks(String scenarioId) {
         ensureScenario(scenarioId);
-        return jdbc.query(
-            "SELECT id, scenario_id, source_binding_id, target_binding_id, link_type, " +
-            "       source_contract, remark, version_no " +
-            "FROM ecos_scenario_binding_link " +
-            "WHERE scenario_id = ? AND is_deleted = 0 ORDER BY id",
-            (rs, rowNum) -> new ScenarioBindingLinkVO(
-                rs.getString("id"), rs.getString("scenario_id"),
-                rs.getString("source_binding_id"), rs.getString("target_binding_id"),
-                rs.getString("link_type"), rs.getString("source_contract"),
-                rs.getString("remark"), rs.getString("version_no")),
-            scenarioId);
+        return dao.listLinksOfScenario(scenarioId);
     }
 
     public ScenarioBindingLinkVO find(String scenarioId, String linkId) {
         ensureScenario(scenarioId);
-        List<ScenarioBindingLinkVO> rows = jdbc.query(
-            "SELECT id, scenario_id, source_binding_id, target_binding_id, link_type, " +
-            "       source_contract, remark, version_no " +
-            "FROM ecos_scenario_binding_link WHERE id = ? AND scenario_id = ? AND is_deleted = 0",
-            (rs, rowNum) -> new ScenarioBindingLinkVO(
-                rs.getString("id"), rs.getString("scenario_id"),
-                rs.getString("source_binding_id"), rs.getString("target_binding_id"),
-                rs.getString("link_type"), rs.getString("source_contract"),
-                rs.getString("remark"), rs.getString("version_no")),
-            linkId, scenarioId);
+        List<ScenarioBindingLinkVO> rows = dao.listLinkByIdAndScenario(linkId, scenarioId);
         if (rows.isEmpty()) {
             throw new NotFoundException("LINK-404: 边不存在");
         }
@@ -87,10 +68,7 @@ public class ScenarioBindingLinkService {
     public ScenarioGraphVO graph(String scenarioId) {
         ensureScenario(scenarioId);
 
-        List<Map<String, Object>> bindings = jdbc.queryForList(
-            "SELECT id, binding_type, target_ref, target_id, target_type " +
-            "FROM ecos_scenario_binding WHERE scenario_id = ? AND is_deleted = 0 ORDER BY id",
-            scenarioId);
+        List<Map<String, Object>> bindings = dao.listBindingRowsForGraph(scenarioId);
         List<ScenarioBindingLinkVO> links = listLinks(scenarioId);
         Set<String> touched = new HashSet<>();
         for (ScenarioBindingLinkVO l : links) {
@@ -158,32 +136,22 @@ public class ScenarioBindingLinkService {
         requireBindingInScenario(scenarioId, source);
         requireBindingInScenario(scenarioId, target);
 
-        Integer cnt = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM ecos_scenario_binding_link WHERE scenario_id = ? AND is_deleted = 0",
-            Integer.class, scenarioId);
+        Integer cnt = dao.countLinksOfScenario(scenarioId);
         if (cnt != null && cnt >= MAX_LINKS_PER_SCENARIO) {
             throw new BusinessException(400, "LINK-400: 场景边数超上限 " + MAX_LINKS_PER_SCENARIO);
         }
-        Integer dup = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM ecos_scenario_binding_link " +
-            "WHERE scenario_id = ? AND source_binding_id = ? AND target_binding_id = ? " +
-            "AND link_type = ? AND is_deleted = 0",
-            Integer.class, scenarioId, source, target, linkType);
+        Integer dup = dao.countDuplicateLink(scenarioId, source, target, linkType);
         if (dup != null && dup > 0) {
             throw new BusinessException(400, "LINK-409: 边已存在");
         }
 
         String operator = currentOperator();
         String id = "bsl_" + UUID.randomUUID().toString().substring(0, 12);
-        jdbc.update(
-            "INSERT INTO ecos_scenario_binding_link " +
-            "(id, scenario_id, source_binding_id, target_binding_id, link_type, source_contract, " +
-            " remark, version_no, create_by, update_by, is_deleted, domain) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, '1', ?, ?, 0, 'default')",
+        dao.insertLink(
             id, scenarioId, source, target, linkType,
             dto.getSourceContract(),
             dto.getRemark() == null ? "" : dto.getRemark(),
-            operator, operator);
+            operator);
 
         postSaveIsolationCheck(scenarioId);
         log.info("边保存成功 linkId={} scenario={} type={} src={} tgt={}",
@@ -196,11 +164,7 @@ public class ScenarioBindingLinkService {
     public void delete(String scenarioId, String linkId) {
         ensureScenario(scenarioId);
         String operator = currentOperator();
-        int rows = jdbc.update(
-            "UPDATE ecos_scenario_binding_link " +
-            "SET is_deleted = 1, update_time = NOW(), update_by = ? " +
-            "WHERE id = ? AND scenario_id = ? AND is_deleted = 0",
-            operator, linkId, scenarioId);
+        int rows = dao.logicDeleteLink(operator, linkId, scenarioId);
         if (rows < 1) {
             throw new NotFoundException("LINK-404: 边不存在");
         }
@@ -209,19 +173,14 @@ public class ScenarioBindingLinkService {
     // ── 私有辅助 ───────────────────────────────────────────
 
     private void ensureScenario(String scenarioId) {
-        Integer n = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM ecos_business_scenario WHERE id = ? AND is_deleted = 0",
-            Integer.class, scenarioId);
+        Integer n = dao.countScenarioForLink(scenarioId);
         if (n == null || n < 1) {
             throw new NotFoundException("LINK-404: 场景不存在: " + scenarioId);
         }
     }
 
     private void requireBindingInScenario(String scenarioId, String bindingId) {
-        Integer n = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM ecos_scenario_binding " +
-            "WHERE id = ? AND scenario_id = ? AND is_deleted = 0",
-            Integer.class, bindingId, scenarioId);
+        Integer n = dao.countBindingInScenario(bindingId, scenarioId);
         if (n == null || n < 1) {
             throw new BusinessException(400, "LINK-400: 绑定 " + bindingId + " 不属于场景 " + scenarioId);
         }
@@ -232,9 +191,7 @@ public class ScenarioBindingLinkService {
      * 必须存在 MAPPING 边（否则的对象无用 + 数据孤岛）。
      */
     private void postSaveIsolationCheck(String scenarioId) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT binding_type FROM ecos_scenario_binding WHERE scenario_id = ? AND is_deleted = 0",
-            scenarioId);
+        List<Map<String, Object>> rows = dao.listBindingTypesOfScenario(scenarioId);
         int totalObjects = 0, totalDatasets = 0;
         for (Map<String, Object> b : rows) {
             String bt = (String) b.get("binding_type");
@@ -242,10 +199,7 @@ public class ScenarioBindingLinkService {
             if ("DATASET".equals(bt)) totalDatasets++;
         }
         if (totalDatasets < 1 || totalObjects < 1) return;
-        Integer mappingCount = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM ecos_scenario_binding_link " +
-            "WHERE scenario_id = ? AND link_type = 'MAPPING' AND is_deleted = 0",
-            Integer.class, scenarioId);
+        Integer mappingCount = dao.countMappingLinksOfScenario(scenarioId);
         if (mappingCount == null || mappingCount < 1) {
             throw new BusinessException(400,
                 "LINK-400: 孤岛场景（§0.6.2.1）—— DATASET 与 OBJECT_TYPE 无 MAPPING 边，请先建映射");
