@@ -35,25 +35,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ConfigSingleSourceArchTest {
 
-    /** 相对 ecos_backend 的路径，按当前 HEAD 实测存在且含 {@code sys_config}。只减不增。 */
+    /** 相对 ecos_backend 的路径。R2 数据访问收口后，原 4 处 bypass（cognitive 配置自造 ORM /
+     * data-engine DQ 定时任务 + Git 归档 / workspace 知识配置聚合）的 SQL 已下沉到各模块
+     * {@code dao} 层（继承 {@code JdbcTemplateDaoSupport}）。基线同步替换为收口后的 DAO 文件。
+     * 口径仍为 <b>no-new-violation</b>（存量只减不增，待后续批次经 sysman 面切断时逐项删除）。
+     */
     private static final Set<String> KNOWN_VIOLATION_BASELINE = new TreeSet<>(Set.of(
-            "engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/CognitiveConfigQueryService.java",
-            "engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/scheduler/DqScheduledTask.java",
-            "engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/metadata/MetadataCollectGitArchive.java",
-            "workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/knowledge/service/KnowledgeConfigAggregator.java"
+            "engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/dao/ConfigQueryDao.java",
+            "engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/DqScheduleRunDao.java",
+            "engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/MetadataGitArchiveConfigDao.java",
+            "workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/dao/WorkspaceDataDao.java"
     ));
 
-    /** 白名单：允许触达 sys_config 表的应用层（面自身的实现）。 */
+    /** 白名单：允许触达 sys_config 表的应用层（sysman 面本体 + gateway 内置面板的 sysman-facade 直通）。 */
     private static final Set<String> LEGITIMATE_ACCESSORS = new TreeSet<>(Set.of(
             // sysman 面本体
-            "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/config/service/impl/SysConfigService.java",
             "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/SysConfigController.java",
-            "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/service/SysConfigQueryService.java",
             "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/UserController.java",
+            "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/service/SysConfigQueryService.java",
+            "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/SysConfigDao.java",
             // gateway 内置面板的 sysman-facade 直通（组织/认证鉴权面，非引擎）
             "gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/SysConfigController.java",
-            // B6b R2 收口：facade 门面已下沉 JdbcTemplateDaoSupport 派生的 DAO（架构铁律 §2.5 / IR06）
-            "gateway/src/main/java/com/chinacreator/gzcm/gateway/service/GatewaySysConfigService.java",
             "gateway/src/main/java/com/chinacreator/gzcm/gateway/dao/SysConfigDao.java"
     ));
 
