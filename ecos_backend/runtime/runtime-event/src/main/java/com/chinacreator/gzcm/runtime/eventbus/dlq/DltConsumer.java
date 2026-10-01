@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentMap;
  * <p>关闭 W13：此前 {@code <topic>.DLT} 仅在 {@code EcosOntologyEventConsumer} 注释出现、无消费者、无 lag 告警。
  * 本组件是 DLQ 的<b>统一出口</b>（默认 {@code DefaultErrorHandler} 连续失败投 DLT 后由本消费者收口）：
  * <ol>
- *   <li>落控制域 {@code public.ecos_runtime_event_dlq}（payload + error + firstSeen，C.5.2 DDL=V243）；</li>
+ *   <li>落控制域 {@code ecos_control.ecos_runtime_event_dlq}（payload + error + firstSeen，C.5.2 DDL=V243）；</li>
  *   <li>lag > {@link #LAG_THRESHOLD}（默认 100）持续 > {@link #LAG_WINDOW}（默认 5min）→ 经
  *       {@link DltAlertSink} 升级告警（不在此内联告警实现，告警分支归 runtime-monitor / 01 册门面）。</li>
  * </ol>
@@ -31,7 +31,7 @@ public class DltConsumer {
 
     public static final int LAG_THRESHOLD = 100;
     public static final Duration LAG_WINDOW = Duration.ofMinutes(5);
-    private static final String T = "public.ecos_runtime_event_dlq";
+    private static final String T = "ecos_control.ecos_runtime_event_dlq";
     private static final String V = "1.0.0";
 
     private static final Logger log = LoggerFactory.getLogger(DltConsumer.class);

@@ -106,7 +106,7 @@ public class MemoryServiceImpl implements MemoryService {
     private void persistToDb(MemoryRecord record) {
         try {
             jdbcTemplate.update(
-                "INSERT INTO ecos_agent.agent_memory (id, agent_id, session_id, layer, content, created_at) " +
+                "INSERT INTO ecos_ai.agent_memory (id, agent_id, session_id, layer, content, created_at) " +
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 record.getId(),
                 record.getAgentId(),
@@ -126,7 +126,7 @@ public class MemoryServiceImpl implements MemoryService {
         try {
             return jdbcTemplate.query(
                 "SELECT id, agent_id, session_id, layer, content, created_at " +
-                "FROM ecos_agent.agent_memory WHERE agent_id = ? AND layer = ? " +
+                "FROM ecos_ai.agent_memory WHERE agent_id = ? AND layer = ? " +
                 "ORDER BY created_at DESC LIMIT ?",
                 (rs, rowNum) -> {
                     MemoryRecord r = new MemoryRecord();

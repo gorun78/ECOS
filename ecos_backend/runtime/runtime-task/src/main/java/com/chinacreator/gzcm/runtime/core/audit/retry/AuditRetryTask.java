@@ -17,7 +17,7 @@ import java.util.function.BiConsumer;
  * 详细设计-00 C.5.4 (F00-12) — 审计兜底 SLA。
  *
  * <p>关闭 W12/G5-7 尾项「审计失败兜底仅 log」：Kafka 写失败或 onAudit 下游写入失败时，
- * producer 侧把 payload 暂存到控制域 {@code public.ecos_runtime_audit_retry}（DDL=V244）；
+ * producer 侧把 payload 暂存到控制域 {@code ecos_control.ecos_runtime_audit_retry}（DDL=V244）；
  * 本任务在每 {@link #INTERVAL_MS}=60s 拉一次 pending + 到期记录，重投 Kafka（经 {@link AuditReplayer}），
  * 指数退避（attempts ≤ {@link #MAX_ATTEMPTS}=3）；3 次仍失败转 critical 告警（必须人工 ack），
  * SLA：从失败到落库告警 ≤ 15min（当前 60s 重放间隔下最坏 3×60s + 成功率 100% 命中 <1min）。</p>
@@ -31,7 +31,7 @@ public class AuditRetryTask {
 
     public static final long INTERVAL_MS = 60_000L;
     public static final int MAX_ATTEMPTS = 3;
-    private static final String T = "public.ecos_runtime_audit_retry";
+    private static final String T = "ecos_control.ecos_runtime_audit_retry";
     private static final String V = "1.0.0";
     private static final int BATCH = 50;
 

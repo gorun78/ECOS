@@ -29,13 +29,13 @@ public class KnowledgeStatsVO implements Serializable {
     /** 向量嵌入块数（ecos_knowledge.knowledge_embedding） */
     private Long embeddingCount;
 
-    /** 合规规则总数（public.sys_compliance_rule） */
+    /** 合规规则总数（ecos_control.sys_compliance_rule） */
     private Long complianceRuleCount;
 
     /** 已激活合规规则数（status = 'ACTIVE'） */
     private Long activeComplianceRuleCount;
 
-    /** 规则版本快照数（public.sys_rule_version） */
+    /** 规则版本快照数（ecos_control.sys_rule_version） */
     private Long ruleVersionCount;
 
     /** 本体快照数（ecos_knowledge.kb_ontology_snapshot, is_deleted = 0） */

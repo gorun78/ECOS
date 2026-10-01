@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * W78/C62 验收 — 指标定义<b>语义二分</b>：
  *
  * <ol>
- *   <li>{@code public.ecos_biz_metric}（75 行 demo 数值，外键ecos_wm_goal）= <b>业务域指标实例/结果</b>，
+ *   <li>{@code ecos_control.ecos_biz_metric}（75 行 demo 数值，外键ecos_wm_goal）= <b>业务域指标实例/结果</b>，
  *       本体域**零读写**（治 O-12 孤表定性）；</li>
  *   <li>{@code ecos_ontology.metric_definition}（0 行）= 旧<b>定义表</b>，R-4 a+b 下停写；</li>
  *   <li>{@code ecos_ontology.ecos_metric_definition}（V168.1 新建）= <b>唯一可写入口</b>（新写路径落此）。

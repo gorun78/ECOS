@@ -32,7 +32,7 @@ public class GitArchiveRetryTask {
     public static final long INTERVAL_MS = 60_000L;
     public static final int MAX_ATTEMPTS = 3;
     public static final int BATCH = 50;
-    private static final String T = "public.ecos_ontology_git_archive_pending";
+    private static final String T = "ecos_ontology.ecos_ontology_git_archive_pending";
 
     private static final Logger log = LoggerFactory.getLogger(GitArchiveRetryTask.class);
 

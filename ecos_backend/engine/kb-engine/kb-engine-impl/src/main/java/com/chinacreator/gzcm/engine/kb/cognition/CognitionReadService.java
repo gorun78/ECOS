@@ -13,7 +13,7 @@ import java.util.Map;
  * 场景认知三态只读读取 — 详细设计-04 F04-08 / REQ-KB-04。
  *
  * <p>kb 对场景侧<b>只读</b>开放 hypothesis/belief/mind。读表真身见 {@link CognitionContractGuard}
- * 常量映射（{@code public.ecos_cognitive_*}）。认知三态属 <b>认知引擎独立持久</b>（控制域外），
+ * 常量映射（{@code ecos_cognitive.ecos_cognitive_*}）。认知三态属 <b>认知引擎独立持久</b>（控制域外），
  * standard 档可能不存在对应表 → 读取命中 {@code DataAccessException} 时<b>返回空列表而非 404/500</b>
  *（认知数据"场景侧不可用"是合法空态，不是 kb_nav_* 那种结构性表缺失）。
  *

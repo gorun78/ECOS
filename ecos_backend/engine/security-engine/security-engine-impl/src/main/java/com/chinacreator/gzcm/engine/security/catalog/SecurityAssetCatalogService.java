@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 /**
  * 详细设计-01 F01-09 — 敏感数据目录（表/列/级别/防护组合/豁免引用）数据访问服务。
  *
- * <p>落库形态：{@code public.ecos_security_asset}（V164 建表 + V246 首批预测场景种子）。
+ * <p>落库形态：{@code ecos_control.ecos_security_asset}（V164 建表 + V246 首批预测场景种子）。
  * 目录承载 PRD-REQ-SEC-01 §1.1 六类敏感对象的**治理画像**：ID、granularity、
  * sensitivity 级别（S0-S4）、防护组合（{@code rls}+{@code cls}+{@code mask} 固定 token 组合）、
  * 豁免引用（指向 ST03-A 豁免登记表）、责任角色、描述。目录<b>不含</b>密钥材料、
@@ -47,7 +47,7 @@ public class SecurityAssetCatalogService {
     public List<Map<String, Object>> listAll() {
         String sql = "SELECT id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role, "
                 + "description, version_no, is_deleted, domain, tenant_id, create_time, update_time "
-                + "FROM public.ecos_security_asset WHERE is_deleted = 0 ORDER BY asset_key";
+                + "FROM ecos_control.ecos_security_asset WHERE is_deleted = 0 ORDER BY asset_key";
         return jdbc.queryForList(sql);
     }
 
@@ -58,7 +58,7 @@ public class SecurityAssetCatalogService {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role, description, "
                         + "version_no, is_deleted, domain, tenant_id, create_time, update_time "
-                        + "FROM public.ecos_security_asset WHERE is_deleted = 0 AND asset_key = ? LIMIT 1",
+                        + "FROM ecos_control.ecos_security_asset WHERE is_deleted = 0 AND asset_key = ? LIMIT 1",
                 assetKey);
         return rows.isEmpty() ? null : rows.get(0);
     }
@@ -90,7 +90,7 @@ public class SecurityAssetCatalogService {
             // insert
             String id = "sec-asset-" + assetKey.hashCode();
             jdbc.update(
-                    "INSERT INTO public.ecos_security_asset "
+                    "INSERT INTO ecos_control.ecos_security_asset "
                             + "(id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role, "
                             + "     description, version_no, is_deleted, domain, tenant_id, "
                             + "      create_time, update_time, create_by, update_by) "
@@ -104,7 +104,7 @@ public class SecurityAssetCatalogService {
 
         String id = String.valueOf(existing.get("id"));
         jdbc.update(
-                "UPDATE public.ecos_security_asset SET kind = ?, sensitivity = ?, guard_combo = ?, "
+                "UPDATE ecos_control.ecos_security_asset SET kind = ?, sensitivity = ?, guard_combo = ?, "
                         + "exemption_ref = ?, owner_role = ?, description = ?, update_time = NOW(), update_by = 'api', "
                         + "version_no = CAST(CAST(version_no AS INT) + 1 AS VARCHAR) "
                         + "WHERE id = ?",
@@ -124,7 +124,7 @@ public class SecurityAssetCatalogService {
     public boolean logicalDelete(String assetKey) {
         Map<String, Object> existing = findByAssetKey(assetKey);
         if (existing == null) return false;
-        int rows = jdbc.update("UPDATE public.ecos_security_asset SET is_deleted = 1, "
+        int rows = jdbc.update("UPDATE ecos_control.ecos_security_asset SET is_deleted = 1, "
                 + "update_time = NOW(), update_by = 'api' WHERE id = ?",
                 existing.get("id"));
         return rows > 0;

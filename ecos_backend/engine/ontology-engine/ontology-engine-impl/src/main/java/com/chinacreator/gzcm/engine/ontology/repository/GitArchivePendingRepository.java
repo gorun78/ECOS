@@ -15,8 +15,8 @@ import org.springframework.stereotype.Repository;
  * 本体版本 Git 归档补偿队列（W83/C66 / F03-15）—
  * 生产侧（本体引擎）只做「未 COMMITTED → 入队」；消费侧在 runtime/runtime-task。
  *
- * <p>表 {@code public.ecos_ontology_git_archive_pending}（V170.2）。
- * 控制域主控制 schema（与 V244 {@code ecos_runtime_audit_retry} 同族，同由 runtime-task 统一驱动）。
+ * <p>表 {@code ecos_ontology.ecos_ontology_git_archive_pending}（V170.2）。
+ * 本体控制面 schema（与 V244 {@code ecos_runtime_audit_retry} 同族，同由 runtime-task 统一驱动）。
  *
  * <p>红线：本仓库不做 {@code @Scheduled} 重试（铁律 §2.5-4）；
  * 唯一动作是 enqueue 一次、查自己列入队计数、markClosed/markExhausted 三方法，
@@ -31,7 +31,7 @@ public class GitArchivePendingRepository {
     private final String table;
 
     public GitArchivePendingRepository(JdbcTemplate jdbc,
-                                       @Value("${ecos.ontology.control-schema:public}") String pendingSchema) {
+                                       @Value("${ecos.ontology.control-schema:ecos_ontology}") String pendingSchema) {
         this.jdbc = jdbc;
         this.table = pendingSchema + ".ecos_ontology_git_archive_pending";
     }

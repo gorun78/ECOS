@@ -220,9 +220,9 @@ public class OntologyMappingService {
         }
         String sql = "SELECT " + MAPPING_COLUMNS_ALIASED + " FROM ecos_entity_table_mapping m "
                 + "WHERE m.entity_code IN ("
-                + "SELECT e.id FROM public.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0 "
+                + "SELECT e.id FROM ecos_ontology.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0 "
                 + "UNION "
-                + "SELECT e.code FROM public.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0"
+                + "SELECT e.code FROM ecos_ontology.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0"
                 + ") ORDER BY m.created_at DESC";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, ontologyId, ontologyId);
         List<OntologyMappingVO> result = new ArrayList<>(rows.size());

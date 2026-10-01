@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * 详细设计-00 F00-09 (W07) — 分级告警规则/记录的控制域持久化。
  *
- * <p>落 {@code public.ecos_runtime_alert_rule} / {@code ecos_runtime_alert_record}
+ * <p>落 {@code ecos_control.ecos_runtime_alert_rule} / {@code ecos_control.ecos_runtime_alert_record}
  * （DDL = 08 册单源 V242，C.6.2 模板合规：UUID 应用侧、版本列双载、双时间戳）。
  * 仅在有 {@link JdbcTemplate} 的容器（gateway / 各 service）内生效；无数据源栈则本 Bean 不装配，
  * {@link com.chinacreator.gzcm.runtime.core.alert.service.impl.AlertServiceImpl} 退回纯进程内缓存。</p>
@@ -44,7 +44,7 @@ public class AlertRepository {
                            java.math.BigDecimal threshold, Integer windowSec,
                            Integer upgradeMin, Integer enabled, String channel, String webhookUrl) {
         jdbc.update(
-            "INSERT INTO public.ecos_runtime_alert_rule" +
+            "INSERT INTO ecos_control.ecos_runtime_alert_rule" +
             " (id, rule_code, metric_key, severity, threshold_num, window_sec, upgrade_min," +
             "  enabled, channel, webhook_url, version_no, is_deleted, domain)" +
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'default')",
@@ -60,7 +60,7 @@ public class AlertRepository {
                                String sourceModule, String traceId, String tenantId) {
         String id = java.util.UUID.randomUUID().toString();
         jdbc.update(
-            "INSERT INTO public.ecos_runtime_alert_record" +
+            "INSERT INTO ecos_control.ecos_runtime_alert_record" +
             " (id, rule_code, severity, status, title, detail_json, source_module, trace_id," +
             "  occurred_at, version_no, is_deleted, domain, tenant_id)" +
             " VALUES (?, ?, ?, 'open', ?, ?, ?, ?, NOW(), ?, 0, 'default', ?)",
@@ -75,7 +75,7 @@ public class AlertRepository {
                 "SELECT id, rule_code AS ruleCode, severity, status, title, detail_json AS detailJson," +
                 " source_module AS sourceModule, trace_id AS traceId, ack_by AS ackBy, ack_time AS ackTime," +
                 " close_time AS closeTime, occurred_at AS occurredAt" +
-                " FROM public.ecos_runtime_alert_record WHERE id = ? AND is_deleted = 0", id);
+                " FROM ecos_control.ecos_runtime_alert_record WHERE id = ? AND is_deleted = 0", id);
         } catch (Exception ex) {
             return null;
         }
@@ -89,7 +89,7 @@ public class AlertRepository {
         String sql = "SELECT id, rule_code AS ruleCode, severity, status, title, detail_json AS detailJson," +
                 " source_module AS sourceModule, trace_id AS traceId, ack_by AS ackBy, ack_time AS ackTime," +
                 " close_time AS closeTime, occurred_at AS occurredAt" +
-                " FROM public.ecos_runtime_alert_record" + where +
+                " FROM ecos_control.ecos_runtime_alert_record" + where +
                 " ORDER BY occurred_at DESC LIMIT ? OFFSET ?";
         args.add(pageSize);
         args.add((page - 1) * pageSize);
@@ -101,13 +101,13 @@ public class AlertRepository {
         List<Object> args = new ArrayList<>();
         if (status != null && !status.isEmpty()) { where.append("AND status = ?"); args.add(status); }
         if (severity != null && !severity.isEmpty()) { where.append("AND severity = ?"); args.add(severity); }
-        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM public.ecos_runtime_alert_record" + where, Long.class, args.toArray());
+        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM ecos_control.ecos_runtime_alert_record" + where, Long.class, args.toArray());
         return c == null ? 0 : c;
     }
 
     public boolean ackRecord(String id, String ackBy, String note) {
         return jdbc.update(
-            "UPDATE public.ecos_runtime_alert_record SET status = 'acked', ack_by = ?, ack_time = NOW()," +
+            "UPDATE ecos_control.ecos_runtime_alert_record SET status = 'acked', ack_by = ?, ack_time = NOW()," +
             " detail_json = ? , update_time = NOW()" +
             " WHERE id = ? AND status = 'open'",
             safe(ackBy), appendAckNote(lookupDetail(id), note), id) > 0;
@@ -115,7 +115,7 @@ public class AlertRepository {
 
     public boolean closeRecord(String id) {
         return jdbc.update(
-            "UPDATE public.ecos_runtime_alert_record SET status = 'closed', close_time = NOW(), update_time = NOW()" +
+            "UPDATE ecos_control.ecos_runtime_alert_record SET status = 'closed', close_time = NOW(), update_time = NOW()" +
             " WHERE id = ? AND status IN ('open','acked')", id) > 0;
     }
 
@@ -144,7 +144,7 @@ public class AlertRepository {
     private String lookupDetail(String id) {
         try {
             return jdbc.queryForObject(
-                "SELECT detail_json FROM public.ecos_runtime_alert_record WHERE id = ? AND is_deleted = 0",
+                "SELECT detail_json FROM ecos_control.ecos_runtime_alert_record WHERE id = ? AND is_deleted = 0",
                 String.class, id);
         } catch (Exception ex) {
             return null;

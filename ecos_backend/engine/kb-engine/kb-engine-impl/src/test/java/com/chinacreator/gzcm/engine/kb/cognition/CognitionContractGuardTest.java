@@ -24,10 +24,10 @@ class CognitionContractGuardTest {
     /** 契约名（文档/前端别名 + 库内名）→ 库内真身表名，未知名 → null。 */
     @Test
     void guardTablesResolveToRealRelation() {
-        assertEquals("public.ecos_cognitive_hypothesis", guard.resolveReal("kb_cognitive_hypothesis"));
-        assertEquals("public.ecos_cognitive_hypothesis", guard.resolveReal("ecos_cognitive_hypothesis"));
-        assertEquals("public.ecos_cognitive_belief", guard.resolveReal("kb_cognitive_belief"));
-        assertEquals("public.ecos_cognitive_mind", guard.resolveReal("kb_cognitive_mind"));
+        assertEquals("ecos_cognitive.ecos_cognitive_hypothesis", guard.resolveReal("kb_cognitive_hypothesis"));
+        assertEquals("ecos_cognitive.ecos_cognitive_hypothesis", guard.resolveReal("ecos_cognitive_hypothesis"));
+        assertEquals("ecos_cognitive.ecos_cognitive_belief", guard.resolveReal("kb_cognitive_belief"));
+        assertEquals("ecos_cognitive.ecos_cognitive_mind", guard.resolveReal("kb_cognitive_mind"));
 
         assertTrue(guard.isGuardedContract("kb_cognitive_hypothesis"));
         assertFalse(guard.isGuardedContract("kb_cognitive_something_else"));

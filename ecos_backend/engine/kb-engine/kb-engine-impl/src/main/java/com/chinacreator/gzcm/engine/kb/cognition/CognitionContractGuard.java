@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  *       任何试图经 kb 写入认知表的调用必须命中 {@link #assertReadOnly()} 陷阱 →
  *       {@code 405 ECOS-KB-070}（{@code COGNITION_WRITE_FORBIDDEN}）。</li>
  *   <li><b>契约名 ↔ 库内真身名映射</b>：文档/契约写 {@code kb_cognitive_hypothesis} 等别名，
- *       库内真身是 {@code public.ecos_cognitive_hypothesis}（K-49 守护对象表名不存在，G2-6）；
+ *       库内真身是 {@code ecos_cognitive.ecos_cognitive_hypothesis}（K-49 守护对象表名不存在，G2-6）；
  *       映射交 R-12 / PRD 回写裁定，本类只做确定性 resolve 供读路径与守门测试复用。</li>
  *   <li><b>枚举冻结</b>：status 枚举见 {@link HypothesisStatus}（PROPOSED/EVIDENCED/BELIEVED/REFUTED），
  *       白名单判定唯一入口 {@link HypothesisStatus#isValidStatus(String)}。</li>
@@ -21,10 +21,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class CognitionContractGuard {
 
-    /** 认知三态库内真身表名（G2-6 守卫对象；schema = public，控制域外的认知引擎独立持久）。 */
-    public static final String HYPOTHESIS_REAL_TABLE = "public.ecos_cognitive_hypothesis";
-    public static final String BELIEF_REAL_TABLE = "public.ecos_cognitive_belief";
-    public static final String MIND_REAL_TABLE = "public.ecos_cognitive_mind";
+    /** 认知三态库内真身表名（G2-6 守卫对象；schema = ecos_cognitive，控制域外的认知引擎独立持久）。 */
+    public static final String HYPOTHESIS_REAL_TABLE = "ecos_cognitive.ecos_cognitive_hypothesis";
+    public static final String BELIEF_REAL_TABLE = "ecos_cognitive.ecos_cognitive_belief";
+    public static final String MIND_REAL_TABLE = "ecos_cognitive.ecos_cognitive_mind";
 
     /**
      * 契约名 → 库内真身表名。

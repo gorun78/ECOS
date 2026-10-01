@@ -28,7 +28,7 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
  * 本体数据实例 Controller — 管理对象类型（ObjectType）下的数据记录。
  *
  * <p>Wave B-3 T15：从内存 ConcurrentHashMap 改造为 PostgreSQL 持久化
- * （表 public.ecos_ontology_data，见 V119__ecos_ontology_data.sql）。
+ * （表 ecos_ontology.ecos_ontology_data，见 V119__ecos_ontology_data.sql）。
  * 主键改全量 UUID（防多实例冲突），所有查询带 is_deleted=0 过滤（逻辑删除语义）。
  *
  * <p>注意（T15 过渡态）：DELETE /api/v1/ontology/data/{id} 与
@@ -45,7 +45,7 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
  *   <li>DELETE /api/v1/ontology/data              — 清空（T15 过渡，仅查询计数不实际删）</li>
  * </ul>
  *
- * <p>持久化映射（表 public.ecos_ontology_data 字段 ↔ API 字段）：
+ * <p>持久化映射（表 ecos_ontology.ecos_ontology_data 字段 ↔ API 字段）：
  * <ul>
  *   <li>id (VARCHAR PK) ← 全量 UUID（替代原 "dat"+AtomicInteger 截断 ID）</li>
  *   <li>ontology_id (VARCHAR NOT NULL) ← objectTypeId（业务上对象类型 ID 即归属域）</li>

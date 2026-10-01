@@ -51,7 +51,7 @@ public class ToolRouterServiceImpl implements ToolRouterService {
         log.info("Getting available tools for agent: {}", agentId);
         try {
             return jdbcTemplate.query(
-                "SELECT code, name, tool_type, endpoint_url, status FROM ecos_agent.ecos_tool_definition WHERE status = 'ACTIVE'",
+                "SELECT code, name, tool_type, endpoint_url, status FROM ecos_ai.ecos_tool_definition WHERE status = 'ACTIVE'",
                 (rs, rowNum) -> {
                     ToolDefinition def = new ToolDefinition();
                     def.setCode(rs.getString("code"));

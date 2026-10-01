@@ -108,7 +108,7 @@ public class OntologyVersionService {
      *   <li>{@link OntologyGitArchiveResult#STATUS_COMMITTED}
      *       → 回填 {@code git_ref}（+ {@code commitId}），版本快照列语义降级为"在用指针"；</li>
      *   <li>非 COMMITTED（{@code not_available}）或抛异常
-     *       → 写补偿队列 {@code public.ecos_ontology_git_archive_pending}（V170.2），
+     *       → 写补偿队列 {@code ecos_ontology.ecos_ontology_git_archive_pending}（V170.2），
      *          由 runtime-task 指数退避重放；<b>git_ref 不回填</b>（禁伪成功），版本 UI 显"待归档"。</li>
      *   <li>compensation 队列本身写入失败 → 仅记 error 日志，不反噬发布（可用性优先，SLA 归分册 00 C20 底座）。</li>
      * </ol>
