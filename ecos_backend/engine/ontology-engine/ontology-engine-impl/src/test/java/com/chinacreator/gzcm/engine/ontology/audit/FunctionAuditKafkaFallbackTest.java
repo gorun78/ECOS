@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.audit;
 
+import com.chinacreator.gzcm.engine.ontology.dao.FunctionAuditDao;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionAuditRecord;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionCacheManager;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,8 @@ class FunctionAuditKafkaFallbackTest {
         // 本地兜底成功
         when(fakes.jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
 
-        FunctionCacheManager mgr = new FunctionCacheManager(fakes.jdbc, fakes.eventBus, "ecos_ontology");
+        FunctionCacheManager mgr = new FunctionCacheManager(
+                new FunctionAuditDao(fakes.jdbc, "ecos_ontology"), fakes.eventBus, "ecos_ontology");
 
         FunctionAuditRecord rec = FunctionAuditRecord.builder()
                 .functionId("fid-1")

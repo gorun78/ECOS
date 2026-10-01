@@ -2,20 +2,16 @@ package com.chinacreator.gzcm.engine.ontology.engine;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.stereotype.Component;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.chinacreator.gzcm.engine.ontology.dao.FunctionSandboxDao;
 
 /**
  * FunctionSandboxEngine — SQL 编译 + 沙箱执行引擎。
@@ -35,6 +31,9 @@ import java.util.regex.Pattern;
  *   <li>参数化查询防注入</li>
  *   <li>白名单函数验证（由 FunctionValidator 前置）</li>
  * </ul>
+ *
+ * <p>B3c 数据访问收口：本类不再直接持有 {@code JdbcTemplate}，
+ * SQL 沙箱执行（PreparedStatementCreator + 5s 超时）委托给 {@link FunctionSandboxDao}。</p>
  */
 @Component
 public class FunctionSandboxEngine {
@@ -50,12 +49,10 @@ public class FunctionSandboxEngine {
     private static final Pattern STRING_LITERAL = Pattern.compile(
         "'([^']*)'");
 
-    private static final int QUERY_TIMEOUT_SECONDS = 5;
+    private final FunctionSandboxDao dao;
 
-    private final JdbcTemplate jdbc;
-
-    public FunctionSandboxEngine(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public FunctionSandboxEngine(FunctionSandboxDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -150,36 +147,13 @@ public class FunctionSandboxEngine {
             sql = sql.replace("FROM " + entityName, "FROM " + tableName);
         }
 
-        // 执行（带超时）
+        // 执行（带超时）— B3c 收口：委托给 FunctionSandboxDao
         String finalSql = sql;
         Object value;
         try {
-            if (params.isEmpty()) {
-                value = jdbc.query((Connection conn) -> {
-                    PreparedStatement ps = conn.prepareStatement(finalSql);
-                    ps.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
-                    return ps;
-                }, (ResultSet rs) -> {
-                    if (rs.next()) {
-                        return rs.getObject("result");
-                    }
-                    return null;
-                });
-            } else {
-                value = jdbc.query((Connection conn) -> {
-                    PreparedStatement ps = conn.prepareStatement(finalSql);
-                    ps.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
-                    for (int i = 0; i < params.size(); i++) {
-                        ps.setObject(i + 1, params.get(i));
-                    }
-                    return ps;
-                }, (ResultSet rs) -> {
-                    if (rs.next()) {
-                        return rs.getObject("result");
-                    }
-                    return null;
-                });
-            }
+            value = params.isEmpty()
+                ? dao.executeWithTimeout(finalSql)
+                : dao.executeWithTimeout(finalSql, params);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startTime;
             log.error("Function execution failed: sql={} params={} error={}", finalSql, params, e.getMessage());

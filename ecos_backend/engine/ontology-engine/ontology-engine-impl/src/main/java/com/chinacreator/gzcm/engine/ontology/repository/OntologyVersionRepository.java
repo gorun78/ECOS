@@ -1,139 +1,78 @@
 package com.chinacreator.gzcm.engine.ontology.repository;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.stereotype.Repository;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyRule;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyAction;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyDomain;
+import com.chinacreator.gzcm.engine.ontology.dao.OntologyVersionDao;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyVersion;
+import org.springframework.stereotype.Repository;
 
 /**
- * JdbcTemplate 仓库 — 版本 CRUD（ecos_ontology_version 表）
+ * JdbcTemplate 仓库（门面）— 版本 CRUD（ecos_ontology_version 表）。
+ *
+ * <p>B3c 数据访问收口：JDBC 实现下沉到 {@link OntologyVersionDao}，
+ * 本仓库保留 API 委托，供 Service 层 &amp; 既有代码（Wave31 / OntologyVersionGitArchive /
+ * ProposalLifecycle 等）transparent 使用。</p>
+ * <p>方法命名保留 {@code findByOntology} / {@code findById} / {@code findPreviousVersion}，
+ * 与 HistoryNotInDbTest 的静态断言对齐。</p>
  */
 @Repository
 public class OntologyVersionRepository {
 
-    private final JdbcTemplate jdbc;
+    private final OntologyVersionDao dao;
 
-    public OntologyVersionRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
-
-    private final RowMapper<OntologyVersion> ROW_MAPPER = (rs, rn) -> {
-        OntologyVersion v = new OntologyVersion();
-        v.setId(rs.getString("id"));
-        v.setOntologyId(rs.getString("ontology_id"));
-        v.setVersionNo(rs.getString("version_no"));
-        v.setStatus(rs.getString("status"));
-        v.setSnapshot(rs.getString("snapshot"));
-        v.setChangeLog(rs.getString("change_log"));
-        v.setPublisher(rs.getString("publisher"));
-        v.setPublishedAt(ts(rs.getTimestamp("published_at")));
-        v.setCreatedAt(ts(rs.getTimestamp("created_at")));
-        return v;
-    };
-
-    private static LocalDateTime ts(Timestamp t) {
-        return t != null ? t.toLocalDateTime() : null;
+    public OntologyVersionRepository(OntologyVersionDao dao) {
+        this.dao = dao;
     }
 
     public List<OntologyVersion> findByOntology(String ontologyId) {
-        return jdbc.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? ORDER BY created_at DESC",
-            ROW_MAPPER, ontologyId);
+        return dao.findByOntology(ontologyId);
     }
 
     public Optional<OntologyVersion> findById(String id) {
-        List<OntologyVersion> list = jdbc.query(
-            "SELECT * FROM ecos_ontology_version WHERE id = ?", ROW_MAPPER, id);
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+        return dao.findById(id);
     }
 
     public Optional<OntologyVersion> findByOntologyAndVersion(String ontologyId, String versionNo) {
-        List<OntologyVersion> list = jdbc.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND version_no = ?",
-            ROW_MAPPER, ontologyId, versionNo);
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+        return dao.findByOntologyAndVersion(ontologyId, versionNo);
     }
 
     public Optional<OntologyVersion> findLatestPublished(String ontologyId) {
-        List<OntologyVersion> list = jdbc.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND status = 'Published' ORDER BY created_at DESC LIMIT 1",
-            ROW_MAPPER, ontologyId);
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+        return dao.findLatestPublished(ontologyId);
     }
 
     public int insert(OntologyVersion version) {
-        return jdbc.update("""
-            INSERT INTO ecos_ontology_version (id, ontology_id, version_no, status, snapshot, change_log, publisher, published_at, created_at)
-            VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, NOW())
-            """, version.getId(), version.getOntologyId(), version.getVersionNo(),
-            version.getStatus(), version.getSnapshot(), version.getChangeLog(),
-            version.getPublisher(), version.getPublishedAt() != null ? Timestamp.valueOf(version.getPublishedAt()) : null);
+        return dao.insert(version);
     }
 
     public int updateStatus(String id, String status) {
-        return jdbc.update("""
-            UPDATE ecos_ontology_version SET status = ?, published_at = CASE WHEN ? = 'Published' THEN NOW() ELSE published_at END
-            WHERE id = ?
-            """, status, status, id);
+        return dao.updateStatus(id, status);
     }
 
-    /**
-     * F03-15 (W83)：Git 归档成功/入补偿失败时回填 git_ref。
-     *
-     * <p>additive only；V170.1 已为 public / ecos_ontology 双侧补列（Bearer=true）。
-     * 与 `is_deleted=0` 前提下更新（软删行不再回写）。
-     */
+    /** F03-15 (W83)：Git 归档成功/入补偿失败时回填 git_ref（V170.1 additive 补列）。 */
     public int setGitRef(String id, String gitRef) {
-        return jdbc.update(
-            "UPDATE ecos_ontology_version SET git_ref = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0",
-            gitRef, id);
+        return dao.setGitRef(id, gitRef);
     }
 
-    /**
-     * 逻辑删除 version (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。
-     * is_deleted / update_time / update_by 列由 V120__ecos_ontology_wave31_fallback.sql
-     * 建表时补齐 (ecos_ontology_version 历史无 schema, 本 bundle 首次建表)。
-     */
+    /** 逻辑删除 version (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。 */
     public int delete(String id) {
-        return jdbc.update(
-            "UPDATE ecos_ontology_version SET is_deleted = 1, status = 'ARCHIVED', " +
-            "update_time = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
+        return dao.delete(id);
     }
 
     public List<OntologyVersion> findAll() {
-        return jdbc.query("SELECT * FROM ecos_ontology_version ORDER BY created_at DESC", ROW_MAPPER);
+        return dao.findAll();
     }
 
     /**
      * 生成下一个版本主键（{@code ver} + 数字后缀）。
-     *
-     * <p>基于库内既有 ID 的最大数字后缀自增，替代原内存自增计数器 —— 后者在进程重启后
-     * 会从头计数，与库内既有 {@code ver5001/ver5002} 撞主键，导致版本创建与提案执行失败。
-     *
-     * @return 下一个可用版本 ID，如 {@code ver5003}
+     * 最大数字后缀自增 vs 库内既有 {@code ver5001/ver5002}，避免进程重启撞主键。
      */
     public String nextId() {
-        Long max = jdbc.queryForObject(
-            "SELECT COALESCE(MAX(NULLIF(regexp_replace(id, '\\D', '', 'g'), '')::bigint), 5000) "
-                + "FROM ecos_ontology_version", Long.class);
-        return "ver" + ((max == null ? 5000L : max) + 1L);
+        return dao.nextId();
     }
 
-    public Optional<OntologyVersion> findPreviousVersion(String ontologyId, java.time.LocalDateTime beforeTime) {
-        List<OntologyVersion> list = jdbc.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",
-            ROW_MAPPER, ontologyId, beforeTime != null ? java.sql.Timestamp.valueOf(beforeTime) : null);
-        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    public Optional<OntologyVersion> findPreviousVersion(String ontologyId, LocalDateTime beforeTime) {
+        return dao.findPreviousVersion(ontologyId, beforeTime);
     }
 }

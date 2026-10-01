@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.audit;
 
+import com.chinacreator.gzcm.engine.ontology.dao.FunctionAuditDao;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionAuditRecord;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionCacheManager;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
@@ -44,7 +45,7 @@ class FunctionAuditAttributionTest {
     @BeforeEach
     void setUp() {
         // eventBus=null → 直接走本地兜底
-        cacheManager = new FunctionCacheManager(jdbc, null, "ecos_ontology");
+        cacheManager = new FunctionCacheManager(new FunctionAuditDao(jdbc, "ecos_ontology"), null, "ecos_ontology");
     }
 
     @AfterEach

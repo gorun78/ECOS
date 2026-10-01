@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.engine;
 
+import com.chinacreator.gzcm.engine.ontology.dao.PreconditionDao;
 import com.chinacreator.gzcm.engine.ontology.model.ActionType;
 import com.chinacreator.gzcm.sysman.abac.model.AbacContext;
 import com.chinacreator.gzcm.sysman.abac.service.IAbacPermissionChecker;
@@ -9,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -40,14 +40,14 @@ public class PreconditionEngine {
     private static final Logger log = LoggerFactory.getLogger(PreconditionEngine.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final PreconditionDao dao;
 
     /** ABAC 权限检查器（可选注入，未配置时 ABAC 操作符宽容通过）。 */
     private final IAbacPermissionChecker abacPermissionChecker;
 
-    public PreconditionEngine(JdbcTemplate jdbc,
+    public PreconditionEngine(PreconditionDao dao,
                               Optional<IAbacPermissionChecker> abacPermissionChecker) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.abacPermissionChecker = abacPermissionChecker.orElse(null);
     }
 
@@ -114,16 +114,14 @@ public class PreconditionEngine {
         if (objectId == null || objectId.isBlank()) return Map.of();
         try {
             // 尝试从 ecos_ontology_object 表查询
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM ecos_ontology_object WHERE id = ?", objectId);
+            List<Map<String, Object>> rows = dao.findObjectStateFromOntologyObject(objectId);
             if (!rows.isEmpty()) return rows.get(0);
         } catch (Exception e) {
             log.debug("ecos_ontology_object not available: {}", e.getMessage());
         }
         // 尝试 ecos_ontology 表
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM ecos_ontology WHERE id = ?", objectId);
+            List<Map<String, Object>> rows = dao.findObjectStateFromOntology(objectId);
             if (!rows.isEmpty()) return rows.get(0);
         } catch (Exception e) {
             log.debug("ecos_ontology not available: {}", e.getMessage());
@@ -208,11 +206,7 @@ public class PreconditionEngine {
     private boolean checkUserRole(String userId, String role) {
         if (userId == null || userId.isBlank()) return false;
         try {
-            Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_user_role ur " +
-                "JOIN sys_role r ON ur.role_id = r.id " +
-                "WHERE ur.user_id = ? AND r.code = ?",
-                Integer.class, userId, role);
+            Integer count = dao.countUserRole(userId, role);
             return count != null && count > 0;
         } catch (Exception e) {
             log.debug("Role check skipped (table may not exist): {}", e.getMessage());

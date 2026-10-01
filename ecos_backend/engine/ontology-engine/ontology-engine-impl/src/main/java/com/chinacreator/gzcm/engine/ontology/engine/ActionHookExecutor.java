@@ -9,21 +9,9 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import com.chinacreator.gzcm.common.engine.IActionHookExecutor;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyRule;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyAction;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyDomain;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyVersion;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyRuleRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyDomainRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyVersionRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
+import com.chinacreator.gzcm.engine.ontology.dao.ActionHookAuditDao;
 
 /**
  * Action 钩子执行器 — preHook（VALIDATION） + postHook（NOTIFICATION, AUDIT_LOG）。
@@ -35,6 +23,9 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
  *   <li><b>AUDIT_LOG</b> — 执行后记录审计日志，写入 td_audit_log（event_type="ACTION_EXECUTE"）</li>
  * </ul>
  *
+ * <p>B3c 数据访问收口：本类不再直接持有 {@code JdbcTemplate}，
+ * 审计日志写入委托给 {@link ActionHookAuditDao}。
+ *
  * <p>关键约束：Hook 执行异常不阻塞主流程（捕获 + log）。
  */
 @Component
@@ -43,10 +34,10 @@ public class ActionHookExecutor implements IActionHookExecutor {
     private static final Logger log = LoggerFactory.getLogger(ActionHookExecutor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final ActionHookAuditDao dao;
 
-    public ActionHookExecutor(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ActionHookExecutor(ActionHookAuditDao dao) {
+        this.dao = dao;
     }
 
     // ═══════════════ Public API ═══════════════════
@@ -190,9 +181,7 @@ public class ActionHookExecutor implements IActionHookExecutor {
             detailsJson = "{}";
         }
 
-        jdbc.update(
-            "INSERT INTO td_audit_log (log_id, event_type, timestamp, user_id, resource, action, result, details) " +
-            "VALUES (?, ?, NOW(), ?, ?, ?, ?, ?)",
+        dao.insertAuditLog(
             UUID.randomUUID().toString(),
             "NOTIFICATION",
             userId != null ? userId : "system",
@@ -220,9 +209,7 @@ public class ActionHookExecutor implements IActionHookExecutor {
             requestDataJson = "{}";
         }
 
-        jdbc.update(
-            "INSERT INTO td_audit_log (log_id, event_type, timestamp, user_id, resource, action, result, details) " +
-            "VALUES (?, ?, NOW(), ?, ?, ?, ?, ?)",
+        dao.insertAuditLog(
             UUID.randomUUID().toString(),
             "ACTION_EXECUTE",
             userId != null ? userId : "system",

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.audit;
 
+import com.chinacreator.gzcm.engine.ontology.dao.FunctionAuditDao;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionAuditRecord;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionCacheManager;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +36,8 @@ class FunctionAuditBothFailDenyTest {
         doThrow(new IllegalStateException("broker unreachable")).when(eventBus).publish(anyString(), any());
         doThrow(new DataAccessException("pg down") { }).when(jdbc).update(anyString(), any(Object[].class));
 
-        FunctionCacheManager mgr = new FunctionCacheManager(jdbc, eventBus, "ecos_ontology");
+        FunctionCacheManager mgr = new FunctionCacheManager(
+                new FunctionAuditDao(jdbc, "ecos_ontology"), eventBus, "ecos_ontology");
 
         FunctionAuditRecord rec = FunctionAuditRecord.builder()
                 .functionId("fid-1")

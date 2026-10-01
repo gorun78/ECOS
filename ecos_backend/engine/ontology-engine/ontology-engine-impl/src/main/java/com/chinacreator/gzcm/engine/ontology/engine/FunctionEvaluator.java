@@ -1,6 +1,10 @@
 package com.chinacreator.gzcm.engine.ontology.engine;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -8,21 +12,10 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import com.chinacreator.gzcm.common.engine.IFunctionPropertyEvaluator;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
+import com.chinacreator.gzcm.engine.ontology.dao.FunctionEvaluatorDao;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyRule;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyAction;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyDomain;
-import com.chinacreator.gzcm.engine.ontology.model.OntologyVersion;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyRuleRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyDomainRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyVersionRepository;
-import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
 
 /**
  * 计算属性求值引擎 — 支持 EXPRESSION / AGGREGATION / LOOKUP 三种Function。
@@ -36,16 +29,19 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
  *
  * <h3>错误处理</h3>
  * 计算异常返回 null + log error，不抛500。
+ *
+ * <p>B3c 数据访问收口：本类不再直接持有 {@code JdbcTemplate}，
+ * AGGREGATION / LOOKUP / FUNCTION 属性 3 处 JDBC 存取委托给 {@link FunctionEvaluatorDao}。
  */
 @Component
 public class FunctionEvaluator implements IFunctionPropertyEvaluator {
 
     private static final Logger log = LoggerFactory.getLogger(FunctionEvaluator.class);
 
-    private final JdbcTemplate jdbc;
+    private final FunctionEvaluatorDao dao;
 
-    public FunctionEvaluator(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public FunctionEvaluator(FunctionEvaluatorDao dao) {
+        this.dao = dao;
     }
 
     // ── 白名单函数 ──────────────────────────────────────────────
@@ -363,6 +359,8 @@ public class FunctionEvaluator implements IFunctionPropertyEvaluator {
      * 聚合求值。
      * 表达式格式: "SUM(Entity.field) WHERE Entity.fk = ?"
      * 其中 ? 会被替换为当前对象的对应字段值。
+     *
+     * <p>B3c 收口：SQL 执行委托给 {@link FunctionEvaluatorDao#aggregate}。</p>
      */
     Object evaluateAggregation(String expr, Map<String, Object> objectData) {
         Matcher m = AGG_PATTERN.matcher(expr.trim());
@@ -387,7 +385,7 @@ public class FunctionEvaluator implements IFunctionPropertyEvaluator {
             sql.append(" WHERE ").append(resolvedWhere);
 
             try {
-                return jdbc.queryForObject(sql.toString(), params.toArray(), Object.class);
+                return dao.aggregate(sql.toString(), params.toArray());
             } catch (Exception e) {
                 log.error("AGGREGATION query failed: {} — {}", sql, e.getMessage());
                 return null;
@@ -395,7 +393,7 @@ public class FunctionEvaluator implements IFunctionPropertyEvaluator {
         }
 
         try {
-            return jdbc.queryForObject(sql.toString(), Object.class);
+            return dao.aggregate(sql.toString(), new Object[0]);
         } catch (Exception e) {
             log.error("AGGREGATION query failed: {} — {}", sql, e.getMessage());
             return null;
@@ -407,6 +405,8 @@ public class FunctionEvaluator implements IFunctionPropertyEvaluator {
     /**
      * LOOKUP 求值。
      * 表达式格式: "LOOKUP(Entity.field BY pk = THIS.fk)"
+     *
+     * <p>B3c 收口：SQL 执行委托给 {@link FunctionEvaluatorDao#lookup}。</p>
      */
     Object evaluateLookup(String expr, Map<String, Object> objectData) {
         Matcher m = LOOKUP_PATTERN.matcher(expr.trim());
@@ -428,7 +428,7 @@ public class FunctionEvaluator implements IFunctionPropertyEvaluator {
 
         String sql = "SELECT " + targetField + " FROM " + entity + " WHERE " + pkColumn + " = ? LIMIT 1";
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, fkValue);
+            List<Map<String, Object>> rows = dao.lookup(sql, fkValue);
             if (rows.isEmpty()) return null;
             return rows.get(0).values().iterator().next();
         } catch (Exception e) {
@@ -542,24 +542,12 @@ public class FunctionEvaluator implements IFunctionPropertyEvaluator {
 
     /**
      * 查询指定 entity 的所有 FUNCTION 类型属性。
+     *
+     * <p>B3c 收口：委托给 {@link FunctionEvaluatorDao#findFunctionProperties}。</p>
      */
     private List<OntologyProperty> findFunctionProperties(String entityCode) {
         try {
-            return jdbc.query(
-                "SELECT p.* FROM ecos_ontology_property p " +
-                "JOIN ecos_ontology_entity e ON p.entity_id = e.id " +
-                "WHERE e.code = ? AND p.function_type IS NOT NULL AND p.function_type <> ''",
-                (rs, rn) -> {
-                    OntologyProperty p = new OntologyProperty();
-                    p.setId(rs.getString("id"));
-                    p.setEntityId(rs.getString("entity_id"));
-                    p.setCode(rs.getString("code"));
-                    p.setName(rs.getString("name"));
-                    p.setPropertyType(rs.getString("property_type"));
-                    p.setFunctionType(rs.getString("function_type"));
-                    p.setFunctionExpression(rs.getString("function_expression"));
-                    return p;
-                }, entityCode);
+            return dao.findFunctionProperties(entityCode);
         } catch (Exception e) {
             log.warn("Failed to find function properties for entity {}: {}", entityCode, e.getMessage());
             return List.of();
