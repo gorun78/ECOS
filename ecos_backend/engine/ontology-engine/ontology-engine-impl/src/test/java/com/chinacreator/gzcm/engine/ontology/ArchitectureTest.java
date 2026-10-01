@@ -64,7 +64,8 @@ public class ArchitectureTest {
             .should().haveSimpleNameStartingWith("I")
             .orShould().haveSimpleNameStartingWith("Knowledge")  // kb-engine legacy
             .orShould().haveSimpleNameStartingWith("Causal")     // cognitive-engine legacy
-            .orShould().haveSimpleNameStartingWith("Engine");    // IEngine variants
+            .orShould().haveSimpleNameStartingWith("Engine")    // IEngine variants
+            .orShould().haveSimpleNameStartingWith("Lineage");   // DatNetLineageGuard 血缘列供给抽象（F03-03 V3）
         rule.allowEmptyShould(true).check(classes);
     }
 

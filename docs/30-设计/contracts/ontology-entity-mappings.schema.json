@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ecos-ontology-entity-mappings",
+  "title": "ECOS ontology entity-mappings frozen contract (F03-05)",
+  "description": "Frozen response-shape contract for GET /api/v1/ontology/entity-mappings (REQ-ONTO-03, F03-05). Fields are additive-only: removing/renaming/changing any of the required entries listed here must fail the build (EntityMappingContractFrozenTest). The response is wrapped by ApiResponse { code: 0, data: [ ... this schema ... ] }.",
+  "type": "array",
+  "minItems": 0,
+  "items": {
+    "type": "object",
+    "required": ["entityCode", "datasetId", "resourceName", "materialized", "fieldMappings"],
+    "properties": {
+      "entityCode": {
+        "description": "Owning ontology entity type code (e.g. Project, Customer, Contract).",
+        "type": "string",
+        "minLength": 1
+      },
+      "datasetId": {
+        "description": "Backing dataset / data-resource identifier in the data-engine; null allowed for unmaterialised contracts.",
+        "type": ["string", "null"]
+      },
+      "resourceName": {
+        "description": "Physical / logical resource name as registered in the data-engine catalog (e.g. ecos_biz_stage_fact).",
+        "type": ["string", "null"]
+      },
+      "materialized": {
+        "description": "Q2_SKIP pipeline flag. null / \"\" / \"true\" / \"1\" => materialize (load); any other value => skip. Locked by KbMappingSkipTest.",
+        "type": ["string", "null"]
+      },
+      "fieldMappings": {
+        "description": "Column-level mapping entries; at least one entry is required for a materialised entity.",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["entityField", "physicalColumn"],
+          "properties": {
+            "entityField": {
+              "description": "Logical field name on the ontology entity (camelCase dot-ok).",
+              "type": "string",
+              "minLength": 1
+            },
+            "physicalColumn": {
+              "description": "Physical column name on the fact table (snake_case). Missing/renamed column vs. the frozen fact schema yields INVALID_MAPPING.",
+              "type": "string",
+              "minLength": 1
+            },
+            "transform": {
+              "description": "Optional SQL transformation applied to the physical column during instance extraction (e.g. COALESCE(x, 0)); null = raw parity.",
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

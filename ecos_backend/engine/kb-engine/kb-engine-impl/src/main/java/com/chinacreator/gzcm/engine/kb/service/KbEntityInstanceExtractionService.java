@@ -94,10 +94,7 @@ public class KbEntityInstanceExtractionService {
     /** data-engine 跨引擎取数 base URL 覆写（可覆写显式配置，默认空 = 走 resolver；F02-15 ①）。 */
     private final String datanetBaseUrlOverride;
 
-    /** data-engine engine-api base 覆写（同上；ontology-engine REST 既有姿态保留）。 */
-    private final String ontologyApiBase;
-
-    /** 跨引擎 base URL 唯一寻址出口（optional；缺席时 datanet 寻址 fail-loud + ontology 回落既有配置）。 */
+    /** 跨引擎 base URL 唯一寻址出口（optional；缺席时 datanet / ontology 寻址均 fail-loud）。 */
     @Autowired(required = false)
     private ServiceEndpointResolver endpointResolver;
 
@@ -107,12 +104,10 @@ public class KbEntityInstanceExtractionService {
     public KbEntityInstanceExtractionService(
             JdbcTemplate jdbc,
             RestTemplate restTemplate,
-            @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride,
-            @Value("${ecos.ontology-api-base:http://localhost:8080/api/v1}") String ontologyApiBase) {
+            @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride) {
         this.jdbc = jdbc;
         this.restTemplate = restTemplate;
         this.datanetBaseUrlOverride = datanetBaseUrlOverride;
-        this.ontologyApiBase = ontologyApiBase;
     }
 
     /**
@@ -129,6 +124,22 @@ public class KbEntityInstanceExtractionService {
         return endpointResolver.resolve("datanet", ServiceEndpointResolver.RouteMode.MONOLITH)
                 .orElseThrow(() -> crossEngineUnavailable(
                         "datanet 服务寻址失败（route-manifest 缺 datanet 条目）"));
+    }
+
+    /**
+     * ontology-engine base URL：经 ServiceEndpointResolver 两态寻址（route-manifest owner=buszhi）；
+     * resolver bean 缺席 → fail-loud（本体集成硬依赖，禁自拼 / 回落 :8080 自环，O-6/W84）；
+     * bean 在场但 route-manifest 缺条 → 回落 gateway 兜底 base（保留历史默认）。
+     */
+    private String ontologyBase() {
+        if (endpointResolver == null) {
+            // FAIL-LOUD: required for ontology integration
+            throw new IllegalStateException(
+                    "ECOS-KB-404: ServiceEndpointResolver not wired; kb cannot reach ontology entity-mappings endpoint");
+        }
+        return endpointResolver.resolve("buszhi", ServiceEndpointResolver.RouteMode.MONOLITH)
+                .map(s -> s + "/api/v1")
+                .orElse("http://localhost:8080/api/v1");
     }
 
     /** 跨引擎取数依赖不可用 → fail-loud 503 + ECOS-DATA-041（禁静默空值，D-14）。
@@ -622,7 +633,7 @@ public class KbEntityInstanceExtractionService {
     /** 拉本体映射契约（含 materialized）；失败记告警不抛，返回空列表。 */
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> loadEntityMappings(String ontologyId, EntityInstanceExtractionReportVO report) {
-        String url = ontologyApiBase + "/ontology/entity-mappings?ontologyId=" + encode(ontologyId);
+        String url = ontologyBase() + "/ontology/entity-mappings?ontologyId=" + encode(ontologyId);
         try {
             Map<String, Object> body = restTemplate.getForObject(url, Map.class);
             Object data = body == null ? null : body.get("data");
@@ -642,7 +653,7 @@ public class KbEntityInstanceExtractionService {
     @SuppressWarnings("unchecked")
     private Map<String, String> loadEntityAliases(String ontologyId, EntityInstanceExtractionReportVO report) {
         Map<String, String> aliases = new LinkedHashMap<>();
-        String url = ontologyApiBase + "/ecos/ontologies/" + encode(ontologyId) + "/entities";
+        String url = ontologyBase() + "/ecos/ontologies/" + encode(ontologyId) + "/entities";
         try {
             Map<String, Object> body = restTemplate.getForObject(url, Map.class);
             Object data = body == null ? null : body.get("data");
@@ -673,7 +684,7 @@ public class KbEntityInstanceExtractionService {
     private List<RelationDef> loadRelationDefs(String ontologyId, Map<String, String> refToCode,
                                                EntityInstanceExtractionReportVO report) {
         List<RelationDef> defs = new ArrayList<>();
-        String url = ontologyApiBase + "/ecos/ontologies/" + encode(ontologyId) + "/relationships";
+        String url = ontologyBase() + "/ecos/ontologies/" + encode(ontologyId) + "/relationships";
         try {
             Map<String, Object> body = restTemplate.getForObject(url, Map.class);
             Object data = body == null ? null : body.get("data");

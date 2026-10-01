@@ -103,6 +103,14 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- 测试 — 源码扫描架构守卫（W88/BuszhiComponentScanBoundaryTest）
+             版本由父 POM dependencyManagement 管理，不引入新三方库 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

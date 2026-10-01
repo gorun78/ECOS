@@ -17,6 +17,9 @@ public class WorkflowEntity {
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer isDeleted = 0;
+    private String domain = "default";
+    private String versionNo = "1";
 
     public WorkflowEntity() {}
 
@@ -49,4 +52,13 @@ public class WorkflowEntity {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Integer getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Integer isDeleted) { this.isDeleted = isDeleted; }
+
+    public String getDomain() { return domain; }
+    public void setDomain(String domain) { this.domain = domain; }
+
+    public String getVersionNo() { return versionNo; }
+    public void setVersionNo(String versionNo) { this.versionNo = versionNo; }
 }

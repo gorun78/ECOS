@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -81,14 +81,15 @@ public class SecurityEngineClient {
     private final int timeoutMs;
 
     /**
-     * 可选 — 容器中存在 KafkaTemplate Bean 时注入（反射访问容忍 classpath 差异）。
-     * <p>PMO-55 E-A 修复：限定 @Qualifier("kafkaTemplate")，否则 Object 类型 byType 解析
-     * 把容器内所有 bean 当作候选，触发 NoUniqueBeanDefinitionException。
-     * required=false 保证 Kafka 未配置时静默拿到 null。</p>
+     * 可选 — runtime 统一事件总线（铁律 §2.5 公共底座）。
+     * <p>O-25/W89 修复：原先以 Object 类型 Bean + 反射元数据查找方式直连
+     * spring-kafka KafkaTemplate（该写法对 import 图检查不可见，且 bean 缺失时
+     * 静默丢审计事件）。现收敛到 runtime-event {@link EventBusService}（Kafka 在 →
+     * 入 topic；不在 → 内存 fallback），required=false 保证 runtime-event 未装配时
+     * 静默拿到 null，audit 仅记 error 不抛。</p>
      */
     @Autowired(required = false)
-    @org.springframework.beans.factory.annotation.Qualifier("kafkaTemplate")
-    private Object kafkaTemplateBean;
+    private EventBusService eventBus;
 
     /** 可选 — RestTemplate 来自 buszhi/gateway 全局 */
     private final RestTemplate serviceRestTemplate;
@@ -268,8 +269,12 @@ public class SecurityEngineClient {
     // ═══════════════ 5. 审计 — Kafka ecos.audit ═══════════════
 
     /**
-     * 审计事件 — 发 Kafka {@link KafkaTopics#AUDIT} topic（common-api 常量）
-     * <p>不阻塞主流程，失败仅 warn。</p>
+     * 审计事件 — 经 runtime-event {@link EventBusService#publish} 发 {@link KafkaTopics#AUDIT}
+     * topic（common-api 常量）。
+     * <p>不阻塞主流程：bean 缺失或 publish 抛错仅记 error，不影响业务主流程（O-25/W89）。
+     * 引擎内禁止 new KafkaTemplate 或以反射元查找方式直接调用其发送方法；此类基础设施
+     * 一律收敛于 runtime-event {@link EventBusService}，源码级门禁见
+     * {@code ReflectiveKafkaBypassArchTest}。</p>
      */
     public void audit(String action, Object result) {
         try {
@@ -282,25 +287,15 @@ public class SecurityEngineClient {
             event.put("action", action);
             event.put("resource", "ontology");
             event.put("result", result == null ? "OK" : String.valueOf(result));
-            if (kafkaTemplateBean == null) {
-                log.warn("SecurityEngineClient.audit: KafkaTemplate 不可用，审计事件仅记日志: action={} userId={}",
+            if (eventBus == null) {
+                log.error("SecurityEngineClient.audit: EventBusService 未装配（runtime-event 缺失），审计事件仅记日志(数据丢失风险): action={} userId={}",
                         action, currentUserIdOrAnonymous());
                 return;
             }
-            // 通过反射调用 KafkaTemplate.send(String, Object) 容忍 classpath 差异
-            Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
-            Object future = send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
-            if (future instanceof java.util.concurrent.CompletableFuture<?> cf) {
-                cf.whenComplete((r, ex) -> {
-                    if (ex != null) {
-                        log.warn("SecurityEngineClient.audit async failed: action={} reason={}",
-                                action, ex.getMessage());
-                    }
-                });
-            }
+            eventBus.publish(KafkaTopics.AUDIT, event);
         } catch (Exception e) {
-            log.warn("SecurityEngineClient.audit failed: action={} reason={}",
-                    action, e.getMessage());
+            log.error("SecurityEngineClient.audit: 发布审计事件失败: action={} reason={}",
+                    action, e.getMessage(), e);
         }
     }
 

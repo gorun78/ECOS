@@ -1,11 +1,24 @@
 package com.chinacreator.gzcm.sysman.service;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * PortalSearchQueryService — Portal 全局搜索只读查询层（PMO-39 批次2 T4）。
@@ -18,14 +31,32 @@ import java.util.Map;
 @Service
 public class PortalSearchQueryService {
 
+    private static final Logger log = LoggerFactory.getLogger(PortalSearchQueryService.class);
+
+    /** 跨域单点入口（monolith 承流，ADR-15；BC 安全在 monolith 态直打本进程 gateway） */
+    private static final String WORKFLOW_SEARCH_BASE = "http://localhost:8080";
+    private static final int WORKFLOW_SEARCH_TIMEOUT_MS = 3000;
+
     /** 候选 agent 表（历史命名不一，按序探测，首个存在者生效） */
     public static final List<String> AGENT_TABLE_CANDIDATES =
             List.of("ecos_agent", "agent_mesh", "t_agent_mesh", "agent");
 
     private final JdbcTemplate jdbc;
+    private final RestTemplate workflowSearchHttpClient;
 
-    public PortalSearchQueryService(JdbcTemplate jdbc) {
+    public PortalSearchQueryService(JdbcTemplate jdbc,
+                                    Optional<RestTemplate> workflowSearchHttpClient) {
         this.jdbc = jdbc;
+        // 共享 RestTemplate 存在则复用；否则内联建带超时的短命 RestTemplate 兜底
+        this.workflowSearchHttpClient = workflowSearchHttpClient
+                .orElseGet(PortalSearchQueryService::newWorkflowSearchHttpClient);
+    }
+
+    private static RestTemplate newWorkflowSearchHttpClient() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(WORKFLOW_SEARCH_TIMEOUT_MS);
+        factory.setReadTimeout(WORKFLOW_SEARCH_TIMEOUT_MS);
+        return new RestTemplate(factory);
     }
 
     /** agent 只读检索（实体级，关键词过滤；表不存在时降级为空列表） */
@@ -46,14 +77,34 @@ public class PortalSearchQueryService {
 
     /** workflow 只读检索 */
     public List<Map<String, Object>> searchWorkflows(String keyword) {
+        // 跨域入口（F03-14 / W88/铁律 IR01：域表只由本域引擎访问）：
+        // 改经 buszhi REST 单点，禁止直查 buszhi 域表。
         try {
-            return jdbc.queryForList("""
-                    SELECT id, name, description, status
-                    FROM ecos_workflow_v2
-                    WHERE name LIKE ? OR description LIKE ?
-                    LIMIT 20
-                    """, "%" + keyword + "%", "%" + keyword + "%");
+            URI uri = UriComponentsBuilder.fromHttpUrl(WORKFLOW_SEARCH_BASE)
+                    .path("/api/v1/ontology/workflows")
+                    .queryParam("keyword", keyword)
+                    .queryParam("limit", 20)
+                    .build(true)
+                    .toUri();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Accept", "application/json");
+            ResponseEntity<List> response = workflowSearchHttpClient.exchange(
+                    uri, HttpMethod.GET, new HttpEntity<>(headers), List.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return List.of();
+            }
+            List<Map<String, Object>> mapped = new ArrayList<>();
+            for (Object row : response.getBody()) {
+                if (row instanceof Map<?, ?> m) {
+                    Map<String, Object> converted = new LinkedHashMap<>();
+                    m.forEach((k, v) -> converted.put(String.valueOf(k), v));
+                    mapped.add(converted);
+                }
+            }
+            return mapped;
         } catch (Exception e) {
+            // buszhi 不可达/超时：门户搜索优雅降级为空列表（不静默吞数据，只呈现空直至 buszhi 就绪）
+            log.error("searchWorkflows REST 调用失败，降级为空列表: {}", e.getMessage(), e);
             return List.of();
         }
     }

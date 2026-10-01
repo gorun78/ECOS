@@ -16,6 +16,8 @@ public class OntologyVersion {
     private String publisher;
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
+    /** F03-15 / W83：Git 归档成功后回填；在用作归档指针（R-5③：历史内容从 DB 迁 Git）。 */
+    private String gitRef;
 
     public OntologyVersion() {}
 
@@ -45,4 +47,7 @@ public class OntologyVersion {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getGitRef() { return gitRef; }
+    public void setGitRef(String gitRef) { this.gitRef = gitRef; }
 }

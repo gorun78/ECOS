@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +30,7 @@ import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVerifyVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
+import com.chinacreator.gzcm.engine.ontology.service.PublishGateService;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -74,20 +76,55 @@ public class OntologyProposalController {
     public static final String STATUS_APPROVED = "APPROVED";
     public static final String STATUS_REJECTED = "REJECTED";
     public static final String STATUS_EXECUTED = "EXECUTED";
+    /** F03-08：verify 成功后的「已验证」态（大写口径统一；旧代码误写小写 "verified"）。 */
+    public static final String STATUS_VERIFIED = "VERIFIED";
 
     /** 终态集合：不可再变更 */
     private static final Set<String> TERMINAL_STATUSES = Set.of(STATUS_APPROVED, STATUS_REJECTED, STATUS_EXECUTED);
 
+    /**
+     * F03-08 / V174 §A —— {@code /execute} 允许的状态白名单。
+     * <p>移除 PENDING（原 bug：未审批即可直接执行）。仅已审批 / 已验证可执行；
+     * PENDING 直达命中 409 ECOS-ONTO-012（见 {@link #executeProposal}）。</p>
+     */
+    private static final Set<String> ALLOWED_FOR_EXECUTE = Set.of(STATUS_VERIFIED, STATUS_APPROVED);
+
+    /**
+     * IR04 显式列清单（替代旧 {@code SELECT * FROM ecos_ontology_proposals}）。
+     * 字段顺序与 {@link #toVO} 读取一致。
+     */
+    private static final String ID_COLUMNS =
+            "id, domain_code, proposal_type, target_entity, payload, snapshot, status, "
+                    + "author, reviewer, reviewer_comment, version_id, optimistic_lock_version, "
+                    + "created_at, updated_at";
+
+    /** 提案表裸表名（Controller 直拼 SQL 用；持久化主力在 {@link OntologyProposalService}）。 */
+    private static final String TABLE = "ecos_ontology_proposals";
+
+    /** 控制域 schema（ST07 / §四附则1）。 */
+    private final String schema;
+
     private final OntologyProposalService proposalService;
     private final OntologyVersionService versionService;
     private final OntologyService ontologyService;
+    /** W75 F03-03 发布门禁编排器：execute / approve-and-publish 前置守卫。 */
+    private final PublishGateService publishGate;
 
     public OntologyProposalController(OntologyProposalService proposalService,
                                        OntologyVersionService versionService,
-                                       OntologyService ontologyService) {
+                                       OntologyService ontologyService,
+                                       PublishGateService publishGate,
+                                       @Value("${ecos.ontology.control-schema:ecos_ontology}") String schema) {
         this.proposalService = proposalService;
         this.versionService = versionService;
         this.ontologyService = ontologyService;
+        this.publishGate = publishGate;
+        this.schema = schema;
+    }
+
+    /** schema 限定表名（§四附则1）；供 Controller 直拼 SQL 片段。 */
+    private String qualifiedTable() {
+        return schema + "." + TABLE;
     }
 
     // ═══════════════ 提案 CRUD ═══════════════════
@@ -210,11 +247,16 @@ public class OntologyProposalController {
             }
         }
 
-        proposalService.insertProposal(domainCode, proposalType, targetEntity, payloadJson,
+        // W72：主键应用侧生成 UUID（insertProposal 返回落库 id），查询刚插入记录返回详情。
+        String newId = proposalService.insertProposal(domainCode, proposalType, targetEntity, payloadJson,
                 snapshotJson, STATUS_DRAFT, author);
 
-        // 查询刚插入的记录获取自增ID
-        Map<String, Object> created = proposalService.findCreatedProposal();
+        Map<String, Object> created = proposalService.findProposalById(newId);
+        if (created == null) {
+            created = new LinkedHashMap<>();
+            created.put("id", newId);
+            created.put("status", STATUS_DRAFT);
+        }
 
         log.info("Ontology proposal created: {} [{}] proposalType={}", created.get("id"), proposalType, proposalType);
         return ApiResponse.success(toVO(created));
@@ -242,8 +284,8 @@ public class OntologyProposalController {
                             + ", only DRAFT proposals can be edited");
         }
 
-        // 构建更新（按 DTO 字段非空判定 → 拼 SQL）
-        StringBuilder sql = new StringBuilder("UPDATE ecos_ontology_proposals SET updated_at=NOW()");
+        // 构建更新（按 DTO 字段非空判定 → 拼 SQL；不含 WHERE，委托 updateProposal 统一追加）
+        StringBuilder sql = new StringBuilder("UPDATE " + qualifiedTable() + " SET updated_at=NOW()");
         List<Object> params = new ArrayList<>();
 
         if (dto.getDomainCode() != null) {
@@ -268,7 +310,7 @@ public class OntologyProposalController {
         }
         if (dto.getPayload() != null) {
             try {
-                sql.append(", payload=?::jsonb");
+                sql.append(", payload=?");
                 Object p = dto.getPayload();
                 params.add(p instanceof String s ? s : MAPPER.writeValueAsString(p));
             } catch (JsonProcessingException e) {
@@ -277,16 +319,13 @@ public class OntologyProposalController {
         }
         if (dto.getSnapshot() != null) {
             try {
-                sql.append(", snapshot=?::jsonb");
+                sql.append(", snapshot=?");
                 Object s = dto.getSnapshot();
                 params.add(s instanceof String str ? str : MAPPER.writeValueAsString(s));
             } catch (JsonProcessingException e) {
                 // ignore snapshot serialization error
             }
         }
-
-        sql.append(" WHERE id=?::bigint");
-        params.add(id);
 
         Map<String, Object> updated = proposalService.updateProposal(id, sql, params);
         log.info("Ontology proposal updated: {}", id);
@@ -362,7 +401,8 @@ public class OntologyProposalController {
             String id, String expectedFrom, String target, OntologyProposalSaveDTO body) {
         Map<String, Object> existing;
         try {
-            existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+            existing = proposalService.queryForMap(
+                    "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
         } catch (EmptyResultDataAccessException e) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
@@ -397,7 +437,7 @@ public class OntologyProposalController {
             }
         }
 
-        StringBuilder sql = new StringBuilder("UPDATE ecos_ontology_proposals SET status=?, updated_at=NOW()");
+        StringBuilder sql = new StringBuilder("UPDATE " + qualifiedTable() + " SET status=?, updated_at=NOW()");
         List<Object> params = new ArrayList<>();
         params.add(target);
 
@@ -411,13 +451,13 @@ public class OntologyProposalController {
             params.add(body.getReviewComment());
         }
 
-        sql.append(" WHERE id=?::bigint");
+        sql.append(" WHERE id=?");
         params.add(id);
 
         proposalService.update(sql.toString(), params.toArray());
 
         Map<String, Object> updated = proposalService.queryForMap(
-                "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+                "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
         log.info("Ontology proposal {} transition: {} → {}", id, expectedFrom, target);
         return ApiResponse.success(toVO(updated));
     }
@@ -433,7 +473,8 @@ public class OntologyProposalController {
     public ApiResponse<OntologyProposalVerifyVO> verifyProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
-            existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+            existing = proposalService.queryForMap(
+                    "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
         } catch (EmptyResultDataAccessException e) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
@@ -490,14 +531,15 @@ public class OntologyProposalController {
             valid = false;
         }
 
-        // 更新提案状态为 verified / rejected
-        String newStatus = valid ? "verified" : STATUS_REJECTED;
-        proposalService.update("UPDATE ecos_ontology_proposals SET status=? WHERE id=?::bigint", newStatus, id);
+        // 更新提案状态为 VERIFIED / REJECTED（F03-08：大写口径统一，旧 "verified" 小写弃用）
+        String newStatus = valid ? STATUS_VERIFIED : STATUS_REJECTED;
+        proposalService.update("UPDATE " + qualifiedTable() + " SET status=? WHERE id=?", newStatus, id);
 
         OntologyProposalVerifyVO vo = new OntologyProposalVerifyVO();
         vo.setValid(valid);
         vo.setIssues(issues);
-        vo.setProposal(proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id));
+        vo.setProposal(proposalService.queryForMap(
+                "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id));
         log.info("Proposal {} verified: valid={}", id, valid);
         return ApiResponse.success(vo);
     }
@@ -509,16 +551,27 @@ public class OntologyProposalController {
     public ApiResponse<OntologyProposalVO> executeProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
-            existing = proposalService.queryForMap("SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+            existing = proposalService.queryForMap(
+                    "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
         } catch (EmptyResultDataAccessException e) {
             return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
         }
 
         String status = String.valueOf(existing.get("status"));
-        if (!"verified".equalsIgnoreCase(status) && !STATUS_APPROVED.equalsIgnoreCase(status)
-                && !STATUS_PENDING.equalsIgnoreCase(status)) {
-            return ApiResponse.badRequest(
-                    "ONT-004: Proposal must be verified/approved/pending to execute, current: " + status);
+        if (!ALLOWED_FOR_EXECUTE.contains(status.toUpperCase())) {
+            // F03-08 (W74/C58)：PENDING 直达 = 绕过审批。设计口径 409；ApiResponse 无 conflict() 工厂方法，
+            // 用 error(409, msg) 保留 409 HTTP 语义 + ECOS-ONTO-012 错误码（fidelity gap 见类注释）。
+            if (STATUS_PENDING.equalsIgnoreCase(status)) {
+                return ApiResponse.error(409,
+                        "ECOS-ONTO-012: proposal must be VERIFIED or APPROVED, not PENDING (bypassing review)");
+            }
+            return ApiResponse.badRequest("ECOS-ONTO-012: proposal status " + status + " not executable");
+        }
+
+        // W75 F03-03 发布门禁：状态校验之后、executeAndPublish 之前（stage + fail-closed）。
+        ApiResponse<OntologyProposalVO> gate = PublishGateService.toApiResponse(publishGate.validate(existing));
+        if (gate != null) {
+            return gate;
         }
 
         // 真正执行 payload（建版本 → 执行变更 → 发布版本 → 回填 EXECUTED），
@@ -531,7 +584,7 @@ public class OntologyProposalController {
         }
 
         Map<String, Object> updated = proposalService.queryForMap(
-                "SELECT * FROM ecos_ontology_proposals WHERE id=?::bigint", id);
+                "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
         return ApiResponse.success(toVO(updated));
     }
 
@@ -584,6 +637,12 @@ public class OntologyProposalController {
         String reviewerComment = body != null && body.getReviewComment() != null ? body.getReviewComment() : "";
 
         proposalService.approve(id, STATUS_APPROVED, reviewer, reviewerComment);
+
+        // W75 F03-03 发布门禁：approve 之后、executeAndPublish 之前（stage + fail-closed）。
+        ApiResponse<OntologyProposalPublishVO> gate = PublishGateService.toApiResponse(publishGate.validate(proposal));
+        if (gate != null) {
+            return gate;
+        }
 
         // 3-6. 建版本 → 执行变更 → 发布 → 回填 EXECUTED（与 execute 端点同一闭环）
         String versionIdStr;

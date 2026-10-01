@@ -89,6 +89,18 @@ public class OntologyVersionRepository {
     }
 
     /**
+     * F03-15 (W83)：Git 归档成功/入补偿失败时回填 git_ref。
+     *
+     * <p>additive only；V170.1 已为 public / ecos_ontology 双侧补列（Bearer=true）。
+     * 与 `is_deleted=0` 前提下更新（软删行不再回写）。
+     */
+    public int setGitRef(String id, String gitRef) {
+        return jdbc.update(
+            "UPDATE ecos_ontology_version SET git_ref = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0",
+            gitRef, id);
+    }
+
+    /**
      * 逻辑删除 version (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。
      * is_deleted / update_time / update_by 列由 V120__ecos_ontology_wave31_fallback.sql
      * 建表时补齐 (ecos_ontology_version 历史无 schema, 本 bundle 首次建表)。

@@ -36,6 +36,8 @@ import { InterfaceView, SharedPropertyView, DatasetView } from './ontology/Other
 import GlossaryTab from './knowledge/tabs/GlossaryTab';
 import ObjectExplorerView from './ObjectExplorerView';
 import ProposalPanel from './ontology/ProposalPanel';
+import CaliberPage from './ontology/caliber';
+import FunctionAuditPage from './ontology/function-audit';
 
 import {
   createEntity,
@@ -63,7 +65,7 @@ import type { CreateExportDTO } from '../types/ontology';
 import { useOntologyData } from '../hooks/useOntologyData';
 import type { Entity } from '../types/workbench';
 
-type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
+type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit';
 type CreatableType = 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function';
 
 export default function OntologyWorkbenchLayout() {
@@ -438,7 +440,9 @@ export default function OntologyWorkbenchLayout() {
              selectedCategory === 'interface' ? t('ow.nav.interface') :
              selectedCategory === 'shared_property' ? t('ow.nav.shared_property') :
              selectedCategory === 'dataset' ? t('ow.nav.dataset') :
-             selectedCategory === 'glossary' ? t('ow.nav.glossary') : ''}
+             selectedCategory === 'glossary' ? t('ow.nav.glossary') :
+             selectedCategory === 'caliber' ? t('ow.nav.caliber') :
+             selectedCategory === 'function_audit' ? t('ow.nav.functionAudit') : ''}
           </span>
           <div className="flex items-center gap-1.5">
             <button
@@ -637,6 +641,20 @@ export default function OntologyWorkbenchLayout() {
           // h-full + min-h-0：GlossaryManager 是 h-full flex 布局，父级不给确定高度会塌成 0
           <div className="p-4 h-full min-h-0">
             <GlossaryTab />
+          </div>
+        )}
+
+        {/* 口径与指标治理（F03-16 / B.1） */}
+        {selectedCategory === 'caliber' && (
+          <div className="h-full min-h-0">
+            <CaliberPage onToast={showToast} />
+          </div>
+        )}
+
+        {/* Function 审计（F03-16 / B.5） */}
+        {selectedCategory === 'function_audit' && (
+          <div className="h-full min-h-0">
+            <FunctionAuditPage onToast={showToast} />
           </div>
         )}
         </div>

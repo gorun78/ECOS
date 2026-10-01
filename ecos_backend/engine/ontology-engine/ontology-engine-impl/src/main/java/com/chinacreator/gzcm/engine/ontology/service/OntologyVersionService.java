@@ -31,6 +31,7 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyRuleRepository;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyDomainRepository;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyVersionRepository;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
+import com.chinacreator.gzcm.engine.ontology.repository.GitArchivePendingRepository;
 
 /**
  * 版本业务服务 — Snapshot / Publish / Rollback / Diff
@@ -51,63 +52,128 @@ public class OntologyVersionService {
     /** Git 归档通道（runtime GitService 委托）；未装配时为空，发布流程降级为不归档。 */
     private final Optional<OntologyGitService> gitService;
 
-    /** 旧 5 参构造保留（Wave31 单测直接 new；Git 归档默认关闭）。 */
+    /** Git 归档补偿队列入口（W83 新增）；未装配时空 = 归档失败仅日志不补偿。 */
+    private final Optional<GitArchivePendingRepository> gitArchivePending;
+
+    /** 旧 5 参构造保留（Wave31 单测直接 new；Git 归档 + 补偿均默认关闭）。 */
     public OntologyVersionService(OntologyVersionRepository versionRepository,
                                    OntologyRepository ontologyRepository,
                                    OntologyProposalService proposalService,
                                    ApplicationEventPublisher appEventPublisher,
                                    Optional<EventBusService> eventBus) {
         this(versionRepository, ontologyRepository, proposalService, appEventPublisher, eventBus,
-                Optional.empty());
+                Optional.empty(), Optional.empty());
     }
 
-    /** Spring 装配入口（新增 Git 归档通道，API 只增不改）。 */
-    @Autowired
+    /** 6 参数过渡构造（API 只增不改；Wave-N / DI 兼容）。 */
     public OntologyVersionService(OntologyVersionRepository versionRepository,
                                    OntologyRepository ontologyRepository,
                                    OntologyProposalService proposalService,
                                    ApplicationEventPublisher appEventPublisher,
                                    Optional<EventBusService> eventBus,
                                    Optional<OntologyGitService> gitService) {
+        this(versionRepository, ontologyRepository, proposalService, appEventPublisher, eventBus,
+                gitService, Optional.empty());
+    }
+
+    /** Spring 装配入口（F03-15/W83 补齐：git + git_archive_pending 双补偿口）。 */
+    @Autowired
+    public OntologyVersionService(OntologyVersionRepository versionRepository,
+                                   OntologyRepository ontologyRepository,
+                                   OntologyProposalService proposalService,
+                                   ApplicationEventPublisher appEventPublisher,
+                                   Optional<EventBusService> eventBus,
+                                   Optional<OntologyGitService> gitService,
+                                   Optional<GitArchivePendingRepository> gitArchivePending) {
         this.versionRepository = versionRepository;
         this.ontologyRepository = ontologyRepository;
         this.proposalService = proposalService;
         this.appEventPublisher = appEventPublisher;
         this.eventBus = eventBus;
         this.gitService = gitService != null ? gitService : Optional.empty();
+        this.gitArchivePending = gitArchivePending != null ? gitArchivePending : Optional.empty();
     }
 
+    private static final String GIT_REPO_ONTOLOGY = "ontology";
+    private static final String GIT_ASSET_TYPE = "ontology";
+
     /**
-     * 发布成功后委托 runtime Git 归档真实链路（H4-T4 / VG-2，best-effort 不阻塞主流程）。
+     * 发布成功后委托 runtime Git 归档真实链路（H4-T4 / VG-2），并升级为 F03-15 可补偿语义（W83/C66）。
      *
      * <p>内容来源 = 版本快照 {@code snapshot}（{@link #generateSnapshot} 序列化产物）；
      * 仓库仅由服务端逻辑 {@code repositoryId="ontology"} 定位，禁止任何客户端 localPath/gitUrl。
-     * 归档失败/仓库未注册时 {@link OntologyGitService} 内部返回 {@code not_available}，
-     * 此处仅记日志，不影响已提交的发布状态（与事件 fan-out 同降级口径）。
+     *
+     * <p>三态处理（发布与归档分离，均不阻塞/回滚发布）：
+     * <ol>
+     *   <li>{@link OntologyGitArchiveResult#STATUS_COMMITTED}
+     *       → 回填 {@code git_ref}（+ {@code commitId}），版本快照列语义降级为"在用指针"；</li>
+     *   <li>非 COMMITTED（{@code not_available}）或抛异常
+     *       → 写补偿队列 {@code public.ecos_ontology_git_archive_pending}（V170.2），
+     *          由 runtime-task 指数退避重放；<b>git_ref 不回填</b>（禁伪成功），版本 UI 显"待归档"。</li>
+     *   <li>compensation 队列本身写入失败 → 仅记 error 日志，不反噬发布（可用性优先，SLA 归分册 00 C20 底座）。</li>
+     * </ol>
+     * Git 通道未装配（monolith 早期 / 测试）时纯 no-op，与 Wave31 五参构造向后兼容。
      */
     private void archiveToGit(OntologyVersion ver, String actor) {
-        gitService.ifPresent(svc -> {
-            try {
-                OntologyGitArchiveRequest req = new OntologyGitArchiveRequest();
-                req.setRepositoryId("ontology");
-                req.setAssetType("ontology");
-                req.setAssetId(ver.getOntologyId());
-                req.setVersionNo(ver.getVersionNo());
-                req.setContent(ver.getSnapshot());
-                req.setCommitMessage("Publish ontology " + ver.getOntologyId() + " " + ver.getVersionNo());
-                req.setAuthorName(actor == null || actor.isBlank() ? "system" : actor);
-                OntologyGitArchiveResult r = svc.archiveVersion(req);
-                if (r == null || !OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())) {
-                    log.info("Git 归档未落地（best-effort）: ontologyId={} version={} status={} reason={}",
-                        ver.getOntologyId(), ver.getVersionNo(),
-                        r == null ? "null" : r.getStatus(),
-                        r == null ? "null result" : r.getReason());
+        if (gitService.isEmpty()) {
+            return;
+        }
+        String actorNorm = (actor == null || actor.isBlank()) ? "system" : actor;
+        String commitMessage = "Publish ontology " + ver.getOntologyId() + " " + ver.getVersionNo();
+        try {
+            OntologyGitArchiveRequest req = new OntologyGitArchiveRequest();
+            req.setRepositoryId(GIT_REPO_ONTOLOGY);
+            req.setAssetType(GIT_ASSET_TYPE);
+            req.setAssetId(ver.getOntologyId());
+            req.setVersionNo(ver.getVersionNo());
+            req.setContent(ver.getSnapshot());
+            req.setCommitMessage(commitMessage);
+            req.setAuthorName(actorNorm);
+            OntologyGitArchiveResult r = gitService.get().archiveVersion(req);
+            if (r != null && OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())) {
+                String ref = r.getCommitId() != null ? r.getCommitId() : r.getTag();
+                if (ref != null && !ref.isBlank()) {
+                    versionRepository.setGitRef(ver.getId(), ref);
                 }
-            } catch (Exception e) {
-                log.error("Git 归档异常（best-effort，不影响发布）: ontologyId={} version={}",
-                    ver.getOntologyId(), ver.getVersionNo(), e);
+                return;
             }
-        });
+            log.warn("Git 归档未 COMMITTED，入补偿队列: ontologyId={} version={} status={} reason={}",
+                    ver.getOntologyId(), ver.getVersionNo(),
+                    r == null ? "null" : r.getStatus(),
+                    r == null ? "null result" : r.getReason());
+            enqueueArchivePending(ver, commitMessage, actorNorm,
+                    r == null ? "null result" : r.getReason());
+        } catch (Exception e) {
+            log.warn("Git 归档异常，入补偿队列: ontologyId={} version={} err={}",
+                    ver.getOntologyId(), ver.getVersionNo(), e.getMessage());
+            enqueueArchivePending(ver, commitMessage, actorNorm,
+                    e.getClass().getSimpleName() + ":" + e.getMessage());
+        }
+    }
+
+    /**
+     * F03-15 (W83)：归档未落地时入补偿队列（不阻塞发布）。
+     *
+     * <p>队列表未装配或入队异常都仅记日志——补偿是<b>增强</b>而非发布前置，
+     * 缺补偿不影响发布正确性（版本行依然 Published），仅"历史内容走 Git"这一 SLA 需人工补归档。
+     */
+    private void enqueueArchivePending(OntologyVersion ver, String commitMessage,
+                                       String actor, String reason) {
+        if (gitArchivePending.isEmpty()) {
+            log.error("Git 归档失败但补偿队列未装配（跳过）: ontologyId={} version={} reason={}",
+                    ver.getOntologyId(), ver.getVersionNo(), reason);
+            return;
+        }
+        try {
+            String queueId = gitArchivePending.get().enqueue(
+                    ver.getOntologyId(), ver.getId(), ver.getVersionNo(),
+                    GIT_REPO_ONTOLOGY, commitMessage, actor, ver.getSnapshot(), null);
+            log.info("Git 归档已入补偿队列: queueId={} ontologyId={} version={} reason={}",
+                    queueId, ver.getOntologyId(), ver.getVersionNo(), reason);
+        } catch (Exception e) {
+            log.error("Git 归档入补偿队列失败（不阻断发布）: ontologyId={} version={} err={}",
+                    ver.getOntologyId(), ver.getVersionNo(), e.getMessage());
+        }
     }
 
     /** 版本主键：库内最大后缀自增（重启安全）；方法级加锁避免并发取到同一序号。 */

@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.buszhi.workflow;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -12,15 +13,30 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 工作流任务仓库 — ecos_workflow_task 表 CRUD。
+ * 工作流任务仓库 — {@code {schema}.ecos_workflow_task} 表 CRUD（W85）。
+ *
+ * <p>R-7 归属①：schema 由 {@code ecos.ontology.control-schema} 注入（默认 {@code ecos_ontology}）；
+ * 显式列清单，无 {@code SELECT *}；JSON 文本值以 {@code ?} 绑定 String（不再 {@code ?::jsonb}）。
  */
 @Repository
 public class WorkflowTaskRepository {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowTaskRepository.class);
     private final JdbcTemplate jdbc;
+    private final String schema;
 
-    public WorkflowTaskRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public WorkflowTaskRepository(JdbcTemplate jdbc,
+                                  @Value("${ecos.ontology.control-schema:ecos_ontology}") String schema) {
+        this.jdbc = jdbc;
+        this.schema = schema;
+    }
+
+    /** 显式列清单 — 与 V1.1 DDL 一致。 */
+    private static final String COLS = """
+        id, instance_id, node_id, task_type, title, assignee, candidate_users, candidate_roles,
+        status, priority, form_schema, form_data, result, agent_result,
+        due_date, completed_at, completed_by, created_at, updated_at
+        """;
 
     private final RowMapper<WorkflowTaskEntity> ROW_MAPPER = (rs, rowNum) -> {
         WorkflowTaskEntity e = new WorkflowTaskEntity();
@@ -51,44 +67,41 @@ public class WorkflowTaskRepository {
     }
 
     public Optional<WorkflowTaskEntity> findById(String id) {
-        List<WorkflowTaskEntity> list = jdbc.query(
-            "SELECT * FROM ecos_workflow_task WHERE id = ?", ROW_MAPPER, id);
+        String sql = "SELECT " + COLS + " FROM " + schema + ".ecos_workflow_task WHERE id = ?";
+        List<WorkflowTaskEntity> list = jdbc.query(sql, ROW_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public List<WorkflowTaskEntity> findByInstanceId(String instanceId) {
-        return jdbc.query(
-            "SELECT * FROM ecos_workflow_task WHERE instance_id = ? ORDER BY created_at",
-            ROW_MAPPER, instanceId);
+        String sql = "SELECT " + COLS + " FROM " + schema + ".ecos_workflow_task WHERE instance_id = ? ORDER BY created_at";
+        return jdbc.query(sql, ROW_MAPPER, instanceId);
     }
 
     public List<WorkflowTaskEntity> findByAssignee(String assignee, int limit) {
-        return jdbc.query(
-            "SELECT * FROM ecos_workflow_task WHERE assignee = ? ORDER BY created_at DESC LIMIT ?",
-            ROW_MAPPER, assignee, limit);
+        String sql = "SELECT " + COLS + " FROM " + schema + ".ecos_workflow_task WHERE assignee = ? ORDER BY created_at DESC LIMIT ?";
+        return jdbc.query(sql, ROW_MAPPER, assignee, limit);
     }
 
     public List<WorkflowTaskEntity> findByStatus(String status, int limit) {
-        return jdbc.query(
-            "SELECT * FROM ecos_workflow_task WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-            ROW_MAPPER, status, limit);
+        String sql = "SELECT " + COLS + " FROM " + schema + ".ecos_workflow_task WHERE status = ? ORDER BY created_at DESC LIMIT ?";
+        return jdbc.query(sql, ROW_MAPPER, status, limit);
     }
 
     /** 查找待认领的任务（无 assignee + 状态 New） */
     public List<WorkflowTaskEntity> findUnassigned(int limit) {
-        return jdbc.query(
-            "SELECT * FROM ecos_workflow_task WHERE status = 'New' AND assignee IS NULL ORDER BY created_at LIMIT ?",
-            ROW_MAPPER, limit);
+        String sql = "SELECT " + COLS + " FROM " + schema
+            + ".ecos_workflow_task WHERE status = 'New' AND assignee IS NULL ORDER BY created_at LIMIT ?";
+        return jdbc.query(sql, ROW_MAPPER, limit);
     }
 
     public int insert(WorkflowTaskEntity entity) {
         String sql = """
-            INSERT INTO ecos_workflow_task
+            INSERT INTO %s.ecos_workflow_task
             (id, instance_id, node_id, task_type, title, assignee, candidate_users, candidate_roles,
              status, priority, form_schema, form_data, result, agent_result,
              due_date, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?,NOW(),NOW())
-            """;
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())
+            """.formatted(schema);
         return jdbc.update(sql,
             entity.getId(), entity.getInstanceId(), entity.getNodeId(), entity.getTaskType(),
             entity.getTitle(), entity.getAssignee(), entity.getCandidateUsers(), entity.getCandidateRoles(),
@@ -97,26 +110,30 @@ public class WorkflowTaskRepository {
     }
 
     public int claim(String taskId, String assignee) {
-        return jdbc.update(
-            "UPDATE ecos_workflow_task SET assignee = ?, status = 'Assigned', updated_at = NOW() WHERE id = ? AND status = 'New'",
-            assignee, taskId);
+        String sql = """
+            UPDATE %s.ecos_workflow_task SET assignee = ?, status = 'Assigned', updated_at = NOW() WHERE id = ? AND status = 'New'
+            """.formatted(schema);
+        return jdbc.update(sql, assignee, taskId);
     }
 
     public int complete(String taskId, String result, String completedBy) {
-        return jdbc.update(
-            "UPDATE ecos_workflow_task SET status = 'Completed', result = ?::jsonb, completed_by = ?, completed_at = NOW(), updated_at = NOW() WHERE id = ?",
-            result, completedBy, taskId);
+        String sql = """
+            UPDATE %s.ecos_workflow_task SET status = 'Completed', result = ?, completed_by = ?, completed_at = NOW(), updated_at = NOW() WHERE id = ?
+            """.formatted(schema);
+        return jdbc.update(sql, result, completedBy, taskId);
     }
 
     public int transfer(String taskId, String newAssignee) {
-        return jdbc.update(
-            "UPDATE ecos_workflow_task SET assignee = ?, status = 'Transferred', updated_at = NOW() WHERE id = ?",
-            newAssignee, taskId);
+        String sql = """
+            UPDATE %s.ecos_workflow_task SET assignee = ?, status = 'Transferred', updated_at = NOW() WHERE id = ?
+            """.formatted(schema);
+        return jdbc.update(sql, newAssignee, taskId);
     }
 
     public int reject(String taskId, String reason) {
-        return jdbc.update(
-            "UPDATE ecos_workflow_task SET status = 'Rejected', result = ?::jsonb, updated_at = NOW() WHERE id = ?",
-            reason, taskId);
+        String sql = """
+            UPDATE %s.ecos_workflow_task SET status = 'Rejected', result = ?, updated_at = NOW() WHERE id = ?
+            """.formatted(schema);
+        return jdbc.update(sql, reason, taskId);
     }
 }

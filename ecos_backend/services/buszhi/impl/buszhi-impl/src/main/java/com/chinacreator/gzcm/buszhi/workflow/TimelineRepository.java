@@ -45,7 +45,7 @@ public class TimelineRepository {
         try {
             jdbc.update("""
                 INSERT INTO ecos_object_timeline (id, object_id, entity_code, event_type, event_summary, actor, details, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, NOW())
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
                 """, id, objectId, entityCode, eventType, summary, actor,
                 details != null ? toJsonString(details) : null);
             log.debug("Timeline recorded: {} [{}] for {}/{}", id, eventType, entityCode, objectId);

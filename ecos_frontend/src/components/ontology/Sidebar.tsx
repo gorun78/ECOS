@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import { BookOpen, ChevronDown, LayoutDashboard, Plus } from 'lucide-react';
+import { Scale, ScrollText, BookOpen, ChevronDown, LayoutDashboard, Plus } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
@@ -21,7 +21,7 @@ import DomainFormModal from './sidebar/DomainFormModal';
 import SidebarElementSections from './sidebar/SidebarElementSections';
 import CreateElementMenu from './sidebar/CreateElementMenu';
 
-type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
+type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit';
 
 interface SidebarProps {
   objectTypes: ObjectType[];
@@ -38,7 +38,7 @@ interface SidebarProps {
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objects: ObjectType[]) => void;
 
-  selectedCategory: 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary';
+  selectedCategory: SidebarCategory;
   selectedId: string | null;
 
   onSelectCategory: (category: SidebarCategory, id: string | null) => void;
@@ -218,7 +218,7 @@ export default function Sidebar({
       )}
 
       {/* 📖 术语（Glossary）快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
-      <div className={`border-t ${styles.appBorder} px-3 py-3`}>
+      <div className={`border-t ${styles.appBorder} px-3 py-3 space-y-1`}>
         <button
           onClick={() => onSelectCategory('glossary', null)}
           className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
@@ -229,6 +229,30 @@ export default function Sidebar({
         >
           <BookOpen size={14} />
           <span>{t('ow.sidebar.glossary')}</span>
+        </button>
+
+        {/* F03-16: 治理速览入口（口径与指标 / Function 审计） */}
+        <button
+          onClick={() => onSelectCategory('caliber', null)}
+          className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
+            selectedCategory === 'caliber'
+              ? 'bg-emerald-50 text-emerald-700 border-l-2 border-emerald-600'
+              : `${styles.sidebarText} ${styles.sidebarHoverBg}`
+          }`}
+        >
+          <Scale size={14} />
+          <span>{t('ow.sidebar.caliber')}</span>
+        </button>
+        <button
+          onClick={() => onSelectCategory('function_audit', null)}
+          className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
+            selectedCategory === 'function_audit'
+              ? 'bg-violet-50 text-violet-700 border-l-2 border-violet-600'
+              : `${styles.sidebarText} ${styles.sidebarHoverBg}`
+          }`}
+        >
+          <ScrollText size={14} />
+          <span>{t('ow.sidebar.functionAudit')}</span>
         </button>
       </div>
 

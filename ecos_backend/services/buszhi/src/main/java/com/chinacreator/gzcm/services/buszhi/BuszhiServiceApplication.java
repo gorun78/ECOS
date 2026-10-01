@@ -42,9 +42,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // sysman.config.service — CognitiveConfigController 依赖 SysConfigService,
         // 只扫 config 子包避开 sysman 主体 security 域 (避免三滤波器越界)
         "com.chinacreator.gzcm.sysman.config",
-        // engine.data.service — ICopilotService impl (CopilotServiceImpl) in DatEngine,
-        // OntologyCopilotController 依赖 bean (同 workspace-service)
-        "com.chinacreator.gzcm.engine.data.service",
         // 横切底座
         "com.chinacreator.gzcm.runtime"
 }, excludeFilters = {
@@ -67,10 +64,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",
         // runtime.llm.repository 横切底座
-        "com.chinacreator.gzcm.runtime.llm.repository",
-        // engine.data @Mapper 接口 (CopilotServiceImpl 构造器需 DataSourceRepository)
-        "com.chinacreator.gzcm.engine.data.**.repository",
-        "com.chinacreator.gzcm.engine.data.**.mapper"
+        "com.chinacreator.gzcm.runtime.llm.repository"
 })
 public class BuszhiServiceApplication {
 

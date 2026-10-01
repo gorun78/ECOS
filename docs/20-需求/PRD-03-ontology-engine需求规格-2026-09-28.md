@@ -4,7 +4,7 @@
 > 版本: v1.1（**v1.1（2026-09-29 批量批准定版）**：凭证 = [需求检视报告 §十四 14.1](需求检视报告-2026-09-28.md)（批准人 = 用户，依 **Q12** 不补分册 APPROVAL_RECORD）。本册两处更正：**§1.4-V1 按 R-6 ①**——**口径主权归 ontology**，`ecos_metric_definition` 为唯一语义入口（随 **R-4 a+b** 的 `V168`），删除"跨引擎读 workspace 口径服务"的反向依赖表述，PRD-09 FC-01 同步更正（该册 §1.1/§1.3 另按 **R-60 ②** 把 `ecos_fc_caliber` 降为引用视图、禁第五套版本+审批栈）；**§2.1 `caliber_snapshot_json` 按 MC02** 由 `JSONB` 更正为 `TEXT`（数据库访问规范 v1.2 受控 JSON 只准 TEXT）。**"已批准"仅指需求文本生效**：本册 V1~V3 门禁与 `V168` 落地实测为 0，DDL 只落**迁移脚本文件**不实跑库，改业务 Java 代码需逐项再授权（报告 §14.4）；未创建的测试类一律记"未执行"（Q13／铁律 :14））
 > 上游: [PRD-00 总纲](PRD-00-ECOS平台需求规格说明书-2026-09-28.md) · [PRD-01 平台级](PRD-01-平台级与横切需求规格-2026-09-28.md)
 > 覆盖: REQ-ONTO-01~04
-> 模块: `ecos_backend/engine/ontology-engine`（buszhi:18083）
+> 模块: `ecos_backend/engine/ontology-engine`（**ADR-15 双口径**：制品随 `buszhi:18083` 部署，当前*承流*宿主 = `gateway:8080` monolith fat-JAR——与分册 01/02 同款；两态可达性以 `route-manifest` 为单源）
 
 ---
 
@@ -13,6 +13,8 @@
 ### 1.1 需求陈述
 
 在既有 V52 worldmodel 通用元模型（对象类型/关系/指标定义）之上，支持发布**利润形成领域语义**：业务对象关系图 + 指标定义集，并可被 kb 抽取与预测计算消费。不新造元模型——复用提案系统与版本快照机制。
+
+> **v1.2 实测限定（分册 03 §7.2 回写）**：提案控制器（`OntologyProposalController` 六端点）存在但 `ecos_ontology_proposals` 实测 **0 行**（发布流程从未真正跑通）；指标两张表（`ecos_ontology.metric_definition` 0 行 / `public.ecos_biz_metric` 75 行）均**零代码引用**（孤表）；V52 worldmodel 表居 `public`（`ecos_wm_goal` 等），与 ontology 语义表不同族——故"复用"指**控制器/机制框架可复用**，非"既有数据/血缘可直接承载"，落地须按分册 03 W73~W78 补建承载。
 
 ### 1.2 领域对象与关系注册清单（首个领域包 `biz-profit`）
 
@@ -37,7 +39,7 @@
 | CONSUMES | Project → ResourceInput | 1:n |
 | INCURS | Project/Department → *Cost | 1:n |
 
-### 1.3 指标定义集（9 项，逐项登记）
+### 1.3 指标定义集（10 项，逐项登记；v1.2 更正：原表头误写"9 项"，实际列 10 行）
 
 | 指标编码 | 名称 | 公式（口径引用） | 可加性 | 期间 | 单位 |
 |---|---|---|---|---|---|
@@ -53,6 +55,8 @@
 | M_COLLECTION_CYCLE | 回款周期 | 验收月→回款月差（月数，均值聚合） | 不可加 | 季/年 | 月 |
 
 **登记字段（每指标必带）**：编码 / 名称 / 公式表达式 / 可加性（ADDITIVE/SEMI/NON）/ 期间粒度 / 币种 / **caliber_id + formula_version（REQ-ONTO-02）** / 血缘（引用的事实表列 + 上游指标）。
+
+> **v1.2 溯源**：`caliber_id + formula_version` 的**来源裁决** = R-6 ①（口径主权归 ontology，本体是唯一语义入口）——分册 01 落地前的当前时点口径基线不存在，两项字段以「未绑定」状态入表，绑定动作与 `caliber` 实体详见 REQ-ONTO-02 与 F03-01。
 
 ### 1.4 发布流程与校验
 
@@ -102,11 +106,15 @@
 
 ### 3.1 冻结契约（唯一入口 `GET /api/v1/ontology/entity-mappings?ontologyId=`）
 
-**响应字段集冻结（只增不改）**：
+**响应字段集冻结（只增不改）**（v1.2 依分册 03 §7.2 第 7 条：响应包络统一为分册 00 D.5.1 的增量 `ApiResponse`——含 `errorCode`/`timestamp`/`traceId`；`data` 内字段集才是本契约冻结对象）：
 
 ```json
 {
   "code": 0,
+  "errorCode": null,
+  "message": "ok",
+  "timestamp": 1761696000000,
+  "traceId": "9f0d…(8-36位)",
   "data": [{
     "entityCode": "Project",
     "datasetId": "ds-uuid",
@@ -139,7 +147,7 @@
 
 1. 既有红线"无审计日志的 Function 执行拒收"保持；补齐审计落 **Kafka `ecos.audit`**（替代/并存本地日志，事件 schema 见 PRD-01 §3.1）：
    - eventType=`FUNCTION_EXEC`；detail={functionId, expression(截断 512), objectType, params, resultSummary(单值), durationMs, cacheHit}；
-2. 拒绝路径：审计发送失败（Kafka down）→ log 兜底**且允许执行**（与写操作审计口径一致，不阻断）；但**审计上下文缺失**（无 operator/traceId）→ 拒收执行（400）；
+2. 拒绝路径：审计发送失败（Kafka down）→ log 兜底**且允许执行**（与写操作审计口径一致，不阻断）；**若本地兜底写入亦失败 → 拒收（500 `ECOS-ONTO-061`）**（v1.2 依分册 03 §7.2 第 5 条例定，本地 Kafka + 本地表双失败不收为"允许执行"）；但**审计上下文缺失**（无 operator/traceId）→ 拒收执行（400 `ECOS-ONTO-060`）；
 3. 沙箱边界不变：受限 SQL 聚合子集、单表、5s 超时、Caffeine 300s、本体变更主动失效。
 
 ### 4.2 验收
