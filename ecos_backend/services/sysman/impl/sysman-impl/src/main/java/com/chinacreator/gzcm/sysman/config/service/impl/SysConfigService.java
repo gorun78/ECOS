@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.sysman.config.service.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -23,15 +22,15 @@ public class SysConfigService {
 
     private static final Logger log = LoggerFactory.getLogger(SysConfigService.class);
 
-    private final JdbcTemplate jdbcTemplate;
+    private final com.chinacreator.gzcm.sysman.dao.SysConfigDao sysConfigDao;
 
     /** 内存缓存：configKey → config_value (Caffeine，配置常驻不设过期) */
     private final Cache<String, String> cache = Caffeine.newBuilder()
         .maximumSize(1000)
         .build();
 
-    public SysConfigService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public SysConfigService(com.chinacreator.gzcm.sysman.dao.SysConfigDao sysConfigDao) {
+        this.sysConfigDao = sysConfigDao;
     }
 
     // ── 初始化 ──────────────────────────────────────────
@@ -100,15 +99,7 @@ public class SysConfigService {
             {"dw.catalog.search_limit","500","data-engine","int","[迁移]目录搜索限制"},
         };
         try {
-            for (String[] row : defaults) {
-                String label = row[0].contains(".") ? row[0].substring(row[0].lastIndexOf('.') + 1) : row[0];
-                jdbcTemplate.update(
-                    "INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) " +
-                    "VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') " +
-                    "ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description",
-                    row[0], row[1], row[2], row[3], label, row[4]
-                );
-            }
+            sysConfigDao.ensureDefaultConfigs(defaults);
         } catch (Exception e) {
             log.error("初始化默认配置失败: {}", e.getMessage());
         }
@@ -119,9 +110,7 @@ public class SysConfigService {
      */
     public void refreshCache() {
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT config_key, config_value FROM sys_config WHERE status = 'active'"
-            );
+            List<Map<String, Object>> rows = sysConfigDao.listConfigs();
             cache.invalidateAll();
             for (Map<String, Object> row : rows) {
                 String key = (String) row.get("config_key");
@@ -202,32 +191,17 @@ public class SysConfigService {
 
     /** 按分组查询配置列表 */
     public List<Map<String, Object>> listByGroup(String group) {
-        String sql;
-        Object[] args;
-        if (group != null && !group.isEmpty()) {
-            sql = "SELECT * FROM sys_config WHERE config_group = ? AND status = 'active' ORDER BY sort_order";
-            args = new Object[]{group};
-        } else {
-            sql = "SELECT * FROM sys_config WHERE status = 'active' ORDER BY config_group, sort_order";
-            args = new Object[]{};
-        }
-        return jdbcTemplate.queryForList(sql, args);
+        return sysConfigDao.listByGroup(group);
     }
 
     /** 按 key 获取完整配置行 */
     public Map<String, Object> getByKey(String key) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-            "SELECT * FROM sys_config WHERE config_key = ? AND status = 'active'", key
-        );
-        return rows.isEmpty() ? null : rows.get(0);
+        return sysConfigDao.getByKey(key);
     }
 
     /** 更新配置值并刷新缓存 */
     public boolean updateValue(String key, String value) {
-        int rows = jdbcTemplate.update(
-            "UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?",
-            value, key
-        );
+        int rows = sysConfigDao.updateValue(key, value);
         if (rows > 0) {
             cache.put(key, value);
             log.info("配置已更新: {} = {}", key, value);
@@ -239,18 +213,12 @@ public class SysConfigService {
     /** 插入或更新配置值 (SELECT-check + INSERT/UPDATE)，并刷新缓存 */
     public void upsertValue(String configKey, String configValue, String configGroup, String configType, String description) {
         // Check if exists
-        int count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM sys_config WHERE config_key = ?", Integer.class, configKey);
+        int count = sysConfigDao.countByKey(configKey);
         if (count > 0) {
-            jdbcTemplate.update(
-                "UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?",
-                configValue, configKey);
+            sysConfigDao.updateValue(configKey, configValue);
         } else {
             String label = configKey.contains(".") ? configKey.substring(configKey.lastIndexOf('.') + 1) : configKey;
-            jdbcTemplate.update(
-                "INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) " +
-                "VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all')",
-                configKey, configValue, configGroup, configType, label, description);
+            sysConfigDao.insertConfig(configKey, configValue, configGroup, configType, label, description);
         }
         cache.put(configKey, configValue);
     }

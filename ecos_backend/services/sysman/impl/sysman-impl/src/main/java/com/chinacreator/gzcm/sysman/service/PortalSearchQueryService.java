@@ -8,7 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.sysman.dao.PortalSearchQueryDao;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -41,12 +41,12 @@ public class PortalSearchQueryService {
     public static final List<String> AGENT_TABLE_CANDIDATES =
             List.of("ecos_agent", "agent_mesh", "t_agent_mesh", "agent");
 
-    private final JdbcTemplate jdbc;
+    private final PortalSearchQueryDao dao;
     private final RestTemplate workflowSearchHttpClient;
 
-    public PortalSearchQueryService(JdbcTemplate jdbc,
+    public PortalSearchQueryService(PortalSearchQueryDao dao,
                                     Optional<RestTemplate> workflowSearchHttpClient) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         // 共享 RestTemplate 存在则复用；否则内联建带超时的短命 RestTemplate 兜底
         this.workflowSearchHttpClient = workflowSearchHttpClient
                 .orElseGet(PortalSearchQueryService::newWorkflowSearchHttpClient);
@@ -64,7 +64,7 @@ public class PortalSearchQueryService {
         String like = "%" + keyword + "%";
         for (String table : AGENT_TABLE_CANDIDATES) {
             try {
-                return jdbc.queryForList(
+                return dao.queryForList(
                         "SELECT id, name, status FROM " + table
                                 + " WHERE name LIKE ? OR system_prompt LIKE ? LIMIT 20",
                         like, like);
@@ -121,14 +121,14 @@ public class PortalSearchQueryService {
         String tenantId = TenantContextHolder.getTenantId();
         try {
             if (tenantId == null || tenantId.isBlank()) {
-                return jdbc.queryForList("""
+                return dao.queryForList("""
                         SELECT code AS id, name AS term, definition
                         FROM ecos_glossary_term
                         WHERE name LIKE ? OR definition LIKE ?
                         LIMIT 20
                         """, like, like);
             }
-            return jdbc.queryForList("""
+            return dao.queryForList("""
                     SELECT code AS id, name AS term, definition
                     FROM ecos_glossary_term
                     WHERE (name LIKE ? OR definition LIKE ?)
@@ -143,7 +143,7 @@ public class PortalSearchQueryService {
     /** scenario 场景只读检索 */
     public List<Map<String, Object>> searchScenarios(String keyword) {
         try {
-            return jdbc.queryForList("""
+            return dao.queryForList("""
                     SELECT id, name, description
                     FROM ecos_world_scenarios
                     WHERE name LIKE ? OR description LIKE ?

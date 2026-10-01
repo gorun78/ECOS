@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.sysman.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.sysman.dao.ParamTemplateQueryDao;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,10 +22,10 @@ public class ParamTemplateQueryService {
     /** 类目枚举（墓碑表：system/agent/workflow/global 四值锁定） */
     public static final List<String> CATEGORIES = List.of("system", "agent", "workflow", "global");
 
-    private final JdbcTemplate jdbc;
+    private final ParamTemplateQueryDao dao;
 
-    public ParamTemplateQueryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ParamTemplateQueryService(ParamTemplateQueryDao dao) {
+        this.dao = dao;
     }
 
     /** 参数模板列表（category 可选过滤，表缺失/无权限降级空列表） */
@@ -42,7 +42,7 @@ public class ParamTemplateQueryService {
                 params.add(category);
             }
             sql.append(" ORDER BY \"PARAM_NAME\" LIMIT 100");
-            return jdbc.queryForList(sql.toString(), params.toArray());
+            return dao.queryForList(sql.toString(), params.toArray());
         } catch (Exception e) {
             return List.of();
         }
@@ -51,7 +51,7 @@ public class ParamTemplateQueryService {
     /** 单个模板（按 PARAM_ID） */
     public Map<String, Object> get(String paramId) {
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList("""
+            List<Map<String, Object>> rows = dao.queryForList("""
                     SELECT "PARAM_ID" AS id, "PARAM_NAME" AS name,
                            "PARAM_CONTENT" AS content, "PARAM_DESC" AS description,
                            "PARAM_TYPE" AS templateType
@@ -67,7 +67,7 @@ public class ParamTemplateQueryService {
     public Map<String, Object> create(String paramId, String name, Object content,
                                       String description, String category) {
         try {
-            jdbc.update("""
+            dao.update("""
                         INSERT INTO td_system_param
                             ("PARAM_ID", "PARAM_NAME", "PARAM_CONTENT", "PARAM_DESC", "PARAM_TYPE")
                         VALUES (?, ?, ?, ?, ?)
@@ -83,7 +83,7 @@ public class ParamTemplateQueryService {
     /** 更新模板（仅允许改 content/description — 参数只增不改，键名锁定） */
     public boolean update(String paramId, Object content, String description) {
         try {
-            int n = jdbc.update("""
+            int n = dao.update("""
                         UPDATE td_system_param
                         SET "PARAM_CONTENT" = ?, "PARAM_DESC" = ?,
                             "UPDATED_TIME" = NOW()
@@ -99,7 +99,7 @@ public class ParamTemplateQueryService {
     /** 删除模板（软删：清 content 保留行 — DB 铁律只增不删） */
     public boolean delete(String paramId) {
         try {
-            int n = jdbc.update("""
+            int n = dao.update("""
                         UPDATE td_system_param
                         SET "PARAM_CONTENT" = NULL,
                             "PARAM_DESC" = 'DELETED',
@@ -115,7 +115,7 @@ public class ParamTemplateQueryService {
     /** T4 全局搜索用：标题/描述命中才计入 */
     public List<Map<String, Object>> search(String keyword) {
         try {
-            return jdbc.queryForList("""
+            return dao.queryForList("""
                     SELECT "PARAM_ID" AS id, "PARAM_NAME" AS name,
                            "PARAM_DESC" AS description, "PARAM_TYPE" AS templateType
                     FROM td_system_param

@@ -27,7 +27,7 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
 
     private boolean dbAvailable() {
         try {
-            causalQueryService.queryForObject("SELECT 1", Integer.class);
+            causalQueryService.ping();
             return true;
         } catch (Exception e) {
             return false;
@@ -86,27 +86,8 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
             List<Map<String, Object>> edges;
 
             if (dbAvailable()) {
-                nodes = causalQueryService.query(
-                        "SELECT id, name, type, domain_group FROM ecos_causal_node ORDER BY id",
-                        (rs, rowNum) -> {
-                            Map<String, Object> n = new LinkedHashMap<>();
-                            n.put("id", rs.getString("id"));
-                            n.put("name", rs.getString("name"));
-                            n.put("type", rs.getString("type"));
-                            n.put("group", rs.getString("domain_group"));
-                            return n;
-                        });
-                edges = causalQueryService.query(
-                        "SELECT id, source_node_id, target_node_id, weight, edge_type FROM ecos_causal_edge ORDER BY id",
-                        (rs, rowNum) -> {
-                            Map<String, Object> e = new LinkedHashMap<>();
-                            e.put("id", rs.getString("id"));
-                            e.put("source", rs.getString("source_node_id"));
-                            e.put("target", rs.getString("target_node_id"));
-                            e.put("weight", rs.getDouble("weight"));
-                            e.put("type", rs.getString("edge_type"));
-                            return e;
-                        });
+                nodes = causalQueryService.listNodes();
+                edges = causalQueryService.listEdges();
             } else {
                 nodes = new ArrayList<>(nodeStore.values());
                 edges = new ArrayList<>(edgeStore.values());

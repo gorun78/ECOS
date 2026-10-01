@@ -2,12 +2,9 @@ package com.chinacreator.gzcm.sysman.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import com.chinacreator.gzcm.sysman.dao.SecurityPolicyQueryDao;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,52 +36,11 @@ public class SecurityPolicyQueryService {
 
     private static final String TABLE = "ecos_security_policy";
 
-    private static final String COLUMNS = "id, name, domain, policy_expr, priority, "
-            + "create_time, update_time, create_by";
+    private final SecurityPolicyQueryDao dao;
 
-    private final JdbcTemplate jdbc;
-
-    public SecurityPolicyQueryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SecurityPolicyQueryService(SecurityPolicyQueryDao dao) {
+        this.dao = dao;
     }
-
-    // ── RowMapper ──────────────────────────────────────────────
-
-    /** 列表/详情默认行映射：{@code policy_expr} 只出摘要（B12 防原文泄露）。 */
-    private final RowMapper<Map<String, Object>> ROW_MAPPER = (rs, rowNum) -> {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", rs.getString("id"));
-        row.put("name", rs.getString("name"));
-        row.put("domain", rs.getString("domain"));
-        String expr = rs.getString("policy_expr");
-        // B12: 列表/详情默认返摘要（前50字符），防 ABAC 策略原文泄露
-        row.put("policyExprSummary", expr != null && expr.length() > 50 ? expr.substring(0, 50) + "..." : expr);
-        row.put("priority", rs.getInt("priority"));
-        Timestamp ct = rs.getTimestamp("create_time");
-        row.put("createTime", ct != null ? ct.getTime() : null);
-        Timestamp ut = rs.getTimestamp("update_time");
-        row.put("updateTime", ut != null ? ut.getTime() : null);
-        row.put("createBy", rs.getString("create_by"));
-        return row;
-    };
-
-    /** 详情端点专用：含完整 policy_expr（受 security-engine ABAC 评估保护）。 */
-    private final RowMapper<Map<String, Object>> ROW_MAPPER_FULL = (rs, rowNum) -> {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", rs.getString("id"));
-        row.put("name", rs.getString("name"));
-        row.put("domain", rs.getString("domain"));
-        String expr = rs.getString("policy_expr");
-        row.put("policyExpr", expr);
-        row.put("policyExprSummary", expr != null && expr.length() > 50 ? expr.substring(0, 50) + "..." : expr);
-        row.put("priority", rs.getInt("priority"));
-        Timestamp ct = rs.getTimestamp("create_time");
-        row.put("createTime", ct != null ? ct.getTime() : null);
-        Timestamp ut = rs.getTimestamp("update_time");
-        row.put("updateTime", ut != null ? ut.getTime() : null);
-        row.put("createBy", rs.getString("create_by"));
-        return row;
-    };
 
     // ── 查询 ───────────────────────────────────────────────────
 
@@ -94,9 +50,7 @@ public class SecurityPolicyQueryService {
      * @return 策略 Map 列表（永不为 null）
      */
     public List<Map<String, Object>> listAll() {
-        String sql = "SELECT " + COLUMNS + " FROM " + TABLE
-                + " WHERE is_deleted = 0 ORDER BY priority DESC";
-        return jdbc.query(sql, ROW_MAPPER);
+        return dao.listAll();
     }
 
     /**
@@ -106,9 +60,7 @@ public class SecurityPolicyQueryService {
      * @return 命中行；不存在返回 {@code null}
      */
     public Map<String, Object> findSummaryById(String id) {
-        String sql = "SELECT " + COLUMNS + " FROM " + TABLE + " WHERE id = ? AND is_deleted = 0";
-        List<Map<String, Object>> rows = jdbc.query(sql, ROW_MAPPER, id);
-        return rows.isEmpty() ? null : rows.get(0);
+        return dao.findSummaryById(id);
     }
 
     /**
@@ -118,9 +70,7 @@ public class SecurityPolicyQueryService {
      * @return 命中行；不存在返回 {@code null}
      */
     public Map<String, Object> findFullExprById(String id) {
-        String sql = "SELECT " + COLUMNS + " FROM " + TABLE + " WHERE id = ? AND is_deleted = 0";
-        List<Map<String, Object>> rows = jdbc.query(sql, ROW_MAPPER_FULL, id);
-        return rows.isEmpty() ? null : rows.get(0);
+        return dao.findFullExprById(id);
     }
 
     /**
@@ -130,7 +80,7 @@ public class SecurityPolicyQueryService {
      * @return COUNT(1) 结果（理论上非 null，保留 {@code Integer} 以对齐下沉前的 null 判定）
      */
     public Integer countById(String id) {
-        return jdbc.queryForObject(
+        return dao.queryForObject(
                 "SELECT COUNT(1) FROM " + TABLE + " WHERE id = ? AND is_deleted = 0",
                 Integer.class, id);
     }
@@ -151,7 +101,7 @@ public class SecurityPolicyQueryService {
         String sql = "INSERT INTO " + TABLE
                 + " (id, name, domain, policy_expr, priority, create_by, update_by, is_deleted, create_time, update_time)"
                 + " VALUES (?, ?, ?, ?, ?, 'system', 'system', 0, NOW(), NOW())";
-        jdbc.update(sql, id, name, domain, policyExpr, priority);
+        dao.update(sql, id, name, domain, policyExpr, priority);
         log.debug("ecos_security_policy insert ok: id={}, name={}", id, name);
         return id;
     }
@@ -172,7 +122,7 @@ public class SecurityPolicyQueryService {
                     update_by = 'system'
                 WHERE id = ? AND is_deleted = 0
                 """.formatted(TABLE);
-        return jdbc.update(sql, name, domain, policyExpr, priority, id);
+        return dao.update(sql, name, domain, policyExpr, priority, id);
     }
 
     /**
@@ -181,7 +131,7 @@ public class SecurityPolicyQueryService {
      * @return 受影响行数（0 表示不存在或已删除）
      */
     public int logicalDelete(String id) {
-        return jdbc.update(
+        return dao.update(
                 "UPDATE " + TABLE + " SET is_deleted = 1, update_time = NOW() WHERE id = ? AND is_deleted = 0",
                 id);
     }

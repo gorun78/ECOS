@@ -1,30 +1,30 @@
 package com.chinacreator.gzcm.sysman.service;
 
+import com.chinacreator.gzcm.sysman.dao.SysConfigDao;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 /**
  * 系统配置查询服务 — 从 SysConfigController 下沉的 JdbcTemplate 访问。
- * 读写 sys_config 表。SQL 与原 Controller 保持一致。
+ * <p>铁律 §2.5：SQL 与数据访问下沉到 DAO（{@link SysConfigDao}），本类保留 JSONB 反序列化。
  */
 @Service
 public class SysConfigQueryService {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final JdbcTemplate jdbcTemplate;
+    private final SysConfigDao dao;
 
-    public SysConfigQueryService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public SysConfigQueryService(SysConfigDao dao) {
+        this.dao = dao;
     }
 
     /** 数据源是否可用（Controller 依赖此判断以返回兜底空结果） */
     public boolean isAvailable() {
-        return jdbcTemplate != null;
+        return dao != null;
     }
 
     /**
@@ -61,7 +61,7 @@ public class SysConfigQueryService {
             sqlBuilder.append(" ORDER BY config_group, sort_order");
         }
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+        List<Map<String, Object>> rows = dao.queryForList(
                 sqlBuilder.toString(), params.toArray());
 
         // Post-process: parse config_options JSONB → List
@@ -85,7 +85,7 @@ public class SysConfigQueryService {
 
     /** 更新单个配置值；返回受影响行数 */
     public int updateConfigValue(String configKey, String val) {
-        return jdbcTemplate.update(
+        return dao.update(
                 "UPDATE sys_config SET config_value=?, updated_at=NOW() WHERE config_key=?",
                 val, configKey);
     }
@@ -95,20 +95,20 @@ public class SysConfigQueryService {
         String sql = "SELECT id, config_group, config_key, config_value, config_type, " +
                      "config_label, config_label_en, description, impact_scope, edition " +
                      "FROM sys_config ORDER BY config_group, sort_order";
-        return jdbcTemplate.queryForList(sql);
+        return dao.queryForList(sql);
     }
 
     /** 查询用于消费审计的配置项基本信息 */
     public List<Map<String, Object>> queryForAudit() {
         String sql = "SELECT config_key, config_group, config_label, description FROM sys_config ORDER BY config_group, sort_order";
-        return jdbcTemplate.queryForList(sql);
+        return dao.queryForList(sql);
     }
 
     // ── PMO-E2 通用委托方法（供 Controller 调用）──
     public List<Map<String, Object>> queryForList(String sql, Object... args) {
-        return jdbcTemplate.queryForList(sql, args);
+        return dao.queryForList(sql, args);
     }
     public int update(String sql, Object... args) {
-        return jdbcTemplate.update(sql, args);
+        return dao.update(sql, args);
     }
 }

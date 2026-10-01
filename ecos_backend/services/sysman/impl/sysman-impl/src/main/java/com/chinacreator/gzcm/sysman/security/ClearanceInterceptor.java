@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -38,7 +37,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
         {"/api/v1/",          "1"},
     };
 
-    private final JdbcTemplate jdbc;
+    private final com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 可选注入 EventBusService（避免编译期硬依赖 runtime-event / Kafka；不可用时跳过审计）。 */
@@ -47,15 +46,15 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     /** ThreadLocal 保存当前请求，供辅助方法获取 orgId/tenantId */
     private final ThreadLocal<HttpServletRequest> currentRequest = new ThreadLocal<>();
 
-    public ClearanceInterceptor(JdbcTemplate jdbc,
+    public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
                                 org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider) {
-        this.jdbc = jdbc;
+        this.clearanceLookupDao = clearanceLookupDao;
         this.eventBusProvider = eventBusProvider;
     }
 
     /** 兼容构造器（无事件总线）：超管旁路审计仅落日志。保留供既有单测与非注入装配使用。 */
-    public ClearanceInterceptor(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao) {
+        this.clearanceLookupDao = clearanceLookupDao;
         this.eventBusProvider = null;
     }
 
@@ -247,8 +246,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
         // gateway EcosTrustHeaderFilter 剥离；此处兜底彻底移除客户端来源，双重保险。
         if (userId != null) {
             try {
-                List<Map<String, Object>> rows = jdbc.queryForList(
-                        "SELECT \"ORG_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+                List<Map<String, Object>> rows = clearanceLookupDao.findOrgById(userId);
                 if (rows != null && !rows.isEmpty()) {
                     Object oid = rows.get(0).get("ORG_ID");
                     return oid != null ? oid.toString() : null;
@@ -294,20 +292,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     private Integer queryClearanceLevel(String tableName, String idColumn, String idValue, String tenantId) {
         try {
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = String.format(
-                        "SELECT clearance_level FROM %s WHERE %s = ? AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1",
-                        tableName, idColumn);
-                params = new Object[]{idValue, tenantId};
-            } else {
-                sql = String.format(
-                        "SELECT clearance_level FROM %s WHERE %s = ? LIMIT 1",
-                        tableName, idColumn);
-                params = new Object[]{idValue};
-            }
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, params);
+            List<Map<String, Object>> rows = clearanceLookupDao.queryClearanceRows(tableName, idColumn, idValue, tenantId);
             if (!rows.isEmpty()) {
                 Object val = rows.get(0).get("clearance_level");
                 if (val instanceof Number n) {
@@ -322,26 +307,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     private Integer queryHighestRoleClearanceLevel(String userId, String tenantId) {
         try {
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = """
-                        SELECT COALESCE(MAX(rsp.clearance_level), -1) AS max_level
-                        FROM td_user_role ur
-                        JOIN td_role_security_profile rsp ON ur.ROLE_ID = rsp.role_id
-                        WHERE ur.USER_ID = ? AND (rsp.tenant_id = ? OR rsp.tenant_id IS NULL)
-                        """;
-                params = new Object[]{userId, tenantId};
-            } else {
-                sql = """
-                        SELECT COALESCE(MAX(rsp.clearance_level), -1) AS max_level
-                        FROM td_user_role ur
-                        JOIN td_role_security_profile rsp ON ur.ROLE_ID = rsp.role_id
-                        WHERE ur.USER_ID = ?
-                        """;
-                params = new Object[]{userId};
-            }
-            Integer val = jdbc.queryForObject(sql, Integer.class, params);
+            Integer val = clearanceLookupDao.highestRoleClearanceLevel(userId, tenantId);
             return (val != null && val >= 0) ? val : null;
         } catch (Exception e) {
             log.warn("查询用户角色安全配置失败，级联继续下一档: userId={}", userId, e);
@@ -351,16 +317,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     private Integer queryGlobalDefaultClearanceLevel(String tenantId) {
         try {
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT clearance_level FROM td_user_security_profile WHERE is_default = TRUE AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1";
-                params = new Object[]{tenantId};
-            } else {
-                sql = "SELECT clearance_level FROM td_user_security_profile WHERE is_default = TRUE LIMIT 1";
-                params = new Object[]{};
-            }
-            Integer val = jdbc.queryForObject(sql, Integer.class, params);
+            Integer val = clearanceLookupDao.globalDefaultClearanceLevel(tenantId);
             return val;
         } catch (EmptyResultDataAccessException e) {
             log.debug("未查到全局默认安全配置行: tenantId={}", tenantId);
@@ -375,16 +332,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     private Integer queryClearanceLevelByOrg(String orgId, String tenantId) {
         try {
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT clearance_level FROM td_user_security_profile WHERE org_id = ? AND scope_type = 'ORG' AND (tenant_id = ? OR tenant_id IS NULL) ORDER BY clearance_level DESC LIMIT 1";
-                params = new Object[]{orgId, tenantId};
-            } else {
-                sql = "SELECT clearance_level FROM td_user_security_profile WHERE org_id = ? AND scope_type = 'ORG' ORDER BY clearance_level DESC LIMIT 1";
-                params = new Object[]{orgId};
-            }
-            Integer val = jdbc.queryForObject(sql, Integer.class, params);
+            Integer val = clearanceLookupDao.orgClearanceLevel(orgId, tenantId);
             return val;
         } catch (EmptyResultDataAccessException e) {
             log.debug("未查到机构级安全配置行: orgId={}", orgId);
@@ -397,8 +345,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     private Integer queryClearanceLevelByTenant(String tenantId) {
         try {
-            String sql = "SELECT clearance_level FROM td_user_security_profile WHERE tenant_id = ? AND scope_type = 'TENANT' ORDER BY clearance_level DESC LIMIT 1";
-            Integer val = jdbc.queryForObject(sql, Integer.class, tenantId);
+            Integer val = clearanceLookupDao.tenantClearanceLevel(tenantId);
             return val;
         } catch (EmptyResultDataAccessException e) {
             log.debug("未查到租户级安全配置行: tenantId={}", tenantId);

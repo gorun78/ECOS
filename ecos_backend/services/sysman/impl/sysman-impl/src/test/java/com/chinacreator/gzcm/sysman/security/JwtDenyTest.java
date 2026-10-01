@@ -7,7 +7,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,7 +43,7 @@ import static org.mockito.Mockito.when;
 class JwtDenyTest {
 
     private JwtTokenProvider jwtTokenProvider;
-    private JdbcTemplate jdbcTemplate;
+    private com.chinacreator.gzcm.sysman.dao.AuthLookupDao authLookupDao;
     private JwtAuthenticationFilter filter;
     private FilterChain chain;
     private boolean chainInvoked;
@@ -56,8 +55,8 @@ class JwtDenyTest {
 
     private void setUp(boolean chainPassThrough) {
         jwtTokenProvider = mock(JwtTokenProvider.class);
-        jdbcTemplate = mock(JdbcTemplate.class);
-        filter = new JwtAuthenticationFilter(jwtTokenProvider, jdbcTemplate);
+        authLookupDao = mock(com.chinacreator.gzcm.sysman.dao.AuthLookupDao.class);
+        filter = new JwtAuthenticationFilter(jwtTokenProvider, authLookupDao);
         chain = new FilterChain() {
             @Override
             public void doFilter(jakarta.servlet.ServletRequest req,
@@ -117,9 +116,8 @@ class JwtDenyTest {
         when(claims.getId()).thenReturn("jti-1");
         when(claims.getSubject()).thenReturn("u1");
         when(jwtTokenProvider.validateToken(anyString())).thenReturn(claims);
-        // 黑名单 COUNT>0
-        when(jdbcTemplate.queryForObject(anyString(), any(Class.class), any()))
-                .thenReturn(Integer.valueOf(1));
+        // 黑名单命中
+        when(authLookupDao.isTokenBlacklisted("jti-1")).thenReturn(true);
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(bearerRequest("tok", "/api/v1/data"), resp, chain);
@@ -138,7 +136,7 @@ class JwtDenyTest {
         when(claims.getSubject()).thenReturn("u1");
         when(jwtTokenProvider.validateToken(anyString())).thenReturn(claims);
         doThrow(new QueryTimeoutException("pg down"))
-                .when(jdbcTemplate).queryForObject(anyString(), any(Class.class), any());
+                .when(authLookupDao).isTokenBlacklisted("jti-1");
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(bearerRequest("tok", "/api/v1/data"), resp, chain);
@@ -159,6 +157,8 @@ class JwtDenyTest {
         when(jwtTokenProvider.validateToken(anyString())).thenReturn(claims);
         // Mockito 默认对 List 返回值返 emptyList()：loadUserPermissions 与 tenant 回查均返回空
         // → tenantId 未解析且回查为空 → 403 ECOS-AUTH-006
+        when(authLookupDao.loadUserPermissions("u1")).thenReturn(Collections.<String>emptyList());
+        when(authLookupDao.findTenantById("u1")).thenReturn(Collections.<Map<String, Object>>emptyList());
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(bearerRequest("tok", "/api/v1/data"), resp, chain);
 
@@ -177,8 +177,8 @@ class JwtDenyTest {
         when(claims.get("tenant_id", String.class)).thenReturn("t1");
         when(claims.get("roles")).thenReturn(List.of("ROLE_ADMIN"));
         when(jwtTokenProvider.validateToken(anyString())).thenReturn(claims);
-        when(jdbcTemplate.queryForList(anyString(), any(Class.class), any()))
-                .thenReturn(Collections.<String>emptyList());
+        when(authLookupDao.isTokenBlacklisted(any())).thenReturn(false);
+        when(authLookupDao.loadUserPermissions("u1")).thenReturn(Collections.<String>emptyList());
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(bearerRequest("tok", "/api/v1/data"), resp, chain);

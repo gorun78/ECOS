@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -27,27 +26,14 @@ public class DbBlacklistStore implements BlacklistStore {
 
     // H8-T1: sys_token_blacklist 建表 DDL 收编至 db/migration（V162），运行时不再内嵌 DDL。
 
-    private static final String INSERT_SQL =
-        "INSERT INTO sys_token_blacklist (token, expire_at) VALUES (?, ?) " +
-        "ON CONFLICT (token) DO UPDATE SET expire_at = EXCLUDED.expire_at";
-
-    private static final String SELECT_SQL =
-        "SELECT token, expire_at FROM sys_token_blacklist WHERE expire_at > ?";
-
-    private static final String DELETE_SQL =
-        "DELETE FROM sys_token_blacklist WHERE token = ?";
-
-    private static final String CLEAN_EXPIRED_SQL =
-        "DELETE FROM sys_token_blacklist WHERE expire_at <= ?";
-
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private com.chinacreator.gzcm.sysman.dao.BlacklistDao blacklistDao;
 
     @PostConstruct
     public void init() {
         try {
             // 表由 db/migration（V162）维护；此处仅清理已过期项（DML，非 DDL）
-            jdbcTemplate.update(CLEAN_EXPIRED_SQL, System.currentTimeMillis());
+            blacklistDao.cleanExpired(System.currentTimeMillis());
             log.info("DbBlacklistStore 初始化完成，已清理 sys_token_blacklist 过期项");
         } catch (Exception e) {
             log.warn("DbBlacklistStore 初始化失败（表缺失/清理），降级为纯内存模式: {}", e.getMessage());
@@ -57,7 +43,7 @@ public class DbBlacklistStore implements BlacklistStore {
     @Override
     public void save(String token, long expireAt) {
         try {
-            jdbcTemplate.update(INSERT_SQL, token, expireAt);
+            blacklistDao.save(token, expireAt);
         } catch (Exception e) {
             log.warn("DbBlacklistStore save 失败，降级为纯内存: {}", e.getMessage());
         }
@@ -67,7 +53,7 @@ public class DbBlacklistStore implements BlacklistStore {
     public Map<String, Long> load() {
         Map<String, Long> result = new HashMap<>();
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_SQL, System.currentTimeMillis());
+            List<Map<String, Object>> rows = blacklistDao.loadUnexpired(System.currentTimeMillis());
             for (Map<String, Object> row : rows) {
                 String token = (String) row.get("token");
                 Long expireAt = ((Number) row.get("expire_at")).longValue();
@@ -82,7 +68,7 @@ public class DbBlacklistStore implements BlacklistStore {
     @Override
     public void remove(String token) {
         try {
-            jdbcTemplate.update(DELETE_SQL, token);
+            blacklistDao.remove(token);
         } catch (Exception e) {
             log.warn("DbBlacklistStore remove 失败: {}", e.getMessage());
         }

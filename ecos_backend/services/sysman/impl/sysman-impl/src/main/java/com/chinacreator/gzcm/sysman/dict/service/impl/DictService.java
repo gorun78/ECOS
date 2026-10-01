@@ -1,20 +1,15 @@
 package com.chinacreator.gzcm.sysman.dict.service.impl;
 
+import com.chinacreator.gzcm.sysman.dao.DictDao;
 import com.chinacreator.gzcm.sysman.dict.entity.SysDict;
 import com.chinacreator.gzcm.sysman.dict.service.IDictService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -26,7 +21,7 @@ public class DictService implements IDictService {
 
     private static final Logger log = LoggerFactory.getLogger(DictService.class);
 
-    private final JdbcTemplate jdbc;
+    private final DictDao dao;
 
     /**
      * 内存缓存: dict_type -> List<SysDict>（Caffeine，字典常驻不设过期，靠 refreshCache 主动失效）
@@ -40,10 +35,8 @@ public class DictService implements IDictService {
      */
     private volatile Set<String> cachedTypes = Collections.emptySet();
 
-    private static final RowMapper<SysDict> ROW_MAPPER = new SysDictRowMapper();
-
-    public DictService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public DictService(DictDao dao) {
+        this.dao = dao;
         // H8-T1: sys_dict.subsystem 列补齐 ALTER 收编至 db/migration（V162），构造函数不再执行 DDL。
         // 启动时初始化缓存
         refreshCache();
@@ -89,20 +82,11 @@ public class DictService implements IDictService {
         }
         if (dict.getSortOrder() == 0) {
             // 自动计算 sort_order
-            Integer maxOrder = jdbc.queryForObject(
-                "SELECT COALESCE(MAX(sort_order), 0) FROM sys_dict WHERE dict_type = ?",
-                Integer.class, dict.getDictType());
+            Integer maxOrder = dao.maxSortOrder(dict.getDictType());
             dict.setSortOrder(maxOrder != null ? maxOrder + 1 : 1);
         }
 
-        jdbc.update(
-            "INSERT INTO sys_dict (id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
-            dict.getId(), dict.getDictType(), dict.getDictCode(), dict.getDictLabel(),
-            dict.getDictLabelEn(), dict.getSortOrder(),
-            dict.getStatus() != null ? dict.getStatus() : "active",
-            dict.getParentCode(), dict.getExtValue(),
-            dict.getSubsystem());
+        dao.insert(dict);
 
         // 刷新该类型的缓存
         refreshDictType(dict.getDictType());
@@ -111,12 +95,7 @@ public class DictService implements IDictService {
 
     @Override
     public SysDict updateDictItem(String dictType, String dictCode, SysDict dict) {
-        jdbc.update(
-            "UPDATE sys_dict SET dict_label = ?, dict_label_en = ?, sort_order = ?, parent_code = ?, ext_value = ?, subsystem = ?, updated_at = NOW() " +
-            "WHERE dict_type = ? AND dict_code = ?",
-            dict.getDictLabel(), dict.getDictLabelEn(), dict.getSortOrder(),
-            dict.getParentCode(), dict.getExtValue(), dict.getSubsystem(),
-            dictType, dictCode);
+        dao.update(dict, dictType, dictCode);
 
         // 刷新该类型的缓存
         refreshDictType(dictType);
@@ -125,9 +104,7 @@ public class DictService implements IDictService {
 
     @Override
     public void deleteDictItem(String dictType, String dictCode) {
-        jdbc.update(
-            "UPDATE sys_dict SET status = 'inactive', updated_at = NOW() WHERE dict_type = ? AND dict_code = ?",
-            dictType, dictCode);
+        dao.deactivate(dictType, dictCode);
 
         // 刷新该类型的缓存
         refreshDictType(dictType);
@@ -138,10 +115,7 @@ public class DictService implements IDictService {
         long start = System.currentTimeMillis();
         cache.invalidateAll();
 
-        List<SysDict> allItems = jdbc.query(
-            "SELECT id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at " +
-            "FROM sys_dict WHERE status = 'active' ORDER BY dict_type, sort_order",
-            ROW_MAPPER);
+        List<SysDict> allItems = dao.listAllActive();
 
         // 按 dict_type 分组
         Map<String, List<SysDict>> grouped = new LinkedHashMap<>();
@@ -237,10 +211,7 @@ public class DictService implements IDictService {
      * 从数据库加载指定类型的字典项
      */
     private List<SysDict> loadFromDb(String dictType) {
-        return jdbc.query(
-            "SELECT id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at " +
-            "FROM sys_dict WHERE dict_type = ? AND status = 'active' ORDER BY sort_order",
-            ROW_MAPPER, dictType);
+        return dao.listByType(dictType);
     }
 
     /**
@@ -248,32 +219,5 @@ public class DictService implements IDictService {
      */
     private void updateCachedTypes() {
         cachedTypes = new LinkedHashSet<>(cache.asMap().keySet());
-    }
-
-    /**
-     * RowMapper 实现
-     */
-    private static class SysDictRowMapper implements RowMapper<SysDict> {
-        @Override
-        public SysDict mapRow(ResultSet rs, int rowNum) throws SQLException {
-            SysDict d = new SysDict();
-            d.setId(rs.getString("id"));
-            d.setDictType(rs.getString("dict_type"));
-            d.setDictCode(rs.getString("dict_code"));
-            d.setDictLabel(rs.getString("dict_label"));
-            d.setDictLabelEn(rs.getString("dict_label_en"));
-            d.setSortOrder(rs.getInt("sort_order"));
-            d.setStatus(rs.getString("status"));
-            d.setParentCode(rs.getString("parent_code"));
-            d.setExtValue(rs.getString("ext_value"));
-            d.setSubsystem(rs.getString("subsystem"));
-
-            Timestamp ca = rs.getTimestamp("created_at");
-            if (ca != null) d.setCreatedAt(ca.toLocalDateTime());
-            Timestamp ua = rs.getTimestamp("updated_at");
-            if (ua != null) d.setUpdatedAt(ua.toLocalDateTime());
-
-            return d;
-        }
     }
 }

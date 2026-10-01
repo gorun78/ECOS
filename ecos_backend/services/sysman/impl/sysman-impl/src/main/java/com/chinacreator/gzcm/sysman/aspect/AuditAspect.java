@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -52,8 +51,9 @@ public class AuditAspect {
     private final IAuditLogService auditLogService;
 
     // R1.2: 用于查询用户 audit_mode，以及 full 模式下写入 ecos_audit_log（哈希链表）
+    // 注：null = DAO 不可用 → 降级为不双写（保留语义信号）
     @Autowired(required = false)
-    private JdbcTemplate jdbcTemplate;
+    private com.chinacreator.gzcm.sysman.dao.AuditLogDao auditLogDao;
 
     // R1.2: full 模式下联动 AuditHashChainService（位于 security-engine-impl，
     // sysman-impl 编译期不可见，故通过 ApplicationContext + 反射调用，不可用时降级）
@@ -188,19 +188,13 @@ public class AuditAspect {
      * <p>查询 td_user_security_profile 表，异常或无配置时默认 "basic"。
      */
     private String resolveAuditMode(String userId) {
-        if (jdbcTemplate == null || userId == null || "anonymous".equals(userId)) {
+        if (auditLogDao == null || userId == null || "anonymous".equals(userId)) {
             return "basic";
         }
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT audit_mode FROM td_user_security_profile " +
-                    "WHERE scope_type = 'user' AND user_id = ? LIMIT 1",
-                    userId);
-            if (!rows.isEmpty() && rows.get(0).get("audit_mode") != null) {
-                String mode = rows.get(0).get("audit_mode").toString().trim().toLowerCase();
-                if (!mode.isBlank()) {
-                    return mode;
-                }
+            String mode = auditLogDao.queryAuditMode(userId);
+            if (mode != null) {
+                return mode;
             }
         } catch (Exception e) {
             log.debug("R1.2 查询 audit_mode 失败 user={}, 降级为 basic: {}", userId, e.getMessage());
@@ -256,7 +250,7 @@ public class AuditAspect {
      */
     private void writeHashChainAudit(String userId, String actionType, String resource,
                                      String targetId, String ipAddress, Map<String, Object> details) {
-        if (jdbcTemplate == null) {
+        if (auditLogDao == null) {
             log.debug("R1.2 full 模式: JdbcTemplate 不可用，跳过哈希链双写");
             return;
         }
@@ -276,10 +270,7 @@ public class AuditAspect {
             }
 
             // 写入 ecos_audit_log，获取自增 id（bigint）
-            Long auditId = jdbcTemplate.queryForObject(
-                    "INSERT INTO ecos_audit_log (username, operation, entity_type, entity_id, changes, ip_address, created_at, category) " +
-                    "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, NOW(), ?) RETURNING id",
-                    Long.class,
+            Long auditId = auditLogDao.insertHashChainAudit(
                     userId,
                     actionType,
                     resource != null ? resource : "Unknown",
