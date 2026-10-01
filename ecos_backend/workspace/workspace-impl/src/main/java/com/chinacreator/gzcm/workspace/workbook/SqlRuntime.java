@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.workbook;
 
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -8,7 +10,6 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Component;
  *   <li>禁止多语句（分号分割）</li>
  *   <li>禁止危险关键字（备用黑名单）</li>
  * </ol>
+ *
+ * <p>B6a 收口（R2 架构铁律 §2.5 / IR06）：SELECT 执行下沉 {@link WorkspaceDataDao}。</p>
  */
 @Component
 public class SqlRuntime {
@@ -44,10 +47,10 @@ public class SqlRuntime {
         ";(?=(?:[^']*'[^']*')*[^']*$)(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"
     );
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
 
-    public SqlRuntime(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SqlRuntime(WorkspaceDataDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -91,7 +94,7 @@ public class SqlRuntime {
         // 4. 执行并计时
         long start = System.currentTimeMillis();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(trimmed);
+            List<Map<String, Object>> rows = dao.executeSelect(trimmed);
             long elapsed = System.currentTimeMillis() - start;
 
             // 提取列名

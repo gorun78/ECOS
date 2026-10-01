@@ -2,13 +2,12 @@ package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -23,20 +22,22 @@ import java.util.Map;
 /**
  * 场景心智变体服务 — 场景授权心智 1:N CRUD（PMO-60 v2.0 P1）。
  *
- * <p>遵循 {@code ScenarioService} 既有模式：单类 {@code @Service} + JdbcTemplate + 无 Lombok。
- * 对应表 {@code ecos_scenario_mind}（DDL V146）。
+ * <p>对应表 {@code ecos_scenario_mind}（DDL V146）。
  * cognitive 三表（evidence/hypothesis/belief）写入走后续 P3b T25，本次仅落 workspace 侧。</p>
+ *
+ * <p>B6a 收口（R2 架构铁律 §2.5 / IR06）：raw-SQL + RowMapper 下沉 {@link WorkspaceDataDao}；
+ * 行对象由本服务公开嵌套类 {@link ScenarioMindRawRef} 承载（DAO 侧 RowMapper 需可见）。</p>
  */
 @Service
 public class ScenarioMindService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioMindService.class);
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;
 
-    public ScenarioMindService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
+    public ScenarioMindService(WorkspaceDataDao dao, ObjectMapper objectMapper) {
+        this.dao = dao;
         this.objectMapper = objectMapper;
     }
 
@@ -80,25 +81,17 @@ public class ScenarioMindService {
         String endpointsJson = toJson(dto != null ? dto.getCognitiveEndpoints() : null, "{}");
 
         // 查已有（同 scenario + label 未删除）
-        List<Long> existing = jdbc.queryForList(
-            "SELECT id FROM ecos_scenario_mind WHERE scenario_id = ? AND mind_label = ? AND is_deleted = 0",
-            Long.class, scenarioId, label);
+        List<Long> existing = dao.listMindIdsByScenarioAndLabel(scenarioId, label);
 
         if (!existing.isEmpty()) {
             // UPDATE 已有
             Long mindId = existing.get(0);
             boolean isActive = (label.equals("base"));
             if (!isActive) {
-                Integer current = jdbc.query(
-                    "SELECT active_mind FROM ecos_scenario_mind WHERE id = ?",
-                    (rs, rowNum) -> rs.getInt("active_mind"), mindId).get(0);
-                isActive = current == 1;
+                Integer current = dao.selectMindActiveFlag(mindId);
+                isActive = current != null && current == 1;
             }
-            int n = jdbc.update(
-                "UPDATE ecos_scenario_mind SET mind_label=?, active_mind=?, initial_belief_jsonb=?::jsonb, " +
-                "evidence_refs=?::jsonb, hypothesis_refs=?::jsonb, model_refs=?::jsonb, " +
-                "cognitive_endpoints=?::jsonb, initial_confidence=?, update_time=NOW(), update_by=? " +
-                "WHERE id=? AND is_deleted=0",
+            int n = dao.updateMindUpsert(
                 label, isActive ? 1 : 0, beliefJson, evidenceJson, hypothesisJson, modelJson,
                 endpointsJson, confidence, operator, mindId);
             if (n == 0) {
@@ -112,23 +105,17 @@ public class ScenarioMindService {
         boolean willBeActive = activateIfNew || label.equals("base");
         if (willBeActive) {
             // 先全清 active_mind（与 activateMind 同一语义，但纳入本事务）
-            jdbc.update("UPDATE ecos_scenario_mind SET active_mind=0, update_time=NOW() WHERE scenario_id=? AND is_deleted=0 AND active_mind=1", scenarioId);
+            dao.deactivateAllMindsOfScenario(scenarioId);
         }
         try {
-            jdbc.update(
-                "INSERT INTO ecos_scenario_mind (scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
-                "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, create_by, update_by) " +
-                "VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?)",
-                scenarioId, label, willBeActive ? 1 : 0, beliefJson, evidenceJson, hypothesisJson,
-                modelJson, endpointsJson, confidence, operator, operator);
+            dao.insertMind(scenarioId, label, willBeActive ? 1 : 0, beliefJson, evidenceJson, hypothesisJson,
+                modelJson, endpointsJson, confidence, operator);
         } catch (DataIntegrityViolationException e) {
             log.warn("upsertMind 唯一约束冲突: scenario={} label={}", scenarioId, label);
             throw new BusinessException(409, "MIND-409: same scenario already has another active mind 或 label 重复: " + label);
         }
         // 取回新插入的 id
-        Long newId = jdbc.queryForList(
-            "SELECT id FROM ecos_scenario_mind WHERE scenario_id=? AND mind_label=? AND is_deleted=0 ORDER BY id DESC LIMIT 1",
-            Long.class, scenarioId, label).get(0);
+        Long newId = dao.selectLatestMindId(scenarioId, label);
         log.info("新建场景心智 {} label={} active={} by={}", newId, label, willBeActive, operator);
         return getMind(newId);
     }
@@ -138,14 +125,9 @@ public class ScenarioMindService {
         if (scenarioId == null || scenarioId.isBlank()) {
             throw new BusinessException(400, "MIND-400: scenarioId 必填");
         }
-        List<ScenarioMindRaw> rows = jdbc.query(
-            "SELECT id, scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
-            "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, " +
-            "create_time, update_time " +
-            "FROM ecos_scenario_mind WHERE scenario_id=? AND is_deleted=0 " +
-            "ORDER BY (active_mind=1) DESC, mind_label", MIND_MAPPER, scenarioId);
+        List<ScenarioMindRawRef> rows = dao.listMindsOfScenario(scenarioId);
         List<ScenarioMindVO> result = new ArrayList<>(rows.size());
-        for (ScenarioMindRaw r : rows) {
+        for (ScenarioMindRawRef r : rows) {
             result.add(toVO(r));
         }
         return result;
@@ -167,21 +149,16 @@ public class ScenarioMindService {
             throw new BusinessException(400, "MIND-400: mindId 必填");
         }
         // 验证 mind 属于该场景
-        Integer n = jdbc.queryForObject(
-            "SELECT COUNT(1) FROM ecos_scenario_mind WHERE id=? AND scenario_id=? AND is_deleted=0",
-            Integer.class, mindId, scenarioId);
+        Integer n = dao.countMindBelongsToScenario(mindId, scenarioId);
         if (n == null || n == 0) {
             throw new NotFoundException("MIND-404: 心智不存在或不属于该场景: id=" + mindId);
         }
         String operator = currentOperator();
         try {
             // 全清
-            jdbc.update("UPDATE ecos_scenario_mind SET active_mind=0, update_time=NOW(), update_by=? WHERE scenario_id=? AND is_deleted=0 AND active_mind=1",
-                    operator, scenarioId);
+            dao.deactivateScenarioMinds(operator, scenarioId);
             // 设 1
-            int updated = jdbc.update(
-                "UPDATE ecos_scenario_mind SET active_mind=1, update_time=NOW(), update_by=? WHERE id=? AND scenario_id=? AND is_deleted=0",
-                operator, mindId, scenarioId);
+            int updated = dao.activateMindById(operator, mindId, scenarioId);
             if (updated == 0) {
                 throw new NotFoundException("MIND-404: 心智不存在或已删除: id=" + mindId);
             }
@@ -210,31 +187,22 @@ public class ScenarioMindService {
         }
         String operator = currentOperator();
         // 先查被删 mind 的 label
-        String label = jdbc.queryForList(
-            "SELECT mind_label FROM ecos_scenario_mind WHERE id=? AND scenario_id=? AND is_deleted=0",
-            String.class, mindId, scenarioId).stream().findFirst().orElse(null);
+        String label = dao.selectMindLabel(mindId, scenarioId);
         if (label == null) {
             throw new NotFoundException("MIND-404: 心智不存在或不属于该场景: id=" + mindId);
         }
-        int n = jdbc.update(
-            "UPDATE ecos_scenario_mind SET is_deleted=1, update_time=NOW(), update_by=? WHERE id=? AND scenario_id=? AND is_deleted=0",
-            operator, mindId, scenarioId);
+        int n = dao.logicDeleteMind(operator, mindId, scenarioId);
         if (n == 0) {
             throw new NotFoundException("MIND-404: 心智不存在或已删除: id=" + mindId);
         }
         // 若删的是 base，自动补位
         if ("base".equals(label)) {
-            List<Long> remaining = jdbc.queryForList(
-                "SELECT id FROM ecos_scenario_mind WHERE scenario_id=? AND is_deleted=0 AND active_mind=1 LIMIT 1",
-                Long.class, scenarioId);
+            List<Long> remaining = dao.listActiveMindIds(scenarioId);
             if (remaining.isEmpty()) {
                 // 找一个未删 mind 设为 active
-                List<Long> candidates = jdbc.queryForList(
-                    "SELECT id FROM ecos_scenario_mind WHERE scenario_id=? AND is_deleted=0 ORDER BY create_time LIMIT 1",
-                    Long.class, scenarioId);
+                List<Long> candidates = dao.listFirstMindId(scenarioId);
                 if (!candidates.isEmpty()) {
-                    jdbc.update("UPDATE ecos_scenario_mind SET active_mind=1, update_time=NOW(), update_by=? WHERE id=?",
-                            operator, candidates.get(0));
+                    dao.activateMindByIdOnly(operator, candidates.get(0));
                     log.info("删除 base mind 后自动补位: scenario={} newActive={}", scenarioId, candidates.get(0));
                 }
             }
@@ -253,11 +221,7 @@ public class ScenarioMindService {
         if (scenarioId == null || scenarioId.isBlank()) {
             throw new BusinessException(400, "MIND-400: scenarioId 必填");
         }
-        List<ScenarioMindRaw> rows = jdbc.query(
-            "SELECT id, scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
-            "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, " +
-            "create_time, update_time " +
-            "FROM ecos_scenario_mind WHERE scenario_id=? AND active_mind=1 AND is_deleted=0", MIND_MAPPER, scenarioId);
+        List<ScenarioMindRawRef> rows = dao.listActiveMind(scenarioId);
         if (rows.isEmpty()) {
             return null;
         }
@@ -274,11 +238,7 @@ public class ScenarioMindService {
         if (scenarioId == null || scenarioId.isBlank()) {
             throw new BusinessException(400, "MIND-400: scenarioId 必填");
         }
-        List<ScenarioMindRaw> rows = jdbc.query(
-            "SELECT id, scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
-            "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, " +
-            "create_time, update_time " +
-            "FROM ecos_scenario_mind WHERE scenario_id=? AND mind_label='base' AND is_deleted=0", MIND_MAPPER, scenarioId);
+        List<ScenarioMindRawRef> rows = dao.listBaseMind(scenarioId);
         if (rows.isEmpty()) {
             return null;
         }
@@ -289,11 +249,7 @@ public class ScenarioMindService {
      * 按 id 获取单个 mind。
      */
     public ScenarioMindVO getMind(Long mindId) {
-        List<ScenarioMindRaw> rows = jdbc.query(
-            "SELECT id, scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
-            "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, " +
-            "create_time, update_time " +
-            "FROM ecos_scenario_mind WHERE id=? AND is_deleted=0", MIND_MAPPER, mindId);
+        List<ScenarioMindRawRef> rows = dao.listMindById(mindId);
         if (rows.isEmpty()) {
             throw new NotFoundException("MIND-404: 心智不存在或已删除: id=" + mindId);
         }
@@ -302,25 +258,7 @@ public class ScenarioMindService {
 
     // ═══════════════ 私有辅助 ═══════════════
 
-    /** 心智行映射（JSONB 字段读为字符串，后续 toVO 解析）。 */
-    private final RowMapper<ScenarioMindRaw> MIND_MAPPER = (rs, rowNum) -> {
-        ScenarioMindRaw r = new ScenarioMindRaw();
-        r.id = rs.getLong("id");
-        r.scenarioId = rs.getString("scenario_id");
-        r.mindLabel = rs.getString("mind_label");
-        r.activeMind = rs.getInt("active_mind");
-        r.initialBeliefJson = rs.getString("initial_belief_jsonb");
-        r.evidenceRefsJson = rs.getString("evidence_refs");
-        r.hypothesisRefsJson = rs.getString("hypothesis_refs");
-        r.modelRefsJson = rs.getString("model_refs");
-        r.cognitiveEndpointsJson = rs.getString("cognitive_endpoints");
-        r.initialConfidence = rs.getDouble("initial_confidence");
-        r.createTime = rs.getTimestamp("create_time");
-        r.updateTime = rs.getTimestamp("update_time");
-        return r;
-    };
-
-    /** PO 中间对象（JSONB 保持原始字符串，toVO 时解析）。 */
+    /** 心智 PO 中间对象（B6a 收口时保留 — JSONB 保持原始字符串，toVO 时解析）。 */
     private static class ScenarioMindRaw {
         Long id;
         String scenarioId;
@@ -336,7 +274,26 @@ public class ScenarioMindService {
         java.sql.Timestamp updateTime;
     }
 
-    private ScenarioMindVO toVO(ScenarioMindRaw r) {
+    /**
+     * B6a 收口：DAO 侧心智行引用（{@code WorkspaceDataDao} 的 RowMapper 落点）。
+     * 字段与 {@link ScenarioMindRaw} 逐字段一致，由 Service 侧 {@code toVO} 直接消费。
+     */
+    public static class ScenarioMindRawRef {
+        public Long id;
+        public String scenarioId;
+        public String mindLabel;
+        public int activeMind;
+        public String initialBeliefJson;
+        public String evidenceRefsJson;
+        public String hypothesisRefsJson;
+        public String modelRefsJson;
+        public String cognitiveEndpointsJson;
+        public double initialConfidence;
+        public java.sql.Timestamp createTime;
+        public java.sql.Timestamp updateTime;
+    }
+
+    private ScenarioMindVO toVO(ScenarioMindRawRef r) {
         ScenarioMindVO vo = new ScenarioMindVO();
         vo.setId(r.id);
         vo.setScenarioId(r.scenarioId);

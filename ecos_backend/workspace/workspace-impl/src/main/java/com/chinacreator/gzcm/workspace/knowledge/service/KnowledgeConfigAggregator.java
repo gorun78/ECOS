@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.workspace.knowledge.service;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.workspace.knowledge.dto.KnowledgeEngineConfigVO;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -11,7 +12,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -49,15 +49,15 @@ public class KnowledgeConfigAggregator {
     private static final String KNOWLEDGE_GROUP = "knowledge";
     private static final String COGNITIVE_GROUP = "cognitive-engine";
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
     private final RestTemplate restTemplate;
     private final String kbBase;
     private final String cognitiveBase;
 
-    public KnowledgeConfigAggregator(JdbcTemplate jdbc,
+    public KnowledgeConfigAggregator(WorkspaceDataDao dao,
                                      @Value("${ecos.kb-base:http://localhost:18086/api/v1}") String kbBase,
                                      @Value("${ecos.cognitive-base:http://localhost:18084/api/v1}") String cognitiveBase) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.restTemplate = newShortTimeoutRestTemplate();
         this.kbBase = kbBase;
         this.cognitiveBase = cognitiveBase;
@@ -217,9 +217,7 @@ public class KnowledgeConfigAggregator {
         Map<String, String> map = new LinkedHashMap<>();
         for (String group : groups) {
             try {
-                List<Map<String, Object>> rows = jdbc.queryForList(
-                        "SELECT config_key, config_value FROM sys_config WHERE config_group = ? ORDER BY config_key",
-                        group);
+                List<Map<String, Object>> rows = dao.listSysConfigByGroup(group);
                 for (Map<String, Object> row : rows) {
                     Object k = row.get("config_key");
                     Object v = row.get("config_value");

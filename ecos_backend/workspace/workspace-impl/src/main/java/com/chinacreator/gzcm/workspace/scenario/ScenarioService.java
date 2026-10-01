@@ -2,12 +2,11 @@ package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -21,6 +20,10 @@ import java.util.*;
  *
  * <p>替代原内存 {@code ConcurrentHashMap} 实现，落 PG 表 {@code ecos_business_scenario} +
  * {@code ecos_scenario_binding}。遵循分层铁律：参数校验 / 空值判断 / 枚举约束 / 异常捕获均在 Service。</p>
+ *
+ * <p>B6a 收口（R2 架构铁律 §2.5 / IR06）：raw-SQL 下沉 {@link WorkspaceDataDao}，
+ * {@link BusinessScenario} / {@link ScenarioBinding} 行映射随 SQL 一并搬迁；
+ * 本层保留事务边界（ {@code @Transactional} ）与方法签名不变。</p>
  */
 @Service
 public class ScenarioService {
@@ -43,11 +46,11 @@ public class ScenarioService {
         BINDING_ENDPOINTS.put("INTERFACE", "interfaces");
     }
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;
 
-    public ScenarioService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
+    public ScenarioService(WorkspaceDataDao dao, ObjectMapper objectMapper) {
+        this.dao = dao;
         this.objectMapper = objectMapper;
     }
 
@@ -55,12 +58,7 @@ public class ScenarioService {
 
     /** 场景列表（未删除，按创建时间倒序）。 */
     public List<ScenarioVO> list() {
-        List<BusinessScenario> rows = jdbc.query(
-            "SELECT id, name, description, business_goal, department, priority, status, budget, " +
-            "       safety_index_target, actual_safety_index, metrics, create_time, update_time, " +
-            "       create_by, update_by, is_deleted " +
-            "FROM ecos_business_scenario WHERE is_deleted = 0 ORDER BY create_time DESC",
-            ROW_MAPPER);
+        List<BusinessScenario> rows = dao.listScenarios();
         List<ScenarioVO> result = new ArrayList<>(rows.size());
         for (BusinessScenario e : rows) {
             result.add(ScenarioVO.fromEntity(e));
@@ -71,11 +69,7 @@ public class ScenarioService {
 
     /** 场景详情（含聚合绑定 + 指标）。 */
     public ScenarioVO get(String id) {
-        List<BusinessScenario> rows = jdbc.query(
-            "SELECT id, name, description, business_goal, department, priority, status, budget, " +
-            "       safety_index_target, actual_safety_index, metrics, create_time, update_time, " +
-            "       create_by, update_by, is_deleted " +
-            "FROM ecos_business_scenario WHERE id = ? AND is_deleted = 0", ROW_MAPPER, id);
+        List<BusinessScenario> rows = dao.listScenarioById(id);
         if (rows.isEmpty()) {
             throw new NotFoundException("SCEN-404: 场景不存在: " + id);
         }
@@ -97,11 +91,7 @@ public class ScenarioService {
         String operator = currentOperator();
         String metricsJson = toMetricsJson(dto.getMetrics());
 
-        jdbc.update(
-            "INSERT INTO ecos_business_scenario " +
-            "(id, name, description, business_goal, department, priority, status, budget, " +
-            " safety_index_target, actual_safety_index, metrics, create_by, update_by, is_deleted) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 0)",
+        dao.insertScenario(
             id, dto.getName(),
             dto.getDescription() == null ? "" : dto.getDescription(),
             dto.getBusinessGoal() == null ? dto.getDescription() : dto.getBusinessGoal(),
@@ -187,12 +177,12 @@ public class ScenarioService {
         sql.append(" WHERE id = ? AND is_deleted = 0");
         args.add(id);
 
-        int updated = jdbc.update(sql.toString(), args.toArray());
+        int updated = dao.updateScenarioDynamic(sql.toString(), args.toArray());
         if (updated == 0) {
             throw new NotFoundException("SCEN-404: 场景不存在或已删除: " + id);
         }
         if (dto.getBindings() != null) {
-            jdbc.update("UPDATE ecos_scenario_binding SET is_deleted = 1, update_time = NOW() WHERE scenario_id = ? AND is_deleted = 0", id);
+            dao.logicDeleteBindings(id);
             saveBindings(id, dto.getBindings(), operator);
         }
         log.info("更新业务场景 id={} by={}", id, operator);
@@ -206,8 +196,8 @@ public class ScenarioService {
             throw new NotFoundException("SCEN-404: 场景不存在: " + id);
         }
         String operator = currentOperator();
-        jdbc.update("UPDATE ecos_business_scenario SET is_deleted = 1, update_time = NOW(), update_by = ? WHERE id = ?", operator, id);
-        jdbc.update("UPDATE ecos_scenario_binding SET is_deleted = 1, update_time = NOW() WHERE scenario_id = ? AND is_deleted = 0", id);
+        dao.logicDeleteScenario(operator, id);
+        dao.logicDeleteBindings(id);
         log.info("逻辑删除业务场景 id={} by={}", id, operator);
     }
 
@@ -217,9 +207,7 @@ public class ScenarioService {
             throw new NotFoundException("SCEN-404: 场景不存在: " + id);
         }
         Map<String, List<String>> grouped = ScenarioVO.emptyBindings();
-        List<ScenarioBinding> rows = jdbc.query(
-            "SELECT id, scenario_id, binding_type, target_ref, target_id, target_type, remark, create_time " +
-            "FROM ecos_scenario_binding WHERE scenario_id = ? AND is_deleted = 0 ORDER BY id", BINDING_MAPPER, id);
+        List<ScenarioBinding> rows = dao.listBindingsByScenario(id);
         for (ScenarioBinding b : rows) {
             String key = BINDING_ENDPOINTS.get(b.getBindingType());
             if (key != null) {
@@ -247,15 +235,11 @@ public class ScenarioService {
         }
         String operator = currentOperator();
         if (mergeMetrics == null || mergeMetrics.isEmpty()) {
-            int n = jdbc.update(
-                "UPDATE ecos_business_scenario SET actual_safety_index = ?, update_time = NOW(), update_by = ? WHERE id = ? AND is_deleted = 0",
-                actual, operator, id);
+            int n = dao.updateScenarioSafetyIndex(actual, operator, id);
             return n > 0;
         }
         // 合并 metrics：读旧 JSONB → 合并 → 写回
-        String oldJson = jdbc.query(
-            "SELECT metrics FROM ecos_business_scenario WHERE id = ? AND is_deleted = 0",
-            (rs, rowNum) -> rs.getString("metrics"), id).stream().findFirst().orElse(null);
+        String oldJson = dao.selectScenarioMetrics(id);
         Map<String, Object> merged = new LinkedHashMap<>();
         if (oldJson != null) {
             try {
@@ -265,47 +249,11 @@ public class ScenarioService {
             }
         }
         merged.putAll(mergeMetrics);
-        int n = jdbc.update(
-            "UPDATE ecos_business_scenario SET actual_safety_index = ?, metrics = ?::jsonb, update_time = NOW(), update_by = ? WHERE id = ? AND is_deleted = 0",
-            actual, toJson(merged), operator, id);
+        int n = dao.updateScenarioSafetyIndexAndMetrics(actual, toJson(merged), operator, id);
         return n > 0;
     }
 
     // ═══════════════ 私有辅助 ═══════════════
-
-    private RowMapper<BusinessScenario> ROW_MAPPER = (rs, rowNum) -> {
-        BusinessScenario e = new BusinessScenario();
-        e.setId(rs.getString("id"));
-        e.setName(rs.getString("name"));
-        e.setDescription(rs.getString("description"));
-        e.setBusinessGoal(rs.getString("business_goal"));
-        e.setDepartment(rs.getString("department"));
-        e.setPriority(rs.getString("priority"));
-        e.setStatus(rs.getString("status"));
-        e.setBudget(rs.getString("budget"));
-        e.setSafetyIndexTarget(rs.getBigDecimal("safety_index_target"));
-        e.setActualSafetyIndex(rs.getBigDecimal("actual_safety_index"));
-        e.setMetricsJson(rs.getString("metrics"));
-        e.setCreateTime(rs.getTimestamp("create_time") == null ? null : rs.getTimestamp("create_time").toLocalDateTime());
-        e.setUpdateTime(rs.getTimestamp("update_time") == null ? null : rs.getTimestamp("update_time").toLocalDateTime());
-        e.setCreateBy(rs.getString("create_by"));
-        e.setUpdateBy(rs.getString("update_by"));
-        e.setIsDeleted(rs.getInt("is_deleted"));
-        return e;
-    };
-
-    private RowMapper<ScenarioBinding> BINDING_MAPPER = (rs, rowNum) -> {
-        ScenarioBinding b = new ScenarioBinding();
-        b.setId(rs.getString("id"));
-        b.setScenarioId(rs.getString("scenario_id"));
-        b.setBindingType(rs.getString("binding_type"));
-        b.setTargetRef(rs.getString("target_ref"));
-        b.setTargetId(rs.getString("target_id"));
-        b.setTargetType(rs.getString("target_type"));
-        b.setRemark(rs.getString("remark"));
-        b.setCreateTime(rs.getTimestamp("create_time") == null ? null : rs.getTimestamp("create_time").toLocalDateTime());
-        return b;
-    };
 
     /** 填充 VO 的绑定 + 指标聚合。 */
     private void fillAggregates(List<ScenarioVO> vos) {
@@ -315,9 +263,7 @@ public class ScenarioService {
         for (ScenarioVO vo : vos) {
             String json = null;
             try {
-                json = jdbc.query(
-                    "SELECT metrics FROM ecos_business_scenario WHERE id = ?",
-                    (rs, rowNum) -> rs.getString("metrics"), vo.getId()).stream().findFirst().orElse("{}");
+                json = dao.selectScenarioMetrics(vo.getId());
             } catch (Exception ex) {
                 log.debug("读取场景 metrics 失败: id={}, err={}", vo.getId(), ex.getMessage());
             }
@@ -345,9 +291,7 @@ public class ScenarioService {
             // v2.0: targetId 优先，targetRef 兜底；target_type 真资源类型
             String targetRef = item.getTargetId() != null && !item.getTargetId().isBlank()
                     ? item.getTargetId() : item.getTargetRef();
-            jdbc.update(
-                "INSERT INTO ecos_scenario_binding (id, scenario_id, binding_type, target_ref, target_id, target_type, remark, create_by, update_by, is_deleted) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+            dao.insertBinding(
                 bid, scenarioId, item.getBindingType().toUpperCase(), targetRef,
                 item.getTargetId(), item.getTargetType(),
                 item.getRemark() == null ? "" : item.getRemark(), operator, operator);
@@ -356,8 +300,7 @@ public class ScenarioService {
 
     /** 场景是否存在（未删除）。 */
     private boolean exists(String id) {
-        Integer n = jdbc.queryForObject(
-            "SELECT COUNT(1) FROM ecos_business_scenario WHERE id = ? AND is_deleted = 0", Integer.class, id);
+        Integer n = dao.countScenarioById(id);
         return n != null && n > 0;
     }
 

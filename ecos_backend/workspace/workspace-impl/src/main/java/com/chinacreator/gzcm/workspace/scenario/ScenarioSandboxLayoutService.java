@@ -2,12 +2,12 @@ package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -28,11 +28,11 @@ public class ScenarioSandboxLayoutService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioSandboxLayoutService.class);
 
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;
 
-    public ScenarioSandboxLayoutService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
+    public ScenarioSandboxLayoutService(WorkspaceDataDao dao, ObjectMapper objectMapper) {
+        this.dao = dao;
         this.objectMapper = objectMapper;
     }
 
@@ -46,9 +46,7 @@ public class ScenarioSandboxLayoutService {
         if (scenarioId == null || scenarioId.isBlank()) {
             throw new BusinessException(400, "SBX-400: scenarioId 必填");
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT scenario_id, layout_jsonb, layout_version, update_time " +
-            "FROM ecos_scenario_sandbox_layout WHERE scenario_id=? AND is_deleted=0", scenarioId);
+        List<Map<String, Object>> rows = dao.layoutRows(scenarioId);
         if (rows.isEmpty()) {
             // 返回默认布局
             return buildDefaultLayout(scenarioId);
@@ -95,22 +93,15 @@ public class ScenarioSandboxLayoutService {
         }
 
         // 乐观锁：UPDATE 现有记录（version 匹配）或 INSERT 新记录（无现有）
-        int updated = jdbc.update(
-            "UPDATE ecos_scenario_sandbox_layout SET layout_jsonb=?::jsonb, " +
-            "layout_version=layout_version+1, update_time=NOW(), update_by=? " +
-            "WHERE scenario_id=? AND is_deleted=0 AND layout_version=?",
-            layoutJson, operator, scenarioId, expected);
+        int updated = dao.updateLayoutVersion(layoutJson, operator, scenarioId, expected);
 
         if (updated == 0) {
             // 可能是首次保存（无记录）→ 尝试 INSERT
-            boolean exists = jdbc.queryForList(
-                "SELECT 1 FROM ecos_scenario_sandbox_layout WHERE scenario_id=? AND is_deleted=0",
-                Integer.class, scenarioId).stream().findFirst().isPresent();
+            boolean exists = dao.layoutRowExists(scenarioId) != null;
             if (exists) {
                 // 版本冲突
-                Integer currentVersion = jdbc.queryForList(
-                    "SELECT layout_version FROM ecos_scenario_sandbox_layout WHERE scenario_id=? AND is_deleted=0",
-                    Integer.class, scenarioId).stream().findFirst().orElse(1);
+                Integer currentVersion = dao.currentLayoutVersion(scenarioId) != null
+                        ? dao.currentLayoutVersion(scenarioId) : 1;
                 throw new BusinessException(409, "version_conflict: expected=" + expected + " current=" + currentVersion);
             }
             // 首次保存 → INSERT
@@ -118,10 +109,7 @@ public class ScenarioSandboxLayoutService {
                 throw new BusinessException(409, "version_conflict: expected=" + expected + " but no record exists");
             }
             try {
-                jdbc.update(
-                    "INSERT INTO ecos_scenario_sandbox_layout (scenario_id, layout_jsonb, layout_version, create_by, update_by, is_deleted) " +
-                    "VALUES (?, ?::jsonb, 1, ?, ?, 0)",
-                    scenarioId, layoutJson, operator, operator);
+                dao.insertLayout(scenarioId, layoutJson, operator);
             } catch (DataIntegrityViolationException e) {
                 log.warn("saveLayout INSERT 唯一约束冲突: scenario={}", scenarioId);
                 throw new BusinessException(409, "version_conflict: 并发首次保存冲突");

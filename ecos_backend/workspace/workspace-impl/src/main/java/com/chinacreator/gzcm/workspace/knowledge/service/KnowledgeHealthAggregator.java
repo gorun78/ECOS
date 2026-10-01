@@ -2,13 +2,13 @@ package com.chinacreator.gzcm.workspace.knowledge.service;
 
 import com.chinacreator.gzcm.workspace.knowledge.dto.KnowledgeHealthVO;
 import com.chinacreator.gzcm.workspace.knowledge.dto.KnowledgeHealthVO.EngineHealthVO;
+import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -72,14 +72,14 @@ public class KnowledgeHealthAggregator {
 
     /** 探活 supplier — 每引擎包装成一个 Function<name, EngineHealthVO> box 说明。 */
     private final RestTemplate restTemplate;
-    private final JdbcTemplate jdbc;
+    private final WorkspaceDataDao dao;
     private final String gatewayBase;
 
     public KnowledgeHealthAggregator(
-            JdbcTemplate jdbc,
+            WorkspaceDataDao dao,
             @Value("${ecos.gateway-base:http://localhost:8080}") String gatewayBase) {
         this.restTemplate = newShortTimeoutRestTemplate();
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.gatewayBase = gatewayBase;
     }
 
@@ -179,7 +179,7 @@ public class KnowledgeHealthAggregator {
 
     private String probePgDatabase() {
         try {
-            Long one = jdbc.queryForObject("SELECT 1", Long.class);
+            Long one = dao.probePgDb();
             return one != null ? "UP" : "DOWN";
         } catch (Exception ex) {
             log.error("pgdb probe failed: {}", shortMsg(ex));
@@ -189,9 +189,7 @@ public class KnowledgeHealthAggregator {
 
     private String probePgVector() {
         try {
-            Boolean has = jdbc.queryForObject(
-                    "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-                    Boolean.class);
+            Boolean has = dao.probePgVectorExtension();
             return Boolean.TRUE.equals(has) ? "UP" : "NOT_INSTALLED";
         } catch (Exception ex) {
             log.error("pgvector probe failed: {}", shortMsg(ex));
