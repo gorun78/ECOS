@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.common.service.IGraphService;
+import com.chinacreator.gzcm.engine.ontology.dao.PgGraphDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -30,10 +30,10 @@ public class PgGraphService implements IGraphService {
 
     private static final Logger log = LoggerFactory.getLogger(PgGraphService.class);
 
-    private final JdbcTemplate jdbc;
+    private final PgGraphDao graphDao;
 
-    public PgGraphService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public PgGraphService(PgGraphDao graphDao) {
+        this.graphDao = graphDao;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -45,7 +45,7 @@ public class PgGraphService implements IGraphService {
         String sql = translateCypherToSql(cypherPattern, params);
         log.debug("PG Cypher→SQL: {}  =>  {}", cypherPattern, sql);
         try {
-            return jdbc.queryForList(sql, extractSqlParams(params));
+            return graphDao.executeTranslatedQuery(sql, extractSqlParams(params));
         } catch (Exception e) {
             log.error("PG graph query failed: {}", sql, e);
             return List.of();
@@ -63,24 +63,14 @@ public class PgGraphService implements IGraphService {
                 ? String.valueOf(props.get("type")) : "";
         String category = props != null && props.containsKey("category")
                 ? String.valueOf(props.get("category")) : "";
-        jdbc.update(
-            "INSERT INTO ecos_objects (id, label, type, category, name, properties, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, '{}'::jsonb, NOW()) " +
-            "ON CONFLICT (id) DO UPDATE SET label=EXCLUDED.label, type=EXCLUDED.type, " +
-            "category=EXCLUDED.category, name=EXCLUDED.name",
-            id, label, type, category, name
-        );
+        graphDao.createNode(id, label, type, category, name);
         log.debug("PG node created: label={}, id={}", label, id);
     }
 
     @Override
     public void createRelationship(String fromId, String toId, String relType) {
         String id = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        jdbc.update(
-            "INSERT INTO ecos_object_links (id, source_id, target_id, rel_type, strength, properties, created_at) " +
-            "VALUES (?, ?, ?, ?, 0.5, '{}'::jsonb, NOW())",
-            id, fromId, toId, relType
-        );
+        graphDao.createRelationship(id, fromId, toId, relType);
         log.debug("PG relationship created: {} --[{}]--> {}", fromId, relType, toId);
     }
 
@@ -89,23 +79,10 @@ public class PgGraphService implements IGraphService {
         Map<String, Object> result = new LinkedHashMap<>();
 
         // 查询中心节点及关联节点
-        List<Map<String, Object>> nodes = jdbc.queryForList(
-            "SELECT o1.*, o2.id   AS linked_id, o2.label AS linked_label, " +
-            "       o2.type AS linked_type, o2.category AS linked_category, o2.name AS linked_name " +
-            "FROM ecos_objects o1 " +
-            "JOIN ecos_object_links l ON o1.id = l.source_id " +
-            "JOIN ecos_objects o2 ON l.target_id = o2.id " +
-            "WHERE o1.id = ?",
-            entityId
-        );
+        List<Map<String, Object>> nodes = graphDao.findSubgraphNodes(entityId);
 
         // 查询边
-        List<Map<String, Object>> edges = jdbc.queryForList(
-            "SELECT l.id, l.source_id, l.target_id, l.rel_type, l.strength " +
-            "FROM ecos_object_links l " +
-            "WHERE l.source_id = ? OR l.target_id = ?",
-            entityId, entityId
-        );
+        List<Map<String, Object>> edges = graphDao.findSubgraphEdges(entityId);
 
         result.put("nodes", nodes);
         result.put("edges", edges);

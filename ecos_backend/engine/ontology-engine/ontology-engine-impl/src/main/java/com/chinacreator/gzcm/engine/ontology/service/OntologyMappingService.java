@@ -8,12 +8,11 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.client.DataNetResourceClient;
+import com.chinacreator.gzcm.engine.ontology.dao.OntologyMappingDao;
 import com.chinacreator.gzcm.engine.ontology.dto.FieldMappingItemDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingIssueVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingSaveDTO;
@@ -25,7 +24,7 @@ import com.chinacreator.gzcm.engine.ontology.dto.OntologyMappingVO;
  * 本体映射持久化服务 — 封装 ecos_entity_table_mapping 表的 SQL 操作。
  *
  * <p>由 {@link com.chinacreator.gzcm.engine.ontology.controller.OntologyMappingController}
- * 调用，Controller 层不再直接持有 {@link JdbcTemplate}。</p>
+ * 调用，Controller 层不再直接持有 JDBC 模板（数据访问下沉 {@code OntologyMappingDao}）。</p>
  *
  * <p>PMO-B2 T2：新增 {@link #validateMappings(OntologyMappingValidateDTO)} 实现方案 §2.3
  * 「C4 映射有效性」——DW 表/列存在性与类型兼容校验，DW 元数据一律经
@@ -53,24 +52,13 @@ public class OntologyMappingService {
     /** 问题码：指定的映射主键不存在。 */
     private static final String CODE_MAPPING_NOT_FOUND = "MAPPING_NOT_FOUND";
 
-    /** 映射表显式列清单（禁 {@code SELECT *}，架构铁律 §六 SQL 规范；含 Q2 新增列 materialized、W2 新增列 doc_anchor_json/doc_anchor_type）。 */
-    private static final String MAPPING_COLUMNS =
-            "id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, "
-                    + "field_mappings, materialized, doc_anchor_json, doc_anchor_type, created_at, updated_at";
-
-    /** 映射表显式列清单（带 {@code m.} 别名，联表查询用）。 */
-    private static final String MAPPING_COLUMNS_ALIASED =
-            "m.id, m.entity_code, m.entity_name, m.domain_code, m.datasource_id, m.resource_name, "
-                    + "m.table_schema, m.field_mappings, m.materialized, m.doc_anchor_json, m.doc_anchor_type, "
-                    + "m.created_at, m.updated_at";
-
-    private final JdbcTemplate jdbc;
+    private final OntologyMappingDao mappingDao;
 
     /** data-engine REST 客户端（DW 层资源 + 列定义，禁止直查 td_data_* 跨引擎表）。 */
     private final DataNetResourceClient dataNetClient;
 
-    public OntologyMappingService(JdbcTemplate jdbc, DataNetResourceClient dataNetClient) {
-        this.jdbc = jdbc;
+    public OntologyMappingService(OntologyMappingDao mappingDao, DataNetResourceClient dataNetClient) {
+        this.mappingDao = mappingDao;
         this.dataNetClient = dataNetClient;
     }
 
@@ -78,21 +66,7 @@ public class OntologyMappingService {
      * 查询映射列表（可按 objectId / sourceType 过滤）。返回原始行。
      */
     public List<Map<String, Object>> listMappings(String objectId, String sourceType) {
-        StringBuilder sql = new StringBuilder(
-                "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE 1=1");
-        List<Object> params = new ArrayList<>();
-
-        if (objectId != null && !objectId.isBlank()) {
-            sql.append(" AND entity_code=?");
-            params.add(objectId);
-        }
-        if (sourceType != null && !sourceType.isBlank()) {
-            sql.append(" AND domain_code=?");
-            params.add(sourceType);
-        }
-        sql.append(" ORDER BY created_at DESC");
-
-        return jdbc.queryForList(sql.toString(), params.toArray());
+        return mappingDao.listMappings(objectId, sourceType);
     }
 
     /**
@@ -112,12 +86,7 @@ public class OntologyMappingService {
      * 查询单个映射详情，不存在返回 null。
      */
     public Map<String, Object> findMappingById(String id) {
-        try {
-            return jdbc.queryForMap(
-                    "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
-        } catch (EmptyResultDataAccessException e) {
-            return null;
-        }
+        return mappingDao.findMappingById(id);
     }
 
     /**
@@ -150,14 +119,8 @@ public class OntologyMappingService {
     public void insertMapping(String id, String objectId, String sourceName,
                               String sourceType, String sourceUri, String fieldMappingsJson,
                               Boolean materialized, String docAnchorJson, String docAnchorType) {
-        String normalizedType = (docAnchorType == null || docAnchorType.isBlank())
-                ? null : docAnchorType.trim();
-        jdbc.update(
-                "INSERT INTO ecos_entity_table_mapping (id, entity_code, entity_name, domain_code, datasource_id, resource_name, table_schema, field_mappings, materialized, doc_anchor_json, doc_anchor_type, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?::jsonb, ?, NOW(), NOW())",
-                id, objectId, sourceName, sourceType, "",
-                sourceName, sourceUri, fieldMappingsJson,
-                materialized == null ? Boolean.TRUE : materialized, docAnchorJson, normalizedType);
+        mappingDao.insertMapping(id, objectId, sourceName, sourceType, sourceUri, fieldMappingsJson,
+                materialized, docAnchorJson, docAnchorType);
     }
 
     /**
@@ -174,18 +137,14 @@ public class OntologyMappingService {
      * 更新映射记录（拼接 SQL），返回更新后的行，不存在返回 null。
      */
     public Map<String, Object> updateMapping(String id, StringBuilder sql, List<Object> params) {
-        jdbc.update(sql.toString(), params.toArray());
-        return jdbc.queryForMap(
-                "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
+        return mappingDao.updateMapping(id, sql.toString(), params);
     }
 
     /**
      * 强类型 VO 版（T16-2）。
      */
     public OntologyMappingVO updateMappingVO(String id, StringBuilder sql, List<Object> params) {
-        jdbc.update(sql.toString(), params.toArray());
-        Map<String, Object> row = jdbc.queryForMap(
-                "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
+        Map<String, Object> row = mappingDao.updateMapping(id, sql.toString(), params);
         return toVO(row);
     }
 
@@ -193,15 +152,7 @@ public class OntologyMappingService {
      * 删除映射记录。返回被删除的行（用于日志），不存在返回 null。
      */
     public Map<String, Object> deleteMapping(String id) {
-        Map<String, Object> existing;
-        try {
-            existing = jdbc.queryForMap(
-                    "SELECT " + MAPPING_COLUMNS + " FROM ecos_entity_table_mapping WHERE id=?", id);
-        } catch (EmptyResultDataAccessException e) {
-            return null;
-        }
-        jdbc.update("DELETE FROM ecos_entity_table_mapping WHERE id=?", id);
-        return existing;
+        return mappingDao.deleteMapping(id);
     }
 
     /**
@@ -218,13 +169,7 @@ public class OntologyMappingService {
         if (isBlank(ontologyId)) {
             return listMappingsVO(null, null);
         }
-        String sql = "SELECT " + MAPPING_COLUMNS_ALIASED + " FROM ecos_entity_table_mapping m "
-                + "WHERE m.entity_code IN ("
-                + "SELECT e.id FROM ecos_ontology.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0 "
-                + "UNION "
-                + "SELECT e.code FROM ecos_ontology.ecos_ontology_entity e WHERE e.ontology_id = ? AND e.is_deleted = 0"
-                + ") ORDER BY m.created_at DESC";
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, ontologyId, ontologyId);
+        List<Map<String, Object>> rows = mappingDao.listMappingsByOntology(ontologyId);
         List<OntologyMappingVO> result = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             result.add(toVO(row));
@@ -477,18 +422,7 @@ public class OntologyMappingService {
         if (isBlank(entityRef) || isBlank(propertyRef)) {
             return null;
         }
-        try {
-            List<String> types = jdbc.queryForList(
-                    "SELECT p.property_type FROM ecos_ontology_property p "
-                            + "JOIN ecos_ontology_entity e ON p.entity_id = e.id "
-                            + "WHERE (e.id = ? OR e.code = ?) AND (p.id = ? OR p.code = ?) "
-                            + "AND p.is_deleted = 0 LIMIT 1",
-                    String.class, entityRef, entityRef, propertyRef, propertyRef);
-            return types.isEmpty() ? null : types.get(0);
-        } catch (Exception e) {
-            log.warn("查询本体属性类型失败 entity={} property={}: {}", entityRef, propertyRef, e.getMessage());
-            return null;
-        }
+        return mappingDao.resolveOntologyPropertyType(entityRef, propertyRef);
     }
 
     /** 字段映射原始列表（List&lt;Map&gt;）→ 强类型 {@link FieldMappingItemDTO} 列表。 */

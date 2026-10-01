@@ -4,17 +4,17 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.chinacreator.gzcm.engine.ontology.dao.CaliberDao;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,8 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,6 +29,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * W76/M0 · rule 4 + rule 3 — Metric 口径绑定门禁（纯 Mockito 无 Spring 上下文）。
+ *
+ * <p>R2-B3 (架构铁律 §2.5 #1)：JDBC 下沉 {@link CaliberDao}，mock 对象由
+ * JdbcTemplate 切换为 CaliberDao（read-through 行/快照/状态查询均取 DAO 方法）。</p>
  *
  * <p>断言：
  * <ol>
@@ -44,19 +45,18 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MetricCaliberBindingTest {
 
-    private static final String SCHEMA = "ecos_ontology";
     private static final String M = "M_SALES_GMV";
     private static final String CID = "cal-uuid-1";
     private static final String V = "2";
 
     @Mock
-    private JdbcTemplate jdbc;
+    private CaliberDao caliberDao;
 
     private CaliberService service;
 
     @BeforeEach
     void setUp() {
-        service = new CaliberService(jdbc, SCHEMA);
+        service = new CaliberService(caliberDao);
     }
 
     @Test
@@ -68,7 +68,7 @@ class MetricCaliberBindingTest {
         metric.put("formula_version", null);
         metric.put("caliber_snapshot", null);
         metric.put("status", "PUBLISHED");
-        when(jdbc.queryForMap(anyString(), eq(M))).thenReturn(metric);
+        when(caliberDao.findMetricCaliberBinding(M)).thenReturn(metric);
 
         assertThrows(CaliberService.CaliberMissingException.class,
                 () -> service.assertMetricCaliberApprovedForPublish(M));
@@ -83,13 +83,10 @@ class MetricCaliberBindingTest {
         metric.put("formula_version", V);
         metric.put("caliber_snapshot", null);
         metric.put("status", "PUBLISHED");
-        when(jdbc.queryForMap(anyString(), eq(M))).thenReturn(metric);
+        when(caliberDao.findMetricCaliberBinding(M)).thenReturn(metric);
 
-        // lookupVersionStatus: SELECT status FROM ... AND version_no=? → "DRAFT"（非 APPROVED）
-        when(jdbc.queryForObject(
-                argThat(s -> s != null && s.contains("SELECT status FROM")),
-                eq(String.class), eq(CID), eq(V)))
-                .thenReturn("DRAFT");
+        // lookupVersionStatus: 版本 status=DRAFT（非 APPROVED）
+        when(caliberDao.lookupVersionStatus(CID, V)).thenReturn("DRAFT");
 
         assertThrows(CaliberService.CaliberNotApprovedException.class,
                 () -> service.assertMetricCaliberApprovedForPublish(M));
@@ -98,35 +95,24 @@ class MetricCaliberBindingTest {
     @Test
     @DisplayName("rule 3: 快照已非空 → bindMetricCaliber 抛 SnapshotFrozenException")
     void bindMetricWithExistingSnapshot_throwsFrozen() {
-        // throwIfSnapshotFrozen: SELECT caliber_snapshot FROM ecos_metric_definition WHERE code=?
-        when(jdbc.queryForObject(
-                argThat(s -> s != null && s.contains("caliber_snapshot") && s.contains("ecos_metric_definition")),
-                eq(String.class), eq(M)))
-                .thenReturn("{\"caliber_id\":\"cal-uuid-1\"}");
+        when(caliberDao.findMetricCaliberSnapshot(M)).thenReturn("{\"caliber_id\":\"cal-uuid-1\"}");
 
         assertThrows(CaliberService.SnapshotFrozenException.class,
                 () -> service.bindMetricCaliber(M, CID, V));
 
-        // 冻结后不得产生任何 UPDATE
-        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        // 冻结后不得产生任何写入
+        verify(caliberDao, never()).bindMetricCaliber(any(), any(), any(), any());
+        verify(caliberDao, never()).updateMetricCaliberSnapshot(any(), any());
     }
 
     @Test
     @DisplayName("rule 3（正）: 首次绑定（快照为空）→ 成功写入冻结快照")
     void firstTimeBinding_succeedsAndFreezes() {
         // snapshot 查询 → 空（允许）
-        when(jdbc.queryForObject(
-                argThat(s -> s != null && s.contains("caliber_snapshot") && s.contains("ecos_metric_definition")),
-                eq(String.class), eq(M)))
-                .thenReturn(null);
+        when(caliberDao.findMetricCaliberSnapshot(M)).thenReturn(null);
 
         // formula 查询 → 明文
-        when(jdbc.queryForObject(
-                argThat(s -> s != null && s.contains("SELECT formula FROM")),
-                eq(String.class), eq(CID), eq(V)))
-                .thenReturn("SUM(amount)");
-
-        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+        when(caliberDao.lookupVersionFormula(CID, V)).thenReturn("SUM(amount)");
 
         Map<String, Object> result = assertDoesNotThrow(
                 () -> service.bindMetricCaliber(M, CID, V));
@@ -140,14 +126,15 @@ class MetricCaliberBindingTest {
         assertEquals(CID, result.get("caliber_id"));
         assertEquals(V, result.get("formula_version"));
 
-        verify(jdbc).update(anyString(), any(Object[].class));
+        ArgumentCaptor<String> snapshotCap = ArgumentCaptor.forClass(String.class);
+        verify(caliberDao).bindMetricCaliber(eq(M), eq(CID), eq(V), snapshotCap.capture());
+        assertEquals(snapshot, snapshotCap.getValue());
     }
 
     @Test
     @DisplayName("rule 4: 指标行不存在（Draft 路径）→ 静默返回，不抛异常")
     void missingMetricRow_isSilentDraftPath() {
-        when(jdbc.queryForMap(anyString(), eq(M)))
-                .thenThrow(new EmptyResultDataAccessException(1));
+        when(caliberDao.findMetricCaliberBinding(M)).thenReturn(null);
 
         assertDoesNotThrow(() -> service.assertMetricCaliberApprovedForPublish(M));
     }

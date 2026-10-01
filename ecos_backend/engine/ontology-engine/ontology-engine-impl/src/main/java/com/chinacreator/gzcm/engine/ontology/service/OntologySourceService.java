@@ -6,9 +6,9 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.engine.ontology.dao.OntologySourceDao;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologySourceQuery;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologySourceVO;
 
@@ -31,10 +31,10 @@ public class OntologySourceService {
     private static final int DEFAULT_LIMIT = 100;
     private static final int MAX_LIMIT = 500;
 
-    private final JdbcTemplate jdbc;
+    private final OntologySourceDao sourceDao;
 
-    public OntologySourceService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public OntologySourceService(OntologySourceDao sourceDao) {
+        this.sourceDao = sourceDao;
     }
 
     /**
@@ -48,22 +48,8 @@ public class OntologySourceService {
         String domainCode = query.getDomainCode();
         boolean hasFilter = domainCode != null && !domainCode.isBlank();
 
-        String sql = "SELECT "
-            + "  e.id          AS \"ontologyId\", "
-            + "  d.code        AS \"sourceDomain\", "
-            + "  m.resource_name AS \"originManifest\", "
-            + "  e.created_at  AS \"createdAt\", "
-            + "FROM ecos_entity_table_mapping m "
-            + "INNER JOIN ecos_ontology_entity e ON e.code = m.entity_code "
-            + "INNER JOIN ecos_domain d ON d.id = e.domain_id AND d.code = m.domain_code";
-        if (hasFilter) {
-            sql += " WHERE m.domain_code = ?";
-        }
-        sql += " ORDER BY m.created_at DESC LIMIT ?";
-
-        List<Map<String, Object>> rawRows = hasFilter
-            ? jdbc.queryForList(sql, domainCode, lim)
-            : jdbc.queryForList(sql, lim);
+        List<Map<String, Object>> rawRows = sourceDao.listSourcesRaw(
+                hasFilter ? domainCode : null, lim);
 
         List<OntologySourceVO> voList = new ArrayList<>(rawRows.size());
         for (Map<String, Object> r : rawRows) {

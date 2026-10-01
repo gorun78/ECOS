@@ -5,15 +5,17 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.engine.ontology.dao.OntologyDataDao;
+
 /**
- * 本体数据实例持久化服务 — 承载 {@code ecos_ontology.ecos_ontology_data} 表的全部 JDBC 访问。
+ * 本体数据实例持久化服务 — 委托 {@link OntologyDataDao} 承载
+ * {@code ecos_ontology.ecos_ontology_data} 表的全部 JDBC 访问。
  *
  * <p>由 {@code OntologyDataController} 调用：把数据记录（ObjectType 下的实例）
- * 的列表/详情/新增/更新/计数 SQL 从 Controller 抽到 Service 层
- * （此前 Controller 直接持有 {@code JdbcTemplate}，违反"Controller 不直连数据库"铁律）。
+ * 的列表/详情/新增/更新/计数 SQL 收敛到 DAO 层
+ * （R2-B3 / 架构铁律 §2.5 #1：Service 不直持 JdbcTemplate）。
  *
  * <p>所有查询带 {@code is_deleted = 0} 过滤（逻辑删除语义）；
  * 返回 {@code List<Map<String, Object>>} 原始行，row→前端契约 Map 的映射
@@ -24,15 +26,10 @@ public class OntologyDataService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyDataService.class);
 
-    /** 数据行统一列选择（保持列顺序与既有契约一致）。 */
-    private static final String SELECT_COLUMNS =
-            "SELECT id, ontology_id, object_type, record_key, payload, status, " +
-            "       create_time, update_time, create_by, update_by ";
+    private final OntologyDataDao dataDao;
 
-    private final JdbcTemplate jdbc;
-
-    public OntologyDataService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public OntologyDataService(OntologyDataDao dataDao) {
+        this.dataDao = dataDao;
     }
 
     /**
@@ -42,13 +39,7 @@ public class OntologyDataService {
      * @return 匹配 is_deleted=0 的行数
      */
     public Integer countRecords(String filterType) {
-        boolean hasFilter = filterType != null && !filterType.isBlank();
-        final String where = hasFilter
-                ? "WHERE ontology_id = ? AND is_deleted = 0"
-                : "WHERE is_deleted = 0";
-        return hasFilter
-                ? jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology.ecos_ontology_data " + where, Integer.class, filterType)
-                : jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology.ecos_ontology_data " + where, Integer.class);
+        return dataDao.countRecords(filterType);
     }
 
     /**
@@ -60,21 +51,7 @@ public class OntologyDataService {
      * @return 原始行列表
      */
     public List<Map<String, Object>> listRecords(String filterType, int limit, int offset) {
-        boolean hasFilter = filterType != null && !filterType.isBlank();
-        final String where = hasFilter
-                ? "WHERE ontology_id = ? AND is_deleted = 0"
-                : "WHERE is_deleted = 0";
-        return hasFilter
-                ? jdbc.queryForList(
-                        SELECT_COLUMNS +
-                        "FROM ecos_ontology.ecos_ontology_data " + where + " " +
-                        "ORDER BY create_time DESC LIMIT ? OFFSET ?",
-                        filterType, limit, offset)
-                : jdbc.queryForList(
-                        SELECT_COLUMNS +
-                        "FROM ecos_ontology.ecos_ontology_data " + where + " " +
-                        "ORDER BY create_time DESC LIMIT ? OFFSET ?",
-                        limit, offset);
+        return dataDao.listRecords(filterType, limit, offset);
     }
 
     /**
@@ -84,10 +61,7 @@ public class OntologyDataService {
      * @return 原始行列表（命中 0 或 1 行）
      */
     public List<Map<String, Object>> findRecordById(String id) {
-        return jdbc.queryForList(
-                SELECT_COLUMNS +
-                "FROM ecos_ontology.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
-                id);
+        return dataDao.findRecordById(id);
     }
 
     /**
@@ -97,12 +71,7 @@ public class OntologyDataService {
      */
     public int insertRecord(String id, String objectTypeId, String objectTypeName,
                             String recordKey, String payloadJson, String createdBy) {
-        return jdbc.update(
-                "INSERT INTO ecos_ontology.ecos_ontology_data " +
-                "(id, ontology_id, object_type, record_key, payload, status, " +
-                " create_time, update_time, create_by, update_by, is_deleted) " +
-                "VALUES (?, ?, ?, ?, ?, 'ACTIVE', now(), now(), ?, ?, 0)",
-                id, objectTypeId, objectTypeName, recordKey, payloadJson, createdBy, createdBy);
+        return dataDao.insertRecord(id, objectTypeId, objectTypeName, recordKey, payloadJson, createdBy);
     }
 
     /**
@@ -111,33 +80,20 @@ public class OntologyDataService {
      * @return 受影响行数
      */
     public int updateRecord(String id, String objectTypeName, String createdBy, String payloadJson) {
-        return jdbc.update(
-                "UPDATE ecos_ontology.ecos_ontology_data SET " +
-                "  object_type = COALESCE(?, object_type), " +
-                "  create_by   = COALESCE(?, create_by), " +
-                "  update_by   = COALESCE(?, update_by), " +
-                "  payload     = ?, " +
-                "  update_time = now() " +
-                "WHERE id = ? AND is_deleted = 0",
-                objectTypeName, createdBy, "system", payloadJson, id);
+        return dataDao.updateRecord(id, objectTypeName, createdBy, payloadJson);
     }
 
     /**
      * 按主键计数（存在性检查，is_deleted=0 过滤）。
      */
     public Integer countById(String id) {
-        return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_ontology.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
-                Integer.class, id);
+        return dataDao.countById(id);
     }
 
     /**
      * 按归属域计数（is_deleted=0 过滤）。
      */
     public Integer countByObjectType(String objectTypeId) {
-        return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_ontology.ecos_ontology_data " +
-                "WHERE ontology_id = ? AND is_deleted = 0",
-                Integer.class, objectTypeId);
+        return dataDao.countByObjectType(objectTypeId);
     }
 }

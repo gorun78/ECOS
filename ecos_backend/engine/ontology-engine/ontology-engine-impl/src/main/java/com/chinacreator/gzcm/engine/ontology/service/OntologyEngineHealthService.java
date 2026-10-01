@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
+import com.chinacreator.gzcm.engine.ontology.dao.OntologyEngineHealthDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,15 +10,15 @@ public class OntologyEngineHealthService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyEngineHealthService.class);
 
-    private final JdbcTemplate jdbc;
+    private final OntologyEngineHealthDao healthDao;
 
-    public OntologyEngineHealthService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public OntologyEngineHealthService(OntologyEngineHealthDao healthDao) {
+        this.healthDao = healthDao;
     }
 
     public boolean pingDb() {
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            healthDao.pingDb();
             return true;
         } catch (Exception e) {
             log.warn("DB health check failed: {}", e.getMessage());
@@ -28,7 +28,7 @@ public class OntologyEngineHealthService {
 
     public long countOntologies() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology", Long.class);
+            return healthDao.countOntologies();
         } catch (Exception e) {
             return -1;
         }
@@ -36,7 +36,7 @@ public class OntologyEngineHealthService {
 
     public long countEntities() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology_entity", Long.class);
+            return healthDao.countEntities();
         } catch (Exception e) {
             return -1;
         }
@@ -44,7 +44,7 @@ public class OntologyEngineHealthService {
 
     public long countProperties() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology_property", Long.class);
+            return healthDao.countProperties();
         } catch (Exception e) {
             return -1;
         }
@@ -52,7 +52,7 @@ public class OntologyEngineHealthService {
 
     public long countRelationships() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology_relationship", Long.class);
+            return healthDao.countRelationships();
         } catch (Exception e) {
             return -1;
         }

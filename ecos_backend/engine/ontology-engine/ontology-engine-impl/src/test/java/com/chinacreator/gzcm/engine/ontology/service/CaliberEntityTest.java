@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.chinacreator.gzcm.engine.ontology.dao.CaliberDao;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,8 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -24,78 +23,68 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * W73/M0 · F03-01 — Caliber entity service behavior tests (pure Mockito, no Spring context).
  *
+ * <p>R2-B3 (arch rule §2.5 #1): JDBC 下沉 {@link CaliberDao}，本测试 mock 对象由
+ * JdbcTemplate 切换为 CaliberDao（SQL 文本断言随收口迁至 DAO 层，Service 层只断言
+ * 业务语义：MC01 应用侧 UUID、状态机入参、filter 透传）。</p>
+ *
  * <p>Cover:
  * <ol>
- *   <li>{@code insertCaliber} — schema-qualified INSERT; app-side UUID id (MC01);</li>
- *   <li>{@code findByCode} — returns empty on {@link EmptyResultDataAccessException};</li>
+ *   <li>{@code insertCaliber} — 先落主表再按 code 读回; app-side UUID id (MC01);</li>
+ *   <li>{@code findByCode} — 透传 DAO 的 Optional（empty 分支）;</li>
  *   <li>rule 2 — insertVersion default DRAFT; promote via archiveVersion;</li>
- *   <li>{@code listVersionsByCaliberId} respects status filter.</li>
+ *   <li>{@code listVersionsByCaliberId} status filter 透传。</li>
  * </ol>
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CaliberEntityTest {
 
-    private static final String SCHEMA = "ecos_ontology";
-
     @Mock
-    private JdbcTemplate jdbc;
+    private CaliberDao caliberDao;
 
     private CaliberService service;
 
     @BeforeEach
     void setUp() {
-        service = new CaliberService(jdbc, SCHEMA);
+        service = new CaliberService(caliberDao);
     }
 
     @Test
-    @DisplayName("insertCaliber: app-side UUID + schema-qualified INSERT")
-    void insertCaliber_schemaQualifiedUuidId() {
+    @DisplayName("insertCaliber: app-side UUID id 先落主表，再按 code 读回行")
+    void insertCaliber_appSideUuidId() {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", "uuid-1");
         row.put("code", "CAL_X");
         row.put("name", "cal x");
         row.put("status", "ACTIVE");
-        when(jdbc.queryForMap(anyString(), eq("CAL_X"))).thenReturn(row);
+        when(caliberDao.findByCode("CAL_X")).thenReturn(Optional.of(row));
 
         Map<String, Object> result = service.insertCaliber("CAL_X", "cal x", "CNY", "CNY",
                 "role.A", null, "ACTIVE");
 
-        // 1. assert id returned to caller is non-null UUID
+        // 1. assert id returned to caller is the mocked row id
         assertEquals("uuid-1", result.get("id"));
         assertNotNull(result.get("id"));
 
-        // 2. assert mocked JDBC received INSERT INTO ecos_ontology.ecos_caliber with is_deleted=0 and version_no='1'
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).update(sqlCaptor.capture(), argsCaptor.capture());
-        String sql = sqlCaptor.getValue();
-        assertTrue(sql.contains("INSERT INTO " + SCHEMA + ".ecos_caliber"),
-                "expected schema-qualified INSERT but got: " + sql);
-        assertTrue(sql.contains("is_deleted"));
-        assertTrue(sql.contains("version_no"));
-        // MC01: app-side UUID as first arg (36 chars, contains hyphen)
-        Object[] args = argsCaptor.getValue();
-        assertTrue(args.length > 0 && args[0] instanceof String, "first INSERT arg must be app-side UUID");
-        String id = (String) args[0];
+        // 2. assert DAO 收到 insert，第一参数是应用侧 UUID (MC01)
+        ArgumentCaptor<String> idCaptor = ArgumentCaptor.forClass(String.class);
+        verify(caliberDao).insertCaliber(idCaptor.capture(), eq("CAL_X"), eq("cal x"), eq("ACTIVE"),
+                eq("CNY"), eq("CNY"), eq("role.A"), eq((String) null));
+        String id = idCaptor.getValue();
         assertTrue(id.length() == 36 && id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
                 "expected UUID format id but got: " + id);
     }
 
     @Test
-    @DisplayName("findByCode: empty Optional when EmptyResultDataAccessException")
+    @DisplayName("findByCode: DAO 返回 empty Optional 时 Service 透传 empty")
     void findByCode_emptyOnNoRow() {
-        doThrow(new EmptyResultDataAccessException(1))
-                .when(jdbc).queryForMap(anyString(), eq("CAL_X"));
+        when(caliberDao.findByCode("CAL_X")).thenReturn(Optional.empty());
 
         Optional<Map<String, Object>> opt = service.findByCode("CAL_X");
         assertTrue(opt.isEmpty(), "expected empty Optional");
@@ -107,44 +96,34 @@ class CaliberEntityTest {
         Map<String, Object> vRow = new LinkedHashMap<>();
         vRow.put("id", "vuuid");
         vRow.put("status", "DRAFT");
-        when(jdbc.queryForMap(anyString(), any(Object.class)))
-                .thenAnswer(inv -> vRow);
+        when(caliberDao.findVersionById(anyString())).thenReturn(vRow);
 
         Map<String, Object> inserted = service.insertVersion("c1", "1", "SUM(x)", 1, "MONTH", null);
         assertEquals("DRAFT", inserted.get("status"));
 
-        // Verify INSERT received status='DRAFT' as last positional arg (MC01: id UUID first)
-        ArgumentCaptor<Object[]> arrCap = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).update(anyString(), arrCap.capture());
-        Object[] args = arrCap.getValue();
-        assertTrue(args[0] instanceof String && ((String) args[0]).matches(
-                "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
-                "expected UUID first arg (MC01) but got: " + args[0]);
-        assertEquals("DRAFT", args[args.length - 1]);
+        // Verify INSERT received status='DRAFT' as last arg (MC01: id UUID first)
+        ArgumentCaptor<String> idCap = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> statusCap = ArgumentCaptor.forClass(String.class);
+        verify(caliberDao).insertVersion(idCap.capture(), eq("c1"), eq("1"), eq("SUM(x)"),
+                eq(1), eq("MONTH"), statusCap.capture());
+        String id = idCap.getValue();
+        assertTrue(id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+                "expected UUID first arg (MC01) but got: " + id);
+        assertEquals("DRAFT", statusCap.getValue());
 
-        // Now promote: current DRAFT → target APPROVED (DRAFT→APPROVED is allowed after whitelist update)
-        when(jdbc.queryForObject(anyString(), eq(String.class), eq("c1"), eq("1")))
-                .thenReturn("DRAFT");
-        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+        // Now promote: current DRAFT → target APPROVED (DRAFT→APPROVED is allowed)
+        when(caliberDao.findVersionStatus("c1", "1")).thenReturn("DRAFT");
+        when(caliberDao.archiveVersion("c1", "1", "APPROVED", "admin", "DRAFT")).thenReturn(1);
         int affected = service.archiveVersion("c1", "1", "APPROVED", "admin");
         assertEquals(1, affected);
     }
 
     @Test
-    @DisplayName("listVersionsByCaliberId: status filter applied to SQL")
+    @DisplayName("listVersionsByCaliberId: status filter 透传到 DAO")
     void listVersions_statusFilterApplied() {
-        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+        when(caliberDao.listVersionsByCaliberId("c1", "APPROVED")).thenReturn(List.of());
         service.listVersionsByCaliberId("c1", "APPROVED");
 
-        ArgumentCaptor<String> sqlCap = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object[]> argsCap = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).queryForList(sqlCap.capture(), argsCap.capture());
-        String sql = sqlCap.getValue();
-        assertTrue(sql.contains("AND status=?"),
-                "expected status filter in SQL but got: " + sql);
-        Object[] args = argsCap.getValue();
-        // first param is caliberId, then status, then limit (if any)
-        assertEquals("c1", args[0]);
-        assertEquals("APPROVED", args[1]);
+        verify(caliberDao).listVersionsByCaliberId("c1", "APPROVED");
     }
 }
