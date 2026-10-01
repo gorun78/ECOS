@@ -2,13 +2,12 @@ package com.chinacreator.gzcm.engine.security.event;
 
 import com.chinacreator.gzcm.common.event.DataAssetSecurityTaggedEvent;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.security.dao.DataSecurityLevelDao;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,24 +20,25 @@ import static org.mockito.Mockito.*;
  * DataSecurityLevelEventListenerTest (PMO-data10)
  *
  * <p>事件 → CLS（L3+ 字段进 blocked_cols）+ RLS（L4 资产 clearance_level >= 4）写入。
- * 集成语义：V154 加的 resource_id 列兼顾 table_name 兜底（R9 只加不删）。</p>
+ * 集成语义：V154 加的 resource_id 列兼顾 table_name 兜底（R9 只加不删）。
+ * R2-B3b 数据访问收口后改以 {@link DataSecurityLevelDao} 为边界验证存在/新建分支。</p>
  */
 class DataSecurityLevelEventListenerTest {
 
-    private JdbcTemplate jdbc;
+    private DataSecurityLevelDao dao;
     private ObjectProvider<EventBusService> eventBusProvider;
     private EventBusService eventBus;
     private DataSecurityLevelEventListener listener;
 
     @BeforeEach
     void setUp() {
-        jdbc = mock(JdbcTemplate.class);
+        dao = mock(DataSecurityLevelDao.class);
         eventBus = mock(EventBusService.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<EventBusService> provider = (ObjectProvider<EventBusService>) mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(eventBus);
         eventBusProvider = provider;
-        listener = new DataSecurityLevelEventListener(jdbc, eventBusProvider);
+        listener = new DataSecurityLevelEventListener(dao, eventBusProvider);
     }
 
     /** 构造基础事件：资产 L3 1 字段 L3-身份证 */
@@ -51,10 +51,9 @@ class DataSecurityLevelEventListenerTest {
             "tester", Instant.now());
     }
 
-    /** 让 listener 进入 "INSERT 新策略" 分支（mock 未预置既有策略）。*/
+    /** 让 listener 进入 "INSERT 新策略" 分支（既有策略查询返回 null）。*/
     private void mockNoExistingPolicy() {
-        when(jdbc.queryForList(anyString(), eq(String.class), any(String.class), any(String.class)))
-            .thenReturn(List.of());
+        when(dao.findExistingPolicy(anyString(), anyString(), anyString())).thenReturn(null);
     }
 
     @Test
@@ -62,8 +61,9 @@ class DataSecurityLevelEventListenerTest {
     void onKafkaDirectObject() {
         mockNoExistingPolicy();
         listener.onKafka(baseEvent("L3"));
-        // INSERT ecos_cls_policy —— 一次 UPDATE / INSERT 按情况（这里 mock 会走 INSERT）
-        verify(jdbc, atLeastOnce()).update(anyString(), any(Object[].class));
+        // INSERT ecos_cls_policy —— DAO 层应触发 CLS 新建
+        verify(dao, atLeastOnce()).insertClsPolicy(anyString(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString());
     }
 
     @Test
@@ -78,7 +78,7 @@ class DataSecurityLevelEventListenerTest {
     void onKafkaMissingAssetSkip() {
         assertDoesNotThrow(() -> listener.onKafka(
             new DataAssetSecurityTaggedEvent("e", null, "r", "t", "T", "d", "L3", 0, List.of(), "o", Instant.now())));
-        verifyNoInteractions(jdbc);
+        verifyNoInteractions(dao);
     }
 
     @Test
@@ -86,27 +86,21 @@ class DataSecurityLevelEventListenerTest {
     void applyPoliciesL4GeneratesRls() {
         mockNoExistingPolicy();
         listener.applyPolicies(baseEvent("L4"));
-        // RLS INSERT 命中 filter_expr='clearance_level >= 4'；至少一次 update 调用
-        verify(jdbc, atLeastOnce()).update(anyString(), any(Object[].class));
+        // RLS INSERT 命中 filter_expr='clearance_level >= 4'
+        verify(dao, atLeastOnce()).insertRlsPolicy(anyString(), anyString(), anyString(), anyString(),
+                eq("clearance_level >= 4"), anyString(), anyString());
     }
 
     @Test
     @DisplayName("applyPolicies — 既有 CLS 策略走 UPDATE 分支 (R9 资源 id 双轨覆盖)")
     void applyPoliciesUpdatesExistingCls() {
-        when(jdbc.queryForList(anyString(), eq(String.class), any(String.class), any(String.class)))
-            .thenReturn(List.of("EXISTING-CLS-ID"));
+        when(dao.findExistingPolicy(anyString(), anyString(), anyString()))
+            .thenReturn("EXISTING-CLS-ID");
         // L3 只有 CLS；L3 写入用 UPDATE（因为 existingId != null）
         listener.applyPolicies(baseEvent("L3"));
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbc, atLeastOnce()).update(sqlCaptor.capture(), any(Object[].class));
-        // UPDATE 只写既有 blocked_cols —— 不应构建新 INSERT
-        boolean hasUpdate = false, hasInsert = false;
-        for (String s : sqlCaptor.getAllValues()) {
-            if (s.startsWith("UPDATE ecos_cls_policy") || s.contains("UPDATE ecos_cls_policy")) hasUpdate = true;
-            if (s.contains("INSERT INTO ecos_cls_policy")) hasInsert = true;
-        }
-        assertTrue(hasUpdate, "L3 已存在策略 → 走 UPDATE 分支");
-        assertFalse(hasInsert, "L3 已存在策略 → 不应再 INSERT");
+        verify(dao, atLeastOnce()).updateClsPolicy(anyString(), anyString(), anyString(), eq("EXISTING-CLS-ID"));
+        verify(dao, never()).insertClsPolicy(anyString(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString());
     }
 
     /** kafka topic 常量对齐 EventBusService 编程式订阅 */

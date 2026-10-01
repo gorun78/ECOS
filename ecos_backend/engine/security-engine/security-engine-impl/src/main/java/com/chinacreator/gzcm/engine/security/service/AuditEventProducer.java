@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.security.dao.AuditDao;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -31,12 +31,12 @@ public class AuditEventProducer {
 
     private static final Logger log = LoggerFactory.getLogger(AuditEventProducer.class);
 
-    private final JdbcTemplate jdbc;
+    private final AuditDao auditDao;
     @Autowired(required = false)
     private EventBusService eventBus;
 
-    public AuditEventProducer(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AuditEventProducer(AuditDao auditDao) {
+        this.auditDao = auditDao;
     }
 
     /** 审计事件结构（发布到 Kafka 的 payload 序列化形态）。 */
@@ -76,10 +76,7 @@ public class AuditEventProducer {
         try {
             Map<String, Object> payload = toMap(event);
             String payloadJson = toJsonSafe(payload);
-            jdbc.update(
-                "INSERT INTO ecos_runtime_audit_retry (id, event_type, payload, attempts, next_retry_at, status, create_time, update_time, version_no, is_deleted, domain) " +
-                "VALUES (?, 'security_audit', ?, 0, NOW(), 'pending', NOW(), NOW(), '1', 0, 'default')",
-                event.id(), payloadJson);
+            auditDao.insertAuditRetry(event.id(), payloadJson);
             log.warn("审计事件入重试表: id={}, action={}", event.id(), event.action());
         } catch (Exception retryEx) {
             log.error("审计事件重试表也写入失败(仅 log): id={}, error={}",

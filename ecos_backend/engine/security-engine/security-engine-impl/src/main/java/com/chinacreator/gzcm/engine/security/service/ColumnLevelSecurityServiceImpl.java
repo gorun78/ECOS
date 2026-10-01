@@ -1,12 +1,12 @@
 package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.security.dao.ColumnLevelSecurityDao;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -17,10 +17,10 @@ public class ColumnLevelSecurityServiceImpl {
     private static final Logger log = LoggerFactory.getLogger(ColumnLevelSecurityServiceImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbcTemplate;
+    private final ColumnLevelSecurityDao dao;
 
-    public ColumnLevelSecurityServiceImpl(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public ColumnLevelSecurityServiceImpl(ColumnLevelSecurityDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -33,20 +33,9 @@ public class ColumnLevelSecurityServiceImpl {
      * {@code resource_id} 命中（数据资产驱动，参见 {@code DataSecurityLevelEventListener}）。
      */
     public Map<String, Object> getColumns(String tableName, String userId, List<String> allColumns) {
-        String sql = """
-            SELECT visible_cols, blocked_cols, priority, policy_name
-            FROM ecos_cls_policy
-            WHERE (table_name = ? OR resource_id = ?) AND enabled = true
-              AND (user_id = ? OR user_id IS NULL)
-              AND (role_id IS NULL OR role_id IN (
-                  SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?
-              ))
-            ORDER BY priority ASC
-            """;
-
         List<Map<String, Object>> policies;
         try {
-            policies = jdbcTemplate.queryForList(sql, tableName, tableName, userId, userId);
+            policies = dao.findPoliciesForUser(tableName, userId);
         } catch (Exception e) {
             log.warn("查询CLS策略失败，按 fail-closed 拒绝全部列: table={}, userId={}", tableName, userId, e);
             return deniedResult(tableName, Collections.emptyList());
@@ -102,20 +91,11 @@ public class ColumnLevelSecurityServiceImpl {
     // ── CRUD ──────────────────────────────────────────
 
     public List<Map<String, Object>> listPolicies(String tableName) {
-        String sql;
-        Object[] args;
-        if (tableName != null && !tableName.isBlank()) {
-            sql = "SELECT * FROM ecos_cls_policy WHERE table_name = ? ORDER BY priority ASC, created_at DESC";
-            args = new Object[]{tableName};
-        } else {
-            sql = "SELECT * FROM ecos_cls_policy ORDER BY priority ASC, created_at DESC";
-            args = new Object[]{};
-        }
-        return jdbcTemplate.queryForList(sql, args);
+        return dao.listPolicies(tableName);
     }
 
     public Map<String, Object> getPolicy(String id) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM ecos_cls_policy WHERE id = ?", id);
+        List<Map<String, Object>> rows = dao.findByPolicyId(id);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
@@ -140,8 +120,7 @@ public class ColumnLevelSecurityServiceImpl {
             throw new ValidationException("blockedCols 序列化失败，策略未创建");
         }
 
-        jdbcTemplate.update(
-            "INSERT INTO ecos_cls_policy (id, policy_name, table_name, visible_cols, blocked_cols, role_id, user_id, priority, enabled, description, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        dao.createPolicy(
             id,
             body.getOrDefault("policyName", ""),
             body.getOrDefault("tableName", ""),
@@ -186,8 +165,7 @@ public class ColumnLevelSecurityServiceImpl {
             }
         }
 
-        jdbcTemplate.update(
-            "UPDATE ecos_cls_policy SET policy_name=?, table_name=?, visible_cols=?, blocked_cols=?, role_id=?, user_id=?, priority=?, enabled=?, description=?, updated_at=NOW() WHERE id=?",
+        dao.updatePolicy(
             body.getOrDefault("policyName", existing.get("policy_name")),
             body.getOrDefault("tableName", existing.get("table_name")),
             visibleColsJson,
@@ -204,7 +182,7 @@ public class ColumnLevelSecurityServiceImpl {
     }
 
     public boolean deletePolicy(String id) {
-        int rows = jdbcTemplate.update("DELETE FROM ecos_cls_policy WHERE id = ?", id);
+        int rows = dao.deletePolicy(id);
         if (rows > 0) {
             log.info("CLS策略删除: id={}", id);
         }

@@ -1,25 +1,27 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.security.dao.RowLevelSecurityDao;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * RlsControllerTest — 行级安全应用端点。
  *
  * <p>Wave-5.1 T-05：验证 tableName/userId 校验与 WHERE 子句 snippet 透传。
- * 使用真实 {@link RowLevelSecurityServiceImpl}，但抛异常的 JdbcTemplate
- * 让它返回空策略，确保不连 PG。
+ * 使用真实 {@link RowLevelSecurityServiceImpl}，但 mock {@link RowLevelSecurityDao}
+ * 的查询让它返回空策略，确保不连 PG。</p>
  */
 class RlsControllerTest {
 
@@ -27,20 +29,12 @@ class RlsControllerTest {
 
     @BeforeEach
     void setUp() {
-        // 构造一个 JdbcTemplate，其 queryForList 直接抛异常，
+        // 构造一个 mock DAO：查询直接抛异常，
         // RowLevelSecurityServiceImpl 内部 catch 后返回空策略 → condition=1=1
-        org.springframework.jdbc.core.JdbcTemplate jdbc = new org.springframework.jdbc.core.JdbcTemplate() {
-            @Override
-            public List<Map<String, Object>> queryForList(String sql, Object... args) {
-                throw new RuntimeException("DB not available in unit test");
-            }
-
-            @Override
-            public int update(String sql, Object... args) {
-                throw new RuntimeException("DB not available in unit test");
-            }
-        };
-        RowLevelSecurityServiceImpl rlsService = new RowLevelSecurityServiceImpl(jdbc);
+        RowLevelSecurityDao dao = mock(RowLevelSecurityDao.class);
+        when(dao.findPoliciesForUser(anyString(), anyString()))
+                .thenThrow(new RuntimeException("DB not available in unit test"));
+        RowLevelSecurityServiceImpl rlsService = new RowLevelSecurityServiceImpl(dao);
         this.controller = new RlsController(rlsService);
     }
 

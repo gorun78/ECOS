@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.event;
 
 import com.chinacreator.gzcm.common.event.DataAssetSecurityTaggedEvent;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.security.dao.DataSecurityLevelDao;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,7 +10,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -60,12 +60,12 @@ public class DataSecurityLevelEventListener {
     private static final String AUDIT_TOPIC = KafkaTopics.AUDIT;
     private static final String POLICY_PREFIX = "asset-";
 
-    private final JdbcTemplate jdbc;
+    private final DataSecurityLevelDao dao;
     private final ObjectProvider<EventBusService> eventBus;
 
-    public DataSecurityLevelEventListener(JdbcTemplate jdbc,
+    public DataSecurityLevelEventListener(DataSecurityLevelDao dao,
                                           ObjectProvider<EventBusService> eventBusProvider) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.eventBus = eventBusProvider;
     }
 
@@ -172,26 +172,17 @@ public class DataSecurityLevelEventListener {
         String existingId = findExistingPolicy("ecos_cls_policy", resourceId, tableName);
         if (existingId != null) {
             // 覆盖式更新 — 行为直观 + 幂等清晰（仅写老列，避免迁移前缺列造成 SQL 报错）
-            jdbc.update(
-                "UPDATE ecos_cls_policy SET blocked_cols = ?, description = ?, created_by = ? " +
-                "WHERE id = ?",
-                blockedJson,
+            dao.updateClsPolicy(blockedJson,
                 "PMO-data10 资产 " + assetId + " 字段级脱敏",
                 operator, existingId);
             log.info("CLS policy 更新: id={} resource={} blockedCols={}",
                     existingId, resourceId, blockedCols.size());
         } else {
             String id = UUID.randomUUID().toString().replace("-", "");
-            jdbc.update(
-                "INSERT INTO ecos_cls_policy (" +
-                "  id, policy_name, table_name, resource_id, " +
-                "  visible_cols, blocked_cols, description, " +
-                "  enabled, priority, created_by" +
-                ") VALUES (?, 'asset-' || ?, ?, ?, ?, ?, ?, true, 10, ?)",
-                id, assetId, tableName, resourceId,
-                "[]", blockedJson,
-                "PMO-data10 资产 " + assetId + " 字段级脱敏",
-                operator);
+            dao.insertClsPolicy(id, assetId, tableName, resourceId,
+                    blockedJson,
+                    "PMO-data10 资产 " + assetId + " 字段级脱敏",
+                    operator);
             log.info("CLS policy 新建: id={} resource={} blockedCols={}",
                     id, resourceId, blockedCols.size());
         }
@@ -206,22 +197,15 @@ public class DataSecurityLevelEventListener {
 
         String existingId = findExistingPolicy("ecos_rls_policy", resourceId, tableName);
         if (existingId != null) {
-            jdbc.update(
-                "UPDATE ecos_rls_policy SET filter_expr = ?, description = ?, created_by = ? WHERE id = ?",
-                filterExpr, "PMO-data10 资产 " + assetId + " L4 准入",
-                operator, existingId);
+            dao.updateRlsPolicy(filterExpr, "PMO-data10 资产 " + assetId + " L4 准入",
+                    operator, existingId);
             log.info("RLS policy 更新: id={} resource={} filter='{}'",
                     existingId, resourceId, filterExpr);
         } else {
             String id = UUID.randomUUID().toString().replace("-", "");
-            jdbc.update(
-                "INSERT INTO ecos_rls_policy (" +
-                "  id, policy_name, table_name, resource_id, filter_expr, " +
-                "  description, enabled, priority, created_by" +
-                ") VALUES (?, 'asset-' || ?, ?, ?, ?, ?, true, 10, ?)",
-                id, assetId, tableName, resourceId, filterExpr,
-                "PMO-data10 资产 " + assetId + " L4 准入",
-                operator);
+            dao.insertRlsPolicy(id, assetId, tableName, resourceId, filterExpr,
+                    "PMO-data10 资产 " + assetId + " L4 准入",
+                    operator);
             log.info("RLS policy 新建: id={} resource={} filter='{}'",
                     id, resourceId, filterExpr);
         }
@@ -230,11 +214,7 @@ public class DataSecurityLevelEventListener {
     /** 查找已存在策略 id（V154 resource_id 优先，table_name 兜底向后兼容）。 */
     private String findExistingPolicy(String policyTable, String resourceId, String tableName) {
         try {
-            String sql = "SELECT id FROM " + policyTable +
-                    " WHERE enabled = true " +
-                    " AND (resource_id = ? OR table_name = ?) LIMIT 1";
-            List<String> ids = jdbc.queryForList(sql, String.class, resourceId, tableName);
-            return ids.isEmpty() ? null : ids.get(0);
+            return dao.findExistingPolicy(policyTable, resourceId, tableName);
         } catch (Exception e) {
             log.warn("查找既有 {} 策略失败: {}", policyTable, e.getMessage());
             return null;

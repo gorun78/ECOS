@@ -1,14 +1,13 @@
 package com.chinacreator.gzcm.engine.security.decision;
 
+import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -45,17 +44,17 @@ public class SecurityDecisionService {
     private final RowLevelSecurityServiceImpl rls;
     private final ColumnLevelSecurityServiceImpl cls;
     private final OpaPolicyService opa;
-    private final JdbcTemplate jdbc;
+    private final SecurityDecisionDao dao;
 
     public SecurityDecisionService(
             @Qualifier("ecosRlsService") RowLevelSecurityServiceImpl rls,
             @Qualifier("ecosClsService") ColumnLevelSecurityServiceImpl cls,
             OpaPolicyService opa,
-            JdbcTemplate jdbc) {
+            SecurityDecisionDao dao) {
         this.rls = rls;
         this.cls = cls;
         this.opa = opa;
-        this.jdbc = jdbc;
+        this.dao = dao;
     }
 
     public DecisionBundle decide(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
@@ -142,16 +141,7 @@ public class SecurityDecisionService {
         try {
             // asset_key 形如 [schema.]table.column；本表列目录的 asset_key 前缀 = asset.key()
             String prefix = asset.key();
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT split_part(asset_key, '.', array_position(string_to_array(asset_key, '.'), ?) + 1) AS column, " +
-                "       CASE WHEN guard_combo LIKE '%staff%' THEN 'STAFF_REF' " +
-                "            WHEN guard_combo LIKE '%amount%' THEN 'AMOUNT' " +
-                "            ELSE 'MASK' END AS strategy " +
-                "FROM ecos_security_asset " +
-                "WHERE kind = 'COLUMN' AND is_deleted = 0 " +
-                "  AND asset_key LIKE '%' || ? || '.%' " +
-                "ORDER BY asset_key",
-                asset.getTable(), prefix);
+            List<Map<String, Object>> rows = dao.masksForTable(asset.getTable(), prefix);
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> mm = new LinkedHashMap<>();

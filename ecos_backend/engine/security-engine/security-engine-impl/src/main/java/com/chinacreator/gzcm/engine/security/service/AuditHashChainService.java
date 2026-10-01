@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.engine.security.dao.AuditDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -23,10 +23,10 @@ public class AuditHashChainService {
     private static final String HASH_ALGORITHM = "SHA-256";
     private static final String EMPTY_HASH = sha256("");
 
-    private final JdbcTemplate jdbc;
+    private final AuditDao auditDao;
 
-    public AuditHashChainService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AuditHashChainService(AuditDao auditDao) {
+        this.auditDao = auditDao;
     }
 
     /**
@@ -36,14 +36,10 @@ public class AuditHashChainService {
     public void stampHashChain(long auditLogId) {
         try {
             // 获取当前记录内容
-            Map<String, Object> row = jdbc.queryForMap(
-                "SELECT username, operation, entity_type, entity_id, created_at::text as created_at " +
-                "FROM ecos_audit_log WHERE id = ?", auditLogId);
+            Map<String, Object> row = auditDao.findAuditRowContent(auditLogId);
 
             // 获取前一条记录的 curr_hash
-            String prevHash = jdbc.queryForObject(
-                "SELECT COALESCE(curr_hash, ?) FROM ecos_audit_log WHERE id < ? ORDER BY id DESC LIMIT 1",
-                String.class, EMPTY_HASH, auditLogId);
+            String prevHash = auditDao.findPrevHash(auditLogId, EMPTY_HASH);
             if (prevHash == null) prevHash = EMPTY_HASH;
 
             // 计算当前记录的哈希: SHA-256(prev_hash || username || operation || entity_type || entity_id || created_at)
@@ -56,9 +52,7 @@ public class AuditHashChainService {
             String currHash = sha256(recordContent);
 
             // 更新哈希字段
-            jdbc.update(
-                "UPDATE ecos_audit_log SET prev_hash = ?, curr_hash = ?, hash_algorithm = ? WHERE id = ?",
-                prevHash, currHash, HASH_ALGORITHM, auditLogId);
+            auditDao.updateHashFields(prevHash, currHash, HASH_ALGORITHM, auditLogId);
         } catch (Exception e) {
             log.warn("审计哈希链戳记失败: id={}, error={}", auditLogId, e.getMessage());
         }
@@ -75,9 +69,7 @@ public class AuditHashChainService {
         String expectedPrevHash = EMPTY_HASH;
 
         try {
-            var rows = jdbc.queryForList(
-                "SELECT id, username, operation, entity_type, entity_id, created_at::text as created_at, " +
-                "prev_hash, curr_hash FROM ecos_audit_log ORDER BY created_at ASC, id ASC");
+            var rows = auditDao.findHashChainRows();
 
             for (Map<String, Object> row : rows) {
                 totalChecked++;

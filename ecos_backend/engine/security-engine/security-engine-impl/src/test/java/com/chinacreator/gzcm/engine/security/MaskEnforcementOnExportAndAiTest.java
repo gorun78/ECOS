@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security;
 
+import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
@@ -10,7 +11,6 @@ import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +22,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * 详细设计-01 F01-03 — 脱敏（mask）出口治理：导出与 AI 工具通道<b>强制</b>经 mask 裁决。
+ *
+ * <p>B3b-security 数据访问收口后：mask 源目录收敛到 {@link SecurityDecisionDao#masksForTable}。</p>
  *
  * <p>断言：</p>
  * <ul>
@@ -39,8 +41,8 @@ class MaskEnforcementOnExportAndAiTest {
         RowLevelSecurityServiceImpl rls = mock(RowLevelSecurityServiceImpl.class);
         ColumnLevelSecurityServiceImpl cls = mock(ColumnLevelSecurityServiceImpl.class);
         OpaPolicyService opa = mock(OpaPolicyService.class);
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        svc = new SecurityDecisionService(rls, cls, opa, jdbc);
+        SecurityDecisionDao dao = mock(SecurityDecisionDao.class);
+        svc = new SecurityDecisionService(rls, cls, opa, dao);
 
         Map<String, Object> rlsRes = new LinkedHashMap<>();
         Map<String, Object> pred = new LinkedHashMap<>();
@@ -61,7 +63,7 @@ class MaskEnforcementOnExportAndAiTest {
         when(opa.evaluate(anyString(), anyMap())).thenReturn(opaRes);
 
         // 目录：staff_ref → STAFF_REF，amount → AMOUNT（两张登记列都走 mask）
-        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+        when(dao.masksForTable(anyString(), anyString())).thenReturn(List.of(
                 Map.of("column", "staff_ref", "strategy", "STAFF_REF"),
                 Map.of("column", "amount", "strategy", "AMOUNT")));
     }
@@ -97,11 +99,11 @@ class MaskEnforcementOnExportAndAiTest {
     @DisplayName("目录未登记 → masks 空（不放大权限）")
     void noCatalogEntryMeansNoMaskInflation() {
         // 用空目录重建服务
-        JdbcTemplate emptyJdbc = mock(JdbcTemplate.class);
+        SecurityDecisionDao emptyDao = mock(SecurityDecisionDao.class);
         RowLevelSecurityServiceImpl rls = mock(RowLevelSecurityServiceImpl.class);
         ColumnLevelSecurityServiceImpl cls = mock(ColumnLevelSecurityServiceImpl.class);
         OpaPolicyService opa = mock(OpaPolicyService.class);
-        SecurityDecisionService svcEmpty = new SecurityDecisionService(rls, cls, opa, emptyJdbc);
+        SecurityDecisionService svcEmpty = new SecurityDecisionService(rls, cls, opa, emptyDao);
 
         Map<String, Object> r = new LinkedHashMap<>();
         Map<String, Object> pred = new LinkedHashMap<>();
@@ -116,7 +118,7 @@ class MaskEnforcementOnExportAndAiTest {
         o.put("policyRef", "p");
         o.put("obligations", List.of());
         when(opa.evaluate(anyString(), anyMap())).thenReturn(o);
-        when(emptyJdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+        when(emptyDao.masksForTable(anyString(), anyString())).thenReturn(List.of());
 
         DecisionBundle b = svcEmpty.decide(asset(), DecisionBundle.Purpose.EXPORT, ctx());
         assertTrue(b.masks().isEmpty(), "无目录登记不得凭空放大 mask 集合");
