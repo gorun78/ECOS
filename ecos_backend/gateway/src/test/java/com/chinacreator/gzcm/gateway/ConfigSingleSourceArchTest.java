@@ -52,7 +52,9 @@ class ConfigSingleSourceArchTest {
             "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/UserController.java",
             // gateway 内置面板的 sysman-facade 直通（组织/认证鉴权面，非引擎）
             "gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/SysConfigController.java",
-            "gateway/src/main/java/com/chinacreator/gzcm/gateway/service/GatewaySysConfigService.java"
+            // B6b R2 收口：facade 门面已下沉 JdbcTemplateDaoSupport 派生的 DAO（架构铁律 §2.5 / IR06）
+            "gateway/src/main/java/com/chinacreator/gzcm/gateway/service/GatewaySysConfigService.java",
+            "gateway/src/main/java/com/chinacreator/gzcm/gateway/dao/SysConfigDao.java"
     ));
 
     private static final Pattern SYS_CONFIG_SQL =

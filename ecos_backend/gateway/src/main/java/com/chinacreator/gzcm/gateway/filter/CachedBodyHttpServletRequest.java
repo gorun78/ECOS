@@ -17,9 +17,10 @@ import java.nio.charset.StandardCharsets;
 /**
  * P0-3' 修复：包装 HttpServletRequest 使 body 可重读。
  *
- * <p>QuotaFilter 内部用 {@code jdbc.query} 执行原子 UPDATE 时，spring-tomcat 已将
- * request body 流化一遍。如果下游 Spring MVC {@code @RequestBody} 再次读取，会因
- * InputStream 已被消费而 EOF → 400 {@code HttpMessageNotReadableException}。
+ * <p>QuotaFilter 经 {@link QuotaDao} 执行原子 UPDATE（用量累加）时，其过滤发生在
+ * request body 被 Spring 通过 {@code @RequestBody} 读取之前；而本 wrapper 需保证
+ * 即便 QuotaFilter 先读过 body，下游 Spring MVC 再次读取也不因 InputStream 已被消费
+ * 而 EOF → 400 {@code HttpMessageNotReadableException}。
  *
  * <p>本 wrapper 在构造时一次性读全 body 到内存 {@code bodyBuf}，
  * 之后 {@link #getInputStream()} / {@link #getReader()} 均从该 buffer 返回新流。
