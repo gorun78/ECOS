@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.config;
 
 import com.chinacreator.gzcm.runtime.core.monitor.interfaces.IWarnLogService;
+import com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.WarnLogDao;
 import com.chinacreator.gzcm.runtime.core.monitor.service.impl.WarnLogServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * PMO-59 P2b 心智层装配配置 — 仅补"公共底座缺口"，不新建引擎自有基建（铁律 §2.5 补强而非自建）。
@@ -23,6 +23,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * {@code KafkaTemplate<String,String>}）已由 PMO-74 H2-T4 迁至 runtime-event 底座
  * （{@code KafkaBusProducerConfig}），本类不再持有 spring-kafka 依赖（铁律 §2.5：事件通道
  * 单一收敛于 runtime-event）。</p>
+ *
+ * <p>R2-B4c 数据访问收口：落库通道由 runtime 侧 {@link WarnLogDao}（..server.warn.dao..，
+ * 继承 runtime-core {@code JdbcTemplateDaoSupport}）承担，本配置不再直接持有 JdbcTemplate。</p>
  */
 @Configuration
 public class CognitiveMentalConfig {
@@ -32,18 +35,19 @@ public class CognitiveMentalConfig {
     /**
      * 告警日志服务（runtime-monitor 公共底座；补强既有 impl 的 Spring 装配缺口）。
      *
-     * <p>PMO-59 P4a：装配时一并注入 {@link JdbcTemplate}，使告警落库 {@code ecos_warn_log}（V131），
-     * 关闭 P2b「告警内存态，进程重启即失」残留风险；JdbcTemplate 缺失时退化为纯内存态（仅 WARN，不阻断启动）。</p>
+     * <p>PMO-59 P4a：装配时通过 {@link ObjectProvider} 条件注入 {@link WarnLogDao}（DAO 已
+     * {@code @ConditionalOnBean(JdbcTemplate.class)}，无数据源栈时该 bean 缺失），使告警落库
+     * {@code ecos_warn_log}（V131）；DAO 缺失时退化为纯内存态（仅 WARN，不阻断启动）。</p>
      */
     @Bean
     @ConditionalOnMissingBean(IWarnLogService.class)
-    public IWarnLogService cognitiveWarnLogService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
-        if (jdbcTemplate == null) {
-            log.warn("[CognitiveMental] IWarnLogService 已装配，但 JdbcTemplate 缺失 → 告警仅内存态（不落库）");
+    public IWarnLogService cognitiveWarnLogService(ObjectProvider<WarnLogDao> warnLogDaoProvider) {
+        WarnLogDao dao = warnLogDaoProvider.getIfAvailable();
+        if (dao == null) {
+            log.warn("[CognitiveMental] IWarnLogService 已装配，但 WarnLogDao 缺失 → 告警仅内存态（不落库）");
         } else {
             log.info("[CognitiveMental] IWarnLogService 已装配 + 告警落库通道启用 (ecos_warn_log, PMO-59 P4a)");
         }
-        return new WarnLogServiceImpl(jdbcTemplate);
+        return new WarnLogServiceImpl(dao);
     }
 }
