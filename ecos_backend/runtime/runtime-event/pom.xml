@@ -52,6 +52,14 @@
             <artifactId>spring-jdbc</artifactId>
         </dependency>
 
+        <!-- R2 B4c-runtime: DLQ DAO 收敛点继承 runtime-core/database/support.JdbcTemplateDaoSupport
+             (AlertDao/WarnLogDao 同族底座, 与 monitor/core 复用同一 JdbcTemplate 通道) -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-core</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- 测试 (PMO-74 H2-T8: 本模块此前零测试); 版本由 root pom dependencyManagement 锁定 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -61,6 +69,17 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- R2 B4c-runtime: DataAccessArchTest 门禁 + ReflectionTestUtils 注入 mock jdbcTemplate -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

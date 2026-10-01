@@ -9,10 +9,8 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
@@ -20,18 +18,17 @@ import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.persistence.ITaskPersistenceService;
 import com.chinacreator.gzcm.runtime.core.task.persistence.TaskPersistenceException;
+import com.chinacreator.gzcm.runtime.core.task.persistence.dao.TaskPersistenceDao;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * PMO-72 W4 — JdbcTemplate 直连 sys_man 的任务持久化服务。
+ * PMO-72 W4 — R2 B4c-runtime（架构铁律 §2.5#1 / IR06）收口后的任务持久化服务。
  *
- * <p>替代 {@link DatabaseTaskPersistenceServiceImpl} 通过 ISystemDatabaseAccess 反射落库的"假实现"。
- * 这里 5 张表 (td_runtime_task / _plan / _status / _log / _execution) 全部走 Spring JdbcTemplate
- * (HikariCP 默认池, IR01/EN01)。全部 SQL 列名必须双引号包裹 (pg_attribute quote_ident 验证)。</p>
- *
- * <p>失败容忍：{@code saveX} 失败抛 {@link TaskPersistenceException}（与接口契约一致）；
- * {@code updatePlanXxxPersist} / {@code logTask} / {@code recordExecution} 失败仅 warn，吞掉不抛（双态同 Kafka）。</p>
+ * <p>R2 收口：raw-SQL 全部下沉到 {@link TaskPersistenceDao}（sys_man 5 张表
+ * td_runtime_task / _plan / _status / _log / _execution），本类退化为编排骨架
+ * + 失败容忍策略（saveX 抛 / watch 吞掉）+ DTO↔row 映射门面，生产类不再持有
+ * JdbcTemplate。</p>
  *
  * @author PMO Worker (W4)
  */
@@ -45,20 +42,10 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
     private static final TypeReference<List<String>> LIST_TYPE = new TypeReference<List<String>>() { };
     private static final TypeReference<Object> JSON_ANY = new TypeReference<Object>() { };
 
-    private static final String T_TASK = "td_runtime_task";
-    private static final String T_PLAN = "td_runtime_task_plan";
-    private static final String T_STATUS = "td_runtime_task_status";
-    private static final String T_EXEC = "td_runtime_task_execution";
-    private static final String T_LOG = "td_runtime_task_log";
+    private final TaskPersistenceDao dao;
 
-    private final JdbcTemplate jdbcTemplate;
-
-    @SuppressWarnings("unused")
-    @Value("${spring.datasource.url:}")
-    private String jdbcUrl;
-
-    public JdbcTaskPersistenceService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public JdbcTaskPersistenceService(TaskPersistenceDao dao) {
+        this.dao = dao;
     }
 
     // ============================= 任务 =============================
@@ -69,53 +56,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("TaskDescription.taskId 不能为空");
         }
         try {
-            String sql = "INSERT INTO " + T_TASK +
-                    " (\"TASK_ID\",\"TASK_NAME\",\"TASK_TYPE\",\"DESCRIPTION\",\"TASK_CONFIG\"," +
-                    "  \"PARAMETERS\",\"PRIORITY\",\"TIMEOUT\",\"RETRY_COUNT\",\"ASYNC_FLAG\"," +
-                    "  \"DEPENDENCIES\",\"SCHEDULE_ID\",\"NODE_ID\",\"EXECUTION_MODE\"," +
-                    "  \"CREATED_BY\",\"TENANT_ID\",\"TAGS\",\"EXTENSIONS\"," +
-                    "  \"CREATED_TIME\",\"UPDATED_TIME\",\"create_time\",\"update_time\"," +
-                    "  \"create_by\",\"update_by\",\"is_deleted\",\"domain\",\"version_no\") " +
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,NOW(),NOW(),?,?,?,0,'default','1') " +
-                    "ON CONFLICT (\"TASK_ID\") DO UPDATE SET " +
-                    "  \"TASK_NAME\"=EXCLUDED.\"TASK_NAME\", " +
-                    "  \"TASK_TYPE\"=EXCLUDED.\"TASK_TYPE\", " +
-                    "  \"DESCRIPTION\"=EXCLUDED.\"DESCRIPTION\", " +
-                    "  \"TASK_CONFIG\"=EXCLUDED.\"TASK_CONFIG\", " +
-                    "  \"PARAMETERS\"=EXCLUDED.\"PARAMETERS\", " +
-                    "  \"PRIORITY\"=EXCLUDED.\"PRIORITY\", " +
-                    "  \"TIMEOUT\"=EXCLUDED.\"TIMEOUT\", " +
-                    "  \"RETRY_COUNT\"=EXCLUDED.\"RETRY_COUNT\", " +
-                    "  \"ASYNC_FLAG\"=EXCLUDED.\"ASYNC_FLAG\", " +
-                    "  \"DEPENDENCIES\"=EXCLUDED.\"DEPENDENCIES\", " +
-                    "  \"SCHEDULE_ID\"=EXCLUDED.\"SCHEDULE_ID\", " +
-                    "  \"NODE_ID\"=EXCLUDED.\"NODE_ID\", " +
-                    "  \"EXECUTION_MODE\"=EXCLUDED.\"EXECUTION_MODE\", " +
-                    "  \"CREATED_BY\"=EXCLUDED.\"CREATED_BY\", " +
-                    "  \"TENANT_ID\"=EXCLUDED.\"TENANT_ID\", " +
-                    "  \"TAGS\"=EXCLUDED.\"TAGS\", " +
-                    "  \"EXTENSIONS\"=EXCLUDED.\"EXTENSIONS\", " +
-                    "  \"UPDATED_TIME\"=NOW(), \"update_time\"=NOW()";
-            jdbcTemplate.update(sql,
-                    task.getTaskId(), task.getTaskName(), task.getTaskType(),
-                    task.getDescription(), task.getTaskConfig(),
-                    jstr(task.getParameters()),
-                    intOrZero(task.getPriority()),
-                    longOrZero(task.getTimeout()),
-                    intOrZero(task.getRetryCount()),
-                    task.getAsync() ? "1" : "0",
-                    jstr(task.getDependencies()),
-                    ext(task, "scheduleId"), ext(task, "nodeId"), ext(task, "executionMode"),
-                    task.getCreatedBy(), task.getTenantId(),
-                    jstr(task.getTags()), jstr(task.getExtensions()),
-                    task.getCreatedBy(), task.getCreatedBy());
-
-            // 同步原大写字段（V150 双轨）
-            if (task.getCreateTime() != null) {
-                jdbcTemplate.update("UPDATE " + T_TASK +
-                        " SET \"CREATED_TIME\"=? WHERE \"TASK_ID\"=?",
-                        ts(task.getCreateTime()), task.getTaskId());
-            }
+            dao.saveTask(task);
         } catch (Exception e) {
             logger.error("PG saveTask 失败: taskId={}", task.getTaskId(), e);
             throw new TaskPersistenceException("PG saveTask 失败: " + e.getMessage(), e);
@@ -128,13 +69,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("taskId 不能为空");
         }
         try {
-            String sql = "SELECT \"TASK_ID\",\"TASK_NAME\",\"TASK_TYPE\",\"DESCRIPTION\",\"TASK_CONFIG\"," +
-                    " \"PARAMETERS\",\"PRIORITY\",\"TIMEOUT\",\"RETRY_COUNT\",\"ASYNC_FLAG\"," +
-                    " \"DEPENDENCIES\",\"SCHEDULE_ID\",\"NODE_ID\",\"EXECUTION_MODE\"," +
-                    " \"CREATED_BY\",\"TENANT_ID\",\"TAGS\",\"EXTENSIONS\",\"CREATED_TIME\" " +
-                    "FROM " + T_TASK +
-                    " WHERE \"TASK_ID\"=? AND is_deleted=0";
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, taskId);
+            List<Map<String, Object>> rows = dao.queryTask(taskId);
             if (rows.isEmpty()) {
                 return null;
             }
@@ -153,20 +88,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("TaskExecutionPlan.taskId 不能为空");
         }
         try {
-            String sql = "INSERT INTO " + T_PLAN +
-                    " (\"TASK_ID\",\"PLAN_CONTENT\",\"EXECUTION_MODE\",\"TARGET_NODE_ID\"," +
-                    "  \"CREATED_TIME\",\"UPDATED_TIME\") " +
-                    "VALUES (?, ?, ?, ?, NOW(), NOW()) " +
-                    "ON CONFLICT (\"TASK_ID\") DO UPDATE SET " +
-                    "  \"PLAN_CONTENT\"=EXCLUDED.\"PLAN_CONTENT\", " +
-                    "  \"EXECUTION_MODE\"=COALESCE(EXCLUDED.\"EXECUTION_MODE\", \"EXECUTION_MODE\"), " +
-                    "  \"TARGET_NODE_ID\"=COALESCE(EXCLUDED.\"TARGET_NODE_ID\", \"TARGET_NODE_ID\"), " +
-                    "  \"UPDATED_TIME\"=NOW()";
-            jdbcTemplate.update(sql,
-                    plan.getTaskId(),
-                    jstr(plan),
-                    metaStr(plan.getMetadata(), "executionMode"),
-                    metaStr(plan.getMetadata(), "targetNodeId"));
+            dao.savePlan(plan);
         } catch (Exception e) {
             logger.error("PG savePlan 失败: taskId={}", plan.getTaskId(), e);
             throw new TaskPersistenceException("PG savePlan 失败: " + e.getMessage(), e);
@@ -179,10 +101,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("taskId 不能为空");
         }
         try {
-            String sql = "SELECT \"TASK_ID\",\"PLAN_CONTENT\",\"EXECUTION_MODE\",\"TARGET_NODE_ID\" " +
-                    "FROM " + T_PLAN +
-                    " WHERE \"TASK_ID\"=? AND is_deleted=0";
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, taskId);
+            List<Map<String, Object>> rows = dao.queryPlan(taskId);
             if (rows.isEmpty()) {
                 return null;
             }
@@ -230,12 +149,8 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             return false;
         }
         try {
-            int r = jdbcTemplate.update("UPDATE " + T_PLAN +
-                    " SET \"CRON_EXPRESSION\"=?, \"NEXT_RUN_AT\"=?, \"TASK_NAME\"=?, \"TASK_TYPE\"=?, " +
-                    "     \"EXECUTION_MODE\"=?, \"TARGET_NODE_ID\"=?, \"UPDATED_TIME\"=NOW() " +
-                    "WHERE \"TASK_ID\"=?",
-                    cronExpression, ts(nextRunAt), taskName, taskType,
-                    executionMode, targetNodeId, taskId);
+            int r = dao.updatePlanState(taskId, taskName, taskType, cronExpression,
+                    nextRunAt, executionMode, targetNodeId);
             return r >= 0;
         } catch (Exception e) {
             logger.warn("PG saveJdbcPlanState 失败: taskId={}", taskId, e);
@@ -251,10 +166,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             return false;
         }
         try {
-            int r = jdbcTemplate.update("UPDATE " + T_PLAN +
-                    " SET \"LAST_RUN_AT\"=?, \"LAST_STATUS\"=?, \"UPDATED_TIME\"=NOW() " +
-                    "WHERE \"TASK_ID\"=?",
-                    ts(lastRunAt), lastStatus, taskId);
+            int r = dao.markLastRun(taskId, lastRunAt, lastStatus);
             return r >= 0;
         } catch (Exception e) {
             logger.warn("PG markLastRun 失败: taskId={}", taskId, e);
@@ -268,26 +180,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
      */
     public List<JdbcPlanState> listPlansByType(String taskType) {
         try {
-            String sql;
-            Object[] params;
-            if (taskType != null && !taskType.isEmpty()) {
-                sql = "SELECT \"TASK_ID\",\"PLAN_CONTENT\",\"TASK_NAME\",\"TASK_TYPE\"," +
-                        "  \"CRON_EXPRESSION\",\"NEXT_RUN_AT\",\"LAST_RUN_AT\",\"LAST_STATUS\"," +
-                        "  \"EXECUTION_MODE\",\"TARGET_NODE_ID\" " +
-                        "FROM " + T_PLAN +
-                        " WHERE \"TASK_TYPE\"= ? AND is_deleted=0 " +
-                        "ORDER BY \"UPDATED_TIME\" DESC NULLS LAST LIMIT 1000";
-                params = new Object[]{taskType};
-            } else {
-                sql = "SELECT \"TASK_ID\",\"PLAN_CONTENT\",\"TASK_NAME\",\"TASK_TYPE\"," +
-                        "  \"CRON_EXPRESSION\",\"NEXT_RUN_AT\",\"LAST_RUN_AT\",\"LAST_STATUS\"," +
-                        "  \"EXECUTION_MODE\",\"TARGET_NODE_ID\" " +
-                        "FROM " + T_PLAN +
-                        " WHERE is_deleted=0 " +
-                        "ORDER BY \"UPDATED_TIME\" DESC NULLS LAST LIMIT 1000";
-                params = new Object[]{ };
-            }
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params);
+            List<Map<String, Object>> rows = dao.queryPlansByType(taskType);
             List<JdbcPlanState> out = new ArrayList<>(rows.size());
             for (Map<String, Object> r : rows) {
                 JdbcPlanState p = new JdbcPlanState();
@@ -319,10 +212,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("taskId 不能为空");
         }
         try {
-            // R9：逻辑删除
-            jdbcTemplate.update("UPDATE " + T_PLAN +
-                    " SET \"is_deleted\"=1, \"UPDATED_TIME\"=NOW() WHERE \"TASK_ID\"=?",
-                    taskId);
+            dao.softDeletePlan(taskId);
         } catch (Exception e) {
             logger.error("PG deletePlan 失败: taskId={}", taskId, e);
             throw new TaskPersistenceException("PG deletePlan 失败: " + e.getMessage(), e);
@@ -337,40 +227,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("TaskStatus.taskId 不能为空");
         }
         try {
-            String sql = "INSERT INTO " + T_STATUS +
-                    " (\"TASK_ID\",\"STATUS\",\"STATUS_MESSAGE\",\"PROGRESS\",\"CURRENT_STEP_ID\"," +
-                    "  \"START_TIME\",\"END_TIME\",\"ESTIMATED_REMAINING_TIME\"," +
-                    "  \"PROCESSED_COUNT\",\"TOTAL_COUNT\",\"ERROR_MESSAGE\",\"ERROR_STACK\"," +
-                    "  \"RESULT\",\"METRICS\",\"EXECUTION_NODE_ID\",\"UPDATED_TIME\") " +
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW()) " +
-                    "ON CONFLICT (\"TASK_ID\") DO UPDATE SET " +
-                    "  \"STATUS\"=EXCLUDED.\"STATUS\", " +
-                    "  \"STATUS_MESSAGE\"=EXCLUDED.\"STATUS_MESSAGE\", " +
-                    "  \"PROGRESS\"=EXCLUDED.\"PROGRESS\", " +
-                    "  \"CURRENT_STEP_ID\"=EXCLUDED.\"CURRENT_STEP_ID\", " +
-                    "  \"START_TIME\"=COALESCE(EXCLUDED.\"START_TIME\", \"START_TIME\"), " +
-                    "  \"END_TIME\"=COALESCE(EXCLUDED.\"END_TIME\", \"END_TIME\"), " +
-                    "  \"ESTIMATED_REMAINING_TIME\"=EXCLUDED.\"ESTIMATED_REMAINING_TIME\", " +
-                    "  \"PROCESSED_COUNT\"=EXCLUDED.\"PROCESSED_COUNT\", " +
-                    "  \"TOTAL_COUNT\"=EXCLUDED.\"TOTAL_COUNT\", " +
-                    "  \"ERROR_MESSAGE\"=EXCLUDED.\"ERROR_MESSAGE\", " +
-                    "  \"ERROR_STACK\"=EXCLUDED.\"ERROR_STACK\", " +
-                    "  \"RESULT\"=EXCLUDED.\"RESULT\", " +
-                    "  \"METRICS\"=EXCLUDED.\"METRICS\", " +
-                    "  \"EXECUTION_NODE_ID\"=EXCLUDED.\"EXECUTION_NODE_ID\", " +
-                    "  \"UPDATED_TIME\"=NOW()";
-            jdbcTemplate.update(sql,
-                    status.getTaskId(),
-                    status.getStatus() != null ? status.getStatus().name() : "PENDING",
-                    status.getStatusMessage(),
-                    status.getProgress(),
-                    status.getCurrentStepId(),
-                    ts(status.getStartTime()), ts(status.getEndTime()),
-                    status.getEstimatedRemainingTime(),
-                    status.getProcessedRecords(), status.getTotalRecords(),
-                    status.getErrorMessage(), status.getErrorStack(),
-                    status.getResult(), jstr(status.getMetrics()),
-                    metricNode(status));
+            dao.saveStatus(status);
         } catch (Exception e) {
             logger.error("PG saveStatus 失败: taskId={}", status.getTaskId(), e);
             throw new TaskPersistenceException("PG saveStatus 失败: " + e.getMessage(), e);
@@ -383,13 +240,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             throw new TaskPersistenceException("taskId 不能为空");
         }
         try {
-            String sql = "SELECT \"TASK_ID\",\"STATUS\",\"STATUS_MESSAGE\",\"PROGRESS\",\"CURRENT_STEP_ID\"," +
-                    " \"START_TIME\",\"END_TIME\",\"ESTIMATED_REMAINING_TIME\"," +
-                    " \"PROCESSED_COUNT\",\"TOTAL_COUNT\",\"ERROR_MESSAGE\",\"ERROR_STACK\"," +
-                    " \"RESULT\",\"METRICS\",\"EXECUTION_NODE_ID\",\"UPDATED_TIME\" " +
-                    "FROM " + T_STATUS +
-                    " WHERE \"TASK_ID\"=?";
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, taskId);
+            List<Map<String, Object>> rows = dao.queryStatus(taskId);
             if (rows.isEmpty()) {
                 return null;
             }
@@ -406,37 +257,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
     public List<TaskDescription> queryTasks(Map<String, Object> condition, int offset, int limit)
             throws TaskPersistenceException {
         try {
-            StringBuilder where = new StringBuilder(" WHERE is_deleted=0");
-            List<Object> params = new ArrayList<>();
-            if (condition != null) {
-                if (condition.get("taskType") != null) {
-                    where.append(" AND \"TASK_TYPE\"=?");
-                    params.add(condition.get("taskType"));
-                }
-                if (condition.get("taskId") != null) {
-                    where.append(" AND \"TASK_ID\"=?");
-                    params.add(condition.get("taskId"));
-                }
-                if (condition.get("tenantId") != null) {
-                    where.append(" AND \"TENANT_ID\"=?");
-                    params.add(condition.get("tenantId"));
-                }
-                if (condition.get("createdBy") != null) {
-                    where.append(" AND \"CREATED_BY\"=?");
-                    params.add(condition.get("createdBy"));
-                }
-            }
-            int safeOffset = Math.max(0, offset);
-            int safeLimit = limit <= 0 ? 1000 : limit;
-            String sql = "SELECT \"TASK_ID\",\"TASK_NAME\",\"TASK_TYPE\",\"DESCRIPTION\",\"TASK_CONFIG\"," +
-                    " \"PARAMETERS\",\"PRIORITY\",\"TIMEOUT\",\"RETRY_COUNT\",\"ASYNC_FLAG\"," +
-                    " \"DEPENDENCIES\",\"SCHEDULE_ID\",\"NODE_ID\",\"EXECUTION_MODE\"," +
-                    " \"CREATED_BY\",\"TENANT_ID\",\"TAGS\",\"EXTENSIONS\",\"CREATED_TIME\" " +
-                    "FROM " + T_TASK + where +
-                    " ORDER BY \"CREATED_TIME\" DESC NULLS LAST LIMIT ? OFFSET ?";
-            params.add(safeLimit);
-            params.add(safeOffset);
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params.toArray());
+            List<Map<String, Object>> rows = dao.queryTasks(condition, offset, limit);
             List<TaskDescription> out = new ArrayList<>(rows.size());
             for (Map<String, Object> r : rows) {
                 out.add(mapToTaskDescription(r));
@@ -452,29 +273,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
     public List<TaskStatus> queryTaskStatuses(Map<String, Object> condition, int offset, int limit)
             throws TaskPersistenceException {
         try {
-            StringBuilder where = new StringBuilder(" WHERE 1=1");
-            List<Object> params = new ArrayList<>();
-            if (condition != null) {
-                if (condition.get("taskId") != null) {
-                    where.append(" AND \"TASK_ID\"=?");
-                    params.add(condition.get("taskId"));
-                }
-                if (condition.get("status") != null) {
-                    where.append(" AND \"STATUS\"=?");
-                    params.add(condition.get("status"));
-                }
-            }
-            int safeOffset = Math.max(0, offset);
-            int safeLimit = limit <= 0 ? 1000 : limit;
-            String sql = "SELECT \"TASK_ID\",\"STATUS\",\"STATUS_MESSAGE\",\"PROGRESS\",\"CURRENT_STEP_ID\"," +
-                    " \"START_TIME\",\"END_TIME\",\"ESTIMATED_REMAINING_TIME\"," +
-                    " \"PROCESSED_COUNT\",\"TOTAL_COUNT\",\"ERROR_MESSAGE\",\"ERROR_STACK\"," +
-                    " \"RESULT\",\"METRICS\",\"EXECUTION_NODE_ID\",\"UPDATED_TIME\" " +
-                    "FROM " + T_STATUS + where +
-                    " ORDER BY \"UPDATED_TIME\" DESC NULLS LAST LIMIT ? OFFSET ?";
-            params.add(safeLimit);
-            params.add(safeOffset);
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params.toArray());
+            List<Map<String, Object>> rows = dao.queryTaskStatuses(condition, offset, limit);
             List<TaskStatus> out = new ArrayList<>(rows.size());
             for (Map<String, Object> r : rows) {
                 out.add(mapToStatus(r));
@@ -493,10 +292,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
         }
         try {
             // R9: 逻辑删除（is_deleted=1），不物理删
-            jdbcTemplate.update("UPDATE " + T_STATUS + " SET \"is_deleted\"=1 WHERE \"TASK_ID\"=?", taskId);
-            jdbcTemplate.update("UPDATE " + T_PLAN + " SET \"is_deleted\"=1 WHERE \"TASK_ID\"=?", taskId);
-            jdbcTemplate.update("UPDATE " + T_TASK +
-                    " SET \"is_deleted\"=1, \"UPDATED_TIME\"=NOW() WHERE \"TASK_ID\"=?", taskId);
+            dao.softDeleteTask(taskId);
         } catch (Exception e) {
             logger.error("PG deleteTask 失败: taskId={}", taskId, e);
             throw new TaskPersistenceException("PG deleteTask 失败: " + e.getMessage(), e);
@@ -507,11 +303,7 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
 
     public void logTask(String executionId, String taskId, String level, String message) {
         try {
-            jdbcTemplate.update("INSERT INTO " + T_LOG +
-                    " (\"EXECUTION_ID\",\"TASK_ID\",\"LOG_LEVEL\",\"MESSAGE\",\"CREATED_TIME\") " +
-                    "VALUES (?,?,?, ?,NOW())",
-                    executionId, taskId,
-                    level == null ? null : level.toUpperCase(), message);
+            dao.logTask(executionId, taskId, level, message);
         } catch (Exception e) {
             logger.warn("PG logTask 失败: taskId={}", taskId, e);
         }
@@ -521,77 +313,14 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
             Date startTime, Date endTime, String result, String errorMessage,
             String errorStack, String executionNodeId) {
         try {
-            Long duration = null;
-            if (startTime != null && endTime != null) {
-                duration = endTime.getTime() - startTime.getTime();
-            }
-            jdbcTemplate.update("INSERT INTO " + T_EXEC +
-                    " (\"EXECUTION_ID\",\"TASK_ID\",\"STATUS\",\"START_TIME\",\"END_TIME\"," +
-                    "  \"DURATION\",\"RESULT\",\"ERROR_MESSAGE\",\"ERROR_STACK\"," +
-                    "  \"EXECUTION_NODE_ID\",\"CREATED_TIME\") " +
-                    "VALUES (?,?,?,?,?,?,?,?,?,NOW()) " +
-                    "ON CONFLICT (\"EXECUTION_ID\") DO NOTHING",
-                    executionId, taskId, status, ts(startTime), ts(endTime),
-                    duration, result, errorMessage, errorStack, executionNodeId);
+            dao.recordExecution(executionId, taskId, status, startTime, endTime,
+                    result, errorMessage, errorStack, executionNodeId);
         } catch (Exception e) {
             logger.warn("PG recordExecution 失败: taskId={}", taskId, e);
         }
     }
 
-    // ============================= 工具 =============================
-
-    private static Timestamp ts(Date d) {
-        if (d == null) {
-            return null;
-        }
-        return new Timestamp(d.getTime());
-    }
-
-    private static String jstr(Object o) {
-        if (o == null) {
-            return null;
-        }
-        if (o instanceof String s) {
-            return s;
-        }
-        try {
-            return objectMapper.writeValueAsString(o);
-        } catch (Exception e) {
-            return String.valueOf(o);
-        }
-    }
-
-    private static int intOrZero(Integer i) {
-        return i == null ? 0 : i;
-    }
-
-    private static long longOrZero(Long l) {
-        return l == null ? 0L : l;
-    }
-
-    private static String ext(TaskDescription t, String key) {
-        if (t == null || t.getExtensions() == null) {
-            return null;
-        }
-        Object v = t.getExtensions().get(key);
-        return v == null ? null : String.valueOf(v);
-    }
-
-    private static String metaStr(Map<String, Object> md, String key) {
-        if (md == null) {
-            return null;
-        }
-        Object v = md.get(key);
-        return v == null ? null : String.valueOf(v);
-    }
-
-    private static String metricNode(TaskStatus s) {
-        if (s == null || s.getMetrics() == null) {
-            return null;
-        }
-        Object v = s.getMetrics().get("executionNodeId");
-        return v == null ? null : String.valueOf(v);
-    }
+    // ============================= DTO 映射工具 =============================
 
     private TaskDescription mapToTaskDescription(Map<String, Object> r) {
         TaskDescription t = new TaskDescription();

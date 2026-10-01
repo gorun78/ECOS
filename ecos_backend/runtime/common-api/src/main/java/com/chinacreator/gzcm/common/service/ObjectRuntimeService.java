@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.chinacreator.gzcm.common.dao.ObjectRuntimeDao;
 import com.chinacreator.gzcm.common.event.ObjectCreatedEvent;
 import com.chinacreator.gzcm.common.event.ObjectUpdatedEvent;
 import com.chinacreator.gzcm.common.event.StatusChangedEvent;
@@ -12,7 +13,6 @@ import com.chinacreator.gzcm.common.event.ActionExecutedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,6 +20,10 @@ import org.springframework.stereotype.Service;
  *
  * <p>提供统一的事件记录和发布入口，被 ObjectController、StateMachineEngine、
  * ObjectActionController 等调用。
+ *
+ * <p>架构铁律 §2.5#1 / IR06 收口（R2 B4c-runtime）：本服务不再直持 {@code JdbcTemplate}，
+ * 跨表 raw-SQL 一律经 {@link ObjectRuntimeDao}；本服务保留事件编排 / 图谱组装 /
+ * label 解析等业务逻辑。</p>
  */
 @Service
 public class ObjectRuntimeService {
@@ -34,11 +38,11 @@ public class ObjectRuntimeService {
         "Invoice",  "demo_invoice"
     );
 
-    private final JdbcTemplate jdbc;
+    private final ObjectRuntimeDao dao;
     private final ApplicationEventPublisher eventPublisher;
 
-    public ObjectRuntimeService(JdbcTemplate jdbc, ApplicationEventPublisher eventPublisher) {
-        this.jdbc = jdbc;
+    public ObjectRuntimeService(ObjectRuntimeDao dao, ApplicationEventPublisher eventPublisher) {
+        this.dao = dao;
         this.eventPublisher = eventPublisher;
     }
 
@@ -53,10 +57,7 @@ public class ObjectRuntimeService {
                                 String summary, String actor, Map<String, Object> details) {
         String id = "tl-" + ID_SEQ.incrementAndGet();
         try {
-            jdbc.update("""
-                INSERT INTO ecos_object_timeline (id, object_id, entity_code, event_type, event_summary, actor, details, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, NOW())
-                """, id, objectId, entityCode, eventType, summary, actor,
+            dao.insertTimeline(id, objectId, entityCode, eventType, summary, actor,
                 details != null ? toJsonString(details) : null);
             log.debug("Timeline recorded: {} [{}] for {}/{}", id, eventType, entityCode, objectId);
         } catch (Exception e) {
@@ -69,18 +70,10 @@ public class ObjectRuntimeService {
      */
     public Map<String, Object> getTimeline(String entityCode, String objectId, int page, int size) {
         int offset = (page - 1) * size;
-        String countSql = "SELECT COUNT(*) FROM ecos_object_timeline WHERE object_id = ?";
-        String dataSql = """
-            SELECT id, object_id, entity_code, event_type, event_summary, actor, details, created_at
-            FROM ecos_object_timeline
-            WHERE object_id = ?
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-            """;
 
         try {
-            Long total = jdbc.queryForObject(countSql, Long.class, objectId);
-            List<Map<String, Object>> rows = jdbc.queryForList(dataSql, objectId, size, offset);
+            Long total = dao.countTimeline(objectId);
+            List<Map<String, Object>> rows = dao.queryTimeline(objectId, size, offset);
 
             List<Map<String, Object>> data = new ArrayList<>();
             for (Map<String, Object> row : rows) {
@@ -119,15 +112,10 @@ public class ObjectRuntimeService {
         String id = "ver-" + ID_SEQ.incrementAndGet();
         try {
             // 获取当前最大版本号
-            Long maxVer = jdbc.queryForObject(
-                "SELECT COALESCE(MAX(version_no), 0) FROM ecos_object_version WHERE object_id = ?",
-                Long.class, objectId);
+            Long maxVer = dao.queryMaxVersion(objectId);
             int newVer = (maxVer != null ? maxVer.intValue() : 0) + 1;
 
-            jdbc.update("""
-                INSERT INTO ecos_object_version (id, object_id, entity_code, version_no, snapshot, change_summary, created_by, created_at)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, NOW())
-                """, id, objectId, entityCode, newVer, toJsonString(snapshot), changeSummary, createdBy);
+            dao.insertVersion(id, objectId, entityCode, newVer, toJsonString(snapshot), changeSummary, createdBy);
             log.debug("Version {} created for {}/{}, v{}", id, entityCode, objectId, newVer);
         } catch (Exception e) {
             log.warn("Failed to create version for {}/{}: {}", entityCode, objectId, e.getMessage());
@@ -138,14 +126,8 @@ public class ObjectRuntimeService {
      * 查询对象版本列表。
      */
     public List<Map<String, Object>> getVersions(String entityCode, String objectId) {
-        String sql = """
-            SELECT id, object_id, entity_code, version_no, change_summary, created_by, created_at
-            FROM ecos_object_version
-            WHERE object_id = ?
-            ORDER BY version_no DESC
-            """;
         try {
-            return jdbc.queryForList(sql, objectId);
+            return dao.queryVersions(objectId);
         } catch (Exception e) {
             log.warn("Failed to query versions for {}/{}: {}", entityCode, objectId, e.getMessage());
             return List.of();
@@ -156,13 +138,8 @@ public class ObjectRuntimeService {
      * 获取特定版本。
      */
     public Map<String, Object> getVersion(String entityCode, String objectId, int versionNo) {
-        String sql = """
-            SELECT id, object_id, entity_code, version_no, snapshot, change_summary, created_by, created_at
-            FROM ecos_object_version
-            WHERE object_id = ? AND version_no = ?
-            """;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, objectId, versionNo);
+            List<Map<String, Object>> rows = dao.queryVersion(objectId, versionNo);
             return rows.isEmpty() ? null : rows.get(0);
         } catch (Exception e) {
             log.warn("Failed to get version {} for {}/{}: {}", versionNo, entityCode, objectId, e.getMessage());
@@ -181,10 +158,7 @@ public class ObjectRuntimeService {
                                                     Map<String, Object> properties) {
         String id = "rel-" + ID_SEQ.incrementAndGet();
         try {
-            jdbc.update("""
-                INSERT INTO ecos_object_relationship (id, source_object_id, target_object_id, source_entity_code, target_entity_code, relationship_code, relationship_type, properties, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, NOW())
-                """, id, sourceObjectId, targetObjectId, sourceEntityCode, targetEntityCode,
+            dao.insertRelationship(id, sourceObjectId, targetObjectId, sourceEntityCode, targetEntityCode,
                 relationshipCode, relationshipType, properties != null ? toJsonString(properties) : null);
             log.info("Relationship created: {} [{}→{} via {}]", id, sourceObjectId, targetObjectId, relationshipCode);
 
@@ -207,15 +181,8 @@ public class ObjectRuntimeService {
      * 查询对象的所有直接关系。
      */
     public List<Map<String, Object>> getRelationships(String entityCode, String objectId) {
-        String sql = """
-            SELECT r.id, r.source_object_id, r.target_object_id, r.source_entity_code, r.target_entity_code,
-                   r.relationship_code, r.relationship_type, r.properties, r.created_at
-            FROM ecos_object_relationship r
-            WHERE r.source_object_id = ? OR r.target_object_id = ?
-            ORDER BY r.created_at DESC
-            """;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, objectId, objectId);
+            List<Map<String, Object>> rows = dao.queryRelationships(objectId);
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> rel = new LinkedHashMap<>();
@@ -258,8 +225,7 @@ public class ObjectRuntimeService {
         String table = ENTITY_TABLE.get(entityCode);
         if (table != null) {
             try {
-                List<Map<String, Object>> objRows = jdbc.queryForList(
-                    "SELECT name FROM " + table + " WHERE id = ?", objectId);
+                List<Map<String, Object>> objRows = dao.queryEntityName(table, objectId);
                 if (!objRows.isEmpty() && objRows.get(0).get("name") != null) {
                     centerLabel = objRows.get(0).get("name");
                 }
@@ -273,49 +239,6 @@ public class ObjectRuntimeService {
         centerNode.put("entityCode", entityCode);
         centerNode.put("label", centerLabel);
 
-        // ★ PostgreSQL Recursive CTE for graph traversal
-        String cteSql = """
-            WITH RECURSIVE graph_traverse AS (
-                -- Anchor: edges directly connected to the center node
-                SELECT
-                    r.id,
-                    r.source_object_id,
-                    r.target_object_id,
-                    r.source_entity_code,
-                    r.target_entity_code,
-                    r.relationship_code,
-                    r.relationship_type,
-                    1 AS level
-                FROM ecos_object_relationship r
-                WHERE r.source_object_id = ? OR r.target_object_id = ?
-                UNION
-                -- Recursive: edges connected to previously discovered nodes
-                SELECT
-                    r.id,
-                    r.source_object_id,
-                    r.target_object_id,
-                    r.source_entity_code,
-                    r.target_entity_code,
-                    r.relationship_code,
-                    r.relationship_type,
-                    g.level + 1
-                FROM ecos_object_relationship r
-                INNER JOIN graph_traverse g ON (
-                    r.source_object_id = g.source_object_id
-                    OR r.source_object_id = g.target_object_id
-                    OR r.target_object_id = g.source_object_id
-                    OR r.target_object_id = g.target_object_id
-                )
-                AND r.id <> g.id
-                WHERE g.level < ?
-            )
-            SELECT DISTINCT ON (id) id, source_object_id, target_object_id,
-                   source_entity_code, target_entity_code,
-                   relationship_code, relationship_type, level
-            FROM graph_traverse
-            ORDER BY id, level
-            """;
-
         // Collect nodes and edges from CTE result
         Set<String> nodeIds = new LinkedHashSet<>();
         List<Map<String, Object>> nodes = new ArrayList<>();
@@ -326,7 +249,7 @@ public class ObjectRuntimeService {
         nodes.add(centerNode);
 
         try {
-            List<Map<String, Object>> rels = jdbc.queryForList(cteSql, objectId, objectId, depth);
+            List<Map<String, Object>> rels = dao.queryGraphEdges(objectId, depth);
 
             for (Map<String, Object> rel : rels) {
                 String srcId = (String) rel.get("source_object_id");
@@ -374,8 +297,7 @@ public class ObjectRuntimeService {
         String table = ENTITY_TABLE.get(entityCode);
         if (table != null) {
             try {
-                List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT name FROM " + table + " WHERE id = ?", objectId);
+                List<Map<String, Object>> rows = dao.queryEntityName(table, objectId);
                 if (!rows.isEmpty() && rows.get(0).get("name") != null) {
                     node.put("label", rows.get(0).get("name"));
                     return node;
@@ -392,7 +314,7 @@ public class ObjectRuntimeService {
      * 删除关系。
      */
     public boolean deleteRelationship(String relId) {
-        int rows = jdbc.update("DELETE FROM ecos_object_relationship WHERE id = ?", relId);
+        int rows = dao.deleteRelationship(relId);
         if (rows > 0) {
             log.info("Relationship deleted: {}", relId);
         }
@@ -405,14 +327,8 @@ public class ObjectRuntimeService {
      * 查询对象附件列表。
      */
     public List<Map<String, Object>> getAttachments(String entityCode, String objectId) {
-        String sql = """
-            SELECT id, object_id, entity_code, file_name, file_path, file_size, mime_type, version_no, uploaded_by, created_at
-            FROM ecos_object_attachment
-            WHERE object_id = ?
-            ORDER BY created_at DESC
-            """;
         try {
-            return jdbc.queryForList(sql, objectId);
+            return dao.queryAttachments(objectId);
         } catch (Exception e) {
             log.warn("Failed to query attachments for {}/{}: {}", entityCode, objectId, e.getMessage());
             return List.of();

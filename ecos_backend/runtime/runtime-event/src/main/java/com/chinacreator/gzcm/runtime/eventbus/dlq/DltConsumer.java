@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.runtime.eventbus.dlq;
 
+import com.chinacreator.gzcm.runtime.eventbus.dlq.dao.EcosRuntimeEventDlqDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -24,30 +24,34 @@ import java.util.concurrent.ConcurrentMap;
  *
  * <p>红线：只 `<topic>.DLT`；不吞业务 payload 中的敏感字段（payload 已加密/脱敏由 producer 保证）；
  * 重放走 {@code POST /api/v1/monitor/dlq/{id}/replay}（gateway C 章），本组件不直接重放。</p>
+ *
+ * <p>架构铁律 §2.5#1 / IR06 收口（R2 B4c-runtime）：本组件不再直持 {@code JdbcTemplate}，
+ * 控制域 SQL 一律经 {@link EcosRuntimeEventDlqDao}（继承
+ * {@code com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport}）执行；
+ * 本组件保留消费编排 / lag 窗口 / 告警下沉职责。条件装配目标同步改为 DAO Bean
+ * （DAO 本身以 {@code @ConditionalOnBean(JdbcTemplate.class)} 装配，语义等价）。</p>
  */
 @Component
-@ConditionalOnBean(JdbcTemplate.class)
+@ConditionalOnBean(EcosRuntimeEventDlqDao.class)
 public class DltConsumer {
 
     public static final int LAG_THRESHOLD = 100;
     public static final Duration LAG_WINDOW = Duration.ofMinutes(5);
-    private static final String T = "ecos_control.ecos_runtime_event_dlq";
-    private static final String V = "1.0.0";
 
     private static final Logger log = LoggerFactory.getLogger(DltConsumer.class);
 
-    private final JdbcTemplate jdbc;
+    private final EcosRuntimeEventDlqDao dao;
     private final DltAlertSink alertSink;
     // topic -> 首次进入滞后窗口时刻
     private final ConcurrentMap<String, Long> lagWindowOpenedAt = new ConcurrentHashMap<>();
 
-    public DltConsumer(JdbcTemplate jdbc) {
-        this(jdbc, (severity, message) ->
+    public DltConsumer(EcosRuntimeEventDlqDao dao) {
+        this(dao, (severity, message) ->
                 log.warn("[runtime-dlq] ALERT sev={} msg={}", severity, message));
     }
 
-    public DltConsumer(JdbcTemplate jdbc, DltAlertSink alertSink) {
-        this.jdbc = jdbc;
+    public DltConsumer(EcosRuntimeEventDlqDao dao, DltAlertSink alertSink) {
+        this.dao = dao;
         this.alertSink = alertSink == null ? (sev, m) -> log.warn("[runtime-dlq] ALERT [] {}", m) : alertSink;
     }
 
@@ -62,11 +66,7 @@ public class DltConsumer {
     public String consume(String topic, String payload, Throwable error) {
         String id = java.util.UUID.randomUUID().toString();
         String base = baseTopic(topic);
-        jdbc.update(
-            "INSERT INTO " + T +
-            " (id, topic, dlt_topic, payload, error_message, attempts, first_seen_at, status, version_no, is_deleted, domain)" +
-            " VALUES (?, ?, ?, ?, ?, 0, NOW(), 'pending', ?, 0, 'default')",
-            id, base, topic, payload, truncate(error == null ? null : String.valueOf(error), 1000), V);
+        dao.insertDlt(id, base, topic, payload, truncate(error == null ? null : String.valueOf(error), 1000));
         log.info("[runtime-dlq] persisted dlt={} payloadLen={} err={}",
                 topic, payload == null ? 0 : payload.length(), error);
         return id;
@@ -91,26 +91,17 @@ public class DltConsumer {
     }
 
     public long dlqCount() {
-        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM " + T + " WHERE is_deleted = 0", Long.class);
-        return c == null ? 0 : c;
+        return dao.count();
     }
 
     public Map<String, Object> findPending(int limit) {
         // 供 monitor/DLQ 重放接口取样；取最早一条 pending
-        try {
-            return jdbc.queryForMap(
-                "SELECT id, topic, dlt_topic, payload, error_message AS errorMessage," +
-                " attempts, first_seen_at AS firstSeenAt, status FROM " + T +
-                " WHERE is_deleted = 0 AND status = 'pending' ORDER BY first_seen_at ASC LIMIT ?",
-                Math.max(1, limit));
-        } catch (Exception ex) {
-            return null;
-        }
+        return dao.findPending(limit);
     }
+
     /** 重放标记成功：status → replayed（由 gateway C 章 replay 接口调）。 */
     public boolean markReplayed(String id) {
-        return jdbc.update("UPDATE " + T +
-                " SET status = 'replayed', replayed_at = NOW(), update_time = NOW() WHERE id = ?", id) > 0;
+        return dao.markReplayed(id);
     }
 
     static String baseTopic(String dltTopic) {
