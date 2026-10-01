@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.services.agent.runtime.toolrouter.tools;
 
+import com.chinacreator.gzcm.services.agent.dao.AgentToolDao;
 import com.chinacreator.gzcm.services.agent.runtime.toolrouter.ToolExecutor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -10,10 +10,10 @@ import java.util.Map;
 @Component
 public class RunQualityCheckTool implements ToolExecutor {
 
-    private final JdbcTemplate jdbc;
+    private final AgentToolDao dao;
 
-    public RunQualityCheckTool(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public RunQualityCheckTool(AgentToolDao dao) {
+        this.dao = dao;
     }
 
     @Override
@@ -23,10 +23,7 @@ public class RunQualityCheckTool implements ToolExecutor {
         String tableName = (String) params.get("tableName");
         int sampleSize = params.containsKey("sampleSize") ? ((Number) params.get("sampleSize")).intValue() : 1000;
         String checkId = java.util.UUID.randomUUID().toString();
-        jdbc.update(
-            "INSERT INTO ecos_quality_check (id, rule_id, datasource_id, table_name, sample_size, status, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, 'RUNNING', NOW())",
-            checkId, ruleId, datasourceId, tableName, sampleSize);
+        dao.insertQualityCheck(checkId, ruleId, datasourceId, tableName, sampleSize);
         Map<String, Object> result = new HashMap<>();
         result.put("checkId", checkId);
         result.put("ruleId", ruleId);
