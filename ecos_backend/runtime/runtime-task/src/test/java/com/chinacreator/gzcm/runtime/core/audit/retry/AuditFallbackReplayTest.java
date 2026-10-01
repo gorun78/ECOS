@@ -5,6 +5,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import com.chinacreator.gzcm.runtime.core.audit.retry.dao.AuditRetryDao;
 
 import java.util.List;
 import java.util.Map;
@@ -24,11 +27,19 @@ import static org.mockito.Mockito.when;
 
 /**
  * 详细设计-00 F00-12 / C.5.4 — 审计兜底 SLA：Kafka 失败暂存 + 定时重放（指数退避 ≤3）+ 3 次失败转告警。
- * JdbcTemplate mock，不依赖 PG/Kafka。
+ * R2 收口后 SQL 全部下沉 {@link AuditRetryDao}；本测试用真实 DAO + Mockito.mock(JdbcTemplate)
+ * （经 ReflectionTestUtils 注入 DAO 的 jdbcTemplate 字段）继续逐字节断言 SQL，不依赖 PG/Kafka。
  */
 class AuditFallbackReplayTest {
 
     private static JdbcTemplate db() { return Mockito.mock(JdbcTemplate.class); }
+
+    /** 真实 DAO + mock 的 jdbcTemplate（收口后 AuditRetryTask 只持有 DAO）。 */
+    private static AuditRetryDao dao(JdbcTemplate j) {
+        AuditRetryDao dao = new AuditRetryDao();
+        ReflectionTestUtils.setField(dao, "jdbcTemplate", j);
+        return dao;
+    }
 
     private static Map<String, Object> row(String id, int attempts, String payload) {
         return java.util.Map.of("id", id, "eventType", "bos", "payload", payload, "attempts", attempts);
@@ -41,7 +52,7 @@ class AuditFallbackReplayTest {
     @Test
     void enqueue_targetsEcosTable_attemptsStartZero() {
         JdbcTemplate j = db();
-        AuditRetryTask t = new AuditRetryTask(j, (topic, p) -> true, (s, m) -> {});
+        AuditRetryTask t = new AuditRetryTask(dao(j), (topic, p) -> true, (s, m) -> {});
         String id = t.enqueue("bos", "{\"u\":1}", "T-1");
         ArgumentCaptor<String> sqlC = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object[]> argsC = ArgumentCaptor.forClass(Object[].class);
@@ -60,7 +71,7 @@ class AuditFallbackReplayTest {
         when(j.update(anyString(), any(String.class))).thenReturn(1);
 
         AtomicBoolean replayed = new AtomicBoolean(false);
-        AuditRetryTask t = new AuditRetryTask(j,
+        AuditRetryTask t = new AuditRetryTask(dao(j),
                 (topic, p) -> { replayed.set(true); return true; }, (s, m) -> {});
         t.replayDue();
 
@@ -77,7 +88,7 @@ class AuditFallbackReplayTest {
         when(j.update(anyString(), any(String.class))).thenReturn(0);
 
         CopyOnWriteArrayList<String> fired = new CopyOnWriteArrayList<>();
-        AuditRetryTask t = new AuditRetryTask(j, (topic, p) -> false, (s, m) -> fired.add(s));
+        AuditRetryTask t = new AuditRetryTask(dao(j), (topic, p) -> false, (s, m) -> fired.add(s));
         t.replayDue();
 
         assertTrue(fired.contains("critical"), "3 次失败应转 critical，got=" + fired);
@@ -91,7 +102,7 @@ class AuditFallbackReplayTest {
         when(j.queryForMap(anyString(), any())).thenThrow(new EmptyResultDataAccessException(1));
         when(j.update(anyString(), any(String.class))).thenReturn(1);
 
-        AuditRetryTask t = new AuditRetryTask(j, (topic, p) -> true, (s, m) -> {});
+        AuditRetryTask t = new AuditRetryTask(dao(j), (topic, p) -> true, (s, m) -> {});
         t.replayDue();
         verify(j, never()).update(argThat(sql("status = 'closed'")), any(String.class));
     }

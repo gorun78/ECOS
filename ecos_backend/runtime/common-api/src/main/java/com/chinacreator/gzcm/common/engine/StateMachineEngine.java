@@ -3,11 +3,11 @@ package com.chinacreator.gzcm.common.engine;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.chinacreator.gzcm.common.dao.StateMachineDao;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,6 +15,10 @@ import org.springframework.stereotype.Service;
  *
  * <p>从 ecos_object_state_machine 表读取状态转换定义，
  * 校验转换合法性，执行状态变更并发布事件。
+ *
+ * <p>架构铁律 §2.5#1 / IR06 收口（R2 B4c-runtime）：本引擎不再直持 {@code JdbcTemplate}，
+ * 状态机定义 CRUD + 状态更新一律经 {@link StateMachineDao}；
+ * 本引擎保留转换校验 / 事件发布编排。</p>
  */
 @Service
 public class StateMachineEngine {
@@ -22,11 +26,11 @@ public class StateMachineEngine {
     private static final Logger log = LoggerFactory.getLogger(StateMachineEngine.class);
     private static final AtomicInteger ID_SEQ = new AtomicInteger(200);
 
-    private final JdbcTemplate jdbc;
+    private final StateMachineDao dao;
     private final ObjectRuntimeService runtimeService;
 
-    public StateMachineEngine(JdbcTemplate jdbc, ObjectRuntimeService runtimeService) {
-        this.jdbc = jdbc;
+    public StateMachineEngine(StateMachineDao dao, ObjectRuntimeService runtimeService) {
+        this.dao = dao;
         this.runtimeService = runtimeService;
     }
 
@@ -38,15 +42,8 @@ public class StateMachineEngine {
      * 查询指定实体+当前状态下可用的状态转换。
      */
     public List<Map<String, Object>> getAvailableTransitions(String entityCode, String currentStatus) {
-        String sql = """
-            SELECT id, entity_code, from_status, to_status, transition_code, transition_name,
-                   require_role, guard_rule, side_effect, sort_order
-            FROM ecos_object_state_machine
-            WHERE entity_code = ? AND from_status = ?
-            ORDER BY sort_order
-            """;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql, entityCode, currentStatus);
+            List<Map<String, Object>> rows = dao.queryAvailableTransitions(entityCode, currentStatus);
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> t = new LinkedHashMap<>();
@@ -90,14 +87,9 @@ public class StateMachineEngine {
                                                   String currentStatus, String transitionCode,
                                                   String actor, String comment) {
         // 1. 查找转换定义
-        String sql = """
-            SELECT to_status, transition_name, require_role
-            FROM ecos_object_state_machine
-            WHERE entity_code = ? AND from_status = ? AND transition_code = ?
-            """;
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(sql, entityCode, currentStatus, transitionCode);
+            rows = dao.queryTransitionDef(entityCode, currentStatus, transitionCode);
         } catch (Exception e) {
             log.error("Failed to query state machine for {}/{}/{}: {}", entityCode, currentStatus, transitionCode, e.getMessage());
             throw new IllegalArgumentException("状态机查询失败: " + e.getMessage());
@@ -115,7 +107,7 @@ public class StateMachineEngine {
         String table = ObjectRuntimeService.ENTITY_TABLE.get(entityCode);
         if (table != null) {
             try {
-                int updated = jdbc.update("UPDATE " + table + " SET status = ? WHERE id = ?", newStatus, objectId);
+                int updated = dao.updateEntityStatus(table, newStatus, objectId);
                 if (updated == 0) {
                     throw new IllegalArgumentException("OBJ-001: 对象 " + entityCode + "/" + objectId + " 不存在");
                 }
@@ -151,15 +143,8 @@ public class StateMachineEngine {
     // ═══════════════ 状态机定义管理 (CRUD) ═══════════════════
 
     public List<Map<String, Object>> listDefinitions(String entityCode) {
-        String sql = """
-            SELECT id, entity_code, from_status, to_status, transition_code, transition_name,
-                   require_role, guard_rule, side_effect, sort_order, created_at
-            FROM ecos_object_state_machine
-            WHERE entity_code = ?
-            ORDER BY sort_order
-            """;
         try {
-            return jdbc.queryForList(sql, entityCode);
+            return dao.queryDefinitions(entityCode);
         } catch (Exception e) {
             log.warn("Failed to list state machine defs for {}: {}", entityCode, e.getMessage());
             return List.of();
@@ -178,10 +163,7 @@ public class StateMachineEngine {
         String sideEffect = (String) body.getOrDefault("sideEffect", null);
         int sortOrder = body.containsKey("sortOrder") ? ((Number) body.get("sortOrder")).intValue() : 0;
 
-        jdbc.update("""
-            INSERT INTO ecos_object_state_machine (id, entity_code, from_status, to_status, transition_code, transition_name, require_role, guard_rule, side_effect, sort_order, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            """, id, entityCode, fromStatus, toStatus, transitionCode, transitionName, requireRole, guardRule, sideEffect, sortOrder);
+        dao.insertDefinition(id, entityCode, fromStatus, toStatus, transitionCode, transitionName, requireRole, guardRule, sideEffect, sortOrder);
 
         log.info("State machine def created: {} [{}: {}→{} via {}]", id, entityCode, fromStatus, toStatus, transitionCode);
 
@@ -196,7 +178,7 @@ public class StateMachineEngine {
     }
 
     public boolean deleteDefinition(String id) {
-        int rows = jdbc.update("DELETE FROM ecos_object_state_machine WHERE id = ?", id);
+        int rows = dao.deleteDefinition(id);
         if (rows > 0) {
             log.info("State machine def deleted: {}", id);
         }

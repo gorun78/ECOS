@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.runtime.core.ontology.archive;
 
+import com.chinacreator.gzcm.runtime.core.ontology.archive.dao.GitArchivePendingDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,32 +24,37 @@ import java.util.Map;
  * <p>调用链解耦：本任务不 import {@code OntologyGitService}（避免 runtime 反依赖 engine）；
  * 由 {@link GitArchiveReplayer} lambda 承接实际归档动作。同 JVM 下由 engine
  * 注册的 {@code @Component} 提供实现（gateway fat-JAR 组件扫描覆盖）。
+ *
+ * <p>架构铁律 §2.5#1 / IR06 收口（R2 B4c-runtime）：本任务不再直持 {@code JdbcTemplate}，
+ * 补偿队列 SQL 一律经 {@link GitArchivePendingDao}（继承
+ * {@code com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport}）执行；
+ * 本任务保留重放/退避/告警编排。条件装配目标同步改为 DAO Bean（DAO 本身以
+ * {@code @ConditionalOnBean(JdbcTemplate.class)} 装配，语义等价）。</p>
  */
 @Component
-@ConditionalOnBean(JdbcTemplate.class)
+@ConditionalOnBean(GitArchivePendingDao.class)
 public class GitArchiveRetryTask {
 
     public static final long INTERVAL_MS = 60_000L;
     public static final int MAX_ATTEMPTS = 3;
     public static final int BATCH = 50;
-    private static final String T = "ecos_ontology.ecos_ontology_git_archive_pending";
 
     private static final Logger log = LoggerFactory.getLogger(GitArchiveRetryTask.class);
 
-    private final JdbcTemplate jdbc;
+    private final GitArchivePendingDao dao;
     private final GitArchiveReplayer replayer;
     private final GitArchiveFailureSink failureSink;
 
-    public GitArchiveRetryTask(JdbcTemplate jdbc) {
-        this(jdbc, (repoId, targetVersionNo, commitMessage, authorName, payload) ->
+    public GitArchiveRetryTask(GitArchivePendingDao dao) {
+        this(dao, (repoId, targetVersionNo, commitMessage, authorName, payload) ->
                 ReplayerResult.fail("runtime-task 占位 replayer：缺引擎侧注入（monolith 态才有真 OntologyGitService）"),
             (sev, m) -> log.warn("[ontology-git-archive] ALERT [{}] {}", sev, m));
     }
 
-    public GitArchiveRetryTask(JdbcTemplate jdbc,
+    public GitArchiveRetryTask(GitArchivePendingDao dao,
                                 GitArchiveReplayer replayer,
                                 GitArchiveFailureSink failureSink) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.replayer = replayer == null ? ((r, v, c, a, p) -> ReplayerResult.fail("replayer=null")) : replayer;
         this.failureSink = failureSink == null ? ((s, m) ->
                 log.warn("[ontology-git-archive] ALERT [{}] {}", s, m)) : failureSink;
@@ -58,16 +63,12 @@ public class GitArchiveRetryTask {
     @Scheduled(fixedDelay = INTERVAL_MS, initialDelay = INTERVAL_MS)
     public void replayDue() {
         Timestamp now = Timestamp.from(Instant.now());
-        List<String> ids = jdbc.queryForList(
-            "SELECT id FROM " + T
-                + " WHERE is_deleted = 0 AND status = 'pending' AND attempts < " + MAX_ATTEMPTS
-                + "   AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT " + BATCH,
-            String.class, now);
+        List<String> ids = dao.queryDueIds(now, MAX_ATTEMPTS, BATCH);
         if (ids.isEmpty()) return;
 
         int ok = 0, escalated = 0;
         for (String id : ids) {
-            Map<String, Object> row = fetch(id);
+            Map<String, Object> row = dao.findRow(id);
             if (row == null) continue;
 
             ReplayerResult res;
@@ -84,14 +85,12 @@ public class GitArchiveRetryTask {
             }
 
             if (res.isSuccess()) {
-                jdbc.update("UPDATE " + T
-                        + " SET status = 'closed', last_commit_id = ?, update_time = NOW() WHERE id = ?",
-                    res.getCommitId(), id);
+                dao.markClosed(id, res.getCommitId());
                 ok++;
             } else {
                 int attempts = currentAttempts(row);
                 if (attempts + 1 >= MAX_ATTEMPTS) {
-                    markExhausted(id, res.getError());
+                    dao.markExhausted(id, clamp(res.getError()));
                     failureSink.alert("critical",
                         "ontology-git-archive " + MAX_ATTEMPTS + " 次仍失败，需人工介入：id=" + id
                         + " ontology_id=" + row.get("ontologyId")
@@ -99,11 +98,7 @@ public class GitArchiveRetryTask {
                     escalated++;
                 } else {
                     long delayMinutes = 1L << (attempts + 1); // 1→2, 2→4
-                    jdbc.update("UPDATE " + T
-                            + " SET attempts = attempts + 1, last_error = ?,"
-                            + "   next_retry_at = NOW() + INTERVAL '1 minute' * " + delayMinutes + ","
-                            + "   update_time = NOW() WHERE id = ?",
-                        clamp(res.getError()), id);
+                    dao.bumpAttempt(id, clamp(res.getError()), delayMinutes);
                 }
             }
         }
@@ -112,29 +107,10 @@ public class GitArchiveRetryTask {
         }
     }
 
-    private Map<String, Object> fetch(String id) {
-        try {
-            return jdbc.queryForMap(
-                "SELECT id, ontology_id AS ontologyId, version_id AS versionId,"
-                    + " target_version_no AS targetVersionNo, repository_id AS repositoryId,"
-                    + " commit_message AS commitMessage, author_name AS authorName,"
-                    + " payload, attempts FROM " + T
-                    + " WHERE id = ? AND is_deleted = 0", id);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     private int currentAttempts(Map<String, Object> row) {
         Object a = row.get("attempts");
         if (a instanceof Number n) return n.intValue();
         return 0;
-    }
-
-    private void markExhausted(String id, String reason) {
-        jdbc.update("UPDATE " + T
-                + " SET status = 'exhausted', last_error = ?, update_time = NOW() WHERE id = ?",
-            clamp(reason), id);
     }
 
     private static String clamp(String s) {
