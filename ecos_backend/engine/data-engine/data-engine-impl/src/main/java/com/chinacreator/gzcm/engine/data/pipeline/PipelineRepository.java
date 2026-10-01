@@ -1,26 +1,36 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
-import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import com.chinacreator.gzcm.engine.data.dao.PipelineDefinitionDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
- * Pipeline Repository — 基于 JdbcTemplate 的 CRUD 操作。
+ * Pipeline Repository — 数据模型 CRUD 门面（委托 {@link PipelineDefinitionDao} 落库）。
  *
- * <p>B1 收口：继承 runtime-core {@link JdbcTemplateDaoSupport}，不再私持
- * {@code JdbcTemplate} 字段；所有数据访问均经 runtime 数据访问底座。
+ * <p>B4a 收口：本类不再私持 {@code JdbcTemplate}、不再 inline raw-SQL；所有
+ * SQL 下沉 {@link PipelineDefinitionDao}（{@code ..dao..}），本 Repository 仅做
+ * 业务编排（参数前置校验、行 mapper 组装、状态默认值补齐），原方法签名与
+ * 返回契约保持不变（API 只增不改）。
  *
  * @author DataBridge Datanet Team
  */
 @Repository
-public class PipelineRepository extends JdbcTemplateDaoSupport {
+public class PipelineRepository {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineRepository.class);
+
+    private final PipelineDefinitionDao dao;
+
+    public PipelineRepository(PipelineDefinitionDao dao) {
+        this.dao = dao;
+    }
 
     // H8-T1: ecos_pipeline_node.depends_on 列由 db/migration 单一来源维护（V25_1 已含
     // CREATE + ALTER ADD COLUMN IF NOT EXISTS），运行时不再内嵌 DDL。
@@ -29,10 +39,8 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
 
     public PipelineDefinition insertDefinition(PipelineDefinition def) {
         String id = def.getId() != null ? def.getId() : UUID.randomUUID().toString().replace("-", "");
-        String definitionJson = buildDefinitionJson(def);
-        String sql = "INSERT INTO ecos_pipeline_definition (id, name, description, definition, status, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?::jsonb, ?, NOW(), NOW())";
-        jdbcTemplate.update(sql, id, def.getName(), def.getDescription(),
+        String definitionJson = PipelineDefinitionDao.buildDefinitionJson(def);
+        dao.insertDefinition(id, def.getName(), def.getDescription(),
                 definitionJson,
                 def.getStatus() != null ? def.getStatus() : "DRAFT");
         return findDefinitionById(id);
@@ -62,8 +70,7 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
         set.append("updated_at = NOW()");
         params.add(id);
 
-        String sql = "UPDATE ecos_pipeline_definition SET " + set + " WHERE id = ?";
-        jdbcTemplate.update(sql, params.toArray());
+        dao.updateDefinition(id, set.toString(), params);
         return findDefinitionById(id);
     }
 
@@ -79,40 +86,33 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
             Map<String, Object> root = new LinkedHashMap<>();
             root.put("schedule", schedule);
             String json = om.writeValueAsString(root);
-            String sql = "UPDATE ecos_pipeline_definition SET definition = ?::jsonb, updated_at = NOW() WHERE id = ?";
-            jdbcTemplate.update(sql, json, id);
+            dao.updateDefinitionScheduleJson(json, id);
         } catch (Exception e) {
             log.warn("Failed to update schedule for definition {}: {}", id, e.getMessage());
         }
     }
 
     public void deleteDefinition(String id) {
-        String sql = "UPDATE ecos_pipeline_definition SET status = 'ARCHIVED', updated_at = NOW() WHERE id = ?";
-        jdbcTemplate.update(sql, id);
+        dao.archiveDefinition(id);
     }
 
     public PipelineDefinition findDefinitionById(String id) {
-        String sql = "SELECT id, name, description, definition, status, created_at, updated_at " +
-                "FROM ecos_pipeline_definition WHERE id = ?";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, id);
+        List<Map<String, Object>> rows = dao.findDefinitionRow(id);
         if (rows.isEmpty()) return null;
-        return mapToDefinition(rows.get(0));
+        return PipelineDefinitionDao.mapDefinition(rows.get(0));
     }
 
     public List<PipelineDefinition> findAllDefinitions() {
-        String sql = "SELECT id, name, description, definition, status, created_at, updated_at " +
-                "FROM ecos_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY created_at DESC";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+        List<Map<String, Object>> rows = dao.findDefinitionRowsActive();
         List<PipelineDefinition> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
-            result.add(mapToDefinition(row));
+            result.add(PipelineDefinitionDao.mapDefinition(row));
         }
         return result;
     }
 
     public boolean definitionExists(String id) {
-        String sql = "SELECT COUNT(*) FROM ecos_pipeline_definition WHERE id = ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+        Integer count = dao.countDefinition(id);
         return count != null && count > 0;
     }
 
@@ -120,30 +120,24 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
 
     public void insertNode(PipelineNode node) {
         String id = node.getId() != null ? node.getId() : UUID.randomUUID().toString().replace("-", "");
-        String sql = "INSERT INTO ecos_pipeline_node (id, definition_id, node_id, type, config, depends_on, position_x, position_y, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, NOW(), NOW())";
-        jdbcTemplate.update(sql, id, node.getDefinitionId(), node.getNodeId(), node.getType(),
+        dao.insertNode(id, node.getDefinitionId(), node.getNodeId(), node.getType(),
                 node.getConfig(), node.getDependsOn() != null ? node.getDependsOn() : "[]",
                 node.getPositionX(), node.getPositionY());
     }
 
     public void deleteNodesByDefinitionId(String definitionId) {
-        String sql = "DELETE FROM ecos_pipeline_node WHERE definition_id = ?";
-        jdbcTemplate.update(sql, definitionId);
+        dao.deleteNodesByDefinitionId(definitionId);
     }
 
     public void updateNodeDependsOn(String definitionId, String nodeId, String dependsOnJson) {
-        String sql = "UPDATE ecos_pipeline_node SET depends_on = ?::jsonb WHERE definition_id = ? AND node_id = ?";
-        jdbcTemplate.update(sql, dependsOnJson, definitionId, nodeId);
+        dao.updateNodeDependsOn(definitionId, nodeId, dependsOnJson);
     }
 
     public List<PipelineNode> findNodesByDefinitionId(String definitionId) {
-        String sql = "SELECT id, definition_id, node_id, type, config, depends_on, position_x, position_y, created_at, updated_at " +
-                "FROM ecos_pipeline_node WHERE definition_id = ? ORDER BY created_at";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, definitionId);
+        List<Map<String, Object>> rows = dao.findNodeRowsByDefinitionId(definitionId);
         List<PipelineNode> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
-            result.add(mapToNode(row));
+            result.add(PipelineDefinitionDao.mapNode(row));
         }
         return result;
     }
@@ -152,34 +146,20 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
 
     public PipelineExecution insertExecution(PipelineExecution exec) {
         String id = exec.getId() != null ? exec.getId() : UUID.randomUUID().toString().replace("-", "");
-        String sql = "INSERT INTO ecos_pipeline_execution (id, pipeline_id, status, started_at) VALUES (?, ?, ?, NOW())";
-        jdbcTemplate.update(sql, id, exec.getDefinitionId(),
+        dao.insertExecution(id, exec.getDefinitionId(),
                 exec.getStatus() != null ? exec.getStatus() : "PENDING");
         return findExecutionById(id);
     }
 
     public void updateExecutionStatus(String id, String status, String errorMessage, Long rowsProcessed) {
-        String sql = "UPDATE ecos_pipeline_execution SET status = ?, error_message = ?, rows_processed = ?";
-        List<Object> params = new ArrayList<>();
-        params.add(status);
-        params.add(errorMessage);
-        params.add(rowsProcessed);
-
-        if ("COMPLETED".equals(status) || "FAILED".equals(status)) {
-            sql += ", finished_at = NOW()";
-        }
-        sql += " WHERE id = ?";
-        params.add(id);
-
-        jdbcTemplate.update(sql, params.toArray());
+        boolean finishedNow = "COMPLETED".equals(status) || "FAILED".equals(status);
+        dao.updateExecutionStatus(id, status, errorMessage, rowsProcessed, finishedNow);
     }
 
     public PipelineExecution findExecutionById(String id) {
-        String sql = "SELECT id, pipeline_id, status, started_at, finished_at, error_message, rows_processed " +
-                "FROM ecos_pipeline_execution WHERE id = ?";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, id);
+        List<Map<String, Object>> rows = dao.findExecutionRow(id);
         if (rows.isEmpty()) return null;
-        return mapToExecution(rows.get(0));
+        return PipelineDefinitionDao.mapExecution(rows.get(0));
     }
 
     /**
@@ -192,13 +172,10 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
      */
     public List<PipelineExecution> findExecutionsByDefinitionId(String definitionId, int page, int pageSize) {
         int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
-        String sql = "SELECT id, pipeline_id, status, started_at, finished_at, error_message, rows_processed " +
-                "FROM ecos_pipeline_execution WHERE pipeline_id = ? " +
-                "ORDER BY started_at DESC, created_at DESC LIMIT ? OFFSET ?";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, definitionId, pageSize, offset);
+        List<Map<String, Object>> rows = dao.findExecutionRowsByDefinitionId(definitionId, Math.max(pageSize, 1), offset);
         List<PipelineExecution> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
-            result.add(mapToExecution(row));
+            result.add(PipelineDefinitionDao.mapExecution(row));
         }
         return result;
     }
@@ -207,125 +184,7 @@ public class PipelineRepository extends JdbcTemplateDaoSupport {
      * 按 definitionId 统计执行记录总数（分页 total 用）。
      */
     public long countExecutionsByDefinitionId(String definitionId) {
-        String sql = "SELECT COUNT(*) FROM ecos_pipeline_execution WHERE pipeline_id = ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, definitionId);
+        Integer count = dao.countExecutionsByDefinitionId(definitionId);
         return count != null ? count : 0L;
-    }
-
-    // ==================== Mappers ====================
-
-    private PipelineDefinition mapToDefinition(Map<String, Object> row) {
-        PipelineDefinition def = new PipelineDefinition();
-        def.setId((String) row.get("id"));
-        def.setName((String) row.get("name"));
-        def.setDescription((String) row.get("description"));
-        def.setStatus((String) row.get("status"));
-        // 解析 definition JSONB：{schedule:{cron,scheduleId}, ...}
-        Object defVal = row.get("definition");
-        if (defVal != null) {
-            parseDefinitionJson(def, defVal.toString());
-        }
-        def.setCreatedAt(toLocalDateTime(row.get("created_at")));
-        def.setUpdatedAt(toLocalDateTime(row.get("updated_at")));
-        return def;
-    }
-
-    /**
-     * 解析 definition JSONB 列，填充 scheduleCron 与 extensions。
-     */
-    @SuppressWarnings("unchecked")
-    private void parseDefinitionJson(PipelineDefinition def, String json) {
-        if (json == null || json.isBlank() || "{}".equals(json)) return;
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
-            Map<String, Object> root = om.readValue(json, Map.class);
-            Object schedule = root.get("schedule");
-            Map<String, Object> extensions = new LinkedHashMap<>(root);
-            if (schedule instanceof Map) {
-                Map<String, Object> sch = (Map<String, Object>) schedule;
-                Object cron = sch.get("cron");
-                if (cron != null) def.setScheduleCron(cron.toString());
-                Object sid = sch.get("scheduleId");
-                if (sid != null) extensions.put("scheduleId", sid);
-            }
-            def.setExtensions(extensions);
-        } catch (Exception e) {
-            log.warn("Failed to parse definition JSON: {}", json, e);
-        }
-    }
-
-    /**
-     * 构造 definition JSONB 列内容，包含 schedule（cron + scheduleId）。
-     */
-    private String buildDefinitionJson(PipelineDefinition def) {
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
-            Map<String, Object> root = new LinkedHashMap<>();
-            if (def.getScheduleCron() != null || def.getExtensions() != null) {
-                Map<String, Object> schedule = new LinkedHashMap<>();
-                if (def.getScheduleCron() != null) schedule.put("cron", def.getScheduleCron());
-                if (def.getExtensions() != null && def.getExtensions().get("scheduleId") != null) {
-                    schedule.put("scheduleId", def.getExtensions().get("scheduleId"));
-                }
-                root.put("schedule", schedule);
-            }
-            if (def.getExtensions() != null) {
-                for (Map.Entry<String, Object> e : def.getExtensions().entrySet()) {
-                    if (!"schedule".equals(e.getKey())) root.put(e.getKey(), e.getValue());
-                }
-            }
-            return om.writeValueAsString(root);
-        } catch (Exception e) {
-            return "{}";
-        }
-    }
-
-    private PipelineNode mapToNode(Map<String, Object> row) {
-        PipelineNode node = new PipelineNode();
-        node.setId((String) row.get("id"));
-        node.setDefinitionId((String) row.get("definition_id"));
-        node.setNodeId((String) row.get("node_id"));
-        node.setType((String) row.get("type"));
-        // JSONB columns come back as PGobject — use toString()
-        Object configVal = row.get("config");
-        node.setConfig(configVal != null ? configVal.toString() : null);
-        Object dependsOnVal = row.get("depends_on");
-        node.setDependsOn(dependsOnVal != null ? dependsOnVal.toString() : null);
-        node.setPositionX(toInteger(row.get("position_x")));
-        node.setPositionY(toInteger(row.get("position_y")));
-        node.setCreatedAt(toLocalDateTime(row.get("created_at")));
-        node.setUpdatedAt(toLocalDateTime(row.get("updated_at")));
-        return node;
-    }
-
-    private PipelineExecution mapToExecution(Map<String, Object> row) {
-        PipelineExecution exec = new PipelineExecution();
-        exec.setId((String) row.get("id"));
-        exec.setDefinitionId((String) row.get("pipeline_id"));
-        exec.setStatus((String) row.get("status"));
-        exec.setStartedAt(toLocalDateTime(row.get("started_at")));
-        exec.setCompletedAt(toLocalDateTime(row.get("finished_at")));
-        exec.setErrorMessage((String) row.get("error_message"));
-        exec.setRowsProcessed(toLong(row.get("rows_processed")));
-        return exec;
-    }
-
-    private LocalDateTime toLocalDateTime(Object val) {
-        if (val == null) return null;
-        if (val instanceof Timestamp ts) return ts.toLocalDateTime();
-        if (val instanceof LocalDateTime ldt) return ldt;
-        return null;
-    }
-
-    private Integer toInteger(Object val) {
-        if (val == null) return 0;
-        if (val instanceof Number n) return n.intValue();
-        return 0;
-    }
-
-    private Long toLong(Object val) {
-        if (val == null) return 0L;
-        if (val instanceof Number n) return n.longValue();
-        return 0L;
     }
 }

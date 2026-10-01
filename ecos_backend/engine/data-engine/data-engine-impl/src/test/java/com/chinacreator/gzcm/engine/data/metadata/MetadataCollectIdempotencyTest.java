@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.metadata;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.engine.data.dao.MetadataGitArchiveConfigDao;
 import com.chinacreator.gzcm.engine.data.service.GitRepoRootResolver;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,7 +56,7 @@ class MetadataCollectIdempotencyTest {
     @Mock
     private GitService gitService;
     @Mock
-    private JdbcTemplate jdbc;
+    private MetadataGitArchiveConfigDao configDao;
     @Mock
     private GitRepoRootResolver repoRootResolver;
 
@@ -67,7 +67,7 @@ class MetadataCollectIdempotencyTest {
 
     @BeforeEach
     void setUp() {
-        this.archive = new MetadataCollectGitArchive(gitService, jdbc, repoRootResolver);
+        this.archive = new MetadataCollectGitArchive(gitService, configDao, repoRootResolver);
     }
 
     /** 构造两次采集的 resources —— 完全一致的表清单与 rowCount，模拟稳定数据源 */
