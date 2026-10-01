@@ -4,7 +4,6 @@ import com.chinacreator.gzcm.runtime.access.olap.DuckDBQueryService;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -17,6 +16,9 @@ import java.util.*;
  * DataLake 导出服务（P3-A 从 gateway 迁至 datanet）。
  * DuckDB 已迁移至 Doris，exportTable 降级为空操作。
  *
+ * <p>R2-B5 数据访问收口（架构铁律 §2.5 #1 / IR06）：{@code exportTable} 降级为空操作后，
+ * PG {@code JdbcTemplate} 直持成为死代码，本批一并移除（原 {@code pgJdbc} 字段/构造参数/import）。</p>
+ *
  * @author ecos-factory
  * @since PMO-49 P3-A
  */
@@ -26,13 +28,11 @@ public class DataLakeExportService {
     private static final Logger log = LoggerFactory.getLogger(DataLakeExportService.class);
     private static final String EXPORT_DIR = "./data/datalake";
 
-    private final JdbcTemplate pgJdbc;
     private final DuckDBQueryService duckDB;
     private final MinioStorageService minioStorage;
 
-    public DataLakeExportService(JdbcTemplate pgJdbc, DuckDBQueryService duckDB,
+    public DataLakeExportService(DuckDBQueryService duckDB,
                                   MinioStorageService minioStorage) {
-        this.pgJdbc = pgJdbc;
         this.duckDB = duckDB;
         this.minioStorage = minioStorage;
     }

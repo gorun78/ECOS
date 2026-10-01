@@ -55,5 +55,11 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- B5 数据访问收口守门（架构铁律 §2.5 #1 / IR06 防回潮）：ArchUnit 门禁（版本由 root POM 管理） -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
