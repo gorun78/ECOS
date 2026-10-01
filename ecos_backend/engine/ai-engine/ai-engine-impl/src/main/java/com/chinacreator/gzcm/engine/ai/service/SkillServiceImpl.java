@@ -9,17 +9,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.engine.ai.SkillService;
+import com.chinacreator.gzcm.engine.ai.dao.SkillDao;
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
-import com.chinacreator.gzcm.engine.ai.repository.SkillRepository;
 
 @Service
 public class SkillServiceImpl implements SkillService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillServiceImpl.class);
 
-    private final SkillRepository skillRepository;
+    private final SkillDao skillRepository;
 
-    public SkillServiceImpl(SkillRepository skillRepository) {
+    public SkillServiceImpl(SkillDao skillRepository) {
         this.skillRepository = skillRepository;
     }
 

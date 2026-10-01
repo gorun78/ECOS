@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.engine.ai.dao.AiEngineHealthDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,15 +10,15 @@ public class AiEngineHealthService {
 
     private static final Logger log = LoggerFactory.getLogger(AiEngineHealthService.class);
 
-    private final JdbcTemplate jdbc;
+    private final AiEngineHealthDao dao;
 
-    public AiEngineHealthService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AiEngineHealthService(AiEngineHealthDao dao) {
+        this.dao = dao;
     }
 
     public boolean pingDb() {
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            dao.pingDb();
             return true;
         } catch (Exception e) {
             log.warn("DB health check failed: {}", e.getMessage());
@@ -28,7 +28,7 @@ public class AiEngineHealthService {
 
     public long countAgents() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_agent_registry", Long.class);
+            return dao.countAgents();
         } catch (Exception e) {
             return -1;
         }
@@ -36,7 +36,7 @@ public class AiEngineHealthService {
 
     public long countMissions() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_mission", Long.class);
+            return dao.countMissions();
         } catch (Exception e) {
             return -1;
         }
@@ -44,7 +44,7 @@ public class AiEngineHealthService {
 
     public long countGuardrailPolicies() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_guardrail_policy", Long.class);
+            return dao.countGuardrailPolicies();
         } catch (Exception e) {
             return -1;
         }
@@ -52,7 +52,7 @@ public class AiEngineHealthService {
 
     public long countExecutionPlans() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_execution_plan", Long.class);
+            return dao.countExecutionPlans();
         } catch (Exception e) {
             return -1;
         }

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.engine.ai.dao.ToolDao;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlSecurityGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * 工具执行器 — 从 ecos_tool_definition 表加载工具 schema
  * 支持三种执行模式：
  * <ul>
- *   <li>SQL: 注入 JdbcTemplate 执行预定义查询</li>
+ *   <li>SQL: 经 ToolDao 执行预定义查询（R2-B4-ai 数据访问收口）</li>
  *   <li>REST: 用 RestTemplate 调内部微服务 API</li>
  *   <li>BUILTIN: Java 内置函数（如 getCurrentTime, calculateRisk）</li>
  * </ul>
@@ -40,7 +40,7 @@ public class ToolExecutorService {
     private static final int TIMEOUT_SECONDS = 30;
     private static final int MAX_RESULT_LENGTH = 2000;
 
-    private JdbcTemplate jdbcTemplate;
+    private ToolDao toolDao;
     private final RestTemplate restTemplate;
     private final Map<String, ToolDefinitionEntry> fallbackTools = new ConcurrentHashMap<>();
 
@@ -54,8 +54,8 @@ public class ToolExecutorService {
             "(?i).*(DELETE|DROP|TRUNCATE|ALTER\\s+TABLE|EXEC|RM\\s|MV\\s|UPDATE\\s+.*WHERE|GRANT|REVOKE).*");
 
     @Autowired(required = false)
-    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public void setToolDao(ToolDao toolDao) {
+        this.toolDao = toolDao;
     }
 
     // 使用 @Lazy 打破 AgentDelegationService → AgentLoopService → ToolExecutorService 循环依赖
@@ -70,7 +70,7 @@ public class ToolExecutorService {
 
     // H8-T4 (PMO-74 L3): Agent 工具 SQL 安全闸 —— 表/列白名单 + security-engine
     // policy-engine/evaluate 裁决（铁律 §2.4-4/§2.4-6；不可用/超时/不可解析 = DENY）。
-    // setter 注入与本类 jdbcTemplate 既有风格一致（字段注入存量清单归 H11-T3 统一整改）。
+    // setter 注入与本类 toolDao 既有风格一致（字段注入存量清单归 H11-T3 统一整改）。
     private AgentToolSqlSecurityGate sqlSecurityGate;
     private AgentToolSqlWhitelist sqlWhitelist;
 
@@ -183,7 +183,7 @@ public class ToolExecutorService {
                                      String callId, long startNs) {
         try {
             String userId = getCurrentUserId();
-            if (userId == null || jdbcTemplate == null) {
+            if (userId == null || toolDao == null) {
                 return null; // 无用户上下文或无DB → 放行
             }
 
@@ -275,10 +275,7 @@ public class ToolExecutorService {
      */
     private Boolean querySandboxMandatory(String userId) {
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT sandbox_mandatory FROM td_user_security_profile " +
-                    "WHERE scope_type = 'user' AND user_id = ? LIMIT 1",
-                    userId);
+            List<Map<String, Object>> rows = toolDao.querySandboxMandatory(userId);
             if (rows.isEmpty() || rows.get(0).get("sandbox_mandatory") == null) {
                 return false;
             }
@@ -359,22 +356,14 @@ public class ToolExecutorService {
      * R1.3: 写入沙盒拦截审计日志到 ecos_audit_log。
      */
     private void writeSandboxBlockAudit(String userId, String toolName, String instruction) {
-        if (jdbcTemplate == null) return;
+        if (toolDao == null) return;
         try {
             String changesJson = String.format(
                     "{\"userId\":\"%s\",\"toolName\":\"%s\",\"instruction\":\"%s\",\"action\":\"sandbox_block\",\"result\":\"FAILURE\"}",
                     userId != null ? userId : "",
                     toolName != null ? toolName : "",
                     escapeJson(truncate(instruction, 1000)));
-            jdbcTemplate.update(
-                    "INSERT INTO ecos_audit_log (username, operation, entity_type, entity_id, changes, ip_address, created_at, category) " +
-                    "VALUES (?, ?, ?, ?, CAST(? AS jsonb), NULL, NOW(), ?)",
-                    userId,
-                    "SANDBOX_BLOCK",
-                    "TOOL_EXECUTION",
-                    toolName,
-                    changesJson,
-                    "security");
+            toolDao.insertSandboxAudit(userId, toolName, changesJson);
         } catch (Exception e) {
             log.error("R1.3 沙盒拦截审计日志写入失败: {}", e.getMessage());
         }
@@ -404,16 +393,12 @@ public class ToolExecutorService {
     }
 
     private ToolDefinitionEntry loadFromDatabase(String toolName) {
-        if (jdbcTemplate == null) {
-            log.debug("JdbcTemplate not available, skipping DB load for tool: {}", toolName);
+        if (toolDao == null) {
+            log.debug("ToolDao not available, skipping DB load for tool: {}", toolName);
             return null;
         }
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT code, name, description, tool_type, endpoint_url, http_method, schema_json " +
-                "FROM ecos_ai.ecos_tool_definition WHERE code = ? AND status = 'ACTIVE'",
-                toolName
-            );
+            List<Map<String, Object>> rows = toolDao.loadToolDefinition(toolName);
             if (rows.isEmpty()) {
                 return null;
             }
@@ -473,8 +458,8 @@ public class ToolExecutorService {
     // ── SQL Execution ─────────────────────────────────────────────────────
 
     private String executeSql(ToolDefinitionEntry def, Map<String, Object> arguments) throws Exception {
-        if (jdbcTemplate == null) {
-            throw new IllegalStateException("JdbcTemplate 不可用，无法执行 SQL 工具");
+        if (toolDao == null) {
+            throw new IllegalStateException("ToolDao 不可用，无法执行 SQL 工具");
         }
 
         // H8-T4: 防御纵深 —— 安全闸未装配时拒绝一切 SQL 工具（fail-closed，§2.4-6）
@@ -492,7 +477,7 @@ public class ToolExecutorService {
         List<Object> paramList = extractParamsFromSchema(schemaObj, arguments);
 
         log.debug("Executing SQL: {} with params: {}", sql, paramList);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, paramList.toArray());
+        List<Map<String, Object>> rows = toolDao.queryForList(sql, paramList.toArray());
 
         return objectMapper.writeValueAsString(Map.of(
             "rows", rows,

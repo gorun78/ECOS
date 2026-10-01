@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.engine.ai.PromptCompilerService;
+import com.chinacreator.gzcm.engine.ai.dao.PromptCompilerDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -13,10 +13,10 @@ public class PromptCompilerServiceImpl implements PromptCompilerService {
 
     private static final Logger log = LoggerFactory.getLogger(PromptCompilerServiceImpl.class);
 
-    private final JdbcTemplate jdbc;
+    private final PromptCompilerDao dao;
 
-    public PromptCompilerServiceImpl(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public PromptCompilerServiceImpl(PromptCompilerDao dao) {
+        this.dao = dao;
     }
 
     @Override
@@ -26,10 +26,7 @@ public class PromptCompilerServiceImpl implements PromptCompilerService {
 
         List<Map<String, Object>> sources = new ArrayList<>();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT table_name, table_comment FROM information_schema.tables " +
-                    "WHERE table_schema = 'public' AND table_name LIKE ? LIMIT ?",
-                    "%" + query + "%", topK);
+            List<Map<String, Object>> rows = dao.searchTableNames("%" + query + "%", topK);
             for (Map<String, Object> row : rows) {
                 Map<String, Object> source = new LinkedHashMap<>();
                 source.put("type", "table");

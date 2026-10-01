@@ -1,31 +1,28 @@
-package com.chinacreator.gzcm.engine.ai.config;
+package com.chinacreator.gzcm.engine.ai.dao;
 
 import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import com.chinacreator.gzcm.engine.ai.config.AgentEntity;
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+
 /**
- * JdbcTemplate 仓库 — Agent 配置持久化 CRUD
+ * 数据访问收口（R2-B4-ai / 架构铁律 §2.5 #1 / IR06）：{@code ecos_agent} 配置持久化 CRUD 的 JDBC 落点。
  * <p>
- * 遵循 WorkflowRepository / OntologyRepository 模式。
+ * 原 {@code config.AgentRepository}，SQL 与 {@code RowMapper} 原样搬运，只搬不改语义。
  * tools 和 knowledge 以 JSON 字符串存储在 TEXT 列中。
  * </p>
  */
 @Repository
-public class AgentRepository {
+public class AgentDao extends JdbcTemplateDaoSupport {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentRepository.class);
+    private static final Logger log = LoggerFactory.getLogger(AgentDao.class);
 
-    private final JdbcTemplate jdbc;
-
-    public AgentRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     private final RowMapper<AgentEntity> ROW_MAPPER = (rs, rowNum) -> {
         AgentEntity e = new AgentEntity();
@@ -46,12 +43,12 @@ public class AgentRepository {
 
     public List<AgentEntity> findAll(int limit) {
         String sql = "SELECT * FROM ecos_agent ORDER BY updated_at DESC LIMIT ?";
-        return jdbc.query(sql, ROW_MAPPER, limit);
+        return jdbcTemplate.query(sql, ROW_MAPPER, limit);
     }
 
     public Optional<AgentEntity> findById(String id) {
         String sql = "SELECT * FROM ecos_agent WHERE id = ?";
-        List<AgentEntity> list = jdbc.query(sql, ROW_MAPPER, id);
+        List<AgentEntity> list = jdbcTemplate.query(sql, ROW_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
@@ -60,7 +57,7 @@ public class AgentRepository {
             INSERT INTO ecos_agent (id, name, model_provider, model_name, system_prompt, tools, knowledge, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             """;
-        return jdbc.update(sql,
+        return jdbcTemplate.update(sql,
             entity.getId(), entity.getName(), entity.getModelProvider(),
             entity.getModelName(), entity.getSystemPrompt(),
             entity.getTools(), entity.getKnowledge(), entity.getStatus());
@@ -80,30 +77,30 @@ public class AgentRepository {
                 updated_at = NOW()
             WHERE id = ?
             """;
-        return jdbc.update(sql, name, modelProvider, modelName, systemPrompt,
+        return jdbcTemplate.update(sql, name, modelProvider, modelName, systemPrompt,
             tools, knowledge, status, id);
     }
 
     public int updateTools(String id, String tools) {
         String sql = "UPDATE ecos_agent SET tools = ?, updated_at = NOW() WHERE id = ?";
-        return jdbc.update(sql, tools, id);
+        return jdbcTemplate.update(sql, tools, id);
     }
 
     public int updateKnowledge(String id, String knowledge) {
         String sql = "UPDATE ecos_agent SET knowledge = ?, updated_at = NOW() WHERE id = ?";
-        return jdbc.update(sql, knowledge, id);
+        return jdbcTemplate.update(sql, knowledge, id);
     }
 
     public int publish(String id) {
         String sql = "UPDATE ecos_agent SET status = 'published', updated_at = NOW() WHERE id = ?";
-        return jdbc.update(sql, id);
+        return jdbcTemplate.update(sql, id);
     }
 
     public int deleteById(String id) {
-        return jdbc.update("DELETE FROM ecos_agent WHERE id = ?", id);
+        return jdbcTemplate.update("DELETE FROM ecos_agent WHERE id = ?", id);
     }
 
     public long count() {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_agent", Long.class);
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_agent", Long.class);
     }
 }

@@ -1,23 +1,23 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.engine.ai.dao.NLQDao;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 自然语言查询 (NLQ) 服务 — 从 NLQController 下沉的 JdbcTemplate 访问层。
+ * 自然语言查询 (NLQ) 服务 — 从 NLQController 下沉的访问层。
  *
- * <p>负责执行 ObjectQLParser 解析后生成的 SQL。</p>
+ * <p>负责执行 ObjectQLParser 解析后生成的 SQL。R2-B4-ai 收口：SQL 落点下沉至 {@link NLQDao}。</p>
  */
 @Service
 public class NLQService {
 
-    private final JdbcTemplate jdbc;
+    private final NLQDao dao;
 
-    public NLQService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public NLQService(NLQDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -29,15 +29,16 @@ public class NLQService {
      */
     public List<Map<String, Object>> queryForList(String sql, List<Object> params) {
         if (params == null || params.isEmpty()) {
-            return jdbc.queryForList(sql);
+            return dao.queryForList(sql);
         }
-        return jdbc.queryForList(sql, params.toArray());
+        return dao.queryForList(sql, params.toArray());
     }
 
     public List<Map<String, Object>> queryForList(String sql) {
-        return jdbc.queryForList(sql);
+        return dao.queryForList(sql);
     }
+
     public List<Map<String, Object>> queryForList(String sql, Object[] params) {
-        return jdbc.queryForList(sql, params);
+        return dao.queryForList(sql, params);
     }
 }

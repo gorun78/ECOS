@@ -2,9 +2,9 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
+import com.chinacreator.gzcm.engine.ai.dao.GuardrailsPolicyDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -29,10 +29,10 @@ public class GuardrailsServiceImpl implements GuardrailsService {
             "(?i)(ignore\\s+(all\\s+)?(previous|above)\\s+instructions?" +
             "|pretend\\s+you\\s+are|you\\s+are\\s+DAN|override\\s+system\\s+prompt|ignore\\s+all\\s+constraints)");
 
-    private final JdbcTemplate jdbc;
+    private final GuardrailsPolicyDao dao;
 
-    public GuardrailsServiceImpl(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public GuardrailsServiceImpl(GuardrailsPolicyDao dao) {
+        this.dao = dao;
     }
 
     @Override
@@ -92,7 +92,7 @@ public class GuardrailsServiceImpl implements GuardrailsService {
     @Override
     public List<Map<String, Object>> listPolicies() {
         try {
-            return jdbc.queryForList("SELECT * FROM ecos_guardrail_policy ORDER BY created_at DESC");
+            return dao.listPolicies();
         } catch (Exception e) {
             log.debug("Guardrail policies table not available: {}", e.getMessage());
             return Collections.emptyList();
@@ -124,11 +124,10 @@ public class GuardrailsServiceImpl implements GuardrailsService {
         result.put("updatedAt", now);
 
         try {
-            jdbc.update(
-                "INSERT INTO ecos_guardrail_policy (id, name, type, severity, is_enabled, parameters, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?::jsonb, NOW(), NOW())",
-                id, name, result.get("type"), result.get("severity"),
-                result.get("isEnabled"), "[]");
+            dao.insertPolicy(id, name,
+                String.valueOf(result.get("type")),
+                String.valueOf(result.get("severity")),
+                Boolean.TRUE.equals(result.get("isEnabled")));
         } catch (Exception e) {
             log.debug("Persist guardrail policy failed (using memory): {}", e.getMessage());
         }
@@ -140,7 +139,7 @@ public class GuardrailsServiceImpl implements GuardrailsService {
     @Override
     public void deletePolicy(String id) {
         try {
-            jdbc.update("DELETE FROM ecos_guardrail_policy WHERE id = ?", id);
+            dao.deletePolicy(id);
         } catch (Exception e) {
             log.debug("Delete guardrail policy from DB failed: {}", e.getMessage());
         }

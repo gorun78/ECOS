@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.engine.ai.dao.AgentMetricsWriteDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.LinkedBlockingQueue;
@@ -23,11 +23,11 @@ public class AgentMetricsCollector {
     /** 慢查询阈值（毫秒）: 5 分钟 */
     private static final long SLOW_THRESHOLD_MS = 300_000L;
 
-    private final JdbcTemplate jdbc;
+    private final AgentMetricsWriteDao writeDao;
     private final ThreadPoolExecutor writer;
 
-    public AgentMetricsCollector(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AgentMetricsCollector(AgentMetricsWriteDao writeDao) {
+        this.writeDao = writeDao;
         this.writer = new ThreadPoolExecutor(
                 1, 1, 60L, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(2000),
@@ -52,10 +52,7 @@ public class AgentMetricsCollector {
                         long elapsedMs, int tokensIn, int tokensOut, String traceId) {
         writer.execute(() -> {
             try {
-                jdbc.update(
-                    "INSERT INTO ecos_agent_metrics " +
-                    "(agent_id, action, success, elapsed_ms, tokens_in, tokens_out, trace_id, created_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+                writeDao.insertMetric(
                     nvl(agentId, "unknown"), action, success, elapsedMs,
                     tokensIn, tokensOut, nvl(traceId, ""));
             } catch (Exception e) {
@@ -77,10 +74,7 @@ public class AgentMetricsCollector {
                     "Agent '%s' 执行 '%s' 耗时 %d ms (阈值 %d ms), trace=%s",
                     nvl(agentId, "unknown"), action, elapsedMs, SLOW_THRESHOLD_MS,
                     nvl(traceId, ""));
-                jdbc.update(
-                    "INSERT INTO ecos_agent_alert " +
-                    "(trace_id, agent_id, alert_type, message, created_at) " +
-                    "VALUES (?, ?, ?, ?, NOW())",
+                writeDao.insertAlert(
                     nvl(traceId, ""), nvl(agentId, "unknown"), "SLOW_QUERY", message);
                 log.warn("[AgentMetrics] ALERT: {}", message);
             } catch (Exception e) {

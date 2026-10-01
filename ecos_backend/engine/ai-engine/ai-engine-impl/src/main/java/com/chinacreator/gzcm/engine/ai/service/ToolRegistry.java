@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.engine.ai.dao.ToolDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -40,7 +40,7 @@ public class ToolRegistry {
     private final Map<String, Function<Map<String, Object>, ToolExecutorService.ToolResult>> executors =
             new ConcurrentHashMap<>();
 
-    private JdbcTemplate jdbcTemplate;
+    private ToolDao toolDao;
     private final RestTemplate restTemplate;
 
     @org.springframework.context.annotation.Lazy
@@ -51,8 +51,8 @@ public class ToolRegistry {
     private FileToolService fileToolService;
 
     @Autowired(required = false)
-    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public void setToolDao(ToolDao toolDao) {
+        this.toolDao = toolDao;
     }
 
     public ToolRegistry() {
@@ -167,10 +167,10 @@ public class ToolRegistry {
             long startNs = System.nanoTime();
             String callId = "qdb_" + UUID.randomUUID().toString().substring(0, 8);
 
-            if (jdbcTemplate == null) {
+            if (toolDao == null) {
                 long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
                 return ToolExecutorService.ToolResult.fail(callId, "query_db",
-                        "JdbcTemplate 不可用（数据库未连接）", elapsedMs);
+                        "数据库不可用（数据库未连接）", elapsedMs);
             }
 
             String sql = getStringArg(args, "sql");
@@ -198,7 +198,7 @@ public class ToolRegistry {
                 }
 
                 log.debug("[ToolRegistry] query_db executing: {}", sql);
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params);
+                List<Map<String, Object>> rows = toolDao.executeSelect(sql, params);
                 long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
 
                 String content = objectMapper.writeValueAsString(Map.of(

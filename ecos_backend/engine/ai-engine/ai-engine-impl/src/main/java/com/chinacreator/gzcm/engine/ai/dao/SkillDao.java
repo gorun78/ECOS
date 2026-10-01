@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.engine.ai.repository;
+package com.chinacreator.gzcm.engine.ai.dao;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -6,26 +6,21 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 
 /**
- * JdbcTemplate 仓库 — Skill CRUD
- * 对应 ecos_skill 表
+ * 数据访问收口（R2-B4-ai / 架构铁律 §2.5 #1 / IR06）：{@code ecos_skill} CRUD 的 JDBC 落点。
+ * <p>SQL 与 {@code RowMapper} 原样搬运自原 {@code repository.SkillRepository}，只搬不改语义。</p>
  */
 @Repository
-public class SkillRepository {
+public class SkillDao extends JdbcTemplateDaoSupport {
 
-    private static final Logger log = LoggerFactory.getLogger(SkillRepository.class);
+    private static final Logger log = LoggerFactory.getLogger(SkillDao.class);
 
-    private final JdbcTemplate jdbc;
-
-    public SkillRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     private final RowMapper<SkillEntity> ROW_MAPPER = (rs, rowNum) -> {
         SkillEntity e = new SkillEntity();
@@ -57,17 +52,17 @@ public class SkillRepository {
             params.add(enabled);
         }
         sql.append(" ORDER BY created_at DESC");
-        return jdbc.query(sql.toString(), ROW_MAPPER, params.toArray());
+        return jdbcTemplate.query(sql.toString(), ROW_MAPPER, params.toArray());
     }
 
     public Optional<SkillEntity> findById(Long id) {
         String sql = "SELECT * FROM ecos_skill WHERE id = ?";
-        List<SkillEntity> list = jdbc.query(sql, ROW_MAPPER, id);
+        List<SkillEntity> list = jdbcTemplate.query(sql, ROW_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public List<SkillEntity> findByName(String name) {
-        return jdbc.query("SELECT * FROM ecos_skill WHERE name = ? ORDER BY created_at DESC", ROW_MAPPER, name);
+        return jdbcTemplate.query("SELECT * FROM ecos_skill WHERE name = ? ORDER BY created_at DESC", ROW_MAPPER, name);
     }
 
     public int insert(SkillEntity entity) {
@@ -75,7 +70,7 @@ public class SkillRepository {
             INSERT INTO ecos_skill (name, description, version, enabled, category, package_info, created_by, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             """;
-        return jdbc.update(sql,
+        return jdbcTemplate.update(sql,
             entity.getName(), entity.getDescription(), entity.getVersion(),
             entity.getEnabled(), entity.getCategory(), entity.getPackageInfo(),
             entity.getCreatedBy());
@@ -94,22 +89,22 @@ public class SkillRepository {
                 updated_at = NOW()
             WHERE id = ?
             """;
-        return jdbc.update(sql,
+        return jdbcTemplate.update(sql,
             entity.getName(), entity.getDescription(), entity.getVersion(),
             entity.getEnabled(), entity.getCategory(), entity.getPackageInfo(),
             entity.getCreatedBy(), entity.getId());
     }
 
     public int updateEnabled(Long id, boolean enabled) {
-        return jdbc.update("UPDATE ecos_skill SET enabled = ?, updated_at = NOW() WHERE id = ?", enabled, id);
+        return jdbcTemplate.update("UPDATE ecos_skill SET enabled = ?, updated_at = NOW() WHERE id = ?", enabled, id);
     }
 
     public int deleteById(Long id) {
-        return jdbc.update("DELETE FROM ecos_skill WHERE id = ?", id);
+        return jdbcTemplate.update("DELETE FROM ecos_skill WHERE id = ?", id);
     }
 
     public long count() {
-        Long result = jdbc.queryForObject("SELECT COUNT(*) FROM ecos_skill", Long.class);
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_skill", Long.class);
         return result != null ? result : 0L;
     }
 

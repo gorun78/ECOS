@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.engine.ai.ActionBridgeService;
+import com.chinacreator.gzcm.engine.ai.dao.ActionBridgeDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -12,10 +12,10 @@ import java.util.*;
 public class ActionBridgeServiceImpl implements ActionBridgeService {
 
     private static final Logger log = LoggerFactory.getLogger(ActionBridgeServiceImpl.class);
-    private final JdbcTemplate jdbc;
+    private final ActionBridgeDao actionBridgeDao;
 
-    public ActionBridgeServiceImpl(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ActionBridgeServiceImpl(ActionBridgeDao actionBridgeDao) {
+        this.actionBridgeDao = actionBridgeDao;
     }
 
     @Override
@@ -44,7 +44,7 @@ public class ActionBridgeServiceImpl implements ActionBridgeService {
     @Override
     public List<Map<String, Object>> getAvailableActions() {
         try {
-            return jdbc.queryForList("SELECT * FROM ecos_ontology_action ORDER BY created_at DESC LIMIT 100");
+            return actionBridgeDao.listOntologyActions();
         } catch (Exception e) {
             List<Map<String, Object>> defaults = new ArrayList<>();
             Map<String, Object> a1 = new LinkedHashMap<>();
@@ -100,10 +100,8 @@ public class ActionBridgeServiceImpl implements ActionBridgeService {
 
     private void logActionAudit(Map<String, Object> action, String llmOutput) {
         try {
-            jdbc.update(
-                "INSERT INTO ecos_action_audit (action_code, llm_output_snippet, executed_at) " +
-                "VALUES (?, ?, NOW())",
-                action.get("actionCode"), llmOutput.substring(0, Math.min(llmOutput.length(), 200)));
+            actionBridgeDao.insertActionAudit(
+                String.valueOf(action.get("actionCode")), llmOutput.substring(0, Math.min(llmOutput.length(), 200)));
         } catch (Exception e) {
             log.debug("Action audit log failed: {}", e.getMessage());
         }

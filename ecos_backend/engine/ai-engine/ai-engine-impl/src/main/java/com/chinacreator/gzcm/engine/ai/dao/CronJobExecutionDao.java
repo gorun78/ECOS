@@ -1,29 +1,24 @@
-package com.chinacreator.gzcm.engine.ai.repository;
+package com.chinacreator.gzcm.engine.ai.dao;
 
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import com.chinacreator.gzcm.engine.ai.entity.CronJobExecutionEntity;
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 
 /**
- * JdbcTemplate 仓库 — CronJob 执行历史
- * 对应 ecos_cron_job_execution 表
+ * 数据访问收口（R2-B4-ai / 架构铁律 §2.5 #1 / IR06）：{@code ecos_cron_job_execution} 的 JDBC 落点。
+ * <p>SQL 与 {@code RowMapper} 原样搬运自原 {@code repository.CronJobExecutionRepository}，只搬不改语义。</p>
  */
 @Repository
-public class CronJobExecutionRepository {
+public class CronJobExecutionDao extends JdbcTemplateDaoSupport {
 
-    private static final Logger log = LoggerFactory.getLogger(CronJobExecutionRepository.class);
+    private static final Logger log = LoggerFactory.getLogger(CronJobExecutionDao.class);
 
-    private final JdbcTemplate jdbc;
-
-    public CronJobExecutionRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     private final RowMapper<CronJobExecutionEntity> ROW_MAPPER = (rs, rowNum) -> {
         CronJobExecutionEntity e = new CronJobExecutionEntity();
@@ -43,7 +38,7 @@ public class CronJobExecutionRepository {
 
     public List<CronJobExecutionEntity> findByCronJobId(Long cronJobId, int limit) {
         String sql = "SELECT * FROM ecos_cron_job_execution WHERE cron_job_id = ? ORDER BY created_at DESC LIMIT ?";
-        return jdbc.query(sql, ROW_MAPPER, cronJobId, limit);
+        return jdbcTemplate.query(sql, ROW_MAPPER, cronJobId, limit);
     }
 
     public int insert(CronJobExecutionEntity entity) {
@@ -51,13 +46,13 @@ public class CronJobExecutionRepository {
             INSERT INTO ecos_cron_job_execution (cron_job_id, started_at, finished_at, status, result, error_message, created_at)
             VALUES (?, ?, ?, ?, ?, ?, NOW())
             """;
-        return jdbc.update(sql,
+        return jdbcTemplate.update(sql,
             entity.getCronJobId(), entity.getStartedAt(), entity.getFinishedAt(),
             entity.getStatus(), entity.getResult(), entity.getErrorMessage());
     }
 
     public long countByCronJobId(Long cronJobId) {
-        Long result = jdbc.queryForObject(
+        Long result = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM ecos_cron_job_execution WHERE cron_job_id = ?", Long.class, cronJobId);
         return result != null ? result : 0L;
     }

@@ -9,15 +9,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import com.chinacreator.gzcm.engine.ai.CronJobService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
+import com.chinacreator.gzcm.engine.ai.dao.CronJobDao;
+import com.chinacreator.gzcm.engine.ai.dao.CronJobExecutionDao;
+import com.chinacreator.gzcm.engine.ai.dao.DataSeedDao;
+import com.chinacreator.gzcm.engine.ai.dao.SkillDao;
 import com.chinacreator.gzcm.engine.ai.entity.CronJobEntity;
-import com.chinacreator.gzcm.engine.ai.repository.CronJobExecutionRepository;
-import com.chinacreator.gzcm.engine.ai.repository.CronJobRepository;
-import com.chinacreator.gzcm.engine.ai.repository.SkillRepository;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -93,28 +93,28 @@ public class DataInitializer implements CommandLineRunner {
         )
     );
 
-    private final CronJobRepository cronJobRepository;
-    private final CronJobExecutionRepository executionRepository;
-    private final SkillRepository skillRepository;
+    private final CronJobDao cronJobRepository;
+    private final CronJobExecutionDao executionRepository;
+    private final SkillDao skillRepository;
     private final CronJobService cronJobService;
     private final SkillService skillService;
-    private final JdbcTemplate jdbcTemplate;
+    private final DataSeedDao dataSeedDao;
 
     @Autowired(required = false)
     private AgentRegistryRepository agentRepo;
 
-    public DataInitializer(CronJobRepository cronJobRepository,
-                           CronJobExecutionRepository executionRepository,
-                           SkillRepository skillRepository,
+    public DataInitializer(CronJobDao cronJobRepository,
+                           CronJobExecutionDao executionRepository,
+                           SkillDao skillRepository,
                            CronJobService cronJobService,
                            SkillService skillService,
-                           JdbcTemplate jdbcTemplate) {
+                           DataSeedDao dataSeedDao) {
         this.cronJobRepository = cronJobRepository;
         this.executionRepository = executionRepository;
         this.skillRepository = skillRepository;
         this.cronJobService = cronJobService;
         this.skillService = skillService;
-        this.jdbcTemplate = jdbcTemplate;
+        this.dataSeedDao = dataSeedDao;
     }
 
     @Override
@@ -207,9 +207,8 @@ public class DataInitializer implements CommandLineRunner {
 
     private void seedRoles() {
         try {
-            Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM td_role", Long.class);
-            if (count != null && count > 0) {
+            long count = dataSeedDao.countRoles();
+            if (count > 0) {
                 log.info("td_role table already has {} records, skip seeding", count);
                 return;
             }
@@ -229,10 +228,7 @@ public class DataInitializer implements CommandLineRunner {
         };
 
         for (Object[] r : roles) {
-            jdbcTemplate.update(
-                "INSERT INTO td_role (ROLE_ID, ROLE_NAME, ROLE_CODE, DESCRIPTION, STATUS, CREATED_TIME, CREATED_BY) "
-                + "VALUES (?, ?, ?, ?, 'ACTIVE', ?::timestamp, 'system')",
-                r[0], r[1], r[2], r[3], now);
+            dataSeedDao.insertRole((String) r[0], (String) r[1], (String) r[2], (String) r[3], now);
         }
         log.info("Seeded 5 roles into td_role");
 
@@ -270,10 +266,8 @@ public class DataInitializer implements CommandLineRunner {
         };
 
         for (Object[] p : perms) {
-            jdbcTemplate.update(
-                "INSERT INTO td_permission (PERMISSION_ID, PERMISSION_NAME, PERMISSION_CODE, RESOURCE_ID, ACTION, DESCRIPTION, CREATED_TIME, CREATED_BY) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?::timestamp, 'system')",
-                p[0], p[1], p[2], p[3], p[4], p[5], now);
+            dataSeedDao.insertPermission((String) p[0], (String) p[1], (String) p[2],
+                    (String) p[3], (String) p[4], (String) p[5], now);
         }
         log.info("Seeded {} permissions into td_permission", perms.length);
 
@@ -313,10 +307,7 @@ public class DataInitializer implements CommandLineRunner {
         };
 
         for (String[] rp : rolePerms) {
-            jdbcTemplate.update(
-                "INSERT INTO td_role_permission (ROLE_ID, PERMISSION_ID, CREATED_TIME) "
-                + "VALUES (?, ?, ?::timestamp)",
-                rp[0], rp[1], now);
+            dataSeedDao.insertRolePermission(rp[0], rp[1], now);
         }
         log.info("Seeded {} role-permission mappings into td_role_permission", rolePerms.length);
     }

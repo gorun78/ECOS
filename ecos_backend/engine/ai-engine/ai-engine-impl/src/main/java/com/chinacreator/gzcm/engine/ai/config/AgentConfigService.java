@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.engine.ai.dao.AgentDao;
 import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.model.ProfileConfig;
 import com.chinacreator.gzcm.runtime.llm.repository.ProfileConfigRepository;
@@ -36,7 +37,7 @@ public class AgentConfigService {
     private static final String TEST_SUBSYSTEM = "sysman";
     private static final String TEST_PROFILE_PREFIX = "agent-test-";
 
-    private final AgentRepository repository;
+    private final AgentDao repository;
     private final ObjectMapper objectMapper;
 
     @Autowired(required = false)
@@ -45,7 +46,7 @@ public class AgentConfigService {
     @Autowired(required = false)
     private ProfileConfigRepository profileConfigRepository;
 
-    public AgentConfigService(AgentRepository repository, ObjectMapper objectMapper) {
+    public AgentConfigService(AgentDao repository, ObjectMapper objectMapper) {
         this.repository = repository;
         this.objectMapper = objectMapper;
     }
