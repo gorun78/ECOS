@@ -1,0 +1,47 @@
+package com.chinacreator.gzcm.sysman.dao;
+
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * JWT 认证过滤器数据访问 DAO — 承接 JwtAuthenticationFilter 中的 JdbcTemplate 操作。
+ * <p>铁律 §2.5：过滤器不直用 JdbcTemplate，统一经 DAO。
+ */
+@Repository
+public class AuthLookupDao extends com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport {
+
+    /** 从 TD_USER_ROLE + TD_ROLE_PERMISSION + TD_PERMISSION 查询用户权限码 */
+    private static final String PERMISSION_QUERY =
+        "SELECT DISTINCT p.\"PERMISSION_CODE\" " +
+        "FROM TD_USER_ROLE ur " +
+        "JOIN TD_ROLE_PERMISSION rp ON ur.\"ROLE_ID\" = rp.\"ROLE_ID\" " +
+        "JOIN TD_PERMISSION p ON rp.\"PERMISSION_ID\" = p.\"PERMISSION_ID\" " +
+        "WHERE ur.\"USER_ID\" = ?";
+
+    /** 检查 token jti 是否在黑名单中（已被强制踢出）。 */
+    public boolean isTokenBlacklisted(String jti) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM ecos_token_blacklist WHERE jti = ? AND expires_at > NOW()",
+            Integer.class, jti);
+        return count != null && count > 0;
+    }
+
+    /** 加载用户权限码列表。 */
+    public List<String> loadUserPermissions(String userId) {
+        return jdbcTemplate.queryForList(PERMISSION_QUERY, String.class, userId);
+    }
+
+    /** 按 userId 回查用户名。 */
+    public List<String> loadUsernames(String userId) {
+        return jdbcTemplate.queryForList(
+            "SELECT \"USERNAME\" FROM td_user WHERE \"USER_ID\" = ?", String.class, userId);
+    }
+
+    /** 按 userId 回查租户ID。 */
+    public List<Map<String, Object>> findTenantById(String userId) {
+        return jdbcTemplate.queryForList(
+            "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+    }
+}

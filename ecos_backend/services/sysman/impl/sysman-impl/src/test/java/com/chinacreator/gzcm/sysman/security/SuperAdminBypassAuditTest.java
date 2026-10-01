@@ -1,12 +1,12 @@
 package com.chinacreator.gzcm.sysman.security;
 
+import com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -87,14 +87,12 @@ class SuperAdminBypassAuditTest {
                         List.of(new SimpleGrantedAuthority("ROLE_ANALYST"))));
     }
 
-    /** 放行路径用的 jdbc：所有 clearance 查询都成功返回低等级（证明非超管不靠旁路，超管不到这步）。 */
-    private JdbcTemplate jdbcLevel(int level) {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(), any(Object[].class)))
+    /** 放行路径用的 DAO：所有 clearance 查询都成功返回低等级（证明非超管不靠旁路，超管不到这步）。 */
+    private ClearanceLookupDao daoLevel(int level) {
+        ClearanceLookupDao dao = mock(ClearanceLookupDao.class);
+        when(dao.queryClearanceRows(anyString(), anyString(), anyString(), any()))
                 .thenReturn(List.of(Map.of("clearance_level", level)));
-        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
-                .thenReturn(null);
-        return jdbc;
+        return dao;
     }
 
     private boolean preHandle(ClearanceInterceptor interceptor, String path) throws Exception {
@@ -111,8 +109,8 @@ class SuperAdminBypassAuditTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<Object> provider = (ObjectProvider<Object>) mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(bus);
-        JdbcTemplate jdbc = jdbcLevel(0);
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(jdbc, provider);
+        ClearanceLookupDao dao = daoLevel(0);
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(dao, provider);
 
         setSuperAdmin("root");
         loginAsL1();
@@ -122,7 +120,7 @@ class SuperAdminBypassAuditTest {
 
         verify(bus, times(1)).publish(eq("ecos.audit"), any(Object.class));
         // 旁路发生在 clearance 级联之前，不应触发 clearance 查询
-        verify(jdbc, never()).queryForList(anyString(), any(Object[].class));
+        verify(dao, never()).queryClearanceRows(anyString(), anyString(), anyString(), any());
     }
 
     @Test
@@ -132,7 +130,7 @@ class SuperAdminBypassAuditTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<Object> provider = (ObjectProvider<Object>) mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(bus);
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(jdbcLevel(0), provider);
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(daoLevel(0), provider);
 
         setSuperAdmin("admin1");
         loginAsL1();
@@ -154,7 +152,7 @@ class SuperAdminBypassAuditTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<Object> provider = (ObjectProvider<Object>) mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(jdbcLevel(0), provider);
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(daoLevel(0), provider);
 
         setSuperAdmin("admin2");
         loginAsL1();
@@ -171,7 +169,7 @@ class SuperAdminBypassAuditTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<Object> provider = (ObjectProvider<Object>) mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(bus);
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(jdbcLevel(0), provider);
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(daoLevel(0), provider);
 
         setSuperAdmin("admin3");
         loginAsL1();
@@ -188,7 +186,7 @@ class SuperAdminBypassAuditTest {
         ObjectProvider<Object> provider = (ObjectProvider<Object>) mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(bus);
         // 用户等级 L1，L3 平面 → 应被拒
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(jdbcLevel(1), provider);
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(daoLevel(1), provider);
 
         setRegularUser("u-regular");
         loginAsL1();

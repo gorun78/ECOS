@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.sysman.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import com.chinacreator.gzcm.sysman.dao.WorldModelGraphQueryDao;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -9,23 +8,30 @@ import java.util.Map;
 
 /**
  * WorldModelGraphQueryService — WorldModelGraph 查询服务（PMO-E2: 从 WorldModelGraphController 下沉的 JdbcTemplate 访问层）。
+ * <p>铁律 §2.5：数据访问下沉到 DAO（{@link WorldModelGraphQueryDao}）。
  */
 @Service
 public class WorldModelGraphQueryService {
 
-    private final JdbcTemplate jdbc;
+    private final WorldModelGraphQueryDao dao;
 
-    public WorldModelGraphQueryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public WorldModelGraphQueryService(WorldModelGraphQueryDao dao) {
+        this.dao = dao;
     }
 
-    public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... args) {
-        return jdbc.query(sql, rowMapper, args);
+    public Integer ping() {
+        return dao.ping();
     }
-    public <T> List<T> query(String sql, RowMapper<T> rowMapper) {
-        return jdbc.query(sql, rowMapper);
+
+    public List<Map<String, Object>> listGoals() {
+        return dao.listGoals();
     }
-    public <T> T queryForObject(String sql, Class<T> type, Object... args) {
-        return jdbc.queryForObject(sql, type, args);
+
+    public List<Map<String, Object>> listCausalGraphNodes() {
+        return dao.listCausalGraphNodes();
+    }
+
+    public List<Map<String, Object>> listCausalGraphEdges() {
+        return dao.listCausalGraphEdges();
     }
 }

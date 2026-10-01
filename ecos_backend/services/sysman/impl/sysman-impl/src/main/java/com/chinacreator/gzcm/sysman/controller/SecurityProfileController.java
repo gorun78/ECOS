@@ -8,10 +8,8 @@ import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Timestamp;
 import java.util.*;
 import com.chinacreator.gzcm.sysman.service.SecurityProfileQueryService;
 
@@ -32,57 +30,8 @@ public class SecurityProfileController {
         private final SecurityProfileQueryService securityProfileQueryService;
 private static final Logger log = LoggerFactory.getLogger(SecurityProfileController.class);
 
-    private static final String[] LEVEL_NAMES = {"L0公开", "L1内部", "L2保密", "L3机密", "L4绝密"};
-
     public SecurityProfileController(SecurityProfileQueryService securityProfileQueryService) {
         this.securityProfileQueryService = securityProfileQueryService;
-    }
-
-    // ────────────────────────────────────────────────
-    // RowMapper
-    // ────────────────────────────────────────────────
-
-    private final RowMapper<SecurityProfile> USER_PROFILE_MAPPER = (rs, rowNum) -> {
-        SecurityProfile p = new SecurityProfile();
-        p.setUserId(rs.getString("user_id"));
-        p.setClearanceLevel(rs.getInt("clearance_level"));
-        p.setLevel(rs.getInt("clearance_level"));
-        p.setLevelName(levelNameFor(rs.getInt("clearance_level")));
-        p.setLinkedWorkstation(rs.getString("linked_workstation"));
-        p.setAuditMode(rs.getString("audit_mode"));
-        p.setSandboxMandatory(rs.getBoolean("sandbox_mandatory"));
-        p.setIsDefault(rs.getBoolean("is_default"));
-        p.setScopeType(rs.getString("scope_type"));
-        p.setTenantId(rs.getString("tenant_id"));
-        p.setOrgId(rs.getString("org_id"));
-        Timestamp ca = rs.getTimestamp("created_at");
-        p.setCreatedAt(ca != null ? ca.getTime() : null);
-        Timestamp ua = rs.getTimestamp("updated_at");
-        p.setUpdatedAt(ua != null ? ua.getTime() : null);
-        return p;
-    };
-
-    private final RowMapper<SecurityProfile> ROLE_PROFILE_MAPPER = (rs, rowNum) -> {
-        SecurityProfile p = new SecurityProfile();
-        p.setRoleId(rs.getString("role_id"));
-        p.setClearanceLevel(rs.getInt("clearance_level"));
-        p.setLevel(rs.getInt("clearance_level"));
-        p.setLevelName(levelNameFor(rs.getInt("clearance_level")));
-        p.setLinkedWorkstation(rs.getString("linked_workstation"));
-        p.setAuditMode(rs.getString("audit_mode"));
-        p.setSandboxMandatory(rs.getBoolean("sandbox_mandatory"));
-        p.setScopeType(rs.getString("scope_type"));
-        p.setTenantId(rs.getString("tenant_id"));
-        p.setOrgId(rs.getString("org_id"));
-        Timestamp ca = rs.getTimestamp("created_at");
-        p.setCreatedAt(ca != null ? ca.getTime() : null);
-        Timestamp ua = rs.getTimestamp("updated_at");
-        p.setUpdatedAt(ua != null ? ua.getTime() : null);
-        return p;
-    };
-
-    private static String levelNameFor(int level) {
-        return level >= 0 && level < LEVEL_NAMES.length ? LEVEL_NAMES[level] : ("L" + level);
     }
 
     /**
@@ -445,18 +394,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
 
     private SecurityProfile queryUserProfile(String userId) {
         try {
-            String tenantId = getCurrentTenantId();
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT * FROM td_user_security_profile WHERE user_id = ? AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1";
-                params = new Object[]{userId, tenantId};
-            } else {
-                sql = "SELECT * FROM td_user_security_profile WHERE user_id = ? LIMIT 1";
-                params = new Object[]{userId};
-            }
-            List<SecurityProfile> list = securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
-            return list.isEmpty() ? null : list.get(0);
+            return securityProfileQueryService.findUser(userId, getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询用户安全配置异常: userId={}, {}", userId, e.getMessage());
             return null;
@@ -465,18 +403,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
 
     private SecurityProfile queryRoleProfile(String roleId) {
         try {
-            String tenantId = getCurrentTenantId();
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT * FROM td_role_security_profile WHERE role_id = ? AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1";
-                params = new Object[]{roleId, tenantId};
-            } else {
-                sql = "SELECT * FROM td_role_security_profile WHERE role_id = ? LIMIT 1";
-                params = new Object[]{roleId};
-            }
-            List<SecurityProfile> list = securityProfileQueryService.query(sql, ROLE_PROFILE_MAPPER, params);
-            return list.isEmpty() ? null : list.get(0);
+            return securityProfileQueryService.findRole(roleId, getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询角色安全配置异常: roleId={}, {}", roleId, e.getMessage());
             return null;
@@ -485,30 +412,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
 
     private SecurityProfile queryHighestRoleProfileForUser(String userId) {
         try {
-            String tenantId = getCurrentTenantId();
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = """
-                        SELECT rsp.* FROM td_role_security_profile rsp
-                        JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id
-                        WHERE ur.USER_ID = ? AND (rsp.tenant_id = ? OR rsp.tenant_id IS NULL)
-                        ORDER BY rsp.clearance_level DESC
-                        LIMIT 1
-                        """;
-                params = new Object[]{userId, tenantId};
-            } else {
-                sql = """
-                        SELECT rsp.* FROM td_role_security_profile rsp
-                        JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id
-                        WHERE ur.USER_ID = ?
-                        ORDER BY rsp.clearance_level DESC
-                        LIMIT 1
-                        """;
-                params = new Object[]{userId};
-            }
-            List<SecurityProfile> list = securityProfileQueryService.query(sql, ROLE_PROFILE_MAPPER, params);
-            return list.isEmpty() ? null : list.get(0);
+            return securityProfileQueryService.findHighestRoleForUser(userId, getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询用户最高角色安全配置异常: userId={}, {}", userId, e.getMessage());
             return null;
@@ -517,18 +421,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
 
     private SecurityProfile queryGlobalDefaultProfile() {
         try {
-            String tenantId = getCurrentTenantId();
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT * FROM td_user_security_profile WHERE is_default = TRUE AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1";
-                params = new Object[]{tenantId};
-            } else {
-                sql = "SELECT * FROM td_user_security_profile WHERE is_default = TRUE LIMIT 1";
-                params = new Object[]{};
-            }
-            List<SecurityProfile> list = securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
-            return list.isEmpty() ? null : list.get(0);
+            return securityProfileQueryService.findGlobalDefault(getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询全局默认安全配置异常: {}", e.getMessage());
             return null;
@@ -537,17 +430,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
 
     private List<SecurityProfile> queryAllUserProfiles() {
         try {
-            String tenantId = getCurrentTenantId();
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT * FROM td_user_security_profile WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY updated_at DESC";
-                params = new Object[]{tenantId};
-            } else {
-                sql = "SELECT * FROM td_user_security_profile ORDER BY updated_at DESC";
-                params = new Object[]{};
-            }
-            return securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
+            return securityProfileQueryService.listAllUser(getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询所有用户安全配置异常: {}", e.getMessage());
             return Collections.emptyList();
@@ -556,17 +439,7 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
 
     private List<SecurityProfile> queryAllRoleProfiles() {
         try {
-            String tenantId = getCurrentTenantId();
-            String sql;
-            Object[] params;
-            if (tenantId != null) {
-                sql = "SELECT * FROM td_role_security_profile WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY clearance_level DESC";
-                params = new Object[]{tenantId};
-            } else {
-                sql = "SELECT * FROM td_role_security_profile ORDER BY clearance_level DESC";
-                params = new Object[]{};
-            }
-            return securityProfileQueryService.query(sql, ROLE_PROFILE_MAPPER, params);
+            return securityProfileQueryService.listAllRole(getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询所有角色安全配置异常: {}", e.getMessage());
             return Collections.emptyList();
@@ -582,23 +455,15 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
      */
     private SecurityProfile queryProfileByScope(String scopeType, String scopeId) {
         try {
-            String sql;
-            Object[] params;
             switch (scopeType) {
                 case "TENANT":
-                    sql = "SELECT * FROM td_user_security_profile WHERE tenant_id = ? AND scope_type = 'TENANT' LIMIT 1";
-                    params = new Object[]{scopeId};
-                    break;
                 case "ORG":
-                    sql = "SELECT * FROM td_user_security_profile WHERE org_id = ? AND scope_type = 'ORG' LIMIT 1";
-                    params = new Object[]{scopeId};
-                    break;
+                    SecurityProfile profile = securityProfileQueryService.findUserByScope(scopeType, scopeId);
+                    return profile;
                 default:
                     log.debug("未知作用域类型: {}", scopeType);
                     return null;
             }
-            List<SecurityProfile> list = securityProfileQueryService.query(sql, USER_PROFILE_MAPPER, params);
-            return list.isEmpty() ? null : list.get(0);
         } catch (Exception e) {
             log.warn("按作用域查询安全配置异常: scopeType={}, scopeId={}, {}", scopeType, scopeId, e.getMessage());
             return null;

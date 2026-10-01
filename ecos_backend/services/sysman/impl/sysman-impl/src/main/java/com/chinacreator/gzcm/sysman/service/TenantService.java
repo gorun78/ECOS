@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.sysman.service;
 
+import com.chinacreator.gzcm.sysman.dao.TenantDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -22,10 +22,10 @@ public class TenantService {
     private static final Logger log = LoggerFactory.getLogger(TenantService.class);
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    private final JdbcTemplate jdbc;
+    private final TenantDao tenantDao;
 
-    public TenantService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public TenantService(TenantDao tenantDao) {
+        this.tenantDao = tenantDao;
     }
 
     public DateTimeFormatter getMonthFmt() {
@@ -48,7 +48,7 @@ public class TenantService {
 
         // Count
         String countSql = "SELECT COUNT(*) FROM ecos_tenant" + where;
-        int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
+        int total = tenantDao.queryForObject(countSql, Integer.class, params.toArray());
 
         // Paginate
         String sql = "SELECT id, tenant_name, tenant_code, status, max_users, " +
@@ -60,7 +60,7 @@ public class TenantService {
         pagedParams.add(size);
         pagedParams.add((page - 1) * size);
 
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, pagedParams.toArray());
+        List<Map<String, Object>> rows = tenantDao.queryForList(sql, pagedParams.toArray());
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("page", page);
@@ -76,7 +76,7 @@ public class TenantService {
                 "max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
                 "created_at, updated_at " +
                 "FROM ecos_tenant WHERE id = ?";
-        return jdbc.queryForList(sql, id);
+        return tenantDao.queryForList(sql, id);
     }
 
     /** 创建租户 */
@@ -87,14 +87,14 @@ public class TenantService {
                 "max_users, max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
                 "created_at, updated_at) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-        jdbc.update(sql, id, tenantName, tenantCode, status,
+        tenantDao.update(sql, id, tenantName, tenantCode, status,
                 maxUsers, maxStorageMb, maxApiPerDay, isolationMode, schemaName, databaseUrl);
     }
 
     /** 检查租户是否存在，返回行数 */
     public int countTenant(String id) {
         String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-        return jdbc.queryForObject(checkSql, Integer.class, id);
+        return tenantDao.queryForObject(checkSql, Integer.class, id);
     }
 
     /** 更新租户：执行动态 SET 更新 */
@@ -103,13 +103,13 @@ public class TenantService {
         params.add(id);
 
         String sql = "UPDATE ecos_tenant SET " + set + " WHERE id = ?";
-        jdbc.update(sql, params.toArray());
+        tenantDao.update(sql, params.toArray());
     }
 
     /** 软删除租户：返回受影响行数 */
     public int deleteTenant(String id) {
         String sql = "UPDATE ecos_tenant SET status = 'DELETED', updated_at = NOW() WHERE id = ?";
-        return jdbc.update(sql, id);
+        return tenantDao.update(sql, id);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -118,7 +118,7 @@ public class TenantService {
 
     /** 查询租户配额列表 */
     public List<Map<String, Object>> queryTenantQuotas(String id) {
-        return jdbc.queryForList(
+        return tenantDao.queryForList(
                 "SELECT id, tenant_id, quota_type, daily_limit, monthly_limit, created_at, updated_at " +
                 "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
     }
@@ -127,19 +127,19 @@ public class TenantService {
     public List<Map<String, Object>> queryTenantUsageSummary(String id) {
         String usageSql = "SELECT quota_type, MAX(used_count) AS used_count " +
                 "FROM ecos_tenant_usage WHERE tenant_id = ? GROUP BY quota_type";
-        return jdbc.queryForList(usageSql, id);
+        return tenantDao.queryForList(usageSql, id);
     }
 
     /** 查询指定 quota_type 的配额是否存在（返回行列表） */
     public List<Map<String, Object>> queryExistingQuota(String id, String quotaType) {
-        return jdbc.queryForList(
+        return tenantDao.queryForList(
                 "SELECT id FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?",
                 id, quotaType);
     }
 
     /** 插入新配额 */
     public void insertQuota(String id, String quotaType, long dailyLimit, long monthlyLimit) {
-        jdbc.update(
+        tenantDao.update(
                 "INSERT INTO ecos_tenant_quota (tenant_id, quota_type, daily_limit, monthly_limit) " +
                 "VALUES (?, ?, ?, ?)", id, quotaType, dailyLimit, monthlyLimit);
     }
@@ -149,19 +149,19 @@ public class TenantService {
         sql.append(" WHERE tenant_id = ? AND quota_type = ?");
         params.add(id);
         params.add(quotaType);
-        jdbc.update(sql.toString(), params.toArray());
+        tenantDao.update(sql.toString(), params.toArray());
     }
 
     /** 查询更新后的配额行 */
     public Map<String, Object> queryQuotaRow(String id, String quotaType) {
-        return jdbc.queryForMap(
+        return tenantDao.queryForMap(
                 "SELECT id, tenant_id, quota_type, daily_limit, monthly_limit, created_at, updated_at " +
                 "FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?", id, quotaType);
     }
 
     /** 查询用量明细（按日期范围） */
     public List<Map<String, Object>> queryDailyUsage(String id, LocalDate startDate) {
-        return jdbc.queryForList(
+        return tenantDao.queryForList(
                 "SELECT usage_date, quota_type, used_count " +
                 "FROM ecos_tenant_usage " +
                 "WHERE tenant_id = ? AND usage_date >= ? " +
@@ -171,7 +171,7 @@ public class TenantService {
 
     /** 查询月度用量汇总 */
     public List<Map<String, Object>> queryMonthlyUsage(String id, LocalDate start, LocalDate end) {
-        return jdbc.queryForList(
+        return tenantDao.queryForList(
                 "SELECT quota_type, SUM(used_count) AS total_used " +
                 "FROM ecos_tenant_usage " +
                 "WHERE tenant_id = ? AND usage_date BETWEEN ? AND ? " +
@@ -181,22 +181,22 @@ public class TenantService {
 
     /** 查询租户配额定义 */
     public List<Map<String, Object>> queryQuotaDefinitions(String id) {
-        return jdbc.queryForList(
+        return tenantDao.queryForList(
                 "SELECT quota_type, daily_limit, monthly_limit " +
                 "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
     }
 
     // ── PMO-E2 通用委托方法（供 Controller 调用）──
     public List<Map<String, Object>> queryForList(String sql, Object... args) {
-        return jdbc.queryForList(sql, args);
+        return tenantDao.queryForList(sql, args);
     }
     public Map<String, Object> queryForMap(String sql, Object... args) {
-        return jdbc.queryForMap(sql, args);
+        return tenantDao.queryForMap(sql, args);
     }
     public <T> T queryForObject(String sql, Class<T> type, Object... args) {
-        return jdbc.queryForObject(sql, type, args);
+        return tenantDao.queryForObject(sql, type, args);
     }
     public int update(String sql, Object... args) {
-        return jdbc.update(sql, args);
+        return tenantDao.update(sql, args);
     }
 }

@@ -1,13 +1,14 @@
 package com.chinacreator.gzcm.sysman.security;
 
+import com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -16,7 +17,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,8 +49,8 @@ class ClearanceInterceptorTest {
         UserContext.setCurrent(context);
     }
 
-    private boolean preHandle(JdbcTemplate jdbc, String path) throws Exception {
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(jdbc);
+    private boolean preHandle(ClearanceLookupDao dao, String path) throws Exception {
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(dao);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         request.setRequestURI(path);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -63,53 +63,53 @@ class ClearanceInterceptorTest {
         return false;
     }
 
-    private JdbcTemplate jdbcThrowingOnEveryQuery() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(), any(Object[].class)))
+    private ClearanceLookupDao daoThrowingOnEveryQuery() {
+        ClearanceLookupDao dao = mock(ClearanceLookupDao.class);
+        when(dao.queryClearanceRows(anyString(), anyString(), anyString(), any()))
                 .thenThrow(new RuntimeException("security profile table unreachable"));
-        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+        when(dao.highestRoleClearanceLevel(anyString(), any()))
                 .thenThrow(new RuntimeException("security profile table unreachable"));
-        return jdbc;
+        when(dao.globalDefaultClearanceLevel(any()))
+                .thenThrow(new RuntimeException("security profile table unreachable"));
+        return dao;
     }
 
-    private JdbcTemplate jdbcWithUserLevel(int level) {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(), any(Object[].class)))
+    private ClearanceLookupDao daoWithUserLevel(int level) {
+        ClearanceLookupDao dao = mock(ClearanceLookupDao.class);
+        when(dao.queryClearanceRows(anyString(), anyString(), anyString(), any()))
                 .thenReturn(List.of(Map.of("clearance_level", level)));
-        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
-                .thenReturn(null);
-        return jdbc;
+        return dao;
     }
 
     @Test
     void anonymousCallerIsRejectedOnBusinessPlane() throws Exception {
-        assertFalse(preHandle(jdbcWithUserLevel(4), "/api/v1/datanet/datasource"));
+        assertFalse(preHandle(daoWithUserLevel(4), "/api/v1/datanet/datasource"));
     }
 
     @Test
     void configuredLevelAdmitsL1PlaneButNotL3Plane() throws Exception {
         loginAs("u-test");
         // PATH_RULES: /api/v1/ -> L1，/api/v1/system/ -> L3
-        assertTrue(preHandle(jdbcWithUserLevel(1), "/api/v1/datanet/datasource"));
-        assertFalse(preHandle(jdbcWithUserLevel(1), "/api/v1/system/users"));
+        assertTrue(preHandle(daoWithUserLevel(1), "/api/v1/datanet/datasource"));
+        assertFalse(preHandle(daoWithUserLevel(1), "/api/v1/system/users"));
     }
 
     @Test
     void insufficientConfiguredLevelIsRejectedRegardlessOfPath() throws Exception {
         loginAs("u-test");
-        assertFalse(preHandle(jdbcWithUserLevel(1), "/api/v1/system/users"));
-        assertTrue(preHandle(jdbcWithUserLevel(3), "/api/v1/system/users"));
+        assertFalse(preHandle(daoWithUserLevel(1), "/api/v1/system/users"));
+        assertTrue(preHandle(daoWithUserLevel(3), "/api/v1/system/users"));
     }
 
     @Test
     void cascadeQueryFailureNeverReachesConfidentialPlane() throws Exception {
         loginAs("u-test");
         // 全级联查询异常 -> 兜底 L1：L3 平面必须仍被拒（fail-closed 方向不得随查询失败而放宽）
-        assertFalse(preHandle(jdbcThrowingOnEveryQuery(), "/api/v1/system/users"));
+        assertFalse(preHandle(daoThrowingOnEveryQuery(), "/api/v1/system/users"));
     }
 
     @Test
     void healthPathStaysExempt() throws Exception {
-        assertTrue(preHandle(jdbcThrowingOnEveryQuery(), "/api/health"));
+        assertTrue(preHandle(daoThrowingOnEveryQuery(), "/api/health"));
     }
 }

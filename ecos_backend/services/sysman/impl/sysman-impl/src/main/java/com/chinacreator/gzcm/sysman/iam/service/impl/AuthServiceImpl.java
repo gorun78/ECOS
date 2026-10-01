@@ -7,10 +7,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.dao.UserLookupDao;
 import com.chinacreator.gzcm.sysman.iam.entity.UserAccount;
 import com.chinacreator.gzcm.sysman.iam.service.IAuthService;
 import com.chinacreator.gzcm.sysman.iam.service.ITokenService;
@@ -31,7 +31,7 @@ public class AuthServiceImpl implements IAuthService {
     private ISessionService sessionService;
     private IUserService userService;
     private final SysConfigService sysConfigService;
-    private final JdbcTemplate jdbcTemplate;
+    private final UserLookupDao userLookupDao;
     
     /**
      * 构造函数
@@ -41,12 +41,12 @@ public class AuthServiceImpl implements IAuthService {
      */
     @Autowired
     public AuthServiceImpl(ITokenService tokenService, ISessionService sessionService, IUserService userService,
-                           SysConfigService sysConfigService, JdbcTemplate jdbcTemplate) {
+                           SysConfigService sysConfigService, UserLookupDao userLookupDao) {
         this.tokenService = tokenService;
         this.sessionService = sessionService;
         this.userService = userService;
         this.sysConfigService = sysConfigService;
-        this.jdbcTemplate = jdbcTemplate;
+        this.userLookupDao = userLookupDao;
     }
     
     @Override
@@ -224,8 +224,7 @@ public class AuthServiceImpl implements IAuthService {
      */
     private String getUserTenantId(String username) {
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+            List<Map<String, Object>> rows = userLookupDao.findTenantByUsername(username);
             if (rows != null && !rows.isEmpty()) {
                 Object tid = rows.get(0).get("TENANT_ID");
                 if (tid != null && !tid.toString().isBlank()) {

@@ -2,12 +2,9 @@ package com.chinacreator.gzcm.sysman.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import com.chinacreator.gzcm.sysman.dao.InterfaceRefQueryDao;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,31 +28,11 @@ public class InterfaceRefQueryService {
 
     private static final String TABLE = "ecos_interface_ref";
 
-    private static final String COLUMNS = "id, name, interface_type, endpoint, method, timeout_ms, "
-            + "create_time, update_time, create_by";
+    private final InterfaceRefQueryDao dao;
 
-    private final JdbcTemplate jdbc;
-
-    public InterfaceRefQueryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public InterfaceRefQueryService(InterfaceRefQueryDao dao) {
+        this.dao = dao;
     }
-
-    /** 行映射：列名 → 前端驼峰键（顺序与下沉前一致）。 */
-    private final RowMapper<Map<String, Object>> ROW_MAPPER = (rs, rowNum) -> {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", rs.getString("id"));
-        row.put("name", rs.getString("name"));
-        row.put("interfaceType", rs.getString("interface_type"));
-        row.put("endpoint", rs.getString("endpoint"));
-        row.put("method", rs.getString("method"));
-        row.put("timeoutMs", rs.getInt("timeout_ms"));
-        Timestamp ct = rs.getTimestamp("create_time");
-        row.put("createTime", ct != null ? ct.getTime() : null);
-        Timestamp ut = rs.getTimestamp("update_time");
-        row.put("updateTime", ut != null ? ut.getTime() : null);
-        row.put("createBy", rs.getString("create_by"));
-        return row;
-    };
 
     /**
      * 全部未删除接口引用（按 id 升序）。
@@ -63,9 +40,7 @@ public class InterfaceRefQueryService {
      * @return 接口引用 Map 列表（永不为 null）
      */
     public List<Map<String, Object>> listAll() {
-        String sql = "SELECT " + COLUMNS + " FROM " + TABLE
-                + " WHERE is_deleted = 0 ORDER BY id";
-        return jdbc.query(sql, ROW_MAPPER);
+        return dao.listAll();
     }
 
     /**
@@ -75,9 +50,7 @@ public class InterfaceRefQueryService {
      * @return 命中行；不存在返回 {@code null}
      */
     public Map<String, Object> findById(String id) {
-        String sql = "SELECT " + COLUMNS + " FROM " + TABLE + " WHERE id = ? AND is_deleted = 0";
-        List<Map<String, Object>> rows = jdbc.query(sql, ROW_MAPPER, id);
-        return rows.isEmpty() ? null : rows.get(0);
+        return dao.findById(id);
     }
 
     /**
@@ -87,7 +60,7 @@ public class InterfaceRefQueryService {
      * @return COUNT(1) 结果（保留 {@code Integer} 以对齐下沉前的 null 判定）
      */
     public Integer countById(String id) {
-        return jdbc.queryForObject(
+        return dao.queryForObject(
                 "SELECT COUNT(1) FROM " + TABLE + " WHERE id = ? AND is_deleted = 0",
                 Integer.class, id);
     }
@@ -102,7 +75,7 @@ public class InterfaceRefQueryService {
         String sql = "INSERT INTO " + TABLE
                 + " (id, name, interface_type, endpoint, method, timeout_ms, create_by, update_by, is_deleted, create_time, update_time)"
                 + " VALUES (?, ?, ?, ?, ?, ?, 'system', 'system', 0, NOW(), NOW())";
-        jdbc.update(sql, id, name, interfaceType, endpoint, method, timeoutMs);
+        dao.update(sql, id, name, interfaceType, endpoint, method, timeoutMs);
         log.debug("ecos_interface_ref insert ok: id={}, name={}", id, name);
         return id;
     }
@@ -125,7 +98,7 @@ public class InterfaceRefQueryService {
                     update_by = 'system'
                 WHERE id = ? AND is_deleted = 0
                 """.formatted(TABLE);
-        return jdbc.update(sql, name, interfaceType, endpoint, method, timeoutMs, id);
+        return dao.update(sql, name, interfaceType, endpoint, method, timeoutMs, id);
     }
 
     /**
@@ -134,7 +107,7 @@ public class InterfaceRefQueryService {
      * @return 受影响行数（0 表示不存在或已删除）
      */
     public int logicalDelete(String id) {
-        return jdbc.update(
+        return dao.update(
                 "UPDATE " + TABLE + " SET is_deleted = 1, update_time = NOW() WHERE id = ? AND is_deleted = 0",
                 id);
     }

@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,20 +45,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    /** 从 TD_USER_ROLE + TD_ROLE_PERMISSION + TD_PERMISSION 查询用户权限码 */
-    private static final String PERMISSION_QUERY =
-        "SELECT DISTINCT p.\"PERMISSION_CODE\" " +
-        "FROM TD_USER_ROLE ur " +
-        "JOIN TD_ROLE_PERMISSION rp ON ur.\"ROLE_ID\" = rp.\"ROLE_ID\" " +
-        "JOIN TD_PERMISSION p ON rp.\"PERMISSION_ID\" = p.\"PERMISSION_ID\" " +
-        "WHERE ur.\"USER_ID\" = ?";
-
     private final JwtTokenProvider jwtTokenProvider;
-    private final JdbcTemplate jdbcTemplate;
+    private final com.chinacreator.gzcm.sysman.dao.AuthLookupDao authLookupDao;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, JdbcTemplate jdbcTemplate) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                    com.chinacreator.gzcm.sysman.dao.AuthLookupDao authLookupDao) {
         this.jwtTokenProvider = jwtTokenProvider;
-        this.jdbcTemplate = jdbcTemplate;
+        this.authLookupDao = authLookupDao;
     }
 
     @Override
@@ -167,8 +159,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String tenantSource = "claims";
         if (tenantId == null || tenantId.isBlank()) {
             try {
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                        "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+                List<Map<String, Object>> rows = authLookupDao.findTenantById(userId);
                 if (rows != null && !rows.isEmpty()) {
                     Object tid = rows.get(0).get("TENANT_ID");
                     tenantId = tid != null ? tid.toString() : null;
@@ -212,8 +203,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     private String loadUsername(String userId) {
         try {
-            List<String> names = jdbcTemplate.queryForList(
-                "SELECT \"USERNAME\" FROM td_user WHERE \"USER_ID\" = ?", String.class, userId);
+            List<String> names = authLookupDao.loadUsernames(userId);
             if (names != null && !names.isEmpty() && names.get(0) != null) {
                 return names.get(0);
             }
@@ -229,15 +219,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * 仅业务异常返回 false（如 EmptyResultDataAccessException 视为未命中）。</p>
      */
     private boolean isTokenBlacklisted(String jti) {
-        Integer count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM ecos_token_blacklist WHERE jti = ? AND expires_at > NOW()",
-            Integer.class, jti);
-        return count != null && count > 0;
+        return authLookupDao.isTokenBlacklisted(jti);
     }
 
     /** 从数据库加载用户权限码列表（IR01 过渡态，见 W04 备注）。 */
     private List<String> loadUserPermissions(String userId) {
-        return jdbcTemplate.queryForList(PERMISSION_QUERY, String.class, userId);
+        return authLookupDao.loadUserPermissions(userId);
     }
 
     /** 从 JWT Claims 中提取角色列表（缺失 / 非 List 时返回空集）。 */

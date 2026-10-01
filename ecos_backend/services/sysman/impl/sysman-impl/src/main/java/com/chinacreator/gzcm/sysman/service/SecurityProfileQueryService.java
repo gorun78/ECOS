@@ -1,31 +1,53 @@
 package com.chinacreator.gzcm.sysman.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import com.chinacreator.gzcm.sysman.dao.SecurityProfileQueryDao;
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * SecurityProfileQueryService — SecurityProfile 查询服务（PMO-E2: 从 SecurityProfileController 下沉的 JdbcTemplate 访问层）。
+ * <p>铁律 §2.5：数据访问下沉到 DAO（{@link SecurityProfileQueryDao}）。
  */
 @Service
 public class SecurityProfileQueryService {
 
-    private final JdbcTemplate jdbc;
+    private final SecurityProfileQueryDao dao;
 
-    public SecurityProfileQueryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SecurityProfileQueryService(SecurityProfileQueryDao dao) {
+        this.dao = dao;
     }
 
-    public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... args) {
-        return jdbc.query(sql, rowMapper, args);
+    public SecurityProfile findUser(String userId, String tenantId) {
+        return dao.findUser(userId, tenantId);
     }
-    public <T> List<T> query(String sql, RowMapper<T> rowMapper) {
-        return jdbc.query(sql, rowMapper);
+
+    public SecurityProfile findRole(String roleId, String tenantId) {
+        return dao.findRole(roleId, tenantId);
     }
+
+    public SecurityProfile findHighestRoleForUser(String userId, String tenantId) {
+        return dao.findHighestRoleForUser(userId, tenantId);
+    }
+
+    public SecurityProfile findGlobalDefault(String tenantId) {
+        return dao.findGlobalDefault(tenantId);
+    }
+
+    public List<SecurityProfile> listAllUser(String tenantId) {
+        return dao.listAllUser(tenantId);
+    }
+
+    public List<SecurityProfile> listAllRole(String tenantId) {
+        return dao.listAllRole(tenantId);
+    }
+
+    public SecurityProfile findUserByScope(String scopeType, String scopeId) {
+        return dao.findUserByScope(scopeType, scopeId);
+    }
+
     public int update(String sql, Object... args) {
-        return jdbc.update(sql, args);
+        return dao.update(sql, args);
     }
 }

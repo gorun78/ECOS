@@ -9,10 +9,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.dao.UserLookupDao;
 import com.chinacreator.gzcm.sysman.iam.dao.UserDao;
 import com.chinacreator.gzcm.sysman.iam.entity.UserAccount;
 import com.chinacreator.gzcm.sysman.iam.service.IUserService;
@@ -29,17 +29,17 @@ public class UserServiceImpl implements IUserService {
     private static final int DEFAULT_MIN_PASSWORD_LENGTH = 6;
     private final UserDao userDao;
     private final SysConfigService sysConfigService;
-    private final JdbcTemplate jdbcTemplate;
+    private final UserLookupDao userLookupDao;
     private final PasswordHasher passwordHasher = new PasswordHasher();
 
     // 简单失败计数（可替换为Redis）
     private final Map<String, Integer> failedAttempts = new HashMap<>();
 
     @Autowired
-    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService, JdbcTemplate jdbcTemplate) {
+    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService, UserLookupDao userLookupDao) {
         this.userDao = userDao;
         this.sysConfigService = sysConfigService;
-        this.jdbcTemplate = jdbcTemplate;
+        this.userLookupDao = userLookupDao;
     }
 
     @Override
@@ -94,10 +94,9 @@ public class UserServiceImpl implements IUserService {
             // 更新用户-组织关联（td_user_organization）
             if (user.getOrgId() != null) {
                 try {
-                    jdbcTemplate.update("DELETE FROM td_user_organization WHERE \"USER_ID\" = ?", existing.getUserId());
+                    userLookupDao.deleteUserOrg(existing.getUserId());
                     if (!user.getOrgId().isEmpty()) {
-                        jdbcTemplate.update("INSERT INTO td_user_organization (\"USER_ID\", \"ORG_ID\", \"IS_PRIMARY\", \"CREATED_TIME\", \"CREATED_BY\") VALUES (?, ?, '1', now(), ?)",
-                            existing.getUserId(), user.getOrgId(), operator);
+                        userLookupDao.insertUserOrg(existing.getUserId(), user.getOrgId(), operator);
                     }
                 } catch (Exception orgEx) {
                     // 组织关联更新失败不影响用户更新主流程
