@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.event.PipelineEvent;
+import com.chinacreator.gzcm.engine.security.dao.SecuritySandboxDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
@@ -19,11 +19,11 @@ public class SecuritySandboxService {
 
     private final List<Map<String, Object>> auditLogs = new CopyOnWriteArrayList<>();
     private final ApplicationEventPublisher eventPublisher;
-    private final JdbcTemplate jdbc;  // SEC-P0-5: 用于查询用户角色
+    private final SecuritySandboxDao sandboxDao;  // SEC-P0-5: 用于查询用户角色
 
-    public SecuritySandboxService(ApplicationEventPublisher eventPublisher, JdbcTemplate jdbc) {
+    public SecuritySandboxService(ApplicationEventPublisher eventPublisher, SecuritySandboxDao sandboxDao) {
         this.eventPublisher = eventPublisher;
-        this.jdbc = jdbc;
+        this.sandboxDao = sandboxDao;
         seedAuditLogs();
     }
 
@@ -227,14 +227,10 @@ public class SecuritySandboxService {
     /** SEC-P0-5: 基于数据库角色判断超级管理员，替代硬编码用户名 */
     private boolean isSuperAdminRole(String userId) {
         if (userId == null || userId.isBlank()) return false;
-        // 通过 JdbcTemplate 查询用户角色（注入由 Spring 管理）
+        // 通过 DAO 查询用户角色
         try {
-            Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM td_user_security_profile usp " +
-                "JOIN td_role_security_profile rsp ON usp.profile_id = rsp.profile_id " +
-                "WHERE usp.user_id = ? AND rsp.role_name = 'ROLE_SUPER_ADMIN'",
-                Integer.class, userId);
-            return count != null && count > 0;
+            int count = sandboxDao.countSuperAdminRole(userId);
+            return count > 0;
         } catch (Exception e) {
             log.warn("超级管理员角色查询失败, userId={}, error={}", userId, e.getMessage());
             return false;

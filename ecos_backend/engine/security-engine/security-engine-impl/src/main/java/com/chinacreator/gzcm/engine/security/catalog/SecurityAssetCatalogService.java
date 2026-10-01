@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.security.catalog;
 
+import com.chinacreator.gzcm.engine.security.dao.SecurityAssetCatalogDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -35,31 +35,24 @@ public class SecurityAssetCatalogService {
     private static final Pattern KIND = Pattern.compile("^(COLUMN|TABLE)$");
     private static final Pattern ASSET_KEY = Pattern.compile("^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+){1,2}$");
 
-    private final JdbcTemplate jdbc;
+    private final SecurityAssetCatalogDao dao;
 
-    public SecurityAssetCatalogService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public SecurityAssetCatalogService(SecurityAssetCatalogDao dao) {
+        this.dao = dao;
     }
 
     /**
      * 列表查询（未删除的全部）。
      */
     public List<Map<String, Object>> listAll() {
-        String sql = "SELECT id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role, "
-                + "description, version_no, is_deleted, domain, tenant_id, create_time, update_time "
-                + "FROM ecos_control.ecos_security_asset WHERE is_deleted = 0 ORDER BY asset_key";
-        return jdbc.queryForList(sql);
+        return dao.listAll();
     }
 
     /**
      * 按 asset_key 查询单条。
      */
     public Map<String, Object> findByAssetKey(String assetKey) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role, description, "
-                        + "version_no, is_deleted, domain, tenant_id, create_time, update_time "
-                        + "FROM ecos_control.ecos_security_asset WHERE is_deleted = 0 AND asset_key = ? LIMIT 1",
-                assetKey);
+        List<Map<String, Object>> rows = dao.findByAssetKey(assetKey);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
@@ -89,13 +82,7 @@ public class SecurityAssetCatalogService {
         if (existing == null) {
             // insert
             String id = "sec-asset-" + assetKey.hashCode();
-            jdbc.update(
-                    "INSERT INTO ecos_control.ecos_security_asset "
-                            + "(id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role, "
-                            + "     description, version_no, is_deleted, domain, tenant_id, "
-                            + "      create_time, update_time, create_by, update_by) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, '1', 0, 'default', ?, NOW(), NOW(), 'api', 'api')",
-                    id, assetKey, kind, sensitivity, guardCombo, exemptionRef, ownerRole, description, tenantId);
+            dao.insert(id, assetKey, kind, sensitivity, guardCombo, exemptionRef, ownerRole, description, tenantId);
             Map<String, Object> row = new LinkedHashMap<>(freshRow(assetKey, kind, sensitivity, guardCombo,
                     exemptionRef, ownerRole, description, id));
             log.info("安全资产目录新增: key={}, kind={}, sensitivity={}, guard={}", assetKey, kind, sensitivity, guardCombo);
@@ -103,12 +90,7 @@ public class SecurityAssetCatalogService {
         }
 
         String id = String.valueOf(existing.get("id"));
-        jdbc.update(
-                "UPDATE ecos_control.ecos_security_asset SET kind = ?, sensitivity = ?, guard_combo = ?, "
-                        + "exemption_ref = ?, owner_role = ?, description = ?, update_time = NOW(), update_by = 'api', "
-                        + "version_no = CAST(CAST(version_no AS INT) + 1 AS VARCHAR) "
-                        + "WHERE id = ?",
-                kind, sensitivity, guardCombo, exemptionRef, ownerRole, description, id);
+        dao.update(kind, sensitivity, guardCombo, exemptionRef, ownerRole, description, id);
         Map<String, Object> row = new LinkedHashMap<>(existing);
         row.put("kind", kind);
         row.put("sensitivity", sensitivity);
@@ -124,9 +106,7 @@ public class SecurityAssetCatalogService {
     public boolean logicalDelete(String assetKey) {
         Map<String, Object> existing = findByAssetKey(assetKey);
         if (existing == null) return false;
-        int rows = jdbc.update("UPDATE ecos_control.ecos_security_asset SET is_deleted = 1, "
-                + "update_time = NOW(), update_by = 'api' WHERE id = ?",
-                existing.get("id"));
+        int rows = dao.logicalDelete(String.valueOf(existing.get("id")));
         return rows > 0;
     }
 

@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.security;
 
+import com.chinacreator.gzcm.engine.security.dao.RowLevelSecurityDao;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -31,18 +31,18 @@ import static org.mockito.Mockito.when;
 class RlsPredicateBindingTest {
 
     private RowLevelSecurityServiceImpl svc;
-    private JdbcTemplate jdbc;
+    private RowLevelSecurityDao dao;
 
     @BeforeEach
     void setUp() {
-        jdbc = mock(JdbcTemplate.class);
-        svc = new RowLevelSecurityServiceImpl(jdbc);
+        dao = mock(RowLevelSecurityDao.class);
+        svc = new RowLevelSecurityServiceImpl(dao);
     }
 
     @Test
     @DisplayName("1. 参数化策略 → predicateTemplate 含占位符、params 非空、无裸值")
     void parameterizedPolicyYieldsPlaceholdersAndParams() {
-        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(policyRow(
+        when(dao.findPoliciesForUser(anyString(), anyString())).thenReturn(List.of(policyRow(
                 "parameterized", "department_id = :userDeptId",
                 "[{\"name\":\"userDeptId\",\"source\":\"CONTEXT_ORG\",\"value\":null}]")));
 
@@ -68,7 +68,7 @@ class RlsPredicateBindingTest {
     @Test
     @DisplayName("2. 无策略 → 1=1 兜底 + denyIfEmpty=true（调用方据此 DENY）")
     void noPolicyYieldsOneEqualsOneAndDenyIfEmpty() {
-        when(jdbc.queryForList(anyString(), any(), any(), any(), any())).thenReturn(List.of());
+        when(dao.findPoliciesForUser(anyString(), any())).thenReturn(List.of());
 
         Map<String, Object> r = svc.apply("t", "u1");
 
@@ -81,7 +81,7 @@ class RlsPredicateBindingTest {
     @Test
     @DisplayName("3. 存量裸文本策略(legacy) → 包一层 legacy_text，params 空但 template 保留")
     void legacyTextPolicyWrapped() {
-        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(
+        when(dao.findPoliciesForUser(anyString(), anyString())).thenReturn(
                 List.of(policyRow("legacy", "clearance_level >= 4", null)));
 
         Map<String, Object> r = svc.apply("t", "u1");

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.security.dao.AuditDao;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -8,7 +9,6 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -38,12 +38,12 @@ public class AuditKafkaConsumer {
     private static final ObjectMapper MAPPER =
             new ObjectMapper().registerModule(new JavaTimeModule());
 
-    private final JdbcTemplate jdbc;
+    private final AuditDao auditDao;
     private final ObjectProvider<EventBusService> eventBus;
 
-    public AuditKafkaConsumer(JdbcTemplate jdbc,
+    public AuditKafkaConsumer(AuditDao auditDao,
                               ObjectProvider<EventBusService> eventBus) {
-        this.jdbc = jdbc;
+        this.auditDao = auditDao;
         this.eventBus = eventBus;
     }
 
@@ -103,10 +103,7 @@ public class AuditKafkaConsumer {
         String ip = asStr(evt.get("ipAddress"));
         try {
             // PG 幂等：ON CONFLICT (id) DO NOTHING（id 已 PK 化，多库分支待 MC03 阶段收口）
-            int inserted = jdbc.update(
-                "INSERT INTO ecos_audit_log (id, user_id, username, action, resource, result, detail, ip_address) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
-                id, userId, username, action, resource, result, detail, ip);
+            int inserted = auditDao.insertAuditLogIdempotent(id, userId, username, action, resource, result, detail, ip);
             if (inserted == 0) {
                 log.trace("AuditKafkaConsumer: id={} 已存在(重放跳过)", id);
             } else {
@@ -115,15 +112,11 @@ public class AuditKafkaConsumer {
         } catch (org.springframework.dao.DataAccessException e) {
             // 非 PG 或 ON CONFLICT 不支持时退化路径：先查后插（幂等语义等价，性能略降）
             try {
-                Integer exists = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM ecos_audit_log WHERE id = ?", Integer.class, id);
-                if (exists != null && exists > 0) {
+                int exists = auditDao.countAuditLog(id);
+                if (exists > 0) {
                     log.trace("AuditKafkaConsumer(退化): id={} 已存在, 重放跳过", id);
                 } else {
-                    jdbc.update(
-                        "INSERT INTO ecos_audit_log (id, user_id, username, action, resource, result, detail, ip_address) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        id, userId, username, action, resource, result, detail, ip);
+                    auditDao.insertAuditLog(id, userId, username, action, resource, result, detail, ip);
                 }
             } catch (Exception inner) {
                 log.error("AuditKafkaConsumer 落库失败(退化) id={}: {}", id, inner.getMessage());

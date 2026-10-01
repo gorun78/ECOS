@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security;
 
+import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
@@ -10,7 +11,6 @@ import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,7 +32,7 @@ class ThreeChannelDecisionTest {
     private RowLevelSecurityServiceImpl rls;
     private ColumnLevelSecurityServiceImpl cls;
     private OpaPolicyService opa;
-    private JdbcTemplate jdbc;
+    private SecurityDecisionDao dao;
     private SecurityDecisionService svc;
 
     @BeforeEach
@@ -40,8 +40,8 @@ class ThreeChannelDecisionTest {
         rls = mock(RowLevelSecurityServiceImpl.class);
         cls = mock(ColumnLevelSecurityServiceImpl.class);
         opa = mock(OpaPolicyService.class);
-        jdbc = mock(JdbcTemplate.class);
-        svc = new SecurityDecisionService(rls, cls, opa, jdbc);
+        dao = mock(SecurityDecisionDao.class);
+        svc = new SecurityDecisionService(rls, cls, opa, dao);
 
         // RLS 源：参数化策略（含 : 占位符 + bindings，禁裸拼）
         Map<String, Object> rlsRes = new LinkedHashMap<>();
@@ -74,7 +74,7 @@ class ThreeChannelDecisionTest {
         when(opa.evaluate(anyString(), anyMap())).thenReturn(opaRes);
 
         // mask 源：目录无登记 → 空集
-        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+        when(dao.masksForTable(anyString(), anyString())).thenReturn(List.of());
     }
 
     private DecisionContext ctx() {

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.engine.security.dao.RowLevelSecurityDao;
 import com.chinacreator.gzcm.engine.security.rls.PredicateBinding;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicateValidator;
@@ -7,7 +8,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -19,10 +19,10 @@ public class RowLevelSecurityServiceImpl {
     private static final Logger log = LoggerFactory.getLogger(RowLevelSecurityServiceImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbcTemplate;
+    private final RowLevelSecurityDao dao;
 
-    public RowLevelSecurityServiceImpl(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public RowLevelSecurityServiceImpl(RowLevelSecurityDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -38,21 +38,9 @@ public class RowLevelSecurityServiceImpl {
      * 绑定变量传入（参见 {@code data-engine} 查询调用方）。
      */
     public Map<String, Object> apply(String tableName, String userId) {
-        String sql = """
-            SELECT filter_expr, priority, policy_name,
-                   predicate_template, bindings_json, source_kind
-            FROM ecos_rls_policy
-            WHERE (table_name = ? OR resource_id = ?) AND enabled = true
-              AND (user_id = ? OR user_id IS NULL)
-              AND (role_id IS NULL OR role_id IN (
-                  SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?
-              ))
-            ORDER BY priority ASC
-            """;
-
         List<Map<String, Object>> policies;
         try {
-            policies = jdbcTemplate.queryForList(sql, tableName, tableName, userId, userId);
+            policies = dao.findPoliciesForUser(tableName, userId);
         } catch (Exception e) {
             log.error("查询RLS策略失败: table={}, userId={}", tableName, userId, e);
             policies = Collections.emptyList();
@@ -140,27 +128,17 @@ public class RowLevelSecurityServiceImpl {
     // ── CRUD ──────────────────────────────────────────
 
     public List<Map<String, Object>> listPolicies(String tableName) {
-        String sql;
-        Object[] args;
-        if (tableName != null && !tableName.isBlank()) {
-            sql = "SELECT * FROM ecos_rls_policy WHERE table_name = ? ORDER BY priority ASC, created_at DESC";
-            args = new Object[]{tableName};
-        } else {
-            sql = "SELECT * FROM ecos_rls_policy ORDER BY priority ASC, created_at DESC";
-            args = new Object[]{};
-        }
-        return jdbcTemplate.queryForList(sql, args);
+        return dao.listPolicies(tableName);
     }
 
     public Map<String, Object> getPolicy(String id) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM ecos_rls_policy WHERE id = ?", id);
+        List<Map<String, Object>> rows = dao.findByPolicyId(id);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     public Map<String, Object> createPolicy(Map<String, Object> body) {
         String id = UUID.randomUUID().toString().replace("-", "");
-        jdbcTemplate.update(
-            "INSERT INTO ecos_rls_policy (id, policy_name, table_name, filter_expr, role_id, user_id, priority, enabled, description, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        dao.createPolicy(
             id,
             body.getOrDefault("policyName", ""),
             body.getOrDefault("tableName", ""),
@@ -180,8 +158,7 @@ public class RowLevelSecurityServiceImpl {
         Map<String, Object> existing = getPolicy(id);
         if (existing == null) return null;
 
-        jdbcTemplate.update(
-            "UPDATE ecos_rls_policy SET policy_name=?, table_name=?, filter_expr=?, role_id=?, user_id=?, priority=?, enabled=?, description=?, updated_at=NOW() WHERE id=?",
+        dao.updatePolicy(
             body.getOrDefault("policyName", existing.get("policy_name")),
             body.getOrDefault("tableName", existing.get("table_name")),
             body.getOrDefault("filterExpr", existing.get("filter_expr")),
@@ -197,7 +174,7 @@ public class RowLevelSecurityServiceImpl {
     }
 
     public boolean deletePolicy(String id) {
-        int rows = jdbcTemplate.update("DELETE FROM ecos_rls_policy WHERE id = ?", id);
+        int rows = dao.deletePolicy(id);
         if (rows > 0) {
             log.info("RLS策略删除: id={}", id);
         }
@@ -238,23 +215,17 @@ public class RowLevelSecurityServiceImpl {
         Object enabled = body.getOrDefault("enabled", true);
         int enabledInt = enabled instanceof Boolean b ? (b ? 1 : 0) : ((Number) enabled).intValue();
 
-        Object existing = jdbcTemplate.query("SELECT id FROM ecos_rls_policy WHERE id = ?",
-                r -> r.next() ? r.getObject(1) : null, id);
+        Object existing = dao.existsProbe(id);
         if (existing == null) {
-            jdbcTemplate.update(
-                "INSERT INTO ecos_rls_policy (id, policy_name, table_name, filter_expr, role_id, user_id, priority, enabled, "
-                        + "predicate_template, bindings_json, source_kind, version_no, is_deleted, created_at, updated_at, created_by) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,'parameterized','1',0,NOW(),NOW(),?)",
+            dao.insertParameterized(
                 id, policyName, tableName, template,
                 body.get("roleId"), body.get("userId"), priority, enabledInt,
-                template, bindingsJson, body.get("createdBy"));
+                bindingsJson, body.get("createdBy"));
         } else {
-            jdbcTemplate.update(
-                "UPDATE ecos_rls_policy SET policy_name=?, table_name=?, filter_expr=?, role_id=?, user_id=?, priority=?, enabled=?, "
-                        + "predicate_template=?, bindings_json=?, source_kind='parameterized', updated_at=NOW() WHERE id=?",
+            dao.updateParameterized(
                 policyName, tableName, template,
                 body.getOrDefault("roleId", null), body.getOrDefault("userId", null), priority, enabledInt,
-                template, bindingsJson, id);
+                bindingsJson, id);
         }
         log.info("RLS策略 upsert(参数化): id={}, name={}, table={}, template={}", id, policyName, tableName, template);
         return getPolicy(id);
