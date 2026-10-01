@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.engine.ai.dao.AgentMetricsDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -11,17 +11,17 @@ import java.util.Map;
 /**
  * Agent 指标查询服务 — 读取 ecos_agent_metrics 和 ecos_agent_alert 表。
  *
- * <p>从 AgentMetricsController 下沉的 JdbcTemplate 访问层。</p>
+ * <p>从 AgentMetricsController 下沉的访问层。R2-B4-ai 收口：SQL 落点下沉至 {@link AgentMetricsDao}。</p>
  */
 @Service
 public class AgentMetricsService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentMetricsService.class);
 
-    private final JdbcTemplate jdbc;
+    private final AgentMetricsDao dao;
 
-    public AgentMetricsService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AgentMetricsService(AgentMetricsDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -31,17 +31,7 @@ public class AgentMetricsService {
      * @return total 行 (total_count, success_count, failure_count, avg_elapsed_ms, total_tokens_in, total_tokens_out)
      */
     public Map<String, Object> queryTotal(String agentId) {
-        return jdbc.queryForMap(
-            "SELECT " +
-            "  COUNT(*) AS total_count, " +
-            "  COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0) AS success_count, " +
-            "  COALESCE(SUM(CASE WHEN NOT success THEN 1 ELSE 0 END), 0) AS failure_count, " +
-            "  ROUND(AVG(elapsed_ms)::numeric, 1) AS avg_elapsed_ms, " +
-            "  COALESCE(SUM(tokens_in), 0) AS total_tokens_in, " +
-            "  COALESCE(SUM(tokens_out), 0) AS total_tokens_out " +
-            "FROM ecos_agent_metrics WHERE agent_id = ?",
-            agentId
-        );
+        return dao.queryTotal(agentId);
     }
 
     /**
@@ -51,13 +41,7 @@ public class AgentMetricsService {
      * @return pct 行 (p50_ms, p99_ms)
      */
     public Map<String, Object> queryPercentiles(String agentId) {
-        return jdbc.queryForMap(
-            "SELECT " +
-            "  COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY elapsed_ms), 0)::bigint AS p50_ms, " +
-            "  COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY elapsed_ms), 0)::bigint AS p99_ms " +
-            "FROM ecos_agent_metrics WHERE agent_id = ?",
-            agentId
-        );
+        return dao.queryPercentiles(agentId);
     }
 
     /**
@@ -70,9 +54,7 @@ public class AgentMetricsService {
      */
     public boolean exists(String agentId) {
         try {
-            Integer cnt = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_agent_metrics WHERE agent_id = ?",
-                Integer.class, agentId);
+            Integer cnt = dao.queryExists(agentId);
             return cnt != null && cnt > 0;
         } catch (Exception e) {
             log.warn("exists() failed for agentId={}: {}", agentId, e.getMessage());
@@ -88,13 +70,6 @@ public class AgentMetricsService {
      * @return 行列表
      */
     public List<Map<String, Object>> queryErrors(String agentId, int limit) {
-        return jdbc.queryForList(
-            "SELECT id, trace_id AS \"traceId\", agent_id AS \"agentId\", " +
-            "alert_type AS \"alertType\", message, " +
-            "created_at AS \"createdAt\" " +
-            "FROM ecos_agent_alert WHERE agent_id = ? " +
-            "ORDER BY created_at DESC LIMIT ?",
-            agentId, limit
-        );
+        return dao.queryErrors(agentId, limit);
     }
 }

@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+
+import com.chinacreator.gzcm.engine.ai.dao.AgentSessionDao;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,8 @@ import static org.mockito.Mockito.*;
  * Wave-5.1 T-09 — Agent Memory 等价行为测试。
  *
  * <p>任务原文中的 AgentMemory 在 ai-engine 当前实现中由 {@link AgentSessionService}
- * + {@link MemoryExtractor} 承载。本测试 mock JdbcTemplate，不连接 PG。
+ * + {@link MemoryExtractor} 承载。R2-B4-ai 收口后本测试 mock {@link AgentSessionDao}，
+ * 不连接 PG。
  *
  * @author ECOS AI Engine Team
  * @since 2026-09-02 (Wave-5.1)
@@ -28,10 +29,10 @@ import static org.mockito.Mockito.*;
 class AgentMemoryTest {
 
     @Mock
-    private JdbcTemplate jdbc;
+    private AgentSessionDao agentSessionDao;
 
     private AgentSessionService newService() {
-        return new AgentSessionService(jdbc);
+        return new AgentSessionService(agentSessionDao);
     }
 
     @Test
@@ -46,15 +47,12 @@ class AgentMemoryTest {
         assertEquals("tenant-1", session.getTenantId());
         assertEquals("ACTIVE", session.getStatus());
         assertTrue(session.getMessages().isEmpty());
-        verify(jdbc).update(anyString(),
+        verify(agentSessionDao).insertSession(
                 eq(session.getId()),
                 eq("agent-1"),
                 eq("user-1"),
                 eq("tenant-1"),
-                eq("ACTIVE"),
-                eq(0),
-                any(Long.class),
-                any(Long.class));
+                anyLong());
     }
 
     @Test
@@ -71,8 +69,7 @@ class AgentMemoryTest {
         assertEquals("sess-1", msg.getSessionId());
         assertEquals("assistant", msg.getRole());
         assertEquals("main", msg.getThreadId());
-        verify(jdbc).update(
-                contains("INSERT INTO sys_agent_message"),
+        verify(agentSessionDao).insertMessage(
                 eq("sess-1"),
                 eq("assistant"),
                 eq("回复内容"),
@@ -80,10 +77,7 @@ class AgentMemoryTest {
                 argThat((String json) -> json != null && json.contains("ok")),
                 eq("main"),
                 anyLong());
-        verify(jdbc).update(
-                contains("UPDATE sys_agent_session SET message_count = message_count + 1"),
-                anyLong(),
-                eq("sess-1"));
+        verify(agentSessionDao).incrementMessageCount(eq("sess-1"), anyLong());
     }
 
     @Test
@@ -93,40 +87,26 @@ class AgentMemoryTest {
 
         service.getMessages("sess-1");
 
-        verify(jdbc).query(
-                contains("FROM sys_agent_message WHERE session_id = ? AND thread_id = ? ORDER BY id ASC"),
-                any(RowMapper.class),
-                eq("sess-1"),
-                eq("main"));
+        verify(agentSessionDao).findMessages(eq("sess-1"), eq("main"));
     }
 
     @Test
     @DisplayName("T-09-2-4: 压缩历史 — 未达阈值时不删除旧消息")
     void compressHistorySkipsWhenBelowThreshold() {
         AgentSessionService service = newService();
-        when(jdbc.queryForObject(
-                contains("SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?"),
-                eq(Integer.class),
-                eq("sess-1")))
-                .thenReturn(3);
+        when(agentSessionDao.countMessages("sess-1")).thenReturn(3);
 
         service.compressHistory("sess-1", 5);
 
-        verify(jdbc).queryForObject(startsWith("SELECT COUNT(*) FROM sys_agent_message"), eq(Integer.class), eq("sess-1"));
-        verify(jdbc, never()).update(
-                startsWith("DELETE FROM sys_agent_message"),
-                anyString(),
-                anyLong());
+        verify(agentSessionDao).countMessages("sess-1");
+        verify(agentSessionDao, never()).deleteMessagesUpTo(anyString(), anyLong());
     }
 
     @Test
     @DisplayName("T-09-2-5: 过期会话 — 更新命中 1 行返回 true")
     void expireSessionReturnsTrueWhenRowUpdated() {
         AgentSessionService service = newService();
-        when(jdbc.update(
-                contains("SET status = 'EXPIRED' WHERE id = ?"),
-                eq("sess-1")))
-                .thenReturn(1);
+        when(agentSessionDao.expireSession("sess-1")).thenReturn(1);
 
         assertTrue(service.expireSession("sess-1"));
     }
@@ -135,10 +115,7 @@ class AgentMemoryTest {
     @DisplayName("T-09-2-6: 归档会话 — 更新 0 行返回 false")
     void archiveSessionReturnsFalseWhenNoRowUpdated() {
         AgentSessionService service = newService();
-        when(jdbc.update(
-                contains("SET status = 'ARCHIVED' WHERE id = ?"),
-                eq("sess-1")))
-                .thenReturn(0);
+        when(agentSessionDao.archiveSession("sess-1")).thenReturn(0);
 
         assertFalse(service.archiveSession("sess-1"));
     }

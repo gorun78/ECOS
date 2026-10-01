@@ -1,7 +1,5 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -9,12 +7,10 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.engine.ai.dao.AgentSessionDao;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -26,6 +22,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * 数据存储:
  *   sys_agent_session  — 会话主表
  *   sys_agent_message  — 消息表
+ *
+ * 数据访问统一收口至 {@link AgentSessionDao}（R2-B4-ai / 架构铁律 §2.5 #1 / IR06）。
  */
 @Service
 public class AgentSessionService {
@@ -39,10 +37,10 @@ public class AgentSessionService {
     /** 上下文压缩阈值 — 消息条数超过此值时触发压缩 */
     private static final int COMPRESS_THRESHOLD = 20;
 
-    private final JdbcTemplate jdbc;
+    private final AgentSessionDao agentSessionDao;
 
-    public AgentSessionService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AgentSessionService(AgentSessionDao agentSessionDao) {
+        this.agentSessionDao = agentSessionDao;
     }
 
     // ═══════════════════════════════════════════════════
@@ -56,11 +54,7 @@ public class AgentSessionService {
         String sessionId = "sess-" + UUID.randomUUID().toString().replace("-", "");
         long now = System.currentTimeMillis();
 
-        jdbc.update(
-            "INSERT INTO sys_agent_session (id, agent_id, user_id, tenant_id, status, message_count, created_at, last_active_at) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            sessionId, agentId, userId, tenantId, "ACTIVE", 0, now, now
-        );
+        agentSessionDao.insertSession(sessionId, agentId, userId, tenantId, now);
 
         log.info("Session created: id={} agentId={} userId={} tenantId={}", sessionId, agentId, userId, tenantId);
 
@@ -81,11 +75,7 @@ public class AgentSessionService {
      * 查询会话 + 加载消息历史
      */
     public AgentSession getSession(String sessionId) {
-        List<AgentSession> rows = jdbc.query(
-            "SELECT id, agent_id, user_id, tenant_id, status, message_count, created_at, last_active_at "
-            + "FROM sys_agent_session WHERE id = ?",
-            new SessionRowMapper(), sessionId
-        );
+        List<AgentSession> rows = agentSessionDao.findSessionById(sessionId);
 
         if (rows.isEmpty()) {
             return null;
@@ -124,17 +114,10 @@ public class AgentSessionService {
         String toolResultsJson = (toolResults != null) ? toJson(toolResults) : null;
         String tid = threadId != null && !threadId.isBlank() ? threadId : "main";
 
-        jdbc.update(
-            "INSERT INTO sys_agent_message (session_id, role, content, tool_calls, tool_results, thread_id, created_at) "
-            + "VALUES (?::varchar, ?::varchar, ?::text, ?::jsonb, ?::jsonb, ?::varchar, ?)",
-            sessionId, role, content, toolCallsJson, toolResultsJson, tid, now
-        );
+        agentSessionDao.insertMessage(sessionId, role, content, toolCallsJson, toolResultsJson, tid, now);
 
         // 更新会话计数与活跃时间
-        jdbc.update(
-            "UPDATE sys_agent_session SET message_count = message_count + 1, last_active_at = ? WHERE id = ?",
-            now, sessionId
-        );
+        agentSessionDao.incrementMessageCount(sessionId, now);
 
         log.debug("Message appended: sessionId={} role={} threadId={} toolCalls={} toolResults={}",
             sessionId, role, tid, toolCalls != null, toolResults != null);
@@ -164,11 +147,7 @@ public class AgentSessionService {
      */
     public List<AgentMessage> getMessages(String sessionId, String threadId) {
         String tid = threadId != null && !threadId.isBlank() ? threadId : "main";
-        return jdbc.query(
-            "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, thread_id, created_at "
-            + "FROM sys_agent_message WHERE session_id = ? AND thread_id = ? ORDER BY id ASC",
-            new MessageRowMapper(), sessionId, tid
-        );
+        return agentSessionDao.findMessages(sessionId, tid);
     }
 
     // ═══════════════════════════════════════════════════
@@ -180,10 +159,7 @@ public class AgentSessionService {
      */
     public int markIdleSessions() {
         long cutoff = System.currentTimeMillis() - IDLE_THRESHOLD_MS;
-        int affected = jdbc.update(
-            "UPDATE sys_agent_session SET status = 'IDLE' WHERE status = 'ACTIVE' AND last_active_at < ?",
-            cutoff
-        );
+        int affected = agentSessionDao.markIdleSessions(cutoff);
         if (affected > 0) {
             log.info("Marked {} sessions as IDLE", affected);
         }
@@ -194,9 +170,7 @@ public class AgentSessionService {
      * 将指定会话标记为 EXPIRED
      */
     public boolean expireSession(String sessionId) {
-        int affected = jdbc.update(
-            "UPDATE sys_agent_session SET status = 'EXPIRED' WHERE id = ?", sessionId
-        );
+        int affected = agentSessionDao.expireSession(sessionId);
         if (affected > 0) {
             log.info("Session expired: {}", sessionId);
             return true;
@@ -208,9 +182,7 @@ public class AgentSessionService {
      * 将指定会话标记为 ARCHIVED (软删除)
      */
     public boolean archiveSession(String sessionId) {
-        int affected = jdbc.update(
-            "UPDATE sys_agent_session SET status = 'ARCHIVED' WHERE id = ?", sessionId
-        );
+        int affected = agentSessionDao.archiveSession(sessionId);
         if (affected > 0) {
             log.info("Session archived: {}", sessionId);
             return true;
@@ -222,22 +194,14 @@ public class AgentSessionService {
      * 按状态查询会话列表
      */
     public List<AgentSession> listByStatus(String status) {
-        return jdbc.query(
-            "SELECT id, agent_id, user_id, tenant_id, status, message_count, created_at, last_active_at "
-            + "FROM sys_agent_session WHERE status = ? ORDER BY last_active_at DESC",
-            new SessionRowMapper(), status
-        );
+        return agentSessionDao.listByStatus(status);
     }
 
     /**
      * 按 agent 查询会话列表
      */
     public List<AgentSession> listByAgent(String agentId) {
-        return jdbc.query(
-            "SELECT id, agent_id, user_id, tenant_id, status, message_count, created_at, last_active_at "
-            + "FROM sys_agent_session WHERE agent_id = ? ORDER BY last_active_at DESC",
-            new SessionRowMapper(), agentId
-        );
+        return agentSessionDao.listByAgent(agentId);
     }
 
     // ═══════════════════════════════════════════════════
@@ -261,18 +225,13 @@ public class AgentSessionService {
         }
         try {
             // 统计该会话的总消息数
-            Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?",
-                Integer.class, sessionId);
+            Integer count = agentSessionDao.countMessages(sessionId);
             if (count == null || count < threshold) {
                 return; // 未达阈值，无需压缩
             }
 
             // 取最早 20 条消息，拼接为摘要
-            List<AgentMessage> oldMessages = jdbc.query(
-                "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, thread_id, created_at "
-                + "FROM sys_agent_message WHERE session_id = ? ORDER BY id ASC LIMIT ?",
-                new MessageRowMapper(), sessionId, threshold);
+            List<AgentMessage> oldMessages = agentSessionDao.findOldestMessages(sessionId, threshold);
 
             if (oldMessages.isEmpty()) return;
 
@@ -291,20 +250,14 @@ public class AgentSessionService {
             Long maxId = oldMessages.stream()
                     .mapToLong(AgentMessage::getId)
                     .max().orElse(0);
-            jdbc.update("DELETE FROM sys_agent_message WHERE session_id = ? AND id <= ?",
-                    sessionId, maxId);
+            agentSessionDao.deleteMessagesUpTo(sessionId, maxId);
 
             // 插入摘要 system 消息
             long now = System.currentTimeMillis();
-            jdbc.update(
-                "INSERT INTO sys_agent_message (session_id, role, content, thread_id, created_at) "
-                + "VALUES (?::varchar, 'system', ?::text, 'main', ?)",
-                sessionId, summary.toString(), now);
+            agentSessionDao.insertSummaryMessage(sessionId, summary.toString(), now);
 
             // 重新校准 message_count
-            jdbc.update(
-                "UPDATE sys_agent_session SET message_count = (SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?) WHERE id = ?",
-                sessionId, sessionId);
+            agentSessionDao.recalcMessageCount(sessionId);
 
             log.info("[AgentSession] Compressed history for session={}, removed {} old messages",
                     sessionId, oldMessages.size());
@@ -332,7 +285,7 @@ public class AgentSessionService {
         if ("ACTIVE".equals(session.getStatus())
                 && session.getLastActiveAt() != null
                 && (now - session.getLastActiveAt()) > IDLE_THRESHOLD_MS) {
-            jdbc.update("UPDATE sys_agent_session SET status = 'IDLE' WHERE id = ?", session.getId());
+            agentSessionDao.autoSetIdle(session.getId());
             session.setStatus("IDLE");
             log.debug("Session {} auto-transitioned to IDLE", session.getId());
         }
@@ -345,68 +298,6 @@ public class AgentSessionService {
         } catch (JsonProcessingException e) {
             log.warn("JSON serialization failed: {}", e.getMessage());
             return null;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════
-    //  RowMapper
-    // ═══════════════════════════════════════════════════
-
-    private static class SessionRowMapper implements RowMapper<AgentSession> {
-        @Override
-        public AgentSession mapRow(ResultSet rs, int rowNum) throws SQLException {
-            AgentSession s = new AgentSession();
-            s.setId(rs.getString("id"));
-            s.setAgentId(rs.getString("agent_id"));
-            s.setUserId(rs.getString("user_id"));
-            s.setTenantId(rs.getString("tenant_id"));
-            s.setStatus(rs.getString("status"));
-            s.setMessageCount(rs.getInt("message_count"));
-            s.setCreatedAt(getLong(rs, "created_at"));
-            s.setLastActiveAt(getLong(rs, "last_active_at"));
-            return s;
-        }
-
-        private Long getLong(ResultSet rs, String column) throws SQLException {
-            long val = rs.getLong(column);
-            return rs.wasNull() ? null : val;
-        }
-    }
-
-    private static class MessageRowMapper implements RowMapper<AgentMessage> {
-        @Override
-        public AgentMessage mapRow(ResultSet rs, int rowNum) throws SQLException {
-            AgentMessage m = new AgentMessage();
-            m.setId(rs.getLong("id"));
-            m.setSessionId(rs.getString("session_id"));
-            m.setRole(rs.getString("role"));
-            m.setContent(rs.getString("content"));
-            m.setToolCalls(parseJsonListOfMap(rs.getString("tool_calls")));
-            m.setToolResultsRaw(rs.getString("tool_results"));
-            m.setTokens(getInt(rs, "tokens"));
-            m.setThreadId(rs.getString("thread_id"));
-            m.setCreatedAt(getLong(rs, "created_at"));
-            return m;
-        }
-
-        private Integer getInt(ResultSet rs, String column) throws SQLException {
-            int val = rs.getInt(column);
-            return rs.wasNull() ? null : val;
-        }
-
-        private Long getLong(ResultSet rs, String column) throws SQLException {
-            long val = rs.getLong(column);
-            return rs.wasNull() ? null : val;
-        }
-
-        private List<Map<String, Object>> parseJsonListOfMap(String json) {
-            if (json == null || json.isBlank()) return null;
-            try {
-                return mapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
-            } catch (Exception e) {
-                log.debug("Failed to parse tool_calls JSON (len={}): {}", json.length(), e.getMessage());
-                return null;
-            }
         }
     }
 

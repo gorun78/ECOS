@@ -10,22 +10,22 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.engine.ai.CronJobService;
+import com.chinacreator.gzcm.engine.ai.dao.CronJobDao;
+import com.chinacreator.gzcm.engine.ai.dao.CronJobExecutionDao;
 import com.chinacreator.gzcm.engine.ai.entity.CronJobEntity;
 import com.chinacreator.gzcm.engine.ai.entity.CronJobExecutionEntity;
-import com.chinacreator.gzcm.engine.ai.repository.CronJobExecutionRepository;
-import com.chinacreator.gzcm.engine.ai.repository.CronJobRepository;
 
 @Service
 public class CronJobServiceImpl implements CronJobService {
 
     private static final Logger log = LoggerFactory.getLogger(CronJobServiceImpl.class);
 
-    private final CronJobRepository cronJobRepository;
-    private final CronJobExecutionRepository executionRepository;
+    private final CronJobDao cronJobRepository;
+    private final CronJobExecutionDao executionRepository;
     private final AgentCronJobBridge agentCronJobBridge;
 
-    public CronJobServiceImpl(CronJobRepository cronJobRepository,
-                              CronJobExecutionRepository executionRepository,
+    public CronJobServiceImpl(CronJobDao cronJobRepository,
+                              CronJobExecutionDao executionRepository,
                               AgentCronJobBridge agentCronJobBridge) {
         this.cronJobRepository = cronJobRepository;
         this.executionRepository = executionRepository;
