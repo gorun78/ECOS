@@ -14,7 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * R2-B5 buszhi 数据访问收口（架构铁律 §2.5 #1 / IR06）：
- * {@code public.ecos_object_timeline} 结构化时间线表 JDBC 落点。
+ * {@code ecos_control.ecos_object_timeline} 结构化时间线表 JDBC 落点（V200 后位于
+ * 主控制 schema；SQL 内经 search_path 无 schema 前缀）。
  *
  * <p>承接原 {@link com.chinacreator.gzcm.buszhi.workflow.TimelineRepository}，
  * SQL / 分页构造 / JSON 序列化 helper 原样搬运。</p>
