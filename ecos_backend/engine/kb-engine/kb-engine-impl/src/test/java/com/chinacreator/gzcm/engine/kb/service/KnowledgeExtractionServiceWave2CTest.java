@@ -1,15 +1,16 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeExtractionServiceDao;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
 import com.chinacreator.gzcm.runtime.access.document.MinerUHttpParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Wave-2C (PMO-24) 审批闭环单元测试 — kb-engine-impl。
  *
  * <p>覆盖 KnowledgeExtractionService.approve/reject 的状态机行为，
- * 使用 mock JdbcTemplate 验证 SQL 交互。</p>
+ * 使用 mock {@link KnowledgeExtractionServiceDao} 验证数据访问交互。</p>
  *
  * @author ECOS KB Engine Team
  * @since 2026-09-02
@@ -25,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class KnowledgeExtractionServiceWave2CTest {
 
     private KnowledgeExtractionService service;
-    private JdbcTemplate mockJdbc;
+    private KnowledgeExtractionServiceDao mockDao;
     private ComplianceRuleMapper mockRuleMapper;
     private KGWriterService mockKgWriter;
     private DocumentParseService mockDocParser;
@@ -33,14 +34,14 @@ class KnowledgeExtractionServiceWave2CTest {
 
     @BeforeEach
     void setUp() {
-        mockJdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
+        mockDao = org.mockito.Mockito.mock(KnowledgeExtractionServiceDao.class);
         mockRuleMapper = org.mockito.Mockito.mock(ComplianceRuleMapper.class);
         mockKgWriter = org.mockito.Mockito.mock(KGWriterService.class);
         mockDocParser = new DocumentParseService(new MinerUHttpParser());
         mockEntityLinker = org.mockito.Mockito.mock(EntityLinkerService.class);
 
         service = new KnowledgeExtractionService(
-            mockJdbc, mockRuleMapper, mockKgWriter, mockDocParser, mockEntityLinker, null, new org.springframework.web.client.RestTemplate());
+            mockDao, mockRuleMapper, mockKgWriter, mockDocParser, mockEntityLinker, null, new org.springframework.web.client.RestTemplate());
     }
 
     // ── UT-6: reject 带 reason → 数据库写入 rejected_reason ──
@@ -48,21 +49,15 @@ class KnowledgeExtractionServiceWave2CTest {
     @Test
     @DisplayName("UT-6: reject 带 reason → status=REJECTED + rejected_reason 写入 DB")
     void rejectWithReasonShouldUpdateStatusAndReason() {
-        // mock: 查询 status 返回 PENDING_REVIEW
-        org.mockito.Mockito.when(mockJdbc.queryForMap(
-            "SELECT status FROM extraction_drafts WHERE id = ?", "test-id"))
+        org.mockito.Mockito.when(mockDao.fetchDraftStatus("test-id"))
             .thenReturn(Map.of("status", "PENDING_REVIEW"));
-
-        org.mockito.Mockito.when(mockJdbc.update(
-            org.mockito.Mockito.eq("UPDATE extraction_drafts SET status = 'REJECTED', rejected_reason = ?, updated_at = NOW() WHERE id = ?"),
-            org.mockito.Mockito.eq("quality issue"), org.mockito.Mockito.eq("test-id")))
-            .thenReturn(1);
 
         Map<String, Object> result = service.reject("test-id", "quality issue");
 
         assertEquals("test-id", result.get("id"));
         assertEquals("REJECTED", result.get("status"));
         assertEquals("quality issue", result.get("rejectedReason"));
+        org.mockito.Mockito.verify(mockDao).markRejected("quality issue", "test-id");
     }
 
     // ── UT-7: reject 非 PENDING_REVIEW 状态 → IllegalStateException ──
@@ -70,8 +65,7 @@ class KnowledgeExtractionServiceWave2CTest {
     @Test
     @DisplayName("UT-7: reject 在 APPROVED 状态 → IllegalStateException (状态机保护)")
     void rejectApprovedShouldThrowIllegalState() {
-        org.mockito.Mockito.when(mockJdbc.queryForMap(
-            "SELECT status FROM extraction_drafts WHERE id = ?", "test-id"))
+        org.mockito.Mockito.when(mockDao.fetchDraftStatus("test-id"))
             .thenReturn(Map.of("status", "APPROVED"));
 
         assertThrows(IllegalStateException.class,
@@ -89,9 +83,7 @@ class KnowledgeExtractionServiceWave2CTest {
         draftRow.put("status", "UPLOADED");
         draftRow.put("extracted_rules_json", null);
 
-        org.mockito.Mockito.when(mockJdbc.queryForMap(
-            "SELECT * FROM extraction_drafts WHERE id = ?", "test-id"))
-            .thenReturn(draftRow);
+        org.mockito.Mockito.when(mockDao.fetchDraft("test-id")).thenReturn(draftRow);
 
         assertThrows(IllegalStateException.class,
             () -> service.approve("test-id"),

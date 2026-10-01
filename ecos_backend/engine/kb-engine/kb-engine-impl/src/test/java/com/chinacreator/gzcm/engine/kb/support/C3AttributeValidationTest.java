@@ -3,7 +3,6 @@ package com.chinacreator.gzcm.engine.kb.support;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.LinkedHashMap;
@@ -101,14 +100,14 @@ class C3AttributeValidationTest {
     @Test
     @SuppressWarnings("unchecked")
     void c3DisabledMarksC3Skipped() {
-        JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
+        com.chinacreator.gzcm.engine.kb.dao.KbEntityInstanceExtractionServiceDao dao =
+                org.mockito.Mockito.mock(com.chinacreator.gzcm.engine.kb.dao.KbEntityInstanceExtractionServiceDao.class);
         RestTemplate restTemplate = org.mockito.Mockito.mock(RestTemplate.class);
         // 无可用本体快照 → extract 早退（返回前 c3Skipped 已在开关关闭时置位）
-        org.mockito.Mockito.when(jdbc.queryForList(org.mockito.ArgumentMatchers.anyString()))
-                .thenReturn(List.of());
+        org.mockito.Mockito.when(dao.selectAllSnapshots()).thenReturn(List.of());
 
         KbEntityInstanceExtractionService svc =
-                new KbEntityInstanceExtractionService(jdbc, restTemplate, "http://datanet.local", false);
+                new KbEntityInstanceExtractionService(dao, restTemplate, "http://datanet.local", false);
         EntityInstanceExtractionReportVO report = svc.extract(null, "job-c3-off", false);
 
         assertTrue(report.isC3Skipped(), "c3_enabled=false 时报告必须标 c3Skipped=true");

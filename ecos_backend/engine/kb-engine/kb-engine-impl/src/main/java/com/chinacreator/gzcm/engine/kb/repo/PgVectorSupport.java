@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.kb.repo;
 
 import jakarta.annotation.PostConstruct;
+import com.chinacreator.gzcm.engine.kb.dao.PgVectorSupportDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -23,7 +23,7 @@ public class PgVectorSupport {
 
     private static final Logger log = LoggerFactory.getLogger(PgVectorSupport.class);
 
-    private final JdbcTemplate jdbcTemplate;
+    private final PgVectorSupportDao dao;
 
     /** pgvector 是否可用（volatile：启动探测一次，运行期只读） */
     private volatile boolean available = false;
@@ -31,8 +31,8 @@ public class PgVectorSupport {
     /** 探测到的 pgvector 版本，未知为 unknown */
     private volatile String version = "unknown";
 
-    public PgVectorSupport(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public PgVectorSupport(PgVectorSupportDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -41,8 +41,7 @@ public class PgVectorSupport {
     @PostConstruct
     public void refresh() {
         try {
-            Map<String, Object> row = jdbcTemplate.queryForMap(
-                    "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector'");
+            Map<String, Object> row = dao.fetchVectorExtension();
             version = String.valueOf(row.getOrDefault("extversion", "unknown"));
             available = true;
             log.info("✅ pgvector 扩展已就绪 — version {}", version);

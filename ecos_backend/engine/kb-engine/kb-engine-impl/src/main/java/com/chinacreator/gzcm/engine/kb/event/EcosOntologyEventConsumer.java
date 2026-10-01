@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.event;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.OntologyPublishedEvent;
+import com.chinacreator.gzcm.engine.kb.dao.KbOntologySnapshotDao;
 import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -57,7 +57,7 @@ public class EcosOntologyEventConsumer {
     private static final ObjectMapper MAPPER =
             new ObjectMapper().registerModule(new JavaTimeModule());
 
-    private final JdbcTemplate jdbc;
+    private final KbOntologySnapshotDao dao;
     private final KgMapperService kgMapper;
     private final RestTemplate restTemplate;
     private final String buszhiBase;
@@ -66,12 +66,12 @@ public class EcosOntologyEventConsumer {
     @Autowired(required = false)
     private EventBusService eventBusService;
 
-    public EcosOntologyEventConsumer(JdbcTemplate jdbc,
+    public EcosOntologyEventConsumer(KbOntologySnapshotDao dao,
                                      @Lazy KgMapperService kgMapper,
                                      @Lazy RestTemplate restTemplate,
                                      @Value("${ecos.ontology-base:http://localhost:18083/api/v1/ecos}")
                                      String buszhiBase) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.kgMapper = kgMapper;
         this.restTemplate = restTemplate;
         this.buszhiBase = buszhiBase;
@@ -178,10 +178,7 @@ public class EcosOntologyEventConsumer {
             log.error("EcosOntologyEventConsumer FAILED ontology={} version={}: {}",
                     evt.ontologyId(), evt.version(), e.getMessage(), e);
             try {
-                jdbc.update(
-                        "INSERT INTO ecos_knowledge.kg_sync_log " +
-                        "(object_type, op, job_id, status, error_message) VALUES (?, 'KB_ONTOLOGY_SYNC', ?, 'FAILED', ?)",
-                        evt.ontologyId(), jobId, truncate(e.getMessage(), 1000));
+                dao.insertSyncLogFailed(evt.ontologyId(), jobId, truncate(e.getMessage(), 1000));
             } catch (Exception logEx) {
                 log.error("write failed kg_sync_log row: {}", logEx.getMessage());
             }
@@ -225,28 +222,14 @@ public class EcosOntologyEventConsumer {
 
         // 旧版本标记为非当前公开（is_deleted=2）— 同 ontology_id 的旧快照是历史回滚基线，仅维护 is_deleted 一行语义
         try {
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kb_ontology_snapshot " +
-                    "SET is_deleted = 2 WHERE ontology_id = ? AND version <> ? AND (is_deleted IS NULL OR is_deleted = 0)",
-                    ontologyId, versionId);
+            dao.softMarkPreviousVersion(ontologyId, versionId);
         } catch (Exception e) {
             log.warn("upsertSnapshot: soft-mark previous version failed: {}", e.getMessage());
         }
 
         // 幂等 upsert（UNIQUE (ontology_id, version)，冲突更新 codes/hash/by/ts + is_deleted=0）
-        jdbc.update(
-                "INSERT INTO ecos_knowledge.kb_ontology_snapshot " +
-                "(ontology_id, version, entity_codes, relationship_codes, schema_hash, created_by, created_at) " +
-                "VALUES (?, ?, ?::jsonb, ?::jsonb, ?, ?, NOW()) " +
-                "ON CONFLICT (ontology_id, version) DO UPDATE SET " +
-                "  entity_codes = EXCLUDED.entity_codes, " +
-                "  relationship_codes = EXCLUDED.relationship_codes, " +
-                "  schema_hash = EXCLUDED.schema_hash, " +
-                "  created_by = EXCLUDED.created_by, " +
-                "  created_at = NOW(), " +
-                "  is_deleted = 0",
-                ontologyId, versionId, entitiesJson, relationshipsJson, hash,
-                publishedBy == null ? "system" : publishedBy);
+        dao.upsertSnapshot(ontologyId, versionId, entitiesJson, relationshipsJson, hash,
+                publishedBy);
     }
 
     private String buildAuditJson(OntologyPublishedEvent evt) {

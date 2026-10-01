@@ -4,9 +4,9 @@ import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.engine.kb.dao.KgMapperDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -43,10 +43,10 @@ public class KgMapperService {
     /** 全量范围标识：对齐全部生效本体快照。 */
     private static final String SCOPE_ALL = "ALL";
 
-    private final JdbcTemplate jdbc;
+    private final KgMapperDao kgMapperDao;
 
-    public KgMapperService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public KgMapperService(KgMapperDao kgMapperDao) {
+        this.kgMapperDao = kgMapperDao;
     }
 
     /**
@@ -140,24 +140,15 @@ public class KgMapperService {
             throw new BusinessException("jobId 不能为空");
         }
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT nodes AS nNodes, edges AS nEdges FROM ecos_knowledge.kg_sync_log " +
-                    "WHERE job_id = ? ORDER BY created_at DESC LIMIT 1",
-                    jobId);
+            List<Map<String, Object>> rows = kgMapperDao.rollbackCounts(jobId);
             if (!rows.isEmpty()) {
                 int nNodes = ((Number) rows.get(0).getOrDefault("nNodes", 0)).intValue();
                 int nEdges = ((Number) rows.get(0).getOrDefault("nEdges", 0)).intValue();
                 if (nNodes > 0) {
-                    nodeDel = jdbc.update(
-                            "DELETE FROM ecos_knowledge.graph_node WHERE id IN (" +
-                            "SELECT id FROM ecos_knowledge.graph_node WHERE id LIKE ? ORDER BY created_at DESC LIMIT ?)",
-                            "kg-" + jobId + "%", nNodes);
+                    nodeDel = kgMapperDao.deleteNodesByJob(jobId, nNodes);
                 }
                 if (nEdges > 0) {
-                    edgeDel = jdbc.update(
-                            "DELETE FROM ecos_knowledge.graph_edge WHERE id IN (" +
-                            "SELECT id FROM ecos_knowledge.graph_edge WHERE id LIKE ? ORDER BY created_at DESC LIMIT ?)",
-                            "kgrel-" + jobId + "%", nEdges);
+                    edgeDel = kgMapperDao.deleteEdgesByJob(jobId, nEdges);
                 }
             }
         } catch (Exception e) {
@@ -187,22 +178,9 @@ public class KgMapperService {
         List<Map<String, Object>> rows;
         try {
             if (SCOPE_ALL.equalsIgnoreCase(scope)) {
-                rows = jdbc.queryForList(
-                        "SELECT DISTINCT ON (ontology_id) ontology_id, version, " +
-                        "       jsonb_array_length(entity_codes) AS entity_count, " +
-                        "       jsonb_array_length(relationship_codes) AS relationship_count " +
-                        "FROM ecos_knowledge.kb_ontology_snapshot " +
-                        "WHERE is_deleted = 0 " +
-                        "ORDER BY ontology_id, created_at DESC");
+                rows = kgMapperDao.readSnapshotsAll();
             } else {
-                rows = jdbc.queryForList(
-                        "SELECT ontology_id, version, " +
-                        "       jsonb_array_length(entity_codes) AS entity_count, " +
-                        "       jsonb_array_length(relationship_codes) AS relationship_count " +
-                        "FROM ecos_knowledge.kb_ontology_snapshot " +
-                        "WHERE is_deleted = 0 AND ontology_id = ? " +
-                        "ORDER BY created_at DESC LIMIT 1",
-                        scope);
+                rows = kgMapperDao.readSnapshotsSingle(scope);
             }
         } catch (Exception e) {
             log.error("KgMapper: 读取本体快照失败 scope={}", scope, e);
@@ -231,10 +209,7 @@ public class KgMapperService {
      * @return 受影响行数
      */
     private int alignNodeVersion(OntologySnapshot snap) {
-        return jdbc.update(
-                "UPDATE ecos_knowledge.graph_node SET ontology_version = ?, updated_at = NOW() " +
-                "WHERE ontology_id = ? AND (ontology_version IS NULL OR ontology_version <> ?)",
-                snap.version(), snap.ontologyId(), snap.version());
+        return kgMapperDao.alignNodeVersion(snap.version(), snap.ontologyId());
     }
 
     /**
@@ -243,10 +218,7 @@ public class KgMapperService {
      * @return 受影响行数
      */
     private int alignEdgeVersion(OntologySnapshot snap) {
-        return jdbc.update(
-                "UPDATE ecos_knowledge.graph_edge SET ontology_version = ?, updated_at = NOW() " +
-                "WHERE ontology_id = ? AND (ontology_version IS NULL OR ontology_version <> ?)",
-                snap.version(), snap.ontologyId(), snap.version());
+        return kgMapperDao.alignEdgeVersion(snap.version(), snap.ontologyId());
     }
 
     private String str(Object o) {

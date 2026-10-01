@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.exception.DataAccessException;
+import com.chinacreator.gzcm.engine.kb.dao.EntityLinkerDao;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -26,11 +26,11 @@ public class EntityLinkerService {
     private static final Logger log = LoggerFactory.getLogger(EntityLinkerService.class);
     private static final double MATCH_THRESHOLD = 0.6;
 
-    private final JdbcTemplate jdbc;
+    private final EntityLinkerDao entityLinkerDao;
     private final KnowledgeNodeMapper nodeMapper;
 
-    public EntityLinkerService(JdbcTemplate jdbc, KnowledgeNodeMapper nodeMapper) {
-        this.jdbc = jdbc;
+    public EntityLinkerService(EntityLinkerDao entityLinkerDao, KnowledgeNodeMapper nodeMapper) {
+        this.entityLinkerDao = entityLinkerDao;
         this.nodeMapper = nodeMapper;
     }
 
@@ -147,13 +147,7 @@ public class EntityLinkerService {
         try {
             // 本体类型候选来源 = 本体快照的 entity_codes（kb_ontology_snapshot，V116）
             // 替代已废弃的幻影表 ontology_objects（B1 缺陷 D1 修正）
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT s.ontology_id AS ontology_id, e AS entity_code " +
-                "FROM ecos_knowledge.kb_ontology_snapshot s, " +
-                "     jsonb_array_elements_text(s.entity_codes) AS e " +
-                "WHERE s.is_deleted = 0 AND e ILIKE ? " +
-                "ORDER BY s.ontology_id LIMIT 50",
-                "%" + domain + "%");
+            List<Map<String, Object>> rows = entityLinkerDao.queryOntologyTypes(domain);
             for (Map<String, Object> row : rows) {
                 String ontologyId = String.valueOf(row.get("ontology_id"));
                 String code = String.valueOf(row.get("entity_code"));

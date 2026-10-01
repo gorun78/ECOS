@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.engine.kb.dto.ExtractCandidateVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractFileVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeExtractionServiceDao;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph.ExtractedEntity;
 import com.chinacreator.gzcm.engine.kb.model.ExtractedSubGraph.ExtractedRelation;
@@ -25,7 +26,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
@@ -97,7 +97,7 @@ public class KnowledgeExtractionService {
         "  \"rules\": [{\"name\": \"string\", \"description\": \"string\", \"condition\": \"string\", \"action\": \"string\", \"severity\": \"WARN|ERROR\"}]\n" +
         "}";
 
-    private final JdbcTemplate jdbc;
+    private final KnowledgeExtractionServiceDao extractionDao;
     /**
      * F04-13：从 {@link com.chinacreator.gzcm.engine.kb.config.KbEngineRestConfig} 注入
      * 共享 RestTemplate — 消除本 service 内 {@code new RestTemplate()} 站点。
@@ -112,14 +112,14 @@ public class KnowledgeExtractionService {
     /** F04-14：统一调度底座（KB_EXTRACT_RUN 异步/同步派发；禁自建 Executor） */
     private final ITaskManagementService taskManagement;
 
-    public KnowledgeExtractionService(JdbcTemplate jdbc,
+    public KnowledgeExtractionService(KnowledgeExtractionServiceDao extractionDao,
                                       ComplianceRuleMapper ruleMapper,
                                       KGWriterService kgWriter,
                                       DocumentParseService documentParserService,
                                       EntityLinkerService entityLinkerService,
                                       ITaskManagementService taskManagement,
                                       RestTemplate restTemplate) {
-        this.jdbc = jdbc;
+        this.extractionDao = extractionDao;
         this.ruleMapper = ruleMapper;
         this.kgWriter = kgWriter;
         this.documentParserService = documentParserService;
@@ -194,10 +194,7 @@ public class KnowledgeExtractionService {
         Path target = Paths.get(UPLOAD_DIR, id + "_" + file.getOriginalFilename());
         file.transferTo(target.toFile());
 
-        jdbc.update(
-            "INSERT INTO extraction_drafts (id, file_name, file_path, status) VALUES (?, ?, ?, 'UPLOADED')",
-            id, file.getOriginalFilename(), target.toString()
-        );
+        extractionDao.insertUploadedDraft(id, file.getOriginalFilename(), target.toString());
 
         // F04-14：走 runtime-task KB_EXTRACT_RUN 异步派发（禁自建 single-thread-executor）
         if (taskManagement != null) {
@@ -239,12 +236,8 @@ public class KnowledgeExtractionService {
         try {
             DocumentParseResult parseResult = documentParserService.parse(filePath);
             text = parseResult.text();
-            jdbc.update(
-                "UPDATE extraction_drafts SET parsed_text = ?, status = 'EXTRACTING', " +
-                "file_type = ?, page_count = ?, char_count = ? WHERE id = ?",
-                text, parseResult.fileType(), parseResult.pageCount(),
-                parseResult.charCount(), id
-            );
+            extractionDao.markExtracting(id, text, parseResult.fileType(),
+                    parseResult.pageCount(), parseResult.charCount());
         } catch (Exception e) {
             handleError(id, "解析失败: " + e.getMessage(), "PARSING");
             return;
@@ -264,11 +257,7 @@ public class KnowledgeExtractionService {
                 String rulesJson = mapper.writeValueAsString(
                         extracted.getOrDefault("rules", Collections.emptyList()));
 
-                jdbc.update(
-                    "UPDATE extraction_drafts SET extracted_entities_json = ?, " +
-                    "extracted_links_json = ?, extracted_rules_json = ?, status = 'PENDING_REVIEW' WHERE id = ?",
-                    entitiesJson, linksJson, rulesJson, id
-                );
+                extractionDao.markPendingReview(id, entitiesJson, linksJson, rulesJson);
                 // 安全计数（非 List 类型退化为 0）
                 int entCount = extracted.get("entities") instanceof java.util.List ?
                     ((java.util.List<?>) extracted.get("entities")).size() : 0;
@@ -376,8 +365,7 @@ public class KnowledgeExtractionService {
      */
     public Map<String, Object> approve(String id) {
         // 1. 校验 status
-        Map<String, Object> draft = jdbc.queryForMap(
-            "SELECT * FROM extraction_drafts WHERE id = ?", id);
+        Map<String, Object> draft = extractionDao.fetchDraft(id);
         String currentStatus = (String) draft.get("status");
         if (!"PENDING_REVIEW".equals(currentStatus)) {
             throw new IllegalStateException("Cannot approve: status is " + currentStatus + ", expected PENDING_REVIEW");
@@ -497,7 +485,7 @@ public class KnowledgeExtractionService {
         }
 
         // 4. 更新状态
-        jdbc.update("UPDATE extraction_drafts SET status = 'APPROVED', updated_at = NOW() WHERE id = ?", id);
+        extractionDao.markApproved(id);
 
         // 5. 审计日志 (异步，不阻塞主流程)
         auditAsync(id, "APPROVED", rulesWritten, entitiesWritten, linksWritten);
@@ -529,8 +517,7 @@ public class KnowledgeExtractionService {
     public Map<String, Object> reject(String id, String reason) {
         String currentStatus;
         try {
-            Map<String, Object> draft = jdbc.queryForMap(
-                "SELECT status FROM extraction_drafts WHERE id = ?", id);
+            Map<String, Object> draft = extractionDao.fetchDraftStatus(id);
             currentStatus = (String) draft.get("status");
         } catch (Exception e) {
             throw new IllegalArgumentException("Draft not found: " + id);
@@ -539,8 +526,7 @@ public class KnowledgeExtractionService {
             throw new IllegalStateException("Cannot reject: status is " + currentStatus);
         }
 
-        jdbc.update("UPDATE extraction_drafts SET status = 'REJECTED', rejected_reason = ?, updated_at = NOW() WHERE id = ?",
-                reason, id);
+        extractionDao.markRejected(reason, id);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", id);
@@ -558,13 +544,11 @@ public class KnowledgeExtractionService {
 
     public List<Map<String, Object>> listTasks(int page, int pageSize) {
         int offset = (page - 1) * pageSize;
-        return jdbc.queryForList(
-            "SELECT id, file_name, status, created_at FROM extraction_drafts ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            pageSize, offset);
+        return extractionDao.listTasks(pageSize, offset);
     }
 
     public Map<String, Object> getTask(String id) {
-        return jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", id);
+        return extractionDao.fetchDraft(id);
     }
 
     // ── 待审核文件 / 候选清单（B5-2 / D6：前端 review Tab） ────────
@@ -584,15 +568,9 @@ public class KnowledgeExtractionService {
 
         List<Map<String, Object>> rows;
         if (status == null || status.isBlank()) {
-            rows = jdbc.queryForList(
-                "SELECT id, file_name, status, extracted_entities_json, extracted_links_json, error_msg, created_at " +
-                "FROM extraction_drafts ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                effectiveSize, offset);
+            rows = extractionDao.listExtractFilesNoStatus(effectiveSize, offset);
         } else {
-            rows = jdbc.queryForList(
-                "SELECT id, file_name, status, extracted_entities_json, extracted_links_json, error_msg, created_at " +
-                "FROM extraction_drafts WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                status.trim().toUpperCase(Locale.ROOT), effectiveSize, offset);
+            rows = extractionDao.listExtractFilesByStatus(status.trim().toUpperCase(Locale.ROOT), effectiveSize, offset);
         }
 
         List<ExtractFileVO> files = new ArrayList<>(rows.size());
@@ -622,9 +600,7 @@ public class KnowledgeExtractionService {
         if (fileId == null || fileId.isBlank()) {
             return Collections.emptyList();
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT extracted_entities_json, extracted_links_json, extracted_rules_json " +
-            "FROM extraction_drafts WHERE id = ?", fileId.trim());
+        List<Map<String, Object>> rows = extractionDao.listCandidateJsons(fileId.trim());
         if (rows.isEmpty()) {
             return Collections.emptyList();
         }
@@ -798,13 +774,11 @@ public class KnowledgeExtractionService {
     // ── 工具方法 ─────────────────────────────────────
 
     private void updateStatus(String id, String status) {
-        jdbc.update("UPDATE extraction_drafts SET status = ?, updated_at = NOW() WHERE id = ?", status, id);
+        extractionDao.updateStatus(id, status);
     }
 
     private void handleError(String id, String errorMsg, String lastStatus) {
-        jdbc.update(
-            "UPDATE extraction_drafts SET status = ?, error_msg = ?, retry_count = retry_count + 1, updated_at = NOW() WHERE id = ?",
-            "REJECTED", lastStatus + ": " + errorMsg, id);
+        extractionDao.recordError("REJECTED", lastStatus + ": " + errorMsg, id);
         log.error("抽取失败 id={}: {}", id, errorMsg);
     }
 

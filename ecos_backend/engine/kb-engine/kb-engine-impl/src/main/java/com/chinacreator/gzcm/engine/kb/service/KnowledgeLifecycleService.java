@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeLifecycleDao;
 import com.chinacreator.gzcm.engine.kb.dto.LifecycleAssetVO;
 import com.chinacreator.gzcm.engine.kb.dto.LifecycleAuditEntryVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -47,10 +47,10 @@ public class KnowledgeLifecycleService {
     /** 分页大小上限（防慢查询） */
     private static final int MAX_PAGE_SIZE = 100;
 
-    private final JdbcTemplate jdbc;
+    private final KnowledgeLifecycleDao knowledgeLifecycleDao;
 
-    public KnowledgeLifecycleService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public KnowledgeLifecycleService(KnowledgeLifecycleDao knowledgeLifecycleDao) {
+        this.knowledgeLifecycleDao = knowledgeLifecycleDao;
     }
 
     /**
@@ -71,10 +71,7 @@ public class KnowledgeLifecycleService {
 
         List<Map<String, Object>> rows;
         if (normalizedStatus == null) {
-            rows = jdbc.queryForList(
-                    "SELECT id, title, status, updated_at FROM ecos_knowledge.knowledge_article "
-                            + "ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-                    effectiveSize, offset);
+            rows = knowledgeLifecycleDao.listAssets(effectiveSize, offset);
         } else {
             if (rawStatuses.isEmpty()) {
                 return List.of();
@@ -83,11 +80,7 @@ public class KnowledgeLifecycleService {
             List<Object> args = new ArrayList<>(rawStatuses);
             args.add(effectiveSize);
             args.add(offset);
-            rows = jdbc.queryForList(
-                    "SELECT id, title, status, updated_at FROM ecos_knowledge.knowledge_article "
-                            + "WHERE lower(status) IN (" + placeholders + ") "
-                            + "ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-                    args.toArray());
+            rows = knowledgeLifecycleDao.listAssetsByStatus(placeholders, args.toArray());
         }
 
         List<LifecycleAssetVO> assets = new ArrayList<>(rows.size());
@@ -118,10 +111,7 @@ public class KnowledgeLifecycleService {
         int effectiveSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         int offset = (effectivePage - 1) * effectiveSize;
 
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, object_type, op, status, created_at FROM ecos_knowledge.kg_sync_log "
-                        + "ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                effectiveSize, offset);
+        List<Map<String, Object>> rows = knowledgeLifecycleDao.listAudit(effectiveSize, offset);
 
         List<LifecycleAuditEntryVO> entries = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {

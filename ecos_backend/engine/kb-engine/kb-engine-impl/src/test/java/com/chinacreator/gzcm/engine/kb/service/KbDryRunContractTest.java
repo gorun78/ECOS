@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.KbEntityInstanceExtractionServiceDao;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -31,9 +31,12 @@ import static org.mockito.Mockito.when;
  * <p>契约：同一输入下 dry-run 与真执行的 {@code {created,updated,issues[]}} 三项 diff=0；
  * dry-run 不改水位线、不改表行数。</p>
  *
- * <p>纯单测：RestTemplate/JdbcTemplate 全 mock，注入受控 DW 数据（1 实体 × 3 行，distinct 主键）。
+ * <p>纯单测：RestTemplate/DAO 全 mock，注入受控 DW 数据（1 实体 × 3 行，distinct 主键）。
  * dry-run 走"预查存在性集合判 created/updated"，真执行走 upsert 返回的 inserted 标志——两条路径
  * 必须收敛到同计数（A 新建 / B、C 更新 / 0 告警），防止 nodeCreated 虚高误导。</p>
+ *
+ * <p>R2 / B2-kb: 数据访问已由 {@link JdbcTemplate} 收口到
+ * {@link KbEntityInstanceExtractionServiceDao}，本测试 mock DAO 验证契约。</p>
  */
 class KbDryRunContractTest {
 
@@ -86,23 +89,28 @@ class KbDryRunContractTest {
     // ── dry-run 不改水位线、不改表行数 ──────────────────────────
     @Test
     void dryRunLeavesWatermarkAndRowCountUnchanged() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        stubSnapshots(jdbc);
+        KbEntityInstanceExtractionServiceDao dao = mock(KbEntityInstanceExtractionServiceDao.class);
+        stubSnapshots(dao);
         AtomicInteger upsertCalls = new AtomicInteger();
-        stubNodeUpsert(jdbc, () -> { upsertCalls.incrementAndGet(); return true; });
-        // 存在性预查（3 参重载）→ 返回 {B,C}
-        when(jdbc.queryForList(anyString(), any(Class.class), any()))
-                .thenReturn(List.of("B", "C"));
+        lenient().when(dao.upsertNode(anyString(), anyString(), anyString(), anyString(),
+                        anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    upsertCalls.incrementAndGet();
+                    return true;
+                });
+        // 存在性预查 → 返回 {B,C}
+        lenient().when(dao.queryExistingNodeIds(anyList())).thenReturn(List.of("B", "C"));
 
-        KbEntityInstanceExtractionService svc = newSrv(jdbc, restRoutes("wm-3"));
+        KbEntityInstanceExtractionService svc = newSrv(dao, restRoutes("wm-3"));
         EntityInstanceExtractionReportVO dry = svc.extract("ONT", "job-dry", false, true);
         assertTrue(dry.isDryRun());
 
         // dry-run 禁止节点 upsert（graph_node 零写入 → 表行数不变）
         assertEquals(0, upsertCalls.get(), "dry-run 不得执行节点 upsert（graph_node 零写入）");
         // 禁止边写 / 水位写
-        verify(jdbc, Mockito.never()).update(org.mockito.ArgumentMatchers.contains("graph_edge"));
-        verify(jdbc, Mockito.never()).update(org.mockito.ArgumentMatchers.contains("kb_extract_watermark"));
+        verify(dao, Mockito.never()).upsertEdge(anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString(), anyString(), any());
+        verify(dao, Mockito.never()).writeWatermark(anyString(), anyString(), anyString(), anyString());
         // 水位线不推进（dry-run 不落持久化水位）
         assertFalse(dry.getNextWatermark() != null && !dry.getNextWatermark().isBlank(),
                 "dry-run 报告不得回填持久化水位（不落库即不推进）");
@@ -110,51 +118,27 @@ class KbDryRunContractTest {
 
     // ── stubs & helpers ─────────────────────────────────────────
 
-    private static boolean isNodeUpsert(String sql) {
-        return sql != null && sql.contains("INSERT INTO ecos_knowledge.graph_node");
-    }
-
-    /** 守卫方法：真执行不应对非 upsert SQL 命中 12 参返回序列。 */
-    private void stubNodeUpsert(JdbcTemplate jdbc, java.util.function.Supplier<Boolean> insertedOf) {
-        // upsert 走 queryForList(sql, Boolean.class, 10 arg) = 12 参
-        lenient().when(jdbc.queryForList(argThat(KbDryRunContractTest::isNodeUpsert),
-                        any(Class.class), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenAnswer(inv -> List.of(insertedOf.get()));
-    }
-
     /** 场景开关 {@code allExisting=true}：存在性全命中 + upsert 全返回更新（0 建 3 更）。 */
     private EntityInstanceExtractionReportVO extractWith(boolean dryRun, boolean allExisting) {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        stubSnapshots(jdbc);
-        // upsert（12 参）：真执行命中，按 allExisting 返回 inserted（true=新建 / false=更新）
-        lenient().when(jdbc.queryForList(argThat(KbDryRunContractTest::isNodeUpsert),
-                        any(Class.class), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenAnswer(inv -> List.of(!allExisting));
-        // 存在性预查：生产侧 jdbc.queryForList(sql, String.class, chunk.toArray()) 会把 Object[3] 展开成 3 个 varargs 元素，
-        // 因此 mock 必须匹配 (String, Class, Object, Object, Object) 共 5 参（本例固定 3 行、单分片）。
-        lenient().when(jdbc.queryForList(anyString(), any(Class.class), any(), any(), any()))
-                .thenAnswer(inv -> {
-                    String sql = (String) inv.getArgument(0);
-                    if (isNodeUpsert(sql)) {
-                        return List.of(); // 兜底（12 参应已被上一 stub 处理）
-                    }
-                    if (sql.contains("graph_node") && sql.contains("IN (")) {
-                        // allExisting=true → 三行实体节点均已存在（与真执行 upsert 全返回 updated 同口径）
-                        if (allExisting) {
-                            return List.of(nodeId("A"), nodeId("B"), nodeId("C"));
-                        }
-                        return List.of();
-                    }
-                    return List.of();
-                });
+        KbEntityInstanceExtractionServiceDao dao = mock(KbEntityInstanceExtractionServiceDao.class);
+        stubSnapshots(dao);
+        // upsert：真执行命中，按 allExisting 返回 inserted（true=新建 / false=更新）
+        lenient().when(dao.upsertNode(anyString(), anyString(), anyString(), anyString(),
+                        anyString(), anyString(), anyString(), anyString(), anyString(), any()))
+                .thenReturn(!allExisting);
+        // 存在性预查：全命中（三行实体节点均已存在）或全空
+        lenient().when(dao.queryExistingNodeIds(anyList()))
+                .thenAnswer(inv -> allExisting
+                        ? List.of(nodeId("A"), nodeId("B"), nodeId("C"))
+                        : List.of());
 
-        KbEntityInstanceExtractionService svc = newSrv(jdbc, restRoutes("wm-3"));
+        KbEntityInstanceExtractionService svc = newSrv(dao, restRoutes("wm-3"));
         return svc.extract("ONT", "job-" + (dryRun ? "dry" : "real"), false, dryRun);
     }
 
-    private KbEntityInstanceExtractionService newSrv(JdbcTemplate jdbc, RestTemplate rest) {
+    private KbEntityInstanceExtractionService newSrv(KbEntityInstanceExtractionServiceDao dao, RestTemplate rest) {
         KbEntityInstanceExtractionService svc =
-                new KbEntityInstanceExtractionService(jdbc, rest, DATANET, true);
+                new KbEntityInstanceExtractionService(dao, rest, DATANET, true);
         ServiceEndpointResolver resolver = mock(ServiceEndpointResolver.class);
         when(resolver.resolve(anyString(), any()))
                 .thenReturn(Optional.of("http://buszhi.test/api/v1"));
@@ -188,11 +172,12 @@ class KbDryRunContractTest {
         return rest;
     }
 
-    private void stubSnapshots(JdbcTemplate jdbc) {
-        lenient().when(jdbc.queryForList(argThat(sql -> sql != null && sql.contains("kb_ontology_snapshot")),
-                        ArgumentMatchers.<Object>any()))
-                .thenReturn(List.of(
-                        Map.of("ontology_id", "ONT", "version", "1", "entity_codes", "[\"PERSON\"]")));
+    private void stubSnapshots(KbEntityInstanceExtractionServiceDao dao) {
+        // scope=ONT（非 ALL）→ selectLatestSnapshot；提供快照行供 C1 校验
+        lenient().when(dao.selectLatestSnapshot(anyString())).thenReturn(List.of(
+                Map.of("ontology_id", "ONT", "version", "1", "entity_codes", "[\"PERSON\"]")));
+        lenient().when(dao.selectAllSnapshots()).thenReturn(List.of(
+                Map.of("ontology_id", "ONT", "version", "1", "entity_codes", "[\"PERSON\"]")));
     }
 
     private Map<String, Object> routes(String url, String nextWm) {

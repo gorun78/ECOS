@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeGraphDao;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
@@ -10,7 +11,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,7 +27,7 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
     private final KnowledgeNodeMapper nodeMapper;
     private final KnowledgeEdgeMapper edgeMapper;
     // PMO-C T3: 分类白名单下沉（kb_nav_article_rel(scope=category) → node_id）
-    private final JdbcTemplate jdbcTemplate;
+    private final KnowledgeGraphDao knowledgeGraphDao;
     /** properties 解析（node.propertiesJson → 查 categoryId/navCategoryId） */
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -43,10 +43,10 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
             .build();
 
     public KnowledgeGraphServiceImpl(KnowledgeNodeMapper nodeMapper, KnowledgeEdgeMapper edgeMapper,
-                                     JdbcTemplate jdbcTemplate) {
+                                     KnowledgeGraphDao knowledgeGraphDao) {
         this.nodeMapper = nodeMapper;
         this.edgeMapper = edgeMapper;
-        this.jdbcTemplate = jdbcTemplate;
+        this.knowledgeGraphDao = knowledgeGraphDao;
     }
 
     @Override
@@ -116,22 +116,8 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         if (cleaned.isEmpty()) {
             return null;
         }
-        // 参数化占位（IR05 红线：禁字符串拼接业务 id）
-        List<Object> args = new ArrayList<>(cleaned.size());
-        StringBuilder inClause = new StringBuilder("(");
-        for (int i = 0; i < cleaned.size(); i++) {
-            if (i > 0) {
-                inClause.append(" OR ");
-            }
-            inClause.append("c.id = ?");
-            args.add(cleaned.get(i));
-        }
-        inClause.append(")");
-        String sql = "SELECT DISTINCT r.node_id FROM ecos_knowledge.kb_nav_article_rel r "
-                + "JOIN ecos_knowledge.kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 "
-                + "WHERE r.is_deleted = 0 AND r.scope = 'category' AND (" + inClause + ")";
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
+            List<Map<String, Object>> rows = knowledgeGraphDao.resolveCategoryNodeIds(cleaned);
             Set<String> out = new HashSet<>();
             for (Map<String, Object> row : rows) {
                 Object nid = row.get("node_id");

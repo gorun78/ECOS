@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeExtractionServiceDao;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,7 +45,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class KnowledgeExtractionServiceTest {
 
-    @Mock private JdbcTemplate jdbc;
+    @Mock private KnowledgeExtractionServiceDao extractionDao;
     @Mock private ComplianceRuleMapper ruleMapper;
     @Mock private KGWriterService kgWriter;
     @Mock private EntityLinkerService entityLinker;
@@ -55,7 +55,7 @@ class KnowledgeExtractionServiceTest {
     void setUp() {
         DocumentParseService parser =
                 new DocumentParseService(new MinerUHttpParser());
-        service = new KnowledgeExtractionService(jdbc, ruleMapper, kgWriter, parser, entityLinker, null, new org.springframework.web.client.RestTemplate());
+        service = new KnowledgeExtractionService(extractionDao, ruleMapper, kgWriter, parser, entityLinker, null, new org.springframework.web.client.RestTemplate());
     }
 
     // ── approve 主流程 ──
@@ -89,7 +89,7 @@ class KnowledgeExtractionServiceTest {
         draft.put("extracted_rules_json", rulesJson);
         draft.put("extracted_entities_json", null);
         draft.put("extracted_links_json", null);
-        when(jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", "x-1")).thenReturn(draft);
+        when(extractionDao.fetchDraft("x-1")).thenReturn(draft);
         when(ruleMapper.findAll()).thenReturn(List.of(rule("r1-existing", "r1", "finance")));
         when(ruleMapper.insert(any(ComplianceRule.class))).thenReturn(1);
 
@@ -119,7 +119,7 @@ class KnowledgeExtractionServiceTest {
         Map<String, Object> draft = new LinkedHashMap<>();
         draft.put("id", "x-2");
         draft.put("status", "PENDING_REVIEW");
-        when(jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", "x-2")).thenReturn(draft);
+        when(extractionDao.fetchDraft("x-2")).thenReturn(draft);
 
         Map<String, Object> res = service.approve("x-2");
         assertEquals("APPROVED", res.get("status"));
@@ -152,7 +152,7 @@ class KnowledgeExtractionServiceTest {
         draft.put("status", "PENDING_REVIEW");
         draft.put("extracted_entities_json", entitiesJson);
         draft.put("extracted_links_json", linksJson);
-        when(jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", "x-3")).thenReturn(draft);
+        when(extractionDao.fetchDraft("x-3")).thenReturn(draft);
         when(kgWriter.writeBatch(anyList(), anyList()))
                 .thenReturn(new KGWriterService.BatchWriteResult(2, 0, 1, 0));
 
@@ -183,7 +183,7 @@ class KnowledgeExtractionServiceTest {
         draft.put("id", "x-4");
         draft.put("status", "PENDING_REVIEW");
         draft.put("extracted_entities_json", entitiesJson);
-        when(jdbc.queryForMap("SELECT * FROM extraction_drafts WHERE id = ?", "x-4")).thenReturn(draft);
+        when(extractionDao.fetchDraft("x-4")).thenReturn(draft);
         when(kgWriter.writeBatch(anyList(), anyList()))
                 .thenReturn(new KGWriterService.BatchWriteResult(1, 0, 0, 0));
         doThrow(new RuntimeException("linker down")).when(entityLinker).linkEntities(anyList());
@@ -198,15 +198,14 @@ class KnowledgeExtractionServiceTest {
     @Test
     @DisplayName("T-07-6-5: reject(id) 不带 reason → 默认 'no reason provided'")
     void rejectWithoutReasonFallbackToDefault() {
-        when(jdbc.queryForMap("SELECT status FROM extraction_drafts WHERE id = ?", "x-5"))
+        when(extractionDao.fetchDraftStatus("x-5"))
             .thenReturn(Map.of("status", "PENDING_REVIEW"));
-        when(jdbc.update(org.mockito.ArgumentMatchers.anyString(), any(String.class), eq("x-5")))
-            .thenReturn(1);
 
         Map<String, Object> res = service.reject("x-5");
 
         assertEquals("REJECTED", res.get("status"));
         assertEquals("no reason provided", res.get("rejectedReason"));
+        verify(extractionDao).markRejected("no reason provided", "x-5");
     }
 
     // ── listTasks 透传 ──
@@ -214,13 +213,13 @@ class KnowledgeExtractionServiceTest {
     @Test
     @DisplayName("T-07-6-6: listTasks 第 2 页 pageSize=10 → LIMIT 10 OFFSET 10")
     void listTasksPageFlipCalculatesOffset() {
-        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("LIMIT ? OFFSET ?"), eq(10), eq(10)))
+        when(extractionDao.listTasks(eq(10), eq(10)))
             .thenReturn(List.of(Map.of("id", "t-1")));
 
         List<Map<String, Object>> res = service.listTasks(2, 10);
 
         assertEquals(1, res.size());
-        verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("LIMIT ? OFFSET ?"), eq(10), eq(10));
+        verify(extractionDao).listTasks(eq(10), eq(10));
     }
 
     // ── 工具 ──

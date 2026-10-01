@@ -3,13 +3,13 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.EcosKnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
+import com.chinacreator.gzcm.engine.kb.dao.EcosKnowledgeGraphDao;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -32,15 +32,15 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
 
     private static final Logger log = LoggerFactory.getLogger(EcosKnowledgeGraphServiceImpl.class);
 
-    private final JdbcTemplate jdbc;
+    private final EcosKnowledgeGraphDao ecosKnowledgeGraphDao;
     private final KgSyncService kgSyncService;
 
     /** Neo4j 投影客户端 — standard 档允许缺省（nullable），缺省/不可用 → 显式降级不投影。 */
     private final Neo4jClient neo4j;
 
-    public EcosKnowledgeGraphServiceImpl(JdbcTemplate jdbc, @Lazy KgSyncService kgSyncService,
+    public EcosKnowledgeGraphServiceImpl(EcosKnowledgeGraphDao ecosKnowledgeGraphDao, @Lazy KgSyncService kgSyncService,
                                          ObjectProvider<Neo4jClient> neo4jProvider) {
-        this.jdbc = jdbc;
+        this.ecosKnowledgeGraphDao = ecosKnowledgeGraphDao;
         this.kgSyncService = kgSyncService;
         this.neo4j = neo4jProvider == null ? null : neo4jProvider.getIfAvailable();
     }
@@ -60,8 +60,7 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
     private List<Map<String, Object>> loadNodes() {
         List<Map<String, Object>> nodes = new ArrayList<>();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT id, label, node_type, domain, properties FROM ecos_knowledge.graph_node ORDER BY label");
+            List<Map<String, Object>> rows = ecosKnowledgeGraphDao.loadNodes();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> n = new LinkedHashMap<>();
                 n.put("code", row.getOrDefault("label", ""));
@@ -87,13 +86,7 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
     private List<Map<String, Object>> loadEdges() {
         List<Map<String, Object>> edges = new ArrayList<>();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT e.id, e.source_id, e.target_id, e.type AS \"relationship\", " +
-                    "       n1.label AS \"sourceName\", n2.label AS \"targetName\" " +
-                    "FROM ecos_knowledge.graph_edge e " +
-                    "LEFT JOIN ecos_knowledge.graph_node n1 ON n1.id = e.source_id " +
-                    "LEFT JOIN ecos_knowledge.graph_node n2 ON n2.id = e.target_id " +
-                    "ORDER BY n1.label, n2.label");
+            List<Map<String, Object>> rows = ecosKnowledgeGraphDao.loadEdges();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> e = new LinkedHashMap<>();
                 e.put("id", row.getOrDefault("id", ""));
@@ -115,14 +108,9 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
     private Map<String, Object> loadStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
         try {
-            Integer nodeCount = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_knowledge.graph_node", Integer.class);
-            Integer edgeCount = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_knowledge.graph_edge", Integer.class);
-            List<String> domains = jdbc.queryForList(
-                    "SELECT DISTINCT domain FROM ecos_knowledge.graph_node " +
-                    "WHERE domain IS NOT NULL ORDER BY domain",
-                    String.class);
+            Integer nodeCount = ecosKnowledgeGraphDao.countNodes();
+            Integer edgeCount = ecosKnowledgeGraphDao.countEdges();
+            List<String> domains = ecosKnowledgeGraphDao.distinctDomains();
             stats.put("nodeCount", nodeCount == null ? 0 : nodeCount);
             stats.put("edgeCount", edgeCount == null ? 0 : edgeCount);
             stats.put("domains", domains);
@@ -157,10 +145,8 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
         int pgNodes = 0;
         int pgEdges = 0;
         try {
-            Integer nc = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_knowledge.graph_node", Integer.class);
-            Integer ec = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_knowledge.graph_edge", Integer.class);
+            Integer nc = ecosKnowledgeGraphDao.countNodes();
+            Integer ec = ecosKnowledgeGraphDao.countEdges();
             pgNodes = nc == null ? 0 : nc;
             pgEdges = ec == null ? 0 : ec;
         } catch (Exception e) {
@@ -183,10 +169,7 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
         // Neo4j 可用 → 提交真投影任务并做 PG↔Neo4j 计数对账
         String jobId = "tg-neo4j-" + System.currentTimeMillis();
         try {
-            jdbc.update(
-                    "INSERT INTO ecos_knowledge.kg_sync_log " +
-                    "(object_type, op, job_id, status, progress) VALUES (?, ?, ?, 'RUNNING', 0)",
-                    "ALL", "NEO4J_SYNC", jobId);
+            ecosKnowledgeGraphDao.insertNeo4jSyncLog(jobId);
         } catch (Exception e) {
             log.warn("insert kg_sync_log for neo4j sync failed: {}", e.getMessage());
         }

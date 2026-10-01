@@ -2,12 +2,12 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
+import com.chinacreator.gzcm.engine.kb.dao.KgSyncLogDao;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -49,7 +49,7 @@ public class KgSyncServiceImpl implements KgSyncService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final KgSyncLogDao kgSyncLogDao;
     private final KgMapperService kgMapper;
 
     /** 图谱实例抽取服务（PMO-B3-2：映射契约驱动 DW 层实例抽取）。 */
@@ -58,11 +58,11 @@ public class KgSyncServiceImpl implements KgSyncService {
     /** 自身代理引用（@Lazy 破循环依赖）——使 trigger* 内部调用走 @Async 代理，避免长任务阻塞 HTTP 线程。 */
     private final KgSyncService self;
 
-    public KgSyncServiceImpl(JdbcTemplate jdbc,
+    public KgSyncServiceImpl(KgSyncLogDao kgSyncLogDao,
                             @Lazy KgMapperService kgMapper,
                             @Lazy KbEntityInstanceExtractionService instanceExtraction,
                             @Lazy KgSyncService self) {
-        this.jdbc = jdbc;
+        this.kgSyncLogDao = kgSyncLogDao;
         this.kgMapper = kgMapper;
         this.instanceExtraction = instanceExtraction;
         this.self = self;
@@ -90,12 +90,7 @@ public class KgSyncServiceImpl implements KgSyncService {
             buckets.add(b);
         }
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT n.domain AS \"type\", " +
-                    "       COUNT(*) AS \"syncedCount\", " +
-                    "       (SELECT MAX(l.finished_at) FROM ecos_knowledge.kg_sync_log l " +
-                    "        WHERE l.object_type = n.domain AND l.status = 'SUCCESS') AS \"lastSyncTime\" " +
-                    "FROM ecos_knowledge.graph_node n GROUP BY n.domain");
+            List<Map<String, Object>> rows = kgSyncLogDao.syncStatusByDomain();
             for (Map<String, Object> row : rows) {
                 String t = row.get("type") == null ? "" : String.valueOf(row.get("type"));
                 if (t.isBlank()) {
@@ -117,10 +112,7 @@ public class KgSyncServiceImpl implements KgSyncService {
         }
         // 全量统计行（type=ALL）
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT COUNT(*) AS \"syncedCount\", " +
-                    "       (SELECT MAX(finished_at) FROM ecos_knowledge.kg_sync_log WHERE status = 'SUCCESS') AS \"lastSyncTime\" " +
-                    "FROM ecos_knowledge.graph_node");
+            List<Map<String, Object>> rows = kgSyncLogDao.syncStatusOverall();
             if (!rows.isEmpty()) {
                 Map<String, Object> b = new LinkedHashMap<>();
                 b.put("type", "ALL");
@@ -139,8 +131,7 @@ public class KgSyncServiceImpl implements KgSyncService {
     @Override
     public String getOverallStatus() {
         try {
-            Integer count = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_knowledge.kg_sync_log", Integer.class);
+            Integer count = kgSyncLogDao.countSyncLog();
             return (count != null && count > 0) ? "ready" : "idle";
         } catch (Exception e) {
             log.warn("getOverallStatus failed: {}", e.getMessage());
@@ -284,12 +275,7 @@ public class KgSyncServiceImpl implements KgSyncService {
     public List<Map<String, Object>> getSyncLogs(int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 200));
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT id, object_type AS \"objectType\", op AS \"operation\", " +
-                    "       job_id AS \"jobId\", status, progress, nodes, edges, " +
-                    "       error_message AS \"message\", created_at AS \"timestamp\", finished_at AS \"finishedAt\" " +
-                    "FROM ecos_knowledge.kg_sync_log ORDER BY created_at DESC LIMIT ?",
-                    safeLimit);
+            List<Map<String, Object>> rows = kgSyncLogDao.getSyncLogs(safeLimit);
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> entry = new LinkedHashMap<>();
@@ -323,12 +309,7 @@ public class KgSyncServiceImpl implements KgSyncService {
         }
         int safeLimit = Math.max(1, Math.min(limit, 200));
         try {
-            return jdbc.queryForList(
-                    "SELECT \"id\", \"object_type\" AS \"objectType\", \"op\" AS \"operation\", " +
-                    "\"job_id\" AS \"jobId\", \"status\", \"progress\", \"nodes\", \"edges\", " +
-                    "\"error_message\" AS \"message\", \"created_at\" AS \"timestamp\", \"finished_at\" AS \"finishedAt\" " +
-                    "FROM ecos_knowledge.kg_sync_log WHERE job_id = ? ORDER BY created_at DESC LIMIT ?",
-                    jobId, safeLimit);
+            return kgSyncLogDao.getJobLogs(jobId, safeLimit);
         } catch (Exception e) {
             log.warn("getJobLogs failed: {}", e.getMessage());
             return Collections.emptyList();
@@ -343,13 +324,7 @@ public class KgSyncServiceImpl implements KgSyncService {
     public List<Map<String, Object>> listJobs(int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 200));
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT t.job_id AS \"jobId\", t.op AS \"operation\", t.status, " +
-                    "       t.error_message AS \"error\", t.created_at AS \"createdAt\", t.finished_at AS \"finishedAt\" " +
-                    "FROM (SELECT DISTINCT ON (job_id) job_id, op, status, error_message, created_at, finished_at " +
-                    "      FROM ecos_knowledge.kg_sync_log ORDER BY job_id, created_at DESC) t " +
-                    "ORDER BY t.created_at DESC LIMIT ?",
-                    safeLimit);
+            List<Map<String, Object>> rows = kgSyncLogDao.listJobs(safeLimit);
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> job = new LinkedHashMap<>();
@@ -398,20 +373,12 @@ public class KgSyncServiceImpl implements KgSyncService {
 
     private void insertLog(String objectType, String op, String jobId, String status,
                            int progress, int nodes, int edges, String errorMessage) {
-        jdbc.update(
-                "INSERT INTO ecos_knowledge.kg_sync_log " +
-                "(object_type, op, job_id, status, progress, nodes, edges, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                objectType, op, jobId, status, progress, nodes, edges,
-                errorMessage == null ? null : truncate(errorMessage, 1024));
+        kgSyncLogDao.insertLog(objectType, op, jobId, status, progress, nodes, edges, errorMessage);
     }
 
     private void markLogSuccess(String jobId, int nodes, int edges) {
         try {
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kg_sync_log " +
-                    "SET status = 'SUCCESS', progress = 100, nodes = ?, edges = ?, finished_at = NOW() " +
-                    "WHERE job_id = ?",
-                    nodes, edges, jobId);
+            kgSyncLogDao.markLogSuccess(jobId, nodes, edges);
         } catch (Exception e) {
             log.warn("markLogSuccess failed: jobId={}, err={}", jobId, e.getMessage());
         }
@@ -429,11 +396,7 @@ public class KgSyncServiceImpl implements KgSyncService {
             return;
         }
         try {
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kg_sync_log " +
-                    "SET status = 'SUCCESS', progress = 100, nodes = ?, edges = ?, report = ?::jsonb, finished_at = NOW() " +
-                    "WHERE job_id = ?",
-                    nodes, edges, reportJson, jobId);
+            kgSyncLogDao.markLogSuccessWithReport(jobId, nodes, edges, reportJson);
         } catch (Exception e) {
             log.warn("回填抽取报告失败（回退仅计数标记）: jobId={}, err={}", jobId, e.getMessage());
             markLogSuccess(jobId, nodes, edges);
@@ -442,11 +405,7 @@ public class KgSyncServiceImpl implements KgSyncService {
 
     private void markLogFailed(String jobId, String err) {
         try {
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kg_sync_log " +
-                    "SET status = 'FAILED', progress = 0, error_message = ?, finished_at = NOW() " +
-                    "WHERE job_id = ? AND status IN ('RUNNING','PENDING')",
-                    err == null ? null : truncate(err, 1024), jobId);
+            kgSyncLogDao.markLogFailed(jobId, err);
         } catch (Exception e) {
             log.warn("markLogFailed failed: jobId={}, err={}", jobId, e.getMessage());
         }
@@ -467,10 +426,6 @@ public class KgSyncServiceImpl implements KgSyncService {
 
     private String formatTs(Object v) {
         return v == null ? null : v.toString();
-    }
-
-    private String truncate(String s, int max) {
-        return s == null ? null : (s.length() <= max ? s : s.substring(0, max));
     }
 
     /**
