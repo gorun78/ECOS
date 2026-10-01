@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
+import com.chinacreator.gzcm.engine.kb.dao.EcosKnowledgeGraphDao;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +30,8 @@ import static org.mockito.Mockito.when;
 /**
  * F04-10 图谱双形态做实 — 验收测试（详细设计-04 二·F04-10，A 章验收标识）。
  *
- * <p>纯单测（无 Spring 上下文）：PG 计数走 {@link JdbcTemplate} mock，Neo4j 走
- * {@link Neo4jClient} mock。</p>
+ * <p>纯单测（无 Spring 上下文）：PG 计数走 {@link EcosKnowledgeGraphDao} mock（R2 / B2-kb 数据访问收口），
+ * Neo4j 走 {@link Neo4jClient} mock。</p>
  *
  * <ul>
  *   <li>{@code syncEitherWritesOrMarksDegraded} — Neo4j 不可用 → 显式 {@code notAttempted} + 降级标记；可用 → 真投影 + 对账；</li>
@@ -49,11 +49,11 @@ class GraphDualFormTest {
     @Test
     void syncEitherWritesOrMarksDegraded() {
         // 分支 1：Neo4j 投影不可用（client 为 null，standard 档）
-        JdbcTemplate jdbcNoNeo4j = mock(JdbcTemplate.class);
+        EcosKnowledgeGraphDao daoNoNeo4j = mock(EcosKnowledgeGraphDao.class);
         Integer nc = 7;
-        jdbcSetNodeAndEdgeCount(jdbcNoNeo4j, nc, 3);
+        daoSetNodeAndEdgeCount(daoNoNeo4j, nc, 3);
         EcosKnowledgeGraphServiceImpl svc =
-                new EcosKnowledgeGraphServiceImpl(jdbcNoNeo4j, mock(KgSyncService.class), null);
+                new EcosKnowledgeGraphServiceImpl(daoNoNeo4j, mock(KgSyncService.class), null);
 
         Map<String, Object> r = svc.syncToNeo4j();
         assertEquals("notAttempted", r.get("status"), "Neo4j 不可用必须显式 notAttempted（禁伪成功）");
@@ -63,7 +63,7 @@ class GraphDualFormTest {
 
         // 分支 2：Neo4j 完全缺失（client 缺省 provider）
         EcosKnowledgeGraphServiceImpl svcNullProvider =
-                new EcosKnowledgeGraphServiceImpl(jdbcNoNeo4j, mock(KgSyncService.class), mock(ObjectProvider.class));
+                new EcosKnowledgeGraphServiceImpl(daoNoNeo4j, mock(KgSyncService.class), mock(ObjectProvider.class));
         Map<String, Object> r2 = svcNullProvider.syncToNeo4j();
         assertEquals("notAttempted", r2.get("status"));
         assertEquals(Boolean.TRUE, r2.get("degraded"));
@@ -77,8 +77,8 @@ class GraphDualFormTest {
         int pgEdges = 20;
 
         // 一致：Neo4j 计数 = PG → synced
-        JdbcTemplate jdbcA = mock(JdbcTemplate.class);
-        jdbcSetNodeAndEdgeCount(jdbcA, pgNodes, pgEdges);
+        EcosKnowledgeGraphDao daoA = mock(EcosKnowledgeGraphDao.class);
+        daoSetNodeAndEdgeCount(daoA, pgNodes, pgEdges);
         Neo4jClient neoA = mock(Neo4jClient.class);
         when(neoA.isAvailable()).thenReturn(true);
         when(neoA.runFirst(anyString(), any())).thenAnswer(inv -> {
@@ -87,7 +87,7 @@ class GraphDualFormTest {
             return Map.<String, Object>of("c", c);
         });
         EcosKnowledgeGraphServiceImpl svcA =
-                new EcosKnowledgeGraphServiceImpl(jdbcA, mock(KgSyncService.class), provider(neoA));
+                new EcosKnowledgeGraphServiceImpl(daoA, mock(KgSyncService.class), provider(neoA));
         Map<String, Object> ok = svcA.syncToNeo4j();
         assertEquals("synced", ok.get("status"), "计数一致应判 synced");
         assertEquals(Boolean.FALSE, ok.get("degraded"));
@@ -98,8 +98,8 @@ class GraphDualFormTest {
 
         // 不一致：Neo4j < PG → reconcile_drift + GRAPH_FORM_MISMATCH
         int neoNodesDrift = 5;
-        JdbcTemplate jdbcB = mock(JdbcTemplate.class);
-        jdbcSetNodeAndEdgeCount(jdbcB, pgNodes, pgEdges);
+        EcosKnowledgeGraphDao daoB = mock(EcosKnowledgeGraphDao.class);
+        daoSetNodeAndEdgeCount(daoB, pgNodes, pgEdges);
         Neo4jClient neoB = mock(Neo4jClient.class);
         when(neoB.isAvailable()).thenReturn(true);
         when(neoB.runFirst(anyString(), any())).thenAnswer(inv -> {
@@ -108,7 +108,7 @@ class GraphDualFormTest {
             return Map.<String, Object>of("c", c);
         });
         EcosKnowledgeGraphServiceImpl svcB =
-                new EcosKnowledgeGraphServiceImpl(jdbcB, mock(KgSyncService.class), provider(neoB));
+                new EcosKnowledgeGraphServiceImpl(daoB, mock(KgSyncService.class), provider(neoB));
         Map<String, Object> drift = svcB.syncToNeo4j();
         assertEquals("reconcile_drift", drift.get("status"), "计数不一致必须显式 reconcile_drift");
         assertEquals(KbErrorCodes.GRAPH_FORM_MISMATCH.code(), drift.get("mismatchCode"),
@@ -143,9 +143,9 @@ class GraphDualFormTest {
     // ── helpers ─────────────────────────────────────────────
 
     /** 两条 COUNT 查询绑定 PG 节点/边数（顺序敏感，同服务实现内先后调用）。 */
-    private void jdbcSetNodeAndEdgeCount(JdbcTemplate jdbc, int nodes, int edges) {
-        lenient().when(jdbc.queryForObject(anyString(), any(Class.class)))
-                .thenAnswer(inv -> ((String) inv.getArgument(0)).contains("graph_node") ? nodes : edges);
+    private void daoSetNodeAndEdgeCount(EcosKnowledgeGraphDao dao, int nodes, int edges) {
+        lenient().when(dao.countNodes()).thenReturn(nodes);
+        lenient().when(dao.countEdges()).thenReturn(edges);
     }
 
     /** 构造返回给定 Neo4jClient 的 ObjectProvider（同包可访问工厂无需真实 Spring）。 */

@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.GraphEdgeQueryDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +19,8 @@ import java.util.Map;
  * <p>
  * 只读：本服务不含任何写路径；边写入仍归 {@code KGWriterService} /
  * {@code KnowledgeEdgeMapper}。
+ * <p>
+ * SQL 已由 {@link GraphEdgeQueryDao} 统一持有（架构铁律 §2.5 单一数据访问底座 / IR06）。
  *
  * @group GRAPH
  */
@@ -27,10 +29,10 @@ public class GraphEdgeQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(GraphEdgeQueryService.class);
 
-    private final JdbcTemplate jdbc;
+    private final GraphEdgeQueryDao graphEdgeQueryDao;
 
-    public GraphEdgeQueryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public GraphEdgeQueryService(GraphEdgeQueryDao graphEdgeQueryDao) {
+        this.graphEdgeQueryDao = graphEdgeQueryDao;
     }
 
     /**
@@ -40,8 +42,7 @@ public class GraphEdgeQueryService {
      * @return 边行列表，键为 {@code source_id} / {@code target_id}
      */
     public List<Map<String, Object>> loadAdjacencyEdges(int limit) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT source_id, target_id FROM ecos_knowledge.graph_edge LIMIT ?", limit);
+        List<Map<String, Object>> rows = graphEdgeQueryDao.loadAdjacencyEdges(limit);
         log.debug("loadAdjacencyEdges: limit={}, rows={}", limit, rows.size());
         return rows;
     }
@@ -53,10 +54,7 @@ public class GraphEdgeQueryService {
      * @return 度数字行，键为 {@code node} / {@code cnt}；未命中的节点不出现在结果中
      */
     public List<Map<String, Object>> countOutDegrees(Object[] ids) {
-        return jdbc.queryForList(
-                "SELECT source_id AS node, COUNT(*) AS cnt FROM ecos_knowledge.graph_edge "
-                        + "WHERE source_id IN (" + placeholders(ids.length) + ") GROUP BY source_id",
-                ids);
+        return graphEdgeQueryDao.countOutDegrees(ids);
     }
 
     /**
@@ -66,21 +64,6 @@ public class GraphEdgeQueryService {
      * @return 度数字行，键为 {@code node} / {@code cnt}；未命中的节点不出现在结果中
      */
     public List<Map<String, Object>> countInDegrees(Object[] ids) {
-        return jdbc.queryForList(
-                "SELECT target_id AS node, COUNT(*) AS cnt FROM ecos_knowledge.graph_edge "
-                        + "WHERE target_id IN (" + placeholders(ids.length) + ") GROUP BY target_id",
-                ids);
-    }
-
-    /** 生成 {@code n} 个 {@code ?} 占位符（逗号分隔），与下沉前 Controller 内实现一致。 */
-    private static String placeholders(int n) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < n; i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append('?');
-        }
-        return sb.toString();
+        return graphEdgeQueryDao.countInDegrees(ids);
     }
 }

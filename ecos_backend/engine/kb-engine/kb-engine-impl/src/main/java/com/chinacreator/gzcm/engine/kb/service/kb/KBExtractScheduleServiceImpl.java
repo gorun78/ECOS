@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service.kb;
 
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.kb.dao.KBExtractScheduleDao;
 import com.chinacreator.gzcm.engine.kb.dto.ScheduledExtractCreatedVO;
 import com.chinacreator.gzcm.engine.kb.dto.ScheduledExtractRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ScheduledExtractVO;
@@ -12,7 +13,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,23 +68,21 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
     /** 业务类别标记（铁律 §1.6-2 biz_kind 列） */
     private static final String BIZ_KIND_KB_EXTRACT = "KB_EXTRACT";
 
-    /** 旧 fallback 镜像表（V141，已 deprecate）。 */
-    private static final String LEGACY_TABLE = "ecos_knowledge.kb_scheduled_extract";
-
-    /** runtime-task plan 事实源表（V152 W4 持久化）。 */
-    private static final String PLAN_TABLE = "td_runtime_task_plan";
-
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    /**
+     * R2-B2b 数据访问收口（铁律 §2.5）：raw-SQL 全部下沉至 {@link KBExtractScheduleDao}；
+     * 本类保留业务编排（taskSchedulerService / 主源→fallback 降级 / 异常仓位）。
+     */
+    private final KBExtractScheduleDao dao;
     private final TaskSchedulerService taskSchedulerService;
     private final ITaskManagementService taskManagementService;
 
     /** 构造器注入（禁 @Autowired 字段注入 — 铁律 §1.1）。 */
-    public KBExtractScheduleServiceImpl(JdbcTemplate jdbc,
+    public KBExtractScheduleServiceImpl(KBExtractScheduleDao dao,
                                         TaskSchedulerService taskSchedulerService,
                                         ITaskManagementService taskManagementService) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.taskSchedulerService = taskSchedulerService;
         this.taskManagementService = taskManagementService;
     }
@@ -139,18 +137,9 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
         // 1) 主源：td_runtime_task_plan（task_type='KB_IMPORT_SCHEDULED'）
         List<ScheduledExtractVO> out = new ArrayList<>();
         try {
-            String enabledSql = enabled == null ? "" : (enabled ? " AND task_status = 'RUNNING'" : " AND task_status = 'PAUSED'");
-            String totalSql = "SELECT COUNT(*) AS c FROM " + PLAN_TABLE +
-                    " WHERE task_type = ? AND is_deleted = 0" + enabledSql;
-            Number cnt = jdbc.queryForObject(totalSql, Number.class, KB_IMPORT_SCHEDULED_TASK_TYPE);
+            Number cnt = dao.countPlans(enabled, KB_IMPORT_SCHEDULED_TASK_TYPE);
             int total = cnt == null ? 0 : cnt.intValue();
-            String sql = "SELECT task_id, task_name, task_type, cron_expression, next_run_at, "
-                    + "last_run_at, last_status, task_status, parameters, created_by, create_time "
-                    + "FROM " + PLAN_TABLE +
-                    " WHERE task_type = ? AND is_deleted = 0 " + enabledSql +
-                    " ORDER BY create_time DESC LIMIT ? OFFSET ?";
-            List<Map<String, Object>> primaryRows = jdbc.queryForList(sql,
-                    KB_IMPORT_SCHEDULED_TASK_TYPE, safePageSize, offset);
+            List<Map<String, Object>> primaryRows = dao.listPlans(enabled, KB_IMPORT_SCHEDULED_TASK_TYPE, safePageSize, offset);
             for (Map<String, Object> row : primaryRows) {
                 out.add(toVoFromPlanRow(row));
             }
@@ -200,9 +189,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
 
         // 3) 启用/禁用 → plan.task_status ∈ {RUNNING, PAUSED}
         if (foundInPlan) {
-            jdbc.update("UPDATE " + PLAN_TABLE
-                    + " SET task_name = ?, parameters = ?::jsonb, task_status = ? "
-                    + " WHERE task_id = ? AND is_deleted = 0",
+            dao.updatePlan(
                     req.getName(),
                     toJsonString(req.getOntologyIds()),
                     enabledNow ? "RUNNING" : "PAUSED",
@@ -229,10 +216,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
             throw new ValidationException("scheduleId 不能为空");
         }
         // plan 事实源：逻辑删除（R9 软删，is_deleted=1）
-        jdbc.update("UPDATE " + PLAN_TABLE
-                + " SET is_deleted = 1, update_time = NOW() "
-                + " WHERE task_id = ? AND is_deleted = 0",
-                scheduleId);
+        dao.softDeletePlan(scheduleId);
         // runtime-task 取消调度（忽略已删）
         try {
             taskSchedulerService.cancelSchedule(scheduleId);
@@ -241,9 +225,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
         }
         // fallback 旧表同步软删（无该行则 0 行）
         try {
-            jdbc.update("UPDATE " + LEGACY_TABLE
-                    + " SET is_deleted = 1, updated_at = NOW() WHERE schedule_id = ?",
-                    scheduleId);
+            dao.softDeleteLegacy(scheduleId);
         } catch (DataAccessException e) {
             log.warn("TB-1 delete 回退旧表软删失败（忽略）: {}", e.getMessage());
         }
@@ -255,9 +237,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
         if (scheduleId == null || scheduleId.isBlank()) {
             throw new ValidationException("scheduleId 不能为空");
         }
-        int n = jdbc.update("UPDATE " + PLAN_TABLE
-                + " SET task_status = 'PAUSED', update_time = NOW() "
-                + " WHERE task_id = ? AND is_deleted = 0", scheduleId);
+        int n = dao.pausePlan(scheduleId);
         if (n == 0) {
             log.warn("TB-1 pause: 未命中 plan 行 scheduleId={}（不在主源或已软删）", scheduleId);
         }
@@ -270,9 +250,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
         if (scheduleId == null || scheduleId.isBlank()) {
             throw new ValidationException("scheduleId 不能为空");
         }
-        int n = jdbc.update("UPDATE " + PLAN_TABLE
-                + " SET task_status = 'RUNNING', update_time = NOW() "
-                + " WHERE task_id = ? AND is_deleted = 0", scheduleId);
+        int n = dao.resumePlan(scheduleId);
         if (n == 0) {
             log.warn("TB-1 resume: 未命中 plan 行 scheduleId={}（不在主源或已软删）", scheduleId);
         }
@@ -454,12 +432,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
     /** 单事实源：读 td_runtime_task_plan 行（含 is_deleted 过滤）。 */
     private Map<String, Object> fetchPlanRow(String scheduleId) {
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT task_id, task_name, task_type, cron_expression, next_run_at, "
-                            + "last_run_at, last_status, task_status, parameters, description, "
-                            + "created_by, create_time FROM " + PLAN_TABLE
-                            + " WHERE task_id = ? AND is_deleted = 0",
-                    scheduleId);
+            List<Map<String, Object>> rows = dao.fetchPlanRows(scheduleId);
             return rows.isEmpty() ? null : rows.get(0);
         } catch (DataAccessException e) {
             log.warn("TB-1 读 plan 行失败 scheduleId={}: {}", scheduleId, e.getMessage());
@@ -470,15 +443,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
     /** 旧 fallback：旧表硬删镜像查询（仅淘宝 UI 默认列表使用，header flag 可短路）。 */
     private List<ScheduledExtractVO> queryLegacyFallback(Boolean enabled, int limit, int offset) {
         try {
-            String enabledSql = enabled == null ? "" : (enabled ? " AND enabled = 1" : " AND enabled = 0");
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT id, schedule_id, name, "
-                            + "convert_from(ontology_ids::bytea,'UTF8') AS ontology_ids, "
-                            + "mode, period, cron_expression, next_run_at, enabled, last_run_at, "
-                            + "last_status, created_at FROM " + LEGACY_TABLE
-                            + " WHERE is_deleted = 0" + enabledSql
-                            + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    limit, offset);
+            List<Map<String, Object>> rows = dao.queryLegacyRows(enabled, limit, offset);
             List<ScheduledExtractVO> out = new ArrayList<>(rows.size());
             for (Map<String, Object> row : rows) {
                 out.add(toVoFromLegacyRow(row));
@@ -493,8 +458,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
     /** fallback 旧表写（幂等，失败 warn）。 */
     private void safeUpdateLegacy(String scheduleId, String column, String value) {
         try {
-            jdbc.update("UPDATE " + LEGACY_TABLE + " SET " + column + " = ? WHERE schedule_id = ?",
-                    value, scheduleId);
+            dao.setLegacyColumn(scheduleId, column, value);
         } catch (DataAccessException e) {
             log.warn("TB-1 旧表同步失败（忽略）: scheduleId={} {}: {}", scheduleId, column, e.getMessage());
         }
@@ -504,18 +468,7 @@ public class KBExtractScheduleServiceImpl implements IKBExtractScheduleService {
     private Long insertLegacyMirror(String scheduleId, ScheduledExtractRequest req,
                                     String mode, String period, String cron, Timestamp nextRunAt) {
         try {
-            Number returned = jdbc.queryForObject(
-                    "INSERT INTO " + LEGACY_TABLE
-                            + " (schedule_id, name, ontology_ids, mode, period, cron_expression, "
-                            + "next_run_at, enabled, created_by, prefers_runtime_task) "
-                            + "VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, 1, 'kb-scheduled-tb1', 'td_runtime_task_plan') "
-                            + "ON CONFLICT (schedule_id) DO UPDATE SET "
-                            + " name = EXCLUDED.name, mode = EXCLUDED.mode, period = EXCLUDED.period, "
-                            + " cron_expression = EXCLUDED.cron_expression, "
-                            + " next_run_at = EXCLUDED.next_run_at, updated_at = NOW(), "
-                            + " ontology_ids = EXCLUDED.ontology_ids "
-                            + " RETURNING id",
-                    Long.class, scheduleId, req.getName(),
+            Long returned = dao.insertLegacyMirror(scheduleId, req.getName(),
                     toJsonString(req.getOntologyIds()), mode, period, cron, nextRunAt);
             return returned == null ? null : returned.longValue();
         } catch (DataAccessException e) {

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEmbedding;
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeRetrievalServiceImplDao;
 import com.chinacreator.gzcm.engine.kb.repo.PgVectorSupport;
 import com.chinacreator.gzcm.engine.kb.repo.QueryEmbeddingHelper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
@@ -13,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -35,8 +35,8 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     private final QueryEmbeddingHelper queryEmbeddingHelper;
     // B4: pgvector 可用性单点判定（与向量写入共用）
     private final PgVectorSupport pgVectorSupport;
-    /** PMO-B T1: 知识导航目录树过滤（可选） */
-    private final JdbcTemplate jdbcTemplate;
+    /** PMO-B T1: 知识导航目录树过滤（可选）— JdbcTemplate 收口到 {@link KnowledgeRetrievalServiceImplDao} */
+    private final KnowledgeRetrievalServiceImplDao retrievalDao;
     private final String embeddingModel;
     private final String llmGatewayBase;
 
@@ -48,7 +48,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                                          KnowledgeEdgeMapper edgeMapper,
                                          @Lazy QueryEmbeddingHelper queryEmbeddingHelper,
                                          PgVectorSupport pgVectorSupport,
-                                         JdbcTemplate jdbcTemplate,
+                                         KnowledgeRetrievalServiceImplDao retrievalDao,
                                          @Value("${ecos.rag.embedding-model:text-embedding-3-small}")
                                          String embeddingModel,
                                          @Value("${ecos.rag.llm-gateway-base:}")
@@ -59,7 +59,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         this.edgeMapper = edgeMapper;
         this.queryEmbeddingHelper = queryEmbeddingHelper;
         this.pgVectorSupport = pgVectorSupport;
-        this.jdbcTemplate = jdbcTemplate;
+        this.retrievalDao = retrievalDao;
         this.embeddingModel = embeddingModel;
         this.llmGatewayBase = llmGatewayBase;
     }
@@ -277,21 +277,9 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         if (cleaned.isEmpty()) {
             return List.of();
         }
-        // 参数化占位（IR05 红线：禁字符串拼接业务 id）
-        List<Object> args = new ArrayList<>(cleaned.size());
-        StringBuilder inClause = new StringBuilder("(");
-        for (int i = 0; i < cleaned.size(); i++) {
-            if (i > 0) {
-                inClause.append(" OR ");
-            }
-            inClause.append("id = ?");
-            args.add(cleaned.get(i));
-        }
-        inClause.append(")");
-        String sql = "SELECT id, path FROM ecos_knowledge.kb_nav_category "
-                + "WHERE is_deleted = 0 AND (" + inClause + ")";
+        // 参数化占位（IR05 红线：禁字符串拼接业务 id）— SQL 拼装 + 查询下沉到 DAO
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
+            List<Map<String, Object>> rows = retrievalDao.selectCategoryPaths(cleaned);
             List<String> out = new ArrayList<>(rows.size());
             for (Map<String, Object> row : rows) {
                 Object p = row.get("path");
@@ -347,12 +335,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                 continue;
             }
             try {
-                Integer n = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM ecos_knowledge.kb_nav_article_rel r "
-                                + "JOIN ecos_knowledge.kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 "
-                                + "WHERE r.is_deleted = 0 AND r.scope = 'category' AND r.article_id = ? "
-                                + "AND c.path LIKE ?",
-                        Integer.class, articleId, p);
+                Integer n = retrievalDao.countCategoryPathMatch(articleId, p);
                 if (n != null && n > 0) {
                     return true;
                 }
@@ -377,29 +360,9 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         if (articleId == null || articleId.isBlank() || tags == null || tags.isEmpty()) {
             return false;
         }
-        // 参数化占位（IR05 红线：禁字符串拼接业务 name）
-        List<Object> args = new ArrayList<>(tags.size() + 1);
-        args.add(articleId);
-        StringBuilder inClause = new StringBuilder("(");
-        for (int i = 0; i < tags.size(); i++) {
-            if (i > 0) {
-                inClause.append(" OR ");
-            }
-            inClause.append("t.tag_name = ?");
-            args.add(tags.get(i));
-        }
-        inClause.append(")");
-        String sql = "SELECT COUNT(*) AS cnt FROM ecos_knowledge.kb_nav_article_rel r "
-                + "JOIN ecos_knowledge.kb_nav_tag t ON t.id = r.node_id AND t.is_deleted = 0 "
-                + "WHERE r.is_deleted = 0 AND r.scope = 'tag' AND r.article_id = ? "
-                + "AND (" + inClause + ")";
+        // 参数化占位（IR05 红线：禁字符串拼接业务 name）— SQL 拼装 + 查询下沉到 DAO
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
-            if (rows.isEmpty()) {
-                return false;
-            }
-            Object cnt = rows.get(0).get("cnt");
-            long n = (cnt instanceof Number num) ? num.longValue() : 0L;
+            long n = retrievalDao.countTagMatch(articleId, tags);
             return n > 0;
         } catch (Exception e) {
             log.debug("matchesTagFilter 失败（articleId={}, tags={}）: {}",

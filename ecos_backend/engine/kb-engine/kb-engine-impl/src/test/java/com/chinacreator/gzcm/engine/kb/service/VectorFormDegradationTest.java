@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeRetrievalServiceImplDao;
 import com.chinacreator.gzcm.engine.kb.repo.PgVectorSupport;
 import com.chinacreator.gzcm.engine.kb.repo.QueryEmbeddingHelper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
@@ -7,7 +8,6 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,7 +54,7 @@ class VectorFormDegradationTest {
                 mock(KnowledgeEdgeMapper.class),
                 mock(QueryEmbeddingHelper.class),
                 pgVector,
-                mock(JdbcTemplate.class),
+                mock(KnowledgeRetrievalServiceImplDao.class),
                 "text-embedding-3-small",
                 "");
         svc.checkPgVectorExtension(); // sets pgVectorAvailable = false

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeEvalDao;
 import com.chinacreator.gzcm.engine.kb.dto.EvalRunRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeEvalReportVO;
 import com.chinacreator.gzcm.engine.kb.repo.PgVectorSupport;
@@ -8,7 +9,6 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -55,7 +55,7 @@ public class KnowledgeEvalService {
 
     private static final String METHOD_SELF_RETRIEVAL = "vector-self-retrieval";
 
-    private final JdbcTemplate jdbc;
+    private final KnowledgeEvalDao knowledgeEvalDao;
 
     private final KnowledgeEmbeddingMapper embeddingMapper;
 
@@ -69,13 +69,13 @@ public class KnowledgeEvalService {
     /** llm-gateway base（空字符串 = 不可用，评估直接降级） */
     private final String llmGatewayBase;
 
-    public KnowledgeEvalService(JdbcTemplate jdbc,
+    public KnowledgeEvalService(KnowledgeEvalDao knowledgeEvalDao,
                                 KnowledgeEmbeddingMapper embeddingMapper,
                                 QueryEmbeddingHelper queryEmbeddingHelper,
                                 PgVectorSupport pgVectorSupport,
                                 @Value("${ecos.rag.embedding-model:text-embedding-3-small}") String embeddingModel,
                                 @Value("${ecos.rag.llm-gateway-base:}") String llmGatewayBase) {
-        this.jdbc = jdbc;
+        this.knowledgeEvalDao = knowledgeEvalDao;
         this.embeddingMapper = embeddingMapper;
         this.queryEmbeddingHelper = queryEmbeddingHelper;
         this.pgVectorSupport = pgVectorSupport;
@@ -113,10 +113,7 @@ public class KnowledgeEvalService {
         }
 
         // 2) 采样真实分块（embedding_vec 非空才可检索）
-        List<Map<String, Object>> samples = jdbc.queryForList(
-                "SELECT id, content FROM ecos_knowledge.knowledge_embedding " +
-                "WHERE embedding_vec IS NOT NULL AND content IS NOT NULL AND content <> '' " +
-                "ORDER BY created_at DESC LIMIT ?", maxQueries);
+        List<Map<String, Object>> samples = knowledgeEvalDao.sampleEmbeddings(maxQueries);
         if (samples.isEmpty()) {
             report.setDegraded(true);
             report.setLimitation("无可用向量分块（knowledge_embedding.embedding_vec 为空），请先完成文档解析与向量化");

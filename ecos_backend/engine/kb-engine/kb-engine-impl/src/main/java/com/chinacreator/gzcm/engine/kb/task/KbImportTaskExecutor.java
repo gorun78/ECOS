@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.task;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.kb.dao.KbExtractAuditDao;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
@@ -13,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -46,7 +46,7 @@ public class KbImportTaskExecutor implements ITaskExecutor {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final KbEntityInstanceExtractionService extractionService;
-    private final JdbcTemplate jdbc;
+    private final KbExtractAuditDao auditDao;
 
     /** 部署环境 tier（standard/enterprise/ultimate），落 audit 记录。 */
     @Value("${ecos.architecture.tier:standard}")
@@ -59,9 +59,9 @@ public class KbImportTaskExecutor implements ITaskExecutor {
     private EventBusService eventBusService;
 
     public KbImportTaskExecutor(KbEntityInstanceExtractionService extractionService,
-                                JdbcTemplate jdbc) {
+                                KbExtractAuditDao auditDao) {
         this.extractionService = extractionService;
-        this.jdbc = jdbc;
+        this.auditDao = auditDao;
     }
 
     @Override
@@ -210,11 +210,7 @@ public class KbImportTaskExecutor implements ITaskExecutor {
                             long durationMs, long rowsTotal, long rowsOk,
                             long rowsFailed, long mismatched, String errorMessage) {
         try {
-            jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_extract_audit "
-                            + "(job_id, task_id, tier, mode, status, duration_ms, rows_total, rows_ok, rows_failed, mismatched, error_message) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    jobId, taskId, tier, mode, status,
+            auditDao.insertAudit(jobId, taskId, tier, mode, status,
                     durationMs, rowsTotal, rowsOk, rowsFailed, mismatched, errorMessage);
             log.info("KB_IMPORT audit JDBC 写入: jobId={} task={} status={}", jobId, taskId, status);
         } catch (Exception e) {

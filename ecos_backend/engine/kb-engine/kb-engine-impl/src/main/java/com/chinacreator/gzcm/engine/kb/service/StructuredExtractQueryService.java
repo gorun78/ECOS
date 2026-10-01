@@ -3,7 +3,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.engine.kb.dao.StructuredExtractQueryDao;
 import org.springframework.stereotype.Service;
 
 /**
@@ -11,7 +11,8 @@ import org.springframework.stereotype.Service;
  * {@code kb_extract_audit}（均在 ecos_knowledge schema）的只读查询。
  *
  * <p>供 {@code StructuredExtractController} 调用：三处 SELECT 全部收敛在 Service 层
- * （架构铁律 §3.6：Controller 不得直接访问数据库）。</p>
+ * （架构铁律 §3.6：Controller 不得直接访问数据库）。SQL 由
+ * {@link StructuredExtractQueryDao} 统一持有（架构铁律 §2.5 单一数据访问底座 / IR06）。</p>
  *
  * <p>异常语义：查询抛出的 {@code DataAccessException} 原样上浮，由调用方 Controller
  * 捕获并按既有 HTTP 行为降级返回。</p>
@@ -19,10 +20,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class StructuredExtractQueryService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final StructuredExtractQueryDao structuredExtractQueryDao;
 
-    public StructuredExtractQueryService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public StructuredExtractQueryService(StructuredExtractQueryDao structuredExtractQueryDao) {
+        this.structuredExtractQueryDao = structuredExtractQueryDao;
     }
 
     /**
@@ -33,11 +34,7 @@ public class StructuredExtractQueryService {
      * @return 原始行列表（ontology_id / entity_code / resource_id / watermark / updated_at）
      */
     public List<Map<String, Object>> listWatermarkRows(int limit, int offset) {
-        return jdbcTemplate.queryForList(
-                "SELECT ontology_id, entity_code, resource_id, watermark, updated_at "
-                        + "FROM ecos_knowledge.kb_extract_watermark "
-                        + "ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-                limit, offset);
+        return structuredExtractQueryDao.listWatermarkRows(limit, offset);
     }
 
     /**
@@ -47,11 +44,7 @@ public class StructuredExtractQueryService {
      * @return 原始行列表（status / op / report / error_message / created_at / finished_at），最多 1 行
      */
     public List<Map<String, Object>> findLatestSyncLogByJobId(String jobId) {
-        return jdbcTemplate.queryForList(
-                "SELECT status, op, report, error_message, created_at, finished_at "
-                        + "FROM ecos_knowledge.kg_sync_log WHERE job_id = ? "
-                        + "ORDER BY created_at DESC LIMIT 1",
-                jobId);
+        return structuredExtractQueryDao.findLatestSyncLogByJobId(jobId);
     }
 
     /**
@@ -62,11 +55,6 @@ public class StructuredExtractQueryService {
      *         rows_total / rows_ok / rows_failed / mismatched / error_message / created_at）
      */
     public List<Map<String, Object>> findAuditRowsByJobId(String jobId) {
-        return jdbcTemplate.queryForList(
-                "SELECT id, job_id, task_id, tier, mode, status, duration_ms, "
-                        + "rows_total, rows_ok, rows_failed, mismatched, error_message, created_at "
-                        + "FROM ecos_knowledge.kb_extract_audit WHERE job_id = ? "
-                        + "ORDER BY created_at DESC LIMIT 100",
-                jobId);
+        return structuredExtractQueryDao.findAuditRowsByJobId(jobId);
     }
 }

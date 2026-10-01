@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.engine.kb.dao.KbEntityInstanceExtractionServiceDao;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.chinacreator.gzcm.engine.kb.support.C3AttributeCompletenessValidator;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
@@ -11,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -88,7 +88,7 @@ public class KbEntityInstanceExtractionService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final KbEntityInstanceExtractionServiceDao extractionDao;
 
     private final RestTemplate restTemplate;
 
@@ -110,11 +110,11 @@ public class KbEntityInstanceExtractionService {
     private final boolean c3Enabled;
 
     public KbEntityInstanceExtractionService(
-            JdbcTemplate jdbc,
+            KbEntityInstanceExtractionServiceDao extractionDao,
             RestTemplate restTemplate,
             @Value("${ecos.route.datanet-base-url:}") String datanetBaseUrlOverride,
             @Value("${ecos.kb.extract.c3_enabled:true}") boolean c3Enabled) {
-        this.jdbc = jdbc;
+        this.extractionDao = extractionDao;
         this.restTemplate = restTemplate;
         this.datanetBaseUrlOverride = datanetBaseUrlOverride;
         this.c3Enabled = c3Enabled;
@@ -529,11 +529,8 @@ public class KbEntityInstanceExtractionService {
         List<String> all = new ArrayList<>(ids);
         for (int i = 0; i < all.size(); i += EXISTENCE_QUERY_CHUNK) {
             List<String> chunk = all.subList(i, Math.min(i + EXISTENCE_QUERY_CHUNK, all.size()));
-            String placeholders = String.join(",", Collections.nCopies(chunk.size(), "?"));
             try {
-                existing.addAll(jdbc.queryForList(
-                        "SELECT id FROM ecos_knowledge.graph_node WHERE id IN (" + placeholders + ")",
-                        String.class, chunk.toArray()));
+                existing.addAll(extractionDao.queryExistingNodeIds(chunk));
             } catch (org.springframework.dao.DataAccessException e) {
                 log.error("批量查询节点存在性失败 chunkSize={}", chunk.size(), e);
                 throw new DataAccessException("批量查询节点存在性失败", e);
@@ -555,21 +552,10 @@ public class KbEntityInstanceExtractionService {
         String propertiesJson = buildPropertiesJson(row, fieldRefs, nullifiedRefs);
         try {
             // RETURNING (xmax = 0)：PG 惯用法，区分 INSERT（true）与 ON CONFLICT UPDATE（false）
-            List<Boolean> inserted = jdbc.queryForList(
-                    "INSERT INTO ecos_knowledge.graph_node "
-                            + "(id, label, node_type, description, properties, domain, created_at, updated_at, "
-                            + " ontology_id, ontology_version, source_resource_id, source_pk) "
-                            + "VALUES (?, ?, ?, ?, ?::jsonb, ?, NOW(), NOW(), ?, ?, ?, ?) "
-                            + "ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, node_type = EXCLUDED.node_type, "
-                            + " description = EXCLUDED.description, properties = EXCLUDED.properties, "
-                            + " domain = EXCLUDED.domain, updated_at = NOW(), ontology_id = EXCLUDED.ontology_id, "
-                            + " ontology_version = EXCLUDED.ontology_version, "
-                            + " source_resource_id = EXCLUDED.source_resource_id, source_pk = EXCLUDED.source_pk "
-                            + "RETURNING (xmax = 0) AS inserted",
-                    Boolean.class,
+            boolean inserted = extractionDao.upsertNode(
                     nodeId, truncate(pkValue, SHORT_COLUMN_MAX), nodeType, description, propertiesJson,
                     domain, snap.ontologyId(), snap.version(), resourceId, truncate(pkValue, 255));
-            return !inserted.isEmpty() && Boolean.TRUE.equals(inserted.get(0));
+            return inserted;
         } catch (org.springframework.dao.DataAccessException e) {
             log.error("实例节点写入失败: nodeId={} entity={} resourceId={}", nodeId, nodeType, resourceId, e);
             throw new DataAccessException("实例节点写入失败: " + nodeId, e);
@@ -580,15 +566,7 @@ public class KbEntityInstanceExtractionService {
     private void upsertEdge(String edgeId, String sourceNodeId, String targetNodeId, String relation,
                             OntologySnapshot snap, String resourceId, String sourcePk) {
         try {
-            jdbc.update(
-                    "INSERT INTO ecos_knowledge.graph_edge "
-                            + "(id, source_id, target_id, type, weight, properties, created_at, "
-                            + " ontology_id, ontology_version, source_resource_id, source_pk) "
-                            + "VALUES (?, ?, ?, ?, 1.0, '{}'::jsonb, NOW(), ?, ?, ?, ?) "
-                            + "ON CONFLICT (id) DO UPDATE SET source_id = EXCLUDED.source_id, "
-                            + " target_id = EXCLUDED.target_id, type = EXCLUDED.type, properties = EXCLUDED.properties, "
-                            + " ontology_id = EXCLUDED.ontology_id, ontology_version = EXCLUDED.ontology_version, "
-                            + " source_resource_id = EXCLUDED.source_resource_id, source_pk = EXCLUDED.source_pk",
+            extractionDao.upsertEdge(
                     edgeId, sourceNodeId, targetNodeId, truncate(relation, SHORT_COLUMN_MAX),
                     snap.ontologyId(), snap.version(), resourceId, truncate(sourcePk, 255));
         } catch (org.springframework.dao.DataAccessException e) {
@@ -609,15 +587,9 @@ public class KbEntityInstanceExtractionService {
         List<Map<String, Object>> rows;
         try {
             if ("ALL".equalsIgnoreCase(scope)) {
-                rows = jdbc.queryForList(
-                        "SELECT DISTINCT ON (ontology_id) ontology_id, version, entity_codes "
-                                + "FROM ecos_knowledge.kb_ontology_snapshot WHERE is_deleted = 0 "
-                                + "ORDER BY ontology_id, created_at DESC");
+                rows = extractionDao.selectAllSnapshots();
             } else {
-                rows = jdbc.queryForList(
-                        "SELECT ontology_id, version, entity_codes FROM ecos_knowledge.kb_ontology_snapshot "
-                                + "WHERE is_deleted = 0 AND ontology_id = ? ORDER BY created_at DESC LIMIT 1",
-                        scope);
+                rows = extractionDao.selectLatestSnapshot(scope);
             }
         } catch (org.springframework.dao.DataAccessException e) {
             log.error("读取本体快照失败 scope={}", scope, e);
@@ -879,11 +851,7 @@ public class KbEntityInstanceExtractionService {
     /** 读上次抽取水位（表缺失或异常时返回 null，即从头读）。 */
     private String readWatermark(String ontologyId, String entityCode, String resourceId) {
         try {
-            List<String> rows = jdbc.queryForList(
-                    "SELECT watermark FROM ecos_knowledge.kb_extract_watermark "
-                            + "WHERE ontology_id = ? AND entity_code = ? AND resource_id = ?",
-                    String.class, ontologyId, entityCode, resourceId);
-            return rows.isEmpty() ? null : rows.get(0);
+            return extractionDao.readWatermark(ontologyId, entityCode, resourceId);
         } catch (org.springframework.dao.DataAccessException e) {
             log.warn("读取抽取水位失败（按全量处理）: ontology={} entity={} resource={} err={}",
                     ontologyId, entityCode, resourceId, e.getMessage());
@@ -894,13 +862,7 @@ public class KbEntityInstanceExtractionService {
     /** 写本次抽取水位（幂等 upsert；失败仅记 warn，不影响抽取结果）。 */
     private void writeWatermark(String ontologyId, String entityCode, String resourceId, String watermark) {
         try {
-            jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_extract_watermark "
-                            + "(ontology_id, entity_code, resource_id, watermark, updated_at) "
-                            + "VALUES (?, ?, ?, ?, NOW()) "
-                            + "ON CONFLICT (ontology_id, entity_code, resource_id) "
-                            + "DO UPDATE SET watermark = EXCLUDED.watermark, updated_at = NOW()",
-                    ontologyId, entityCode, resourceId, truncate(watermark, 255));
+            extractionDao.writeWatermark(ontologyId, entityCode, resourceId, truncate(watermark, 255));
         } catch (org.springframework.dao.DataAccessException e) {
             log.warn("写入抽取水位失败（下次仍按全量处理）: ontology={} entity={} resource={} err={}",
                     ontologyId, entityCode, resourceId, e.getMessage());

@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.engine.kb.controller.KbAssumptionController;
 import com.chinacreator.gzcm.engine.kb.controller.KbProfileController;
 import com.chinacreator.gzcm.engine.kb.controller.NavTaxonController;
+import com.chinacreator.gzcm.engine.kb.dao.NavTaxonDao;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavCategorySaveDTO;
 import com.chinacreator.gzcm.engine.kb.security.KnowledgeNavSecurityEngineClient;
 import com.chinacreator.gzcm.engine.kb.service.nav.NavLlmRecommendService;
@@ -16,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -29,14 +29,22 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * F04-16 隔离/可归因写 验收测试。
+ *
+ * <p>R2 / B2-kb: 数据访问已由 {@code JdbcTemplate} 收口到 {@code NavTaxonDao}（见
+ * {@code engine.kb.dao} 底座）。本测试改为 mock {@code NavTaxonDao}，验证 service 层
+ * 把「真实 actor / domain」正确传递给数据访问落点（归因链路的 service 侧职责）；
+ * 具体 SQL 文本（{@code kb_nav_category} / {@code c.domain = ?} 等值过滤）断言随 SQL
+ * 一并下沉到 DAO 层，此处不再重复。
  *
  * <ol>
  *   <li>{@link #writeUsesRealActorAndDomain()} — 写操作 create_by/update_by 绑定
@@ -49,7 +57,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class KbIsolationTest {
 
-    @Mock private JdbcTemplate jdbc;
+    @Mock private NavTaxonDao dao;
     @Mock private KnowledgeNavSecurityEngineClient securityClient;
     @Mock private NavLlmRecommendService llmRecommendService;
 
@@ -61,7 +69,7 @@ class KbIsolationTest {
     private NavTaxonServiceImpl buildService() {
         // ABAC 放行（测试聚焦写入归因，而非 ABAC 裁决）
         lenient().when(securityClient.evaluatePolicy(anyString(), any())).thenReturn(true);
-        return new NavTaxonServiceImpl(jdbc, securityClient, llmRecommendService);
+        return new NavTaxonServiceImpl(dao, securityClient, llmRecommendService);
     }
 
     @Test
@@ -77,7 +85,7 @@ class KbIsolationTest {
         dto.setDomain("finance");
         dto.setName("还款策略");
 
-        // findByIdRequired → 返回既有行
+        // 回读既有行（createCategory 末尾 findByIdRequired）
         Map<String, Object> existing = new HashMap<>();
         existing.put("id", "cat-1");
         existing.put("domain", "finance");
@@ -86,29 +94,21 @@ class KbIsolationTest {
         existing.put("level", 1);
         existing.put("sort_order", 0);
         existing.put("parent_id", null);
-        lenient().when(jdbc.queryForMap(anyString(), (Object[]) any()))
+        lenient().when(dao.fetchCategoryByNameRequired(eq("finance"), eq("还款策略")))
                 .thenReturn(existing);
-        lenient().when(jdbc.update(nullable(String.class), (Object[]) any()))
-                .thenReturn(1);
 
         service.createCategory(dto);
 
-        // 捕获 INSERT 的 JDBC 参数（含 actor 两次：create_by + update_by）
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).update(sqlCaptor.capture(), (Object[]) argsCaptor.capture());
+        // 捕获 DAO insertCategory 入参（actor 两次：create_by + update_by 同一 actor）
+        ArgumentCaptor<String> actorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dao).insertCategory(eq("finance"), isNull(), eq("还款策略"),
+                anyString(), anyInt(), anyInt(), actorCaptor.capture());
 
-        String sql = sqlCaptor.getValue();
-        assertTrue(sql.contains("kb_nav_category"), "应写 kb_nav_category 表");
-
-        Object[] args = argsCaptor.getValue();
-        assertTrue(Arrays.asList(args).contains("u-42"),
-                "create_by/update_by 应绑定真实 userId u-42，实际 args=" + Arrays.toString(args));
-        assertTrue(!Arrays.asList(args).contains("current-user"),
+        String actor = actorCaptor.getValue();
+        assertTrue("u-42".equals(actor),
+                "create_by/update_by 应绑定真实 userId u-42，实际=" + actor);
+        assertTrue(!"current-user".equals(actor),
                 "禁止硬编码 'current-user'");
-        // domain 归因
-        assertTrue(Arrays.asList(args).contains("finance"),
-                "domain=finance 应绑定（跨租户域隔离）");
     }
 
     @Test
@@ -116,18 +116,15 @@ class KbIsolationTest {
     void crossDomainReadIsDenied() {
         NavTaxonServiceImpl service = buildService();
 
-        lenient().when(jdbc.queryForList(anyString(), (Object[]) any()))
-                .thenReturn(List.of());
+        lenient().when(dao.listCategories(anyString(), any(), any())).thenReturn(List.of());
 
         service.listCategories("finance", null, null);
 
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).queryForList(sqlCaptor.capture(), (Object[]) argsCaptor.capture());
-
-        String sql = sqlCaptor.getValue();
-        assertTrue(sql.contains("c.domain = ?"),
-                "读列表必须按 c.domain = ? 等值过滤（跨域隔离）; sql=" + sql);
+        // service 把归一化后的 domain（finance）原样透传给 DAO（跨域隔离的入口约束）
+        ArgumentCaptor<String> domainCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dao).listCategories(domainCaptor.capture(), isNull(), isNull());
+        assertTrue("finance".equals(domainCaptor.getValue()),
+                "读列表必须按 domain 等值过滤（跨域隔离）; domain=" + domainCaptor.getValue());
     }
 
     @Test

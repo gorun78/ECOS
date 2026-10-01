@@ -1,8 +1,9 @@
 package com.chinacreator.gzcm.engine.kb.cognition;
 
+import com.chinacreator.gzcm.engine.kb.dao.CognitionReadDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,17 +20,20 @@ import java.util.Map;
  *
  * <p>写路径一律不在此：写必须经 cognitive 引擎，kb 侧写代理会被 {@link CognitionContractGuard#assertReadOnly()}
  * 拒绝（405 ECOS-KB-070）。
+ *
+ * <p>R2-B2b 数据访问收口（架构铁律 §2.5 / IR06）：raw-SQL 下沉至
+ * {@link CognitionReadDao}，本类保留 service 职责（data access 异常降级为空列表）。</p>
  */
 @Service
 public class CognitionReadService {
 
     private static final Logger log = LoggerFactory.getLogger(CognitionReadService.class);
 
-    private final JdbcTemplate jdbcTemplate;
+    private final CognitionReadDao dao;
     private final CognitionContractGuard guard;
 
-    public CognitionReadService(JdbcTemplate jdbcTemplate, CognitionContractGuard guard) {
-        this.jdbcTemplate = jdbcTemplate;
+    public CognitionReadService(CognitionReadDao dao, CognitionContractGuard guard) {
+        this.dao = dao;
         this.guard = guard;
     }
 
@@ -49,31 +53,14 @@ public class CognitionReadService {
     }
 
     private List<Map<String, Object>> read(String realTable, String domain, int limit) {
-        if (jdbcTemplate == null) {
+        if (dao == null) {
             return new ArrayList<>();
         }
-        int lim = limit <= 0 ? 50 : Math.min(limit, 500);
         String[] valid = HypothesisStatus.validStatusCodes();
-        StringBuilder in = new StringBuilder();
-        for (int i = 0; i < valid.length; i++) {
-            in.append(i == 0 ? "?" : ",?");
-        }
-        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(realTable)
-                .append(" WHERE status IN (").append(in).append(")");
-        List<Object> args = new ArrayList<>();
-        for (String v : valid) {
-            args.add(v);
-        }
-        if (domain != null && !domain.isBlank()) {
-            sql.append(" AND domain = ?");
-            args.add(domain.trim());
-        }
-        sql.append(" LIMIT ?");
-        args.add(lim);
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString(), args.toArray());
+            List<Map<String, Object>> rows = dao.read(realTable, valid, domain, limit);
             return rows == null ? new ArrayList<>() : rows;
-        } catch (org.springframework.dao.DataAccessException e) {
+        } catch (DataAccessException e) {
             // 认知三态表可能不存在（standard 档 / 场景未启用）→ 合法空态，非结构性表缺失
             log.debug("认知三态读取降级为空 table={} domain={}: {}", realTable, domain, e.getMessage());
             return new ArrayList<>();

@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.exception.ForbiddenException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
+import com.chinacreator.gzcm.engine.kb.dao.NavTaxonDao;
 import com.chinacreator.gzcm.engine.kb.nav.INavService;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavCategorySaveDTO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavCategoryVO;
@@ -17,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,8 +36,9 @@ import java.util.Set;
  *
  * <p>PMO-A A3/A4 主实现。</p>
  *
- * <p><b>数据访问</b>：与 kb-engine-impl 现存风格一致（{@code KnowledgeLifecycleService}）走
- * {@link JdbcTemplate}，schema {@code ecos_knowledge}（不跨引擎 SQL）。</p>
+ * <p><b>数据访问</b>：R2-B2b 收口（架构铁律 §2.5 / IR06）后 raw-SQL 全部下沉
+ * {@link NavTaxonDao}，本类仅保留业务编排（ABAC / 越界校验 / 审计 / undo / VO 映射），
+ * schema {@code ecos_knowledge}（不跨引擎 SQL）。</p>
  *
  * <p><b>ABAC</b>：写操作前调用 {@code KnowledgeNavSecurityEngineClient.evaluatePolicy}，
  * 不可用/拒绝一律抛 403（铁律 §2.4-6：宁可误拒）。</p>
@@ -71,14 +72,14 @@ public class NavTaxonServiceImpl implements INavService {
     /** 分页大小上限（防慢查询） */
     private static final int MAX_PAGE_SIZE = 100;
 
-    private final JdbcTemplate jdbc;
+    private final NavTaxonDao dao;
     private final KnowledgeNavSecurityEngineClient securityClient;
     private final NavLlmRecommendService llmRecommendService;
 
-    public NavTaxonServiceImpl(JdbcTemplate jdbc,
+    public NavTaxonServiceImpl(NavTaxonDao dao,
                                KnowledgeNavSecurityEngineClient securityClient,
                                NavLlmRecommendService llmRecommendService) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.securityClient = securityClient;
         this.llmRecommendService = llmRecommendService;
     }
@@ -88,32 +89,7 @@ public class NavTaxonServiceImpl implements INavService {
     @Override
     public List<NavCategoryVO> listCategories(String domain, String parentId, String search) {
         String d = normalizeDomain(domain);
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT c.id, c.domain, c.parent_id, c.name, c.path, c.level, c.sort_order, ")
-           .append("       c.create_time, c.update_time, ")
-           .append("       COALESCE(p.name, '') AS parent_name, ")
-           .append("       (SELECT COUNT(*) FROM ecos_knowledge.kb_nav_category child ")
-           .append("         WHERE child.parent_id = c.id AND child.is_deleted = 0) AS child_count, ")
-           .append("       (SELECT COUNT(*) FROM ecos_knowledge.kb_nav_article_rel rel ")
-           .append("       JOIN ecos_knowledge.kb_nav_category sub ON sub.id = rel.node_id AND sub.is_deleted = 0 ")
-           .append("       WHERE rel.is_deleted = 0 AND rel.scope = 'category' AND sub.path LIKE c.path || '%') AS article_count ")
-           .append("FROM ecos_knowledge.kb_nav_category c ")
-           .append("LEFT JOIN ecos_knowledge.kb_nav_category p ON p.id = c.parent_id AND p.is_deleted = 0 ")
-           .append("WHERE c.is_deleted = 0 AND c.domain = ? ");
-        List<Object> args = new ArrayList<>();
-        args.add(d);
-        if (parentId != null && !parentId.isBlank()) {
-            sql.append("AND c.parent_id = ? ");
-            args.add(parentId);
-        }
-        if (search != null && !search.isBlank()) {
-            sql.append("AND (lower(c.name) LIKE ? OR lower(c.path) LIKE ?) ");
-            String like = "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
-            args.add(like);
-            args.add(like);
-        }
-        sql.append("ORDER BY c.level ASC, c.sort_order ASC, c.name ASC");
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        List<Map<String, Object>> rows = dao.listCategories(d, parentId, search);
         List<NavCategoryVO> out = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             NavCategoryVO vo = new NavCategoryVO();
@@ -156,16 +132,13 @@ public class NavTaxonServiceImpl implements INavService {
         try {
             // F04-16: 写入可归因 — create_by / update_by 绑 ? → 实际 userId（ServiceContext）
             String actor = currentActor();
-            jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_nav_category (id, domain, parent_id, name, path, level, sort_order, create_by, update_by) "
-                            + "VALUES (gen_random_uuid()::text, ?, ?, ?, ?, ?, ?, ?, ?)",
+            dao.insertCategory(
                     d,
                     parentBlank ? null : dto.getParentId(),
                     name,
                     computePath(parentBlank ? null : dto.getParentId(), name),
                     level,
                     sortOrder,
-                    actor,
                     actor);
         } catch (DuplicateKeyException e) {
             log.warn("kb-nav createCategory 唯一约束命中: domain={} name={}", d, name, e);
@@ -195,18 +168,12 @@ public class NavTaxonServiceImpl implements INavService {
         checkAbac("kb.category.update", abac("id", id, "domain", d, "name", newName));
 
         if (!newName.equalsIgnoreCase(currentName)) {
-            Integer dup = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_knowledge.kb_nav_category WHERE domain = ? AND name = ? AND id <> ? AND is_deleted = 0",
-                    Integer.class, d, newName, id);
+            Integer dup = dao.countSameNameCategory(d, newName, id);
             if (dup != null && dup > 0) {
                 throw new ValidationException("name", "同名目录已存在: " + newName);
             }
         }
-        jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_category SET name = ?, sort_order = ?, update_time = NOW(), "
-                        + "update_by = ?, version_no = (CAST(version_no AS INTEGER) + 1)::text "
-                        + "WHERE id = ? AND is_deleted = 0",
-                newName, sortOrder, currentActor(), id);
+        dao.updateCategory(newName, sortOrder, currentActor(), id);
         NavCategoryVO updated = findByRow(findByIdRequired(d, newName == null ? currentName : newName));
         // 取精确 id（名改名场景下按 name 匹配可能不唯一，按 id 取）
         Map<String, Object> exact = fetchCategory(id);
@@ -224,16 +191,11 @@ public class NavTaxonServiceImpl implements INavService {
             throw new NotFoundException("kb_nav_category id=" + id);
         }
         checkAbac("kb.category.delete", abac("id", id, "domain", str(row.get("domain"))));
-        Integer childCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_knowledge.kb_nav_category WHERE parent_id = ? AND is_deleted = 0",
-                Integer.class, id);
+        Integer childCount = dao.countChildCategories(id);
         if (childCount != null && childCount > 0) {
             throw new ValidationException("id", "请先删除子目录再删除本目录");
         }
-        int affected = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_category SET is_deleted = 1, update_time = NOW(), "
-                        + "update_by = ? WHERE id = ? AND is_deleted = 0",
-                currentActor(), id);
+        int affected = dao.softDeleteCategory(currentActor(), id);
         safeAudit("kb.category.delete", Map.of("id", id, "affected", affected));
     }
 
@@ -273,12 +235,7 @@ public class NavTaxonServiceImpl implements INavService {
             String name = str(row.get("name"));
             int newLevel = root ? LEVEL_1 : targetLevel;
             String newPath = root ? ("/" + name) : recomputePath(targetParentId, name);
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kb_nav_category SET parent_id = ?, level = ?, path = ?, "
-                            + "update_time = NOW(), update_by = ?, "
-                            + "version_no = (CAST(version_no AS INTEGER) + 1)::text "
-                            + "WHERE id = ? AND is_deleted = 0",
-                    root ? null : targetParentId, newLevel, newPath, moveActor, id);
+            dao.moveCategory(root ? null : targetParentId, newLevel, newPath, moveActor, id);
             refreshDescendantPath(id);
             Map<String, Object> exact = fetchCategory(id);
             moved.add(findByRow(exact));
@@ -297,26 +254,9 @@ public class NavTaxonServiceImpl implements INavService {
             throw new NotFoundException("kb_nav_category id=" + categoryId);
         }
         String path = str(row.get("path"));
-        Integer articleCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_knowledge.kb_nav_article_rel r "
-                        + "JOIN ecos_knowledge.kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 "
-                        + "WHERE r.is_deleted = 0 AND r.scope = 'category' AND c.path LIKE ?",
-                Integer.class, path + "%");
-        Integer tagCount = jdbc.queryForObject(
-                "SELECT COUNT(DISTINCT t.tag_name) FROM ecos_knowledge.kb_nav_article_rel r "
-                        + "JOIN ecos_knowledge.kb_nav_tag t ON t.id = r.node_id AND t.is_deleted = 0 "
-                        + "JOIN ecos_knowledge.kb_nav_article_rel cr ON cr.article_id = r.article_id AND cr.scope = 'category' AND cr.is_deleted = 0 "
-                        + "JOIN ecos_knowledge.kb_nav_category c ON c.id = cr.node_id AND c.is_deleted = 0 "
-                        + "WHERE r.scope = 'tag' AND r.is_deleted = 0 AND c.path LIKE ?",
-                Integer.class, path + "%");
-        List<String> tagNames = jdbc.queryForList(
-                "SELECT DISTINCT t.tag_name FROM ecos_knowledge.kb_nav_article_rel r "
-                        + "JOIN ecos_knowledge.kb_nav_tag t ON t.id = r.node_id AND t.is_deleted = 0 "
-                        + "JOIN ecos_knowledge.kb_nav_article_rel cr ON cr.article_id = r.article_id AND cr.scope = 'category' AND cr.is_deleted = 0 "
-                        + "JOIN ecos_knowledge.kb_nav_category c ON c.id = cr.node_id AND c.is_deleted = 0 "
-                        + "WHERE r.scope = 'tag' AND r.is_deleted = 0 AND c.path LIKE ? "
-                        + "ORDER BY t.tag_name LIMIT 50",
-                String.class, path + "%");
+        Integer articleCount = dao.countArticlesByPath(path + "%");
+        Integer tagCount = dao.countDistinctTagsByPath(path + "%");
+        List<String> tagNames = dao.listTagNamesByPath(path + "%");
         NavNodeStatsVO vo = new NavNodeStatsVO();
         vo.setNodeId(categoryId);
         vo.setScope(SCOPE_CATEGORY);
@@ -331,12 +271,7 @@ public class NavTaxonServiceImpl implements INavService {
     @Override
     public List<NavTagVO> listTags(String domain) {
         String d = normalizeDomain(domain);
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT t.id, t.domain, t.tag_name, t.create_time, t.update_time, "
-                        + "(SELECT COUNT(*) FROM ecos_knowledge.kb_nav_article_rel r "
-                        + "   WHERE r.node_id = t.id AND r.scope = 'tag' AND r.is_deleted = 0) AS use_count "
-                        + "FROM ecos_knowledge.kb_nav_tag t WHERE t.domain = ? AND t.is_deleted = 0 "
-                        + "ORDER BY t.tag_name ASC", d);
+        List<Map<String, Object>> rows = dao.listTags(d);
         List<NavTagVO> out = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             NavTagVO vo = new NavTagVO();
@@ -361,19 +296,14 @@ public class NavTaxonServiceImpl implements INavService {
         checkAbac("kb.tag.create", abac("domain", d, "name", name));
         try {
             String actor = currentActor();
-            jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_nav_tag (id, domain, tag_name, create_by, update_by) "
-                            + "VALUES (gen_random_uuid()::text, ?, ?, ?, ?)",
-                    d, name, actor, actor);
+            dao.insertTag(d, name, actor);
         } catch (DuplicateKeyException e) {
             log.warn("kb-nav createTag 唯一约束命中: domain={} name={}", d, name, e);
             throw new ValidationException("tagName", "同名标签已存在: " + name);
         }
         Map<String, Object> row;
         try {
-            row = jdbc.queryForMap(
-                    "SELECT id, domain, tag_name, create_time, update_time FROM ecos_knowledge.kb_nav_tag WHERE domain = ? AND tag_name = ? AND is_deleted = 0",
-                    d, name);
+            row = dao.fetchTagByName(d, name);
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("kb_nav_tag name=" + name);
         }
@@ -398,9 +328,7 @@ public class NavTaxonServiceImpl implements INavService {
             throw new NotFoundException("kb_nav_tag id=" + tagId);
         }
         checkAbac("kb.tag.delete", abac("id", tagId, "domain", str(row.get("domain"))));
-        int affected = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_tag SET is_deleted = 1, update_time = NOW(), update_by = ? WHERE id = ? AND is_deleted = 0",
-                currentActor(), tagId);
+        int affected = dao.softDeleteTag(currentActor(), tagId);
         safeAudit("kb.tag.delete", Map.of("id", tagId, "affected", affected));
     }
 
@@ -414,16 +342,10 @@ public class NavTaxonServiceImpl implements INavService {
         checkAbac("kb.article.categories.set", abac("articleId", articleId, "count", normalized.size()));
         String actor = currentActor();
         // 全删再做 UNION（insert 不带限定，避免重复）
-        int removed = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
-                        + "WHERE article_id = ? AND scope = 'category' AND is_deleted = 0",
-                actor, articleId);
+        int removed = dao.clearArticleCategories(actor, articleId);
         int added = 0;
         for (String cid : normalized) {
-            added += jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "VALUES (?, ?, 'category', ?, ?)",
-                    articleId, cid, actor, actor);
+            added += dao.insertArticleCategory(articleId, cid, actor);
         }
         safeAudit("kb.article.categories.set",
                 Map.of("articleId", articleId, "removed", removed, "added", added));
@@ -436,16 +358,10 @@ public class NavTaxonServiceImpl implements INavService {
         Set<String> tagIds = normalizeTagIds(tagNames, normalizeDomain(null));
         checkAbac("kb.article.tags.set", abac("articleId", articleId, "count", tagIds.size()));
         String actor = currentActor();
-        int removed = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
-                        + "WHERE article_id = ? AND scope = 'tag' AND is_deleted = 0",
-                actor, articleId);
+        int removed = dao.clearArticleTags(actor, articleId);
         int added = 0;
         for (String tid : tagIds) {
-            added += jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "VALUES (?, ?, 'tag', ?, ?)",
-                    articleId, tid, actor, actor);
+            added += dao.insertArticleTag(articleId, tid, actor);
         }
         safeAudit("kb.article.tags.set",
                 Map.of("articleId", articleId, "removed", removed, "added", added));
@@ -463,12 +379,7 @@ public class NavTaxonServiceImpl implements INavService {
         String actor = currentActor();
         int added = 0;
         for (String cid : normalized) {
-            added += jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "SELECT ?, ?, 'category', ?, ? "
-                            + "WHERE NOT EXISTS (SELECT 1 FROM ecos_knowledge.kb_nav_article_rel r2 "
-                            + "  WHERE r2.article_id = ? AND r2.node_id = ? AND r2.scope = 'category' AND r2.is_deleted = 0)",
-                    articleId, cid, actor, actor, articleId, cid);
+            added += dao.addArticleCategoryIfAbsent(articleId, cid, actor);
         }
         safeAudit("kb.article.categories.add", Map.of("articleId", articleId, "added", added));
     }
@@ -485,12 +396,7 @@ public class NavTaxonServiceImpl implements INavService {
         String actor = currentActor();
         int added = 0;
         for (String tid : tagIds) {
-            added += jdbc.update(
-                    "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "SELECT ?, ?, 'tag', ?, ? "
-                            + "WHERE NOT EXISTS (SELECT 1 FROM ecos_knowledge.kb_nav_article_rel r2 "
-                            + "  WHERE r2.article_id = ? AND r2.node_id = ? AND r2.scope = 'tag' AND r2.is_deleted = 0)",
-                    articleId, tid, actor, actor, articleId, tid);
+            added += dao.addArticleTagIfAbsent(articleId, tid, actor);
         }
         safeAudit("kb.article.tags.add", Map.of("articleId", articleId, "added", added));
     }
@@ -510,10 +416,7 @@ public class NavTaxonServiceImpl implements INavService {
             if (cid == null || cid.isBlank()) {
                 continue;
             }
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
-                            + "WHERE article_id = ? AND node_id = ? AND scope = 'category' AND is_deleted = 0",
-                    actor, articleId, cid);
+            dao.removeArticleCategory(actor, articleId, cid);
         }
         safeAudit("kb.article.categories.remove", Map.of("articleId", articleId, "count", categoryIds.size()));
     }
@@ -533,12 +436,7 @@ public class NavTaxonServiceImpl implements INavService {
             if (name == null || name.isBlank()) {
                 continue;
             }
-            jdbc.update(
-                    "UPDATE ecos_knowledge.kb_nav_article_rel r SET is_deleted = 1, update_time = NOW(), update_by = ? "
-                            + "FROM ecos_knowledge.kb_nav_tag t "
-                            + "WHERE r.node_id = t.id AND t.tag_name = ? AND t.is_deleted = 0 "
-                            + "AND r.article_id = ? AND r.scope = 'tag' AND r.is_deleted = 0",
-                    actor, name.trim(), articleId);
+            dao.removeArticleTagNamed(actor, name.trim(), articleId);
         }
         safeAudit("kb.article.tags.remove", Map.of("articleId", articleId, "count", tagNames.size()));
     }
@@ -554,10 +452,7 @@ public class NavTaxonServiceImpl implements INavService {
         }
         checkArticleExists(articleId);
         checkAbac("kb.article.undo." + scope, abac("articleId", articleId, "scope", scope));
-        int affected = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
-                        + "WHERE article_id = ? AND scope = ? AND is_deleted = 0",
-                currentActor(), articleId, scope);
+        int affected = dao.undoArticle(currentActor(), articleId, scope);
         safeAudit("kb.article.undo." + scope, Map.of("articleId", articleId, "affected", affected));
     }
 
@@ -571,12 +466,7 @@ public class NavTaxonServiceImpl implements INavService {
 
         List<Object> args = new ArrayList<>();
         String where = buildProductWhere(query, args);
-        String sql = "SELECT a.id, a.title, a.source, a.domain, a.category, a.status, a.updated_at "
-                + "FROM ecos_knowledge.knowledge_article a "
-                + "WHERE " + where + " "
-                + "ORDER BY a.updated_at DESC "
-                + "LIMIT " + pageSize + " OFFSET " + offset;
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
+        List<Map<String, Object>> rows = dao.listProducts(where, args.toArray(), pageSize, offset);
         List<NavProductItemVO> out = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             NavProductItemVO vo = new NavProductItemVO();
@@ -596,8 +486,7 @@ public class NavTaxonServiceImpl implements INavService {
     public long countProducts(NavFolderQuery query) {
         List<Object> args = new ArrayList<>();
         String where = buildProductWhere(query, args);
-        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM ecos_knowledge.knowledge_article a WHERE " + where,
-                Long.class, args.toArray());
+        Long c = dao.countProducts(where, args.toArray());
         return c == null ? 0 : c;
     }
 
@@ -678,9 +567,7 @@ public class NavTaxonServiceImpl implements INavService {
         }
         Map<String, Object> row;
         try {
-            row = jdbc.queryForMap(
-                    "SELECT id, title, content, domain FROM ecos_knowledge.knowledge_article WHERE id = ?",
-                    articleId);
+            row = dao.readArticleForRecommend(articleId);
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("knowledge_article id=" + articleId);
         }
@@ -693,12 +580,8 @@ public class NavTaxonServiceImpl implements INavService {
     @Override
     public List<String> listDomains() {
         // PMO-C T2: distinct domain from category UNION distinct domain from tag（去 duplicate，升序）
-        String sql = "SELECT DISTINCT domain FROM ecos_knowledge.kb_nav_category WHERE is_deleted = 0 "
-                + "UNION "
-                + "SELECT DISTINCT domain FROM ecos_knowledge.kb_nav_tag WHERE is_deleted = 0 "
-                + "ORDER BY 1 ASC";
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql);
+            List<Map<String, Object>> rows = dao.listDomains();
             List<String> out = new ArrayList<>(rows.size());
             for (Map<String, Object> row : rows) {
                 String d = str(row.get("domain"));
@@ -799,9 +682,7 @@ public class NavTaxonServiceImpl implements INavService {
         if (id == null || id.isBlank()) {
             return 0;
         }
-        Integer l = jdbc.queryForObject(
-                "SELECT level FROM ecos_knowledge.kb_nav_category WHERE id = ? AND is_deleted = 0",
-                Integer.class, id);
+        Integer l = dao.fetchCategoryLevel(id);
         if (l == null) {
             throw new NotFoundException("kb_nav_category id=" + id);
         }
@@ -810,30 +691,13 @@ public class NavTaxonServiceImpl implements INavService {
 
     /** 节点（含自身）的最大深度，用于「移动越界」校验。 */
     private int descDepth(String rootId) {
-        Integer maxDepth = jdbc.queryForObject(
-                "WITH RECURSIVE walk AS ("
-                        + "  SELECT id AS self_id, 1 AS d FROM ecos_knowledge.kb_nav_category "
-                        + "   WHERE id = ? AND is_deleted = 0 "
-                        + "  UNION ALL "
-                        + "  SELECT c.id, w.d + 1 FROM ecos_knowledge.kb_nav_category c "
-                        + "  JOIN walk w ON c.parent_id = w.self_id WHERE c.is_deleted = 0"
-                        + ") SELECT MAX(d) FROM walk",
-                Integer.class, rootId);
+        Integer maxDepth = dao.fetchDescDepth(rootId);
         return maxDepth == null ? 1 : maxDepth;
     }
 
     /** 收集某节点的祖先 ID（含自身），用于循环检测。 */
     private Set<String> collectSelfAndAncestors(String rootId) {
-        List<String> ids = jdbc.queryForList(
-                "WITH RECURSIVE up AS ("
-                        + "  SELECT id FROM ecos_knowledge.kb_nav_category WHERE id = ? AND is_deleted = 0 "
-                        + "  UNION ALL "
-                        + "  SELECT c.id FROM ecos_knowledge.kb_nav_category c "
-                        + "  JOIN up u ON c.id = ("
-                        + "     SELECT p2.parent_id::text FROM ecos_knowledge.kb_nav_category p2 WHERE p2.id = u.id"
-                        + "  ) WHERE c.is_deleted = 0"
-                        + ") SELECT id FROM up",
-                String.class, rootId);
+        List<String> ids = dao.fetchSelfAndAncestors(rootId);
         return ids == null ? new HashSet<>() : new HashSet<>(ids);
     }
 
@@ -849,8 +713,7 @@ public class NavTaxonServiceImpl implements INavService {
         }
         // 子节点按 parent 链逐层重写：每层取父节点的 path + name
         // 简化实现：拉一次目录表，按 parent_id 拓扑推进（kb-nav 目录规模有限，可接受）
-        List<Map<String, Object>> all = jdbc.queryForList(
-                "SELECT id, parent_id, name FROM ecos_knowledge.kb_nav_category WHERE is_deleted = 0");
+        List<Map<String, Object>> all = dao.fetchAllAliveCategories();
         Map<String, String> idToPath = new java.util.HashMap<>();
         idToPath.put(rootId, rootPath);
         int maxRound = 50;
@@ -866,8 +729,7 @@ public class NavTaxonServiceImpl implements INavService {
                 }
                 if (!idToPath.containsKey(id)) {
                     idToPath.put(id, parentPath + "/" + name);
-                    jdbc.update("UPDATE ecos_knowledge.kb_nav_category SET path = ? WHERE id = ?",
-                            parentPath + "/" + name, id);
+                    dao.updateCategoryPath(parentPath + "/" + name, id);
                     changed = true;
                 }
             }
@@ -905,9 +767,7 @@ public class NavTaxonServiceImpl implements INavService {
                 continue;
             }
             try {
-                Map<String, Object> row = jdbc.queryForMap(
-                        "SELECT id FROM ecos_knowledge.kb_nav_tag WHERE tag_name = ? AND domain = ? AND is_deleted = 0",
-                        name.trim(), d);
+                Map<String, Object> row = dao.fetchTagIdByName(name.trim(), d);
                 out.add(str(row.get("id")));
             } catch (EmptyResultDataAccessException e) {
                 throw new NotFoundException("kb_nav_tag name=" + name + " domain=" + d);
@@ -920,9 +780,7 @@ public class NavTaxonServiceImpl implements INavService {
         if (articleId == null || articleId.isBlank()) {
             throw new ValidationException("articleId", "articleId 不能为空");
         }
-        Integer cnt = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_knowledge.knowledge_article WHERE id = ?",
-                Integer.class, articleId);
+        Integer cnt = dao.countArticle(articleId);
         if (cnt == null || cnt == 0) {
             throw new NotFoundException("knowledge_article id=" + articleId);
         }
@@ -933,9 +791,7 @@ public class NavTaxonServiceImpl implements INavService {
             return null;
         }
         try {
-            return jdbc.queryForMap(
-                    "SELECT id, domain, parent_id, name, path, level, sort_order, create_time, update_time "
-                            + "FROM ecos_knowledge.kb_nav_category WHERE id = ? AND is_deleted = 0", id);
+            return dao.fetchCategoryRow(id);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
@@ -946,9 +802,7 @@ public class NavTaxonServiceImpl implements INavService {
             return null;
         }
         try {
-            return jdbc.queryForMap(
-                    "SELECT id, domain, tag_name, create_time, update_time "
-                            + "FROM ecos_knowledge.kb_nav_tag WHERE id = ? AND is_deleted = 0", tagId);
+            return dao.fetchTagRow(tagId);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
@@ -956,10 +810,7 @@ public class NavTaxonServiceImpl implements INavService {
 
     private Map<String, Object> findByIdRequired(String domain, String name) {
         try {
-            return jdbc.queryForMap(
-                    "SELECT id, domain, parent_id, name, path, level, sort_order, create_time, update_time "
-                            + "FROM ecos_knowledge.kb_nav_category WHERE domain = ? AND name = ? AND is_deleted = 0",
-                    domain, name);
+            return dao.fetchCategoryByNameRequired(domain, name);
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("kb_nav_category name=" + name + " domain=" + domain);
         }

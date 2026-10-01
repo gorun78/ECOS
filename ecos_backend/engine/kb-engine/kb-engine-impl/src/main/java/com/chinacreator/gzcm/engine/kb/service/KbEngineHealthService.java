@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.KbEngineHealthDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,15 +10,15 @@ public class KbEngineHealthService {
 
     private static final Logger log = LoggerFactory.getLogger(KbEngineHealthService.class);
 
-    private final JdbcTemplate jdbc;
+    private final KbEngineHealthDao kbEngineHealthDao;
 
-    public KbEngineHealthService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public KbEngineHealthService(KbEngineHealthDao kbEngineHealthDao) {
+        this.kbEngineHealthDao = kbEngineHealthDao;
     }
 
     public boolean pingDb() {
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            kbEngineHealthDao.pingDb();
             return true;
         } catch (Exception e) {
             log.warn("DB health check failed: {}", e.getMessage());
@@ -28,7 +28,7 @@ public class KbEngineHealthService {
 
     public long countNodes() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_knowledge.graph_node", Long.class);
+            return kbEngineHealthDao.countNodes();
         } catch (Exception e) {
             return -1;
         }
@@ -36,7 +36,7 @@ public class KbEngineHealthService {
 
     public long countEdges() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_knowledge.graph_edge", Long.class);
+            return kbEngineHealthDao.countEdges();
         } catch (Exception e) {
             return -1;
         }
@@ -44,7 +44,7 @@ public class KbEngineHealthService {
 
     public long countArticles() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_knowledge.knowledge_article", Long.class);
+            return kbEngineHealthDao.countArticles();
         } catch (Exception e) {
             return -1;
         }
@@ -52,7 +52,7 @@ public class KbEngineHealthService {
 
     public long countRules() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_knowledge.expert_rule", Long.class);
+            return kbEngineHealthDao.countRules();
         } catch (Exception e) {
             return -1;
         }
@@ -60,7 +60,7 @@ public class KbEngineHealthService {
 
     public long countEmbeddings() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM ecos_knowledge.knowledge_embedding", Long.class);
+            return kbEngineHealthDao.countEmbeddings();
         } catch (Exception e) {
             return -1;
         }

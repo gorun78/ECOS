@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
+import com.chinacreator.gzcm.engine.kb.dao.KnowledgeGraphDao;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -22,13 +22,13 @@ class KnowledgeGraphServiceWave54Test {
     @Mock
     private KnowledgeEdgeMapper edgeMapper;
     @Mock
-    private JdbcTemplate jdbcTemplate;
+    private KnowledgeGraphDao knowledgeGraphDao;
 
     private KnowledgeGraphServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new KnowledgeGraphServiceImpl(nodeMapper, edgeMapper, jdbcTemplate);
+        service = new KnowledgeGraphServiceImpl(nodeMapper, edgeMapper, knowledgeGraphDao);
     }
 
     @Test

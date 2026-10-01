@@ -1,12 +1,12 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.engine.kb.dao.ComplianceRuleDao;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,13 +18,13 @@ public class ComplianceRuleVersionService {
 
     private static final Logger log = LoggerFactory.getLogger(ComplianceRuleVersionService.class);
 
-    private final JdbcTemplate jdbcTemplate;
+    private final ComplianceRuleDao complianceRuleDao;
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
-    public ComplianceRuleVersionService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public ComplianceRuleVersionService(ComplianceRuleDao complianceRuleDao) {
+        this.complianceRuleDao = complianceRuleDao;
     }
 
     /**
@@ -32,9 +32,7 @@ public class ComplianceRuleVersionService {
      */
     public void snapshotVersion(ComplianceRule existing, String approvedBy, long now, int newVersion) {
         String versionId = UUID.randomUUID().toString();
-        jdbcTemplate.update(
-            "INSERT INTO sys_rule_version (id, rule_id, version_number, snapshot, changed_by, changed_at, change_note) " +
-            "VALUES (?, ?, ?, ?::jsonb, ?, ?, ?)",
+        complianceRuleDao.insertVersion(
             versionId,
             existing.getId(),
             existing.getVersion(),
@@ -49,11 +47,7 @@ public class ComplianceRuleVersionService {
      * 查询规则版本历史
      */
     public List<Map<String, Object>> getVersions(String ruleId) {
-        return jdbcTemplate.queryForList(
-            "SELECT id, rule_id, version_number, snapshot, changed_by, changed_at, change_note " +
-            "FROM sys_rule_version WHERE rule_id = ? ORDER BY version_number DESC",
-            ruleId
-        );
+        return complianceRuleDao.getVersions(ruleId);
     }
 
     // ── 简易JSON序列化 ────────────────────────────
