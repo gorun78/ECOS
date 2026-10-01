@@ -2,10 +2,9 @@ package com.chinacreator.gzcm.engine.cognitive2.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.engine.cognitive2.dao.EvidenceDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,9 +19,10 @@ import java.util.Map;
 /**
  * 认知证据存储层（PMO-59 P2a / ADR-9 心智层）— 表 {@code ecos_cognitive_evidence}（V127）。
  *
- * <p>数据访问风格跟齐 cognitive 既有实现（{@link ModelRegistryService}）：JdbcTemplate 显式列名，
+ * <p>数据访问风格跟齐 cognitive 既有实现（{@link ModelRegistryService}）：显式列名，
  * 不使用 MyBatis Mapper（cognitive 模块无 mapper 包既有基建，gateway @MapperScan 亦未登记 cognitive 包）。
- * 铁律合规：0 个 {@code SELECT *}，0 个无条件 UPDATE，全部查询带 {@code is_deleted = 0} 逻辑删除过滤。</p>
+ * 铁律合规：0 个 {@code SELECT *}，0 个无条件 UPDATE，全部查询带 {@code is_deleted = 0} 逻辑删除过滤。
+ * SQL 落点已收口至 {@link EvidenceDao}（架构铁律 §2.5 #1 / IR06，B2-b）。</p>
  *
  * <p>JSONB 交互：列显式 {@code ?::jsonb} 绑定，读取经 {@link #parseJsonListText}/{@link #parseJsonObjectText}
  * 归一为字符串文本（对齐 common-api {@code EvidenceRecordVO} 的 String 契约，避免 PGobject 依赖漂移）。</p>
@@ -32,12 +32,6 @@ public class EvidenceStore {
 
     private static final Logger log = LoggerFactory.getLogger(EvidenceStore.class);
 
-    /** 全部列显式清单（禁止 SELECT *；与 V127 DDL 逐列一致） */
-    private static final String EVIDENCE_COLUMNS =
-            "id, evidence_code, tenant_scope, source_type, source_ref, blob, confidence, " +
-            "is_conflict, refuting_evidence_ids, effective_time, expire_time, status, " +
-            "create_time, update_time, create_by, update_by";
-
     /** 证据来源类型白名单（外部方案层1感知接入层口径） */
     public static final List<String> SOURCE_TYPES =
             Arrays.asList("SYSTEM_DATA", "NEWS", "EXPERT", "PIPELINE");
@@ -46,11 +40,11 @@ public class EvidenceStore {
     public static final List<String> STATUSES =
             Arrays.asList("ACTIVE", "CONFLICTED", "ARCHIVED");
 
-    private final JdbcTemplate jdbc;
+    private final EvidenceDao dao;
     private final ObjectMapper objectMapper;
 
-    public EvidenceStore(JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
+    public EvidenceStore(EvidenceDao dao, ObjectMapper objectMapper) {
+        this.dao = dao;
         this.objectMapper = objectMapper;
     }
 
@@ -74,50 +68,25 @@ public class EvidenceStore {
                        String sourceRef, String blob, BigDecimal confidence, boolean isConflict,
                        String refutingIds, LocalDateTime effectiveTime, LocalDateTime expireTime,
                        String status) {
-        jdbc.update(
-            "INSERT INTO ecos_cognitive_evidence (id, evidence_code, tenant_scope, source_type, source_ref, " +
-            "blob, confidence, is_conflict, refuting_evidence_ids, effective_time, expire_time, status, " +
-            "create_by, update_by, is_deleted) " +
-            "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?::jsonb, ?, ?, ?, 'system', 'system', 0)",
-            id, evidenceCode, tenantScope == null || tenantScope.isBlank() ? "default" : tenantScope,
-            sourceType, sourceRef, blob, confidence, isConflict, refutingIds, effectiveTime, expireTime, status);
+        dao.insert(id, evidenceCode, tenantScope, sourceType, sourceRef, blob, confidence,
+                isConflict, refutingIds, effectiveTime, expireTime, status);
         log.info("认知证据落库: id={} code={} sourceType={} confidence={} status={}",
                 id, evidenceCode, sourceType, confidence, status);
     }
 
     /** 校验业务唯一键是否已存在（含逻辑删除行，唯一索引不可复用）。 */
     public boolean existsByCode(String evidenceCode) {
-        Integer count = jdbc.queryForObject(
-            "SELECT COUNT(1) FROM ecos_cognitive_evidence WHERE evidence_code = ?", Integer.class, evidenceCode);
-        return count != null && count > 0;
+        return dao.existsByCode(evidenceCode);
     }
 
     /** 证据详情（未删除）；无记录返回 null。 */
     public Map<String, Object> findById(String id) {
-        try {
-            return jdbc.queryForMap(
-                "SELECT " + EVIDENCE_COLUMNS + " FROM ecos_cognitive_evidence WHERE id = ? AND is_deleted = 0",
-                id);
-        } catch (EmptyResultDataAccessException e) {
-            return null;
-        }
+        return dao.findById(id);
     }
 
     /** 证据列表（未删除；status/sourceType 可选过滤，create_time 倒序）。 */
     public List<Map<String, Object>> list(String status, String sourceType) {
-        StringBuilder sql = new StringBuilder("SELECT " + EVIDENCE_COLUMNS +
-            " FROM ecos_cognitive_evidence WHERE is_deleted = 0");
-        List<Object> args = new ArrayList<>();
-        if (status != null && !status.isBlank()) {
-            sql.append(" AND status = ?");
-            args.add(status.toUpperCase());
-        }
-        if (sourceType != null && !sourceType.isBlank()) {
-            sql.append(" AND source_type = ?");
-            args.add(sourceType.toUpperCase());
-        }
-        sql.append(" ORDER BY create_time DESC, id");
-        return jdbc.queryForList(sql.toString(), args.toArray());
+        return dao.list(status, sourceType);
     }
 
     /**
@@ -137,10 +106,7 @@ public class EvidenceStore {
             return false;
         }
         String updated = addToJsonArrayText(refutingText, newId);
-        return jdbc.update(
-            "UPDATE ecos_cognitive_evidence SET refuting_evidence_ids = ?::jsonb, status = ?, " +
-            "update_time = ? WHERE id = ? AND is_deleted = 0",
-            updated, "CONFLICTED", Timestamp.valueOf(LocalDateTime.now()), oppositeId) > 0;
+        return dao.markRefuted(oppositeId, updated, LocalDateTime.now());
     }
 
     /**
@@ -151,11 +117,7 @@ public class EvidenceStore {
         if (fact == null || fact.isBlank()) {
             return new ArrayList<>();
         }
-        List<Map<String, Object>> candidates = jdbc.queryForList(
-            "SELECT id, blob FROM ecos_cognitive_evidence " +
-            "WHERE is_deleted = 0 AND status IN ('ACTIVE','CONFLICTED') AND blob ->> 'fact' = ? " +
-            "ORDER BY create_time DESC",
-            fact);
+        List<Map<String, Object>> candidates = dao.findConflictCandidates(fact);
         List<String> conflicting = new ArrayList<>();
         for (Map<String, Object> row : candidates) {
             Map<String, Object> blob = parseJsonObjectText(String.valueOf(row.get("blob")));

@@ -8,12 +8,12 @@ import java.util.LinkedHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.engine.cognitive2.dao.CognitivePipelineDao;
 import com.chinacreator.gzcm.engine.cognitive2.model.CognitivePipeline;
 
 /**
@@ -27,6 +27,9 @@ import com.chinacreator.gzcm.engine.cognitive2.model.CognitivePipeline;
  *
  * <p>逻辑删除：所有查询过滤 {@code is_deleted = 0}，
  * 删除操作设置 {@code is_deleted = 1}（铁律 4.8）。</p>
+ *
+ * <p>SQL 落点已收口至 {@link CognitivePipelineDao}（架构铁律 §2.5 #1 / IR06，B2-b）；
+ * RowMapper 与 config JSON 构造/解析仍在本仓库（业务对象映射语义）。</p>
  */
 @Repository
 public class CognitivePipelineRepository implements CognitivePipelineStore {
@@ -34,10 +37,10 @@ public class CognitivePipelineRepository implements CognitivePipelineStore {
     private static final Logger log = LoggerFactory.getLogger(CognitivePipelineRepository.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final CognitivePipelineDao pipelineDao;
 
-    public CognitivePipelineRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public CognitivePipelineRepository(CognitivePipelineDao pipelineDao) {
+        this.pipelineDao = pipelineDao;
     }
 
     /** RowMapper — kb_cognitive_pipeline 行 → CognitivePipeline */
@@ -58,17 +61,9 @@ public class CognitivePipelineRepository implements CognitivePipelineStore {
     @Override
     public void save(CognitivePipeline pipeline) {
         String configJson = buildConfigJson(pipeline);
-        int rows = jdbc.update(
-                "UPDATE kb_cognitive_pipeline SET " +
-                "  name = ?, config = ?::jsonb, updated_at = NOW() " +
-                "WHERE pipeline_id = ? AND is_deleted = 0",
-                pipeline.getName(), configJson, pipeline.getId());
+        int rows = pipelineDao.updatePipeline(pipeline.getId(), pipeline.getName(), configJson);
         if (rows == 0) {
-            jdbc.update(
-                    "INSERT INTO kb_cognitive_pipeline " +
-                    "(pipeline_id, name, status, config, created_by, created_at, updated_at, is_deleted) " +
-                    "VALUES (?, ?, 'DRAFT', ?::jsonb, 'system', NOW(), NOW(), 0)",
-                    pipeline.getId(), pipeline.getName(), configJson);
+            pipelineDao.insertPipeline(pipeline.getId(), pipeline.getName(), configJson);
             log.info("CognitivePipeline inserted: pipelineId={}", pipeline.getId());
         } else {
             log.info("CognitivePipeline updated: pipelineId={}", pipeline.getId());
@@ -77,27 +72,18 @@ public class CognitivePipelineRepository implements CognitivePipelineStore {
 
     @Override
     public Optional<CognitivePipeline> findById(String pipelineId) {
-        List<CognitivePipeline> list = jdbc.query(
-                "SELECT id, pipeline_id, name, status, config, created_by, created_at, updated_at, result, is_deleted " +
-                "FROM kb_cognitive_pipeline WHERE pipeline_id = ? AND is_deleted = 0",
-                ROW_MAPPER, pipelineId);
+        List<CognitivePipeline> list = pipelineDao.findById(pipelineId, ROW_MAPPER);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     @Override
     public List<CognitivePipeline> findAll() {
-        return jdbc.query(
-                "SELECT id, pipeline_id, name, status, config, created_by, created_at, updated_at, result, is_deleted " +
-                "FROM kb_cognitive_pipeline WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT 200",
-                ROW_MAPPER);
+        return pipelineDao.findAll(ROW_MAPPER);
     }
 
     /** 逻辑删除（铁律 4.8） — DELETE 不物理删除，仅标记 is_deleted = 1 */
     public int logicalDelete(String pipelineId) {
-        int rows = jdbc.update(
-                "UPDATE kb_cognitive_pipeline SET is_deleted = 1, updated_at = NOW() " +
-                "WHERE pipeline_id = ? AND is_deleted = 0",
-                pipelineId);
+        int rows = pipelineDao.logicalDelete(pipelineId);
         if (rows > 0) {
             log.info("CognitivePipeline logical deleted: pipelineId={}", pipelineId);
         }

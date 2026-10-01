@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.cognitive2;
 
+import com.chinacreator.gzcm.engine.cognitive2.dao.DecisionDao;
 import com.chinacreator.gzcm.engine.cognitive2.model.Decision;
 import com.chinacreator.gzcm.engine.cognitive2.model.PrecedentRef;
 import com.chinacreator.gzcm.engine.cognitive2.service.DecisionServiceImpl;
 import com.chinacreator.gzcm.engine.cognitive2.service.PrecedentRecaller;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -13,22 +13,29 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Wave-3.2 T2 — PrecedentRecaller 行为测试（不依赖 mockito，用空 JdbcTemplate 兜底降级）。
+ * Wave-3.2 T2 — PrecedentRecaller 行为测试（不依赖 mockito，用"DB down" DAO 兜底降级）。
  *
- * <p>说明：DecisionService.findSimilarDecisions 走 DB SQL，没有 SpringDataDB 时
- * JdbcTemplate 抛出 SQLException，PrecedentRecaller 内部 try-catch 降级为 empty 列表，符合 T2 验收。</p>
+ * <p>说明：DecisionService.findSimilarDecisions 走 DB SQL，DB 不可用时抛异常，
+ * PrecedentRecaller 内部 try-catch 降级为 empty 列表，符合 T2 验收。
+ * B2-b 收口后 DAO 注入改为 {@link DecisionDao}，无法达 DataSource 的 DAO 以
+ * 匿名子类覆写查询方法抛异常等价模拟 "DB down"。</p>
  */
 class PrecedentRecallerTest {
 
-    /** 没有 dataSource 的 JdbcTemplate（任何查询都抛异常，等价于 DB down） */
-    private JdbcTemplate unavailableJdbc() {
-        return new JdbcTemplate();
+    /** DB down 语义的 DecisionDao：任何数据查询都抛异常（等价于无 DataSource）。 */
+    private DecisionDao unavailableDao() {
+        return new DecisionDao() {
+            @Override
+            public List<Map<String, Object>> findSimilarDecisions(String category, String pattern, int maxResults) {
+                throw new IllegalStateException("DB unavailable (no DataSource)");
+            }
+        };
     }
 
     @Test
     void failedDecisionServiceDegradesToEmpty() {
-        // decisionService 内部走 JdbcTemplate（无 DataSource → jdbc queryForList 抛异常）
-        PrecedentRecaller rec = new PrecedentRecaller(new DecisionServiceImpl(unavailableJdbc()));
+        // decisionService 内部走 DAO DB 查询（DB down → DAO 抛异常）
+        PrecedentRecaller rec = new PrecedentRecaller(new DecisionServiceImpl(unavailableDao()));
         // 不抛异常，返回空
         List<PrecedentRef> refs = rec.recall("某场景", "finance", 3);
         assertNotNull(refs);
@@ -37,14 +44,14 @@ class PrecedentRecallerTest {
 
     @Test
     void noScenarioReturnsEmpty() {
-        PrecedentRecaller rec = new PrecedentRecaller(new DecisionServiceImpl(unavailableJdbc()));
+        PrecedentRecaller rec = new PrecedentRecaller(new DecisionServiceImpl(null));
         assertTrue(rec.recall("", "finance", 3).isEmpty());
         assertTrue(rec.recall(null, "finance", 3).isEmpty());
     }
 
     @Test
     void toIndexMapsByPrecedentId() {
-        PrecedentRecaller rec = new PrecedentRecaller(new DecisionServiceImpl(unavailableJdbc()));
+        PrecedentRecaller rec = new PrecedentRecaller(new DecisionServiceImpl(null));
         PrecedentRef r1 = new PrecedentRef("p-1", "d-1", "x", "approved", 0.8);
         PrecedentRef r2 = new PrecedentRef("p-2", "d-2", "y", "approved", 0.8);
         // 用 ArrayList 而不是 List.of（List.of 不接 null 元素）

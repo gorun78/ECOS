@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
+import com.chinacreator.gzcm.engine.cognitive2.dao.RuleDao;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainResult;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -15,23 +15,18 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 规则因果链服务 — 通过 sys_compliance_rule 表的 description 字段文本匹配构建因果链。
  *
  * <p>简化实现：使用 PG SQL 直接查询 sys_compliance_rule，通过 description 中的规则名称/ID 引用
- * 发现因果依赖关系，递归构建因果链节点和边。</p>
+ * 发现因果依赖关系，递归构建因果链节点和边。
+ * SQL 落点已收口至 {@link RuleDao}（架构铁律 §2.5 #1 / IR06，B2-b，与 RuleImpactService 共用）。</p>
  */
 @Service
 public class RuleCausalService {
 
     private static final Logger log = LoggerFactory.getLogger(RuleCausalService.class);
 
-    private static final String SELECT_RULE_BY_ID =
-            "SELECT id, name, domain, description FROM sys_compliance_rule WHERE id = ?";
+    private final RuleDao ruleDao;
 
-    private static final String SELECT_ALL_RULES =
-            "SELECT id, name, domain, description FROM sys_compliance_rule";
-
-    private final JdbcTemplate jdbcTemplate;
-
-    public RuleCausalService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public RuleCausalService(RuleDao ruleDao) {
+        this.ruleDao = ruleDao;
     }
 
     /**
@@ -44,7 +39,7 @@ public class RuleCausalService {
         log.info("Building causal chain for rule: {}", ruleId);
 
         // 1. 查询目标规则
-        List<Map<String, Object>> rootRows = jdbcTemplate.queryForList(SELECT_RULE_BY_ID, ruleId);
+        List<Map<String, Object>> rootRows = ruleDao.findRuleById(ruleId);
         if (rootRows.isEmpty()) {
             log.warn("Rule not found: {}", ruleId);
             return new CausalChainResult(ruleId);
@@ -56,7 +51,7 @@ public class RuleCausalService {
         String rootDesc = (String) rootRow.get("description");
 
         // 2. 加载全量规则
-        List<Map<String, Object>> allRows = jdbcTemplate.queryForList(SELECT_ALL_RULES);
+        List<Map<String, Object>> allRows = ruleDao.findAllRules();
         Map<String, Map<String, Object>> ruleMap = new HashMap<>();
         for (Map<String, Object> row : allRows) {
             ruleMap.put((String) row.get("id"), row);

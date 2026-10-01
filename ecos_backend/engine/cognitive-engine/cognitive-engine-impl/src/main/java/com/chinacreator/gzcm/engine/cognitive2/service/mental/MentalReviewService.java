@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.cognitive2.service.mental;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive2.dao.MentalReviewDao;
 import com.chinacreator.gzcm.engine.cognitive2.service.EvidenceStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -42,11 +42,11 @@ public class MentalReviewService {
     /** 复盘 tag 白名单（与事件 faultContext.reviewTag 生产侧同源；新增 tag 走代码评审扩充） */
     private static final List<String> REVIEW_TAGS = List.of(MentalEventPublisher.REVIEW_TAG);
 
-    private final JdbcTemplate jdbc;
+    private final MentalReviewDao mentalReviewDao;
     private final EvidenceStore evidenceStore;
 
-    public MentalReviewService(JdbcTemplate jdbc, EvidenceStore evidenceStore) {
-        this.jdbc = jdbc;
+    public MentalReviewService(MentalReviewDao mentalReviewDao, EvidenceStore evidenceStore) {
+        this.mentalReviewDao = mentalReviewDao;
         this.evidenceStore = evidenceStore;
     }
 
@@ -86,17 +86,8 @@ public class MentalReviewService {
 
     /** belief 版本时间线（variable 分组，版本升序；since 过滤按版本行 update_time）。 */
     private List<Map<String, Object>> beliefTimelines(LocalDateTime since) {
-        StringBuilder sql = new StringBuilder(
-            "SELECT variable_name, domain, version, distribution, is_manual_override, " +
-            "last_evidence_id, status, update_time FROM ecos_cognitive_belief " +
-            "WHERE is_deleted = 0");
-        List<Object> args = new ArrayList<>();
-        if (since != null) {
-            sql.append(" AND update_time >= ?");
-            args.add(java.sql.Timestamp.valueOf(since));
-        }
-        sql.append(" ORDER BY variable_name, domain, version");
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        java.sql.Timestamp sinceTs = since == null ? null : java.sql.Timestamp.valueOf(since);
+        List<Map<String, Object>> rows = mentalReviewDao.beliefTimelines(sinceTs);
 
         // variable(+domain) 分组保序
         Map<String, Map<String, Object>> grouped = new TreeMap<>();
@@ -124,18 +115,8 @@ public class MentalReviewService {
 
     /** 假设时间线（since 按 invalid_at/update_time；全列显式清单，0 SELECT *）。 */
     private List<Map<String, Object>> hypotheses(LocalDateTime since) {
-        StringBuilder sql = new StringBuilder(
-            "SELECT h.id, h.hypothesis_code, h.domain, h.metric_ref, h.status, h.is_valid, " +
-            "h.invalid_at, h.invalid_reason, h.update_time, h.evidence_ids " +
-            "FROM ecos_cognitive_hypothesis h WHERE h.is_deleted = 0");
-        List<Object> args = new ArrayList<>();
-        if (since != null) {
-            sql.append(" AND (h.invalid_at IS NULL OR h.invalid_at >= ? OR h.update_time >= ?)");
-            args.add(java.sql.Timestamp.valueOf(since));
-            args.add(java.sql.Timestamp.valueOf(since));
-        }
-        sql.append(" ORDER BY h.update_time DESC, h.id");
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        java.sql.Timestamp sinceTs = since == null ? null : java.sql.Timestamp.valueOf(since);
+        List<Map<String, Object>> rows = mentalReviewDao.hypotheses(sinceTs);
         List<Map<String, Object>> out = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             Map<String, Object> h = new LinkedHashMap<>();
@@ -158,16 +139,8 @@ public class MentalReviewService {
 
     /** 证据登记时间线（since 按 create_time）。 */
     private List<Map<String, Object>> evidenceTimeline(LocalDateTime since) {
-        StringBuilder sql = new StringBuilder(
-            "SELECT id, evidence_code, source_type, confidence, is_conflict, status, " +
-            "effective_time, create_time FROM ecos_cognitive_evidence WHERE is_deleted = 0");
-        List<Object> args = new ArrayList<>();
-        if (since != null) {
-            sql.append(" AND create_time >= ?");
-            args.add(java.sql.Timestamp.valueOf(since));
-        }
-        sql.append(" ORDER BY create_time ASC, id");
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        java.sql.Timestamp sinceTs = since == null ? null : java.sql.Timestamp.valueOf(since);
+        List<Map<String, Object>> rows = mentalReviewDao.evidenceTimeline(sinceTs);
         List<Map<String, Object>> out = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             Map<String, Object> e = new LinkedHashMap<>();
@@ -188,16 +161,8 @@ public class MentalReviewService {
 
     /** run 作废留痕（V130 impact 表，since 按 superseded_at）。 */
     private List<Map<String, Object>> runImpacts(LocalDateTime since) {
-        StringBuilder sql = new StringBuilder(
-            "SELECT event_id, hypothesis_id, run_id, auto_detected, superseded_at, detail " +
-            "FROM ecos_cognitive_run_invalidation WHERE is_deleted = 0");
-        List<Object> args = new ArrayList<>();
-        if (since != null) {
-            sql.append(" AND superseded_at >= ?");
-            args.add(java.sql.Timestamp.valueOf(since));
-        }
-        sql.append(" ORDER BY superseded_at DESC, id");
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        java.sql.Timestamp sinceTs = since == null ? null : java.sql.Timestamp.valueOf(since);
+        List<Map<String, Object>> rows = mentalReviewDao.runImpacts(sinceTs);
         List<Map<String, Object>> out = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             Map<String, Object> r = new LinkedHashMap<>();
@@ -245,20 +210,10 @@ public class MentalReviewService {
      * <p>V131 为手工执行 DDL：表不可用时本段降级空列表 + WARN，不阻断复盘其余段落。</p>
      */
     private List<Map<String, Object>> warnAlerts(String reviewTag, LocalDateTime since) {
-        StringBuilder sql = new StringBuilder(
-            "SELECT id, log_id, warn_type, warn_level, warn_objid, warn_objname, warn_message, " +
-            "fault_context, review_tag, warn_time FROM ecos_warn_log " +
-            "WHERE is_deleted = 0 AND review_tag = ?");
-        List<Object> args = new ArrayList<>();
-        args.add(reviewTag);
-        if (since != null) {
-            sql.append(" AND warn_time >= ?");
-            args.add(java.sql.Timestamp.valueOf(since));
-        }
-        sql.append(" ORDER BY warn_time DESC, id");
+        java.sql.Timestamp sinceTs = since == null ? null : java.sql.Timestamp.valueOf(since);
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(sql.toString(), args.toArray());
+            rows = mentalReviewDao.warnAlerts(reviewTag, sinceTs);
         } catch (Exception e) {
             log.warn("告警留痕查询失败 (ignored, 降级空列表): tag={} err={}", reviewTag, e.getMessage());
             return new ArrayList<>();

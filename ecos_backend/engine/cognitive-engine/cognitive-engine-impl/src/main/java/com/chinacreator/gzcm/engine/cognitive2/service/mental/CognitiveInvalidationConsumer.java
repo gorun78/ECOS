@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.cognitive2.service.mental;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive2.dao.InvalidationDao;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,7 +10,6 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +47,7 @@ public class CognitiveInvalidationConsumer {
     /** 可作废的 run 状态白名单（RUNNING/FAILED 不适用"关联作废"语义） */
     private static final List<String> SUPERSEDEABLE_STATUSES = List.of("SUCCEEDED", "SUCCEEDED_DEGRADED");
 
-    private final JdbcTemplate jdbc;
+    private final InvalidationDao invalidationDao;
     private final ObjectMapper objectMapper;
     private final MentalEventPublisher eventPublisher;
 
@@ -55,10 +55,10 @@ public class CognitiveInvalidationConsumer {
     @Autowired(required = false)
     private EventBusService eventBusService;
 
-    public CognitiveInvalidationConsumer(JdbcTemplate jdbc,
+    public CognitiveInvalidationConsumer(InvalidationDao invalidationDao,
                                          ObjectMapper objectMapper,
                                          MentalEventPublisher eventPublisher) {
-        this.jdbc = jdbc;
+        this.invalidationDao = invalidationDao;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
     }
@@ -136,12 +136,7 @@ public class CognitiveInvalidationConsumer {
 
         // 1. 查引用该假设的未决推演 run（JSONB 包含匹配 assumptionRefs 数组）
         String refsArrayJson = toJsonArray(List.of(hypothesisId));
-        List<Map<String, Object>> candidates = jdbc.queryForList(
-            "SELECT id, status FROM ecos_scenario_run " +
-            "WHERE is_deleted = 0 AND status IN (?, ?) " +
-            "AND simulation_result IS NOT NULL " +
-            "AND (simulation_result->'assumptionRefs') @> ?::jsonb " +
-            "ORDER BY create_time DESC",
+        List<Map<String, Object>> candidates = invalidationDao.findCandidateRuns(
             SUPERSEDEABLE_STATUSES.get(0), SUPERSEDEABLE_STATUSES.get(1), refsArrayJson);
         if (candidates.isEmpty()) {
             log.info("CognitiveInvalidationConsumer 无关联 run 可作废: hypothesis={} event={}", hypothesisId, eventId);
@@ -153,24 +148,17 @@ public class CognitiveInvalidationConsumer {
         LocalDateTime now = LocalDateTime.now();
         for (Map<String, Object> run : candidates) {
             String runId = String.valueOf(run.get("id"));
-            int updated = jdbc.update(
-                "UPDATE ecos_scenario_run SET status = 'SUPERSEDED', update_time = ? " +
-                "WHERE id = ? AND is_deleted = 0 AND status IN (?, ?)",
-                now, runId, SUPERSEDEABLE_STATUSES.get(0), SUPERSEDEABLE_STATUSES.get(1));
+            int updated = invalidationDao.supersedeRun(
+                runId, now, SUPERSEDEABLE_STATUSES.get(0), SUPERSEDEABLE_STATUSES.get(1));
             if (updated == 0) {
                 log.warn("run 状态更新未命中（并发或已作废，幂等跳过）: runId={}", runId);
                 continue;
             }
             String impactId = "cog_inv_" + UUID.randomUUID().toString().substring(0, 12);
-            Integer inserted = jdbc.update(
-                "INSERT INTO ecos_cognitive_run_invalidation " +
-                "(id, event_id, hypothesis_id, run_id, auto_detected, superseded_at, detail, create_by, update_by, is_deleted) " +
-                "SELECT ?, ?, ?, ?, ?, ?, ?, 'system', 'system', 0 " +
-                "WHERE NOT EXISTS (SELECT 1 FROM ecos_cognitive_run_invalidation " +
-                "WHERE event_id = ? AND run_id = ? AND is_deleted = 0)",
+            int inserted = invalidationDao.insertRunInvalidation(
                 impactId, eventId, hypothesisId, runId, autoDetected, now,
-                buildDetail(hypothesisCode, invalidReason), eventId, runId);
-            if (inserted != null && inserted > 0) {
+                buildDetail(hypothesisCode, invalidReason));
+            if (inserted != 0 && inserted > 0) {
                 superseded++;
             }
         }
