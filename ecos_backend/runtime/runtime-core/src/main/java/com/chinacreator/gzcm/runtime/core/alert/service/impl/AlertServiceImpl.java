@@ -12,14 +12,14 @@ import java.util.stream.Collectors;
 import com.chinacreator.gzcm.runtime.core.alert.AlertRecord;
 import com.chinacreator.gzcm.runtime.core.alert.AlertRule;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
-import com.chinacreator.gzcm.runtime.core.alert.persist.AlertRepository;
+import com.chinacreator.gzcm.runtime.core.alert.dao.AlertDao;
 
 /**
  * 告警服务实现
  * 提供告警规则管理和告警记录功能
  *
  * <p>详细设计-00 F00-09 (W07)：进程内 {@link ConcurrentMap} 降为<b>可失效重建的进程内缓存</b>，
- * 记录触发时若容器内存在 {@link AlertRepository}（gateway / 各 service 有数据源栈）则同步落
+ * 记录触发时若容器内存在 {@link com.chinacreator.gzcm.runtime.core.alert.dao.AlertDao}（gateway / 各 service 有数据源栈）则同步落
  * 控制域 {@code ecos_runtime_alert_rule/_record}，使 ack/close/升级跨进程可见。</p>
  *
  * @author CDRC Runtime Team
@@ -32,14 +32,14 @@ public class AlertServiceImpl implements IAlertService {
     // 进程内缓存：alertId -> AlertRecord（可失效重建，非权威）
     private final ConcurrentMap<String, AlertRecord> records = new ConcurrentHashMap<>();
 
-    // 详细设计-00 W07：可选持久化通道（无 JdbcTemplate 的容器 = 纯内存缓存态，行为不回退）
-    private final AlertRepository repository;
+    // 详细设计-00 W07：可选持久化通道（无数据源栈的容器 = 纯内存缓存态，行为不回退）
+    private final AlertDao repository;
 
     public AlertServiceImpl() {
         this(null);
     }
 
-    public AlertServiceImpl(AlertRepository repository) {
+    public AlertServiceImpl(AlertDao repository) {
         this.repository = repository;
     }
 

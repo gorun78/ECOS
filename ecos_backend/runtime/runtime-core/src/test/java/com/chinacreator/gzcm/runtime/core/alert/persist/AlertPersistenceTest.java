@@ -2,15 +2,14 @@ package com.chinacreator.gzcm.runtime.core.alert.persist;
 
 import com.chinacreator.gzcm.runtime.core.alert.AlertRecord;
 import com.chinacreator.gzcm.runtime.core.alert.INotificationService;
+import com.chinacreator.gzcm.runtime.core.alert.dao.AlertDao;
 import com.chinacreator.gzcm.runtime.core.alert.service.impl.NotificationServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -21,27 +20,34 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * 详细设计-00 F00-09 / W07 — 告警持久化 + 通知通道（控制域 ecos_runtime_alert_*）。
  *
- * JdbcTemplate 以 Mockito mock，不依赖 PG/H2（本地无 H2 驱动）。验收：
+ * R2-B4c 收口：raw-SQL 已下沉 {@link AlertDao}（..alert.dao..，继承 runtime-core
+ * {@code JdbcTemplateDaoSupport}，SQL 逐字节不变）。本测试改以 {@code JdbcTemplate}
+ * mock 经 {@link ReflectionTestUtils} 注入 DAO 的 {@code jdbcTemplate} 通道，
+ * 不依赖 PG/H2（本地无 H2 驱动）。验收：
  * <ul>
  *   <li>insertRecord 落控制域表、全 slot 参数化（列数 12）</li>
  *   <li>ack/close 状态机 SQL 命中正确表与状态迁移</li>
  *   <li>无 webhook 目标时 webhook 通道降级为 log（返回 success 而非 fail）</li>
  * </ul>
  */
-@ExtendWith(MockitoExtension.class)
 class AlertPersistenceTest {
 
-    @Mock
     private JdbcTemplate jdbc;
+    private AlertDao repo;
 
-    @InjectMocks
-    private AlertRepository repo;
+    @BeforeEach
+    void setUp() {
+        jdbc = mock(JdbcTemplate.class);
+        repo = new AlertDao();
+        ReflectionTestUtils.setField(repo, "jdbcTemplate", jdbc);
+    }
 
     @SuppressWarnings("unchecked")
     @Test

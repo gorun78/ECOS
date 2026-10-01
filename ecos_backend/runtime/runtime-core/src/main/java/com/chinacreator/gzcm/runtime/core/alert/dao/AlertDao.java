@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.runtime.core.alert.persist;
+package com.chinacreator.gzcm.runtime.core.alert.dao;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -7,6 +7,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -23,27 +25,25 @@ import java.util.Map;
  * {@link com.chinacreator.gzcm.runtime.core.alert.service.impl.AlertServiceImpl} 退回纯进程内缓存。</p>
  *
  * <p>铁律红线 EN01/IR01：所有 slot 参数化，缺失 NOT-NULL 列给显式默认。</p>
+ *
+ * <p>架构铁律 §2.5#1 / IR06 收口（R2-B4c）：本类即数据访问收口点，继承 root DDL
+ * runtime-core {@link JdbcTemplateDaoSupport}，使用其 {@code jdbcTemplate} 通道；
+ * SQL 文本自原 {@code AlertRepository}（..alert.persist..）逐字节下沉，方法签名与行为不变。</p>
  */
 @Repository
 @ConditionalOnBean(JdbcTemplate.class)
-public class AlertRepository {
+public class AlertDao extends JdbcTemplateDaoSupport {
 
-    private static final Logger log = LoggerFactory.getLogger(AlertRepository.class);
+    private static final Logger log = LoggerFactory.getLogger(AlertDao.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String V = "1.0.0";
-
-    private final JdbcTemplate jdbc;
-
-    public AlertRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     // ============================= 规则 =============================
 
     public void insertRule(String ruleCode, String metricKey, String severity,
                            java.math.BigDecimal threshold, Integer windowSec,
                            Integer upgradeMin, Integer enabled, String channel, String webhookUrl) {
-        jdbc.update(
+        jdbcTemplate.update(
             "INSERT INTO ecos_control.ecos_runtime_alert_rule" +
             " (id, rule_code, metric_key, severity, threshold_num, window_sec, upgrade_min," +
             "  enabled, channel, webhook_url, version_no, is_deleted, domain)" +
@@ -59,7 +59,7 @@ public class AlertRepository {
     public String insertRecord(String ruleCode, String severity, String title, Map<String, Object> detail,
                                String sourceModule, String traceId, String tenantId) {
         String id = java.util.UUID.randomUUID().toString();
-        jdbc.update(
+        jdbcTemplate.update(
             "INSERT INTO ecos_control.ecos_runtime_alert_record" +
             " (id, rule_code, severity, status, title, detail_json, source_module, trace_id," +
             "  occurred_at, version_no, is_deleted, domain, tenant_id)" +
@@ -71,7 +71,7 @@ public class AlertRepository {
 
     public Map<String, Object> findRecordById(String id) {
         try {
-            return jdbc.queryForMap(
+            return jdbcTemplate.queryForMap(
                 "SELECT id, rule_code AS ruleCode, severity, status, title, detail_json AS detailJson," +
                 " source_module AS sourceModule, trace_id AS traceId, ack_by AS ackBy, ack_time AS ackTime," +
                 " close_time AS closeTime, occurred_at AS occurredAt" +
@@ -93,7 +93,7 @@ public class AlertRepository {
                 " ORDER BY occurred_at DESC LIMIT ? OFFSET ?";
         args.add(pageSize);
         args.add((page - 1) * pageSize);
-        return jdbc.query(sql, RECORD_MAPPER, args.toArray());
+        return jdbcTemplate.query(sql, RECORD_MAPPER, args.toArray());
     }
 
     public long countRecords(String status, String severity) {
@@ -101,12 +101,12 @@ public class AlertRepository {
         List<Object> args = new ArrayList<>();
         if (status != null && !status.isEmpty()) { where.append("AND status = ?"); args.add(status); }
         if (severity != null && !severity.isEmpty()) { where.append("AND severity = ?"); args.add(severity); }
-        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM ecos_control.ecos_runtime_alert_record" + where, Long.class, args.toArray());
+        Long c = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_control.ecos_runtime_alert_record" + where, Long.class, args.toArray());
         return c == null ? 0 : c;
     }
 
     public boolean ackRecord(String id, String ackBy, String note) {
-        return jdbc.update(
+        return jdbcTemplate.update(
             "UPDATE ecos_control.ecos_runtime_alert_record SET status = 'acked', ack_by = ?, ack_time = NOW()," +
             " detail_json = ? , update_time = NOW()" +
             " WHERE id = ? AND status = 'open'",
@@ -114,7 +114,7 @@ public class AlertRepository {
     }
 
     public boolean closeRecord(String id) {
-        return jdbc.update(
+        return jdbcTemplate.update(
             "UPDATE ecos_control.ecos_runtime_alert_record SET status = 'closed', close_time = NOW(), update_time = NOW()" +
             " WHERE id = ? AND status IN ('open','acked')", id) > 0;
     }
@@ -143,7 +143,7 @@ public class AlertRepository {
 
     private String lookupDetail(String id) {
         try {
-            return jdbc.queryForObject(
+            return jdbcTemplate.queryForObject(
                 "SELECT detail_json FROM ecos_control.ecos_runtime_alert_record WHERE id = ? AND is_deleted = 0",
                 String.class, id);
         } catch (Exception ex) {
