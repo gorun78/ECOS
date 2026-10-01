@@ -1,9 +1,9 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
+import com.chinacreator.gzcm.engine.cognitive2.dao.RuleDao;
 import com.chinacreator.gzcm.engine.cognitive2.model.ImpactAnalysisResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -12,23 +12,18 @@ import java.util.*;
  * 规则影响分析服务 — 分析指定规则变更后，哪些下游规则会受到波及影响。
  *
  * <p>简化实现：通过 sys_compliance_rule 表的 description 字段文本匹配，
- * 查找所有 description 中引用了目标规则名称/ID 的其他规则。</p>
+ * 查找所有 description 中引用了目标规则名称/ID 的其他规则。
+ * SQL 落点已收口至 {@link RuleDao}（架构铁律 §2.5 #1 / IR06，B2-b，与 RuleCausalService 共用）。</p>
  */
 @Service
 public class RuleImpactService {
 
     private static final Logger log = LoggerFactory.getLogger(RuleImpactService.class);
 
-    private static final String SELECT_RULE_BY_ID =
-            "SELECT id, name, domain, description FROM sys_compliance_rule WHERE id = ?";
+    private final RuleDao ruleDao;
 
-    private static final String SELECT_ALL_RULES =
-            "SELECT id, name, domain, description FROM sys_compliance_rule";
-
-    private final JdbcTemplate jdbcTemplate;
-
-    public RuleImpactService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public RuleImpactService(RuleDao ruleDao) {
+        this.ruleDao = ruleDao;
     }
 
     /**
@@ -41,7 +36,7 @@ public class RuleImpactService {
         log.info("Analyzing rule impact for: {}", ruleId);
 
         // 1. 查询源规则
-        List<Map<String, Object>> rootRows = jdbcTemplate.queryForList(SELECT_RULE_BY_ID, ruleId);
+        List<Map<String, Object>> rootRows = ruleDao.findRuleById(ruleId);
         if (rootRows.isEmpty()) {
             log.warn("Rule not found: {}", ruleId);
             return new ImpactAnalysisResult(ruleId, null);
@@ -52,7 +47,7 @@ public class RuleImpactService {
         String sourceDomain = (String) rootRow.get("domain");
 
         // 2. 加载全量规则
-        List<Map<String, Object>> allRows = jdbcTemplate.queryForList(SELECT_ALL_RULES);
+        List<Map<String, Object>> allRows = ruleDao.findAllRules();
 
         // 3. 文本匹配：找出 description 中引用源规则的所有规则
         ImpactAnalysisResult result = new ImpactAnalysisResult(ruleId, sourceName);

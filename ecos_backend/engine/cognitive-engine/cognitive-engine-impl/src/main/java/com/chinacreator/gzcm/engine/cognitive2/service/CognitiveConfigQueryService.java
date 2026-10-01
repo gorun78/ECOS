@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chinacreator.gzcm.engine.cognitive2.dao.ConfigQueryDao;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,16 +15,17 @@ import org.springframework.stereotype.Service;
  * 数据源为 sys_config 表，与前端 CognitiveConfigTab 默认 {@code cognitive.*} 前缀的
  * key 对齐；不跨模块 import sysman 包（架构铁律：引擎层不依赖服务层）。</p>
  *
- * <p>异常语义：查询 / 写入抛出的 {@code DataAccessException} 原样上浮，由调用方
+ * <p>SQL 落点已收口至 {@link ConfigQueryDao}（架构铁律 §2.5 #1 / IR06，B2-b）；
+ * 异常语义不变：查询 / 写入抛出的 {@code DataAccessException} 原样上浮，由调用方
  * Controller 捕获并降级返回，与既有 HTTP 行为一致。</p>
  */
 @Service
 public class CognitiveConfigQueryService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final ConfigQueryDao dao;
 
-    public CognitiveConfigQueryService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public CognitiveConfigQueryService(ConfigQueryDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -34,11 +35,7 @@ public class CognitiveConfigQueryService {
      * @return 原始行列表（config_key / config_value / description / config_type / config_label）
      */
     public List<Map<String, Object>> listActiveConfigRows(String group) {
-        return jdbcTemplate.queryForList(
-                "SELECT config_key, config_value, description, config_type, config_label " +
-                "FROM sys_config WHERE config_group = ? AND status = 'active' " +
-                "ORDER BY sort_order, config_key",
-                group);
+        return dao.listActiveConfigRows(group);
     }
 
     /**
@@ -52,19 +49,12 @@ public class CognitiveConfigQueryService {
     public int upsertConfigValue(String key, String value, String group) {
         LocalDateTime now = LocalDateTime.now();
         // 1) 尝试 update（命中 → 视为已存在）
-        int rows = jdbcTemplate.update(
-                "UPDATE sys_config SET config_value = ?, updated_at = ? " +
-                "WHERE config_key = ? AND status = 'active'",
-                value, now, key);
+        int rows = dao.updateConfigValue(key, value, now);
         if (rows > 0) {
             return rows;
         }
         // 2) 不存在 → insert（保持与 Group 一致）
-        jdbcTemplate.update(
-                "INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, " +
-                "config_label, description, sort_order, status, edition, created_at, updated_at) " +
-                "VALUES (gen_random_uuid(), ?, ?, ?, 'string', ?, '', 100, 'active', 'all', ?, ?)",
-                key, value, group, labelFor(key), now, now);
+        dao.insertConfigValue(key, value, group, labelFor(key), now);
         return 0;
     }
 

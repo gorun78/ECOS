@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
 import com.chinacreator.gzcm.engine.cognitive2.DecisionService;
+import com.chinacreator.gzcm.engine.cognitive2.dao.LegacyBridgeDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -28,12 +28,12 @@ public class DecisionLegacyBridge {
 
     private static final Logger log = LoggerFactory.getLogger(DecisionLegacyBridge.class);
 
-    private final JdbcTemplate jdbc;
+    private final LegacyBridgeDao legacyBridgeDao;
     private final DecisionService decisionService;
 
     @Autowired
-    public DecisionLegacyBridge(JdbcTemplate jdbc, DecisionService decisionService) {
-        this.jdbc = jdbc;
+    public DecisionLegacyBridge(LegacyBridgeDao legacyBridgeDao, DecisionService decisionService) {
+        this.legacyBridgeDao = legacyBridgeDao;
         this.decisionService = decisionService;
     }
 
@@ -49,11 +49,7 @@ public class DecisionLegacyBridge {
         // V29 表名 ecos_ceo_causal_chain（如存在）
         int count = 0;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM ecos_ceo_causal_chain WHERE id NOT IN " +
-                "(SELECT entity_id FROM ecos_provenance_entry WHERE entity_type = 'decision' " +
-                "AND source_ref = 'V29_bridge')"
-            );
+            List<Map<String, Object>> rows = legacyBridgeDao.findUnbridgedCeoCausalChains();
 
             for (Map<String, Object> row : rows) {
                 String legacyId = String.valueOf(row.get("id"));
@@ -89,11 +85,7 @@ public class DecisionLegacyBridge {
 
         int count = 0;
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM ecos_diagnostic_agent WHERE id NOT IN " +
-                "(SELECT entity_id FROM ecos_provenance_entry WHERE entity_type = 'decision' " +
-                "AND source_ref = 'V30_bridge')"
-            );
+            List<Map<String, Object>> rows = legacyBridgeDao.findUnbridgedDiagnosticAgents();
 
             for (Map<String, Object> row : rows) {
                 String legacyId = String.valueOf(row.get("id"));
