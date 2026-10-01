@@ -1,14 +1,13 @@
 package com.chinacreator.gzcm.engine.data.metadata;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
+import com.chinacreator.gzcm.engine.data.dao.MetadataGitArchiveConfigDao;
 import com.chinacreator.gzcm.engine.data.service.GitRepoRootResolver;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
-import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -33,11 +32,14 @@ import java.util.stream.Collectors;
  *       20260907_113000.json  — 历史版本（按时间戳命名）
  * </pre>
  *
+ * 采用 DAO 模式：SQL 下沉 {@link com.chinacreator.gzcm.engine.data.dao.MetadataGitArchiveConfigDao}
+ * （B4a 收口，R2-B4a），本组件不再私持 {@code JdbcTemplate}。
+ *
  * @author ECOS Data Engine Team
  * @since 2026-09-07
  */
 @Component
-public class MetadataCollectGitArchive extends JdbcTemplateDaoSupport {
+public class MetadataCollectGitArchive {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataCollectGitArchive.class);
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -53,13 +55,15 @@ public class MetadataCollectGitArchive extends JdbcTemplateDaoSupport {
     private static final List<String> COMPARE_FIELDS = List.of("type", "sourcePath", "description", "fieldCount", "rowCount");
 
     private final GitService gitService;
+    /** 历史版本数配置读取（sys_config dw.metadata.history_versions），SQL 已下沉 DAO */
+    private final MetadataGitArchiveConfigDao configDao;
     /** 仓库根路径单源解析（sys_config ecos_git_repo_root，含 path-traversal 校验） */
     private final GitRepoRootResolver repoRootResolver;
 
-    public MetadataCollectGitArchive(GitService gitService, JdbcTemplate jdbc,
+    public MetadataCollectGitArchive(GitService gitService, MetadataGitArchiveConfigDao configDao,
                                      GitRepoRootResolver repoRootResolver) {
         this.gitService = gitService;
-        this.jdbcTemplate = jdbc;
+        this.configDao = configDao;
         this.repoRootResolver = repoRootResolver;
     }
 
@@ -149,9 +153,7 @@ public class MetadataCollectGitArchive extends JdbcTemplateDaoSupport {
      */
     private int resolveHistoryLimit() {
         try {
-            String val = jdbcTemplate.queryForObject(
-                    "SELECT config_value FROM sys_config WHERE config_key = 'dw.metadata.history_versions'",
-                    String.class);
+            String val = configDao.findHistoryVersionsConfig();
             if (val == null || val.trim().isEmpty()) {
                 return DEFAULT_MAX_HISTORY_VERSIONS;
             }

@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.data.scheduler;
 
-import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import com.chinacreator.gzcm.engine.data.dao.SchemaDetectionDao;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
 import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -26,9 +25,13 @@ import java.util.*;
  * 自动维护 schema_snapshots 和 schema_changes 两张表。
  * 单一调度：runtime-task 注册 + cron 触发（H8-T3 收口，已移除 Spring @Scheduled 双轨）。
  * </p>
+ *
+ * <p>B4a 收口（R2-B4a）：SQL 下沉 {@link SchemaDetectionDao}（..dao..），
+ * 本类不再继承 JdbcTemplateDaoSupport / 私持 JdbcTemplate；
+ * diff / 哈希 / 列解析逻辑保持原位。</p>
  */
 @Component
-public class SchemaChangeDetector extends JdbcTemplateDaoSupport {
+public class SchemaChangeDetector {
 
     private static final Logger log = LoggerFactory.getLogger(SchemaChangeDetector.class);
     private static final String CRON_HOURLY = "0 0 * * * ?";
@@ -36,11 +39,15 @@ public class SchemaChangeDetector extends JdbcTemplateDaoSupport {
 
     private final TaskSchedulerService taskScheduler;
     private final ITaskManagementService taskManagementService;
+    /** B4a 收口：information_schema 扫描 + schema_snapshots/schema_changes 读写 */
+    private final SchemaDetectionDao dao;
 
     public SchemaChangeDetector(TaskSchedulerService taskScheduler,
-                                ITaskManagementService taskManagementService) {
+                                ITaskManagementService taskManagementService,
+                                SchemaDetectionDao dao) {
         this.taskScheduler = taskScheduler;
         this.taskManagementService = taskManagementService;
+        this.dao = dao;
     }
 
     @PostConstruct
@@ -175,86 +182,46 @@ public class SchemaChangeDetector extends JdbcTemplateDaoSupport {
         return changes;
     }
 
-    // ── 查询 information_schema ──────────────────────
+    // ── 查询 information_schema（SQL 在 SchemaDetectionDao）─────────────
 
     private List<SchemaInfo> loadCurrentSchema() {
-        String sql = """
-            SELECT table_schema || '.' || table_name AS full_table,
-                   table_schema AS datasource_id,
-                   table_name,
-                   STRING_AGG(
-                       column_name || '|' || data_type || '|' || COALESCE(character_maximum_length::text,'')
-                       || '|' || COALESCE(is_nullable,'YES'),
-                       ',' ORDER BY ordinal_position
-                   ) AS col_sig
-            FROM information_schema.columns
-            WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-            GROUP BY table_schema, table_name
-            ORDER BY table_schema, table_name
-            """;
-
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
-            String ds = rs.getString("datasource_id");
-            String tn = rs.getString("table_name");
-            String colSig = rs.getString("col_sig");
+        List<Map<String, Object>> rows = dao.scanCurrentSchema();
+        List<SchemaInfo> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            String ds = (String) row.get("datasource_id");
+            String tn = (String) row.get("table_name");
+            String colSig = (String) row.get("col_sig");
             String hash = sha256(colSig);
-            return new SchemaInfo(ds, tn, hash, colSig);
-        });
+            result.add(new SchemaInfo(ds, tn, hash, colSig));
+        }
+        return result;
     }
 
     private List<ColumnInfo> loadCurrentColumns(String datasourceId, String tableName) {
-        String sql = """
-            SELECT column_name, data_type, COALESCE(character_maximum_length::text,'') AS char_len,
-                   COALESCE(is_nullable,'YES') AS is_nullable,
-                   ordinal_position
-            FROM information_schema.columns
-            WHERE table_schema = ? AND table_name = ?
-            ORDER BY ordinal_position
-            """;
-
         String schema = datasourceId.contains(".") ? datasourceId.substring(0, datasourceId.indexOf('.')) : datasourceId;
         String table = tableName;
 
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
-            String cn = rs.getString("column_name");
-            String dt = rs.getString("data_type");
-            String cl = rs.getString("char_len");
-            String nl = rs.getString("is_nullable");
-            return new ColumnInfo(cn, dt, cl, nl);
-        }, schema, table);
+        List<Map<String, Object>> rows = dao.scanCurrentColumns(schema, table);
+        List<ColumnInfo> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            String cn = (String) row.get("column_name");
+            String dt = (String) row.get("data_type");
+            String cl = (String) row.get("char_len");
+            String nl = (String) row.get("is_nullable");
+            result.add(new ColumnInfo(cn, dt, cl, nl));
+        }
+        return result;
     }
 
-    // ── 快照存取 ─────────────────────────────────────
+    // ── 快照存取（SQL 在 SchemaDetectionDao）────────────
 
     private Map<String, String> loadLatestSnapshots() {
-        String sql = """
-            SELECT DISTINCT ON (datasource_id, table_name)
-                   datasource_id, table_name, column_hash
-            FROM schema_snapshots
-            ORDER BY datasource_id, table_name, snapshot_at DESC
-            """;
-
-        Map<String, String> result = new HashMap<>();
-        jdbcTemplate.query(sql, (rs) -> {
-            String key = rs.getString("datasource_id") + "::" + rs.getString("table_name");
-            result.put(key, rs.getString("column_hash"));
-        });
-        return result;
+        return dao.findLatestSnapshotHashes();
     }
 
     private List<ColumnInfo> loadColumnsFromSnapshot(String datasourceId, String tableName, String hash) {
         // 从最近一次快照的 col_sig 字段解析列信息
-        String sql = """
-            SELECT col_sig FROM schema_snapshots
-            WHERE datasource_id = ? AND table_name = ? AND column_hash = ?
-            ORDER BY snapshot_at DESC LIMIT 1
-            """;
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, datasourceId, tableName, hash);
-        if (rows.isEmpty()) {
-            return Collections.emptyList();
-        }
-        String colSig = (String) rows.get(0).get("col_sig");
+        String colSig = dao.findSnapshotColSig(datasourceId, tableName, hash);
         if (colSig == null || colSig.isBlank()) {
             return Collections.emptyList();
         }
@@ -271,17 +238,11 @@ public class SchemaChangeDetector extends JdbcTemplateDaoSupport {
 
     private void insertSnapshot(SchemaInfo si) {
         // H8-T1: schema_snapshots.col_sig 列由 db/migration（V162）建表时即包含，运行时不再 ALTER。
-        jdbcTemplate.update(
-            "INSERT INTO schema_snapshots (datasource_id, table_name, column_hash, snapshot_at, col_sig) VALUES (?,?,?,?,?)",
-            si.datasourceId, si.tableName, si.columnHash, LocalDateTime.now(), si.colSig
-        );
+        dao.insertSnapshot(si.datasourceId, si.tableName, si.columnHash, si.colSig);
     }
 
     private void insertChange(SchemaChange sc) {
-        jdbcTemplate.update(
-            "INSERT INTO schema_changes (datasource_id, table_name, change_type, detail_json, detected_at, acknowledged) VALUES (?,?,?,?,?,?)",
-            sc.datasourceId, sc.tableName, sc.changeType, sc.detailJson, LocalDateTime.now(), false
-        );
+        dao.insertChange(sc.datasourceId, sc.tableName, sc.changeType, sc.detailJson);
     }
 
     // ── 工具 ─────────────────────────────────────────
