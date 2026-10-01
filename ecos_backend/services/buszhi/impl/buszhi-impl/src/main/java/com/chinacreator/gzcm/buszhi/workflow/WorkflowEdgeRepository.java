@@ -1,57 +1,34 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
+import com.chinacreator.gzcm.buszhi.workflow.dao.WorkflowEdgeDao;
+
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 /**
- * 工作流边投影只读仓库 — {@code {schema}.ecos_workflow_edge}（W86/F03-12 M1 只读路径）。
+ * 工作流边投影只读门面 — {@code {schema}.ecos_workflow_edge}（W86/F03-12 M1 只读路径）。
  *
- * <p>与 {@link WorkflowNodeRepository} 同口径：只读，写路径拆解延至 F03-12 M2。
+ * <p>R2-B5 数据访问收口（架构铁律 §2.5 #1 / IR06）：本层不再直持
+ * {@code JdbcTemplate}，全部数据访问下沉到 {@link WorkflowEdgeDao}
+ * （extends {@code com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport}）；
+ * 本仓库仅作 thin façade，保留原 public API，SQL / RowMapper / schema 注入原样由 {@code dao} 层承担，
+ * 门面原样委托。**只读**，写路径拆解延至 F03-12 M2。</p>
  */
 @Repository
 public class WorkflowEdgeRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(WorkflowEdgeRepository.class);
-    private final JdbcTemplate jdbc;
-    private final String schema;
+    private final WorkflowEdgeDao dao;
 
-    /** 显式列清单 — 随 V173 §2 DDL（source_node_key/target_node_key 即 source/target）。 */
-    private static final String COLS =
-        "id, workflow_id, edge_key, source_node_key, target_node_key, sort_order, create_time";
-
-    private final RowMapper<WorkflowEdgeEntity> ROW_MAPPER = (rs, rowNum) -> {
-        WorkflowEdgeEntity e = new WorkflowEdgeEntity();
-        e.setId(rs.getString("id"));
-        e.setWorkflowId(rs.getString("workflow_id"));
-        e.setEdgeKey(rs.getString("edge_key"));
-        e.setSourceNodeKey(rs.getString("source_node_key"));
-        e.setTargetNodeKey(rs.getString("target_node_key"));
-        e.setSortOrder(rs.getObject("sort_order", Integer.class));
-        e.setCreateTime(rs.getTimestamp("create_time") != null
-            ? rs.getTimestamp("create_time").toLocalDateTime() : null);
-        return e;
-    };
-
-    public WorkflowEdgeRepository(JdbcTemplate jdbc,
-                                  @Value("${ecos.ontology.control-schema:ecos_ontology}") String schema) {
-        this.jdbc = jdbc;
-        this.schema = schema;
+    public WorkflowEdgeRepository(WorkflowEdgeDao dao) {
+        this.dao = dao;
     }
 
     public List<WorkflowEdgeEntity> findByWorkflowId(String wfId) {
-        String sql = "SELECT " + COLS + " FROM " + schema + ".ecos_workflow_edge WHERE workflow_id = ? ORDER BY sort_order";
-        return jdbc.query(sql, ROW_MAPPER, wfId);
+        return dao.findByWorkflowId(wfId);
     }
 
     public int countByWorkflowId(String wfId) {
-        String sql = "SELECT COUNT(*) FROM " + schema + ".ecos_workflow_edge WHERE workflow_id = ?";
-        Long c = jdbc.queryForObject(sql, Long.class, wfId);
-        return c != null ? c.intValue() : 0;
+        return dao.countByWorkflowId(wfId);
     }
 }

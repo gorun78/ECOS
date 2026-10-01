@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.chinacreator.gzcm.buszhi.workflow.dao.WorkflowDao;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -13,14 +15,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * W86/O-18 软删守卫（《详细设计-03-本体域》W86）。
  *
- * <p>断言：{@code WorkflowRepository.deleteById} 走 {@code {schema}.ecos_workflow} 软删
+ * <p>断言：{@code WorkflowRepository.deleteById（门面 → WorkflowDao 委托）} 走
+ * {@code {schema}.ecos_workflow} 软删
  * （{@code is_deleted=1 + update_time=NOW() + update_by=?}），**禁物理 DELETE**；
- * schema 限定到 {@code ecos_ontology}（默认值）。
+ * schema 限定到 {@code ecos_ontology}（默认值）。</p>
+ *
+ * <p>2026-10 B5：数据访问下沉 {@code ..dao..}（架构铁律 §2.5 #1 / IR06），本守卫对
+ * {@link WorkflowDao}（门面 {@code WorkflowRepository} 的 JDBC 委托目标）直接断言软删语义。</p>
  */
 class WorkflowSoftDeleteTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final WorkflowRepository repository = new WorkflowRepository(jdbc, "ecos_ontology");
+    private final WorkflowDao repository = new WorkflowDao(jdbc, "ecos_ontology");
 
     @AfterEach
     void clearActor() {
