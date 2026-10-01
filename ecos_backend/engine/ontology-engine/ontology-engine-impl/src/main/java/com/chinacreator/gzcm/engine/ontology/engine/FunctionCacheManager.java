@@ -4,17 +4,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.chinacreator.gzcm.engine.ontology.dao.FunctionAuditDao;
 
 /**
  * FunctionCacheManager — Function 执行结果缓存 + 审计日志写入。
@@ -30,6 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code FUNCTION_EXEC} 事件到 {@code KafkaTopics.AUDIT}（Kafka 为 source of truth）；
  * Kafka 不可用/发布失败 → 本地兜底写 {@code ecos_ontology.ecos_function_audit}（V172）；
  * 两者皆失败 → 抛 {@link AuditWriteException}（Controller 映射 500 ECOS-ONTO-061 拒收）。</p>
+ *
+ * <p>B3c 数据访问收口（架构铁律 §2.5 #1 / IR06）：本类不再直接持有/引用 {@code JdbcTemplate}，
+ * 审计 SQL 全部委托给 {@link FunctionAuditDao}（继承 {@code JdbcTemplateDaoSupport}）。</p>
  */
 @Component
 public class FunctionCacheManager {
@@ -45,7 +48,8 @@ public class FunctionCacheManager {
     /** 内存缓存 */
     private final ConcurrentHashMap<String, CacheEntry<FunctionResult>> cache = new ConcurrentHashMap<>();
 
-    private final JdbcTemplate jdbc;
+    /** 审计双通道写盘与查询下放到 DAO（B3c 收口）。 */
+    private final FunctionAuditDao dao;
 
     /** Kafka 审计通道（runtime-event 事件总线）；缺 Bean 时走内存 fallback，不可用则纯本地兜底。 */
     private final EventBusService eventBus;
@@ -54,17 +58,12 @@ public class FunctionCacheManager {
     private final String controlSchema;
 
     @Autowired
-    public FunctionCacheManager(JdbcTemplate jdbc,
+    public FunctionCacheManager(FunctionAuditDao dao,
                                 @Autowired(required = false) EventBusService eventBus,
                                 @Value("${ecos.ontology.control-schema:ecos_ontology}") String controlSchema) {
-        this.jdbc = jdbc;
+        this.dao = dao;
         this.eventBus = eventBus;
         this.controlSchema = (controlSchema == null || controlSchema.isBlank()) ? "ecos_ontology" : controlSchema;
-    }
-
-    /** 兼容旧构造（默认 schema，无 Kafka 通道）——供不关注审计通道的调用方/测试。 */
-    public FunctionCacheManager(JdbcTemplate jdbc) {
-        this(jdbc, null, "ecos_ontology");
     }
 
     /**
@@ -201,16 +200,14 @@ public class FunctionCacheManager {
 
     /**
      * 本地兜底：INSERT 到 {@code {controlSchema}.ecos_function_audit}（V172）。
-     * 显式列清单（IR04）、应用侧 UUID 主键（MC01）、参数化（IR05）、no {@code ::}（MC03）。
+     *
+     * <p>B3c 收口：SQL 与参数序原样搬至 {@link FunctionAuditDao#localFallbackInsert}；
+     * 本方法仅保留 truncation 规则的应用（DR04：本层只做存取校验），再委托 DAO 落盘。</p>
      */
     private void localFallbackInsert(FunctionAuditRecord r) {
-        String sql = "INSERT INTO " + controlSchema + ".ecos_function_audit ("
-                + "id, function_id, function_name, expression, object_type, params_json,"
-                + " result_summary, duration_ms, is_cache_hit, caller_id, trace_id,"
-                + " status, error_message, create_time, update_time, create_by, update_by,"
-                + " is_deleted, version_no, domain) VALUES ("
-                + "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, ?)";
-        jdbc.update(sql,
+        // B3c 收口：DAO 内部已硬编码 is_deleted=0, version_no="1", domain="default"
+        // （与 V172 表审计列的默认语义一致），故本方法只传 15 个业务字段。
+        dao.localFallbackInsert(
                 UUID.randomUUID().toString(),
                 truncate(r.functionId(), 64),
                 truncate(r.functionName(), 255),
@@ -225,10 +222,7 @@ public class FunctionCacheManager {
                 r.status(),
                 truncate(r.errorMessage(), 2000),
                 truncate(r.callerId(), 100),
-                truncate(r.callerId(), 100),
-                0,
-                "1",
-                "default");
+                truncate(r.callerId(), 100));
     }
 
     /**
@@ -257,60 +251,11 @@ public class FunctionCacheManager {
     /**
      * 查询审计日志（分页）—— 读取 V172 新表 {@code {schema}.ecos_function_audit}
      * （显式列清单禁 SELECT *，参数化，ORDER BY create_time DESC 命中 idx_ecos_func_audit_created）。
+     *
+     * <p>B3c 收口：SQL 与 count/items 双查询 try/catch 语义搬入 {@link FunctionAuditDao#queryAudit}。</p>
      */
     public Map<String, Object> queryAudit(String status, String callerId, int page, int pageSize) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        String table = controlSchema + ".ecos_function_audit";
-        String cols = "id, function_id, function_name, expression, object_type, params_json,"
-                + " result_summary, duration_ms, is_cache_hit, caller_id, trace_id,"
-                + " status, error_message, create_time, update_time, version_no, is_deleted, domain";
-
-        StringBuilder sql = new StringBuilder("SELECT ").append(cols).append(" FROM ").append(table)
-                .append(" WHERE is_deleted = 0");
-        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM ").append(table)
-                .append(" WHERE is_deleted = 0");
-        List<Object> params = new ArrayList<>();
-
-        if (status != null && !status.isBlank()) {
-            sql.append(" AND status = ?");
-            countSql.append(" AND status = ?");
-            params.add(status);
-        }
-        if (callerId != null && !callerId.isBlank()) {
-            sql.append(" AND caller_id = ?");
-            countSql.append(" AND caller_id = ?");
-            params.add(callerId);
-        }
-
-        // 总数
-        int total;
-        try {
-            Integer count = jdbc.queryForObject(countSql.toString(), Integer.class, params.toArray());
-            total = count != null ? count : 0;
-        } catch (Exception e) {
-            log.warn("Failed to count audit logs: {}", e.getMessage());
-            total = 0;
-        }
-
-        // 分页数据（create_time DESC，命中 idx_ecos_func_audit_created）
-        sql.append(" ORDER BY create_time DESC LIMIT ? OFFSET ?");
-        List<Object> dataParams = new ArrayList<>(params);
-        dataParams.add(pageSize);
-        dataParams.add((page - 1) * pageSize);
-
-        List<Map<String, Object>> items;
-        try {
-            items = jdbc.queryForList(sql.toString(), dataParams.toArray());
-        } catch (Exception e) {
-            log.warn("Failed to query audit logs: {}", e.getMessage());
-            items = List.of();
-        }
-
-        result.put("items", items);
-        result.put("total", total);
-        result.put("page", page);
-        result.put("pageSize", pageSize);
-        return result;
+        return dao.queryAudit(status, callerId, page, pageSize);
     }
 
     // ── private helpers ────────────────────────────────

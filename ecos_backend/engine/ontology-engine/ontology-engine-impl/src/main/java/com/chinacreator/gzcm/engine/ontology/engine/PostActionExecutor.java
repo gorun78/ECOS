@@ -1,23 +1,21 @@
 package com.chinacreator.gzcm.engine.ontology.engine;
 
 import com.chinacreator.gzcm.engine.ontology.model.ActionType;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import com.chinacreator.gzcm.engine.ontology.dao.PostActionDao;
 
 /**
  * PostActionExecutor — 后置动作异步执行器。
@@ -30,6 +28,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   <li>write_audit — 写审计日志</li>
  * </ul>
  *
+ * <p>B3c 数据访问收口：本类不再直接持有 {@code JdbcTemplate}，
+ * 对象字段更新与审计日志写入委托给 {@link PostActionDao}。
+ *
  * <p>使用 {@code @Async} 异步执行，失败写审计不阻塞主流程。</p>
  */
 @Component
@@ -38,11 +39,11 @@ public class PostActionExecutor {
     private static final Logger log = LoggerFactory.getLogger(PostActionExecutor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final PostActionDao dao;
     private final List<Map<String, Object>> postActionResults = new CopyOnWriteArrayList<>();
 
-    public PostActionExecutor(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public PostActionExecutor(PostActionDao dao) {
+        this.dao = dao;
     }
 
     /**
@@ -143,9 +144,7 @@ public class PostActionExecutor {
             return;
         }
         try {
-            jdbc.update(
-                "UPDATE ecos_ontology_object SET " + field + " = ?, updated_at = NOW() WHERE id = ?",
-                value != null ? value.toString() : null, objectId);
+            dao.updateObjectField(objectId, field, value != null ? value.toString() : null);
             log.info("Updated field '{}' of object {}", field, objectId);
         } catch (Exception e) {
             log.error("Failed to update field '{}' of object {}: {}", field, objectId, e.getMessage());
@@ -169,11 +168,7 @@ public class PostActionExecutor {
             String userId = context != null
                 ? String.valueOf(context.getOrDefault("userId", "system"))
                 : "system";
-            jdbc.update("""
-                INSERT INTO ecos_audit_log (id, action_type_id, object_id, user_id,
-                    audit_type, summary, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW())
-                """,
+            dao.writeAudit(
                 auditId, action.getId(), objectId, userId,
                 "ACTION_EXECUTION",
                 "Action '" + action.getName() + "' executed on object " + objectId
