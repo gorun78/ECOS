@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
+import com.chinacreator.gzcm.engine.data.dao.DataSourceDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataAsyncTrigger;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataStrategyConfig;
@@ -11,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -36,7 +36,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 public class DataSourceServiceImpl implements DataSourceService {
 
     private static final Logger log = LoggerFactory.getLogger(DataSourceServiceImpl.class);
-    private static final String TABLE = "td_datasource";
 
     /** PMO-49: KMS 数据源密码专用 keyId（全局唯一可绑数据源场景，与 sysman 身份凭证 kek 隔离）。 */
     private static final String KEY_DATA_SOURCE_PASSWORD = "dataSourcePwd";
@@ -62,7 +61,7 @@ public class DataSourceServiceImpl implements DataSourceService {
     private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
             new com.fasterxml.jackson.databind.ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final DataSourceDao dataSourceDao;
     private final com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory connectorFactory;
     /** 可选依赖: 当前系统版本（Spring profile），用于 MINIO/FILESYSTEM 版本校验 */
     private String activeProfiles;
@@ -73,9 +72,9 @@ public class DataSourceServiceImpl implements DataSourceService {
     /** PMO-45: 注入 Environment 以获取 Spring active profile（standard/enterprise/ultimate） */
     private Environment springEnv;
 
-    public DataSourceServiceImpl(JdbcTemplate jdbc,
+    public DataSourceServiceImpl(DataSourceDao dataSourceDao,
                                  com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory connectorFactory) {
-        this.jdbc = jdbc;
+        this.dataSourceDao = dataSourceDao;
         this.connectorFactory = connectorFactory;
     }
 
@@ -289,20 +288,10 @@ public class DataSourceServiceImpl implements DataSourceService {
         ensureKey();
         String passwordEnc = encryptPassword(extractPassword(dto.getConnectionConfig()));
         String storedConfig = stripSensitiveFields(dto.getConnectionConfig());
-        List<String> cols = List.of(
-                "datasource_id", "datasource_name", "datasource_type", "org_id",
-                "description", "connection_config", "status", "tags", "metadata_config",
-                "create_time", "update_time", "password_enc");
-        Object[] vals = {
+        dataSourceDao.register(
                 id, dto.getDatasourceName(), dto.getDatasourceType(), dto.getOrgId(),
-                dto.getDescription(), storedConfig, "active", dto.getTags(),
-                metadataConfigJson, now, now, passwordEnc
-        };
-        jdbc.update(
-            "INSERT INTO " + TABLE + " (" + String.join(", ", cols) + ") " +
-            "VALUES (" + String.join(", ", java.util.Collections.nCopies(vals.length, "?")) + ")",
-            vals
-        );
+                dto.getDescription(), storedConfig, dto.getTags(),
+                metadataConfigJson, now, passwordEnc);
         log.info("Registered datasource: id={}, name={}, strategy={}",
                 id, dto.getDatasourceName(),
                 dto.getMetadataStrategy() != null ? dto.getMetadataStrategy() : "MANUAL");
@@ -341,11 +330,7 @@ public class DataSourceServiceImpl implements DataSourceService {
             }
         }
         String finalMessage = message;
-        jdbc.update(
-            "UPDATE " + TABLE + " SET last_test_time = ?, last_test_result = ?, " +
-            "last_test_message = ?, update_time = ? WHERE datasource_id = ?",
-            now, ok ? "true" : "false", finalMessage, now, datasourceId
-        );
+        dataSourceDao.updateLastTest(datasourceId, now, ok, finalMessage);
         return ok;
     }
 
@@ -354,18 +339,12 @@ public class DataSourceServiceImpl implements DataSourceService {
         // PMO-74 H8-T-DS-PLAIN: 列表出口统一脱敏（与 getById 同口径）。
         // 收口点选在 listAll() 而非 DataSourceRegistryService:41，因为 DataSourceController:29
         // 直接调 service.listAll() 绕过缓存；此处掩码后两个 HTTP 出口 + Caffeine 缓存同时闭环。
-        return jdbc.query(
-            "SELECT * FROM " + TABLE + " ORDER BY create_time DESC",
-            (rs, i) -> maskProtected(mapRow(rs))
-        );
+        return dataSourceDao.listAll().stream().map(this::maskProtected).toList();
     }
 
     @Override
     public DataSourceEntity getById(String datasourceId) {
-        List<DataSourceEntity> list = jdbc.query(
-            "SELECT * FROM " + TABLE + " WHERE datasource_id = ?",
-            (rs, i) -> mapRow(rs), datasourceId
-        );
+        List<DataSourceEntity> list = dataSourceDao.findByDatasourceId(datasourceId);
         return list.isEmpty() ? null : maskProtected(list.get(0));
     }
 
@@ -375,10 +354,7 @@ public class DataSourceServiceImpl implements DataSourceService {
      * 公开 getById() 强制脱敏，防止 Controller 误把密文回显给前端。
      */
     DataSourceEntity getInternal(String datasourceId) {
-        List<DataSourceEntity> list = jdbc.query(
-            "SELECT * FROM " + TABLE + " WHERE datasource_id = ?",
-            (rs, i) -> mapRow(rs), datasourceId
-        );
+        List<DataSourceEntity> list = dataSourceDao.findByDatasourceId(datasourceId);
         return list.isEmpty() ? null : list.get(0);
     }
 
@@ -431,13 +407,11 @@ public class DataSourceServiceImpl implements DataSourceService {
             newEnc = (candidate != null) ? candidate : oldEnc;
         }
         String storedConfig = stripSensitiveFields(dto.getConnectionConfig());
-        jdbc.update(
-            "UPDATE " + TABLE + " SET datasource_name = ?, datasource_type = ?, org_id = ?, " +
-            "description = ?, connection_config = ?, tags = ?, metadata_config = ?, " +
-            "password_enc = ?, update_time = ? WHERE datasource_id = ?",
+        dataSourceDao.updateDataSource(
+            datasourceId,
             dto.getDatasourceName(), dto.getDatasourceType(), dto.getOrgId(),
             dto.getDescription(), storedConfig, dto.getTags(),
-            metadataConfigJson, newEnc, now, datasourceId
+            metadataConfigJson, newEnc, now
         );
         log.info("Updated datasource: id={}, name={}, strategy={}", datasourceId,
             dto.getDatasourceName(),
@@ -452,17 +426,14 @@ public class DataSourceServiceImpl implements DataSourceService {
 
     @Override
     public void remove(String datasourceId) {
-        jdbc.update("DELETE FROM " + TABLE + " WHERE datasource_id = ?", datasourceId);
+        dataSourceDao.remove(datasourceId);
         log.info("Removed datasource: {}", datasourceId);
     }
 
     @Override
     public void updateMetadataConfig(String datasourceId, String json) {
         Timestamp now = new Timestamp(System.currentTimeMillis());
-        int n = jdbc.update(
-            "UPDATE " + TABLE + " SET metadata_config = ?, update_time = ? WHERE datasource_id = ?",
-            json, now, datasourceId
-        );
+        int n = dataSourceDao.updateMetadataConfig(datasourceId, json, now);
         if (n == 0) {
             throw new RuntimeException("数据源不存在: " + datasourceId);
         }
@@ -487,64 +458,6 @@ public class DataSourceServiceImpl implements DataSourceService {
         } catch (Exception e) {
             log.warn("metadataConfigJson 序列化失败，落默认值: {}", e.getMessage());
             return "{\"strategy\":\"MANUAL\",\"includeRowCount\":true,\"countMethod\":\"ESTIMATE\",\"cacheTtlMinutes\":5,\"onSourceEdit\":true}";
-        }
-    }
-
-    private DataSourceEntity mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
-        DataSourceEntity e = new DataSourceEntity();
-        e.setDatasourceId(rs.getString("datasource_id"));
-        e.setDatasourceName(rs.getString("datasource_name"));
-        e.setDatasourceType(rs.getString("datasource_type"));
-        e.setOrgId(rs.getString("org_id"));
-        e.setNodeId(rs.getString("node_id"));
-        e.setDescription(rs.getString("description"));
-        e.setConnectionConfig(rs.getString("connection_config"));
-        e.setStatus(rs.getString("status"));
-        e.setIsDefault(rs.getString("is_default"));
-        e.setLastTestTime(rs.getTimestamp("last_test_time"));
-        e.setLastTestResult(rs.getString("last_test_result"));
-        e.setLastTestMessage(rs.getString("last_test_message"));
-        e.setCreateBy(rs.getString("create_by"));
-        e.setCreateTime(rs.getTimestamp("create_time"));
-        e.setUpdateBy(rs.getString("update_by"));
-        e.setUpdateTime(rs.getTimestamp("update_time"));
-        e.setTags(rs.getString("tags"));
-        e.setRemark(rs.getString("remark"));
-        // PMO-37 新增列（缺列时回退 NULL）
-        e.setMetadataConfig(readMetadataConfig(rs));
-        e.setLastCollectTime(readLastCollectTime(rs));
-        // PMO-49: 密码密文列（decryption 回填跑 connectionConfig 用；公开 getById 前脱敏）
-        e.setPasswordEncrypted(readPasswordEnc(rs));
-        return e;
-    }
-
-    private String readPasswordEnc(java.sql.ResultSet rs) {
-        try {
-            return rs.getString("password_enc");
-        } catch (java.sql.SQLException sqlEx) {
-            return null; // 缺列回退（兼容未迁移库）
-        }
-    }
-
-    private String readMetadataConfig(java.sql.ResultSet rs) throws java.sql.SQLException {
-        try {
-            Object v = rs.getObject("metadata_config");
-            if (v == null) return null;
-            String s = v.toString();
-            if (s == null || s.isBlank()) return null;
-            // PMO-37 修正: "{}" 是合法的空策略对象, 原实现把它转 null 导致
-            // FE 列表接口 items[].metadataConfig 永远空, 现按原样透传.
-            return s;
-        } catch (java.sql.SQLException sqlEx) {
-            return null; // 缺列回退
-        }
-    }
-
-    private Timestamp readLastCollectTime(java.sql.ResultSet rs) throws java.sql.SQLException {
-        try {
-            return rs.getTimestamp("last_collect_time");
-        } catch (java.sql.SQLException sqlEx) {
-            return null;
         }
     }
 
@@ -736,9 +649,7 @@ public class DataSourceServiceImpl implements DataSourceService {
             message = message.substring(0, 900) + "…";
         }
         try {
-            jdbc.update(
-                "UPDATE " + TABLE + " SET last_test_time=?, last_test_result=?, last_test_message=?, update_time=? WHERE datasource_id=?",
-                now, status, message, now, datasourceId);
+            dataSourceDao.persistLastTest(datasourceId, now, status, message);
         } catch (Exception e) {
             log.warn("更新 last_test_* 失败 dsId={}: {}", datasourceId, e.getMessage());
         }

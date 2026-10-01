@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.dao.PipelineExecutionDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
@@ -51,7 +52,7 @@ class PipelineSinkBatchInsertTest {
         ConnectorFactory cf = mock(ConnectorFactory.class);
         when(cf.getConnector("JDBC")).thenReturn(jdbcConnector);
         this.service = new PipelineExecutionService(repository, cf,
-                mock(JdbcTemplate.class), dataSourceService, mock(UdfService.class),
+                mock(PipelineExecutionDao.class), dataSourceService, mock(UdfService.class),
                 mock(MinioStorageService.class),
                 mock(com.chinacreator.gzcm.engine.data.service.DataLakeResourceService.class));
     }

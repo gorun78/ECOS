@@ -12,9 +12,9 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVersionVO;
 
 /**
- * DQ 规则 MyBatis Mapper — 读 {@code ecos_dq.dq_rule} / {@code ecos_dq.dq_rule_version}（只读, Phase 1）。
+ * DQ 规则 MyBatis Mapper — 读 {@code ecos_data.dq_rule} / {@code ecos_data.dq_rule_version}（只读, Phase 1）。
  * <p>
- * PMO-48-A T3: 跨 schema 查询需显式 {@code ecos_dq.} 前缀；gateway 已配置
+ * PMO-48-A T3: 跨 schema 查询需显式 {@code ecos_data.} 前缀；gateway 已配置
  * {@code map-underscore-to-camel-case: true}，驼峰列自动映射 VO。
  * </p>
  *
@@ -23,7 +23,7 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVersionVO;
 @Mapper
 public interface DqRuleMapper {
 
-    /** 列表查询公共 SQL 列（跨 schema 显式 ecos_dq. 前缀） */
+    /** 列表查询公共 SQL 列（跨 schema 显式 ecos_data. 前缀） */
     String COLUMNS = "id, rule_name AS ruleName, rule_code AS ruleCode, category, domain, "
             + "rule_type AS ruleType, severity, target_kind AS targetKind, target_id AS targetId, "
             + "target_table AS targetTable, target_field AS targetField, "
@@ -55,7 +55,7 @@ public interface DqRuleMapper {
     /**
      * 按 ID 查规则详情。
      */
-    @Select("SELECT " + COLUMNS + " FROM ecos_dq.dq_rule WHERE id = #{id} AND is_deleted = FALSE")
+    @Select("SELECT " + COLUMNS + " FROM ecos_data.dq_rule WHERE id = #{id} AND is_deleted = FALSE")
     DqRuleVO findById(@Param("id") String id);
 
     /**
@@ -64,7 +64,7 @@ public interface DqRuleMapper {
     @Select("SELECT id, rule_id AS ruleId, version_number AS versionNumber, "
             + "snapshot::text AS snapshotJson, changed_by AS changedBy, "
             + "changed_at AS changedAt, change_note AS changeNote "
-            + "FROM ecos_dq.dq_rule_version WHERE rule_id = #{ruleId} "
+            + "FROM ecos_data.dq_rule_version WHERE rule_id = #{ruleId} "
             + "ORDER BY version_number DESC")
     List<DqRuleVersionVO> listVersionsByRuleId(@Param("ruleId") String ruleId);
 }

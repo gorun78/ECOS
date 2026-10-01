@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.MetadataService;
+import com.chinacreator.gzcm.engine.data.dao.MetadataDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
@@ -12,7 +13,6 @@ import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,7 +28,7 @@ public class MetadataServiceImpl implements MetadataService {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataServiceImpl.class);
 
-    private final JdbcTemplate jdbc;
+    private final MetadataDao metadataDao;
     private final DataSourceRepository dataSourceRepository;
     private final ConnectorFactory connectorFactory;
     private final ResourceSyncService resourceSyncService;
@@ -39,12 +39,12 @@ public class MetadataServiceImpl implements MetadataService {
      *        DataSourceServiceImpl → MetadataAsyncTrigger → MetadataCollectionService →
      *        MetadataServiceImpl 依赖链下游，直接注入会形成循环依赖，故加 {@link Lazy} 断环。
      */
-    public MetadataServiceImpl(JdbcTemplate jdbc,
+    public MetadataServiceImpl(MetadataDao metadataDao,
                                DataSourceRepository dataSourceRepository,
                                ConnectorFactory connectorFactory,
                                ResourceSyncService resourceSyncService,
                                @Lazy DataSourceService dataSourceService) {
-        this.jdbc = jdbc;
+        this.metadataDao = metadataDao;
         this.dataSourceRepository = dataSourceRepository;
         this.connectorFactory = connectorFactory;
         this.resourceSyncService = resourceSyncService;
@@ -84,27 +84,6 @@ public class MetadataServiceImpl implements MetadataService {
 
     @Override
     public List<DataField> getFields(String resourceId) {
-        return jdbc.query(
-            "SELECT * FROM td_data_field WHERE resource_id = ? ORDER BY field_order",
-            (rs, i) -> {
-                DataField f = new DataField();
-                f.setFieldId(rs.getString("field_id"));
-                f.setResourceId(rs.getString("resource_id"));
-                f.setFieldName(rs.getString("field_name"));
-                f.setFieldAlias(rs.getString("field_alias"));
-                f.setDataType(rs.getString("field_type"));
-                f.setDataLength(rs.getInt("field_length"));
-                f.setDataPrecision(rs.getInt("data_precision"));
-                Boolean nullable = rs.getBoolean("nullable");
-                f.setNullable(nullable);
-                Boolean pk = rs.getBoolean("is_primary_key");
-                f.setPrimaryKey(pk);
-                f.setDefaultValue(rs.getString("default_value"));
-                f.setDescription(rs.getString("description"));
-                f.setSortOrder(rs.getInt("field_order"));
-                return f;
-            },
-            resourceId
-        );
+        return metadataDao.getFields(resourceId);
     }
 }

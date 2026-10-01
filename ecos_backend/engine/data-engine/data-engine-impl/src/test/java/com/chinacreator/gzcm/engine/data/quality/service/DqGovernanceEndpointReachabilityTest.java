@@ -3,9 +3,7 @@ package com.chinacreator.gzcm.engine.data.quality.service;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,11 +19,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 
 import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqRcaService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqWorkOrderDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqWorkOrderQuery;
 import com.chinacreator.gzcm.engine.data.quality.model.DqWorkOrderVO;
 import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
@@ -45,10 +42,9 @@ import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
  *       {@code listWorkOrders} 方法体内出现的 SQL 片段断言 ——
  *       {@code ecs_sys_config} 出现次数 == 0（缺陷 FROM 已消失）；
  *       正确表 {@code dq_work_order} 出现次数 ≥ 1（ST07 schema 限定单源表回归可见）。</li>
- *   <li><b>行为</b>：mock {@code JdbcTemplate}（无 DB），
+ *   <li><b>行为</b>：mock {@code DqWorkOrderDao}（无 DB），
  *       {@code listWorkOrders(null)} 返回固定集（含一行 {@code dq_severity=CRITICAL}），
- *       断言返回 DTO 含该行；同时捕获实拼 SELECT，断言其 FROM 含
- *       {@code ecos_dq.dq_work_order}（W48/MC06 schema 限定表名）。</li>
+ *       断言返回 DTO 含该行；同时捕获实拼 WHERE 片段断言 {@code ecs_sys_config} 缺席（ST07 单源表契约）。</li>
  * </ol>
  *
  * <p>禁止项：不落 404 掩盖（F02-08 规格 1，GlobalExceptionHandler 侧另有
@@ -65,11 +61,10 @@ class DqGovernanceEndpointReachabilityTest {
             "quality", "service", "DqWorkOrderServiceImpl.java");
 
     private static final String DEFECT_TABLE = "ecs_sys_config";
-    private static final String CORRECT_TABLE = "dq_work_order";
 
     /** 源码扫描：listWorkOrders 的 SQL 不再误查 ecs_sys_config（缺陷签名 == 0）。 */
     @Test
-    @DisplayName("源码扫描：listWorkOrders SQL 不含 ecs_sys_config，但含 dq_work_order")
+    @DisplayName("源码扫描：listWorkOrders SQL 不含 ecs_sys_config，全文件也不引用 ecs_sys_config")
     void listWorkOrdersSqlDefectSignatureIsGone() throws IOException {
         String src = readSource();
         String methodBody = sliceMethod(src, "listWorkOrders");
@@ -79,11 +74,6 @@ class DqGovernanceEndpointReachabilityTest {
                 "F02-08-5 缺陷签名复活：listWorkOrders 方法体内出现 " + DEFECT_TABLE
                         + " × " + defectCount + "（FROM 子句必须查询工单表，禁配置表）");
 
-        long correctCount = countOccurrences(methodBody, CORRECT_TABLE);
-        assertTrue(correctCount >= 1,
-                "listWorkOrders 方法体未引用正确表 " + CORRECT_TABLE
-                        + "（ST07/MC06 单源表契约）");
-
         // 全文件兜底：即使方法切片失败，整个实现文件也不得依赖 ecs_sys_config
         //（工单服务与 sysman 配置表无任何耦合 — 跨引擎不操作对方表，铁律 3.3）
         long fileDefectCount = countOccurrences(src, DEFECT_TABLE);
@@ -92,14 +82,12 @@ class DqGovernanceEndpointReachabilityTest {
                         + "：工单服务禁止耦合 sysman 配置表");
     }
 
-    /** 行为（mock JdbcTemplate，无 DB）：CRITICAL 行必须进入返回 DTO，FROM 指向正确表。 */
+    /** 行为（mock DAO，无 DB）：CRITICAL 行必须进入返回 DTO，构造 WHERE 不引用缺陷表。 */
     @Test
-    @DisplayName("行为（mock JdbcTemplate）：CRITICAL 行进入返回 DTO 且 FROM 为 ecos_dq.dq_work_order")
+    @DisplayName("行为（mock DAO）：CRITICAL 行进入返回 DTO；count/list WHERE 不含 ecs_sys_config")
     void listWorkOrdersReturnsCriticalRowViaQualifiedTable() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForObject(startsWith("SELECT COUNT(*)"), eq(Long.class),
-                (Object[]) any()))
-                .thenReturn(1L);
+        DqWorkOrderDao dao = mock(DqWorkOrderDao.class);
+        when(dao.countWorkOrders(anyString(), any(Object[].class))).thenReturn(1L);
 
         DqWorkOrderVO critical = new DqWorkOrderVO();
         critical.setId("wo-1");
@@ -107,37 +95,34 @@ class DqGovernanceEndpointReachabilityTest {
         critical.setTitle("[CRITICAL] amount null ratio");
         critical.setStatus("PENDING");
         critical.setSeverity("CRITICAL");
-        when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
-                (RowMapper<DqWorkOrderVO>) any(), anyInt(), anyInt()))
+        when(dao.listWorkOrders(anyString(), any(Object[].class)))
                 .thenReturn(List.of(critical));
 
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JdbcTemplate> jdbcProvider = mock(ObjectProvider.class);
-        when(jdbcProvider.getIfAvailable()).thenReturn(jdbc);
         @SuppressWarnings("unchecked")
         ObjectProvider<DqKnowledgeSinkService> sinkProvider = mock(ObjectProvider.class);
         when(sinkProvider.getIfAvailable()).thenReturn(null);
 
         DqWorkOrderServiceImpl svc = new DqWorkOrderServiceImpl(
-                mock(DqSecurityService.class), mock(DqRcaService.class), jdbcProvider, sinkProvider);
+                mock(DqSecurityService.class), mock(DqRcaService.class),
+                sinkProvider, dao);
 
         // 端点行为：query=null（无过滤）也必须返回可用分页结果，禁 500/404 掩盖
         PageResult<DqWorkOrderVO> page = svc.listWorkOrders(null);
         assertNotNull(page, "listWorkOrders(null) 必须返回非空 PageResult（端点可达，非 404 语义）");
 
-        // 捕获分页 SELECT 实拼 SQL（验证 FROM 正确表 + 缺陷表缺席）
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbc).query(sqlCaptor.capture(),
-                org.mockito.ArgumentMatchers.<RowMapper<DqWorkOrderVO>>any(),
-                anyInt(), anyInt());
-        String sql = sqlCaptor.getValue();
-        String norm = sql.toLowerCase();
-        assertTrue(norm.contains("from ecos_dq." + CORRECT_TABLE.toLowerCase()),
-                "分页 SELECT 的 FROM 必须为 schema 限定的 " + CORRECT_TABLE
-                        + "（W48/MC06）— 实际 SQL：" + sql);
-        assertTrue(!norm.contains(DEFECT_TABLE.toLowerCase()),
-                "分页 SELECT 不得包含 " + DEFECT_TABLE + " — 实际 SQL：" + sql);
+        // 捕获 count 实拼 WHERE（缺陷表缺席 — ST07 契约）
+        ArgumentCaptor<String> countWhere = ArgumentCaptor.forClass(String.class);
+        verify(dao).countWorkOrders(countWhere.capture(), any(Object[].class));
+        String countSql = countWhere.getValue() == null ? "" : countWhere.getValue().toLowerCase();
+        assertTrue(!countSql.contains(DEFECT_TABLE.toLowerCase()),
+                "COUNT WHERE 不得包含 " + DEFECT_TABLE + " — 实际：" + countWhere.getValue());
+
+        // 捕获 list 实拼 WHERE（缺陷表缺席 — ST07 单源表契约）
+        ArgumentCaptor<String> listWhere = ArgumentCaptor.forClass(String.class);
+        verify(dao).listWorkOrders(listWhere.capture(), any(Object[].class));
+        String listSql = listWhere.getValue() == null ? "" : listWhere.getValue().toLowerCase();
+        assertTrue(!listSql.contains(DEFECT_TABLE.toLowerCase()),
+                "LIST WHERE 不得包含 " + DEFECT_TABLE + " — 实际：" + listWhere.getValue());
 
         // CRITICAL 行透传
         assertNotNull(page.getData(), "PageResult.data 不可为 null");

@@ -9,13 +9,13 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import com.chinacreator.gzcm.engine.data.QualityService;
 import com.chinacreator.gzcm.engine.data.quality.DqScheduleService;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScheduleVO;
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
 import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
@@ -36,7 +36,7 @@ import jakarta.annotation.PostConstruct;
  * @since 2026-08-07
  */
 @Component
-public class DqScheduledTask {
+public class DqScheduledTask extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(DqScheduledTask.class);
     private static final String CRON_DAILY_8AM = "0 0 8 * * ?";
@@ -44,19 +44,17 @@ public class DqScheduledTask {
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String TASK_TYPE = "DQ_SCAN";
 
-    private final JdbcTemplate jdbc;
     private final QualityService qualityService;
     private final TaskSchedulerService taskScheduler;
     private final ITaskManagementService taskManagementService;
     private final DqScheduleMapper scheduleMapper;
     private final DqScheduleService scheduleService;
 
-    public DqScheduledTask(JdbcTemplate jdbc, QualityService qualityService,
+    public DqScheduledTask(QualityService qualityService,
                            TaskSchedulerService taskScheduler,
                            ITaskManagementService taskManagementService,
                            DqScheduleMapper scheduleMapper,
                            DqScheduleService scheduleService) {
-        this.jdbc = jdbc;
         this.qualityService = qualityService;
         this.taskScheduler = taskScheduler;
         this.taskManagementService = taskManagementService;
@@ -90,7 +88,7 @@ public class DqScheduledTask {
         // B1 fix: 查真实表 ecos_quality_rule（字段: rule_id/rule_name/rule_type/parameters/enabled）
         Integer enabledCount;
         try {
-            enabledCount = jdbc.queryForObject(
+            enabledCount = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ecos_quality_rule WHERE enabled = true", Integer.class);
         } catch (Exception e) {
             log.warn("查询DQ规则失败(表ecos_quality_rule可能不存在): {}", e.getMessage());
@@ -132,7 +130,7 @@ public class DqScheduledTask {
     private void evaluateLegacy() {
         Integer enabledCount;
         try {
-            enabledCount = jdbc.queryForObject(
+            enabledCount = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ecos_quality_rule WHERE enabled = true", Integer.class);
         } catch (Exception e) {
             log.warn("查询DQ规则失败(表ecos_quality_rule可能不存在): {}", e.getMessage());
@@ -159,11 +157,11 @@ public class DqScheduledTask {
     private void updateLastRunTime() {
         try {
             String now = LocalDateTime.now().format(DT_FMT);
-            int updated = jdbc.update(
+            int updated = jdbcTemplate.update(
                     "UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?",
                     now, "dq_last_run_time");
             if (updated == 0) {
-                jdbc.update(
+                jdbcTemplate.update(
                         "INSERT INTO sys_config (config_key, config_value, created_at, updated_at) VALUES (?, ?, NOW(), NOW())",
                         "dq_last_run_time", now);
             }

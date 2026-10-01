@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.engine.data.dao.PipelineGitDao;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitCommitRequest;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitCommitResultVO;
 import com.chinacreator.gzcm.engine.data.pipeline.PipelineGitLoadRequest;
@@ -15,7 +16,6 @@ import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -49,20 +49,20 @@ public class PipelineGitService {
             "localPath 入参已废弃：请改传 repositoryId（服务端经仓库注册表/sys_config 根路径解析实际路径）";
 
     private final GitService gitService;
-    private final JdbcTemplate jdbc;
+    private final PipelineGitDao gitDao;
     private final SysConfigService sysConfigService;
     private final GitRepositoryService gitRepositoryService;
     private final GitRepoRootResolver repoRootResolver;
     private final ObjectProvider<SecurityCryptoEgress> cryptoEgressProvider;
 
     public PipelineGitService(GitService gitService,
-                              JdbcTemplate jdbc,
+                              PipelineGitDao gitDao,
                               SysConfigService sysConfigService,
                               GitRepositoryService gitRepositoryService,
                               GitRepoRootResolver repoRootResolver,
                               ObjectProvider<SecurityCryptoEgress> cryptoEgressProvider) {
         this.gitService = gitService;
-        this.jdbc = jdbc;
+        this.gitDao = gitDao;
         this.sysConfigService = sysConfigService;
         this.gitRepositoryService = gitRepositoryService;
         this.repoRootResolver = repoRootResolver;
@@ -159,8 +159,7 @@ public class PipelineGitService {
         String gitUrl = null;
         String gitBranch = "main";
         try {
-            Map<String, Object> task = jdbc.queryForMap(
-                    "SELECT git_url, git_branch FROM ecos_pipeline_task WHERE id = ?", id);
+            Map<String, Object> task = gitDao.gitMetadata(id);
             gitUrl = (String) task.get("git_url");
             Object b = task.get("git_branch");
             if (b != null && !b.toString().isBlank()) {
@@ -238,8 +237,7 @@ public class PipelineGitService {
                                                 PipelineGitOperationResultVO vo) throws GitException {
         // F02-03：YAML 模型只读，pull 改为把 Git 上的 pipeline.yaml（现承载 JSON DAG）
         // 读回并 upsert 进 ecos_pipeline_definition 的 node/edge（不再写 yaml_content）。
-        Map<String, Object> defRow = jdbc.queryForMap(
-                "SELECT id, name FROM ecos_pipeline_definition WHERE id = ?", id);
+        Map<String, Object> defRow = gitDao.definition(id);
         gitService.pull(localPath, "origin", "main");
 
         String definitionJson = loadPipelineYaml(localPath, id);
@@ -272,15 +270,14 @@ public class PipelineGitService {
                     : (nameObj != null ? nameObj.toString() : "Pipeline " + definitionId);
             // 规范化 JSON 文本回写 definition（definition_json 合规列 + definition jsonb 双写）
             String canonical = JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-            jdbc.update("UPDATE ecos_pipeline_definition SET definition_json = ?, definition = ?::jsonb, "
-                    + "updated_at = NOW() WHERE id = ?", canonical, canonical, definitionId);
+            gitDao.updateDefinition(canonical, definitionId);
         } catch (Exception e) {
             log.warn("Git 归档内容非 JSON DAG 模型，跳过节点回写: definitionId={}, {}", definitionId, e.getMessage());
             return 0;
         }
 
-        jdbc.update("DELETE FROM ecos_pipeline_node WHERE definition_id = ?", definitionId);
-        jdbc.update("DELETE FROM ecos_pipeline_edge WHERE definition_id = ?", definitionId);
+        gitDao.deleteNodes(definitionId);
+        gitDao.deleteEdges(definitionId);
         int n = 0;
         for (Map<String, Object> node : nodes) {
             String nodeId = str(node.get("nodeId"));
@@ -290,10 +287,7 @@ public class PipelineGitService {
             String nodeType = str(node.get("type"));
             String config = str(node.get("config"));
             String dependsOn = str(node.get("dependsOn"));
-            jdbc.update(
-                    "INSERT INTO ecos_pipeline_node (id, definition_id, node_id, type, config, depends_on, "
-                            + "position_x, position_y, created_at, updated_at) "
-                            + "VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, 0, 0, NOW(), NOW())",
+            gitDao.insertNode(
                     deterministicId(definitionId + "/node/" + nodeId), definitionId, nodeId,
                     nodeType != null ? nodeType : "TRANSFORM_SQL",
                     config != null ? config : "{}",
@@ -306,9 +300,7 @@ public class PipelineGitService {
             if (from == null || from.isBlank() || to == null || to.isBlank()) {
                 continue;
             }
-            jdbc.update(
-                    "INSERT INTO ecos_pipeline_edge (id, definition_id, from_node_id, to_node_id, created_at) "
-                            + "VALUES (?, ?, ?, ?, NOW())",
+            gitDao.insertEdge(
                     deterministicId(definitionId + "/edge/" + from + "->" + to),
                     definitionId, from, to);
         }
@@ -405,10 +397,7 @@ public class PipelineGitService {
 
         String newTaskId = taskId != null ? taskId : UUID.randomUUID().toString();
         String effectiveBranch = branch != null ? branch : "main";
-        jdbc.update(
-                "INSERT INTO ecos_pipeline_task (id, name, description, yaml_content, git_url, git_branch, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, 'DRAFT') ON CONFLICT (id) DO UPDATE SET yaml_content = EXCLUDED.yaml_content, updated_at = NOW()",
-                newTaskId, "Git: " + pid, "从 Git 加载", yamlContent, gitUrl, effectiveBranch);
+        gitDao.upsertTaskFromGit(newTaskId, "Git: " + pid, "从 Git 加载", yamlContent, gitUrl, effectiveBranch);
 
         log.info("从 Git 加载 Pipeline: gitUrl={}, pipelineId={}", gitUrl, pid);
         vo.setTaskId(newTaskId);
@@ -490,9 +479,7 @@ public class PipelineGitService {
         }
         gitService.checkoutBranch(resolution.localPath(), req.getBranchName());
         if (req.getTaskId() != null) {
-            jdbc.update(
-                    "UPDATE ecos_pipeline_task SET git_branch = ?, updated_at = NOW() WHERE id = ?",
-                    req.getBranchName(), req.getTaskId());
+            gitDao.switchTaskBranch(req.getBranchName(), req.getTaskId());
         }
         log.info("Git 分支切换: {} → {}", req.getRepositoryId(), req.getBranchName());
         vo.setBranchName(req.getBranchName());
@@ -655,12 +642,8 @@ public class PipelineGitService {
      * @return 规范化 JSON 文本（nodes/edges 为空时给出明确占位，不静默）
      */
     String loadDefinitionJson(String definitionId) {
-        List<Map<String, Object>> nodeRows = jdbc.queryForList(
-                "SELECT node_id, type, config, depends_on FROM ecos_pipeline_node "
-                        + "WHERE definition_id = ? ORDER BY created_at", definitionId);
-        List<Map<String, Object>> edgeRows = jdbc.queryForList(
-                "SELECT from_node_id, to_node_id FROM ecos_pipeline_edge "
-                        + "WHERE definition_id = ? ORDER BY created_at", definitionId);
+        List<Map<String, Object>> nodeRows = gitDao.nodes(definitionId);
+        List<Map<String, Object>> edgeRows = gitDao.edges(definitionId);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", "pipeline-definition-json");

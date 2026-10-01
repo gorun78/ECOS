@@ -11,12 +11,13 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.data.dao.DataLayerInstanceDao;
+import com.chinacreator.gzcm.engine.data.dao.DataLayerInstanceDao.ColumnDef;
 import com.chinacreator.gzcm.engine.data.dto.DataLayerRowsVO;
 import com.chinacreator.gzcm.engine.data.model.DataLayer;
 import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
@@ -64,12 +65,12 @@ public class DataLayerInstanceService {
             "numeric", "real", "double precision", "date",
             "timestamp without time zone", "timestamp with time zone");
 
-    private final JdbcTemplate jdbc;
+    private final DataLayerInstanceDao instanceDao;
 
     private final DataResourceRepository resourceRepository;
 
-    public DataLayerInstanceService(JdbcTemplate jdbc, DataResourceRepository resourceRepository) {
-        this.jdbc = jdbc;
+    public DataLayerInstanceService(DataLayerInstanceDao instanceDao, DataResourceRepository resourceRepository) {
+        this.instanceDao = instanceDao;
         this.resourceRepository = resourceRepository;
     }
 
@@ -226,11 +227,7 @@ public class DataLayerInstanceService {
 
     /** 从 PG 目录读取表列定义（列名/类型来自 DB，非用户输入）。 */
     private List<ColumnDef> loadColumns(TableTarget target) {
-        List<ColumnDef> columns = jdbc.query(
-                "SELECT column_name, data_type FROM information_schema.columns "
-                        + "WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position",
-                (rs, rowNum) -> new ColumnDef(rs.getString("column_name"), rs.getString("data_type")),
-                target.schema(), target.table());
+        List<ColumnDef> columns = instanceDao.loadColumns(target.schema(), target.table());
         if (columns.isEmpty()) {
             throw new NotFoundException("DW 层表不存在或未采集列定义: " + target.qualified());
         }
@@ -283,15 +280,7 @@ public class DataLayerInstanceService {
 
     /** 查询表主键列名（无主键返回 null）。 */
     private String findPrimaryKeyColumn(TableTarget target) {
-        List<String> keys = jdbc.queryForList(
-                "SELECT a.attname FROM pg_index i "
-                        + "JOIN pg_class c ON c.oid = i.indrelid "
-                        + "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                        + "JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = i.indkey[0] "
-                        + "WHERE n.nspname = ? AND c.relname = ? AND i.indisprimary "
-                        + "ORDER BY i.indexrelid LIMIT 1",
-                String.class, target.schema(), target.table());
-        return keys.isEmpty() ? null : keys.get(0);
+        return instanceDao.findPrimaryKeyColumn(target.schema(), target.table());
     }
 
     // ═══════════════ SQL 组装与执行 ═══════════════
@@ -316,7 +305,7 @@ public class DataLayerInstanceService {
     /** 执行查询并把行转成小写列名的有序 Map（保持 SELECT 列序）。 */
     private List<Map<String, Object>> queryRows(String sql, Object[] params) {
         try {
-            List<Map<String, Object>> raw = jdbc.queryForList(sql, params);
+            List<Map<String, Object>> raw = instanceDao.queryRows(sql, params);
             List<Map<String, Object>> rows = new ArrayList<>(raw.size());
             for (Map<String, Object> row : raw) {
                 Map<String, Object> ordered = new LinkedHashMap<>();
@@ -353,9 +342,5 @@ public class DataLayerInstanceService {
         private String qualified() {
             return "\"" + schema + "\".\"" + table + "\"";
         }
-    }
-
-    /** 列定义（名称 + PG 目录 data_type）。 */
-    private record ColumnDef(String name, String dataType) {
     }
 }

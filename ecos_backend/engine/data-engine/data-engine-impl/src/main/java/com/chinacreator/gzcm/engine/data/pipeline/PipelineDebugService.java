@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.dao.PipelineDebugDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
@@ -24,7 +25,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.PrintWriter;
@@ -85,7 +85,7 @@ public class PipelineDebugService {
 
     private final PipelineRepository repository;
     private final ConnectorFactory connectorFactory;
-    private final JdbcTemplate jdbc;
+    private final PipelineDebugDao debugDao;
     private final DataSourceService dataSourceService;
     private final UdfService udfService;
     /** 主执行器：SOURCE_MINIO / SINK_MINIO 节点复用其近源层读写逻辑（避免两处实现漂移） */
@@ -107,7 +107,7 @@ public class PipelineDebugService {
 
     public PipelineDebugService(PipelineRepository repository,
                                 ConnectorFactory connectorFactory,
-                                JdbcTemplate jdbc,
+                                PipelineDebugDao debugDao,
                                 DataSourceService dataSourceService,
                                 UdfService udfService,
                                 PipelineExecutionService pipelineExecutionService,
@@ -115,7 +115,7 @@ public class PipelineDebugService {
                                 TaskSchedulerService taskSchedulerService) {
         this.repository = repository;
         this.connectorFactory = connectorFactory;
-        this.jdbc = jdbc;
+        this.debugDao = debugDao;
         this.dataSourceService = dataSourceService;
         this.udfService = udfService;
         this.pipelineExecutionService = pipelineExecutionService;
@@ -525,14 +525,14 @@ public class PipelineDebugService {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         switch (firstToken) {
             case "SELECT", "SHOW", "DESCRIBE", "WITH" -> {
-                List<Map<String, Object>> rows = jdbc.queryForList(trimmed);
+                List<Map<String, Object>> rows = debugDao.queryForListRaw(trimmed);
                 updated = rows.size();
                 snapshot.put("queryRows", updated);
                 snapshot.put("rowsProcessed", s.totalRows + updated);
                 snapshot.put("sqlPreview", sql.length() > 120 ? sql.substring(0, 120) + "..." : sql);
             }
             default -> {
-                updated = jdbc.update(trimmed);
+                updated = debugDao.updateRaw(trimmed);
                 snapshot.put("updatedRows", (long) updated);
                 snapshot.put("rowsProcessed", s.totalRows + updated);
                 snapshot.put("sqlPreview", sql.length() > 120 ? sql.substring(0, 120) + "..." : sql);
@@ -578,7 +578,7 @@ public class PipelineDebugService {
                 params.add(entry.getValue());
             }
             String sql = "INSERT INTO " + targetTable + " (" + cols + ") VALUES (" + vals + ")";
-            jdbc.update(sql, params.toArray());
+            debugDao.updateInsert(sql, params.toArray());
             inserted++;
         }
         Map<String, Object> snapshot = new LinkedHashMap<>();
@@ -887,10 +887,7 @@ public class PipelineDebugService {
     public List<PipelineExecutionVO> listExecutions(String definitionId, int page, int size) {
         List<PipelineExecutionVO> result = new ArrayList<>();
         int offset = (Math.max(page, 1) - 1) * Math.max(size, 1);
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, pipeline_id, status, started_at, finished_at, error_message, rows_processed " +
-                        "FROM ecos_pipeline_execution WHERE pipeline_id = ? " +
-                        "ORDER BY started_at DESC LIMIT ? OFFSET ?",
+        List<Map<String, Object>> rows = debugDao.queryExecutionRows(
                 definitionId, size, offset);
         for (Map<String, Object> r : rows) {
             PipelineExecutionVO vo = new PipelineExecutionVO();

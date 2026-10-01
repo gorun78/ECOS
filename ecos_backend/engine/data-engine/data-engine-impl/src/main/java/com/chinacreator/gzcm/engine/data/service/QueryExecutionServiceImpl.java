@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.engine.data.QueryExecutionService;
+import com.chinacreator.gzcm.engine.data.dao.QueryExecutionDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
@@ -9,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.*;
@@ -29,7 +29,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
     private static final Logger log = LoggerFactory.getLogger(QueryExecutionServiceImpl.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final QueryExecutionDao queryExecutionDao;
     private final DataSourceService dataSourceService;
     private final JdbcConnector jdbcConnector;
 
@@ -42,9 +42,9 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
     private final Map<String, Future<?>> runningQueries = new ConcurrentHashMap<>();
 
     @Autowired
-    public QueryExecutionServiceImpl(JdbcTemplate jdbc, DataSourceService dataSourceService,
+    public QueryExecutionServiceImpl(QueryExecutionDao queryExecutionDao, DataSourceService dataSourceService,
                                      JdbcConnector jdbcConnector) {
-        this.jdbc = jdbc;
+        this.queryExecutionDao = queryExecutionDao;
         this.dataSourceService = dataSourceService;
         this.jdbcConnector = jdbcConnector;
     }
@@ -205,21 +205,14 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             throw new IllegalArgumentException("模板名称、数据源ID和SQL内容不能为空");
         }
 
-        int count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_query_template WHERE id = ?", Integer.class, id);
+        int count = queryExecutionDao.countTemplateById(id);
 
         if (count > 0) {
-            jdbc.update(
-                    "UPDATE ecos_query_template SET name=?, description=?, datasource_id=?, " +
-                    "sql_content=?, params_json=?::jsonb, timeout_seconds=?, max_rows=?, updated_at=NOW() " +
-                    "WHERE id=?",
+            queryExecutionDao.updateTemplate(
                     name, description, datasourceId, sqlContent, paramsJson,
                     timeoutSeconds, maxRows, id);
         } else {
-            jdbc.update(
-                    "INSERT INTO ecos_query_template (id, name, description, datasource_id, sql_content, " +
-                    "params_json, timeout_seconds, max_rows, created_by) " +
-                    "VALUES (?,?,?,?,?,?::jsonb,?,?,?)",
+            queryExecutionDao.insertTemplate(
                     id, name, description, datasourceId, sqlContent,
                     paramsJson, timeoutSeconds, maxRows, createdBy);
         }
@@ -231,25 +224,8 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
     public Map<String, Object> listTemplates(String datasourceId, int page, int pageSize) {
         int offset = (page - 1) * pageSize;
 
-        String countSql = "SELECT COUNT(*) FROM ecos_query_template";
-        String dataSql = "SELECT * FROM ecos_query_template";
-
-        List<Object> params = new ArrayList<>();
-        if (datasourceId != null && !datasourceId.isBlank()) {
-            String where = " WHERE datasource_id = ?";
-            countSql += where;
-            dataSql += where;
-            params.add(datasourceId);
-        }
-        dataSql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
-
-        int total = jdbc.queryForObject(countSql, Integer.class, params.toArray());
-
-        List<Object> dataParams = new ArrayList<>(params);
-        dataParams.add(pageSize);
-        dataParams.add(offset);
-
-        List<Map<String, Object>> items = jdbc.queryForList(dataSql, dataParams.toArray());
+        int total = queryExecutionDao.countTemplates(datasourceId);
+        List<Map<String, Object>> items = queryExecutionDao.listTemplateRows(datasourceId, pageSize, offset);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total);
@@ -261,8 +237,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
 
     @Override
     public Map<String, Object> getTemplate(String id) {
-        List<Map<String, Object>> list = jdbc.queryForList(
-                "SELECT * FROM ecos_query_template WHERE id = ?", id);
+        List<Map<String, Object>> list = queryExecutionDao.getTemplateById(id);
         if (list.isEmpty()) {
             throw new IllegalArgumentException("模板不存在: " + id);
         }
@@ -271,7 +246,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
 
     @Override
     public void deleteTemplate(String id) {
-        int rows = jdbc.update("DELETE FROM ecos_query_template WHERE id = ?", id);
+        int rows = queryExecutionDao.deleteTemplate(id);
         if (rows == 0) {
             throw new IllegalArgumentException("模板不存在: " + id);
         }
@@ -281,12 +256,8 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
     public Map<String, Object> getQueryHistory(int page, int pageSize) {
         int offset = (page - 1) * pageSize;
 
-        int total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_query_history", Integer.class);
-
-        List<Map<String, Object>> items = jdbc.queryForList(
-                "SELECT * FROM ecos_query_history ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                pageSize, offset);
+        int total = queryExecutionDao.countQueryHistory();
+        List<Map<String, Object>> items = queryExecutionDao.listQueryHistory(pageSize, offset);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total);
@@ -298,13 +269,10 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
 
     @Override
     public void cancelQuery(String historyId) {
-        int updated = jdbc.update(
-                "UPDATE ecos_query_history SET status='CANCELLED', finished_at=NOW() " +
-                "WHERE id=? AND status='RUNNING'", historyId);
+        int updated = queryExecutionDao.cancelQuery(historyId);
 
         if (updated == 0) {
-            int count = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ecos_query_history WHERE id=?", Integer.class, historyId);
+            int count = queryExecutionDao.countQueryHistoryById(historyId);
             if (count == 0) {
                 throw new IllegalArgumentException("查询记录不存在: " + historyId);
             }
@@ -312,24 +280,15 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
     }
 
     private void insertHistoryStart(String id, String datasourceId, String sql) {
-        jdbc.update(
-                "INSERT INTO ecos_query_history (id, datasource_id, sql_content, status) " +
-                "VALUES (?, ?, ?, 'RUNNING')",
-                id, datasourceId, sql);
+        queryExecutionDao.insertHistoryStart(id, datasourceId, sql);
     }
 
     private void updateHistorySuccess(String id, int rowsReturned, int elapsedMs) {
-        jdbc.update(
-                "UPDATE ecos_query_history SET status='SUCCESS', rows_returned=?, " +
-                "elapsed_ms=?, finished_at=NOW() WHERE id=?",
-                rowsReturned, elapsedMs, id);
+        queryExecutionDao.updateHistorySuccess(id, rowsReturned, elapsedMs);
     }
 
     private void updateHistoryError(String id, String errorMsg, int elapsedMs) {
-        jdbc.update(
-                "UPDATE ecos_query_history SET status='ERROR', error_msg=?, " +
-                "elapsed_ms=?, finished_at=NOW() WHERE id=?",
-                errorMsg, elapsedMs, id);
+        queryExecutionDao.updateHistoryError(id, errorMsg, elapsedMs);
     }
 
     @SuppressWarnings("unchecked")

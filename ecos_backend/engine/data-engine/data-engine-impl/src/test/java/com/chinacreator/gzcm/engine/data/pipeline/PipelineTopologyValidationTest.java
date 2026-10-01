@@ -2,13 +2,13 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.engine.data.dao.PipelineExecutionDao;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
  * executeNode 走 switch 对各 SOURCE/TRANSFORM/OUTPUT 节点入口断言必填配置。
  * 这层"后端镜像"与前端 {@code pipelineValidation.ts} 同源（架构铁律 §4.8.2）。
  *
- * <p>不涉及外部 PG：PipelineRepository / ConnectorFactory / JdbcTemplate /
+ * <p>不涉及外部 PG：PipelineRepository / ConnectorFactory / PipelineExecutionDao /
  * DataSourceService 全部 mock，只测业务门面分支：
  * <ul>
  *   <li>环 A↔B（depends_on 互指）→ BusinessException("循环依赖")</li>
@@ -45,7 +45,7 @@ class PipelineTopologyValidationTest {
 
     private PipelineRepository repository;
     private ConnectorFactory connectorFactory;
-    private JdbcTemplate jdbc;
+    private PipelineExecutionDao pipelineExecutionDao;
     private com.chinacreator.gzcm.engine.data.DataSourceService dataSourceService;
     private com.chinacreator.gzcm.engine.data.UdfService udfService;
     private PipelineExecutionService service;
@@ -54,11 +54,11 @@ class PipelineTopologyValidationTest {
     void setUp() {
         this.repository = mock(PipelineRepository.class);
         this.connectorFactory = mock(ConnectorFactory.class);
-        this.jdbc = mock(JdbcTemplate.class);
+        this.pipelineExecutionDao = mock(PipelineExecutionDao.class);
         this.dataSourceService = mock(com.chinacreator.gzcm.engine.data.DataSourceService.class);
         this.udfService = mock(com.chinacreator.gzcm.engine.data.UdfService.class);
         this.service = new PipelineExecutionService(
-                repository, connectorFactory, jdbc, dataSourceService, udfService,
+                repository, connectorFactory, pipelineExecutionDao, dataSourceService, udfService,
                 mock(MinioStorageService.class),
                 mock(com.chinacreator.gzcm.engine.data.service.DataLakeResourceService.class));
     }

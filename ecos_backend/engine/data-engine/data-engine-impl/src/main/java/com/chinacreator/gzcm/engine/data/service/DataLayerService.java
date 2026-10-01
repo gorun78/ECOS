@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.engine.data.dao.DataLayerDao;
 import com.chinacreator.gzcm.engine.data.model.DataLayer;
 import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -20,17 +20,18 @@ import java.util.Map;
  *       （D-9 / W51：SEMANTIC、APPLICATION 当前 0 载体），禁止前端呈现为"有数据"。</li>
  *   <li>{@code total}（保留，既有语义不变）。</li>
  * </ul>
+ * 实际 JDBC 访问由 {@link DataLayerDao} 承担；载体登记计数走 MyBatis Mapper（DataResourceRepository）。
  */
 @Service
 public class DataLayerService {
 
-    private final JdbcTemplate jdbc;
+    private final DataLayerDao dataLayerDao;
 
     /** F02-05：载体登记计数走 MyBatis Mapper（DataResourceRepository），禁用 Service 直连 JDBC。 */
     private final DataResourceRepository dataResourceRepository;
 
-    public DataLayerService(JdbcTemplate jdbc, DataResourceRepository dataResourceRepository) {
-        this.jdbc = jdbc;
+    public DataLayerService(DataLayerDao dataLayerDao, DataResourceRepository dataResourceRepository) {
+        this.dataLayerDao = dataLayerDao;
         this.dataResourceRepository = dataResourceRepository;
     }
 
@@ -39,8 +40,7 @@ public class DataLayerService {
         Map<String, Boolean> declared = new LinkedHashMap<>();
         long total = 0;
         for (DataLayer dl : DataLayer.values()) {
-            Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM td_data_resource WHERE layer = ?", Integer.class, dl.name());
+            Integer count = dataLayerDao.countResourcesByLayer(dl.name());
             int c = count != null ? count : 0;
             summary.put(dl.name(), c);
             total += c;
@@ -56,7 +56,6 @@ public class DataLayerService {
     }
 
     public List<Map<String, Object>> getResourcesByLayer(String layer) {
-        return jdbc.queryForList(
-            "SELECT * FROM td_data_resource WHERE layer = ?", layer);
+        return dataLayerDao.getResourcesByLayer(layer);
     }
 }

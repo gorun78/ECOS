@@ -5,25 +5,25 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.chinacreator.gzcm.engine.data.quality.DqAlertService;
 import com.chinacreator.gzcm.engine.data.quality.DqScoreService;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqScheduleDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
 import com.chinacreator.gzcm.engine.data.quality.scoring.ScoringContext;
 
@@ -58,12 +58,11 @@ class ScoringContextHydrationTest {
         DqScoreService scoreService = mock(DqScoreService.class);
         DqSecurityService security = mock(DqSecurityService.class);
         DqAlertService alertService = mock(DqAlertService.class);
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        ObjectProvider<JdbcTemplate> jprov = mock(ObjectProvider.class);
-        when(jprov.getIfAvailable()).thenReturn(jdbc);
+        DqScheduleDao scheduleDao = mock(DqScheduleDao.class);
 
         DqScheduleServiceImpl svc = new DqScheduleServiceImpl(
-                scheduleMapper, ruleMapper, scoreService, security, alertService, jprov);
+                scheduleMapper, ruleMapper, scoreService, security, alertService,
+                scheduleDao);
 
         // 预置 1 条 dq_rule_check 行 — 模拟真实回填源
         Map<String, Object> checkRow = new LinkedHashMap<>();
@@ -82,7 +81,7 @@ class ScoringContextHydrationTest {
                 "{\"col1\":[{\"row\":3,\"expected\":\"not-null\",\"got\":null}]}");
         checkRow.put("errorMessage", null);
 
-        when(jdbc.queryForList(anyString(), any(Object[].class)))
+        when(scheduleDao.findLastCheck(eq("rule-001")))
                 .thenReturn(List.of(checkRow));
         // DqSecurityService.maskParameters 返回入参 map 的一个副拷贝（保参不变）
         when(security.maskParameters(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -134,14 +133,13 @@ class ScoringContextHydrationTest {
         DqScoreService scoreService = mock(DqScoreService.class);
         DqSecurityService security = mock(DqSecurityService.class);
         DqAlertService alertService = mock(DqAlertService.class);
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        ObjectProvider<JdbcTemplate> jprov = mock(ObjectProvider.class);
-        when(jprov.getIfAvailable()).thenReturn(jdbc);
+        DqScheduleDao scheduleDao = mock(DqScheduleDao.class);
 
         DqScheduleServiceImpl svc = new DqScheduleServiceImpl(
-                scheduleMapper, ruleMapper, scoreService, security, alertService, jprov);
-        when(jdbc.queryForList(anyString(), any(Object[].class)))
-                .thenReturn(List.of(), new java.util.ArrayList<>());
+                scheduleMapper, ruleMapper, scoreService, security, alertService,
+                scheduleDao);
+        when(scheduleDao.findLastCheck(eq("rule-002")))
+                .thenReturn(Collections.emptyList());
         when(security.maskParameters(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DqRuleVO rule = new DqRuleVO();

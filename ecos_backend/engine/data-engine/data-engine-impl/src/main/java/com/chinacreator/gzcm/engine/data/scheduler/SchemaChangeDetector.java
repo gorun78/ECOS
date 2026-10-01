@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.scheduler;
 
+import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
 import com.chinacreator.gzcm.runtime.core.task.executor.ITaskExecutor;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
@@ -11,7 +12,6 @@ import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -28,20 +28,17 @@ import java.util.*;
  * </p>
  */
 @Component
-public class SchemaChangeDetector {
+public class SchemaChangeDetector extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(SchemaChangeDetector.class);
     private static final String CRON_HOURLY = "0 0 * * * ?";
     private static final String TASK_TYPE = "SCHEMA_CHANGE_DETECT";
 
-    private final JdbcTemplate jdbc;
     private final TaskSchedulerService taskScheduler;
     private final ITaskManagementService taskManagementService;
 
-    public SchemaChangeDetector(JdbcTemplate jdbc,
-                                TaskSchedulerService taskScheduler,
+    public SchemaChangeDetector(TaskSchedulerService taskScheduler,
                                 ITaskManagementService taskManagementService) {
-        this.jdbc = jdbc;
         this.taskScheduler = taskScheduler;
         this.taskManagementService = taskManagementService;
     }
@@ -196,7 +193,7 @@ public class SchemaChangeDetector {
             ORDER BY table_schema, table_name
             """;
 
-        return jdbc.query(sql, (rs, rowNum) -> {
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
             String ds = rs.getString("datasource_id");
             String tn = rs.getString("table_name");
             String colSig = rs.getString("col_sig");
@@ -218,7 +215,7 @@ public class SchemaChangeDetector {
         String schema = datasourceId.contains(".") ? datasourceId.substring(0, datasourceId.indexOf('.')) : datasourceId;
         String table = tableName;
 
-        return jdbc.query(sql, (rs, rowNum) -> {
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
             String cn = rs.getString("column_name");
             String dt = rs.getString("data_type");
             String cl = rs.getString("char_len");
@@ -238,7 +235,7 @@ public class SchemaChangeDetector {
             """;
 
         Map<String, String> result = new HashMap<>();
-        jdbc.query(sql, (rs) -> {
+        jdbcTemplate.query(sql, (rs) -> {
             String key = rs.getString("datasource_id") + "::" + rs.getString("table_name");
             result.put(key, rs.getString("column_hash"));
         });
@@ -253,7 +250,7 @@ public class SchemaChangeDetector {
             ORDER BY snapshot_at DESC LIMIT 1
             """;
 
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, datasourceId, tableName, hash);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, datasourceId, tableName, hash);
         if (rows.isEmpty()) {
             return Collections.emptyList();
         }
@@ -274,14 +271,14 @@ public class SchemaChangeDetector {
 
     private void insertSnapshot(SchemaInfo si) {
         // H8-T1: schema_snapshots.col_sig 列由 db/migration（V162）建表时即包含，运行时不再 ALTER。
-        jdbc.update(
+        jdbcTemplate.update(
             "INSERT INTO schema_snapshots (datasource_id, table_name, column_hash, snapshot_at, col_sig) VALUES (?,?,?,?,?)",
             si.datasourceId, si.tableName, si.columnHash, LocalDateTime.now(), si.colSig
         );
     }
 
     private void insertChange(SchemaChange sc) {
-        jdbc.update(
+        jdbcTemplate.update(
             "INSERT INTO schema_changes (datasource_id, table_name, change_type, detail_json, detected_at, acknowledged) VALUES (?,?,?,?,?,?)",
             sc.datasourceId, sc.tableName, sc.changeType, sc.detailJson, LocalDateTime.now(), false
         );

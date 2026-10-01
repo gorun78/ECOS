@@ -2,12 +2,12 @@ package com.chinacreator.gzcm.engine.data.integration;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.data.PipelineTaskService;
+import com.chinacreator.gzcm.engine.data.dao.IntegrationMetadataDao;
 import com.chinacreator.gzcm.engine.data.quality.service.DqSecurityService;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -23,12 +23,12 @@ import java.util.*;
  *       位于 {@code public.td_audit_log} 而非 {@code ecos_security} 下），
  *       回退 {@code ecos_audit_log}（AOP CUD 审计），再回退 {@code ecos_object_timeline}
  *       （workspace 结构化事件）。按时间倒序，带 time range + limit 过滤。</li>
- *   <li>drift: 查 {@code ecos_dq.dq_rule_check} 最近 1h 数据质量检测结果（V111__ecos_dq_governance_v1.sql
+ *   <li>drift: 查 {@code ecos_data.dq_rule_check} 最近 1h 数据质量检测结果（V111__ecos_dq_governance_v1.sql
  *       建表）+ {@code ecos_pipeline_task} 最近运行状态，综合生成漂移/断流结论。</li>
  * </ul>
  *
  * <p>Controller 只调本 Service（铁律：Controller 不直用 JdbcTemplate），
- * 构造器注入 JdbcTemplate / PipelineTaskService / DqSecurityService；
+ * 构造器注入 IntegrationMetadataDao / PipelineTaskService / DqSecurityService；
  * EventBusService 用 {@code @Autowired(required=false)} 兜底注入（不可用时审计降级
  * 为 DqSecurityService → security-engine REST，不阻塞主流程）。</p>
  *
@@ -39,7 +39,7 @@ public class IntegrationMetadataService {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationMetadataService.class);
 
-    private final JdbcTemplate jdbc;
+    private final IntegrationMetadataDao integrationMetadataDao;
     private final PipelineTaskService pipelineTaskService;
     /** DQ 治理安全桥接 — 统一走 security-engine REST 审计（同 DQ 先例，禁止各引擎自建 KafkaTemplate） */
     private final DqSecurityService dqSecurityService;
@@ -48,10 +48,10 @@ public class IntegrationMetadataService {
     @Autowired(required = false)
     private EventBusService eventBusService;
 
-    public IntegrationMetadataService(JdbcTemplate jdbc,
+    public IntegrationMetadataService(IntegrationMetadataDao integrationMetadataDao,
                                       PipelineTaskService pipelineTaskService,
                                       DqSecurityService dqSecurityService) {
-        this.jdbc = jdbc;
+        this.integrationMetadataDao = integrationMetadataDao;
         this.pipelineTaskService = pipelineTaskService;
         this.dqSecurityService = dqSecurityService;
     }
@@ -67,9 +67,7 @@ public class IntegrationMetadataService {
         Map<String, Object> result = new LinkedHashMap<>();
         // connections — 启用的数据源（status="ACTIVE"）
         try {
-            List<Map<String, Object>> conns = jdbc.queryForList(
-                "SELECT datasource_id, datasource_name, datasource_type, status " +
-                "FROM td_datasource WHERE status = 'ACTIVE' ORDER BY datasource_name");
+            List<Map<String, Object>> conns = integrationMetadataDao.listActiveConnections();
             List<Map<String, Object>> mapped = new ArrayList<>();
             for (Map<String, Object> row : conns) {
                 Map<String, Object> c = new LinkedHashMap<>();
@@ -116,11 +114,7 @@ public class IntegrationMetadataService {
 
         // 数据源 1：td_audit_log（security-engine 持久化审计，V40 建在 default schema）
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT event_type, timestamp, resource, action, result, details " +
-                "FROM td_audit_log " +
-                "WHERE timestamp >= NOW() - make_interval(hours => ?) " +
-                "ORDER BY timestamp DESC LIMIT ?", hours, maxLimit);
+            List<Map<String, Object>> rows = integrationMetadataDao.tdAuditLog(hours, maxLimit);
             List<Map<String, Object>> mapped = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 mapped.add(mapAuditRow(row));
@@ -134,11 +128,7 @@ public class IntegrationMetadataService {
 
         // 数据源 2：ecos_audit_log（sysman AOP CUD 审计）
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT operation, entity_type, entity_id, changes, created_at, category " +
-                "FROM ecos_audit_log " +
-                "WHERE created_at >= NOW() - make_interval(hours => ?) " +
-                "ORDER BY created_at DESC LIMIT ?", hours, maxLimit);
+            List<Map<String, Object>> rows = integrationMetadataDao.ecosAuditLog(hours, maxLimit);
             List<Map<String, Object>> mapped = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> item = new LinkedHashMap<>();
@@ -164,11 +154,7 @@ public class IntegrationMetadataService {
 
         // 数据源 3：ecos_object_timeline（workspace 结构化对象事件）
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT event_type, event_summary, actor, details, created_at " +
-                "FROM ecos_object_timeline " +
-                "WHERE created_at >= NOW() - make_interval(hours => ?) " +
-                "ORDER BY created_at DESC LIMIT ?", hours, maxLimit);
+            List<Map<String, Object>> rows = integrationMetadataDao.ecosObjectTimeline(hours, maxLimit);
             List<Map<String, Object>> mapped = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> item = new LinkedHashMap<>();
@@ -202,16 +188,12 @@ public class IntegrationMetadataService {
         String drift = (type == null || type.isBlank()) ? "drift" : type.trim().toLowerCase();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
-        String source = "ecos_dq.dq_rule_check (recent 1h) + ecos_pipeline_task";
+        String source = "ecos_data.dq_rule_check (recent 1h) + ecos_pipeline_task";
 
         // 最近 1h 未通过的数据质量检查
         List<Map<String, Object>> failedChecks = new ArrayList<>();
         try {
-            failedChecks = jdbc.queryForList(
-                "SELECT rc.rule_id, rc.passed, rc.total_rows, rc.failed_rows, rc.pass_rate, rc.executed_at " +
-                "FROM ecos_dq.dq_rule_check rc " +
-                "WHERE rc.executed_at >= NOW() - interval '1 hour' " +
-                "ORDER BY rc.executed_at DESC LIMIT 20");
+            failedChecks = integrationMetadataDao.recentDqRuleChecks();
         } catch (Exception e) {
             log.debug("dq_rule_check 查询失败（表可能未初始化）: {}", e.getMessage());
         }

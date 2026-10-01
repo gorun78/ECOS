@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.dao.PipelineExecutionDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.dto.DataResourceRegisterDTO;
 import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
@@ -31,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -57,7 +57,7 @@ public class PipelineExecutionService {
 
     private final PipelineRepository repository;
     private final ConnectorFactory connectorFactory;
-    private final JdbcTemplate jdbc;
+    private final PipelineExecutionDao pipelineExecutionDao;
     private final DataSourceService dataSourceService;
     private final UdfService udfService;
     private final MinioStorageService minioStorageService;
@@ -88,14 +88,14 @@ public class PipelineExecutionService {
 
     public PipelineExecutionService(PipelineRepository repository,
                                      ConnectorFactory connectorFactory,
-                                     JdbcTemplate jdbc,
+                                     PipelineExecutionDao pipelineExecutionDao,
                                      DataSourceService dataSourceService,
                                      UdfService udfService,
                                      MinioStorageService minioStorageService,
                                      DataLakeResourceService dataLakeResourceService) {
         this.repository = repository;
         this.connectorFactory = connectorFactory;
-        this.jdbc = jdbc;
+        this.pipelineExecutionDao = pipelineExecutionDao;
         this.dataSourceService = dataSourceService;
         this.udfService = udfService;
         this.minioStorageService = minioStorageService;
@@ -712,40 +712,23 @@ public class PipelineExecutionService {
     /** 文档行 upsert（queued）：同 doc_id 重解析走 ON CONFLICT，不产生重复行。 */
     private void upsertDocQueued(String docId, String source, String fileName, String objectKey,
                                  String contentType, long sizeBytes) {
-        jdbc.update(
-                "INSERT INTO " + DW_DOC_TABLE + " (id, doc_id, source, original_file_name, object_key, "
-                        + "content_type, size_bytes, parse_status, chunk_count, create_time, update_time, "
-                        + "create_by, update_by, is_deleted) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', 0, NOW(), NOW(), ?, ?, FALSE) "
-                        + "ON CONFLICT (doc_id) DO UPDATE SET source = EXCLUDED.source, "
-                        + "original_file_name = EXCLUDED.original_file_name, object_key = EXCLUDED.object_key, "
-                        + "content_type = EXCLUDED.content_type, size_bytes = EXCLUDED.size_bytes, "
-                        + "parse_status = 'queued', error_message = NULL, chunk_count = 0, "
-                        + "update_time = NOW(), update_by = EXCLUDED.update_by, is_deleted = FALSE",
-                newId(), docId, source, fileName, objectKey, contentType, sizeBytes, DW_ACTOR, DW_ACTOR);
+        pipelineExecutionDao.upsertDocQueued(docId, source, fileName, objectKey, contentType, sizeBytes);
     }
 
     /** 文档状态流转（parsing/extracting）。 */
     private void updateDocStatus(String docId, String status) {
-        jdbc.update("UPDATE " + DW_DOC_TABLE + " SET parse_status = ?, error_message = NULL, "
-                + "update_time = NOW(), update_by = ? WHERE doc_id = ? AND is_deleted = FALSE",
-                status, DW_ACTOR, docId);
+        pipelineExecutionDao.updateDocStatus(docId, status);
     }
 
     /** 文档终态 done（记录分块数与解析完成时间）。 */
     private void markDocDone(String docId, int chunkCount) {
-        jdbc.update("UPDATE " + DW_DOC_TABLE + " SET parse_status = 'done', chunk_count = ?, "
-                + "parsed_at = NOW(), error_message = NULL, update_time = NOW(), update_by = ? "
-                + "WHERE doc_id = ? AND is_deleted = FALSE",
-                chunkCount, DW_ACTOR, docId);
+        pipelineExecutionDao.markDocDone(docId, chunkCount);
     }
 
     /** 文档落 failed 终态；此处失败仅告警，不覆盖原始异常。 */
     private void markDocFailed(String docId, String errorMessage) {
         try {
-            jdbc.update("UPDATE " + DW_DOC_TABLE + " SET parse_status = 'failed', error_message = ?, "
-                    + "update_time = NOW(), update_by = ? WHERE doc_id = ? AND is_deleted = FALSE",
-                    truncateForColumn(errorMessage, 2000), DW_ACTOR, docId);
+            pipelineExecutionDao.markDocFailed(docId, errorMessage);
         } catch (Exception e) {
             logWarnQuietly("TRANSFORM_DOC_PARSE: 落 failed 状态失败（忽略）: docId={}", docId, e);
         }
@@ -753,19 +736,7 @@ public class PipelineExecutionService {
 
     /** 批量 upsert 分块（同 (doc_id, chunk_index) 走 ON CONFLICT，重解析不产生重复行）。 */
     private void insertDocChunks(String docId, List<DocumentChunk> chunks) {
-        String sql = "INSERT INTO " + DW_DOC_CHUNK_TABLE + " (id, chunk_id, doc_id, chunk_index, content, "
-                + "char_start, char_end, metadata, status, create_time, update_time, create_by, update_by, is_deleted) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, '{}'::jsonb, 'active', NOW(), NOW(), ?, ?, FALSE) "
-                + "ON CONFLICT (doc_id, chunk_index) DO UPDATE SET content = EXCLUDED.content, "
-                + "char_start = EXCLUDED.char_start, char_end = EXCLUDED.char_end, status = 'active', "
-                + "update_time = NOW(), update_by = EXCLUDED.update_by, is_deleted = FALSE";
-        List<Object[]> batchArgs = new ArrayList<>(chunks.size());
-        for (DocumentChunk chunk : chunks) {
-            batchArgs.add(new Object[]{
-                    newId(), deterministicChunkId(docId, chunk.chunkIndex()), docId, chunk.chunkIndex(),
-                    chunk.content(), chunk.charStart(), chunk.charEnd(), DW_ACTOR, DW_ACTOR});
-        }
-        jdbc.batchUpdate(sql, batchArgs);
+        pipelineExecutionDao.insertDocChunks(docId, chunks);
     }
 
     /**
@@ -884,19 +855,19 @@ public class PipelineExecutionService {
         return switch (firstToken) {
             // 查询类 → queryForList，返回行数
             case "SELECT", "SHOW", "DESCRIBE", "WITH" -> {
-                List<Map<String, Object>> rows = jdbc.queryForList(trimmed);
+                List<Map<String, Object>> rows = pipelineExecutionDao.transformQuery(trimmed);
                 logInfo("TRANSFORM_SQL query: rows={}", rows.size());
                 yield rows.size();
             }
             // DML/DDL 类 → update，返回受影响行数
             case "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "ALTER", "DROP", "TRUNCATE" -> {
-                long affected = jdbc.update(trimmed);
+                long affected = pipelineExecutionDao.transformUpdate(trimmed);
                 logInfo("TRANSFORM_SQL update: affected={}", affected);
                 yield affected;
             }
             default -> {
                 log.warn("TRANSFORM_SQL 未知首 token: {}, 按 update 处理", firstToken);
-                yield jdbc.update(trimmed);
+                yield pipelineExecutionDao.transformUpdate(trimmed);
             }
         };
     }
@@ -1679,26 +1650,7 @@ public class PipelineExecutionService {
             return 0;
         }
 
-        long count = 0;
-        for (Map<String, Object> row : rows) {
-            StringBuilder cols = new StringBuilder();
-            StringBuilder vals = new StringBuilder();
-            List<Object> params = new ArrayList<>();
-
-            for (Map.Entry<String, Object> entry : row.entrySet()) {
-                if (!cols.isEmpty()) {
-                    cols.append(", ");
-                    vals.append(", ");
-                }
-                cols.append(entry.getKey());
-                vals.append("?");
-                params.add(entry.getValue());
-            }
-
-            String sql = "INSERT INTO " + targetTable + " (" + cols + ") VALUES (" + vals + ")";
-            jdbc.update(sql, params.toArray());
-            count++;
-        }
+        long count = pipelineExecutionDao.insertRows(targetTable, rows);
 
         // 标记 DW 层（layer=CURATED）；失败不影响写入结果
         dataLakeResourceService.markCurated(targetTable);

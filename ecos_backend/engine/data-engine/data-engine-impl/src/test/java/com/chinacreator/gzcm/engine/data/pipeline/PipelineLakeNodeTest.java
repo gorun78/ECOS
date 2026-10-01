@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.UdfService;
+import com.chinacreator.gzcm.engine.data.dao.PipelineExecutionDao;
 import com.chinacreator.gzcm.engine.data.service.DataLakeResourceService;
 import com.chinacreator.gzcm.engine.data.service.LakeObjectKeys;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
@@ -56,7 +57,7 @@ class PipelineLakeNodeTest {
         this.minioStorageService = mock(MinioStorageService.class);
         this.dataLakeResourceService = mock(DataLakeResourceService.class);
         this.service = new PipelineExecutionService(repository, connectorFactory,
-                mock(JdbcTemplate.class), mock(DataSourceService.class), mock(UdfService.class),
+                mock(PipelineExecutionDao.class), mock(DataSourceService.class), mock(UdfService.class),
                 minioStorageService, dataLakeResourceService);
     }
 

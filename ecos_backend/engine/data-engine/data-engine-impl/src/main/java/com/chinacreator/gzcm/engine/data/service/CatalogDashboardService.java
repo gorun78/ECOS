@@ -3,9 +3,9 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.common.data.dto.CatalogQueryDTO;
 import com.chinacreator.gzcm.common.data.model.CatalogItem;
 import com.chinacreator.gzcm.engine.data.CatalogService;
+import com.chinacreator.gzcm.engine.data.dao.CatalogDashboardDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -16,11 +16,11 @@ public class CatalogDashboardService {
     private static final Logger log = LoggerFactory.getLogger(CatalogDashboardService.class);
 
     private final CatalogService catalogService;
-    private final JdbcTemplate jdbc;
+    private final CatalogDashboardDao dashboardDao;
 
-    public CatalogDashboardService(CatalogService catalogService, JdbcTemplate jdbc) {
+    public CatalogDashboardService(CatalogService catalogService, CatalogDashboardDao dashboardDao) {
         this.catalogService = catalogService;
-        this.jdbc = jdbc;
+        this.dashboardDao = dashboardDao;
     }
 
     public Map<String, Object> getDashboard() {
@@ -33,7 +33,7 @@ public class CatalogDashboardService {
 
     private long countResources() {
         try {
-            Long count = jdbc.queryForObject("SELECT COUNT(*) FROM td_data_resource", Long.class);
+            Long count = dashboardDao.countResources();
             return count != null ? count : catalogService.count();
         } catch (Exception e) {
             return catalogService.count();
@@ -42,7 +42,7 @@ public class CatalogDashboardService {
 
     private long countFields() {
         try {
-            Long count = jdbc.queryForObject("SELECT COUNT(*) FROM td_data_field", Long.class);
+            Long count = dashboardDao.countFields();
             return count != null ? count : countFieldsFromService();
         } catch (Exception e) {
             return countFieldsFromService();
@@ -68,12 +68,7 @@ public class CatalogDashboardService {
 
     private Map<String, Long> countByType() {
         try {
-            Map<String, Long> typeCounts = new LinkedHashMap<>();
-            jdbc.query("SELECT resource_type, COUNT(*) FROM td_data_resource GROUP BY resource_type",
-                    rs -> {
-                        typeCounts.put(rs.getString(1), rs.getLong(2));
-                    });
-            return typeCounts;
+            return dashboardDao.countByType();
         } catch (Exception e) {
             return countByTypeFromService();
         }

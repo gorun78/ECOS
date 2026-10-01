@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.engine.data.dao.DataSourceDao;
 import com.chinacreator.gzcm.runtime.access.connector.Connector;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
@@ -50,7 +51,7 @@ class ConnectionTestViaRuntimeTest {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         JdbcConnector jdbcConnector = mock(JdbcConnector.class);
         ConnectorFactory factory = mock(ConnectorFactory.class);
-        DataSourceServiceImpl svc = new DataSourceServiceImpl(jdbc, factory);
+        DataSourceServiceImpl svc = new DataSourceServiceImpl(mock(DataSourceDao.class), factory);
 
         // 子类 spy 包住 getInternal + resolvePassword 加载私有回显逻辑
         DataSourceServiceImpl slicer = spy(svc);
@@ -77,7 +78,7 @@ class ConnectionTestViaRuntimeTest {
     void testConnectionByIdRoutesToJdbcConnectorDetailed() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         ConnectorFactory factory = mock(ConnectorFactory.class);
-        DataSourceServiceImpl svc = new DataSourceServiceImpl(jdbc, factory);
+        DataSourceServiceImpl svc = new DataSourceServiceImpl(mock(DataSourceDao.class), factory);
         DataSourceServiceImpl slicer = spy(svc);
         DataSourceEntity ds = new DataSourceEntity();
         ds.setDatasourceId("ds-det");

@@ -10,8 +10,6 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +18,7 @@ import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.quality.DqAlertService;
 import com.chinacreator.gzcm.engine.data.quality.DqScheduleService;
 import com.chinacreator.gzcm.engine.data.quality.DqScoreService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqScheduleDao;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqThrottleRow;
@@ -38,7 +37,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p>核心能力：</p>
  * <ol>
- *   <li>Schedule CRUD — 读写 {@code ecos_dq.dq_schedule}（MyBatis 显式 ecos_dq. 前缀）</li>
+ *   <li>Schedule CRUD — 读写 {@code ecos_data.dq_schedule}（MyBatis 显式 schema 前缀）</li>
  *   <li>{@link #runRuleBatch} — 核心批执行：拉 ACTIVE 规则 → 限流检查 → 逐条评估写
  *       dq_rule_check → 重算资产评分（复用 T8 {@code DqScoreService.recomputeForAsset}）</li>
  *   <li>限流 — scope 级每日上限（dq_throttle，缺省 100），超限记 SKIP 日志提前返回防雪崩</li>
@@ -83,20 +82,20 @@ public class DqScheduleServiceImpl implements DqScheduleService {
     private final DqScoreService scoreService;
     private final DqSecurityService securityService;
     private final DqAlertService alertService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqScheduleDao scheduleDao;
 
     public DqScheduleServiceImpl(DqScheduleMapper scheduleMapper,
                                  DqRuleMapper ruleMapper,
                                  DqScoreService scoreService,
                                  DqSecurityService securityService,
                                  DqAlertService alertService,
-                                 ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                                 DqScheduleDao scheduleDao) {
         this.scheduleMapper = scheduleMapper;
         this.ruleMapper = ruleMapper;
         this.scoreService = scoreService;
         this.securityService = securityService;
         this.alertService = alertService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.scheduleDao = scheduleDao;
     }
 
     // ==================== 1. CRUD ====================
@@ -324,14 +323,14 @@ public class DqScheduleServiceImpl implements DqScheduleService {
      * 组装 ScoringContext（参数经 DqSecurityService.maskParameters 脱敏 — 铁律 2.4 #3）。
      *
      * <p>F02-09 上下文真实化：{@code lastCheck/totalRows/failedRows/sampleFailures}
-     * 从上一次 {@code ecos_dq.dq_rule_check} 行取真值（同源字段一致性），
+     * 从上一次 {@code ecos_data.dq_rule_check} 行取真值（同源字段一致性），
      * 禁止空 Map 造成评估器"高分通过"假象；本波环境不可接通真实 datasources 表
      * 拉取连接配置，connectionConfig 显式注解 {@code contextIncomplete=true}
      * 提示下游评估器降级为 UNKNOWN（对应 D.5 错误码 "contextIncomplete"）。
      * 数据库不可达时同样置 incomplete=true，不阻断批执行。</p>
      *
      * <p>可见性 package-private 便于验收单测（ScoringContextHydrationTest）
-     * 直接驱动 mock JdbcTemplate → buildContext 分支。</p>
+     * 直接驱动 mock DqScheduleDao → buildContext 分支。</p>
      */
     ScoringContext buildContext(DqRuleVO rule) {
         Map<String, Object> params = securityService.maskParameters(parseParamsJson(rule.getParametersJson()));
@@ -374,22 +373,9 @@ public class DqScheduleServiceImpl implements DqScheduleService {
             lastCheck.put("contextIncomplete", Boolean.TRUE);
             return;
         }
-        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
-        if (jdbc == null) {
-            lastCheck.put("contextIncomplete", Boolean.TRUE);
-            return;
-        }
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(
-                    "SELECT id, rule_id AS ruleId, schedule_id AS scheduleId, trigger_type AS triggerType,"
-                    + " executed_at AS executedAt, passed, total_rows AS totalRows,"
-                    + " failed_rows AS failedRows, pass_rate AS passRate, sample_size AS sampleSize,"
-                    + " sample_failures::text AS sampleFailuresJson, error_message AS errorMessage"
-                    + " FROM ecos_dq.dq_rule_check WHERE rule_id = ? AND is_deleted = FALSE"
-                    + "   AND executed_at >= NOW() - interval '1 hour'"
-                    + " ORDER BY executed_at DESC, id LIMIT 1",
-                    ruleId);
+            rows = scheduleDao.findLastCheck(ruleId);
         } catch (RuntimeException e) {
             log.warn("DqSchedule hydrateFromLastCheck failed: ruleId={}, err={}", ruleId, e.getMessage());
             lastCheck.put("contextIncomplete", Boolean.TRUE);
@@ -427,20 +413,10 @@ public class DqScheduleServiceImpl implements DqScheduleService {
     private void writeCheckRow(String checkId, String scheduleId, String ruleId, String triggerType,
                                boolean passed, long totalRows, long failedRows, double passRate,
                                String errorMessage, int sampleSize, int latencyMs) {
-        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
-        if (jdbc == null) {
-            log.warn("DqSchedule 写 dq_rule_check 跳过（JdbcTemplate 不可用）: ruleId={}", ruleId);
-            return;
-        }
         try {
-            jdbc.update(
-                    "INSERT INTO ecos_dq.dq_rule_check" +
-                    " (id, rule_id, schedule_id, trigger_type, executed_at, passed, total_rows, failed_rows," +
-                    "  pass_rate, latency_ms, error_message, sample_size, sample_failures)" +
-                    " VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?::jsonb)",
-                    checkId, ruleId, scheduleId, triggerType, passed,
+            scheduleDao.insertCheckRow(checkId, ruleId, scheduleId, triggerType, passed,
                     totalRows, failedRows, passRate, latencyMs,
-                    errorMessage, sampleSize, "{}");
+                    errorMessage, sampleSize);
         } catch (RuntimeException e) {
             log.error("DqSchedule 写 dq_rule_check 失败: ruleId={}, error={}", ruleId, e.getMessage(), e);
         }
@@ -653,16 +629,8 @@ public class DqScheduleServiceImpl implements DqScheduleService {
         if (vo.getId() == null) {
             return null;
         }
-        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
-        if (jdbc == null) {
-            return null;
-        }
         try {
-            List<String> rows = jdbc.query(
-                    "SELECT rule_ids::text FROM ecos_dq.dq_schedule WHERE id = ? AND is_deleted = FALSE",
-                    (rs, i) -> rs.getString(1),
-                    vo.getId());
-            return rows.isEmpty() ? null : rows.get(0);
+            return scheduleDao.selectRuleIdsJson(vo.getId());
         } catch (RuntimeException e) {
             log.warn("DqSchedule 回查 rule_ids 失败: id={}, error={}", vo.getId(), e.getMessage());
             return null;

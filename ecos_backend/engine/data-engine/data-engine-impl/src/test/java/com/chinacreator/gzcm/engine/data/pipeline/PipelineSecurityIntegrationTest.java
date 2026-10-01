@@ -212,7 +212,7 @@ class PipelineSecurityIntegrationTest {
     @DisplayName("Controller executeDefinition — ABAC DENY 时 submitTask 不被调用")
     void controllerExecuteAbacDenyBlocksPipelineSubmit() throws Exception {
         PipelineController controller = new PipelineController(
-                mockSecurityDeny(), new PipelineRepository(mock(JdbcTemplate.class)),
+                mockSecurityDeny(), mock(PipelineRepository.class),
                 mock(ITaskManagementService.class),
                 security,
                 org.mockito.Mockito.mock(PipelineNodeTypesService.class));
@@ -244,7 +244,7 @@ class PipelineSecurityIntegrationTest {
         PipelineService svc = org.mockito.Mockito.mock(PipelineService.class);
         PipelineController controller = new PipelineController(
                 svc,
-                new PipelineRepository(mock(JdbcTemplate.class)),
+                mock(PipelineRepository.class),
                 mock(ITaskManagementService.class),
                 security,
                 org.mockito.Mockito.mock(PipelineNodeTypesService.class));

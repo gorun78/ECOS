@@ -11,15 +11,14 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.data.quality.DqAlertService;
 import com.chinacreator.gzcm.engine.data.quality.DqAutoRepairService;
 import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqWorkOrderService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqAlertDao;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertQuery;
 import com.chinacreator.gzcm.engine.data.quality.model.DqAlertVO;
@@ -83,24 +82,24 @@ public class DqAlertServiceImpl implements DqAlertService {
     private final DqAutoRepairService autoRepairService;
     /** IAlertService 可选注入（runtime-core 上下文无 alert Bean 时降级为仅落库，保证主链不炸） */
     private final IAlertService alertService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     /** T16 知识沉淀可选注入（fire-and-forget；缺失时不阻断启动） */
     private final DqKnowledgeSinkService knowledgeSinkService;
+    private final DqAlertDao alertDao;
 
     public DqAlertServiceImpl(DqRuleMapper ruleMapper,
                                DqSecurityService securityService,
                                DqWorkOrderService workOrderService,
                                DqAutoRepairService autoRepairService,
                                ObjectProvider<IAlertService> alertServiceProvider,
-                               ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-                               ObjectProvider<DqKnowledgeSinkService> knowledgeSinkProvider) {
+                               ObjectProvider<DqKnowledgeSinkService> knowledgeSinkProvider,
+                               DqAlertDao alertDao) {
         this.ruleMapper = ruleMapper;
         this.securityService = securityService;
         this.workOrderService = workOrderService;
         this.autoRepairService = autoRepairService;
         this.alertService = alertServiceProvider.getIfAvailable();
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.knowledgeSinkService = knowledgeSinkProvider.getIfAvailable();
+        this.alertDao = alertDao;
     }
 
     // ==================== 1. 核心分发链 ====================
@@ -112,7 +111,6 @@ public class DqAlertServiceImpl implements DqAlertService {
             return;
         }
         try {
-            JdbcTemplate jdbc = requireJdbc();
             // 0. 规则不存在 → 不建告警（脏数据防御），仅留痕
             DqRuleVO rule = ruleMapper.findById(ruleId);
             if (rule == null) {
@@ -122,17 +120,17 @@ public class DqAlertServiceImpl implements DqAlertService {
             }
 
             // 1. 取 check 行诊断位（不存在时降级空 Map — 不阻断建告警）
-            Map<String, Object> check = readCheckRow(jdbc, checkId);
+            Map<String, Object> check = readCheckRow(checkId);
             String alertLevel = mapSeverityToLevel(rule.getSeverity());
             String alertType = resolveAlertType(rule, check);
             String assetId = truncatedAsset(scopeId);
             String assetName = assetNameOf(scopeKind, scopeId, rule);
 
             // 2. 判重：同 rule 5min 内已有 PENDING/NOTIFIED → notify_count++ + 刷新 last_notify_at/payload
-            String alertId = findDedupAlertId(jdbc, ruleId, check, scopeKind);
+            String alertId = findDedupAlertId(ruleId, check, scopeKind);
             boolean dedup = alertId != null;
             if (dedup) {
-                notifyDedupAlert(jdbc, alertId, check, assetId, alertLevel);
+                notifyDedupAlert(alertId, check, assetId, alertLevel);
                 log.info("DqAlert 判重合并: ruleId={}, dedupAlertId={}, level={}, checkId={}",
                         ruleId, alertId, alertLevel, checkId);
                 securityService.auditWrite("DQ_ALERT_DISPATCH_MERGED", alertId, alertLevel);
@@ -148,12 +146,8 @@ public class DqAlertServiceImpl implements DqAlertService {
             String payloadJson = serializePayload(payloadMasked);
             String status = "PENDING";
             try {
-                jdbc.update(
-                        "INSERT INTO ecos_dq.dq_alert_record"
-                        + " (id, rule_id, alert_level, alert_type, asset_id, asset_name, rule_name,"
-                        + "  message, payload, status, notify_count, last_notify_at, notify_channels)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, 1, NOW(), ?::jsonb)",
-                        alertId, ruleId, alertLevel, nullToDefault(alertType, "RULE_CHECK_FAILED"),
+                alertDao.insertAlertRecord(alertId, ruleId, alertLevel,
+                        nullToDefault(alertType, "RULE_CHECK_FAILED"),
                         assetId, assetName, rule.getRuleName(), message, payloadJson, "PENDING",
                         "[]");
             } catch (RuntimeException e) {
@@ -174,10 +168,7 @@ public class DqAlertServiceImpl implements DqAlertService {
                 boolean pushed = pushViaRuntime(alertId, rule, alertLevel, message, check, scopeKind, scopeId);
                 if (pushed) {
                     try {
-                        jdbc.update(
-                                "UPDATE ecos_dq.dq_alert_record SET status = 'NOTIFIED',"
-                                + " last_notify_at = NOW() WHERE id = ?",
-                                alertId);
+                        alertDao.markNotified(alertId);
                     } catch (RuntimeException e) {
                         log.warn("DqAlert 回写 NOTIFIED 状态失败: alertId={}, error={}", alertId, e.getMessage());
                     }
@@ -203,18 +194,13 @@ public class DqAlertServiceImpl implements DqAlertService {
     }
 
     /** 查 check 行诊断位（pass_rate/total_rows 等）；checkId 空或行缺失返回空 Map。 */
-    private Map<String, Object> readCheckRow(JdbcTemplate jdbc, String checkId) {
+    private Map<String, Object> readCheckRow(String checkId) {
         Map<String, Object> out = new LinkedHashMap<>();
         if (checkId == null || checkId.isBlank()) {
             return out;
         }
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT id, rule_id AS ruleId, passed, total_rows AS totalRows,"
-                    + " failed_rows AS failedRows, pass_rate AS passRate,"
-                    + " error_message AS errorMessage, sample_size AS sampleSize"
-                    + " FROM ecos_dq.dq_rule_check WHERE id = ?",
-                    checkId);
+            List<Map<String, Object>> rows = alertDao.readCheckRow(checkId);
             if (!rows.isEmpty()) {
                 out.putAll(rows.get(0));
             }
@@ -251,14 +237,9 @@ public class DqAlertServiceImpl implements DqAlertService {
     }
 
     /** 判重：同 rule 5min 内 status IN (PENDING, NOTIFIED) 的最新一条。 */
-    private String findDedupAlertId(JdbcTemplate jdbc, String ruleId, Map<String, Object> check, String scopeKind) {
+    private String findDedupAlertId(String ruleId, Map<String, Object> check, String scopeKind) {
         try {
-            List<String> rows = jdbc.queryForList(
-                    "SELECT id FROM ecos_dq.dq_alert_record"
-                    + " WHERE rule_id = ? AND status IN ('PENDING','NOTIFIED')"
-                    + " AND created_at >= NOW() - (? || ' minutes')::interval"
-                    + " ORDER BY created_at DESC LIMIT 1",
-                    String.class, ruleId, String.valueOf(DEDUP_WINDOW_MINUTES));
+            List<String> rows = alertDao.findDedupAlertIds(ruleId, String.valueOf(DEDUP_WINDOW_MINUTES));
             return rows.isEmpty() ? null : rows.get(0);
         } catch (RuntimeException e) {
             log.warn("DqAlert 判重查询失败（降级新建）: ruleId={}, error={}", ruleId, e.getMessage());
@@ -267,14 +248,10 @@ public class DqAlertServiceImpl implements DqAlertService {
     }
 
     /** 判重合并：notify_count++ + 刷新 last_notify_at/payload/status（同一次故障的后续命中）。 */
-    private void notifyDedupAlert(JdbcTemplate jdbc, String alertId, Map<String, Object> check,
+    private void notifyDedupAlert(String alertId, Map<String, Object> check,
                                   String assetId, String alertLevel) {
         try {
-            jdbc.update(
-                    "UPDATE ecos_dq.dq_alert_record SET notify_count = notify_count + 1,"
-                    + " last_notify_at = NOW(), status = 'NOTIFIED',"
-                    + " asset_id = COALESCE(?, asset_id) WHERE id = ?",
-                    nullIfBlank(assetId), alertId);
+            alertDao.notifyDedupAlert(nullIfBlank(assetId), alertId);
         } catch (RuntimeException e) {
             log.warn("DqAlert 判重合并更新失败: alertId={}, error={}", alertId, e.getMessage());
         }
@@ -326,14 +303,11 @@ public class DqAlertServiceImpl implements DqAlertService {
             return; // 仅 P0/P1 建单
         }
         try {
-            JdbcTemplate jdbc = requireJdbc();
             // 幂等：同 alert 已有未删除工单 → 不重复建
-            List<String> existing = jdbc.queryForList(
-                    "SELECT id FROM ecos_dq.dq_work_order WHERE alert_id = ? AND is_deleted = FALSE LIMIT 1",
-                    String.class, alertId);
+            List<String> existing = alertDao.findExistingWorkOrderIds(alertId);
             if (!existing.isEmpty()) {
                 log.info("DqAlert 工单已存在（幂等跳过）: alertId={}, workOrderId={}", alertId, existing.get(0));
-                addWorkOrderLinkToAlert(jdbc, alertId, existing.get(0));
+                addWorkOrderLinkToAlert(alertId, existing.get(0));
                 return;
             }
 
@@ -352,7 +326,7 @@ public class DqAlertServiceImpl implements DqAlertService {
                 log.warn("DqAlert 工单创建失败: alertId={}", alertId);
                 return;
             }
-            addWorkOrderLinkToAlert(jdbc, alertId, workOrderId);
+            addWorkOrderLinkToAlert(alertId, workOrderId);
             securityService.auditWrite("DQ_WORK_ORDER_AUTO_CREATE", workOrderId, "SUCCESS");
 
             // 白名单场景由 alert_type 表达；DqWorkOrderServiceImpl 会自动识别并设 handling_mode
@@ -367,10 +341,9 @@ public class DqAlertServiceImpl implements DqAlertService {
     }
 
     /** 观察点：把 workOrder 信息回写到 alert payload（便于前端关联，不阻塞）。 */
-    private void addWorkOrderLinkToAlert(JdbcTemplate jdbc, String alertId, String workOrderId) {
+    private void addWorkOrderLinkToAlert(String alertId, String workOrderId) {
         try {
-            jdbc.update(
-                    "UPDATE ecos_dq.dq_alert_record SET payload = payload || ?::jsonb WHERE id = ?",
+            alertDao.addWorkOrderLinkToAlert(
                     "{\"workOrderId\":\"" + workOrderId.replace("\"", "") + "\"}", alertId);
         } catch (RuntimeException e) {
             log.warn("DqAlert 回写 workOrderId 到 payload 失败: alertId={}, error={}", alertId, e.getMessage());
@@ -408,7 +381,6 @@ public class DqAlertServiceImpl implements DqAlertService {
         DqAlertQuery q = query != null ? query : new DqAlertQuery();
         int pageNum = q.getPageNum() != null && q.getPageNum() > 0 ? q.getPageNum() : 1;
         int pageSize = q.getPageSize() != null && q.getPageSize() > 0 ? Math.min(q.getPageSize(), 100) : 20;
-        JdbcTemplate jdbc = requireJdbc();
 
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
@@ -440,21 +412,10 @@ public class DqAlertServiceImpl implements DqAlertService {
         listParams.add(pageSize);
         listParams.add(offset);
 
-        Integer total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ecos_dq.dq_alert_record" + where, Integer.class,
-                countParams.toArray());
+        Integer total = alertDao.countAlerts(where.toString(), countParams.toArray());
         long totalRows = total != null ? total : 0L;
 
-        List<DqAlertVO> rows = jdbc.query(
-                "SELECT id, rule_id AS ruleId, alert_level AS alertLevel, alert_type AS alertType,"
-                + " asset_id AS assetId, asset_name AS assetName, rule_name AS ruleName, message,"
-                + " payload::text AS payloadJson, status, escalated_to AS escalatedTo,"
-                + " notify_count AS notifyCount, last_notify_at AS lastNotifyAt,"
-                + " ack_by AS ackBy, ack_at AS ackAt, resolved_by AS resolvedBy,"
-                + " resolved_at AS resolvedAt, resolved_note AS resolvedNote, created_at AS createdAt"
-                + " FROM ecos_dq.dq_alert_record" + where
-                + " ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
-                (rs, i) -> mapAlertRow(rs), listParams.toArray());
+        List<DqAlertVO> rows = alertDao.listAlerts(where.toString(), (rs, i) -> mapAlertRow(rs), listParams.toArray());
         securityService.auditRead("DQ_ALERT_LIST", "batch");
         return new PageResult<>(rows, totalRows, pageNum, pageSize);
     }
@@ -464,16 +425,7 @@ public class DqAlertServiceImpl implements DqAlertService {
         if (id == null || id.isBlank()) {
             return null;
         }
-        JdbcTemplate jdbc = requireJdbc();
-        List<DqAlertVO> rows = jdbc.query(
-                "SELECT id, rule_id AS ruleId, alert_level AS alertLevel, alert_type AS alertType,"
-                + " asset_id AS assetId, asset_name AS assetName, rule_name AS ruleName, message,"
-                + " payload::text AS payloadJson, status, escalated_to AS escalatedTo,"
-                + " notify_count AS notifyCount, last_notify_at AS lastNotifyAt,"
-                + " ack_by AS ackBy, ack_at AS ackAt, resolved_by AS resolvedBy,"
-                + " resolved_at AS resolvedAt, resolved_note AS resolvedNote, created_at AS createdAt"
-                + " FROM ecos_dq.dq_alert_record WHERE id = ?",
-                (rs, i) -> mapAlertRow(rs), id);
+        List<DqAlertVO> rows = alertDao.findAlertById(id, (rs, i) -> mapAlertRow(rs));
         DqAlertVO vo = rows.isEmpty() ? null : rows.get(0);
         securityService.auditRead("DQ_ALERT_DETAIL", id);
         return vo;
@@ -481,12 +433,8 @@ public class DqAlertServiceImpl implements DqAlertService {
 
     @Override
     public void ackAlert(String id, String ackBy) {
-        JdbcTemplate jdbc = requireJdbc();
         String by = notBlank(ackBy) ? ackBy.trim() : "system";
-        int n = jdbc.update(
-                "UPDATE ecos_dq.dq_alert_record SET status = 'ACKED', ack_by = ?, ack_at = NOW()"
-                + " WHERE id = ? AND status IN ('PENDING','NOTIFIED','ESCALATED')",
-                by, id);
+        int n = alertDao.ackAlert(by, id);
         if (n == 0) {
             throw new NotFoundException("DQ 告警不存在或当前状态不可确认: " + id);
         }
@@ -496,13 +444,8 @@ public class DqAlertServiceImpl implements DqAlertService {
 
     @Override
     public void resolveAlert(String id, String resolvedBy, String note) {
-        JdbcTemplate jdbc = requireJdbc();
         String by = notBlank(resolvedBy) ? resolvedBy.trim() : "system";
-        int n = jdbc.update(
-                "UPDATE ecos_dq.dq_alert_record SET status = 'RESOLVED', resolved_by = ?,"
-                + " resolved_at = NOW(), resolved_note = ?"
-                + " WHERE id = ? AND status IN ('PENDING','NOTIFIED','ACKED','ESCALATED')",
-                by, note, id);
+        int n = alertDao.resolveAlert(by, note, id);
         if (n == 0) {
             throw new NotFoundException("DQ 告警不存在或当前状态不可解决: " + id);
         }
@@ -643,13 +586,5 @@ public class DqAlertServiceImpl implements DqAlertService {
             return null;
         }
         return scopeId.length() > ASSET_ID_MAX ? scopeId.substring(0, ASSET_ID_MAX) : scopeId;
-    }
-
-    private JdbcTemplate requireJdbc() {
-        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
-        if (jdbc == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行 DQ 告警分发");
-        }
-        return jdbc;
     }
 }

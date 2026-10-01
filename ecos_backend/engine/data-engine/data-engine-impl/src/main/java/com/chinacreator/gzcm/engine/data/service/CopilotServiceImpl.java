@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.engine.data.CopilotService;
+import com.chinacreator.gzcm.engine.data.dao.CopilotDao;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -10,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -35,7 +35,7 @@ public class CopilotServiceImpl implements CopilotService {
     private static final String DEFAULT_MODEL = "deepseek-chat";
     private static final String DEFAULT_PROMPT = "你是 ECOS 数据工程专家，擅长 SQL、Python 和 Pipeline 编排。";
 
-    private final JdbcTemplate jdbc;
+    private final CopilotDao copilotDao;
 
     /** llm-gateway 统一出口；未装配时 Copilot 显式降级不裸调厂商 API */
     @Autowired(required = false)
@@ -48,8 +48,8 @@ public class CopilotServiceImpl implements CopilotService {
     @Value("${llm.deepseek.api-key:}")
     private String copilotApiKey;
 
-    public CopilotServiceImpl(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public CopilotServiceImpl(CopilotDao copilotDao) {
+        this.copilotDao = copilotDao;
     }
 
     // ── LLM 配置读取 (sys_config 分组 data-engine, 经 sysman 门面) ──
@@ -216,8 +216,7 @@ public class CopilotServiceImpl implements CopilotService {
         // 从 DB 获取 run 详情
         String errorMsg = errorLog;
         try {
-            Map<String, Object> run = jdbc.queryForMap(
-                "SELECT * FROM ecos_pipeline_run WHERE id = ?", runId);
+            Map<String, Object> run = copilotDao.getRunById(runId);
             errorMsg = (String) run.getOrDefault("error_msg", "");
         } catch (Exception e) {
             // use provided errorLog

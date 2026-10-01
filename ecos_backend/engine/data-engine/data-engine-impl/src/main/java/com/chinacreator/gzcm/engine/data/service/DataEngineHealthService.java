@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.engine.data.dao.DataEngineHealthDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,15 +10,15 @@ public class DataEngineHealthService {
 
     private static final Logger log = LoggerFactory.getLogger(DataEngineHealthService.class);
 
-    private final JdbcTemplate jdbc;
+    private final DataEngineHealthDao healthDao;
 
-    public DataEngineHealthService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public DataEngineHealthService(DataEngineHealthDao healthDao) {
+        this.healthDao = healthDao;
     }
 
     public boolean pingDb() {
         try {
-            jdbc.queryForObject("SELECT 1", Integer.class);
+            healthDao.pingDb();
             return true;
         } catch (Exception e) {
             log.warn("DB health check failed: {}", e.getMessage());
@@ -28,7 +28,7 @@ public class DataEngineHealthService {
 
     public long countDatasources() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM td_datasource", Long.class);
+            return healthDao.countDatasources();
         } catch (Exception e) {
             return -1;
         }
@@ -36,7 +36,7 @@ public class DataEngineHealthService {
 
     public long countResources() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM td_data_resource", Long.class);
+            return healthDao.countResources();
         } catch (Exception e) {
             return -1;
         }
@@ -44,7 +44,7 @@ public class DataEngineHealthService {
 
     public long countCatalogItems() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM td_catalog_item", Long.class);
+            return healthDao.countCatalogItems();
         } catch (Exception e) {
             return -1;
         }
@@ -52,7 +52,7 @@ public class DataEngineHealthService {
 
     public long countFields() {
         try {
-            return jdbc.queryForObject("SELECT COUNT(*) FROM td_data_field", Long.class);
+            return healthDao.countFields();
         } catch (Exception e) {
             return -1;
         }

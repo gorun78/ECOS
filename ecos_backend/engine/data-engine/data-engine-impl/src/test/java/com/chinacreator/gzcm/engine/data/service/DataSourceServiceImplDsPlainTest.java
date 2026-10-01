@@ -3,12 +3,11 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.engine.data.dao.DataSourceDao;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;
 import java.util.List;
@@ -18,7 +17,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,6 +32,10 @@ import static org.mockito.Mockito.when;
  *
  * <p>含 1 条正向对照（加密可用 → 返回密文）与 1 条 known-0 对照（无口令 → null 不抛），
  * 证明断言本身有效而非恒真。</p>
+ *
+ * <p>数据访问收口（铁律 §2.5 #1）后，SQL 已下沉 {@link DataSourceDao}：本测改以 mock DAO
+ * 驱动，落库动作断言 {@code verifyNoInteractions(dao)}，读出口断言 {@code dao.listAll()}
+ * 返回行的掩码结果；未脱敏差分对照改走 {@code DataSourceDao.mapRow}（收口后 RowMapper 归 DAO）。</p>
  */
 class DataSourceServiceImplDsPlainTest {
 
@@ -41,11 +43,13 @@ class DataSourceServiceImplDsPlainTest {
     private static final String CIPHER = "BASE64_CIPHER_TEXT==";
     private static final String KEY_ID = "dataSourcePwd";
 
-    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final ConnectorFactory connectorFactory = mock(ConnectorFactory.class);
+    private DataSourceDao dao;
 
+    /** 建服务并记住其底层 DAO mock（供 verifyNoInteractions / when stub 引用）。 */
     private DataSourceServiceImpl newService() {
-        return new DataSourceServiceImpl(jdbc, connectorFactory);
+        dao = mock(DataSourceDao.class);
+        return new DataSourceServiceImpl(dao, connectorFactory);
     }
 
     /** 正向对照：加密出口可用时返回密文，说明本类断言能真的观察到成功路径。 */
@@ -99,24 +103,24 @@ class DataSourceServiceImplDsPlainTest {
         dto.setConnectionConfig("{\"host\":\"10.0.0.1\",\"port\":5432,\"password\":\"" + PLAIN + "\"}");
 
         assertThrows(ValidationException.class, () -> newService().register(dto));
-        verifyNoInteractions(jdbc);
+        verifyNoInteractions(dao);
     }
 
     @Test
     @DisplayName("listAll 出口脱敏 → config 口令掩码、host 保留、密文列为 null")
-    void listAllMasksPasswordAndCipher() throws Exception {
-        ResultSet rs = mock(ResultSet.class);
-        when(rs.getString("datasource_id")).thenReturn("ds-1");
-        when(rs.getString("connection_config"))
-                .thenReturn("{\"host\":\"10.0.0.1\",\"username\":\"reader\",\"password\":\"" + PLAIN + "\"}");
-        when(rs.getString("password_enc")).thenReturn(CIPHER);
+    void listAllMasksPasswordAndCipher() {
+        DataSourceEntity stored = new DataSourceEntity();
+        stored.setDatasourceId("ds-1");
+        stored.setDatasourceType("POSTGRESQL");
+        stored.setStatus("active");
+        stored.setConnectionConfig(
+                "{\"host\":\"10.0.0.1\",\"username\":\"reader\",\"password\":\"" + PLAIN + "\"}");
+        stored.setPasswordEncrypted(CIPHER);
+        // 先建服务（初始化 dao mock），再 stub 读路径
+        DataSourceServiceImpl svc = newService();
+        when(dao.listAll()).thenReturn(List.of(stored));
 
-        when(jdbc.query(anyString(), any(RowMapper.class))).thenAnswer(inv -> {
-            RowMapper<DataSourceEntity> mapper = inv.getArgument(1);
-            return List.of(mapper.mapRow(rs, 0));
-        });
-
-        List<DataSourceEntity> rows = newService().listAll();
+        List<DataSourceEntity> rows = svc.listAll();
         assertEquals(1, rows.size());
         DataSourceEntity row = rows.get(0);
         assertTrue(row.getConnectionConfig().contains("********"),
@@ -131,6 +135,7 @@ class DataSourceServiceImplDsPlainTest {
     /**
      * 差分对照（known-&gt;0）：同一行数据走<b>未脱敏</b>的 mapRow 路径时口令明文可见，
      * 证明上一条用例观察到的"明文消失"来自 maskProtected，而非种子数据本身没含口令。
+     * 数据访问收口后 RowMapper 已下沉 {@link DataSourceDao#mapRow}（private static）。
      */
     @Test
     @DisplayName("对照-3 同一种子行：未脱敏路径明文可见（证明脱敏断言非恒真）")
@@ -140,10 +145,10 @@ class DataSourceServiceImplDsPlainTest {
                 .thenReturn("{\"host\":\"10.0.0.1\",\"password\":\"" + PLAIN + "\"}");
         when(rs.getString("password_enc")).thenReturn(CIPHER);
 
-        java.lang.reflect.Method mapRow = DataSourceServiceImpl.class
+        java.lang.reflect.Method mapRow = DataSourceDao.class
                 .getDeclaredMethod("mapRow", ResultSet.class);
         mapRow.setAccessible(true);
-        DataSourceEntity raw = (DataSourceEntity) mapRow.invoke(newService(), rs);
+        DataSourceEntity raw = (DataSourceEntity) mapRow.invoke(null, rs);
 
         assertTrue(raw.getConnectionConfig().contains(PLAIN),
                 "未脱敏路径应仍可见明文（种子有效性校验）");

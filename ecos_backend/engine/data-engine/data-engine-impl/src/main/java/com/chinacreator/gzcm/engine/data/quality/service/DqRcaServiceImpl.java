@@ -7,22 +7,20 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.data.quality.DqKnowledgeSinkService;
 import com.chinacreator.gzcm.engine.data.quality.DqRcaService;
+import com.chinacreator.gzcm.engine.data.quality.dao.DqRcaDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqKnowledgeEntryVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRcaRequest;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRcaResult;
@@ -34,7 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p><b>真接链路</b>（替换 PMO-48-C T13 stub）：</p>
  * <ol>
- *   <li>按 {@code workOrderId} 读 {@code ecos_dq.dq_work_order} 拿 ruleId / severity / description</li>
+ *   <li>按 {@code workOrderId} 读 {@code ecos_data.dq_work_order} 拿 ruleId / severity / description</li>
  *   <li>{@code DqKnowledgeSinkService.searchSimilar(errorMessage, 3)} 取 top3 相似知识（RAG 上下文）</li>
  *   <li>调 cognitive-engine {@code POST /api/v1/cognitive/diagnose}（T6 总线，gateway 聚合 :8080）
  *       — body 承载 {@link DqRcaRequest} 字段 + {@code similarKnowledge} 上下文，
@@ -86,26 +84,26 @@ public class DqRcaServiceImpl implements DqRcaService {
     private RestTemplate restTemplate = buildRestTemplate();
 
     private final DqKnowledgeSinkService knowledgeSinkService;
-    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final DqRcaDao rcaDao;
 
     @org.springframework.beans.factory.annotation.Autowired
     public DqRcaServiceImpl(DqKnowledgeSinkService knowledgeSinkService,
-                             ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                             DqRcaDao rcaDao) {
         this.knowledgeSinkService = knowledgeSinkService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.rcaDao = rcaDao;
     }
 
     /**
      * 测试专用构造器（test-visible，PMO-48-D T17 E2E IT）：允许 mock RestTemplate 注入
      * 以便 stub cognitive diagnose 调用，验证 RCA 真接链路。公共可见性仅测试结果友好；
-     * Bean 装配仍走 {@link #DqRcaServiceImpl(DqKnowledgeSinkService, ObjectProvider)}。
+     * Bean 装配仍走 {@link #DqRcaServiceImpl(DqKnowledgeSinkService, DqRcaDao)}。
      */
     public DqRcaServiceImpl(RestTemplate restTemplate,
                             DqKnowledgeSinkService knowledgeSinkService,
-                            ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+                            DqRcaDao rcaDao) {
         this.restTemplate = restTemplate;
         this.knowledgeSinkService = knowledgeSinkService;
-        this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.rcaDao = rcaDao;
     }
 
     @Override
@@ -168,12 +166,8 @@ public class DqRcaServiceImpl implements DqRcaService {
     // ==================== 1. 工单上下文 ====================
 
     private Map<String, Object> readWorkOrder(String workOrderId) {
-        JdbcTemplate jdbc = jdbc();
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT rule_id AS ruleId, asset_id AS assetId, severity, description"
-                    + " FROM ecos_dq.dq_work_order WHERE id = ? AND is_deleted = FALSE",
-                    workOrderId);
+            List<Map<String, Object>> rows = rcaDao.findWorkOrder(workOrderId);
             return rows.isEmpty() ? new LinkedHashMap<>() : rows.get(0);
         } catch (RuntimeException e) {
             log.warn("DqRca 读 dq_work_order 失败（降级空）: workOrderId={}, error={}",
@@ -394,14 +388,6 @@ public class DqRcaServiceImpl implements DqRcaService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
-    }
-
-    private JdbcTemplate jdbc() {
-        JdbcTemplate tpl = jdbcTemplateProvider.getIfAvailable();
-        if (tpl == null) {
-            throw new BusinessException("JdbcTemplate 不可用，无法执行 DQ RCA");
-        }
-        return tpl;
     }
 
     private static String cleanId(String id) {

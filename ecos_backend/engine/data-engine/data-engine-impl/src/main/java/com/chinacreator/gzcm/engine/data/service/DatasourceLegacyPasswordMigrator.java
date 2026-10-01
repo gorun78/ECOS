@@ -2,12 +2,12 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.engine.data.dao.LegacyPasswordMigrationDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -55,25 +55,21 @@ public class DatasourceLegacyPasswordMigrator implements ApplicationRunner {
 
     /** 与 V164.1 明文凭据检出口径一致：JSON 内含 "password" 键。 */
     static final String SELECT_PENDING_SQL =
-            "SELECT datasource_id, connection_config FROM td_datasource "
-          + "WHERE (password_enc IS NULL OR password_enc = '') "
-          + "AND connection_config IS NOT NULL "
-          + "AND connection_config LIKE '%\"password\"%'";
+            LegacyPasswordMigrationDao.SELECT_PENDING_SQL;
 
     static final String UPDATE_SQL =
-            "UPDATE td_datasource SET password_enc = ?, connection_config = ?, update_time = ? "
-          + "WHERE datasource_id = ?";
+            LegacyPasswordMigrationDao.UPDATE_SQL;
 
     /** 掩码占位（与 DataSourceServiceImpl.MASK_VALUE 口径一致）：不算真实明文，跳过。 */
     private static final String MASK_VALUE = "********";
 
-    private final JdbcTemplate jdbc;
     private final DataSourceServiceImpl dataSourceService;
+    private final LegacyPasswordMigrationDao migrationDao;
 
-    public DatasourceLegacyPasswordMigrator(JdbcTemplate jdbc,
-                                            DataSourceServiceImpl dataSourceService) {
-        this.jdbc = jdbc;
+    public DatasourceLegacyPasswordMigrator(DataSourceServiceImpl dataSourceService,
+                                            LegacyPasswordMigrationDao migrationDao) {
         this.dataSourceService = dataSourceService;
+        this.migrationDao = migrationDao;
     }
 
     @Override
@@ -93,7 +89,7 @@ public class DatasourceLegacyPasswordMigrator implements ApplicationRunner {
      * <p>包级可见便于单测直接调用（无需 Spring 上下文）。</p>
      */
     int migrate() {
-        List<Map<String, Object>> pending = jdbc.queryForList(SELECT_PENDING_SQL);
+        List<Map<String, Object>> pending = migrationDao.findPending();
         int count = 0;
         for (Map<String, Object> row : pending) {
             String id = row.get("datasource_id") == null ? null : row.get("datasource_id").toString();
@@ -108,7 +104,7 @@ public class DatasourceLegacyPasswordMigrator implements ApplicationRunner {
             // 与写路径同一 facade：密钥缺失/加密失败 → 抛异常，run() 捕获记 ERROR（整批失败不半写）
             String enc = dataSourceService.encryptPassword(plain);
             String stripped = dataSourceService.stripSensitiveFields(cfg);
-            jdbc.update(UPDATE_SQL, enc, stripped, new java.sql.Timestamp(System.currentTimeMillis()), id);
+            migrationDao.reencrypt(enc, stripped, id);
             count++;
         }
         return count;

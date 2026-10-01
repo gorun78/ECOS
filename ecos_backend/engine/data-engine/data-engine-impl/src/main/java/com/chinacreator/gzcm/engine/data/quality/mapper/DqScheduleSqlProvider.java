@@ -26,7 +26,7 @@ public class DqScheduleSqlProvider {
             return "SELECT 0";
         }
         String placeholders = ruleIds.stream().map(r -> "?").collect(Collectors.joining(", "));
-        return "SELECT COUNT(*) FROM ecos_dq.dq_rule_check"
+        return "SELECT COUNT(*) FROM ecos_data.dq_rule_check"
                 + " WHERE executed_at >= CURRENT_DATE"
                 + " AND rule_id IN (" + placeholders + ")";
     }

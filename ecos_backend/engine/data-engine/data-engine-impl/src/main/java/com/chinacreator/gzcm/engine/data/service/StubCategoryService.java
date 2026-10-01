@@ -2,13 +2,11 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.data.model.DataCategory;
 import com.chinacreator.gzcm.engine.data.CategoryService;
+import com.chinacreator.gzcm.engine.data.dao.StubCategoryDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,7 +16,7 @@ import java.util.UUID;
 /**
  * CategoryService 真实实现（PMO-B6）。
  * <p>
- * 基于 {@link JdbcTemplate} 操作 {@code ecos_data.td_data_category} 表，实现分类树的真实 CRUD。
+ * 通过 {@link StubCategoryDao} 操作 {@code ecos_data.td_data_category} 表，实现分类树的真实 CRUD。
  * 类名保持 {@code StubCategoryService} 以避免 Bean 名称冲突，但行为已从 stub 升级为真实实现。
  *
  * <h3>表结构</h3>
@@ -33,32 +31,10 @@ public class StubCategoryService implements CategoryService {
 
     private static final Logger log = LoggerFactory.getLogger(StubCategoryService.class);
 
-    private static final String TABLE = "ecos_data.td_data_category";
+    private final StubCategoryDao categoryDao;
 
-    private final JdbcTemplate jdbc;
-
-    /** 行映射器：将 ResultSet 映射为 DataCategory */
-    private final RowMapper<DataCategory> rowMapper = (rs, rowNum) -> {
-        DataCategory c = new DataCategory();
-        c.setCategoryId(rs.getString("category_id"));
-        c.setCategoryName(rs.getString("category_name"));
-        c.setParentId(rs.getString("parent_id"));
-        c.setPath(rs.getString("path"));
-        c.setLevel(rs.getInt("level"));
-        c.setSortOrder(rs.getInt("sort_order"));
-        c.setDescription(rs.getString("description"));
-        c.setStatus(rs.getString("status"));
-        c.setCreateBy(rs.getString("create_by"));
-        Timestamp ct = rs.getTimestamp("create_time");
-        if (ct != null) c.setCreateTime(ct.toLocalDateTime());
-        c.setUpdateBy(rs.getString("update_by"));
-        Timestamp ut = rs.getTimestamp("update_time");
-        if (ut != null) c.setUpdateTime(ut.toLocalDateTime());
-        return c;
-    };
-
-    public StubCategoryService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public StubCategoryService(StubCategoryDao categoryDao) {
+        this.categoryDao = categoryDao;
     }
 
     // H8-T1: ecos_data.td_data_category 建表 DDL（含索引 idx_category_parent 与审计列）
@@ -81,21 +57,7 @@ public class StubCategoryService implements CategoryService {
         if (category.getStatus() == null || category.getStatus().isBlank()) {
             category.setStatus("ACTIVE");
         }
-        String sql = """
-            INSERT INTO ecos_data.td_data_category
-                (category_id, category_name, parent_id, path, level, sort_order, description, status, create_by, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            """;
-        jdbc.update(sql,
-                id,
-                category.getCategoryName(),
-                category.getParentId(),
-                path,
-                level,
-                category.getSortOrder() == null ? 0 : category.getSortOrder(),
-                category.getDescription(),
-                category.getStatus(),
-                category.getCreateBy());
+        categoryDao.insert(category);
         log.info("Category created: id={}, name={}", id, category.getCategoryName());
         return getById(id);
     }
@@ -111,29 +73,7 @@ public class StubCategoryService implements CategoryService {
         category.setLevel(level);
         String path = computePath(category.getParentId(), id);
         category.setPath(path);
-        String sql = """
-            UPDATE ecos_data.td_data_category SET
-                category_name = COALESCE(?, category_name),
-                parent_id     = COALESCE(?, parent_id),
-                path          = COALESCE(?, path),
-                level         = COALESCE(?, level),
-                sort_order    = COALESCE(?, sort_order),
-                description   = COALESCE(?, description),
-                status        = COALESCE(?, status),
-                update_by     = COALESCE(?, update_by),
-                update_time   = NOW()
-            WHERE category_id = ?
-            """;
-        int rows = jdbc.update(sql,
-                category.getCategoryName(),
-                category.getParentId(),
-                path,
-                level,
-                category.getSortOrder(),
-                category.getDescription(),
-                category.getStatus(),
-                category.getUpdateBy(),
-                id);
+        int rows = categoryDao.update(category);
         if (rows == 0) {
             log.warn("Category update affected 0 rows: id={}", id);
             return null;
@@ -145,13 +85,7 @@ public class StubCategoryService implements CategoryService {
     @Override
     public DataCategory getById(String categoryId) {
         if (categoryId == null || categoryId.isBlank()) return null;
-        try {
-            return jdbc.queryForObject(
-                    "SELECT * FROM ecos_data.td_data_category WHERE category_id = ?",
-                    rowMapper, categoryId);
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            return null;
-        }
+        return categoryDao.getById(categoryId);
     }
 
     @Override
@@ -159,9 +93,7 @@ public class StubCategoryService implements CategoryService {
         // 查全量后组装树结构
         List<DataCategory> all;
         try {
-            all = jdbc.query(
-                    "SELECT * FROM ecos_data.td_data_category ORDER BY sort_order, category_name",
-                    rowMapper);
+            all = categoryDao.getTree();
         } catch (Exception e) {
             log.warn("getTree query failed: {}", e.getMessage());
             return List.of();
@@ -173,9 +105,7 @@ public class StubCategoryService implements CategoryService {
     public List<DataCategory> getChildren(String parentId) {
         if (parentId == null || parentId.isBlank()) return List.of();
         try {
-            return jdbc.query(
-                    "SELECT * FROM ecos_data.td_data_category WHERE parent_id = ? ORDER BY sort_order, category_name",
-                    rowMapper, parentId);
+            return categoryDao.getChildren(parentId);
         } catch (Exception e) {
             log.warn("getChildren query failed: {}", e.getMessage());
             return List.of();
@@ -190,23 +120,16 @@ public class StubCategoryService implements CategoryService {
         for (DataCategory child : children) {
             remove(child.getCategoryId());
         }
-        int rows = jdbc.update(
-                "DELETE FROM ecos_data.td_data_category WHERE category_id = ?", categoryId);
+        int rows = categoryDao.delete(categoryId);
         log.info("Category removed: id={}, rows={}", categoryId, rows);
     }
 
     @Override
     public List<DataCategory> getCategoryStats() {
         // 统计每个 status 的数量，返回带 resourceCount 的分类列表
-        String sql = """
-            SELECT status, COUNT(*) AS cnt
-            FROM ecos_data.td_data_category
-            GROUP BY status
-            ORDER BY status
-            """;
         List<Map<String, Object>> rows;
         try {
-            rows = jdbc.queryForList(sql);
+            rows = categoryDao.statusStats();
         } catch (Exception e) {
             log.warn("getCategoryStats query failed: {}", e.getMessage());
             return List.of();

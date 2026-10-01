@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.chinacreator.gzcm.engine.data.DataSourceService;
+import com.chinacreator.gzcm.engine.data.dao.QueryExecutionDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.runtime.access.connector.ConnectorFactory;
 import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
@@ -56,7 +57,7 @@ class SqlConsoleRegressionDorisTest {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         DataSourceService dsSvc = mock(DataSourceService.class);
         JdbcConnector jc = mock(JdbcConnector.class);
-        QueryExecutionServiceImpl svc = new QueryExecutionServiceImpl(jdbc, dsSvc, jc);
+        QueryExecutionServiceImpl svc = new QueryExecutionServiceImpl(mock(QueryExecutionDao.class), dsSvc, jc);
 
         DataSourceEntity ds = new DataSourceEntity();
         ds.setDatasourceId("ds-doris");
