@@ -20,8 +20,14 @@ import org.springframework.stereotype.Repository;
  * <p>SQL 与 {@code RowMapper} 原样搬运自原 {@code service.AgentSessionService}，
  * 只搬不改语义；会话生命周期状态机、上下文压缩的业务编排保留在 Service 层。
  * POJO（{@code AgentSession}/{@code AgentMessage}）留在 Service 供 Controller 消费。</p>
+ *
+ * <p><b>显式 bean name</b>：{@code @Repository("engineAgentSessionDao")}。
+ * 与 {@code com.chinacreator.gzcm.services.agent.dao.AgentSessionDao}
+ * （bean 名 {@code agentSessionDao}，长期/企业级记忆持久化）默认同 simple-name
+ * 冲突。gateway 单 fat-JAR 同时命中 ai-engine + services.agent.runtime/model，
+ * 不显式命名会触发 {@code ConflictingBeanDefinitionException}（2026-10-02 Gate C 实测）。
  */
-@Repository
+@Repository("engineAgentSessionDao")
 public class AgentSessionDao extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(AgentSessionDao.class);

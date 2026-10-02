@@ -12,7 +12,7 @@ spring:
       - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified
+    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=ecos_control,ecos_data,ecos_ontology,ecos_ai,ecos_cognitive,ecos_knowledge,ecos_infra,ecos_dw,public&stringtype=unspecified
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver

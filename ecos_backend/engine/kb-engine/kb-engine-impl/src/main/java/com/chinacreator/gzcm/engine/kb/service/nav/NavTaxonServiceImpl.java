@@ -16,6 +16,8 @@ import com.chinacreator.gzcm.engine.kb.nav.model.NavTagVO;
 import com.chinacreator.gzcm.engine.kb.security.KnowledgeNavSecurityEngineClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
@@ -76,12 +78,29 @@ public class NavTaxonServiceImpl implements INavService {
     private final KnowledgeNavSecurityEngineClient securityClient;
     private final NavLlmRecommendService llmRecommendService;
 
+    /**
+     * <p>V200/R3-B1: schema 由 `${kb.control-schema:ecos_knowledge}` 注入 (MC06 全面落地)。</p>
+     */
+    private final String schema;
+
+    @Autowired
     public NavTaxonServiceImpl(NavTaxonDao dao,
                                KnowledgeNavSecurityEngineClient securityClient,
-                               NavLlmRecommendService llmRecommendService) {
+                               NavLlmRecommendService llmRecommendService,
+                               @Value("${kb.control-schema:ecos_knowledge}") String schema) {
         this.dao = dao;
         this.securityClient = securityClient;
         this.llmRecommendService = llmRecommendService;
+        this.schema = schema;
+    }
+
+    /**
+     * 兼容构造（测试辅助）：使用默认 schema。
+     */
+    public NavTaxonServiceImpl(NavTaxonDao dao,
+                               KnowledgeNavSecurityEngineClient securityClient,
+                               NavLlmRecommendService llmRecommendService) {
+        this(dao, securityClient, llmRecommendService, "ecos_knowledge");
     }
 
     // ═══════════════════════ 目录 CRUD ═══════════════════════
@@ -527,8 +546,8 @@ public class NavTaxonServiceImpl implements INavService {
                 }
             }
             if (!subtreePaths.isEmpty()) {
-                sb.append("AND EXISTS (SELECT 1 FROM ecos_knowledge.kb_nav_article_rel r ")
-                  .append("JOIN ecos_knowledge.kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 ")
+                sb.append("AND EXISTS (SELECT 1 FROM " + schema + ".kb_nav_article_rel r ")
+                  .append("JOIN " + schema + ".kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 ")
                   .append("WHERE r.article_id = a.id AND r.scope = 'category' AND r.is_deleted = 0 AND (");
                 for (int i = 0; i < subtreePaths.size(); i++) {
                     if (i > 0) {
@@ -542,8 +561,8 @@ public class NavTaxonServiceImpl implements INavService {
         }
         if (query.getTags() != null && !query.getTags().isEmpty()) {
             int size = query.getTags().size();
-            sb.append("AND EXISTS (SELECT 1 FROM ecos_knowledge.kb_nav_article_rel r2 ")
-              .append("JOIN ecos_knowledge.kb_nav_tag t ON t.id = r2.node_id AND t.is_deleted = 0 ")
+            sb.append("AND EXISTS (SELECT 1 FROM " + schema + ".kb_nav_article_rel r2 ")
+              .append("JOIN " + schema + ".kb_nav_tag t ON t.id = r2.node_id AND t.is_deleted = 0 ")
               .append("WHERE r2.article_id = a.id AND r2.scope = 'tag' AND r2.is_deleted = 0 ")
               .append("AND t.tag_name IN (");
             for (int i = 0; i < size; i++) {

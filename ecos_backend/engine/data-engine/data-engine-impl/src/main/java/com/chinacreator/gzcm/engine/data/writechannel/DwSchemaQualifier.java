@@ -1,5 +1,8 @@
 package com.chinacreator.gzcm.engine.data.writechannel;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 import java.util.Set;
 
 /**
@@ -17,9 +20,10 @@ import java.util.Set;
  * 本类据 carrierRef 解析出 {@code schema.table} 限定名并判定其归属域（业务/控制/OLAP 载体），
  * 交由 {@link OlapEngineResolver} 做 MC04 守卫。
  */
+@Component
 public final class DwSchemaQualifier {
 
-    /** 业务域 DW schema 默认值（MC06 由配置覆盖，见 {@code ecos.db.business-schema}）。 */
+    /** 业务域 DW schema 默认值（MC06 由配置覆盖，见 {@code dw.business-schema}）。 */
     public static final String DEFAULT_BUSINESS_SCHEMA = "ecos_dw";
 
     /**
@@ -52,7 +56,7 @@ public final class DwSchemaQualifier {
 
     private final String businessSchema;
 
-    public DwSchemaQualifier(String businessSchema) {
+    public DwSchemaQualifier(@Value("${dw.business-schema:}") String businessSchema) {
         this.businessSchema = (businessSchema == null || businessSchema.isBlank())
                 ? DEFAULT_BUSINESS_SCHEMA : businessSchema.trim();
     }

@@ -95,12 +95,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // ── T5: 检查 Token 是否在黑名单中 (forceLogout) ── W06: 查询异常 fail-closed 503
-        String jti = claims.getId();
+        // 键为完整 token 串（sys_token_blacklist.token，与 DbBlacklistStore 写路径同源）
         String userId = claims.getSubject();
-        if (jti != null) {
+        {
             boolean black;
             try {
-                black = isTokenBlacklisted(jti);
+                black = isTokenBlacklisted(token);
             } catch (DataAccessException ex) {
                 log.warn("blacklist query failed (fail-closed): {}", ex.getMessage());
                 sendWithTrace(response, HttpStatus.SERVICE_UNAVAILABLE.value(),
@@ -108,7 +108,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             if (black) {
-                log.warn("Token已被强制踢出: userId={}, jti={}", userId, jti);
+                log.warn("Token已被强制踢出: userId={}", userId);
                 sendWithTrace(response, HttpServletResponse.SC_UNAUTHORIZED,
                         "ECOS-AUTH-004", "Token已被强制踢出，请重新登录");
                 return;
@@ -161,7 +161,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 List<Map<String, Object>> rows = authLookupDao.findTenantById(userId);
                 if (rows != null && !rows.isEmpty()) {
-                    Object tid = rows.get(0).get("TENANT_ID");
+                    Object tid = rows.get(0).get("tenant_id");
                     tenantId = tid != null ? tid.toString() : null;
                     tenantSource = "db";
                 }
@@ -218,8 +218,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * <p>W06：查询异常向上抛出 DataAccessException 由调用方 fail-closed（不再 return false）。
      * 仅业务异常返回 false（如 EmptyResultDataAccessException 视为未命中）。</p>
      */
-    private boolean isTokenBlacklisted(String jti) {
-        return authLookupDao.isTokenBlacklisted(jti);
+    private boolean isTokenBlacklisted(String token) {
+        return authLookupDao.isTokenBlacklisted(token);
     }
 
     /** 从数据库加载用户权限码列表（IR01 过渡态，见 W04 备注）。 */

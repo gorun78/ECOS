@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -46,6 +47,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     /** ThreadLocal 保存当前请求，供辅助方法获取 orgId/tenantId */
     private final ThreadLocal<HttpServletRequest> currentRequest = new ThreadLocal<>();
 
+    @Autowired
     public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
                                 org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider) {
         this.clearanceLookupDao = clearanceLookupDao;

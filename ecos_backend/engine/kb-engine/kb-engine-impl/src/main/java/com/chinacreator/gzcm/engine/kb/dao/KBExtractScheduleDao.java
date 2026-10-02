@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.dao;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
@@ -13,18 +14,31 @@ import java.util.Map;
  * <p>SQL 原样搬运自原 {@code service.kb.KBExtractScheduleServiceImpl}：</p>
  * <ul>
  *   <li>主源事实源表 {@code td_runtime_task_plan}（<b>无 schema 前缀</b>，verbatim 保留）</li>
- *   <li>旧 fallback 镜像表 {@code ecos_knowledge.kb_scheduled_extract}</li>
+ *   <li>旧 fallback 镜像表 {@code ${kb.control-schema:ecos_knowledge}}.kb_scheduled_extract</li>
  * </ul>
  * 异常语义（主源失败回退旧表 / 旧表失败 warn）仍由 Service 层 try/catch 维持，DAO 只抛。
+ *
+ * <p>V200/R3-B1: {@code LEGACY_TABLE} 的 schema 由 {@code ${kb.control-schema:ecos_knowledge}} 注入 (MC06 全面落地)。</p>
  */
 @Repository
 public class KBExtractScheduleDao extends JdbcTemplateDaoSupport {
 
-    /** 旧 fallback 镜像表（V141，已 deprecate）。 */
-    static final String LEGACY_TABLE = "ecos_knowledge.kb_scheduled_extract";
+    /**
+     * 旧 fallback 镜像表（V141，已 deprecate）。
+     * <p>V200/R3-B1: schema 由 {@code ${kb.control-schema:ecos_knowledge}} 注入（MC06），
+     * 转写为非静态 final 字段以承载运行时 schema。</p>
+     */
+    private final String LEGACY_TABLE;
 
-    /** runtime-task plan 事实源表（V152 W4 持久化）。 */
+    /**
+     * runtime-task plan 事实源表（V152 W4 持久化）。
+     * <p>无 schema 前缀（verbatim 保留，非本引擎控制域协议表），不进 MC06 配置化。</p>
+     */
     static final String PLAN_TABLE = "td_runtime_task_plan";
+
+    public KBExtractScheduleDao(@Value("${kb.control-schema:ecos_knowledge}") String schema) {
+        this.LEGACY_TABLE = schema + ".kb_scheduled_extract";
+    }
 
     // ── 主源 td_runtime_task_plan ─────────────────────────────────────
 

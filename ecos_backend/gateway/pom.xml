@@ -241,11 +241,15 @@
             <scope>test</scope>
         </dependency>
         <!-- 详细设计-00 EditionProfileGuardTest：读取三档 profile yml -->
+        <!--
+          Note (2026-10-02 GATE-C 复核): 此前 <scope>test</scope> 会 shadow 掉 spring-boot
+          传递进来的 compile 版 snakeyaml，导致 spring-boot fat-jar 里 snakeyaml 完全缺失,
+          gateway 起动时报 "snakeyaml was not found on the classpath"（IllegalStateException
+          at Application.environmentPrepared）。改为 compile 以恢复传递路径。
+        -->
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.2</version>
-            <scope>test</scope>
         </dependency>
         <!-- A+4: infrastructure access (git/minio/logging/i18n/alert migrated from runtime-core) -->
         <dependency>

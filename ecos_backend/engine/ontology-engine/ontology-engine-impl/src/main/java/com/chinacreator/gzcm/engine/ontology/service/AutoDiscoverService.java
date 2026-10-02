@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * <p>T13 改造: 原 {@code getResourceFields} 用 JdbcTemplate 直查 data-engine 的数据资源
  * / 数据字段两张元数据表 (跨引擎指定, 违反铁律 §0.3.1 微服务边界),
  * 改为 delegate 到 {@link DataNetResourceClient} 走 datanet service REST。
- * 本引擎自有表的读写经 {@link AutoDiscoverDao}（ecos_ontology_entity / ecos_domain /
+ * 本引擎自有表的读写经 {@link AutoDiscoverDao}（ecos_ontology_entity / ecos_ontology_domain /
  * ecos_ontology_property / ecos_entity_table_mapping），属本引擎合理范围。</p>
  *
  * <p>PMO-B7 T1 (D11) 加固: 取数源统一收敛为 DW(CURATED) 层资源清单

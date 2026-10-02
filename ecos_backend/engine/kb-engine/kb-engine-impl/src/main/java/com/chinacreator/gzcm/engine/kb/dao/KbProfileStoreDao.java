@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.dao;
 
 import com.chinacreator.gzcm.engine.kb.service.profile.KbProfileDO;
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
@@ -11,12 +12,22 @@ import java.util.List;
 /**
  * 数据访问收口（R2-B2b kb 子包 / 架构铁律 §2.5 / IR06）：知识库历史画像 JDBC 落点。
  * <p>SQL 原样搬运自原 {@code service.profile.JdbcProfileStore}（schema
- * {@code ecos_knowledge.ecos_kb_profile} 保留）；动态 WHERE 拼接保持 byte-for-byte。</p>
+ * {@code ${kb.control-schema:ecos_knowledge}}.ecos_kb_profile）；动态 WHERE 拼接保持 byte-for-byte。
+ *
+ * <p>V200/R3-B1: schema 由 {@code ${kb.control-schema:ecos_knowledge}} 注入 (MC06 全面落地)。</p>
  */
 @Repository
 public class KbProfileStoreDao extends JdbcTemplateDaoSupport {
 
-    static final String TABLE = "ecos_knowledge.ecos_kb_profile";
+    /**
+     * V200/R3-B1: schema 由 {@code ${kb.control-schema:ecos_knowledge}} 注入（MC06），
+     * 转写为非静态 final 字段以承载运行时 schema。
+     */
+    private final String TABLE;
+
+    public KbProfileStoreDao(@Value("${kb.control-schema:ecos_knowledge}") String schema) {
+        this.TABLE = schema + ".ecos_kb_profile";
+    }
 
     static final RowMapper<KbProfileDO> ROW_MAPPER = (rs, rowNum) -> {
         KbProfileDO d = new KbProfileDO();

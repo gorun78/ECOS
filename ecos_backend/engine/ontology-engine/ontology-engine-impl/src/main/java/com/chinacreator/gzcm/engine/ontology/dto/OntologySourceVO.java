@@ -9,7 +9,7 @@ import lombok.Data;
  * <p>字段对齐 {@code OntologySourceController.listSources} 实际 SELECT 列：
  * ontologyId / sourceDomain / originManifest / createdAt，
  * 来自 {@code ecos_entity_table_mapping} + {@code ecos_ontology_entity} +
- * {@code ecos_domain} 三表 JOIN。
+ * {@code ecos_ontology_domain} 三表 JOIN。
  */
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)

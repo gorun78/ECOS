@@ -44,6 +44,7 @@ public class AuditRetryTask {
     private final AuditReplayer replayer;
     private final AuditFailureSink failureSink;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AuditRetryTask(AuditRetryDao dao) {
         this(dao,
             (topic, payload) -> {

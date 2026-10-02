@@ -14,17 +14,17 @@ public class AuthLookupDao extends com.chinacreator.gzcm.runtime.core.database.s
 
     /** 从 TD_USER_ROLE + TD_ROLE_PERMISSION + TD_PERMISSION 查询用户权限码 */
     private static final String PERMISSION_QUERY =
-        "SELECT DISTINCT p.\"PERMISSION_CODE\" " +
-        "FROM TD_USER_ROLE ur " +
-        "JOIN TD_ROLE_PERMISSION rp ON ur.\"ROLE_ID\" = rp.\"ROLE_ID\" " +
-        "JOIN TD_PERMISSION p ON rp.\"PERMISSION_ID\" = p.\"PERMISSION_ID\" " +
-        "WHERE ur.\"USER_ID\" = ?";
+        "SELECT DISTINCT p.permission_code " +
+        "FROM td_user_role ur " +
+        "JOIN td_role_permission rp ON ur.role_id = rp.role_id " +
+        "JOIN td_permission p ON rp.permission_id = p.permission_id " +
+        "WHERE ur.user_id = ?";
 
-    /** 检查 token jti 是否在黑名单中（已被强制踢出）。 */
-    public boolean isTokenBlacklisted(String jti) {
+    /** 检查 token 是否在黑名单中（已被强制踢出）。键为完整 token 串（sys_token_blacklist.token）。 */
+    public boolean isTokenBlacklisted(String token) {
         Integer count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM ecos_token_blacklist WHERE jti = ? AND expires_at > NOW()",
-            Integer.class, jti);
+            "SELECT COUNT(*) FROM sys_token_blacklist WHERE token = ? AND expire_at > ?",
+            Integer.class, token, System.currentTimeMillis());
         return count != null && count > 0;
     }
 
@@ -36,12 +36,12 @@ public class AuthLookupDao extends com.chinacreator.gzcm.runtime.core.database.s
     /** 按 userId 回查用户名。 */
     public List<String> loadUsernames(String userId) {
         return jdbcTemplate.queryForList(
-            "SELECT \"USERNAME\" FROM td_user WHERE \"USER_ID\" = ?", String.class, userId);
+            "SELECT username FROM td_user WHERE user_id = ?", String.class, userId);
     }
 
     /** 按 userId 回查租户ID。 */
     public List<Map<String, Object>> findTenantById(String userId) {
         return jdbcTemplate.queryForList(
-            "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+            "SELECT tenant_id FROM td_user WHERE user_id = ?", userId);
     }
 }

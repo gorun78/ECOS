@@ -42,17 +42,17 @@ public class AutoDiscoverDao extends JdbcTemplateDaoSupport {
     public Map<String, Object> createOntologyEntity(String entityCode, String domainCode,
                                                     String id, String ontologyId, String tableName) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?)",
+                "SELECT COUNT(*) FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_ontology_domain WHERE code=?)",
                 Integer.class, entityCode, domainCode);
         if (count != null && count > 0) {
             return jdbcTemplate.queryForMap(
-                    "SELECT id, code, name FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?)",
+                    "SELECT id, code, name FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_ontology_domain WHERE code=?)",
                     entityCode, domainCode);
         }
 
         jdbcTemplate.update(
                 "INSERT INTO ecos_ontology_entity (id, ontology_id, code, name, entity_type, description, domain_id, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, 'MASTER', ?, (SELECT id FROM ecos_domain WHERE code=?), NOW(), NOW())",
+                "VALUES (?, ?, ?, ?, 'MASTER', ?, (SELECT id FROM ecos_ontology_domain WHERE code=?), NOW(), NOW())",
                 id, ontologyId, entityCode, tableName, "Auto-discovered from " + tableName, domainCode);
         return null;
     }
@@ -84,7 +84,7 @@ public class AutoDiscoverDao extends JdbcTemplateDaoSupport {
     public Integer countEntityProperty(String propCode, String entityCode, String domainCode) {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ecos_ontology_property WHERE code=? AND entity_id=" +
-                "(SELECT id FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?))",
+                "(SELECT id FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_ontology_domain WHERE code=?))",
                 Integer.class, propCode, entityCode, domainCode);
     }
 
@@ -93,7 +93,7 @@ public class AutoDiscoverDao extends JdbcTemplateDaoSupport {
                                      String ontologyType, String entityCode, String domainCode) {
         jdbcTemplate.update(
                 "INSERT INTO ecos_ontology_property (id, code, name, property_type, entity_id, searchable_flag, required_flag, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, (SELECT id FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_domain WHERE code=?)), 1, 0, NOW(), NOW())",
+                "VALUES (?, ?, ?, ?, (SELECT id FROM ecos_ontology_entity WHERE code=? AND domain_id=(SELECT id FROM ecos_ontology_domain WHERE code=?)), 1, 0, NOW(), NOW())",
                 propId, propCode, fieldName, ontologyType, entityCode, domainCode);
     }
 

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.runtime.core.ontology.archive;
 import com.chinacreator.gzcm.runtime.core.ontology.archive.dao.GitArchivePendingDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -45,6 +46,7 @@ public class GitArchiveRetryTask {
     private final GitArchiveReplayer replayer;
     private final GitArchiveFailureSink failureSink;
 
+    @Autowired
     public GitArchiveRetryTask(GitArchivePendingDao dao) {
         this(dao, (repoId, targetVersionNo, commitMessage, authorName, payload) ->
                 ReplayerResult.fail("runtime-task 占位 replayer：缺引擎侧注入（monolith 态才有真 OntologyGitService）"),

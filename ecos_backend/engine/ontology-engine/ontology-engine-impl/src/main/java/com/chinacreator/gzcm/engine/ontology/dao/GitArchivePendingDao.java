@@ -25,12 +25,19 @@ import org.springframework.stereotype.Repository;
  *   <li>Spring 主注入：{@code (String schema)}；</li>
  *   <li>手动构造（测试）：{@code (JdbcTemplate jdbc, String schema)}。</li>
  * </ul>
+ *
+ * <p><b>显式 bean name</b>：{@code @Repository("engineGitArchivePendingDao")}。
+ * 与 {@code com.chinacreator.gzcm.runtime.core.ontology.archive.dao.GitArchivePendingDao}
+ * （bean 名 {@code gitArchivePendingDao}，W83/C66 F03-15 收口）默认同 simple-name 冲突。
+ * gateway 单 fat-JAR 内的 engine + runtime 都命中 ComponentScan，若不显式命名会触发
+ * {@code ConflictingBeanDefinitionException}（2026-10-02 Gate C 实测）。
  */
-@Repository
+@Repository("engineGitArchivePendingDao")
 public class GitArchivePendingDao extends JdbcTemplateDaoSupport {
 
     private final String table;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public GitArchivePendingDao(
             @Value("${ecos.ontology.control-schema:ecos_ontology}") String pendingSchema) {
         this.table = pendingSchema + ".ecos_ontology_git_archive_pending";

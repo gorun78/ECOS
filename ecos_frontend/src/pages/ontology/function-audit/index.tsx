@@ -188,12 +188,6 @@ export default function FunctionAuditPage({ onToast }: FunctionAuditPageProps) {
             <ShieldAlert size={20} className="mb-2" />
             <span className="font-mono text-center max-w-lg break-all">{error}</span>
           </div>
-        ) : rows.length === 0 ? (
-          <div className={`flex flex-col items-center py-12 text-[11px] ${styles.muted}`}>
-            <Activity size={22} className="mb-2" />
-            <span className="font-semibold">{t("ow.fnAudit.empty.title")}</span>
-            <span className="mt-1 max-w-md text-center">{t("ow.fnAudit.empty.desc")}</span>
-          </div>
         ) : (
           <table className="w-full text-[10px] border-collapse">
             <thead className={`sticky top-0 ${styles.cardBg}`}>
@@ -209,7 +203,17 @@ export default function FunctionAuditPage({ onToast }: FunctionAuditPageProps) {
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className={`text-center`}>
+                    <div className={`flex flex-col items-center py-12 text-[11px] ${styles.muted}`}>
+                      <Activity size={22} className="mb-2" />
+                      <span className="font-semibold">{t("ow.fnAudit.empty.title")}</span>
+                      <span className="mt-1 max-w-md text-center">{t("ow.fnAudit.empty.desc")}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : rows.map(r => {
                 const id = String(r.id);
                 const status = String(r.status || "UNKNOWN");
                 const expr = String(r.expression || "");

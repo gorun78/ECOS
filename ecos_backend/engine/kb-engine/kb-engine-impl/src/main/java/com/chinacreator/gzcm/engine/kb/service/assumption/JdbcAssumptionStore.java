@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service.assumption;
 
 import com.chinacreator.gzcm.engine.kb.dao.KbAssumptionStoreDao;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
@@ -12,8 +11,11 @@ import java.util.List;
  * <p>R2-B2b 数据访问收口（架构铁律 §2.5 / IR06）：raw-SQL 全部下沉至
  * {@link KbAssumptionStoreDao}，本类仅保留 store 端口职责（findLatestByKey/findById 的
  * head-or-null 语义在 Store 层维持，public 签名不变）。</p>
+ *
+ * <p>由 {@link com.chinacreator.gzcm.engine.kb.service.KbProfileAssumptionConfig} 显式
+ * {@code @Bean} 装配，不再标 {@code @Repository}——避免与 @Bean 定义双注册导致
+ * kbAssumptionStore 有 2 个候选 bean。</p>
  */
-@Repository
 public class JdbcAssumptionStore implements KbAssumptionStore {
 
     private final KbAssumptionStoreDao dao;

@@ -44,6 +44,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.engine",
     "com.chinacreator.gzcm.services.agent.runtime",
     "com.chinacreator.gzcm.services.agent.model",
+    // R2-B4b (agent-service JdbcTemplate 收口到 .dao): DAO 类在 .dao 包且带 @Repository，
+    // 必须纳入 gateway 组件扫描，否则 toolrouter Tools 找不到 AgentToolDao bean。
+    "com.chinacreator.gzcm.services.agent.dao",
 }, excludeFilters = {
     @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.runtime\\.core\\.agent\\..*"),
     // A+4: 排除迁出后的 runtime.core 旧包
@@ -134,6 +137,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     // F02-06 业务事实五表 mapper（V167）：fact.dao 下 5 个 @Mapper 接口需纳入扫描，
     // 缺失会导致 FactImportService 注入失败（gateway 启动即失败）
     "com.chinacreator.gzcm.engine.data.fact.dao",
+    // R2-B1 数据访问收口 (data-engine): 血缘 @Mapper 迁到 .lineage.dao，
+    // 未纳入扫描导致 DataLineageService 构造注入 EcosDataLineageMapper 失败
+    "com.chinacreator.gzcm.engine.data.lineage.dao",
+    // R2-B1 (data-engine): 写通道幂等 / 载具目录 @Mapper 落在 .writechannel 包
+    // (表层非 mapper/dao/repository)，未纳入扫描致 DwWriteChannelService 注入失败
+    "com.chinacreator.gzcm.engine.data.writechannel",
     "com.chinacreator.gzcm.engine.kb.repository",
     // 非结构化文档链路：kb.doc.mapper 下的 KbDocMapper/KbDocChunkMapper 不在 kb.repository 内，
     // 不纳入扫描会导致 KnowledgeDocIngestService 注入失败（启动即失败），与 dccheng 侧口径保持一致

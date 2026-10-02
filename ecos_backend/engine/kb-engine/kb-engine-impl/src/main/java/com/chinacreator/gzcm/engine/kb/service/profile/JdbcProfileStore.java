@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service.profile;
 
 import com.chinacreator.gzcm.engine.kb.dao.KbProfileStoreDao;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
@@ -17,8 +16,10 @@ import java.util.List;
  *       维持（public 签名不变）</li>
  *   <li>{@code insert} — 透传 DAO</li>
  * </ul>
+ *
+ * <p>由 {@link com.chinacreator.gzcm.engine.kb.service.KbProfileAssumptionConfig} 显式
+ * {@code @Bean} 装配，不再标 {@code @Repository}——避免与 @Bean 定义双注册。</p>
  */
-@Repository
 public class JdbcProfileStore implements KbProfileStore {
 
     private final KbProfileStoreDao dao;

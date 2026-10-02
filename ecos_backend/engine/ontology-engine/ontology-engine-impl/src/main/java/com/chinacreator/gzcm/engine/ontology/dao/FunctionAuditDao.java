@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -30,6 +31,7 @@ public class FunctionAuditDao extends JdbcTemplateDaoSupport {
 
     private final String schema;
 
+    @Autowired
     public FunctionAuditDao(
             @Value("${ecos.ontology.control-schema:ecos_ontology}") String schema) {
         this.schema = schema;

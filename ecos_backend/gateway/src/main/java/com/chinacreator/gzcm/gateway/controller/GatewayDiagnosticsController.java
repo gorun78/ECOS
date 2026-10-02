@@ -139,6 +139,9 @@ public class GatewayDiagnosticsController {
             return out;
         }
         List<Object> entries = (List<Object>) (((Map<String, Object>) manifest).get("entries"));
+        if (entries == null) {
+            entries = List.of();
+        }
         int svc = 0, mono = 0;
         for (Object o : entries) {
             Map<String, Object> e = (Map<String, Object>) o;

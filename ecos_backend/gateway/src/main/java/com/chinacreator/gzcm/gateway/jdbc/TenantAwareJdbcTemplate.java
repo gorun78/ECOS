@@ -36,7 +36,7 @@ public class TenantAwareJdbcTemplate extends JdbcTemplate {
      * （{@code INSERT ... VALUES (...) WHERE ...}），致该表经 JdbcTemplate 的
      * 新增/导入操作全部失败。该表改按 PMO-30 P1-1 的「仓库内手工租户」约定处理
      * （见 {@code GlossaryRepository}：SELECT 加 {@code tenant_id = ? OR tenant_id IS NULL}、
-     * INSERT 打标、UPDATE/DELETE 带租户条件），与 {@code ecos_domain} 同模式。
+     * INSERT 打标、UPDATE/DELETE 带租户条件），与 {@code ecos_ontology_domain} 同模式。
      * 表本身仍具 tenant_id 列，隔离语义不降低。
      */
     private static final Set<String> TENANT_TABLES = new HashSet<>(Arrays.asList(

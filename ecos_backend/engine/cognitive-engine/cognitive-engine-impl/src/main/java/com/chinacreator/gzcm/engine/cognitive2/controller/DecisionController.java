@@ -14,8 +14,16 @@ import java.util.*;
  * 决策智能 REST API — 前缀 /api/v1/cognitive/decision
  *
  * <p>五步生命周期端点：record → link → query(similar/chain) → govern(impact/check-rules)</p>
+ *
+ * <p><b>显式 bean name</b>：{@code @RestController("cognitiveDecisionController")}。
+ * 与 {@code com.chinacreator.gzcm.engine.security.controller.DecisionController}
+ * （bean 名 {@code decisionController}，详细设计-01 F01-02 / C.1[3] / W33 ·
+ * 三通道唯一裁决端点 {@code POST /api/v1/security/decision}）默认同 simple-name
+ * 冲突。gateway 单 fat-JAR 内 cognitive + security 均命中 ComponentScan，
+ * 不显式命名会触发 {@code ConflictingBeanDefinitionException}（2026-10-02 Gate C 实测）。
+ * 双端点各司其职（认知决策智能记录 vs. 三通道安全裁决），均保留。
  */
-@RestController
+@RestController("cognitiveDecisionController")
 @RequestMapping("/api/v1/cognitive/decision")
 public class DecisionController {
 

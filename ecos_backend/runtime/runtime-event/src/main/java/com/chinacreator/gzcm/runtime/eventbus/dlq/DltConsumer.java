@@ -45,6 +45,7 @@ public class DltConsumer {
     // topic -> 首次进入滞后窗口时刻
     private final ConcurrentMap<String, Long> lagWindowOpenedAt = new ConcurrentHashMap<>();
 
+    @org.springframework.beans.factory.annotation.Autowired
     public DltConsumer(EcosRuntimeEventDlqDao dao) {
         this(dao, (severity, message) ->
                 log.warn("[runtime-dlq] ALERT sev={} msg={}", severity, message));

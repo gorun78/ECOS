@@ -1,27 +1,37 @@
 package com.chinacreator.gzcm.engine.kb.dao;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 数据访问收口（R2 / B2-kb / 架构铁律 §2.5 / IR06）：
+ * <p>V200/R3-B1: schema 由 `${kb.control-schema:ecos_knowledge}` 注入 (MC06 全面落地)。</p>
+ *
+ * <p>数据访问收口（R2 / B2-kb / 架构铁律 §2.5 / IR06）：
  * {@code service.KbEntityInstanceExtractionService} 的图谱实例写入 + 本体快照 + 抽取水位 JDBC 落点。
  *
- * <p>SQL 原样搬运自原 service（表 {@code ecos_knowledge.graph_node / graph_edge /
+ * <p>SQL 原样搬运自原 service（表 {@code " + schema + ".graph_node / graph_edge /
  * kb_ontology_snapshot / kb_extract_watermark}，<b>带 schema 前缀</b>，verbatim 保留；
  * 幂等 upsert / 分片存在性查询 / 水位 upsert 语义不变）。</p>
  */
 @Repository
 public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport {
 
+    private final String schema;
+
+    public KbEntityInstanceExtractionServiceDao(
+            @Value("${kb.control-schema:ecos_knowledge}") String schema) {
+        this.schema = schema;
+    }
+
     /** 分片批量查询已存在的节点 id（IN 列表）。 */
     public List<String> queryExistingNodeIds(List<String> idChunk) {
         String placeholders = String.join(",", java.util.Collections.nCopies(idChunk.size(), "?"));
         return jdbcTemplate.queryForList(
-                "SELECT id FROM ecos_knowledge.graph_node WHERE id IN (" + placeholders + ")",
+                "SELECT id FROM " + schema + ".graph_node WHERE id IN (" + placeholders + ")",
                 String.class, idChunk.toArray());
     }
 
@@ -35,7 +45,7 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
                               String resourceId, String pkValue255) {
         // RETURNING (xmax = 0)：PG 惯用法，区分 INSERT（true）与 ON CONFLICT UPDATE（false）
         List<Boolean> inserted = jdbcTemplate.queryForList(
-                "INSERT INTO ecos_knowledge.graph_node "
+                "INSERT INTO " + schema + ".graph_node "
                         + "(id, label, node_type, description, properties, domain, created_at, updated_at, "
                         + " ontology_id, ontology_version, source_resource_id, source_pk) "
                         + "VALUES (?, ?, ?, ?, ?::jsonb, ?, NOW(), NOW(), ?, ?, ?, ?) "
@@ -55,7 +65,7 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
     public void upsertEdge(String edgeId, String sourceNodeId, String targetNodeId, String relationType,
                            String ontologyId, String ontologyVersion, String resourceId, String sourcePk255) {
         jdbcTemplate.update(
-                "INSERT INTO ecos_knowledge.graph_edge "
+                "INSERT INTO " + schema + ".graph_edge "
                         + "(id, source_id, target_id, type, weight, properties, created_at, "
                         + " ontology_id, ontology_version, source_resource_id, source_pk) "
                         + "VALUES (?, ?, ?, ?, 1.0, '{}'::jsonb, NOW(), ?, ?, ?, ?) "
@@ -71,14 +81,14 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
     public List<Map<String, Object>> selectAllSnapshots() {
         return jdbcTemplate.queryForList(
                 "SELECT DISTINCT ON (ontology_id) ontology_id, version, entity_codes "
-                        + "FROM ecos_knowledge.kb_ontology_snapshot WHERE is_deleted = 0 "
+                        + "FROM " + schema + ".kb_ontology_snapshot WHERE is_deleted = 0 "
                         + "ORDER BY ontology_id, created_at DESC");
     }
 
     /** 本体快照 — 单本体最新一条生效快照。 */
     public List<Map<String, Object>> selectLatestSnapshot(String ontologyId) {
         return jdbcTemplate.queryForList(
-                "SELECT ontology_id, version, entity_codes FROM ecos_knowledge.kb_ontology_snapshot "
+                "SELECT ontology_id, version, entity_codes FROM " + schema + ".kb_ontology_snapshot "
                         + "WHERE is_deleted = 0 AND ontology_id = ? ORDER BY created_at DESC LIMIT 1",
                 ontologyId);
     }
@@ -86,7 +96,7 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
     /** 读抽取水位（ontologyId + entityCode + resourceId）；无行返回 null。 */
     public String readWatermark(String ontologyId, String entityCode, String resourceId) {
         List<String> rows = jdbcTemplate.queryForList(
-                "SELECT watermark FROM ecos_knowledge.kb_extract_watermark "
+                "SELECT watermark FROM " + schema + ".kb_extract_watermark "
                         + "WHERE ontology_id = ? AND entity_code = ? AND resource_id = ?",
                 String.class, ontologyId, entityCode, resourceId);
         return rows.isEmpty() ? null : rows.get(0);
@@ -95,7 +105,7 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
     /** 写本次抽取水位（幂等 upsert）。 */
     public void writeWatermark(String ontologyId, String entityCode, String resourceId, String watermark255) {
         jdbcTemplate.update(
-                "INSERT INTO ecos_knowledge.kb_extract_watermark "
+                "INSERT INTO " + schema + ".kb_extract_watermark "
                         + "(ontology_id, entity_code, resource_id, watermark, updated_at) "
                         + "VALUES (?, ?, ?, ?, NOW()) "
                         + "ON CONFLICT (ontology_id, entity_code, resource_id) "

@@ -29,7 +29,7 @@ public class AutoDiscoverPreviewQueryDao extends JdbcTemplateDaoSupport {
         return jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM ecos_ontology_entity " +
             "WHERE code = ? AND domain_id = " +
-            "(SELECT id FROM ecos_domain WHERE code = ?)",
+            "(SELECT id FROM ecos_ontology_domain WHERE code = ?)",
             Integer.class, entityCode, domainCode);
     }
 }

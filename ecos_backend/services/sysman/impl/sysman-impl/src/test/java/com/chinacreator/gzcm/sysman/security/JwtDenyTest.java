@@ -116,8 +116,8 @@ class JwtDenyTest {
         when(claims.getId()).thenReturn("jti-1");
         when(claims.getSubject()).thenReturn("u1");
         when(jwtTokenProvider.validateToken(anyString())).thenReturn(claims);
-        // 黑名单命中
-        when(authLookupDao.isTokenBlacklisted("jti-1")).thenReturn(true);
+        // 黑名单命中（键为完整 token 串，与生产 fail-closed 路径一致）
+        when(authLookupDao.isTokenBlacklisted("tok")).thenReturn(true);
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(bearerRequest("tok", "/api/v1/data"), resp, chain);
@@ -136,7 +136,7 @@ class JwtDenyTest {
         when(claims.getSubject()).thenReturn("u1");
         when(jwtTokenProvider.validateToken(anyString())).thenReturn(claims);
         doThrow(new QueryTimeoutException("pg down"))
-                .when(authLookupDao).isTokenBlacklisted("jti-1");
+                .when(authLookupDao).isTokenBlacklisted("tok");
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(bearerRequest("tok", "/api/v1/data"), resp, chain);

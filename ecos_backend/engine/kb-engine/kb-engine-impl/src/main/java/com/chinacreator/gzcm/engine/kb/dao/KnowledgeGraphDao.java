@@ -1,14 +1,25 @@
 package com.chinacreator.gzcm.engine.kb.dao;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * <p>V200/R3-B1: schema 由 `${kb.control-schema:ecos_knowledge}` 注入 (MC06 全面落地)。</p>
+ */
 @Repository
 public class KnowledgeGraphDao extends JdbcTemplateDaoSupport {
+
+    private final String schema;
+
+    public KnowledgeGraphDao(
+            @Value("${kb.control-schema:ecos_knowledge}") String schema) {
+        this.schema = schema;
+    }
 
     /**
      * PMO-C T3: 把 categoryIds 映射为可访问节点白名单（kb_nav_article_rel scope=category 的 node_id）。
@@ -29,8 +40,8 @@ public class KnowledgeGraphDao extends JdbcTemplateDaoSupport {
             args.add(cleaned.get(i));
         }
         inClause.append(")");
-        String sql = "SELECT DISTINCT r.node_id FROM ecos_knowledge.kb_nav_article_rel r "
-                + "JOIN ecos_knowledge.kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 "
+        String sql = "SELECT DISTINCT r.node_id FROM " + schema + ".kb_nav_article_rel r "
+                + "JOIN " + schema + ".kb_nav_category c ON c.id = r.node_id AND c.is_deleted = 0 "
                 + "WHERE r.is_deleted = 0 AND r.scope = 'category' AND (" + inClause + ")";
         return jdbcTemplate.queryForList(sql, args.toArray());
     }

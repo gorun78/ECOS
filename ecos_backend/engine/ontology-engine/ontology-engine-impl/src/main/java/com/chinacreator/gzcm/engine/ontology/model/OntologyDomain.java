@@ -3,7 +3,7 @@ package com.chinacreator.gzcm.engine.ontology.model;
 import java.time.LocalDateTime;
 
 /**
- * 领域持久化 POJO — 对应 ecos_domain 表
+ * 领域持久化 POJO — 对应 ecos_ontology_domain 表
  */
 public class OntologyDomain {
 
