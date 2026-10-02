@@ -43,12 +43,24 @@ public class ScenarioService {
         BINDING_ENDPOINTS.put("INTERFACE", "interfaces");
     }
 
+    /**
+     * 后端 bindingType 六值权威词表（F07-05 / X-73 / C151 单源）。
+     * 供 {@link BindingCatalogContractTest} 的"catalog 类型 = 后端权威词表"合约断言消费，
+     * 与 {@code RequiredEdgePolicy.catalog()} 同源判定 —— 分叉即测试红。
+     */
+    static Set<String> bindingTypes() {
+        return BINDING_ENDPOINTS.keySet();
+    }
+
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final ScenarioCompletenessService completenessService;
 
-    public ScenarioService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+    public ScenarioService(JdbcTemplate jdbc, ObjectMapper objectMapper,
+                           ScenarioCompletenessService completenessService) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.completenessService = completenessService;
     }
 
     // ═══════════════ CRUD ═══════════════
@@ -67,6 +79,22 @@ public class ScenarioService {
         }
         fillAggregates(result);
         return result;
+    }
+
+    /**
+     * 场景列表 + 可选用途过滤（F07-14 / R-27①，附加查询参数，不改既有签名）。
+     *
+     * @param purpose {@code forecast} → 只列 {@code status=ACTIVE} 且孤岛为空（向导"选已有场景"服务端支撑）；
+     *                其它/空 → 全量列表（既有行为不变）
+     */
+    public List<ScenarioVO> list(String purpose) {
+        if (purpose == null || purpose.isBlank() || !"forecast".equalsIgnoreCase(purpose)) {
+            return list();
+        }
+        return list().stream()
+            .filter(vo -> "ACTIVE".equals(vo.getStatus())
+                    && (vo.getIslands() == null || vo.getIslands().isEmpty()))
+            .toList();
     }
 
     /** 场景详情（含聚合绑定 + 指标）。 */
@@ -323,6 +351,15 @@ public class ScenarioService {
             }
             vo.setMetrics(parseMetrics(json));
             vo.setBindings(bindings(vo.getId()));
+            // F07-04 / R-26① 保存期岛标（附加字段）：单源取自完整度孤岛判定（边可达性，非节点类型）。
+            // 读路径失败不得拖垮详情主响应 → 降级为空清单（岛标仅提示，激活闸 rejectIfIsolated 仍独立再算）。
+            try {
+                List<CompletenessVO.Island> islands = completenessService.islandsOf(vo.getId());
+                vo.setIslands(islands == null ? List.of() : islands);
+            } catch (Exception ex) {
+                log.debug("孤岛判定降级为空: id={}, err={}", vo.getId(), ex.getMessage());
+                vo.setIslands(List.of());
+            }
         }
     }
 

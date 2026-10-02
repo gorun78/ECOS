@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.workspace.exception.ExternalServiceUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.AvailableItemVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,7 +121,7 @@ public class ScenarioOptionsController {
             ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
-                return unavailable(serviceName, "empty response");
+                throw new ExternalServiceUnavailableException(serviceName, "empty response");
             }
             Object code = body.get("code");
             if (code instanceof Number n && n.intValue() != 0) {
@@ -139,7 +140,7 @@ public class ScenarioOptionsController {
             return ApiResponse.success(items);
         } catch (Exception ex) {
             log.warn("{} 不可达 {}: {}", serviceName, url, ex.getMessage());
-            return unavailable(serviceName, ex.getMessage());
+            throw unavailable(serviceName, ex.getMessage());
         }
     }
 
@@ -156,7 +157,7 @@ public class ScenarioOptionsController {
             ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
-                return unavailable("buszhi", "empty response");
+                throw unavailable("buszhi", "empty response");
             }
             Object code = body.get("code");
             if (code instanceof Number n && n.intValue() != 0) {
@@ -199,13 +200,18 @@ public class ScenarioOptionsController {
             return ApiResponse.success(items);
         } catch (Exception ex) {
             log.warn("buszhi 不可达 {}: {}", url, ex.getMessage());
-            return unavailable("buszhi", ex.getMessage());
+            throw unavailable("buszhi", ex.getMessage());
         }
     }
 
-    private ApiResponse<?> unavailable(String serviceName, String reason) {
-        return ApiResponse.error(503, "service_unreachable",
-                serviceName + " unreachable: " + (reason != null && reason.length() > 128 ? reason.substring(0, 128) : reason));
+    /** 构造 503 不可达异常（X-17：body.code=503 + HTTP 200 无效，改真实 503 状态码）。 */
+    private static ExternalServiceUnavailableException unavailable(String serviceName, String reason) {
+        return new ExternalServiceUnavailableException(serviceName, truncate(reason));
+    }
+
+    /** 截断超长上游细节，避免响应体积膨胀。 */
+    private static String truncate(String reason) {
+        return reason != null && reason.length() > 128 ? reason.substring(0, 128) : reason;
     }
 
     /** 安全字段白名单——仅这些 key 允许透传到前端 extra（防 host/port/username/jdbcUrl/password 泄漏） */

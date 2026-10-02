@@ -8,9 +8,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.workspace.scenario.CompletenessVO;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioCompletenessService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioService;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioStatusTransitionService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioVO;
+import io.swagger.v3.oas.annotations.Operation;
 
 /**
  * Scenario CRUD REST API — 业务场景管理（PMO-50 实体化，替代原内存 Map 实现）。
@@ -32,15 +36,23 @@ public class ScenarioController {
     private static final Logger log = LoggerFactory.getLogger(ScenarioController.class);
 
     private final ScenarioService scenarioService;
+    private final ScenarioCompletenessService completenessService;
+    private final ScenarioStatusTransitionService statusTransitionService;
 
-    public ScenarioController(ScenarioService scenarioService) {
+    public ScenarioController(ScenarioService scenarioService,
+                              ScenarioCompletenessService completenessService,
+                              ScenarioStatusTransitionService statusTransitionService) {
         this.scenarioService = scenarioService;
+        this.completenessService = completenessService;
+        this.statusTransitionService = statusTransitionService;
     }
 
     /** 场景列表。 */
     @GetMapping
-    public ApiResponse<List<ScenarioVO>> list() {
-        return ApiResponse.success(scenarioService.list());
+    public ApiResponse<List<ScenarioVO>> list(
+            @RequestParam(value = "purpose", required = false) String purpose) {
+        // F07-14 R-27① 过滤口径：purpose=forecast → 只回 status=ACTIVE 且 islands 为空
+        return ApiResponse.success(scenarioService.list(purpose));
     }
 
     /** 场景详情（含绑定 + 指标聚合）。 */
@@ -72,5 +84,35 @@ public class ScenarioController {
     @GetMapping("/{id}/bindings")
     public ApiResponse<Map<String, List<String>>> bindings(@PathVariable String id) {
         return ApiResponse.success(scenarioService.bindings(id));
+    }
+
+    /**
+     * N1 完整度（详细设计-07 D-2 / F07-02）：连边覆盖率后端单源，前端只消费不重算。
+     * 场景不存在 → 404（advice）；空场景 coverage=null 且 verdict=EMPTY_SCENARIO。
+     */
+    @Operation(summary = "getScenarioCompleteness")
+    @GetMapping("/{id}/completeness")
+    public ApiResponse<CompletenessVO> completeness(@PathVariable String id) {
+        return ApiResponse.success(completenessService.computeFor(id));
+    }
+
+    /**
+     * N12 状态迁移（详细设计-07 D-2 / F07-07 C-153）。
+     * 非法迁移 → 409 ILLEGAL_TRANSITION；→COMPLETED 无正式运行 → 409 NO_FORMAL_RUN；
+     * →ACTIVE 存在孤岛 → 409 ISLAND_BINDING。服务端下发 allowedTransitions。
+     */
+    @Operation(summary = "transitionScenarioStatus")
+    @PatchMapping("/{id}/status")
+    public ApiResponse<ScenarioStatusTransitionService.StatusVO> transitionStatus(
+            @PathVariable String id, @RequestBody StatusRequest req) {
+        return ApiResponse.success(statusTransitionService.transition(id,
+                req == null ? null : req.getStatus()));
+    }
+
+    /** N12 入参：目标状态（必填）。 */
+    public static class StatusRequest {
+        private String status;
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
 }

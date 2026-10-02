@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.workspace.exception.SandboxReferenceForbiddenException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,17 +31,23 @@ public class ScenarioRunService {
     private static final Set<String> ALLOWED_RUN_TYPES =
         Set.of("DIAGNOSE", "FORECAST", "SIMULATE", "STRATEGY", "SAFEGUARD");
 
+    /** R-25① run_mode 正交列值域（与 run_type 语义正交，禁扩 run_type 枚举）。 */
+    private static final Set<String> ALLOWED_RUN_MODES = Set.of("FORMAL", "SANDBOX");
+
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final DcchengClient dcchengClient;
     private final ScenarioService scenarioService;
+    private final BaselineReferenceGuard baselineReferenceGuard;
 
     public ScenarioRunService(JdbcTemplate jdbc, ObjectMapper objectMapper,
-                              DcchengClient dcchengClient, ScenarioService scenarioService) {
+                              DcchengClient dcchengClient, ScenarioService scenarioService,
+                              BaselineReferenceGuard baselineReferenceGuard) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.dcchengClient = dcchengClient;
         this.scenarioService = scenarioService;
+        this.baselineReferenceGuard = baselineReferenceGuard;
     }
 
     /**
@@ -59,6 +66,13 @@ public class ScenarioRunService {
             throw new NotFoundException("RUN-404: 场景不存在: " + scenarioId);
         }
         List<String> runTypes = normalizeRunTypes(param);
+        // F07-08-1/C154: run_mode 正交列（R-25① 默认 FORMAL，未知值 400）
+        String runMode = normalizeRunMode(param == null ? null : param.get("runMode"));
+        // F07-09/C155: 基线引用守卫（唯一实现 BaselineReferenceGuard，禁两处各写一份）
+        if ("FORMAL".equals(runMode)) {
+            baselineReferenceGuard.assertFormalMayReference(
+                    str(param == null ? null : param.get("baselineRunId")));
+        }
         String metric = str(param.get("metric"));
         if (metric == null) {
             metric = "安全指标"; // 默认场景关注指标
@@ -137,19 +151,21 @@ public class ScenarioRunService {
             }
         }
 
-        // ── 决策/指标回写（闭环） ──
+        // ── 决策/指标回写（闭环）——C154 隔离：SANDBOX 演练不落场景指标（保护事实面） ──
         BigDecimal actualSafety = null;
         Map<String, Object> metricsMerge = new LinkedHashMap<>();
-        if (diagnosis != null && !isError(diagnosis)) {
-            // 以诊断置信度代理安全指标口径（0~1），回写场景
-            Object conf = diagnosis.get("confidence");
-            if (conf instanceof Number) {
-                actualSafety = BigDecimal.valueOf(((Number) conf).doubleValue());
+        boolean sandboxRun = "SANDBOX".equals(runMode);
+        if (!sandboxRun) {
+            if (diagnosis != null && !isError(diagnosis)) {
+                Object conf = diagnosis.get("confidence");
+                if (conf instanceof Number) {
+                    actualSafety = BigDecimal.valueOf(((Number) conf).doubleValue());
+                }
+                metricsMerge.put("lastDiagnosisAt", new Date().toString());
             }
-            metricsMerge.put("lastDiagnosisAt", new Date().toString());
-        }
-        if (forecast != null && !isError(forecast)) {
-            metricsMerge.put("lastForecastAt", new Date().toString());
+            if (forecast != null && !isError(forecast)) {
+                metricsMerge.put("lastForecastAt", new Date().toString());
+            }
         }
 
         String status = degraded ? "SUCCEEDED_DEGRADED" : "SUCCEEDED";
@@ -163,23 +179,27 @@ public class ScenarioRunService {
             toJson(diagnosis), toJson(forecast), toJson(simulation), toJson(strategy),
             degraded, operator, operator);
 
-        // 回写场景指标
-        if (actualSafety != null || !metricsMerge.isEmpty()) {
+        // 场景指标回写：FORMAL 才允许（SANDBOX 演练禁触 D 层事实面 —— C154/F07-08-2）
+        if (!sandboxRun && (actualSafety != null || !metricsMerge.isEmpty())) {
             scenarioService.updateMetrics(scenarioId, actualSafety, metricsMerge);
         }
-        log.info("场景运行完成 runId={} scenario={} status={} runTypes={} degraded={}",
-                runId, scenarioId, status, runTypes, degraded);
+        log.info("场景运行完成 runId={} scenario={} status={} runMode={} runTypes={} degraded={}",
+                runId, scenarioId, status, runMode, runTypes, degraded);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("runId", runId);
         resp.put("scenarioId", scenarioId);
         resp.put("status", status);
+        resp.put("runMode", runMode);          // R-25① 演练结果带持久水印的权威字段
         resp.put("degraded", degraded);
         resp.put("diagnosis", diagnosis);
         resp.put("forecast", forecast);
         resp.put("simulation", simulation);
         resp.put("strategy", strategy);
-        resp.put("metricsWritten", actualSafety != null ? actualSafety : metricsMerge.isEmpty() ? null : "merged");
+        resp.put("metricsWritten",
+                sandboxRun ? null
+                : (actualSafety != null ? actualSafety
+                        : metricsMerge.isEmpty() ? null : "merged"));
         return resp;
     }
 
@@ -217,6 +237,22 @@ public class ScenarioRunService {
         }
         // 去重保序
         return new ArrayList<>(new LinkedHashSet<>(types));
+    }
+
+    /**
+     * F07-08 / R-25① run_mode 归一化：默认 FORMAL，只允许 FORMAL|SANDBOX，未知值 400。
+     * 与 run_type 语义正交（"算什么" vs "是否隔离"），禁扩 run_type 值域。
+     */
+    private String normalizeRunMode(Object raw) {
+        if (raw == null || String.valueOf(raw).isBlank()) {
+            return "FORMAL";
+        }
+        String m = raw.toString().trim().toUpperCase();
+        if (!ALLOWED_RUN_MODES.contains(m)) {
+            throw new BusinessException(400,
+                "RUN-400: 非法 runMode: " + raw + "（允许 " + ALLOWED_RUN_MODES + "）");
+        }
+        return m;
     }
 
     /**

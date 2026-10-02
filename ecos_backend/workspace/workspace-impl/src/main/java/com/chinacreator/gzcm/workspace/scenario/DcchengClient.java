@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -70,6 +71,62 @@ public class DcchengClient {
      */
     public JsonNode counterfactual(Map<String, Object> payload) {
         return postJson("/cognitive/counterfactual", payload);
+    }
+
+    /** 认知信念读侧 GET {base}/cognitive/beliefs（F07-12 N7）。 */
+    public JsonNode beliefsGet(String scenarioId, String mindId) {
+        return get("/cognitive/beliefs", Map.of("scenarioId", scenarioId, "mindId", mindId));
+    }
+
+    /** 认知假设读侧 GET {base}/cognitive/hypotheses（F07-12 N6）。 */
+    public JsonNode hypothesesGet(String scenarioId, String mindId) {
+        return get("/cognitive/hypotheses", Map.of("scenarioId", scenarioId, "mindId", mindId));
+    }
+
+    /** 认知诊断（异常检测读侧）GET {base}/cognitive/diagnosis（F07-12 N4）。 */
+    public JsonNode detect(String scenarioId, String mindId) {
+        return get("/cognitive/diagnosis", Map.of("scenarioId", scenarioId, "mindId", mindId));
+    }
+
+    /** 经营评估读侧 GET {base}/cognitive/operation-eval（F07-12 N5）。 */
+    public JsonNode operationEval(String scenarioId, String mindId) {
+        return get("/cognitive/operation-eval", Map.of("scenarioId", scenarioId, "mindId", mindId));
+    }
+
+    /** 通用 read-side GET 代理：4xx/5xx/超时 → IllegalStateException 供 advice 落真实状态码（A3 红线：空 body 禁 200）。 */
+    private JsonNode get(String path, Map<String, Object> query) {
+        StringBuilder url = new StringBuilder(base).append(path);
+        boolean first = true;
+        for (Map.Entry<String, Object> e : query.entrySet()) {
+            if (e.getValue() == null || String.valueOf(e.getValue()).isBlank()) continue;
+            if (first) { url.append('?'); first = false; } else { url.append('&'); }
+            url.append(e.getKey()).append('=').append(e.getValue());
+        }
+        try {
+            HttpHeaders h = new HttpHeaders();
+            h.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+            String resp = restTemplate.exchange(url.toString(), HttpMethod.GET, new HttpEntity<>(h), String.class).getBody();
+            if (resp == null || resp.isBlank()) {
+                throw new IllegalStateException("cognitive GET 返回空: " + url);
+            }
+            JsonNode root = RAW_JSON.readTree(resp);
+            JsonNode code = root.path("code");
+            if (code.isNumber() && code.asInt() != 0) {
+                throw new IllegalStateException("cognitive 业务错误 code=" + code.asInt()
+                        + " msg=" + root.path("message").asText());
+            }
+            JsonNode data = root.path("data");
+            return data.isMissingNode() || data.isNull() ? root : data;
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (org.springframework.web.client.HttpClientErrorException |
+                 org.springframework.web.client.HttpServerErrorException e) {
+            log.warn("cognitive GET {}: {}", url, e.getMessage());
+            throw new IllegalStateException("cognitive 服务不可用: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.warn("cognitive GET 失败 {}: {}", url, e.getMessage());
+            throw new IllegalStateException("cognitive 服务不可用: " + e.getMessage(), e);
+        }
     }
 
     /**

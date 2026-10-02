@@ -159,11 +159,15 @@ business_scenario.id
 | `ecos_frontend/src/pages/project-workbench/ScenarioHypothesisList.tsx` | E3 列表子组件 |
 | `ecos_frontend/src/pages/project-workbench/ScenarioBeliefList.tsx` | E4 列表子组件 |
 
+> **【校订 2026-10-02，F07-15/X-65】** 三个前端组件文件**尚未落地**（`ecos_frontend/src/pages/project-workbench/` 内 0 命中；前端消费侧整体归 F07-15/C161 前端批次，本堂不盲建以免落不可验桩）。**认知读侧契约真源** = 后端 §F07-12/N4-N7 已实现的四条只读 GET（`ecos_backend/workspace/workspace-impl/.../controller/ScenarioCognitionReadController.java`）：`GET /api/v1/business/scenarios/{id}/cognition/{detect|operation-eval|hypotheses|beliefs}`，`?mind=` 可选参（缺省取 activeMind），异常一律走 `CognitiveEngineUnavailableException` 503 穿透（A3）；前端组件设计时**只消费后端字段，禁本地推断、禁伪造推送**。本文 4.3 的 banner/toast 降级 UI 属分册 08 前端消费侧，本堂只做真源与降级语义，不做前端文件。
+
 ### 4.3 降级策略
 
 - **后端未启 Mind**：E1 返 503 -> 右栏置灰 + banner"认知引擎未启用"
 - **场景无 Mind**：E1 返 `data: []` -> 右栏显示"未关联 Mind，可先到 Mind 工作台关联"
 - **E2/E4 部分失败**：单卡 toast，不全栏崩
+
+> **【校订 2026-10-02】** 后端 503 穿透已落地（`WorkspaceExceptionHandler#handleCognitiveUnavailable` 映射 `CognitiveEngineUnavailableException` → HTTP 503，前段由既有 `ApiResponse.body.code` "200-swallow" 拆除），banner/toast UI 属 F07-06/D 批次前端消费，本堂不盲建。
 
 ---
 
@@ -177,6 +181,8 @@ business_scenario.id
 - [ ] `GET /scenario/{id}/cognition/operation-eval?mind=M001` 走 belief 概率加权
 - [ ] 503 穿透（`cognitive-engine` 未装时）
 - [ ] 单测覆盖：空场景 / 多 Mind / 无 Mind / 503 四种状态
+
+> **【校订 2026-10-02，F07-12/N4-N7 已实现】** 上表四端点**真源路径**为 `GET /api/v1/business/scenarios/{id}/cognition/*`（PRD-08 订正后的形态），实现于 `ScenarioCognitionReadController`（见 `ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ScenarioCognitionReadController.java`）；场景不存在 → `ScenarioNotFoundException` 404（走 `WorkspaceExceptionHandler`）；`?mind=` 缺省取 active mind，失败透传 503 至前端。本验收清单里"无 Mind → data:[]/404"两种语义当前的可复现行为：无 activeMind 时由 cognitive 侧决定返回值，503 为引擎不可用时诚实 503 穿透（**非 200-swallow**），单测载体属 F07-24/P-2 workspace 测试底座（建 `src/test`），本堂未创载体故记**未执行**。
 
 ### 5.2 前端
 

@@ -39,6 +39,12 @@ public class ScenarioVO {
     private String createdAt;
     /** 六类绑定（camelCase key：datasets/objectTypes/knowledgeBases/aiAgents/securityPolicies/interfaces） */
     private Map<String, List<String>> bindings;
+    /**
+     * 孤岛绑定清单（F07-04 / R-26① 保存期岛标，附加字段，兼容既有契约）。
+     * 前端节点"孤岛"角标消费此字段，禁本地推断（§0.6.2-1 / REQ-WS-02 §2.5-2）。
+     * 单一来源 {@code ScenarioCompletenessService.islandsOf}（边可达性判定，非节点类型）。
+     */
+    private List<CompletenessVO.Island> islands;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -66,6 +72,8 @@ public class ScenarioVO {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public Map<String, List<String>> getBindings() { return bindings; }
     public void setBindings(Map<String, List<String>> bindings) { this.bindings = bindings; }
+    public List<CompletenessVO.Island> getIslands() { return islands; }
+    public void setIslands(List<CompletenessVO.Island> islands) { this.islands = islands; }
 
     /** 把 PO 转 VO（不含 bindings/metrics 聚合，由 Service 填充） */
     public static ScenarioVO fromEntity(BusinessScenario e) {

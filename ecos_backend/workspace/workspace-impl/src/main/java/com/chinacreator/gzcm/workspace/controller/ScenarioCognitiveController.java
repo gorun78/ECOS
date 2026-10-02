@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.workspace.exception.CognitiveEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.DcchengClient;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindVO;
@@ -44,7 +45,7 @@ public class ScenarioCognitiveController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.warn("cognitive/diagnose failed for scenario={}: {}", scenarioId, e.getMessage());
-            return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
+            throw new CognitiveEngineUnavailableException("diagnose", e);
         }
     }
 
@@ -58,7 +59,7 @@ public class ScenarioCognitiveController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.warn("cognitive/forecast failed for scenario={}: {}", scenarioId, e.getMessage());
-            return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
+            throw new CognitiveEngineUnavailableException("forecast", e);
         }
     }
 
@@ -89,7 +90,7 @@ public class ScenarioCognitiveController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.warn("cognitive/simulate failed for scenario={}: {}", scenarioId, e.getMessage());
-            return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
+            throw new CognitiveEngineUnavailableException("simulate", e);
         }
     }
 
@@ -103,7 +104,7 @@ public class ScenarioCognitiveController {
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.warn("cognitive/policy failed for scenario={}: {}", scenarioId, e.getMessage());
-            return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
+            throw new CognitiveEngineUnavailableException("policy", e);
         }
     }
 

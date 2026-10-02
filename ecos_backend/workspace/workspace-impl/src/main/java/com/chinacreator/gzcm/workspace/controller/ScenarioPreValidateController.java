@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.workspace.scenario.CompletenessVO;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioCompletenessService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioSandboxLayoutService;
 import com.chinacreator.gzcm.workspace.scenario.SandboxLayoutVO;
@@ -32,14 +34,17 @@ public class ScenarioPreValidateController {
 
     private final ScenarioMindService mindService;
     private final ScenarioSandboxLayoutService sandboxLayoutService;
+    private final ScenarioCompletenessService completenessService;
     private final RestTemplate rt;
 
     public ScenarioPreValidateController(
             ScenarioMindService mindService,
             ScenarioSandboxLayoutService sandboxLayoutService,
+            ScenarioCompletenessService completenessService,
             @org.springframework.beans.factory.annotation.Value("${ecos.gateway-base:http://localhost:8080}") String gatewayBase) {
         this.mindService = mindService;
         this.sandboxLayoutService = sandboxLayoutService;
+        this.completenessService = completenessService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3000);
         factory.setReadTimeout(5000);
@@ -51,7 +56,7 @@ public class ScenarioPreValidateController {
         List<PreValidateCheckVO> checks = new ArrayList<>();
         checks.add(checkMind(scenarioId));
         checks.add(checkSandboxCoverage(scenarioId));
-        checks.add(checkResources(scenarioId));
+        checks.add(checkBindings(scenarioId));
         return ApiResponse.success(checks);
     }
 
@@ -64,35 +69,42 @@ public class ScenarioPreValidateController {
     }
 
     private PreValidateCheckVO checkSandboxCoverage(String scenarioId) {
-        boolean pass = false;
-        String detail = "no sandbox layout found";
-        SandboxLayoutVO layout = sandboxLayoutService.getLayout(scenarioId);
-        if (layout != null && layout.getLayout() != null) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> layoutMap = (Map<String, Object>) layout.getLayout();
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> nodes = (List<Map<String, Object>>) layoutMap.getOrDefault("nodes", List.of());
-            Set<String> presentCategories = new HashSet<>();
-            for (Map<String, Object> node : nodes) {
-                String type = String.valueOf(node.getOrDefault("type", ""));
-                if ("resource".equals(type)) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> data = (Map<String, Object>) node.getOrDefault("data", Map.of());
-                    String cat = String.valueOf(data.getOrDefault("category", ""));
-                    if (!cat.isBlank()) presentCategories.add(cat);
-                }
-            }
-            Set<String> missing = new LinkedHashSet<>(REQUIRED_CATEGORIES);
-            missing.removeAll(presentCategories);
-            pass = missing.isEmpty();
-            detail = pass ? "all 6 categories present" : "missing: " + String.join(", ", missing);
+        // C150-2（X-27）：coverage 判定改由后端单源 completeness 提供（连边覆盖率），
+        // 不再按 type=="resource" 节点计数（那会把非 resource 孤岛漏判）。
+        CompletenessVO vo = completenessService.computeFor(scenarioId);
+        Double coverage = vo.getCoverage();
+        int missingCount = vo.getMissingEdges() == null ? 0 : vo.getMissingEdges().size();
+        boolean pass = coverage != null && missingCount == 0;
+        if (coverage == null) {
+            // 空场景（EMPTY_SCENARIO / NOT_APPLICABLE）：coverage=null，前端显示 "—"
+            return new PreValidateCheckVO("sandbox_coverage", false,
+                    "empty scenario (verdict=" + vo.getVerdict() + ")");
         }
-        return new PreValidateCheckVO("sandbox_coverage", pass, detail);
+        return new PreValidateCheckVO("sandbox_coverage", pass,
+                String.format("coverage=%.3f verdict=%s missingEdges=%d",
+                        coverage, vo.getVerdict(), missingCount));
     }
 
-    private PreValidateCheckVO checkResources(String scenarioId) {
-        // 简化：检查 binding 记录非空即可（具体 6 类 resource reachability 由 Options Controller 联查保障）
-        return new PreValidateCheckVO("bindings_exist", true,
-                "bindings check delegated to /available/* endpoints (deferred reachability check)");
+    /** C150-1（X-27 删桩）：绑定/孤岛/缺失边一律取 completeness 单源，禁硬编码 pass=true。 */
+    private PreValidateCheckVO checkBindings(String scenarioId) {
+        CompletenessVO vo = completenessService.computeFor(scenarioId);
+        List<String> missing = new ArrayList<>();
+        if (vo.getMissingEdges() != null) {
+            for (CompletenessVO.MissingEdgeVO m : vo.getMissingEdges()) {
+                missing.add(m.getType());
+            }
+        }
+        List<String> islands = new ArrayList<>();
+        if (vo.getIslands() != null) {
+            for (CompletenessVO.Island is : vo.getIslands()) {
+                islands.add(is.getBindingId() + "(" + is.getBindingType() + ")");
+            }
+        }
+        boolean pass = missing.isEmpty() && islands.isEmpty();
+        String detail = pass
+                ? "no missing edges, no isolated bindings"
+                : "missingEdges=" + String.join(",", missing)
+                        + ", islands=" + String.join(",", islands);
+        return new PreValidateCheckVO("bindings_exist", pass, detail);
     }
 }
