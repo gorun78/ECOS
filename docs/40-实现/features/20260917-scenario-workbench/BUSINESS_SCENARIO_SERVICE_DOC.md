@@ -15,7 +15,7 @@
 | 决策项 | 裁定 | 落地点 |
 |---|---|---|
 | 主数据源：实体树 from `/workbench` vs `/tree` | **从 `/tree`**（建议 ①） | 前端 `ScenarioWorkbenchPanel` 初始化取数 |
-| 三栏右栏：认知策略合成 vs 实体属性 | **认知策略合成可视化**（建议 ②） | 前端 `ScenarioCognitionPanel` |
+| 三栏右栏：认知策略合成 vs 实体属性 | **认知策略合成可视化**（建议 ②） | 前端 认知策略合成面板（**待实现**，见分册 07 W176） |
 | 认知策略计算时机：实时 vs 滚动间隔 | **滚动间隔 30s + Mind 变化即触发**（建议 ③，混合） | 前端 debounce（100–300ms 已做）+ setInterval 30s |
 | 能力约束机制：显式 UI vs 隐形 | **隐形 — 后端按 Mind 自动过滤**（建议 ④） | 后端 `ScenarioServiceImpl` 三栏接入点 |
 | 权限模型：场景设计者 vs 工作台高危 | **沿用既有分域**（建议 ⑤） | 复用 `@PreAuthorize` |
@@ -141,7 +141,7 @@ business_scenario.id
               +---------------------------------------------------+
               |                     中栏（实体/服务/工作流）                        |
               |                 +--------------------------------------------------------------------+
-              |                 |  右栏 — 认知策略合成 (ScenarioCognitionPanel)                      |
+              |                 |  右栏 — 认知策略合成（认知面板·待实现，见分册 07 W176）          |
               |                 |  - Mind chip + capabilityMask badge                                 |
               |                 |  - E3 "原因" 列表 + confidence 进度条                               |
               |                 |  - E4 "功能" 列表 + probability 热力                                 |
@@ -151,15 +151,15 @@ business_scenario.id
               +---------------------------------------------------+
 ```
 
-### 4.2 三个新增组件
+### 4.2 前端目标组件设计（契约占位 · 未落地）
 
-| 路径 | 职责 |
+| 目标落位（**待实现**，分册 07 W176/W187） | 职责 |
 |---|---|
-| `ecos_frontend/src/pages/project-workbench/ScenarioCognitionPanel.tsx` | 右栏主视图，按 Mind 订阅，debounce + 30s 轮询 |
-| `ecos_frontend/src/pages/project-workbench/ScenarioHypothesisList.tsx` | E3 列表子组件 |
-| `ecos_frontend/src/pages/project-workbench/ScenarioBeliefList.tsx` | E4 列表子组件 |
+| 认知策略合成主视图（`ecos_frontend/src/pages/project-workbench/` 下，**尚未落地**） | 右栏主视图，按 Mind 订阅，debounce + 30s 轮询 |
+| E3 "原因" 列表子组件（同上目录，**尚未落地**） | E3 假设列表 + confidence |
+| E4 "功能" 列表子组件（同上目录，**尚未落地**） | E4 信念列表 + probability |
 
-> **【校订 2026-10-02，F07-15/X-65】** 三个前端组件文件**尚未落地**（`ecos_frontend/src/pages/project-workbench/` 内 0 命中；前端消费侧整体归 F07-15/C161 前端批次，本堂不盲建以免落不可验桩）。**认知读侧契约真源** = 后端 §F07-12/N4-N7 已实现的四条只读 GET（`ecos_backend/workspace/workspace-impl/.../controller/ScenarioCognitionReadController.java`）：`GET /api/v1/business/scenarios/{id}/cognition/{detect|operation-eval|hypotheses|beliefs}`，`?mind=` 可选参（缺省取 activeMind），异常一律走 `CognitiveEngineUnavailableException` 503 穿透（A3）；前端组件设计时**只消费后端字段，禁本地推断、禁伪造推送**。本文 4.3 的 banner/toast 降级 UI 属分册 08 前端消费侧，本堂只做真源与降级语义，不做前端文件。
+> **【校订 2026-10-02，F07-15/X-65 二次订正】** 上表三行目标组件（原标题曾以具名 `.tsx` 落表，实测 `ecos_frontend/src/pages/project-workbench/` 内 **0 命中**）本批已**改为"待实现"占位**，不再以具名路径声明为已存在组件（避免 X-65 "点名的三个前端文件"假记载复现）；前端消费侧整体归分册 08 前端批次，本堂不盲建以免落不可验桩。**认知读侧契约真源** = 后端 §F07-12 已实现的四条只读 GET（`ecos_backend/workspace/workspace-impl/.../controller/ScenarioCognitionReadController.java`）：`GET /api/v1/business/scenarios/{id}/cognition/{detect|operation-eval|hypotheses|beliefs}`，`?mind=` 可选参（缺省取 activeMind），异常一律走 `CognitiveEngineUnavailableException` 503 穿透（A3）；前端组件落地时**只消费后端字段，禁本地推断、禁伪造推送**。本文 4.3 的 banner/toast 降级 UI 属分册 08 前端消费侧，本堂只做真源与降级语义，不做前端文件。
 
 ### 4.3 降级策略
 
