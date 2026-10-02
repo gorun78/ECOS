@@ -81,11 +81,17 @@ workspace/
 
 以下项都是 F07 册内其余批次，是按册优先级列出**给下一窗**：
 1. **F07-01/R-24**（P0 红线）：gateway REGEX 排除拆卸或反向代理路由 + `:18090` 等价 Security 链 + `preflight Test-WorkspaceAuthBaseline`
-2. **F07-19**：JdbcTemplate 14 类 → Mapper + XML（MyBatis，schema 限定）
-3. **F07-20**：V205~V213 实跑审批（PG 执行 + V213 对账视图对账），本表切换 Java 引用
-4. **F07-18**：ABAC/RLS/审计全端点接线（等分册 01 SEC-02/03 契约）
-5. **F07-24**：建 `workspace-impl/src/test` + `workspace-service/src/test`（P-2 底座），P-3 Playwright 工程落地本册 E2E
-6. **F07-22/23**：前端假真值清零 + 主题/i18n/移动端/type 合规收口
+2. **F07-16**：拆除 `workspace-service/pom.xml` 对 4 个 `*-impl` 的直接依赖（sysman/data-engine/ontology-engine/buszhi），全部改经各引擎 api 门面 + REST 调 5 service（三层纪律 / X-8，见下节）
+3. **F07-19**：JdbcTemplate 14 类 → Mapper + XML（MyBatis，schema 限定）
+4. **F07-20**：V205~V213 实跑审批（PG 执行 + V213 对账视图对账），本表切换 Java 引用
+5. **F07-18**：ABAC/RLS/审计全端点接线（等分册 01 SEC-02/03 契约）
+6. **F07-24**：建 `workspace-impl/src/test` + `workspace-service/src/test`（P-2 底座），P-3 Playwright 工程落地本册 E2E
+7. **F07-22/23**：前端假真值清零 + 主题/i18n/移动端/type 合规收口
+
+## 依赖纪律（三层 / X-8 / F07-16）
+
+- workspace-service **禁直引任何引擎或服务的 `*-impl`**（架构铁律 §服务间仅调 api 门面 + REST）。本仓当前**仍有 4 处未合规**（`workspace-service/pom.xml`）：`sysman-impl` / `data-engine-impl` / `ontology-engine-impl` / `buszhi-impl` —— 属 F07-16 待拆项，**存量只定性、不新增**；新代码一律只 `import` 各引擎 `*-api` 接口或经 `ScenarioOptionsController` 一类 REST 门面调 5 service，**禁止**把 `*-impl` 的 `@Service`/`@Component` 直接 `@Autowired` 进本模块 Bean。
+- `-api` 允许直引（接口 + DTO/VO 契约），`-boot`/`-impl` 禁止。
 
 ## 反身门禁（这类仓独特有）
 
