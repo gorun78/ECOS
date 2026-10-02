@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.workspace.exception.ActionValidationException;
 import com.chinacreator.gzcm.workspace.exception.SandboxReferenceForbiddenException;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -67,5 +68,32 @@ class BaselineReferenceGuardTest {
         assertDoesNotThrow(() -> guard.assertFormalMayReference(null));
         assertDoesNotThrow(() -> guard.assertFormalMayReference("   "));
         verify(jdbc, never()).queryForObject(anyString(), eq(Integer.class), any());
+    }
+
+    // ── assertForecastRunIsFormal（F07-10-2 动作提案锚点侧，语义与 assertFormalMayReference 相反）──
+
+    @Test
+    void forecastAnchorBlankIsRejectedBeforeDbAccess() {
+        assertThrows(ActionValidationException.class, () -> guard.assertForecastRunIsFormal(null));
+        assertThrows(ActionValidationException.class, () -> guard.assertForecastRunIsFormal("  "));
+    }
+
+    @Test
+    void forecastAnchorMissingRunIsRejected() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any())).thenReturn(0);
+        assertThrows(ActionValidationException.class, () -> guard.assertForecastRunIsFormal("run_none"));
+    }
+
+    @Test
+    void forecastAnchorOnSandboxRunIsRejectedNotAccepted() {
+        // 反向侧红线：动作提案只能锚定 FORMAL，锚定 SANDBOX 演练产物必须拒，非静默放行
+        stubRunFound("SANDBOX");
+        assertThrows(ActionValidationException.class, () -> guard.assertForecastRunIsFormal("run_sbx"));
+    }
+
+    @Test
+    void forecastAnchorOnFormalRunAccepted() {
+        stubRunFound("FORMAL");
+        assertDoesNotThrow(() -> guard.assertForecastRunIsFormal("run_fml"));
     }
 }
