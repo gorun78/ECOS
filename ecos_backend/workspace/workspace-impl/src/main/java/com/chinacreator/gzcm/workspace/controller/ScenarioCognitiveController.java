@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.workspace.exception.CognitiveEngineUnavailableExcep
 import com.chinacreator.gzcm.workspace.scenario.DcchengClient;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindVO;
+import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +36,7 @@ public class ScenarioCognitiveController {
         this.mindService = mindService;
     }
 
+    @Operation(operationId = "cognitiveDiagnose", summary = "cognitiveDiagnose")
     @PostMapping("/{id}/cognitive/diagnose")
     public ApiResponse<Map<String, Object>> diagnose(
             @PathVariable("id") String scenarioId,
@@ -49,6 +51,7 @@ public class ScenarioCognitiveController {
         }
     }
 
+    @Operation(operationId = "cognitiveForecast", summary = "cognitiveForecast")
     @PostMapping("/{id}/cognitive/forecast")
     public ApiResponse<Map<String, Object>> forecast(
             @PathVariable("id") String scenarioId,
@@ -63,6 +66,7 @@ public class ScenarioCognitiveController {
         }
     }
 
+    @Operation(operationId = "cognitiveSimulate", summary = "cognitiveSimulate")
     @PostMapping("/{id}/cognitive/simulate")
     public ApiResponse<Map<String, Object>> simulate(
             @PathVariable("id") String scenarioId,
@@ -94,6 +98,7 @@ public class ScenarioCognitiveController {
         }
     }
 
+    @Operation(operationId = "cognitivePolicy", summary = "cognitivePolicy")
     @PostMapping("/{id}/cognitive/policy")
     public ApiResponse<Map<String, Object>> policy(
             @PathVariable("id") String scenarioId,

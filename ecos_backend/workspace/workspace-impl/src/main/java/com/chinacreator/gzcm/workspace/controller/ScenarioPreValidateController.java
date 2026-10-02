@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioSandboxLayoutService;
 import com.chinacreator.gzcm.workspace.scenario.SandboxLayoutVO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindVO;
+import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -51,6 +52,7 @@ public class ScenarioPreValidateController {
         this.rt = new RestTemplate(factory);
     }
 
+    @Operation(operationId = "preValidateScenario", summary = "preValidateScenario")
     @PostMapping("/{id}/pre-validate")
     public ApiResponse<List<PreValidateCheckVO>> preValidate(@PathVariable("id") String scenarioId) {
         List<PreValidateCheckVO> checks = new ArrayList<>();

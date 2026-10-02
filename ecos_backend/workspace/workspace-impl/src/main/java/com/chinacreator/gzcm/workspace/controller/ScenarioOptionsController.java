@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.workspace.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.exception.ExternalServiceUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.AvailableItemVO;
+import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,18 +63,21 @@ public class ScenarioOptionsController {
     // ═══════════════ 6 类选项池端点 ═══════════════
 
     /** 可用数据集（datanet 数据源）。 */
+    @Operation(operationId = "listAvailableDatasets", summary = "listAvailableDatasets")
     @GetMapping("/available/datasets")
     public ApiResponse<?> availableDatasets() {
         return callRemote(datanetBase, "/datanet/datasource", "datanet", "id", "name");
     }
 
     /** 可用本体实体（buszhi ontology entities，按 domain 过滤）。 */
+    @Operation(operationId = "listAvailableObjects", summary = "listAvailableObjects")
     @GetMapping("/available/objects")
     public ApiResponse<?> availableObjects(@RequestParam(required = false) String domain) {
         return callRemoteObjects(domain);
     }
 
     /** 可用知识资产（dccheng knowledge assets）。 */
+    @Operation(operationId = "listAvailableKnowledge", summary = "listAvailableKnowledge")
     @GetMapping("/available/knowledge")
     public ApiResponse<?> availableKnowledge(@RequestParam(required = false) String domain) {
         String path = (domain != null && !domain.isBlank())
@@ -83,18 +87,21 @@ public class ScenarioOptionsController {
     }
 
     /** 可用 AI Agent（aiming agent profiles）。 */
+    @Operation(operationId = "listAvailableAgents", summary = "listAvailableAgents")
     @GetMapping("/available/agents")
     public ApiResponse<?> availableAgents() {
         return callRemote(aimingBase, "/agent/profiles", "aiming", "id", "name");
     }
 
     /** 可用安全策略（sysman security policies — P1 新表 ecos_security_policy）。 */
+    @Operation(operationId = "listAvailableSecurity", summary = "listAvailableSecurity")
     @GetMapping("/available/security")
     public ApiResponse<?> availableSecurity() {
         return callRemote(sysmanBase, "/security/policies", "sysman", "id", "name");
     }
 
     /** 可用接口引用（sysman interfaces — P1 新表 ecos_interface_ref）。 */
+    @Operation(operationId = "listAvailableInterfaces", summary = "listAvailableInterfaces")
     @GetMapping("/available/interfaces")
     public ApiResponse<?> availableInterfaces() {
         return callRemote(sysmanBase, "/interfaces", "sysman", "id", "name");

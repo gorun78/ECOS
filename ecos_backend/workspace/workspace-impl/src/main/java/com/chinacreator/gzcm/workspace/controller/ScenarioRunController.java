@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioRunService;
+import io.swagger.v3.oas.annotations.Operation;
 
 /**
  * 场景运行编排 REST API — 场景工作台认知闭环（PMO-52 T2）。
@@ -33,6 +34,7 @@ public class ScenarioRunController {
     }
 
     /** 发起场景运行：body 需 runTypes[]（DIAGNOSE/FORECAST/SIMULATE/STRATEGY 组合），可选 metric/deviation/series/simulateVariables。 */
+    @Operation(operationId = "runScenario", summary = "runScenario")
     @PostMapping("/{id}/runs")
     public ApiResponse<Map<String, Object>> run(@PathVariable String id,
                                                 @RequestBody Map<String, Object> param) {
@@ -41,6 +43,7 @@ public class ScenarioRunController {
     }
 
     /** 场景运行历史（倒序）。 */
+    @Operation(operationId = "listScenarioRuns", summary = "listScenarioRuns")
     @GetMapping("/{id}/runs")
     public ApiResponse<List<Map<String, Object>>> history(@PathVariable String id,
                                                           @RequestParam(defaultValue = "20") int limit) {

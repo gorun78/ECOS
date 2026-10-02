@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.workspace.scenario.MindSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.MindUpdatePartialDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindVO;
+import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -44,12 +45,14 @@ public class ScenarioMindsController {
     // ═══════════════ v2.0 多心智端点 ═══════════════
 
     /** 心智列表（激活优先排序）。 */
+    @Operation(operationId = "listScenarioMinds", summary = "listScenarioMinds")
     @GetMapping("/{id}/minds")
     public ApiResponse<List<ScenarioMindVO>> listMinds(@PathVariable String id) {
         return ApiResponse.success(mindService.listMinds(id));
     }
 
     /** 新建心智（upsert 语义：同 label 则更新）。 */
+    @Operation(operationId = "upsertScenarioMind", summary = "upsertScenarioMind")
     @PostMapping("/{id}/minds")
     public ApiResponse<ScenarioMindVO> createMind(@PathVariable String id,
                                                    @RequestBody MindSaveDTO dto) {
@@ -57,6 +60,7 @@ public class ScenarioMindsController {
     }
 
     /** 更新心智（PATCH 语义：改三要素/四件套/active，只更新非 null 字段）。 */
+    @Operation(operationId = "updateScenarioMind", summary = "updateScenarioMind")
     @PatchMapping("/{id}/minds/{mindId}")
     public ApiResponse<ScenarioMindVO> updateMind(@PathVariable String id,
                                                     @PathVariable Long mindId,
@@ -90,6 +94,7 @@ public class ScenarioMindsController {
     }
 
     /** 逻辑删除心智（删 base 自动补位）。 */
+    @Operation(operationId = "deleteScenarioMind", summary = "deleteScenarioMind")
     @DeleteMapping("/{id}/minds/{mindId}")
     public ApiResponse<Void> deleteMind(@PathVariable String id, @PathVariable Long mindId) {
         mindService.deleteMind(id, mindId);
@@ -99,6 +104,7 @@ public class ScenarioMindsController {
     // ═══════════════ 兼容端点（v1.x /mind-model）═══════════════
 
     /** 兼容：获取 base mind。 */
+    @Operation(operationId = "getScenarioMindModel", summary = "getScenarioMindModel")
     @GetMapping("/{id}/mind-model")
     public ApiResponse<ScenarioMindVO> getMindModel(@PathVariable String id) {
         ScenarioMindVO base = mindService.getMindBase(id);
@@ -109,6 +115,7 @@ public class ScenarioMindsController {
     }
 
     /** 兼容：保存 base mind（upsert）。 */
+    @Operation(operationId = "saveScenarioMindModel", summary = "saveScenarioMindModel")
     @PostMapping("/{id}/mind-model")
     public ApiResponse<ScenarioMindVO> saveMindModel(@PathVariable String id,
                                                        @RequestBody MindSaveDTO dto) {
@@ -116,6 +123,7 @@ public class ScenarioMindsController {
     }
 
     /** 兼容：删除 base mind。 */
+    @Operation(operationId = "deleteScenarioMindModel", summary = "deleteScenarioMindModel")
     @DeleteMapping("/{id}/mind-model")
     public ApiResponse<Void> deleteMindModel(@PathVariable String id) {
         ScenarioMindVO base = mindService.getMindBase(id);

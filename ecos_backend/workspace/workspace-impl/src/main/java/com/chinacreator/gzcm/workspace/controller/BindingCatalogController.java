@@ -27,7 +27,7 @@ public class BindingCatalogController {
         this.requiredEdgePolicy = requiredEdgePolicy;
     }
 
-    @Operation(summary = "listBindingCatalog")
+    @Operation(operationId = "listBindingCatalog", summary = "listBindingCatalog")
     @GetMapping("/binding-catalog")
     public ApiResponse<List<RequiredEdgePolicy.CatalogEntry>> catalog() {
         return ApiResponse.success(requiredEdgePolicy.catalog());

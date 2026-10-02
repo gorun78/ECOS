@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService.ScenarioBindingLinkSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService.ScenarioBindingLinkVO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService.ScenarioGraphVO;
+import io.swagger.v3.oas.annotations.Operation;
 
 /**
  * 场景绑定关系边 REST API — 架构铁律 §0.6.2 子图化（PMO-66 A4）。
@@ -38,18 +39,21 @@ public class ScenarioBindingLinkController {
     }
 
     /** 场景完整图（nodes + links + coverage）— 前端 /graph 消费（B/B3 用）。 */
+    @Operation(operationId = "getScenarioGraph", summary = "getScenarioGraph")
     @GetMapping("/{id}/graph")
     public ApiResponse<ScenarioGraphVO> graph(@PathVariable String id) {
         return ApiResponse.success(linkService.graph(id));
     }
 
     /** 边列表（六类节点间可组成的边）。 */
+    @Operation(operationId = "listBindingLinks", summary = "listBindingLinks")
     @GetMapping("/{id}/binding-links")
     public ApiResponse<List<ScenarioBindingLinkVO>> list(@PathVariable String id) {
         return ApiResponse.success(linkService.listLinks(id));
     }
 
     /** 新增一条边（§0.6.2.1/§0.6.2.2 校验 + 孤岛校验）。 */
+    @Operation(operationId = "saveBindingLink", summary = "saveBindingLink")
     @PostMapping("/{id}/binding-links")
     public ApiResponse<ScenarioBindingLinkVO> save(@PathVariable String id,
                                                    @RequestBody ScenarioBindingLinkSaveDTO dto) {
@@ -59,6 +63,7 @@ public class ScenarioBindingLinkController {
     }
 
     /** 逻辑删除一条边。 */
+    @Operation(operationId = "deleteBindingLink", summary = "deleteBindingLink")
     @DeleteMapping("/{id}/binding-links/{linkId}")
     public ApiResponse<Void> delete(@PathVariable String id, @PathVariable String linkId) {
         linkService.delete(id, linkId);

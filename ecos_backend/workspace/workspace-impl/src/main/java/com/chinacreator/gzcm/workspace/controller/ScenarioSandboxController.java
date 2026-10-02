@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.scenario.SandboxLayoutVO;
 import com.chinacreator.gzcm.workspace.scenario.SandboxSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioSandboxLayoutService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ public class ScenarioSandboxController {
     }
 
     /** 获取场景沙盘布局（无记录返默认布局）。 */
+    @Operation(operationId = "getSandboxLayout", summary = "getSandboxLayout")
     @GetMapping("/{id}/sandbox/layout")
     public ApiResponse<SandboxLayoutVO> getLayout(@PathVariable String id) {
         return ApiResponse.success(layoutService.getLayout(id));
@@ -39,6 +41,7 @@ public class ScenarioSandboxController {
      * 保存场景沙盘布局（乐观锁）。
      * body 含 expectedVersion；冲突返 ApiResponse{code:409, message:"version_conflict..."}。
      */
+    @Operation(operationId = "saveSandboxLayout", summary = "saveSandboxLayout")
     @PostMapping("/{id}/sandbox/layout")
     public ApiResponse<?> saveLayout(@PathVariable String id,
                                       @RequestBody SandboxSaveDTO dto) {

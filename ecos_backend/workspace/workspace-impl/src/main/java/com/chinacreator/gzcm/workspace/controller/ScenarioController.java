@@ -48,6 +48,7 @@ public class ScenarioController {
     }
 
     /** 场景列表。 */
+    @Operation(operationId = "listScenarios", summary = "listScenarios")
     @GetMapping
     public ApiResponse<List<ScenarioVO>> list(
             @RequestParam(value = "purpose", required = false) String purpose) {
@@ -56,24 +57,28 @@ public class ScenarioController {
     }
 
     /** 场景详情（含绑定 + 指标聚合）。 */
+    @Operation(operationId = "getScenario", summary = "getScenario")
     @GetMapping("/{id}")
     public ApiResponse<ScenarioVO> get(@PathVariable String id) {
         return ApiResponse.success(scenarioService.get(id));
     }
 
     /** 创建场景（含可选绑定）。 */
+    @Operation(operationId = "createScenario", summary = "createScenario")
     @PostMapping
     public ApiResponse<ScenarioVO> create(@RequestBody ScenarioSaveDTO dto) {
         return ApiResponse.success(scenarioService.create(dto));
     }
 
     /** 更新场景（null 字段不改动；bindings 非 null 时全量替换）。 */
+    @Operation(operationId = "updateScenario", summary = "updateScenario")
     @PutMapping("/{id}")
     public ApiResponse<ScenarioVO> update(@PathVariable String id, @RequestBody ScenarioSaveDTO dto) {
         return ApiResponse.success(scenarioService.update(id, dto));
     }
 
     /** 逻辑删除场景。 */
+    @Operation(operationId = "deleteScenario", summary = "deleteScenario")
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable String id) {
         scenarioService.delete(id);
@@ -81,6 +86,7 @@ public class ScenarioController {
     }
 
     /** 场景绑定关系（六类分组）。 */
+    @Operation(operationId = "listScenarioBindings", summary = "listScenarioBindings")
     @GetMapping("/{id}/bindings")
     public ApiResponse<Map<String, List<String>>> bindings(@PathVariable String id) {
         return ApiResponse.success(scenarioService.bindings(id));
@@ -90,7 +96,7 @@ public class ScenarioController {
      * N1 完整度（详细设计-07 D-2 / F07-02）：连边覆盖率后端单源，前端只消费不重算。
      * 场景不存在 → 404（advice）；空场景 coverage=null 且 verdict=EMPTY_SCENARIO。
      */
-    @Operation(summary = "getScenarioCompleteness")
+    @Operation(operationId = "getScenarioCompleteness", summary = "getScenarioCompleteness")
     @GetMapping("/{id}/completeness")
     public ApiResponse<CompletenessVO> completeness(@PathVariable String id) {
         return ApiResponse.success(completenessService.computeFor(id));
@@ -101,7 +107,7 @@ public class ScenarioController {
      * 非法迁移 → 409 ILLEGAL_TRANSITION；→COMPLETED 无正式运行 → 409 NO_FORMAL_RUN；
      * →ACTIVE 存在孤岛 → 409 ISLAND_BINDING。服务端下发 allowedTransitions。
      */
-    @Operation(summary = "transitionScenarioStatus")
+    @Operation(operationId = "transitionScenarioStatus", summary = "transitionScenarioStatus")
     @PatchMapping("/{id}/status")
     public ApiResponse<ScenarioStatusTransitionService.StatusVO> transitionStatus(
             @PathVariable String id, @RequestBody StatusRequest req) {

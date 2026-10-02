@@ -39,7 +39,7 @@ public class ScenarioCognitionReadController {
         this.mindService = mindService;
     }
 
-    @Operation(summary = "getCognitionDetect")
+    @Operation(operationId = "getCognitionDetect", summary = "getCognitionDetect")
     @GetMapping("/api/v1/business/scenarios/{id}/cognition/detect")
     public ApiResponse<JsonNode> detect(@PathVariable String id,
                                         @RequestParam(value = "mind", required = false) String mindId) {
@@ -51,7 +51,7 @@ public class ScenarioCognitionReadController {
         }
     }
 
-    @Operation(summary = "getOperationEval")
+    @Operation(operationId = "getOperationEval", summary = "getOperationEval")
     @GetMapping("/api/v1/business/scenarios/{id}/cognition/operation-eval")
     public ApiResponse<JsonNode> operationEval(@PathVariable String id,
                                                @RequestParam(value = "mind", required = false) String mindId) {
@@ -63,7 +63,7 @@ public class ScenarioCognitionReadController {
         }
     }
 
-    @Operation(summary = "listHypotheses")
+    @Operation(operationId = "listHypotheses", summary = "listHypotheses")
     @GetMapping("/api/v1/business/scenarios/{id}/cognition/hypotheses")
     public ApiResponse<JsonNode> hypotheses(@PathVariable String id,
                                             @RequestParam(value = "mind", required = false) String mindId) {
@@ -75,7 +75,7 @@ public class ScenarioCognitionReadController {
         }
     }
 
-    @Operation(summary = "listBeliefs")
+    @Operation(operationId = "listBeliefs", summary = "listBeliefs")
     @GetMapping("/api/v1/business/scenarios/{id}/cognition/beliefs")
     public ApiResponse<JsonNode> beliefs(@PathVariable String id,
                                          @RequestParam(value = "mind", required = false) String mindId) {
