@@ -6,7 +6,10 @@
 param(
     [string[]]$Modules = @('gateway'),
     [switch]$SkipDocker,
-    [switch]$SkipJars
+    [switch]$SkipJars,
+    # F07-01: force the :18090 workspace auth-baseline probe even pre-start
+    # (no-op when the port is down; use after start-backend to verify the live baseline).
+    [switch]$CheckWorkspaceAuth
 )
 $ErrorActionPreference = 'Continue'
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
@@ -20,6 +23,47 @@ function Step([bool]$ok, [string]$name, [string]$detail) {
     $tag = if ($ok) { '[PASS]' } else { '[FAIL]' }
     Write-Host "$tag $name $(if ($detail) { "- $detail" })"
     if (-not $ok) { $script:fail++ }
+}
+
+# F07-01 (design-07 W165/C147 point 4) - workspace auth baseline self-check.
+# Probes the :18090 scenario endpoint for anonymous exposure. Design requires
+# GET /api/v1/workspace/scenarios WITHOUT an Authorization header to return
+# 401/403 (auth required). A bare 200 means "unauthenticated exposure" -- the
+# exact failure R-24 B-case must remove. This is the "no-auth exposure" ->
+# start failure guard, not a wrong-200 tolerate.
+#   ECOS_WS_AUTH_BASELINE=enforce  -> anonymous 200 is a hard FAIL (blocks start)
+#   (unset / any other value)      -> observe only: print, do not gate startup
+# NOTE: comments/strings here stay ASCII-only (PS 5.1 reads this file as GBK).
+function Test-WorkspaceAuthBaseline {
+    $port    = 18090
+    $url     = "http://localhost:$port/api/v1/workspace/scenarios"
+    $enforce = $env:ECOS_WS_AUTH_BASELINE -eq 'enforce'
+    $mode    = if ($enforce) { 'enforce' } else { 'observe' }
+    $busy = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+    if (-not $busy) {
+        Write-Host "[SKIP] Test-WorkspaceAuthBaseline [$mode] - :$port not listening (pre-start); re-run after start-backend.ps1 to enforce the auth baseline"
+        return
+    }
+    $code = $null
+    try {
+        $resp = Invoke-WebRequest -Uri $url -Method GET -UseBasicParsing -TimeoutSec 3 -Headers @{} -ErrorAction Stop
+        $code = [int]$resp.StatusCode
+    } catch {
+        if ($_.Exception.Response) {
+            $code = [int]$_.Exception.Response.StatusCode
+        } else {
+            Step $false "Test-WorkspaceAuthBaseline [$mode]" "could not reach $url : $($_.Exception.Message)"
+            return
+        }
+    }
+    $ok = ($code -eq 401 -or $code -eq 403)
+    if ($ok) {
+        Step $true "Test-WorkspaceAuthBaseline [$mode]" "GET $url -> $code (anonymous denied, PASS)"
+    } elseif ($enforce) {
+        Step $false "Test-WorkspaceAuthBaseline [enforce]" "GET $url -> $code (expect 401/403) - anonymous exposure, start-backend must refuse to start"
+    } else {
+        Write-Host "[WARN] Test-WorkspaceAuthBaseline [observe] - GET $url -> $code (expect 401/403 once the Security chain is wired; set ECOS_WS_AUTH_BASELINE=enforce to hard-block)"
+    }
 }
 
 Step (Test-Path $JavaExe) 'JDK 17' $JavaExe
@@ -85,5 +129,9 @@ if (-not $SkipJars) {
         Step (Test-Path $jar) "Jar built ($m)" $(if (-not (Test-Path $jar)) { "run: & `"$MvnCmd`" -f `"$Backend\pom.xml`" clean install -DskipTests" })
     }
 }
+
+# F07-01 workspace auth baseline (point 4). The accurate 401/403 proof needs a live
+# :18090; pre-start it self-skips with an instructive note (no premature FAIL).
+Test-WorkspaceAuthBaseline
 
 if ($fail -eq 0) { Write-Host "`nPREFLIGHT OK" } else { Write-Host "`nPREFLIGHT FAILED ($fail issue(s))"; exit 1 }
