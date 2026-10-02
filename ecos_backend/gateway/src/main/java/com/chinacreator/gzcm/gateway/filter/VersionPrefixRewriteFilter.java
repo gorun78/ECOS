@@ -93,7 +93,12 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/alerts/",          "/api/v1/alerts/"),
         Map.entry("/api/portal/",          "/api/v1/portal/"),
         // ── PMO-48-A T2: /api/dq/ → /api/v1/dq/ 反向重写 (DQ 三滤波器, 与 pipeline 同粒度) ──
-        Map.entry("/api/dq/",              "/api/v1/dq/")
+        Map.entry("/api/dq/",              "/api/v1/dq/"),
+        // ── 详细设计-07 F07-01-2 / C147：/api/workspace/ → /api/v1/workspace/ 反向重写 ──
+        // 16 个场景域 Controller 全部直映射 /api/v1/workspace/**，无 legacy /api/workspace/
+        // 副体，故按「双路径各写一遍」铁律（AGENTS.md 约束 2）补反向一条；正向（v1→去v1）
+        // 不允许添加——会把正典路径改到空目标，网关 404（同知识/数据源/Pipeline 同规则）。
+        Map.entry("/api/workspace/",       "/api/v1/workspace/")
     );
 
     /** 检查给定路径是否需要反向重写 */
