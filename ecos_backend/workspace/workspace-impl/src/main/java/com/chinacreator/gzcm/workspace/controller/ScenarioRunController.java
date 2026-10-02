@@ -19,7 +19,10 @@ import io.swagger.v3.oas.annotations.Operation;
  * GET  /api/v1/workspace/scenarios/{id}/runs         — 场景运行历史（?limit=N）
  * </pre>
  *
- * <p>三滤波器：{@code /api/v1/workspace/**} 已由 SecurityConfig + ClearanceInterceptor 放行。</p>
+ * <p>【校订 2026-10-02，详细设计-07 F07-01-5 / W165 / C147】承流与鉴权接线（三滤波器第①条
+ * {@code VersionPrefixRewriteFilter} 双向映射 + gateway 反向代理路由 + :18090 态与 gateway 等价的
+ * Security 链 + 两态鉴权等价）尚未完成，gateway 现以 REGEX 排除本 Controller，:18090 态尚未装
+ * JWT 校验——**不得视为已放行**。接线落点与范围详见 详细设计-07 §F07-01，勿在此声称接线已完成。</p>
  */
 @RestController
 @RequestMapping("/api/v1/workspace/scenarios")
