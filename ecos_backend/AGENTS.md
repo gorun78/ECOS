@@ -176,8 +176,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 
 - **后端**: ✅ 编译绿 (7 JAR) + gateway :8080 UP
 - **5 service 双跑**: ✅ sysman:18081 UP, datanet:18082 UP, buszhi:18083 UP, aiming:18084 UP, dccheng:18086 UP — JAR 已 build, 按需启动
-- **workspace 场景层**: ✅ :18090 UP, 封装 Twin/Alert/Task/EngineTask/EcosKnowledgeGraph (P3-C 迁入)
-  - 【校訂 2026-10-02 / F07-25 / X-64】：本行 5 项命名包在 workspace 源码树 58 文件内**全部不存在**（`find workspace/ -type d \( -iname twin -o -iname alert -o -iname task -o -iname enginetask \)` 空）；gateway `GatewayApplication.java:58` 反倒**显式排除** workspace 下的 twin 类包；workspace 本文档实测域 = `scenario / controller / workbook / knowledge / security / audit / service / exception`（`QueryHistoryService` 与 `QueryRecord` 两位顶层文件）。startup 段落其余 ✅ 判定（`:18090 UP`）不受影响；此校訂与 roots 层 `docs/30-设计/详细设计-07-…md` §7.3 C171 / F07-25 台账行同源同判。
+- **workspace 场景层**: ✅ :18090 UP，实测包视角 = `scenario`/`controller`/`workbook`/`knowledge`/`security`/`audit`/`service`/`exception`/`trace` 九子包 + 顶层 `QueryHistoryService` / `QueryRecord`（`scenario` 域为本册场景工作台主承载，余域属 R-29 "存量端点暴露面待迁回属主"登记件，见 roots 层 `docs/30-设计/详细设计-07-…md` §7.3 C164/C165、W182）
 - **PG Schema 预备**: ✅ 5 schema 建库验证
 - **Phase 推荐下线单档**: standard (PG only) — 默认 profile
 - **目标结构附录 A 对齐**: ⏸ Phase 8 Sprint 独立 Sprint 做 (3 个 Sprint 分级) — 不动代码保持可运行, 文档先对齐 (架构铁律 v2.0 + 本 AGENTS)
