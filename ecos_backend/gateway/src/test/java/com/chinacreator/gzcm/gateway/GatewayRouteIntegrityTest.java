@@ -34,12 +34,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       docker 容器依赖、无 ArchUnit 限 — 直接文本扫。</li>
  *   <li>不启动 Spring 容器、不依赖 PG/Neo4j/Kafka/MinIO docker 容器。
  *       运行期 401/403/502/404 行为由 PMO-B B2 端到端冒烟承担（需 compose 起 5 service + gateway）。</li>
+ *   <li>【校订 2026-10-02 / F07-24 批次 A-0 / C170 / X-12】本测试为<b>纯源码 regex 静态扫描</b>，
+ *       只得出了"路由表<b>注册态</b>存在性 + 最长前缀归属"的结论。<b>不得</b>等同于运行期
+ *       可达性（非 4xx/5xx）—— 静态扫描对源码文本声明"可达"正是历史假阳性根因
+ *       （gateway 实际以 REGEX 排除 workspace controller 时，纯文本扫描仍绿）。
+ *       运行期可达/鉴权态由真容器 {@code WorkspaceRouteReachabilityIT}（前置件 P-2）承担，
+ *       P-2 未成前其项一律记"未执行"。反身门禁见 {@link #staticScanDoesNotClaimReachability()}。</li>
  * </ul>
  *
- * <p><b>断言</b>：
+ * <p><b>断言</b>（全部为<b>注册态</b>，非运行期可达性）：
  * <ul>
  *   <li>5 类前缀（/api/dq, /api/v1/ecos/git, /api/datalake, /api/v1/workspace, /api/v1/cognitive）
- *       在路由表中至少有一条 route 命中（≡ 非 404）</li>
+ *       在源码路由表中至少有一条 route 注册命中（<b>注册态存在性</b>，不声明运行期可达）</li>
  *   <li>最长前缀优先：/api/v1/ecos/git/x 必须命中 /api/v1/ecos/git 而非被 /api/v1/x 抢先</li>
  *   <li>5 前缀至少由 2 个不同 .java 文件承载（多引擎分别承载，不 closet 到 monolith）</li>
  * </ul>
@@ -160,7 +166,7 @@ public class GatewayRouteIntegrityTest {
         return targetPath.equals(route) || targetPath.startsWith(route + "/");
     }
 
-    /** 断言 1：5 类前缀各自被路由表至少一条 route 覆盖（非 404） */
+    /** 断言 1：5 类前缀各自在源码路由表注册命中（<b>注册态存在性</b>，非运行期可达性） */
     @Test
     void prefixRouteOwnership() throws IOException {
         Map<String, String> table = scanRoutes();
@@ -184,7 +190,7 @@ public class GatewayRouteIntegrityTest {
             }
         }
         assertTrue(missing.isEmpty(),
-            "5 类前缀以下未被路由表覆盖（gateway 端 404 风险）: " + missing);
+            "5 类前缀以下未被静态路由表覆盖（注册态缺口；运行期可达性不在本静态测试声明范围，见 WorkspaceRouteReachabilityIT）: " + missing);
     }
 
     /** 断言 2：/api/v1/ecos/git/x 命中 git 子路径而非被短 /api/v1/x 抢先 */
@@ -216,5 +222,52 @@ public class GatewayRouteIntegrityTest {
         System.out.println("[PMO-B B3] 5 前缀 controller 文件分布: " + distinct);
         assertTrue(distinct.size() >= 2,
             "5 前缀应由 ≥ 2 个不同 controller 文件承载，实际: " + distinct);
+    }
+
+    /**
+     * 反身门禁（F07-24 / C170 / X-12，批次 A-0）：本静态扫描测试的源码内<b>不得</b>再出现
+     * 把"路由表命中/注册"混同"运行期可达"的结论性措辞。历史假阳性的根因正是
+     * 纯源码文本扫描却对源码声明端点"可达"（gateway 实际以 REGEX 排除 workspace controller
+     * 时该扫描仍绿）。运行期可达/鉴权态移交真容器
+     * {@code WorkspaceRouteReachabilityIT}（前置件 P-2），P-2 未成前其项一律记"未执行"。
+     *
+     * <p>实现要点：判定用的三处被禁子串以<b>字符串拼接</b>构造（把"非"字、"404"数字、
+     * "≡"符号、"风险"二字分别与前后缀拆开再拼接），使它们在本文件内字面零命中；再读自身源
+     * 文件做整文件 {@code contains} 断言。任何后人若在本文件注释/断言文案里重新写下这三类
+     * 措辞，本用例即红 —— 防假阳性表述复发。
+     */
+    @Test
+    void staticScanDoesNotClaimReachability() throws IOException {
+        Path me = selfSourcePath();
+        assertTrue(me != null && Files.isRegularFile(me),
+            "反身门禁需读取本测试源码，但未能定位文件（surefire CWD 异常）");
+        String src = new String(Files.readAllBytes(me), StandardCharsets.UTF_8);
+        // 被禁措辞以拼接构造（前缀/后缀/字面拆开），保证在自身源码中字面 0 命中，从而整文件断言自洽
+        String[] forbidden = {
+            "非 " + "404",        // 「非」+ 空格 + 404
+            "≡ " + "非",          // 「≡」+ 空格 + 非
+            "404 " + "风险",       // 404 + 空格 + 「风险」
+        };
+        List<String> hits = new java.util.ArrayList<>();
+        for (String f : forbidden) {
+            if (src.contains(f)) hits.add("\"" + f + "\"");
+        }
+        assertTrue(hits.isEmpty(),
+            "静态扫描测试源码内出现把注册态混同运行期可达性的表述（假阳性风险，应改为注册态措辞）: "
+                + hits
+                + "\n（运行期可达性移交真容器 WorkspaceRouteReachabilityIT，前置件 P-2 未成前记未执行）");
+    }
+
+    /** 定位本测试源文件（surefire CWD=模块 或 IDE CWD=仓库根 均兼容）。 */
+    private static Path selfSourcePath() {
+        Path repoRoot = Paths.get("").toAbsolutePath();
+        while (repoRoot != null && repoRoot.toFile().exists()
+                && !Files.exists(repoRoot.resolve("ecos_backend"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        if (repoRoot == null) return null;
+        Path p = repoRoot.resolve(
+            "ecos_backend/gateway/src/test/java/com/chinacreator/gzcm/gateway/GatewayRouteIntegrityTest.java");
+        return Files.isRegularFile(p) ? p : null;
     }
 }
