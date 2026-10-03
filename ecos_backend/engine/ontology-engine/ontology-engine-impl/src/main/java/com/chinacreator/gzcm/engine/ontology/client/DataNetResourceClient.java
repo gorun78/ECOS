@@ -8,39 +8,46 @@ import org.springframework.web.client.RestTemplate;
 
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 /**
- * DataNetResourceClient — 调 datanet service REST 拿数据资源采样
+ * DataNetResourceClient — 调 data-engine（data 域）REST 拿数据资源元数据。
  *
- * Wave B-2 · T13
- * 来源: 肖国荣 / 日期: 2026-09-12 / 责任人: fullstack-implementer
+ * <p>F02-15（详细设计-02，2026-09-30 实现）跨引擎取数契约修正：</p>
+ * <ul>
+ *   <li><b>两态寻址</b>：承流态为 monolith（gateway :8080，ADR-15 S0 已实测），base-url
+ *       默认值由 <code>:18082</code>（未运行的独立 datanet）改为 <code>:8080</code>，
+ *       显式配置项 {@code ecos.datanet.base-url} 优先。</li>
+ *   <li><b>真实端点</b>：字段契约改指向存在的 <code>/api/v1/datanet/assets/{assetId}/fields</code>
+ *       （旧 <code>/resources/{id}/fields</code> 在 data-engine 内无映射，结构必 404）。</li>
+ *   <li><b>禁静默空值（fail-loud）</b>：依赖不可用/响应非法一律抛
+ *       {@link DataAccessException}（错误码 <code>ECOS-DATA-041</code> 语义），
+ *       <b>禁止再"返回空列表"让上层看起来成功</b>（D-14 根治）。</li>
+ * </ul>
  *
- * 调用 /api/v1/datanet/resources/{resourceId}/fields (datanet :18082)
- * 端点合同:
- *   GET /api/v1/datanet/resources/{resourceId}/fields
- *   返回 ApiResponse<List<FieldInfo>>, FieldInfo 含 fieldName/fieldType/description/primaryKey
- *
- * 临时处理(datanet 端点未落地):
- *   当前 datanet service 还没暴露该端点, client 在 Spring 配置项
- *   `ecos.datanet.base-url` 不可达或端点 404 时, 返回空列表,
- *   并在 log.warn 中明确标注 `TODO PMO-06 T19 补 datanet /resources/{id}/fields 端点合同`。
- *   这样 AutoDiscover 在端点就绪前不会 500, 只是不再显示候选字段, 等 datanet 端点补上即可无缝切回。
+ * @author ECOS-BE (F02-15)
  */
 @Component
 public class DataNetResourceClient {
 
     private static final Logger log = LoggerFactory.getLogger(DataNetResourceClient.class);
 
+    /** 跨引擎依赖不可用统一错误码（详细设计-02 D.1，503 语义） */
+    public static final String ECOS_DATA_041 = "ECOS-DATA-041";
+
     private final RestTemplate restTemplate;
 
-    @Value("${ecos.datanet.base-url:http://localhost:18082}")
+    /**
+     * F02-15：默认指向 monolith 承流口（gateway :8080）。
+     * service 独立态（:18082）由部署方显式配置 {@code ecos.datanet.base-url} 覆盖，
+     * 不再硬编码未运行的 18082 作为默认值。
+     */
+    @Value("${ecos.datanet.base-url:http://localhost:8080}")
     private String datanetBaseUrl;
 
     public DataNetResourceClient() {
-        // P1-2: 显式 3s connect/read timeout, 避免 datanet 宕机时阻塞主流程 (Wave B-2 P1-2 加固)
+        // P1-2: 显式 3s connect/read timeout, 避免依赖宕机时阻塞主流程 (Wave B-2 P1-2 加固)
         org.springframework.http.client.SimpleClientHttpRequestFactory factory =
                 new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3000);
@@ -49,26 +56,33 @@ public class DataNetResourceClient {
     }
 
     /**
-     * 拿数据资源下的候选字段(用于本体自动发现预览)。
+     * 拿数据资源下的候选字段（用于本体自动发现预览）。
      *
-     * @param resourceId 资源 id
-     * @return 候选字段列表; 不可达或端点缺失时返回空列表(不抛异常)
+     * <p>F02-15：失败 fail-loud —— 依赖不可用或响应非法时抛
+     * {@link DataAccessException}（不再"返回空列表"掩盖缺数据）。</p>
+     *
+     * @param assetId 数据资源（资产）id
+     * @return 候选字段列表
+     * @throws DataAccessException datanet/data-engine 不可达或响应非法（ECOS-DATA-041）
      */
-    public List<Map<String, Object>> listResourceFields(String resourceId) {
-        String url = datanetBaseUrl + "/api/v1/datanet/resources/" + resourceId + "/fields";
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listResourceFields(String assetId) {
+        String url = datanetBaseUrl + "/api/v1/datanet/assets/" + assetId + "/fields";
         try {
-            @SuppressWarnings("unchecked")
             Map<String, Object> body = restTemplate.getForObject(url, Map.class);
             Object data = body == null ? null : body.get("data");
             if (data instanceof List) {
                 return (List<Map<String, Object>>) data;
             }
+            throw new DataAccessException("datanet 资源字段响应非法 (ECOS-DATA-041): " + url);
+        } catch (DataAccessException e) {
+            log.error("datanet 资源字段端点响应非法 (ECOS-DATA-041, fail-loud 不降级空值): {}", url, e);
+            throw e;
         } catch (Exception e) {
-            // datanet 不可达或端点 404: 降级为空候选(不阻断自动发现)
-            // TODO PMO-06 T19 补 datanet /resources/{id}/fields 端点合同
-            log.warn("datanet fields 端点不可用 ({}), 自动发现候选将为空. {}", url, e.getMessage());
+            log.error("datanet 资源字段端点不可用 (ECOS-DATA-041, fail-loud 不降级空值): {}", url, e);
+            throw new DataAccessException(
+                    "跨引擎取数依赖 data-engine 不可用 (ECOS-DATA-041): " + url, e);
         }
-        return Collections.emptyList();
     }
 
     /**

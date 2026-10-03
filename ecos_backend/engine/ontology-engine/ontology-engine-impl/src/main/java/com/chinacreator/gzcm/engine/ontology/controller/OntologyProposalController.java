@@ -1,13 +1,27 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
-import java.time.LocalDateTime;
+import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalPublishVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVerifyVO;
+import com.chinacreator.gzcm.engine.ontology.gate.GateContext;
+import com.chinacreator.gzcm.engine.ontology.gate.GateResult;
+import com.chinacreator.gzcm.engine.ontology.gate.GateViolation;
+import com.chinacreator.gzcm.engine.ontology.gate.PublishGateService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
+import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
+import com.chinacreator.gzcm.sysman.iam.context.UserContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -20,18 +34,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalPublishVO;
-import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalSaveDTO;
-import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVO;
-import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVerifyVO;
-import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
-import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
-import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
-import com.chinacreator.gzcm.sysman.iam.context.UserContext;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 本体变更提案 Controller — 管理本体结构的变更提案与审批流转。
@@ -81,13 +83,128 @@ public class OntologyProposalController {
     private final OntologyProposalService proposalService;
     private final OntologyVersionService versionService;
     private final OntologyService ontologyService;
+    private final PublishGateService publishGateService;
 
     public OntologyProposalController(OntologyProposalService proposalService,
                                        OntologyVersionService versionService,
-                                       OntologyService ontologyService) {
+                                       OntologyService ontologyService,
+                                       PublishGateService publishGateService) {
         this.proposalService = proposalService;
         this.versionService = versionService;
         this.ontologyService = ontologyService;
+        this.publishGateService = publishGateService;
+    }
+
+    // ═══════════════ F03-03 发布门禁（execute 前唯一语义关口）═══════════════
+
+    /** 从提案 payload 构造门禁上下文（无指标/血缘变更 → 空上下文 = 无判据）。 */
+    private GateContext buildGateContext(Map<String, Object> proposal) {
+        GateContext ctx = new GateContext();
+        Map<String, Object> payload = parsePayload(proposal);
+        if (payload == null) {
+            return ctx;
+        }
+        List<GateContext.MetricRef> metrics = new ArrayList<>();
+        List<GateContext.LineageRef> lineage = new ArrayList<>();
+        collectMetricRefs(payload, metrics);
+        collectLineageRefs(payload, lineage);
+        ctx.setMetrics(metrics);
+        ctx.setLineageRefs(lineage);
+        return ctx;
+    }
+
+    /** 收集 payload 中触及的指标（metrics / metricChanges），按 key 去重。 */
+    private void collectMetricRefs(Map<String, Object> payload, List<GateContext.MetricRef> out) {
+        for (Object raw : asList(payload.get("metrics"))) {
+            Map<String, Object> m = asMap(raw);
+            if (m == null) continue;
+            String code = objToString(m.get("code"));
+            if (!isBlankCode(code) && !metricsHasCode(out, code)) {
+                addMetricRef(out, code, m);
+            }
+        }
+    }
+
+    /** 收集 payload 中引用的事实表列（lineageRefs / lineage），按列去重。 */
+    private void collectLineageRefs(Map<String, Object> payload, List<GateContext.LineageRef> out) {
+        for (Object raw : asList(payload.get("lineageRefs"))) {
+            Map<String, Object> l = asMap(raw);
+            if (l == null) continue;
+            String resourceId = objToString(l.get("resourceId"));
+            String col = objToString(l.get("physicalColumn"));
+            if (resourceId != null && !resourceId.isBlank()
+                    && col != null && !col.isBlank()
+                    && !lineageHas(out, resourceId, col)) {
+                out.add(new GateContext.LineageRef(resourceId, col));
+            }
+        }
+    }
+
+    private void addMetricRef(List<GateContext.MetricRef> out, String code, Map<String, Object> m) {
+        if (isBlankCode(code)) {
+            return;
+        }
+        GateContext.MetricRef ref = new GateContext.MetricRef();
+        ref.code = code.trim();
+        ref.caliberId = objToString(m.get("caliberId"));
+        ref.formulaVersion = objToString(m.get("formulaVersion"));
+        ref.expression = objToString(m.get("expression"));
+        ref.aggregation = objToString(m.get("aggregation"));
+        out.add(ref);
+    }
+
+    private boolean metricsHasCode(List<GateContext.MetricRef> out, String code) {
+        for (GateContext.MetricRef r : out) {
+            if (code != null && r.code != null && r.code.trim().equalsIgnoreCase(code.trim())) return true;
+        }
+        return false;
+    }
+
+    private boolean lineageHas(List<GateContext.LineageRef> out, String resourceId, String col) {
+        for (GateContext.LineageRef r : out) {
+            if (resourceId.equals(r.resourceId) && col.equals(r.physicalColumn)) return true;
+        }
+        return false;
+    }
+
+    private static boolean isBlankCode(String s) {
+        return s == null || s.isBlank();
+    }
+
+    /** 门禁描述：拒绝项拼接（含错误码），供 400/503 响应 message。 */
+    private static String describeGate(GateResult r) {
+        if (r.hasDependencyErrors()) {
+            GateResult.DependencyError d = r.getDependencyErrors().get(0);
+            return d.code + ": 门禁依赖 " + d.dependency + " 不可用，未执行（" + d.message + "）";
+        }
+        if (r.hasServiceError()) {
+            return r.getServiceErrorCode() + ": " + r.getViolations().get(0).getMessage();
+        }
+        StringBuilder sb = new StringBuilder();
+        for (GateViolation v : r.getViolations()) {
+            if (sb.length() > 0) sb.append("; ");
+            sb.append(v.getCode()).append(": ").append(v.getMessage());
+        }
+        return sb.length() > 0 ? sb.toString() : "发布门禁未通过";
+    }
+
+    /** 门禁未通过（含依赖不可用）→ 拒绝响应；通过 → null。 */
+    private <T> ApiResponse<T> gateReject(String proposalId, GateResult r) {
+        if (r.isPassed()) {
+            return null;
+        }
+        if (r.hasDependencyErrors()) {
+            // 依赖不可用 → fail-closed，语义 503（API 响应体 code 用 503 段）
+            return ApiResponse.error(503, r.getDependencyErrors().get(0).code,
+                    "Proposal '" + proposalId + "' " + describeGate(r));
+        }
+        if (r.hasServiceError()) {
+            int http = r.getServiceHttpStatus() > 0 ? r.getServiceHttpStatus() : 500;
+            return ApiResponse.error(http, r.getServiceErrorCode(),
+                    "Proposal '" + proposalId + "' " + describeGate(r));
+        }
+        return ApiResponse.error(400, "ECOS-ONTO-GATE",
+                "Proposal '" + proposalId + "' 发布门禁未通过（停留原状态，未执行）: " + describeGate(r));
     }
 
     // ═══════════════ 提案 CRUD ═══════════════════
@@ -515,10 +632,17 @@ public class OntologyProposalController {
         }
 
         String status = String.valueOf(existing.get("status"));
-        if (!"verified".equalsIgnoreCase(status) && !STATUS_APPROVED.equalsIgnoreCase(status)
-                && !STATUS_PENDING.equalsIgnoreCase(status)) {
+        // F03-08：execute 仅接受 VERIFIED/APPROVED，移除 PENDING 直执（那正是绕过审批的口子）→ ECOS-ONTO-012
+        if (!STATUS_APPROVED.equalsIgnoreCase(status) && !"verified".equalsIgnoreCase(status)) {
             return ApiResponse.badRequest(
-                    "ONT-004: Proposal must be verified/approved/pending to execute, current: " + status);
+                    "ECOS-ONTO-012: Proposal must be verified/approved to execute (PENDING 直执已禁)，current: " + status);
+        }
+
+        // F03-03：状态校验之后、executeAndPublish 之前的唯一语义关口（V1 口径 / V2 单位 / V3 血缘）
+        GateResult gate = publishGateService.validate(id, null, buildGateContext(existing));
+        ApiResponse<OntologyProposalVO> gateReject = gateReject(id, gate);
+        if (gateReject != null) {
+            return gateReject;
         }
 
         // 真正执行 payload（建版本 → 执行变更 → 发布版本 → 回填 EXECUTED），
@@ -582,6 +706,14 @@ public class OntologyProposalController {
                     "ONT-007: reviewer '" + reviewer + "' must differ from author '" + proposalAuthor + "'");
         }
         String reviewerComment = body != null && body.getReviewComment() != null ? body.getReviewComment() : "";
+
+        // F03-03：approve-and-publish 复用同一 PublishGateService（两条发布路径同一套校验）。
+        // 门禁先于 approve 落库 —— 拒绝时提案停留原状态（PENDING），不产生半批准态。
+        GateResult gate = publishGateService.validate(id, null, buildGateContext(proposal));
+        ApiResponse<OntologyProposalPublishVO> gateReject = gateReject(id, gate);
+        if (gateReject != null) {
+            return gateReject;
+        }
 
         proposalService.approve(id, STATUS_APPROVED, reviewer, reviewerComment);
 
