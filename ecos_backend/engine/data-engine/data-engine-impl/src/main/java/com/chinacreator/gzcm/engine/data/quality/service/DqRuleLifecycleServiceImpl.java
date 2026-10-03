@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +66,48 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     /** D.1 数据域 DQ 错误码（详细设计-02 D.1）：规则状态机非法迁移 → 409。 */
     static final String CODE_DQ_RULE_STATE_INVALID = "ECOS-DQ-101";
 
+    /** D.1 数据域 DQ 错误码（详细设计-02 D.1 / F02-07 行 234"仅允许绑定变量，禁自由 SQL"）：规则参数含禁用构造（自由 SQL / 裸表名）→ 400。 */
+    static final String CODE_DQ_RULE_EXPR_FORBIDDEN = "ECOS-DQ-102";
+
+    /**
+     * 自由 SQL 语句动词识别探针 —— 用于 F02-07"参数仅允许绑定变量、禁自由 SQL"（D.1 ECOS-DQ-102）。
+     * 只匹配<b>独立单词</b>（单词边界）的 DML/DDL 语句动词，避开日期区间参数里合法的 "from"/"to"
+     * 键，以及 {@code createdAt}/{@code selectedColumns} 之类的 camelCase 字段名（后跟词字符 → 无边界 → 不命中）。
+     * 大小写不敏感。真实注入（如 {@code {"query":"select * from x"}}）的动词出现在 JSON 值内，
+     * 故直接扫原始 JSON 文本（<b>不</b>剥除引号字面量——那会连 SQL 本身一起剥掉、令护栏失效）。
+     */
+    private static final Pattern FORBIDDEN_SQL_STATEMENT = Pattern.compile(
+            "\\b(select|insert|update|delete|drop|alter|truncate|merge)\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 检测 DQ 规则参数（绑定变量 JSON）是否夹带自由 SQL 语句动词（D.1 ECOS-DQ-102）。
+     * <b>纯静态、无副作用</b>：可离线脱离 Spring/DB 直测（对齐 {@link #assertTransition} 的可测口径）。
+     *
+     * @param dto 规则 DTO（可为 null，视为无参数）
+     * @return 命中时返回首个命中的动词（小写原文），未命中返回 null
+     */
+    static String findForbiddenSqlConstruct(DqRuleDTO dto) {
+        String parameters = dto != null ? dto.getParameters() : null;
+        if (parameters == null || parameters.isBlank()) {
+            return null;
+        }
+        Matcher m = FORBIDDEN_SQL_STATEMENT.matcher(parameters);
+        return m.find() ? m.group(1).toLowerCase() : null;
+    }
+
+    /**
+     * 规则参数禁用构造护栏入口（D.1 ECOS-DQ-102）：命中自由 SQL 动词即抛
+     * {@code BusinessException}（HTTP 400），消息携带功能码 + 命中动词，供前端明确提示"参数仅允许绑定变量"。
+     */
+    static void assertNoForbiddenSqlConstruct(DqRuleDTO dto) {
+        String hit = findForbiddenSqlConstruct(dto);
+        if (hit != null) {
+            throw new BusinessException(CODE_DQ_RULE_EXPR_FORBIDDEN
+                    + ": 规则参数仅允许绑定变量，检测到自由 SQL 构造（命中: " + hit + "），禁止直接写 SQL");
+        }
+    }
+
     // ==================== 状态机转换表 ====================
     // key = 当前状态, value = 允许的目标状态集合
     static final Map<String, Set<String>> TRANSITIONS;
@@ -108,6 +152,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     @Transactional
     public String createDraft(DqRuleDTO dto) {
         validateRuleDTO(dto);
+        assertNoForbiddenSqlConstruct(dto);
         String ruleId = UUID.randomUUID().toString().replace("-", "");
         String operator = dto.getOperator() != null ? dto.getOperator() : "system";
 
@@ -145,6 +190,8 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         if (!"DRAFT".equals(existing.getStatus())) {
             throw new BusinessException("规则 " + ruleId + " 非草稿状态，不可编辑");
         }
+        // 若本次提交带新参数，同样禁自由 SQL（parameters 为 null/空 → 护栏自然放行，沿用既有值）
+        assertNoForbiddenSqlConstruct(dto);
         String operator = dto.getOperator() != null ? dto.getOperator() : "system";
 
         String ruleName = dto.getRuleName() != null ? dto.getRuleName() : existing.getRuleName();
