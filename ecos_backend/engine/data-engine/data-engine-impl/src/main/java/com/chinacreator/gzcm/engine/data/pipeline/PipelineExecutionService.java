@@ -55,6 +55,11 @@ public class PipelineExecutionService {
     private static final Logger log = LoggerFactory.getLogger(PipelineExecutionService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
+    /** C.8 降级与失败语义矩阵错误码（详细设计-02 C.8 / D.1 "05x" 行）：管道依赖不可用时 fail-loud，禁降级为"成功"。 */
+    static final String CODE_RUNTIME_ACCESS = "ECOS-DATA-051"; // runtime-access(JDBC Driver) 不可用 → 管道/SQL 直接失败，禁
+    static final String CODE_MINIO_UNAVAILABLE = "ECOS-DATA-052"; // MinIO(RAW 近源层) 不可用 → 管道整体 FAILED，不留半对象，禁
+    static final String CODE_DUCKDB_UNAVAILABLE = "ECOS-DATA-057"; // DuckDB(parquet) 不可用 → 拒绝 parquet 维持 csv，可（明确提示）
+
     private final PipelineRepository repository;
     private final ConnectorFactory connectorFactory;
     private final JdbcTemplate jdbc;
@@ -1238,7 +1243,7 @@ public class PipelineExecutionService {
         if (explicitFormat != null && !"csv".equals(explicitFormat)) {
             log.warn("SINK_MINIO: format={} 写入器未就绪 (table={})，可用格式 csv（节点 format 或 dw.lake.storage_format 配置）",
                     explicitFormat, table);
-            throw new BusinessException("SINK_MINIO: " + explicitFormat
+            throw new BusinessException(CODE_DUCKDB_UNAVAILABLE + ": SINK_MINIO: " + explicitFormat
                     + " 写入器未就绪，请配置 dw.lake.storage_format=csv（或节点 format=csv）；本项目未引入 " + explicitFormat + " 依赖");
         }
         if (explicitFormat == null) {
@@ -1278,7 +1283,7 @@ public class PipelineExecutionService {
         byte[] csvBytes = toCsv(rows, columns);
         Map<String, Object> upload = minioStorageService.putObject(objectName, csvBytes, "text/csv; charset=UTF-8");
         if (!"success".equals(upload.get("status"))) {
-            throw new BusinessException("SINK_MINIO 上传失败: " + upload.get("message"));
+            throw new BusinessException(CODE_MINIO_UNAVAILABLE + ": SINK_MINIO 上传失败: " + upload.get("message"));
         }
         // 登记/标记近源层对象（layer=RAW, zone=STRUCTURED）；失败不影响上传结果
         dataLakeResourceService.markNearSourceStructured(
@@ -1724,10 +1729,14 @@ public class PipelineExecutionService {
         return ds;
     }
 
-    /** 校验 Connector 实际类型。 */
+    /**
+     * 校验 Connector 实际类型。
+     * <p>C.8 降级矩阵：JDBC 依赖（runtime-access JdbcConnector / Driver）不可用即判定为
+     * {@code ECOS-DATA-051}，管道/SQL 直接失败，禁降级为"成功"。
+     */
     private JdbcConnector requireJdbcConnector(Connector c) {
         if (!(c instanceof JdbcConnector jc)) {
-            throw new BusinessException("Expected JdbcConnector but got: " + c.getClass().getName());
+            throw new BusinessException(CODE_RUNTIME_ACCESS + ": Expected JdbcConnector but got: " + c.getClass().getName());
         }
         return jc;
     }
