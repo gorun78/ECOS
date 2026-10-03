@@ -32,6 +32,16 @@ const DataQualityDashboard = lazy(() => import('./DataQualityDashboard'));
  * 消费 datanet 资产 CRUD + 分级分类 REST，展示资产列表与字段级敏感度。
  */
 const DataAssetsDashboard = lazy(() => import('./DataAssetsDashboard'));
+/**
+ * 五层载体浏览器（详细设计-02 B.4）— 让"数据湖五层"变成可核对的载体清单。
+ * 消费 data-engine 分层端点 layers/[layer]/resources/[id]/rows|sample + registerCarrier。
+ */
+const LayerCarrierTab = lazy(() => import('./data-workbench/tabs/LayerCarrierTab'));
+/**
+ * 业务事实导入向导（详细设计-02 B.5，场景批次 A 主入口）— 四类事实上传/校验/发布。
+ * 消费 BusinessFactController /api/v1/datanet/facts（template/import/batches/publish）。
+ */
+const FactImportWizard = lazy(() => import('./data-workbench/tabs/FactImportWizard'));
 
 /** 懒加载 Tab 的加载占位 */
 function TabLoading() {
@@ -42,7 +52,7 @@ function TabLoading() {
   );
 }
 
-type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'data-assets' | 'engine-config';
+type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'data-assets' | 'layer-carriers' | 'fact-import' | 'engine-config';
 
 /** 侧边栏条目：切换工作台内 tab。 */
 interface SideTabItem {
@@ -72,6 +82,8 @@ const TAB_CONFIG: SideTabItem[] = [
   { id: 'health', icon: 'ShieldAlert', i18nKey: 'dw.tab.health' },
   { id: 'lineage', icon: 'Workflow', i18nKey: 'dw.tab.lineage' },
   { id: 'data-assets', icon: 'Package', i18nKey: 'dw.tab.data_assets' },
+  { id: 'layer-carriers', icon: 'Layers', i18nKey: 'dw.tab.layer_carriers' },
+  { id: 'fact-import', icon: 'Import', i18nKey: 'dw.tab.fact_import' },
 ];
 
 /** 侧边栏底部入口（与主菜单同一样式与选中态）。 */
@@ -161,6 +173,16 @@ export default function DataWorkbenchLayout({
           {activeTab === 'data-assets' && (
             <Suspense fallback={<TabLoading />}>
               <DataAssetsDashboard showToast={showToast} t={t} locale={locale} />
+            </Suspense>
+          )}
+          {activeTab === 'layer-carriers' && (
+            <Suspense fallback={<TabLoading />}>
+              <LayerCarrierTab showToast={showToast} t={t} locale={locale} />
+            </Suspense>
+          )}
+          {activeTab === 'fact-import' && (
+            <Suspense fallback={<TabLoading />}>
+              <FactImportWizard showToast={showToast} t={t} locale={locale} />
             </Suspense>
           )}
           {activeTab === 'engine-config' && <EngineConfigTab showToast={showToast} />}
