@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.gateway.filter;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,11 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 使用 ConcurrentHashMap，无需外部依赖
  */
 @Component
-@Order(2)
+// W11（详细设计-00 C.1.1 规定序 6）：限流必须在认证（JWT 链）之后、配额（QuotaFilter +6）之前：
+// 否则匿名洪泛可耗尽真实租户配额（DoS 面）；须显式 @Order 固定链序。
+@Order(5)
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** 速率限制配置：路径前缀 → {限制次数, 窗口大小(毫秒)} */
     private static final Map<String, int[]> RATE_LIMITS = Map.of(
@@ -77,16 +77,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         if (isRateLimited(key, maxRequests, windowMs)) {
             log.warn("速率限制触发: ip={}, user={}, path={}, limit={}/min", clientIp, userId, path, maxRequests);
+            // F00-04（详细设计-00 C.1.3）：429 统一包络 ECOS-RATE-101 + X-RateLimit-* 头（原为裸 Map）
             response.setStatus(429);
-            response.setContentType("application/json;charset=UTF-8");
             response.setHeader("Retry-After", "60");
-            Map<String, Object> body = Map.of(
-                "code", 429,
-                "message", "请求过于频繁，请稍后重试",
-                "success", false,
-                "retryAfter", 60
-            );
-            response.getWriter().write(MAPPER.writeValueAsString(body));
+            response.setHeader("X-RateLimit-Remaining", "0");
+            response.setHeader("X-RateLimit-Reset", "60");
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write(ApiResponse.error(429, "ECOS-RATE-101", "请求过于频繁，请稍后重试").toJson());
             return;
         }
 

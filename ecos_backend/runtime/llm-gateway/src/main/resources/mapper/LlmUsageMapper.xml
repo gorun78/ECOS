@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  public.ecos_runtime_llm_usage — LLM token 计量（V244，详细设计-00 §6.2 / F00-07 E 章）
+  金额列 cost_amount NUMERIC(18,6) 唯一形态；MC01 主键应用侧 UUID。
+-->
+
+<mapper namespace="com.chinacreator.gzcm.runtime.llm.repository.LlmUsageMapper">
+
+    <resultMap id="llmUsageMap" type="com.chinacreator.gzcm.runtime.llm.usage.LlmUsageEntity">
+        <id property="id" column="id"/>
+        <result property="provider" column="provider"/>
+        <result property="model" column="model"/>
+        <result property="purpose" column="purpose"/>
+        <result property="promptTokens" column="prompt_tokens"/>
+        <result property="completionTokens" column="completion_tokens"/>
+        <result property="costAmount" column="cost_amount"/>
+        <result property="callerModule" column="caller_module"/>
+        <result property="callerId" column="caller_id"/>
+        <result property="scenarioId" column="scenario_id"/>
+        <result property="traceId" column="trace_id"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="isDeleted" column="is_deleted"/>
+        <result property="domain" column="domain"/>
+        <result property="tenantId" column="tenant_id"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.chinacreator.gzcm.runtime.llm.usage.LlmUsageEntity">
+        INSERT INTO public.ecos_runtime_llm_usage (
+            id, provider, model, purpose,
+            prompt_tokens, completion_tokens, cost_amount,
+            caller_module, caller_id, scenario_id, trace_id,
+            create_time, update_time, version_no, is_deleted, domain, tenant_id
+        ) VALUES (
+            #{id}, #{provider}, #{model}, #{purpose},
+            #{promptTokens}, #{completionTokens}, #{costAmount},
+            #{callerModule}, #{callerId}, #{scenarioId}, #{traceId},
+            COALESCE(#{createTime}, NOW()), COALESCE(#{updateTime}, NOW()),
+            #{versionNo}, COALESCE(#{isDeleted}, 0), COALESCE(#{domain}, 'default'), #{tenantId}
+        )
+    </insert>
+
+</mapper>

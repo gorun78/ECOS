@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.sysman.security;
 
+import com.chinacreator.gzcm.common.security.registry.AnonymousEndpointRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,22 +27,12 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // PMO-74 H9-T1 匿名面清零（铁律 §1.2① + §2.4-6 默认 DENY）：
-                // 原 87 条 permitAll 收敛为 8 条，仅登录/刷新 + 健康检查 + error；
-                // 其余（ecos/git、privacy、mfa、sysconfig、datasource、pipeline、llm、
-                // policy-engine、task、workspace、integration、kb、ontology、dq…）一律
-                // anyRequest().authenticated()。内部无凭证 RestTemplate 调用方（kb-engine
-                // /api/v1/llm/{chat,embedding}、data/ontology/kb 的 policy-engine/evaluate、
-                // agent-service ontology/graph）须由 H10 补服务凭证，不在此放开匿名。
+                // H9-T1 匿名面清零 + W05（详细设计-00 C.3.2）：permitAll 不再内联清单，
+                // 一律由 AnonymousEndpointRegistry 单源生成（ANONYMOUS 全形态），
+                // 未登记即默认 DENY；新增匿名面须先登记（理由+批准人+日期），
+                // 门禁 = AnonymousEndpointInventoryTest 三处集合比对。
                 .requestMatchers(
-                    "/auth/**",
-                    "/api/v1/auth/**",
-                    "/api/v1/engine/*/health",
-                    "/api/v1/knowledge/health",
-                    "/api/health",
-                    "/health",
-                    "/actuator/health",
-                    "/error"
+                    AnonymousEndpointRegistry.permitAllPatterns().toArray(String[]::new)
                 ).permitAll()
                 .anyRequest().authenticated()
             )

@@ -1,0 +1,16 @@
+# ECOS Kafka topic 与代码常量的单一事实源（C.5.3 / W12 topic 单源口径）。
+# 每行一个 topic；# 开头为注释行，空行忽略。
+# 镜像源：runtime/common-api com.chinacreator.gzcm.common.event.KafkaTopics（11 常量）。
+# 对账测试：gateway KafkaTopicParityTest（本文件 ⇔ 常量集 ⇔ docker-compose kafka-init 初始化面）。
+# 变更纪律：改任何一边必须在同一提交里同步另两边，否则 KafkaTopicParityTest 红灯。
+ecos.identity
+ecos.catalog
+ecos.data.security-tagged
+ecos.ontology
+ecos.ontology.published
+ecos.object
+ecos.workflow
+ecos.agent
+ecos.knowledge
+ecos.cognitive
+ecos.audit

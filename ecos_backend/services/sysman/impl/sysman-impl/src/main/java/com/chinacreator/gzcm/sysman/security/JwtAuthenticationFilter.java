@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -18,23 +20,26 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.LinkedHashSet;
-import java.util.stream.Collectors;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * JWT 认证过滤器 — 从 Authorization 请求头提取 Bearer Token，
  * 解析并验证 JWT，若有效则查询数据库加载用户权限并设置 SecurityContext。
+ *
+ * <h3>W06（详细设计-00 C.1.3/C.2.4，M0）失败语义收紧 — 默认 DENY 唯一实现口径</h3>
+ * <ul>
+ *   <li>签名无效/过期/类型错 → 401 ECOS-AUTH-002/003（不透传 X-ECOS-*）</li>
+ *   <li>jti 命中黑名单 → 401 ECOS-AUTH-004</li>
+ *   <li><b>黑名单查询异常（DB 故障）→ 503 ECOS-AUTH-005 fail-closed</b>（原 return false = fail-open）</li>
+ *   <li><b>JWT 缺 tenant_id 且回查失败 → 403 ECOS-AUTH-006</b>（删除 "tenant-a" 硬编码兜底）</li>
+ * </ul>
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -84,16 +89,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String tokenType = claims.get("type", String.class);
             if (!"access".equals(tokenType)) {
                 log.warn("Invalid token type: {} for subject {}", tokenType, claims.getSubject());
-                sendUnauthorized(response, "Token类型无效");
+                sendRejected(response, 401, "ECOS-AUTH-003", "Token类型无效");
                 return;
             }
 
-            // ── T5: 检查 Token 是否在黑名单中 (forceLogout) ──
+            // ── T5: 检查 Token 是否在黑名单中 (forceLogout) —— DB 异常 fail-closed（W06）──
             String jti = claims.getId();
             String userId = claims.getSubject();
             if (jti != null && isTokenBlacklisted(jti)) {
                 log.warn("Token已被强制踢出: userId={}, jti={}", userId, jti);
-                sendUnauthorized(response, "Token已被强制踢出，请重新登录");
+                sendRejected(response, 401, "ECOS-AUTH-004", "Token已被强制踢出，请重新登录");
                 return;
             }
 
@@ -132,38 +137,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 username = loadUsername(userId);
             }
             context.setUsername(username);
-            context.setTenantId(claims.get("tenant_id", String.class));
-            UserContext.setCurrent(context);
-            
-            // 设置租户上下文 (供 QuotaFilter 等下游使用)
+
+            // ── W06：租户 claim 优先；claim 与回查皆无 → 403 ECOS-AUTH-006（删 tenant-a 兜底）──
             String tenantId = claims.get("tenant_id", String.class);
             if (tenantId == null || tenantId.isBlank()) {
-                // Fallback: 从DB读取（JWT不含tenant_id时的兜底）
-                try {
-                    List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                        "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
-                    if (rows != null && !rows.isEmpty()) {
-                        Object tid = rows.get(0).get("TENANT_ID");
-                        tenantId = tid != null ? tid.toString() : null;
-                    }
-                } catch (Exception ex) {
-                    log.debug("Failed to query tenant for user {}: {}", userId, ex.getMessage());
-                }
-                if (tenantId == null || tenantId.isBlank()) {
-                    tenantId = "tenant-a"; // 默认租户
-                }
+                tenantId = loadTenantId(userId);
             }
-            if (tenantId != null && !tenantId.isBlank()) {
-                TenantContextHolder.setTenantId(tenantId);
-                context.setTenantId(tenantId);
+            if (tenantId == null || tenantId.isBlank()) {
+                log.warn("用户未绑定租户，拒绝登录: userId={}", userId);
+                SecurityContextHolder.clearContext();
+                UserContext.clear();
+                sendRejected(response, 403, "ECOS-AUTH-006", "用户未绑定租户");
+                return;
             }
+            context.setTenantId(tenantId);
+            UserContext.setCurrent(context);
 
-            log.debug("JWT authenticated: userId={}, authorities={}", userId, allAuthorities);
+            // 设置租户上下文 (供 QuotaFilter 等下游使用)
+            TenantContextHolder.setTenantId(tenantId);
 
+            log.debug("JWT authenticated: userId={}, tenant={}, authorities={}", userId, tenantId, allAuthorities);
+
+        } catch (ExpiredJwtException e) {
+            SecurityContextHolder.clearContext();
+            UserContext.clear();
+            sendRejected(response, 401, "ECOS-AUTH-002", "Token已过期");
+            return;
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("JWT validation failed: {}", e.getMessage());
             SecurityContextHolder.clearContext();
-            sendUnauthorized(response, "Token无效或已过期");
+            UserContext.clear();
+            sendRejected(response, 401, "ECOS-AUTH-002", "Token无效或已过期");
+            return;
+        } catch (TokenBlacklistUnavailableException e) {
+            // W06 fail-closed：黑名单依赖不可用 → 503（不再按未拉黑放行）
+            log.error("token 黑名单不可用（DB 故障），fail-closed 拒绝: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
+            UserContext.clear();
+            sendRejected(response, 503, "ECOS-AUTH-005", "认证依赖不可用，请稍后重试");
             return;
         }
 
@@ -190,24 +201,57 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return userId;
     }
 
+    /** W06：按 userId 回查租户（JWT 不含 tenant_id 时的兜底；失败返回 null → 上层 403） */
+    protected String loadTenantId(String userId) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+            if (rows != null && !rows.isEmpty()) {
+                Object tid = rows.get(0).get("TENANT_ID");
+                return tid != null ? tid.toString() : null;
+            }
+        } catch (Exception ex) {
+            log.warn("回查租户失败 userId={}: {}（按默认 DENY 口径交上层 403）", userId, ex.getMessage());
+        }
+        return null;
+    }
+
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        sendRejected(response, 401, "ECOS-AUTH-001", message);
+    }
+
+    /** C.1.3 统一拒绝包络：status + ECOS-AUTH-### errorCode（D.5.2 错误码总表） */
+    private void sendRejected(HttpServletResponse response, int status, String errorCode, String message)
+            throws IOException {
+        response.setStatus(status);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(ApiResponse.unauthorized(message).toJson());
+        if (status == 401) {
+            response.setHeader("WWW-Authenticate", "Bearer");
+        }
+        response.getWriter().write(ApiResponse.error(status, errorCode, message).toJson());
     }
 
     /**
      * 检查 token jti 是否在黑名单中（已被强制踢出）。
+     * <p>W06：查询异常 <b>抛出</b> {@link TokenBlacklistUnavailableException} → 上层 503
+     * fail-closed；原 return false（= DB 故障时已拉黑 token 仍可通行，fail-open）。
+     * <p>测试注入点：子类可覆写本方法模拟黑名单查询。
      */
-    private boolean isTokenBlacklisted(String jti) {
+    protected boolean isTokenBlacklisted(String jti) {
         try {
             Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ecos_token_blacklist WHERE jti = ? AND expires_at > NOW()",
                 Integer.class, jti);
             return count != null && count > 0;
-        } catch (Exception e) {
-            log.warn("查询token黑名单失败: {}", e.getMessage());
-            return false;
+        } catch (DataAccessException e) {
+            throw new TokenBlacklistUnavailableException(jti, e);
+        }
+    }
+
+    /** W06 专用：黑名单依赖不可用（触发 fail-closed 503） */
+    public static class TokenBlacklistUnavailableException extends RuntimeException {
+        public TokenBlacklistUnavailableException(String jti, Throwable cause) {
+            super("token blacklist unavailable for jti=" + jti, cause);
         }
     }
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.chinacreator.gzcm.common.context.TraceContext;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -50,6 +51,8 @@ public class ApiResponse<T> implements Serializable {
     private String message;
     private T data;
     private Long timestamp;
+    /** W09（详细设计-00 D.5.1）：全链 traceId，增量字段，序列化向后兼容（NON_NULL） */
+    private String traceId;
 
     // ── 构造器 ──────────────────────────────────────
 
@@ -137,6 +140,22 @@ public class ApiResponse<T> implements Serializable {
 
     public Long getTimestamp() { return timestamp; }
     public void setTimestamp(Long timestamp) { this.timestamp = timestamp; }
+
+    /**
+     * W09：返回体 traceId。业务代码未显式 set 时，序列化时自动从 MDC 回填，
+     * 保证"请求日志 → 响应体"两处同值；MDC 也无值时返回 null（NON_NULL 省略该字段）。
+     */
+    public String getTraceId() {
+        return traceId != null ? traceId : TraceContext.current();
+    }
+
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+
+    /** 增量工厂（不改既有静态方法签名，API 只增不改） */
+    public ApiResponse<T> withTraceId(String traceId) {
+        this.traceId = traceId;
+        return this;
+    }
 
     // ── 便捷方法 ────────────────────────────────────
 

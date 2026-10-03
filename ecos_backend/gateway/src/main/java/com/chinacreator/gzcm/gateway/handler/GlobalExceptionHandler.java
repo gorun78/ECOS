@@ -105,6 +105,36 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * F02-08 / W46（详细设计-02）：Spring DAO/MyBatis 底层异常 <b>禁止</b>再落入 catch-all 的 404。
+     * <p>
+     * {@link org.springframework.dao.DataAccessException}（{@code BadSqlGrammarException} /
+     * {@code MyBatisSystemException} 等皆为其子类）属真实的数据层失败，若被掩蔽成 404「端点暂未开放」，
+     * 前端会误判为路由/功能未就绪并静默回落 legacy，掩盖缺陷（D-6 a/b/c 三处实测根因）。
+     * 此处显式映射为 <b>500 + ECOS-DATA-031</b>，traceId 由 {@link ApiResponse#getTraceId()} 自动从 MDC 回填，
+     * 便于全链定位；仅真正的 {@code NoHandlerFound/NoResourceFound}（路由不存在）才应走 404。
+     * </p>
+     */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiResponse<Void> handleSpringDaoAccess(org.springframework.dao.DataAccessException ex) {
+        String root = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        log.error("SpringDaoDataAccessException (data-layer failure, NOT masked as 404): {}", root, ex);
+        return ApiResponse.error(500, "ECOS-DATA-031", "数据层处理异常，请稍后重试或联系管理员");
+    }
+
+    /**
+     * MyBatis 运行时异常（{@code org.apache.ibatis.exceptions.PersistenceException} /
+     * {@code MyBatisSystemException} 之上未归入 Spring DAO 体系的分支）。
+     * <p>同样禁止掩蔽为 404，映射 500 + ECOS-DATA-031。</p>
+     */
+    @ExceptionHandler(org.apache.ibatis.exceptions.PersistenceException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiResponse<Void> handleMyBatisPersistence(org.apache.ibatis.exceptions.PersistenceException ex) {
+        log.error("MyBatisPersistenceException (data-layer failure, NOT masked as 404): {}", ex.getMessage(), ex);
+        return ApiResponse.error(500, "ECOS-DATA-031", "数据层处理异常，请稍后重试或联系管理员");
+    }
+
+    /**
      * Spring Security 权限不足（未走 DataBridge 体系的安全链抛出的原生异常）→ 403
      */
     @ExceptionHandler(AccessDeniedException.class)

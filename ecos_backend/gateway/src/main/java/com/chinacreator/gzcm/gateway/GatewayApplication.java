@@ -84,7 +84,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
         com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
-        com.chinacreator.gzcm.gateway.controller.EcosKnowledgeGraphController.class,
+        // F04-01 (2026-09-30): gateway 侧 EcosKnowledgeGraphController 死类已删除（K-13/W95），
+        // 知识图谱唯一实现 = engine/kb 的 EcosKnowledgeGraphController（/api/v1/knowledge/ecos-graph）。
         com.chinacreator.gzcm.gateway.controller.SecurityController.class,
         // 安全引擎: security-engine-impl 的 abac.dao 与 runtime-crypto JAR 冲突，exclude 源码版本
         com.chinacreator.gzcm.engine.security.abac.dao.impl.AbacPolicyDaoImpl.class,

@@ -1,0 +1,193 @@
+{
+  "$comment": "W01/F00-01（详细设计-00 C.4，M0）— 路由前缀唯一真源。消费方：① gateway ServiceEndpointResolver（classpath 读取）② ecos_frontend/server.ts（BFF 前缀表）③ vite.config.ts（dev 直连）④ GatewayRouteIntegrityTest（manifest 每条 prefix 须有承载或已切流，非 404）。三处不得再内联前缀常量；切流开关 = 每条 mode 字段（monolith|service，S3 前一律 monolith，ADR-15）。",
+  "$version": "1.0",
+  "$updatedAt": "2026-09-30",
+  "ports": { "gateway": 8080, "sysman": 18081, "datanet": 18082, "buszhi": 18083, "aiming": 18084, "dccheng": 18086, "workspace": 18090 },
+  "entries": [
+    {
+      "prefix": "/api/v1/datanet",
+      "owner": "datanet",
+      "artifact": "services/datanet",
+      "ports": { "monolith": 8080, "service": 18082 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true,
+      "note": "3 controller 双跑态（DataLake/DqDashboard/Git，F-3）"
+    },
+    {
+      "prefix": "/api/datalake",
+      "owner": "datanet",
+      "artifact": "services/datanet",
+      "ports": { "monolith": 8080, "service": 18082 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/dq",
+      "owner": "datanet",
+      "artifact": "engine/data-engine/data-engine-impl",
+      "ports": { "monolith": 8080, "service": 18082 },
+      "rewrite": "keep",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/engine/data",
+      "owner": "datanet",
+      "artifact": "engine/data-engine/data-engine-impl",
+      "ports": { "monolith": 8080, "service": 18082 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/data",
+      "owner": "datanet",
+      "artifact": "engine/data-engine/data-engine-impl",
+      "ports": { "monolith": 8080, "service": 18082 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/ontology",
+      "owner": "buszhi",
+      "artifact": "engine/ontology-engine/ontology-engine-impl",
+      "ports": { "monolith": 8080, "service": 18083 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/kb",
+      "owner": "dccheng",
+      "artifact": "engine/kb-engine/kb-engine-impl",
+      "ports": { "monolith": 8080, "service": 18086 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/knowledge",
+      "owner": "dccheng",
+      "artifact": "engine/kb-engine/kb-engine-impl",
+      "ports": { "monolith": 8080, "service": 18086 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/knowledge-bases",
+      "owner": "dccheng",
+      "artifact": "engine/kb-engine/kb-engine-impl",
+      "ports": { "monolith": 8080, "service": 18086 },
+      "rewrite": "/api/v1/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/agent",
+      "owner": "aiming",
+      "artifact": "engine/ai-engine/ai-engine-impl",
+      "ports": { "monolith": 8080, "service": 18084 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/agent-loop",
+      "owner": "aiming",
+      "artifact": "engine/ai-engine/ai-engine-impl",
+      "ports": { "monolith": 8080, "service": 18084 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/agents",
+      "owner": "aiming",
+      "artifact": "engine/ai-engine/ai-engine-impl",
+      "ports": { "monolith": 8080, "service": 18084 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/cognitive",
+      "owner": "aiming",
+      "artifact": "engine/cognitive-engine/cognitive-engine-impl",
+      "ports": { "monolith": 8080, "service": 18084 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/workspace",
+      "owner": "workspace",
+      "artifact": "workspace/workspace-impl",
+      "ports": { "monolith": 8080, "service": 18090 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": false,
+      "note": "gateway 排除 workspace controller 宿主（C.6.1），端点经 gateway 聚合但承流态归场景层"
+    },
+    {
+      "prefix": "/api/v1/iam",
+      "owner": "sysman",
+      "artifact": "services/sysman/impl/sysman-impl",
+      "ports": { "monolith": 8080, "service": 18081 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/auth",
+      "owner": "sysman",
+      "artifact": "services/sysman/impl/sysman-impl",
+      "ports": { "monolith": 8080, "service": 18081 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true,
+      "anonymous": true
+    },
+    {
+      "prefix": "/api/v1/security",
+      "owner": "sysman",
+      "artifact": "engine/security-engine/security-engine-impl",
+      "ports": { "monolith": 8080, "service": 18081 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true,
+      "cleared-exempt": true
+    },
+    {
+      "prefix": "/api/v1/audit",
+      "owner": "sysman",
+      "artifact": "engine/security-engine/security-engine-impl",
+      "ports": { "monolith": 8080, "service": 18081 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true,
+      "cleared-exempt": true
+    },
+    {
+      "prefix": "/api/v1/system",
+      "owner": "sysman",
+      "artifact": "services/sysman/impl/sysman-impl",
+      "ports": { "monolith": 8080, "service": 18081 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    },
+    {
+      "prefix": "/api/v1/monitor",
+      "owner": "sysman",
+      "artifact": "runtime/runtime-monitor",
+      "ports": { "monolith": 8080, "service": 18081 },
+      "rewrite": "/api/*",
+      "mode": "monolith",
+      "carried": true
+    }
+  ]
+}

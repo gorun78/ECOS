@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -23,7 +24,9 @@ import java.io.IOException;
  * - Cache-Control — 敏感端点禁止缓存
  */
 @Component
-@Order(1)  // 最高优先级，确保安全头最先设置
+// W11（详细设计-00 C.1.1 规定序 4）：与版本重写(+10)/请求上下文(+11)/信任头(+20)
+// 同族 HIGHEST_PRECEDENCE+n，杜绝小数字与 HIGHEST_PRECEDENCE+n 混用造成链序歧义。
+@Order(Ordered.HIGHEST_PRECEDENCE + 30)
 public class SecurityHeadersFilter extends OncePerRequestFilter {
 
     @Override

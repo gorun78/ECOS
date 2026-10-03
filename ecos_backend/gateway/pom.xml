@@ -248,6 +248,12 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- W08/W11: filter/traceId 单测用 spring-test MockHttpServletRequest 等 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- A+4: infrastructure access (git/minio/logging/i18n/alert migrated from runtime-core) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>

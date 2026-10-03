@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.sysman.security;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.registry.AnonymousEndpointRegistry;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -72,17 +73,11 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
 
-        // 公开端点免检查 — PMO-74 H9-T2（铁律 §1.2①/§2.4-6）：
-        // 业务前缀（knowledge/pipeline/aip/lineage/datanet/workspace/engine/ontology/dq/
-        // datasource/task/sysconfig/ecos/llm/agent 族…）已全部移出豁免表，改由准入等级校验；
-        // 仅保留 health/auth 类 + 安全控制面（security/audit 仅要求认证，见 SecurityPolicyController 设计口径）。
-        if (path.startsWith("/api/v1/auth/") || path.equals("/api/health") || path.equals("/health")
-                || path.startsWith("/api/v1/knowledge/health")
-                || path.startsWith("/api/security")
-                || path.startsWith("/api/v1/security")
-                || path.startsWith("/api/v1/audit")
-                || path.startsWith("/api/audit")
-                ) {
+        // W05（详细设计-00 C.3.2，M0）：豁免判定改由 AnonymousEndpointRegistry 单源查询
+        // （原 9 条内联 startsWith 是第三张分散清单，F-8 三处不一致根因）：
+        // ANONYMOUS 命中 → 无需 clearance；CLEARED_EXEMPT（security/audit/extract 族）
+        // 命中 → 仅要求认证不校验等级；未登记 → 一律进等级校验（fail-closed）。
+        if (AnonymousEndpointRegistry.isExempt(path)) {
             return true;
         }
 

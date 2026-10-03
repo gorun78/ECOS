@@ -12,7 +12,9 @@ spring:
       - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified
+    # W03（详细设计-00 E.6.3，M1）：MC06 — 连接串占位符形态（default 保持现状语义，
+    # 可被 ECOS_DB_URL 覆写以切换 currentSchema=ecos_control 等目标态）
+    url: ${ECOS_DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public&stringtype=unspecified}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver

@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -43,6 +44,9 @@ import java.util.concurrent.TimeUnit;
  * </ol>
  */
 @Component
+// W11（详细设计-00 C.1.1 规定序 7）：显式 @Order(6)，固定于 JWT 链之后（依赖
+// TenantContextHolder，其唯一写入点即 JWT 阶段）与 RateLimitFilter(+5) 之后。
+@Order(6)
 public class QuotaFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(QuotaFilter.class);
@@ -234,7 +238,7 @@ public class QuotaFilter extends OncePerRequestFilter {
                                    String tenantId, String quotaType, long used, long limit) throws IOException {
         response.setStatus(429);
         response.setContentType("application/json;charset=UTF-8");
-        ApiResponse<Map<String, Object>> body = ApiResponse.error(429,
+        ApiResponse<Map<String, Object>> body = ApiResponse.error(429, "ECOS-RATE-102",
             "配额已用尽 — " + quotaType + " 当日使用量已达上限");
         Map<String, Object> detail = new java.util.LinkedHashMap<>();
         detail.put("tenant_id", tenantId);
