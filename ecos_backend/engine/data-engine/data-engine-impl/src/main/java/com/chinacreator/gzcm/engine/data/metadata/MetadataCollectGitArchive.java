@@ -75,16 +75,15 @@ public class MetadataCollectGitArchive {
             return Map.of("archived", false, "error", "无表清单可归档");
         }
 
-        String repoRoot;
+        String dsDir;
         try {
-            repoRoot = repoRootResolver.resolveRepoRoot();
             GitRepoRootResolver.requireSafeSegment(datasourceId);
+            // F02-12: 路径一律经 GitRepoRootResolver 单源解析（禁在本类自拼 repoRoot 越界拼接）
+            dsDir = repoRootResolver.resolveUnderRoot("metadata", datasourceId);
         } catch (Exception e) {
             log.warn("非法 Git 仓库根路径配置或数据源 ID，拒绝归档: {}", e.getMessage());
             return Map.of("archived", false, "error", "非法 Git 仓库根路径配置: " + e.getMessage());
         }
-        Path dsDirPath = Paths.get(repoRoot, "metadata", datasourceId);
-        String dsDir = dsDirPath.toString();
         String snapshotPath = Paths.get(dsDir, "metadata.json").toString();
         String diffPath = Paths.get(dsDir, "DIFF-latest.md").toString();
 
@@ -230,10 +229,13 @@ public class MetadataCollectGitArchive {
      *         versions 按时间降序（新→旧）；目录不存在时返回空列表（非错误）
      */
     public Map<String, Object> listHistoryVersions(String datasourceId) {
-        String repoRoot;
+        String historyDirPath;
+        String currentSnapshotPath;
         try {
-            repoRoot = repoRootResolver.resolveRepoRoot();
             GitRepoRootResolver.requireSafeSegment(datasourceId);
+            // F02-12: 全部路径经 GitRepoRootResolver 单源解析
+            historyDirPath = repoRootResolver.resolveUnderRoot("metadata", datasourceId, "history");
+            currentSnapshotPath = repoRootResolver.resolveUnderRoot("metadata", datasourceId, "metadata.json");
         } catch (Exception e) {
             log.warn("非法 Git 仓库根路径配置或数据源 ID，返回空版本列表: {}", e.getMessage());
             Map<String, Object> rejected = new LinkedHashMap<>();
@@ -246,7 +248,7 @@ public class MetadataCollectGitArchive {
         Map<String, Object> result = new LinkedHashMap<>();
         List<Map<String, Object>> versions = new ArrayList<>();
 
-        Path historyDir = Paths.get(repoRoot, "metadata", datasourceId, "history");
+        Path historyDir = Paths.get(historyDirPath);
         if (Files.isDirectory(historyDir)) {
             try (var stream = Files.list(historyDir)) {
                 List<Path> files = stream
@@ -270,15 +272,13 @@ public class MetadataCollectGitArchive {
         }
 
         // 当前版本（metadata.json 可能不存在 = 从未采集）
-        Map<String, Object> currentSnap = readSnapshot(
-                Paths.get(repoRoot, "metadata", datasourceId, "metadata.json").toString());
+        Map<String, Object> currentSnap = readSnapshot(currentSnapshotPath);
         Map<String, Object> current = new LinkedHashMap<>();
         current.put("exists", currentSnap != null);
         if (currentSnap != null) {
             current.put("collectedAt", currentSnap.get("collectedAt"));
             current.put("tableCount", currentSnap.get("tableCount"));
         }
-
         result.put("versions", versions);
         result.put("current", current);
         return result;
@@ -300,15 +300,21 @@ public class MetadataCollectGitArchive {
         if (versionId == null || !versionId.matches("^\\d{8}_\\d{6}$")) {
             throw new IllegalArgumentException("非法版本号: " + versionId);
         }
-        String repoRoot = repoRootResolver.resolveRepoRoot();
-        GitRepoRootResolver.requireSafeSegment(datasourceId);
-
-        String baseDir = Paths.get(repoRoot, "metadata", datasourceId).toString();
-        Map<String, Object> currentSnap = readSnapshot(Paths.get(baseDir, "metadata.json").toString());
+        String currentSnapshotPath;
+        String previousSnapshotPath;
+        try {
+            GitRepoRootResolver.requireSafeSegment(datasourceId);
+            // F02-12: 全部路径经 GitRepoRootResolver 单源解析（versionId 已先经 ^\d{8}_\d{6}$ 校验，为安全段）
+            currentSnapshotPath = repoRootResolver.resolveUnderRoot("metadata", datasourceId, "metadata.json");
+            previousSnapshotPath = repoRootResolver.resolveUnderRoot("metadata", datasourceId, "history", versionId + ".json");
+        } catch (IllegalArgumentException e) {
+            throw e;
+        }
+        Map<String, Object> currentSnap = readSnapshot(currentSnapshotPath);
         if (currentSnap == null) {
             throw new IllegalArgumentException("当前版本快照不存在（数据源尚未完成元数据采集）");
         }
-        Map<String, Object> prevSnap = readSnapshot(Paths.get(baseDir, "history", versionId + ".json").toString());
+        Map<String, Object> prevSnap = readSnapshot(previousSnapshotPath);
         if (prevSnap == null) {
             throw new IllegalArgumentException("历史版本不存在: " + versionId);
         }

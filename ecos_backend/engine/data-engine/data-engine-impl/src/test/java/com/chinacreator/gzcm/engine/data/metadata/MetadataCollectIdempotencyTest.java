@@ -39,8 +39,12 @@ class MetadataCollectIdempotencyTest {
 
     @BeforeEach
     void setUp() {
-        GitRepoRootResolver resolver = mock(GitRepoRootResolver.class);
-        when(resolver.resolveRepoRoot()).thenReturn(repoRoot.toString());
+        // F02-12 后路径经 GitRepoRootResolver.resolveUnderRoot 单源解析；用真实 resolver（打桩其
+        // SysConfigService 指向 @TempDir 仓库根），使归档真实落盘到 {repoRoot}/metadata/ds*/ 并参与 diff
+        com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService cfg =
+                mock(com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService.class);
+        when(cfg.getString(GitRepoRootResolver.KEY_REPO_ROOT)).thenReturn(repoRoot.toString());
+        GitRepoRootResolver resolver = new GitRepoRootResolver(cfg);
         // archiveAndDiff 只经 resolver + 文件 IO；gitService.commit 委托 runtime（mock 空实现）；
         // jdbc 仅在 clean-up 限额读取处被触碰（unstubbed 返回 null → 默认 50，不触库）
         svc = new MetadataCollectGitArchive(mock(GitService.class), mock(JdbcTemplate.class), resolver);

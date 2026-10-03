@@ -41,8 +41,12 @@ class MetadataHistoryFromGitTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        GitRepoRootResolver resolver = mock(GitRepoRootResolver.class);
-        when(resolver.resolveRepoRoot()).thenReturn(repoRoot.toString());
+        // 用真实 GitRepoRootResolver（打桩其 SysConfigService）→ 走 resolveUnderRoot 真实校验+路径拼接，
+        // 让本测试仍能在磁盘上断言 {repoRoot}/metadata/{dsId}/... 布局落地
+        com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService cfg =
+                mock(com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService.class);
+        when(cfg.getString(GitRepoRootResolver.KEY_REPO_ROOT)).thenReturn(repoRoot.toString());
+        GitRepoRootResolver resolver = new GitRepoRootResolver(cfg);
         // listHistoryVersions 只用 resolver + 文件 IO；gitService/jdbc 此处不被触碰，给 mock 即可
         svc = new MetadataCollectGitArchive(mock(GitService.class), mock(JdbcTemplate.class), resolver);
     }
