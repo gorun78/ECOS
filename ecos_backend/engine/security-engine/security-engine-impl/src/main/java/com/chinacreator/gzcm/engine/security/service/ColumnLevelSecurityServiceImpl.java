@@ -17,6 +17,12 @@ public class ColumnLevelSecurityServiceImpl {
     private static final Logger log = LoggerFactory.getLogger(ColumnLevelSecurityServiceImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** 显式列白名单（IR04：禁 SELECT *） */
+    private static final String CLS_POLICY_COLUMNS =
+            "id, policy_name, table_name, visible_cols, blocked_cols, column_name, mode, " +
+            "allowed_columns_json, scope_type, scope_id, role_id, user_id, priority, enabled, " +
+            "description, created_by, created_at, updated_at, resource_id, version_no, is_deleted";
+
     private final JdbcTemplate jdbcTemplate;
 
     public ColumnLevelSecurityServiceImpl(JdbcTemplate jdbcTemplate) {
@@ -82,6 +88,7 @@ public class ColumnLevelSecurityServiceImpl {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("mode", visibleSet.isEmpty() ? "deny" : "allow");
         result.put("visibleColumns", new ArrayList<>(visibleSet));
         result.put("blockedColumns", new ArrayList<>(blockedSet));
         result.put("tableName", tableName);
@@ -92,6 +99,7 @@ public class ColumnLevelSecurityServiceImpl {
     /** 安全路径解析失败时的拒绝载荷：可见列为空 = 一列都不返回（§2.4-2/6 默认 DENY）。 */
     private Map<String, Object> deniedResult(String tableName, List<String> blocked) {
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("mode", "deny");
         result.put("visibleColumns", new ArrayList<String>());
         result.put("blockedColumns", new ArrayList<>(blocked));
         result.put("tableName", tableName);
@@ -105,17 +113,18 @@ public class ColumnLevelSecurityServiceImpl {
         String sql;
         Object[] args;
         if (tableName != null && !tableName.isBlank()) {
-            sql = "SELECT * FROM ecos_cls_policy WHERE table_name = ? ORDER BY priority ASC, created_at DESC";
+            sql = "SELECT " + CLS_POLICY_COLUMNS + " FROM ecos_cls_policy WHERE table_name = ? ORDER BY priority ASC, created_at DESC";
             args = new Object[]{tableName};
         } else {
-            sql = "SELECT * FROM ecos_cls_policy ORDER BY priority ASC, created_at DESC";
+            sql = "SELECT " + CLS_POLICY_COLUMNS + " FROM ecos_cls_policy ORDER BY priority ASC, created_at DESC";
             args = new Object[]{};
         }
         return jdbcTemplate.queryForList(sql, args);
     }
 
     public Map<String, Object> getPolicy(String id) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM ecos_cls_policy WHERE id = ?", id);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT " + CLS_POLICY_COLUMNS + " FROM ecos_cls_policy WHERE id = ?", id);
         return rows.isEmpty() ? null : rows.get(0);
     }
 

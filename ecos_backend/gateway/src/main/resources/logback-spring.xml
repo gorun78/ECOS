@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- W08（详细设计-00 C.5.1）：全仓统一日志 pattern，traceId 全链贯穿。
+     宿主 jar（gateway fat-JAR）生效；各 service 同名文件随各自 JAR 独立打包。 -->
+<configuration>
+
+    <springProperty name="ECOS_LOG_LEVEL" source="ecos.logging.level" defaultValue="INFO"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${ECOS_LOG_FILE:-logs/ecos.log}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/ecos.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>14</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 第三方降噪 -->
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="org.neo4j.driver" level="WARN"/>
+    <logger name="org.springframework.security" level="WARN"/>
+
+    <root level="${ECOS_LOG_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

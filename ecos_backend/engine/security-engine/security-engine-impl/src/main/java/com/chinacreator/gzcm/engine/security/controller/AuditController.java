@@ -162,6 +162,39 @@ public class AuditController {
     }
 
     /**
+     * 详细设计-01 D.2 {@code POST /api/v1/security/audit/verify-chain} — 区间段验证。
+     * 请求体可选 {from, to}（审计日志 id，可空 = 端点开放）；响应
+     * {valid, totalChecked, brokenAt[], algorithm, from?, to?}。
+     */
+    @PostMapping({"/verify-chain"})
+    public ApiResponse<Map<String, Object>> verifyChain(@RequestBody(required = false) Map<String, Object> body) {
+        try {
+            if (hashChainService == null) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("valid", false);
+                m.put("error", "哈希链服务未就绪");
+                return ApiResponse.success(m);
+            }
+            Long from = toLong(body == null ? null : body.get("from"));
+            Long to = toLong(body == null ? null : body.get("to"));
+            return ApiResponse.success(hashChainService.verifyHashChainRange(from, to));
+        } catch (Exception e) {
+            log.error("审计哈希链区间验证失败", e);
+            return ApiResponse.internalError("审计哈希链区间验证失败");
+        }
+    }
+
+    private static Long toLong(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number n) return n.longValue();
+        try {
+            return Long.parseLong(o.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
      * 写入审计日志端点 — 异步落库，不阻塞调用方。
      * 请求体: {userId, action, resource, result, detail}
      */

@@ -26,19 +26,23 @@ public class DataMaskingService {
     private final Map<String, MaskFunction> maskFunctions = new ConcurrentHashMap<>();
 
     public DataMaskingService() {
-        /* 内置 7 类（V154 字段级 data_type 全量对齐，AGENTS 承诺的 5+2 类补齐） */
+        /* 内置 9 类（V154 字段级 data_type 全量 + 详细设计-01 E.6.3 / C.2.4 补 2 类：STAFF_REF / FREE_TEXT） */
         maskFunctions.put("email", this::maskEmail);
         maskFunctions.put("phone", this::maskPhone);
         maskFunctions.put("idCard", this::maskIdCard);
         maskFunctions.put("bankCard", this::maskBankCard);
         maskFunctions.put("amount", this::maskAmount);
         maskFunctions.put("address", this::maskAddress);
+        maskFunctions.put("staffRef", this::maskStaffRef);
+        maskFunctions.put("staff_ref", this::maskStaffRef);
+        maskFunctions.put("freeText", this::maskFreeText);
+        maskFunctions.put("free_text", this::maskFreeText);
         maskFunctions.put("none", r -> r);  // 占位（data_type=GENERAL 走 none）
     }
 
     public List<String> getSupportedRules() {
-        // 保持老规则在前，向前兼容（vocab 顺序 = demo 顺序）
-        return List.of("email", "phone", "idCard", "bankCard", "amount", "address");
+        // 老规则在前，向前兼容（vocab 顺序 = demo 顺序）；补 2 类
+        return List.of("email", "phone", "idCard", "bankCard", "amount", "address", "staffRef", "freeText");
     }
 
     public List<Map<String, Object>> getDemoSamples() {
@@ -71,6 +75,9 @@ public class DataMaskingService {
             case "BANK_CARD" -> "bankCard";
             case "AMOUNT" -> "amount";
             case "ADDRESS" -> "address";
+            // E.6.3 / C.2.4：新增 2 类
+            case "STAFF_REF" -> "staffRef";
+            case "FREE_TEXT" -> "freeText";
             default -> "none";
         };
     }
@@ -207,6 +214,37 @@ public class DataMaskingService {
             return raw.substring(0, 4) + "*******" + raw.substring(11);
         }
         return raw;
+    }
+
+    /** E.6.3 / C.2.4 — STAFF_REF：工号哈希（不可逆，前 2 + 末位 SHA-256 摘要前 8 hex）。 */
+    private String maskStaffRef(String raw) {
+        if (raw == null) return raw;
+        String s = raw.trim();
+        if (s.isEmpty()) return raw;
+        String digest;
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : d) hex.append(String.format("%02x", b));
+            digest = hex.toString().substring(0, 8);
+        } catch (Exception e) {
+            return "***";
+        }
+        if (s.length() <= 3) {
+            return s.charAt(0) + "***" + digest;
+        }
+        return s.substring(0, 2) + "***" + digest;
+    }
+
+    /** E.6.3 / C.2.4 — FREE_TEXT：截断（前 6 字符 + …，≤6 直接打码）。 */
+    private String maskFreeText(String raw) {
+        if (raw == null) return raw;
+        String s = raw.trim();
+        if (s.length() <= 6) {
+            return s.isEmpty() ? s : "******";
+        }
+        return s.substring(0, 6) + "…";
     }
 
     private Map<String, Object> buildSample(String rule, String raw, String masked) {

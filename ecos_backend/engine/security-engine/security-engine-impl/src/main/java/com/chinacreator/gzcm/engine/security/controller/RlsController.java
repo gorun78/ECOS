@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
+import com.chinacreator.gzcm.engine.security.service.predicate.RlsPredicateValidator.IllegalPredicateTemplateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -55,6 +56,10 @@ public class RlsController {
     public ApiResponse<?> createPolicy(@RequestBody Map<String, Object> body) {
         try {
             return ApiResponse.success(rlsService.createPolicy(body));
+        } catch (IllegalPredicateTemplateException e) {
+            // ECOS-SEC-410：模板非法（消息不回显输入原文，B.3.1 行内提示可绑定变量清单）
+            log.warn("RLS策略模板非法拒收: {}", e.getMessage());
+            return ApiResponse.error(400, "ECOS-SEC-410", e.getMessage());
         } catch (Exception e) {
             log.error("创建RLS策略失败", e);
             return ApiResponse.internalError("创建失败");
@@ -63,18 +68,23 @@ public class RlsController {
 
     @PutMapping("/policies/{id}")
     public ApiResponse<?> updatePolicy(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        Map<String, Object> updated = rlsService.updatePolicy(id, body);
-        if (updated == null) return ApiResponse.notFound("策略不存在: " + id);
-        return ApiResponse.success(updated);
+        try {
+            Map<String, Object> updated = rlsService.updatePolicy(id, body);
+            if (updated == null) return ApiResponse.notFound("策略不存在: " + id);
+            return ApiResponse.success(updated);
+        } catch (IllegalPredicateTemplateException e) {
+            log.warn("RLS策略模板非法拒收: id={}, {}", id, e.getMessage());
+            return ApiResponse.error(400, "ECOS-SEC-410", e.getMessage());
+        } catch (Exception e) {
+            log.error("更新RLS策略失败", e);
+            return ApiResponse.internalError("更新失败");
+        }
     }
 
     @DeleteMapping("/policies/{id}")
     public ApiResponse<?> deletePolicy(@PathVariable String id) {
-        boolean deleted = rlsService.deletePolicy(id);
-        if (!deleted) return ApiResponse.notFound("策略不存在: " + id);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("id", id);
+        Map<String, Object> result = rlsService.disablePolicy(id);
+        if (result == null) return ApiResponse.notFound("策略不存在: " + id);
         return ApiResponse.success(result);
     }
 }

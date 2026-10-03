@@ -69,55 +69,95 @@ public class AuditHashChainService {
      * @return 验证结果 Map: { valid: boolean, totalChecked: int, brokenAt: Long (first broken id or null) }
      */
     public Map<String, Object> verifyHashChain() {
+        return verifyHashChainRange(null, null);
+    }
+
+    /**
+     * 详细设计-01 C.5 / D.2 {@code POST /api/v1/security/audit/verify-chain} 区间段验证。
+     *
+     * <p>入参 {@code from}/{@code to} 均可空（null = 端点开放）；返回
+     * {@code {valid, totalChecked, brokenAt[], algorithm, from, to}}，其中
+     * {@code brokenAt} 是<b>列表</b>（本区间内首次/多次断裂点，最多记录 10 处），
+     * 空列表 = valid=true。</p>
+     */
+    public Map<String, Object> verifyHashChainRange(Long fromId, Long toId) {
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         int totalChecked = 0;
-        Long brokenAt = null;
+        java.util.List<Long> brokenAt = new java.util.ArrayList<>();
         String expectedPrevHash = EMPTY_HASH;
+        boolean hasRange = fromId != null || toId != null;
+
+        // 取区间内的 prev_hash 起点：fromId 之前的最后一行 curr_hash（若 from 有值）
+        if (fromId != null) {
+            try {
+                java.util.List<String> prevs = jdbc.queryForList(
+                        "SELECT curr_hash FROM ecos_audit_log WHERE id < ? AND curr_hash IS NOT NULL ORDER BY id DESC LIMIT 1",
+                        String.class, fromId);
+                if (!prevs.isEmpty()) {
+                    expectedPrevHash = prevs.get(0);
+                }
+            } catch (Exception e) {
+                log.warn("verify-chain 读取 fromId 前链头失败（用 EMPTY 头）: {}", e.getMessage());
+            }
+        }
+
+        StringBuilder where = new StringBuilder();
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        if (hasRange) {
+            where.append(" WHERE 1=1");
+            if (fromId != null) { where.append(" AND id >= ?"); args.add(fromId); }
+            if (toId != null)   { where.append(" AND id <= ?"); args.add(toId); }
+        }
 
         try {
-            var rows = jdbc.queryForList(
-                "SELECT id, username, operation, entity_type, entity_id, created_at::text as created_at, " +
-                "prev_hash, curr_hash FROM ecos_audit_log ORDER BY created_at ASC, id ASC");
+            String sql = "SELECT id, username, operation, entity_type, entity_id, created_at::text as created_at, "
+                    + "prev_hash, curr_hash FROM ecos_audit_log" + where
+                    + " ORDER BY id ASC LIMIT 10000";
+            var rows = args.isEmpty()
+                    ? jdbc.queryForList(sql)
+                    : jdbc.queryForList(sql, args.toArray());
 
             for (Map<String, Object> row : rows) {
                 totalChecked++;
                 String storedPrevHash = str(row.get("prev_hash"));
                 String storedCurrHash = str(row.get("curr_hash"));
-
-                // 验证 prev_hash 链接
-                if (!expectedPrevHash.equals(storedPrevHash)) {
-                    brokenAt = ((Number) row.get("id")).longValue();
-                    break;
+                if (storedCurrHash.isEmpty()) {
+                    // 尚未戳记（写入侧尚未 stamp）→ 跳过但不判定断裂
+                    continue;
                 }
-
-                // 重新计算 curr_hash
+                // 严格区间起点：忽略 expected 断链（区间外既有可以断裂，不属于本区间判定）
+                boolean firstInRange = totalChecked == 1;
+                if (!firstInRange && !expectedPrevHash.equals(storedPrevHash) && brokenAt.size() < 10) {
+                    brokenAt.add(((Number) row.get("id")).longValue());
+                    continue;
+                }
                 String recordContent = storedPrevHash + "|" +
-                    str(row.get("username")) + "|" +
-                    str(row.get("operation")) + "|" +
-                    str(row.get("entity_type")) + "|" +
-                    str(row.get("entity_id")) + "|" +
-                    str(row.get("created_at"));
+                        str(row.get("username")) + "|" +
+                        str(row.get("operation")) + "|" +
+                        str(row.get("entity_type")) + "|" +
+                        str(row.get("entity_id")) + "|" +
+                        str(row.get("created_at"));
                 String computedHash = sha256(recordContent);
-
-                if (!computedHash.equals(storedCurrHash)) {
-                    brokenAt = ((Number) row.get("id")).longValue();
-                    break;
+                if (!computedHash.equals(storedCurrHash) && brokenAt.size() < 10) {
+                    brokenAt.add(((Number) row.get("id")).longValue());
                 }
-
                 expectedPrevHash = storedCurrHash;
             }
-
-            result.put("valid", brokenAt == null);
+            result.put("valid", brokenAt.isEmpty());
             result.put("totalChecked", totalChecked);
             result.put("brokenAt", brokenAt);
             result.put("algorithm", HASH_ALGORITHM);
+            if (hasRange) {
+                result.put("from", fromId);
+                result.put("to", toId);
+            }
         } catch (Exception e) {
-            log.error("哈希链验证失败", e);
+            log.error("哈希链区间验证失败", e);
             result.put("valid", false);
             result.put("error", e.getMessage());
             result.put("totalChecked", totalChecked);
+            result.put("brokenAt", brokenAt);
         }
-
         return result;
     }
 
