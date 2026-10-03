@@ -45,6 +45,14 @@ public class DqGovernanceServiceImpl implements DqGovernanceService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<Map<String, Object>>() {};
 
+    /**
+     * D.1 数据域 DQ 错误码（详细设计-02 D.1 / 行 432）：治理记录不存在 → 真实 404。
+     * 与 {@code ECOS-DATA-031}（数据层 SQL/映射异常 → 500，GlobalExceptionHandler 显式"不再掩蔽成 404"）<b>严格区分</b>：
+     * 本码只用于"记录确实查不到"的业务 404，绝不用于数据层故障。码按仓内"功能码落消息字面"惯例
+     * （同 {@code AssetController} 的 "ASSET-010: …"）随 {@link NotFoundException} 消息透传到 404 响应体。
+     */
+    static final String CODE_DQ_RULE_NOT_FOUND = "ECOS-DQ-111";
+
     private final DqRuleMapper dqRuleMapper;
     private final DqSecurityService securityService;
 
@@ -76,8 +84,9 @@ public class DqGovernanceServiceImpl implements DqGovernanceService {
         }
         DqRuleVO rule = dqRuleMapper.findById(id);
         if (rule == null) {
+            // D.1 ECOS-DQ-111：真实 404（记录不存在），随消息透传，与 031（数据层→500）严格区分
             securityService.auditRead("DQ_RULE_DETAIL", id);
-            throw new NotFoundException("DQ 规则 " + id + " 不存在");
+            throw new NotFoundException(CODE_DQ_RULE_NOT_FOUND + ": DQ 规则 " + id + " 不存在");
         }
         List<DqRuleVersionVO> versions = dqRuleMapper.listVersionsByRuleId(id);
         // 脱敏（铁律 2.4 #3）：规则主体 + target_field 维度 + 版本快照
