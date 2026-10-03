@@ -22,6 +22,9 @@ public class DataLineageService {
         "(?i)(?:sql|query|expression)\\s*:\\s*(?:\\||>)\\s*\\n(.*?)(?=\\n\\S|\\Z)",
         Pattern.DOTALL);
 
+    /** C.9 性能容量基线：血缘重建单次扫描定义数硬上限（2000，超限走增量批处理）。W64 族收口。 */
+    private static final int MAX_REBUILD_DEFINITIONS = 2000;
+
     /** 血缘拓扑重建互斥锁（防止并发重建） */
     private final Object rebuildLock = new Object();
 
@@ -527,11 +530,18 @@ public class DataLineageService {
         }
     }
 
-    /** 扫描 ecs_pipeline_definition（ACTIVE + DRAFT，排除 ARCHIVED）。 */
+    /** 扫描 ecs_pipeline_definition（ACTIVE + DRAFT，排除 ARCHIVED）。C.9 性能容量基线：单次 ≤2000，超限 WARN 提示走增量。LIMIT 参数化（IR05）。 */
     private List<Map<String, Object>> scanDefinitions() {
         try {
-            return jdbc.queryForList(
-                "SELECT id, name, definition::text AS definition FROM ecos_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY updated_at DESC");
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, name, definition::text AS definition FROM ecos_pipeline_definition WHERE status != 'ARCHIVED' ORDER BY updated_at DESC LIMIT ?",
+                MAX_REBUILD_DEFINITIONS);
+            if (rows.size() >= MAX_REBUILD_DEFINITIONS) {
+                // C.9 "增量优先"：entity 达到硬钳时提示走增量（增量语义本身属更大范围的重构，本窗不越权实施）
+                log.warn("rebuildAndPersist definitions 达到 C.9 单次上限 {}，建议改用增量重建（分册 02 C.9 行 4）",
+                        MAX_REBUILD_DEFINITIONS);
+            }
+            return rows;
         } catch (Exception e) {
             log.warn("rebuildAndPersist 查询 definitions 失败（表可能不同步）: {}", e.getMessage());
             return List.of();
