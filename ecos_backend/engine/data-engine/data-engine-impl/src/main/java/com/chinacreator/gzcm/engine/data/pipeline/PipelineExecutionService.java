@@ -55,6 +55,9 @@ public class PipelineExecutionService {
     private static final Logger log = LoggerFactory.getLogger(PipelineExecutionService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
+    /** D.1 功能码：DAG 非法（环 / 孤立），C.4 步骤 2 静态校验失败 → 400（详细设计-02 D.1）。 */
+    static final String CODE_DAG_INVALID = "ECOS-DATA-013";
+
     /** C.8 降级与失败语义矩阵错误码（详细设计-02 C.8 / D.1 "05x" 行）：管道依赖不可用时 fail-loud，禁降级为"成功"。 */
     static final String CODE_RUNTIME_ACCESS = "ECOS-DATA-051"; // runtime-access(JDBC Driver) 不可用 → 管道/SQL 直接失败，禁
     static final String CODE_MINIO_UNAVAILABLE = "ECOS-DATA-052"; // MinIO(RAW 近源层) 不可用 → 管道整体 FAILED，不留半对象，禁
@@ -2080,7 +2083,7 @@ public class PipelineExecutionService {
                 remaining.add(n.getNodeId());
             }
             result.forEach(r -> remaining.remove(r.getNodeId()));
-            throw new BusinessException("Pipeline DAG 存在循环依赖，无法拓扑排序，未排序节点: " + remaining);
+            throw new BusinessException(CODE_DAG_INVALID + ": Pipeline DAG 非法（循环依赖 / 孤立 / 引用未定义节点），无法拓扑排序，未排序节点: " + remaining);
         }
 
         return result;

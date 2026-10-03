@@ -61,6 +61,9 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** D.1 数据域 DQ 错误码（详细设计-02 D.1）：规则状态机非法迁移 → 409。 */
+    static final String CODE_DQ_RULE_STATE_INVALID = "ECOS-DQ-101";
+
     // ==================== 状态机转换表 ====================
     // key = 当前状态, value = 允许的目标状态集合
     static final Map<String, Set<String>> TRANSITIONS;
@@ -80,20 +83,22 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     // ==================== 校验方法 ====================
 
     /**
-     * 断言状态转换合法，违例抛 BusinessException。
+     * 断言状态转换合法，违例抛 {@link com.chinacreator.gzcm.common.exception.BusinessException}
+     * （携带 {@link #CODE_DQ_RULE_STATE_INVALID} ECOS-DQ-101）。<b>纯静态</b>：仅查 {@link #TRANSITIONS}，
+     * 无实例态，直接可离线单测状态机契约。
      *
      * @param from   当前状态
      * @param to     目标状态
      * @param ruleId 规则 ID（用于异常消息）
      */
-    private void assertTransition(String from, String to, String ruleId) {
+    static void assertTransition(String from, String to, String ruleId) {
         if (from == null) {
-            throw new BusinessException("规则 " + ruleId + " 状态未知，无法转换到 " + to);
+            throw new BusinessException(CODE_DQ_RULE_STATE_INVALID + ": 规则 " + ruleId + " 状态未知，无法转换到 " + to);
         }
         Set<String> allowed = TRANSITIONS.getOrDefault(from, Set.of());
         if (!allowed.contains(to)) {
             throw new BusinessException(String.format(
-                    "规则 %s 状态转换非法：%s → %s（允许目标：%s）", ruleId, from, to, allowed));
+                    "%s: 规则 %s 状态转换非法：%s → %s（允许目标：%s）", CODE_DQ_RULE_STATE_INVALID, ruleId, from, to, allowed));
         }
     }
 

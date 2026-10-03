@@ -83,6 +83,9 @@ class PipelineTopologyValidationTest {
         assertEquals("FAILED", exec.getStatus());
         assertTrue(exec.getErrorMessage() != null && exec.getErrorMessage().contains("循环依赖"),
                 "executePipeline 失败时应把循环依赖写进 errorMessage，实际：" + exec.getErrorMessage());
+        // D.1 功能码：DAG 非法（环/孤立）→ ECOS-DATA-013 应落进错误信息（C.4-2 步骤 2 静态校验）
+        assertTrue(exec.getErrorMessage().contains("ECOS-DATA-013"),
+                "DAG 环应落 D.1 错误码 ECOS-DATA-013，实际：" + exec.getErrorMessage());
         verify(repository).updateExecutionStatus(
                 ArgumentMatchers.anyString(),
                 ArgumentMatchers.eq("FAILED"),
